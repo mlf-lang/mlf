@@ -70,13 +70,16 @@
         "mlf-interpreter",
         "mlf-llvm",
         "mlf-xmlf",
-        "mlf-language-core"
+        "mlf-language-core",
+        "mlf-package-core"
       ],
       "source-syntax": "shared-haskell-v1",
       "modules": {
         "MLF.BuiltinPreludeData": "bootstrap/MLF/BuiltinPreludeData.hs",
         "MLF.PreparedCompiler": "bootstrap/MLF/PreparedCompiler.hs",
-        "MLF.PreparedLibraryData": "bootstrap/MLF/PreparedLibraryData.hs"
+        "MLF.PreparedLibraryData": "bootstrap/MLF/PreparedLibraryData.hs",
+        "MLF.PreparedNativeData": "bootstrap/MLF/PreparedNativeData.hs",
+        "MLF.NativeBuild": "bootstrap/MLF/NativeBuild.hs"
       }
     },
     "mlfpkg": {

@@ -6,6 +6,7 @@ import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Package.OS as O
 import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as BootstrapMap
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Crate as Crate
@@ -14,6 +15,7 @@ import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.CrateCodegen as Cache
 import qualified Bootstrap.LLVM as LLVM
 import qualified Bootstrap.X.Checked as Checked
+import qualified Bootstrap.X.Pretty as Pretty
 import qualified Tests.Helpers as H
 import qualified Tests.System as System
 
@@ -214,6 +216,17 @@ compileFixture directory identity entry dependencies prefix moduleName text = do
   H.assert (eqString input (Artifact.encodeObject object)) "pooled crate object changed on roundtrip"
   let aggregate = Separate.fingerprint (Artifact.encodePooledPayload fragments)
   H.assert (eqString aggregate (Artifact.fragmentFingerprint fragments)) "pooled crate fingerprint differs from its canonical aggregate"
+  let summarized = Artifact.fingerprintPooled fragments
+  H.assert (eqString aggregate (S.fst summarized)) "summarized crate fingerprint differs from canonical pooled bytes"
+  H.assert (S.length fragments == S.length (S.snd summarized)) "summarized fragment inventory differs"
+  S.mapM_ (\pair -> case pair of
+    (,) fragment summary -> do
+      let body = Pretty.prettyTerm (Separate.objectBody fragment)
+      let interface = Separate.encodingInterface BootstrapMap.empty (Separate.objectInterface fragment)
+      let interfaceText = Separate.encodeInterface (Separate.objectInterface fragment)
+      H.assert (Separate.encodingLength (S.snd interface) == stringLength interfaceText && eqString (Separate.encodingFingerprint (S.snd interface)) (Separate.fingerprint interfaceText)) "interface summary differs from canonical bytes"
+      H.assert (Separate.encodingLength summary == stringLength body) "fragment summary scalar length differs"
+      H.assert (eqString (Separate.encodingFingerprint summary) (Separate.fingerprint body)) "fragment summary checksum differs") (S.zip fragments (S.snd summarized))
   let legacyAggregate = Separate.fingerprint (Separate.pack (S.map Artifact.encodeFragment fragments))
   H.assert (eqString legacyAggregate (Artifact.legacyFragmentFingerprint fragments)) "legacy streaming crate fingerprint differs from its canonical aggregate"
   let legacyInterface = Artifact.withObjectFingerprint iface legacyAggregate

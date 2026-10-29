@@ -15,7 +15,7 @@ def source_identity(root):
         name = pending.pop()
         if name == 'MLF.Primitive' or name in closure:
             continue
-        if name in ['MLF.BuiltinPreludeData', 'MLF.PreparedLibraryData']:
+        if name in ['MLF.BuiltinPreludeData', 'MLF.PreparedLibraryData', 'MLF.PreparedNativeData']:
             raise RuntimeError('fresh builtin producer depends on generated data')
         path = root / sources[name]
         data = path.read_bytes()

@@ -12,6 +12,7 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Compiler as C;
   import qualified MLF.PreparedCompiler as Prepared;
+  import qualified MLF.NativeBuild as NativeBuild;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Parser as Parse;
@@ -107,7 +108,32 @@ module MLF.Entry.Emlf where {
       [] -> runArgs mode paths arguments
     };
   runArgs :: PreludeMode -> [] String -> [] String -> IO ();
-  runArgs mode paths arguments =
+  runArgs mode paths arguments = case arguments of {
+    (:) "--compile" rest -> NativeBuild.run mode paths rest;
+    ["--native-install-info"] -> do {
+      result <- Prepared.nativeInstallInfo;
+      case result of {
+        Left message -> fatal message;
+        Right info -> putStrLn info
+      }
+    };
+    ["--emit-native-library-llvm"] -> printLLVM Prepared.emitNativeLibraryChunks;
+    ["--native-library-metadata"] -> case Prepared.nativeLibraryMetadata of {
+      Left message -> fatal message;
+      Right info -> putStrLn info
+    };
+    (:) "--emit-native-llvm" rest -> nativeSourceCommand mode paths rest;
+    _ -> if executableBuildArguments arguments then NativeBuild.run mode paths arguments
+      else runOrdinaryArgs mode paths arguments
+  };
+  executableBuildArguments :: [] String -> Bool;
+  executableBuildArguments arguments = L.elem eqString "-o" arguments && case arguments of {
+    [] -> False;
+    (:) first _ -> eqString first "-o" || eqString first "--build-dir" ||
+      (stringLength first > 0 && stringCodeAt first 0 /= 45)
+  };
+  runOrdinaryArgs :: PreludeMode -> [] String -> [] String -> IO ();
+  runOrdinaryArgs mode paths arguments =
     let {
       matchValueShared6 = arguments
     } in
@@ -736,6 +762,27 @@ module MLF.Entry.Emlf where {
           }
         }
     };
+  -- Native emission retains the normal source parser and diagnostics. The
+  -- prepared adapter authenticates its fixed installation before producing
+  -- IR whose explicit link inputs are returned by --native-install-info.
+  nativeSourceCommand :: PreludeMode -> [] String -> [] String -> IO ();
+  nativeSourceCommand mode paths arguments = case parseSource True arguments of {
+    Left message -> fatal message;
+    Right source -> do {
+      result <- case source of {
+        SourceFile file -> Prepared.emitNativeFileChunks mode paths file;
+        SourceText file input -> Prepared.emitNativeSourceChunks mode paths file input;
+        SourceStdin -> do {
+          input <- getContents;
+          Prepared.emitNativeSourceChunks mode paths "<stdin>" input
+        }
+      };
+      case result of {
+        Left error -> fatal (C.prettyError error);
+        Right chunks -> printLLVM (Right chunks)
+      }
+    }
+  };
   load :: Source -> IO ((,) String String);
   load source =
     case source of {
@@ -854,7 +901,10 @@ module MLF.Entry.Emlf where {
     };
   usage =
     ("emlf --version\n       emlf --implementation-identity\n       emlf --check-shared FILE... (grammar and name resolution only)\n" ++
-     (crateUsage ++ baseUsage));
+     (crateUsage ++ (nativeUsage ++ baseUsage)));
+  nativeUsage :: String;
+  nativeUsage =
+    "Executable compilation: emlf [--no-prelude] [-i DIR ...] SOURCE -o OUTPUT [--build-dir FRESH]\n       emlf --compile SOURCE -o OUTPUT\nStandard libraries and runtime are reused automatically; user code is freshly compiled with one Clang -O2 job.\nInstalled native libraries: emlf --native-install-info\n       emlf [-i DIR ...] --emit-native-llvm [FILE | --expr SOURCE]\n       emlf --emit-native-library-llvm\n       emlf --native-library-metadata\nNative IR requires the authenticated link inputs from --native-install-info. Library emission and metadata commands are installation build steps.\n";
   crateUsage :: String;
   crateUsage =
     "Crate compilation: emlf --compile-crate SPEC -o PREFIX\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci [--cache DIR [ --query-report FILE ]]\n";

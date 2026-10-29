@@ -353,7 +353,8 @@ def prepare(args, data, fixture_inputs):
                     record['inputs'][str(builder.resolve())] = adapted
                     record['inputs'][str(adapter.resolve())] = adapted
                     save(receipt, record)
-                runner.run([sys.executable, '-B', source / 'tools/shared/build.py', '--ghc', ghc, '--cc', cc,
+                worker = ['--bootstrap-only'] if '--bootstrap-only' in (source / 'tools/shared/build.py').read_text() else []
+                runner.run([sys.executable, '-B', source / 'tools/shared/build.py', *worker, '--ghc', ghc, '--cc', cc,
                             '--optimization', '2', '--build-dir', producer], source, work / 'setup' / ('producer-' + side))
                 authenticate(producer, source)
                 record['inputs'][str(producer / 'receipt.json')] = sha(producer / 'receipt.json')

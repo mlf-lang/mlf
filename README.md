@@ -198,6 +198,25 @@ golden oracle data, and archived measurements remain available.
 
 ## Native compilation with LLVM
 
+An installed compiler builds an executable directly and automatically reuses
+its fixed standard library and runtime:
+
+```sh
+"$EMLF_BIN" examples/snake.emlf -o .mlf-build/snake
+.mlf-build/snake
+```
+
+Each invocation freshly checks and compiles the user program, runs one ordinary
+Clang `-O2` job, and links the installed objects. `--compile SOURCE -o OUTPUT`
+is an equivalent spelling. By default, a fresh hidden `.emlf-<output>-N`
+directory beside the output retains the IR, object, process logs and
+`receipt.json`, including selected standard-library exports and any fallback
+reason. `--build-dir FRESH_DIRECTORY` selects an explicit fresh location instead. Explicit module search roots take precedence
+over installed standard-library roots. Changed library sources use the ordinary
+checked compilation path. See [standard compiler installation](tools/shared/prepared-build.md).
+
+The standalone LLVM commands remain available for explicit linking:
+
 Compile a saved xMLF program to LLVM IR, then link it with the runtime:
 
 ```sh

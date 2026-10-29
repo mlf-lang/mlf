@@ -234,6 +234,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.LLVM.Library",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Library.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.LLVM.Native",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
       "role": "implementation"
@@ -439,6 +444,11 @@
       "role": "implementation"
     },
     {
+      "module": "MLF.NativeBuild",
+      "path": "bootstrap/MLF/NativeBuild.hs",
+      "role": "implementation"
+    },
+    {
       "module": "MLF.PreparedCompiler",
       "path": "bootstrap/MLF/PreparedCompiler.hs",
       "role": "implementation"
@@ -446,6 +456,11 @@
     {
       "module": "MLF.PreparedLibraryData",
       "path": "bootstrap/MLF/PreparedLibraryData.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.PreparedNativeData",
+      "path": "bootstrap/MLF/PreparedNativeData.hs",
       "role": "implementation"
     },
     {

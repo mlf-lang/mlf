@@ -594,3 +594,10 @@ contexts retain distinct origin slots rather than claiming minimal contexts or
 unrestricted polymorphic-recursion inference. See
 `docs/inference/Unsigned-Recursion-Implementation-Plan.md` and
 `docs/inference/Qualified-Recursion-Implementation-Plan.md`.
+
+The shared-host controls also run `python3 tests/shared-host/test-digest.py`.
+It compares file digests against Python hashlib across SHA padding and 64 KiB
+read boundaries, binary data and filesystem errors, for both the selected host
+implementation and a forced portable implementation. On macOS the selected
+implementation uses CommonCrypto from the system library; other platforms retain
+the portable SHA-256 implementation.

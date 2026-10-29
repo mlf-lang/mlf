@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.ImportedRoot
   (Compilation, finishCompilation, checkedWrapper, inferredType, sourceType,
-   remove) where {
+   remove, finishLinked, materializeImports, materializeLinked, usedImportSignatures) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -30,6 +30,72 @@ module Bootstrap.ImportedRoot
   checkedWrapper (Compilation checked _ _) = checked;
   inferredType (Compilation _ ty _) = ty;
   sourceType (Compilation _ _ rendered) = rendered;
+  -- The composition constructor accepts actual checked terms only. Requested
+  -- imports select a verified prefix; they never supply a claimed result type.
+  finishLinked linked signatures compiled = do {
+    checked <- Checked.finishSpine linked
+      (map (\key -> (,) key (C.targetNameHint key)) (M.keys signatures))
+      (checkedWrapper compiled);
+    ensure (T.alphaEq (Checked.typeOf checked) (inferredType compiled))
+      "prepared library graft changed the user root type";
+    Right checked
+  };
+
+  importVariableReads source = let {
+    child = importVariableReads;
+    join = S.unions X.compareName
+  } in case source of {
+    XVarTerm name -> S.singleton name;
+    XAbs _ _ body -> child body;
+    XApp a b -> join [child a, child b];
+    XTypeAbs _ _ body -> child body;
+    XTypeApp body _ -> child body;
+    XLet _ rhs body -> join [child rhs, child body];
+    XLetRec definitions body -> join ((:) (child body)
+      (map (\((,,) _ _ rhs) -> child rhs) definitions));
+    XCase subject _ alternatives -> join ((:) (child subject)
+      (map (\(XAlternative _ body) -> child body) alternatives));
+    XWithData _ body -> child body;
+    _ -> S.empty
+  };
+  usedImportSignatures signatures compiled = do {
+    let { term = case Checked.term (checkedWrapper compiled) of { XWithData _ body -> body; body -> body } };
+    split <- takeParameters (M.toList signatures) term;
+    let { identities = importVariableReads (snd split);
+      used = S.fromList compareString (map (\((,,) key _ _) -> key)
+        (filter (\((,,) _ name _) -> S.member X.compareName name identities) (fst split))) };
+    Right (M.filterWithKey (\key _ -> S.member compareString key used) signatures)
+  };
+  materializeLinked linked signatures compiled = do {
+    result <- Checked.materializeSpine linked
+      (map (\key -> (,) key (C.targetNameHint key)) (M.keys signatures)) (checkedWrapper compiled);
+    let { remaining = M.filterWithKey (\key _ -> elem eqString key (snd result)) signatures;
+      expected = foldr (\((,) _ ty) result -> XArrow ty result) (inferredType compiled) (M.toList remaining) };
+    ensure (T.alphaEq (Checked.typeOf (fst result)) expected) "materialized import wrapper changed its checked type";
+    Right ((,) (fst result) remaining)
+  };
+  -- Materialize an independently admitted declaration spine while retaining
+  -- the exact remaining native import abstraction. All new identities are
+  -- disjoint, and the resulting wrapper crosses the independent checker again.
+  materializeImports signatures compiled serial available bodies = do {
+    let { remaining = M.filterWithKey (\key _ -> not (M.member compareString key available)) signatures };
+    if M.size remaining == M.size signatures then Right ((,) (checkedWrapper compiled) signatures) else do {
+      let { fresh = Separate.freshObject serial (Checked.term (checkedWrapper compiled));
+            expression = snd fresh;
+            declarations = case expression of { XWithData ds _ -> ds; _ -> [] };
+            parameters = map (\((,) index ((,) key ty)) ->
+              (,,) key (XName index (C.targetNameHint key)) ty)
+              (zip (range (fst fresh) (fst fresh + M.size remaining - 1)) (M.toList remaining));
+            external = M.fromList compareString (map (\((,,) key name ty) -> (,) key ((,) name ty)) parameters) };
+      inner <- remove signatures (M.union compareString available external) expression;
+      grafted <- foldEither (\rest spine -> Separate.graft spine rest) inner bodies;
+      let { wrapped = foldr (\((,,) _ name ty) body -> XAbs name ty body) grafted parameters;
+            expected = foldr (\((,) _ ty) result -> XArrow ty result) (inferredType compiled) (M.toList remaining) };
+      checked <- Checked.check (XWithData declarations wrapped);
+      ensure (T.alphaEq (Checked.typeOf checked) expected) "materialized import wrapper changed its checked type";
+      Right ((,) checked remaining)
+    }
+  };
 
   -- Only the exact prefix emitted by complete class lowering is eligible. In
   -- particular a caller cannot turn an arbitrary checked RHS into an import.

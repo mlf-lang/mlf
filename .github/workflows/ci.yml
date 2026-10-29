@@ -92,7 +92,7 @@ jobs:
       # paths; copying/rebasing receipts would weaken that provenance contract.
       - name: Build exact committed shared sources and direct test runners
         run: |
-          python3 tools/shared/build.py --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
+          python3 tools/shared/build.py --bootstrap-only --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
       - name: Check finite P1-P3 and integrated A1 correctness
         if: matrix.optimization == '2'
@@ -144,6 +144,9 @@ jobs:
       - name: Check shared-value specialization admission and lazy semantics
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_common_calls.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/common-calls
+      - name: Check callback code sharing and capture identity boundaries
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_callback_sharing.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/callback-sharing
       - name: Check lazy IO action specialization with native execution
         if: matrix.optimization == '2'
         run: |
@@ -158,6 +161,19 @@ jobs:
           cp "$archive" "$prefix/lib/libgc.a"
           dpkg-query -W libgc-dev > "$prefix/dependency-version.txt"
           python3 tools/shared/test_io_action_sharing.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/io-action-sharing --clang clang --gc-prefix "$prefix"
+      - name: Check fixed native library boundaries and lazy exports
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc
+      - name: Build and check the default installed standard library
+        if: matrix.optimization == '2' && matrix.suite == 'all'
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y pkg-config
+          PYTHONDONTWRITEBYTECODE=1 python3 -B tools/shared/build.py --optimization 2 --build-dir .mlf-build/stdlib-default
+          PYTHONDONTWRITEBYTECODE=1 python3 -B .mlf-build/stdlib-default/sources/tools/shared/test_native_library.py \
+            --build-receipt .mlf-build/stdlib-default/receipt.json \
+            --output .mlf-build/stdlib-default-controls --clang clang --gc-prefix .mlf-build/io-action-gc \
+            --frontend-source-root .mlf-build/stdlib-default/sources/libraries/mlf-foundation
       - name: Check actual MLF mixed-framework source acceptance
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_guest_framework.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-framework-source

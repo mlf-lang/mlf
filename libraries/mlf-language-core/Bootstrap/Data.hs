@@ -7,6 +7,7 @@ module Bootstrap.Data where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Kind as K;
   import qualified Bootstrap.Unicode as U;
   datatypeName :: DataDecl -> String;
@@ -227,7 +228,7 @@ module Bootstrap.Data where {
   memberString name names = any (eqString name) names;
   distinct :: String -> [] String -> Either String ();
   distinct what xs =
-    if (length xs == length (nubBy eqString xs)) then Right () else Left ("duplicate " ++ what);
+    if (length xs == Set.size (Set.fromList compareString xs)) then Right () else Left ("duplicate " ++ what);
   fieldKind :: [] DataDecl -> DataEnv -> Map String Kind -> Field -> Either String Kind;
   fieldKind declarations env ps field =
     case field of {

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Build the committed shared implementation directly with the installed GHC.
+"""Build an owned compiler with its fixed native standard library by default.
 
-No implementation source is emitted, preprocessed, copied or overlaid for
-compilation. Fresh builtin literal stdout is verification evidence only.
-The static manifest and Cabal package describe the same closed source set.
+--bootstrap-only retains the explicit low-level shared-source GHC producer used
+by installation workers and direct-source qualification.
 """
 from __future__ import annotations
 import argparse
@@ -32,6 +31,14 @@ PACKAGES = ['base', 'array', 'bytestring', 'text', 'containers', 'directory']
 SIGNATURELESS_MODULES = {'Bootstrap.Types', 'Async.Task.Internal'}
 BUILTIN_VERIFICATION_HELPERS = ('tools/shared/builtin_prelude_identity.py',
                                 'tools/shared/verify_builtin_prelude.py')
+
+
+def prepared_verifier():
+    path = Path(__file__).resolve().with_name('verify_prepared_libraries.py')
+    module = types.ModuleType('verify_prepared_libraries')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
 
 
 def builtin_verifier():
@@ -413,19 +420,41 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ghc', default='ghc')
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
-    parser.add_argument('--optimization', choices=['0', '2'], default='0')
+    parser.add_argument('--optimization', choices=['0', '2'], default=None)
     parser.add_argument('--build-dir', type=Path, default=ROOT / '.mlf-build/shared-ghc')
     parser.add_argument('--typecheck-only', action='store_true')
+    parser.add_argument('--bootstrap-only', action='store_true', help='low-level shared producer without recursive standard-library installation')
+    parser.add_argument('--native-config', type=Path, help='explicit fixed native toolchain configuration')
+    parser.add_argument('--clang', default='clang', help='Clang used by default fixed native installation')
     options = parser.parse_args()
+    if options.optimization is None:
+        options.optimization = '0' if options.bootstrap_only or options.typecheck_only else '2'
+    if not options.bootstrap_only and not options.typecheck_only:
+        path = ROOT / 'tools/shared/default_stdlib.py'
+        module = types.ModuleType('default_stdlib')
+        module.__file__ = str(path)
+        exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+        module.build(ROOT, options)
+        return
     output = options.build_dir.resolve()
+    prepared = None
     if output == ROOT or ROOT.is_relative_to(output):
-        raise RuntimeError('build directory must not contain the source checkout')
+        # The public installer owns exactly OUTPUT/sources and authenticates it
+        # before allowing sibling compiler outputs. Arbitrary ancestors remain
+        # forbidden, and an ordinary empty registry cannot claim this layout.
+        if ROOT != output / 'sources':
+            raise RuntimeError('build directory must not contain the source checkout')
+        prepared = prepared_verifier().verify(ROOT)
+        if prepared.get('kind') != 'prepared':
+            raise RuntimeError('compiler-at-root requires an authenticated owned source snapshot')
     output.mkdir(parents=True, exist_ok=True)
     # A new attempt invalidates an earlier success before manifest/tool discovery.
     # Failure during any preflight must never leave a complete stale receipt.
     receipt_path = output / 'receipt.json'
     receipt_path.write_text(json.dumps({'format': 1, 'complete': False,
         'phase': 'preflight', 'started': time.time()}, indent=2) + '\n')
+    if prepared is None:
+        prepared = prepared_verifier().verify(ROOT)
     manifest = load_manifest()
     (output / 'objects').mkdir(exist_ok=True)
     (output / 'bin').mkdir(exist_ok=True)
@@ -469,6 +498,8 @@ def main():
                'host_inputs': {str(p.relative_to(ROOT)): identified(p) for p in host_paths},
                'builtin_verification_helpers': {path: identified(ROOT / path) for path in BUILTIN_VERIFICATION_HELPERS},
                'builtin_verification': None,
+               'prepared_verification': prepared,
+               'prepared_verification_helper': identified(ROOT / 'tools/shared/verify_prepared_libraries.py'),
                'commands': [], 'resolved_modules': {}, 'outputs': {}, 'typecheck_only': options.typecheck_only}
 
     def save():
@@ -593,6 +624,10 @@ def main():
     if not options.typecheck_only:
         verifier.authenticate(receipt['builtin_verification'], ROOT,
             output / 'bin/emlf', output / 'bin/builtin-prelude')
+    helper = receipt['prepared_verification_helper']
+    if sha(helper['path']) != helper['sha256']:
+        raise RuntimeError('prepared verification helper changed during build')
+    prepared_verifier().authenticate(receipt['prepared_verification'], ROOT)
     receipt['complete'] = True
     save()
     print(receipt_path)

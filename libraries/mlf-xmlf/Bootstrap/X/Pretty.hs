@@ -91,6 +91,75 @@ module Bootstrap.X.Pretty where {
   prettyPattern (XDefaultPattern n) = maybeName n;
   maybeName Nothing = "_";
   maybeName (Just n) = name n;
+  -- Exact canonical chunks for consumers that compose text summaries.
+  -- The ordinary formatting functions above remain independent byte oracles.
+  nameChunks (XName identity hint) rest = (:) hint ((:) "_" ((:) (showInt identity) rest));
+  maybeNameChunks Nothing rest = (:) "_" rest;
+  maybeNameChunks (Just value) rest = nameChunks value rest;
+  parenthesized :: Bool -> ([] String -> [] String) -> [] String -> [] String;
+  parenthesized condition body rest =
+    if condition then (:) "(" (body ((:) ")" rest)) else body rest;
+  separated :: forall a. String -> (a -> [] String -> [] String) -> [] a -> [] String -> [] String;
+  separated separator render values rest = case values of {
+    [] -> rest;
+    (:) first remaining -> render first (separatedTail separator render remaining rest)
+  };
+  separatedTail :: forall a. String -> (a -> [] String -> [] String) -> [] a -> [] String -> [] String;
+  separatedTail separator render values rest = case values of {
+    [] -> rest;
+    (:) first remaining -> (:) separator (render first (separatedTail separator render remaining rest))
+  };
+  typeChunks :: Int -> XType -> [] String -> [] String;
+  typeChunks p t rest = case t of {
+    XVar a -> (:) (variable a) rest;
+    XBot -> (:) "bot" rest;
+    XBotKind k -> (:) "bot[" ((:) (prettyKind k) ((:) "]" rest));
+    XArrow a b -> parenthesized (p > 1) (\tail -> typeChunks 2 a ((:) " -> " (typeChunks 1 b tail))) rest;
+    XCon c [] -> (:) c rest;
+    XCon c ts -> parenthesized (p > 2) (\tail -> (:) c (separatedTail " " (typeChunks 3) ts tail)) rest;
+    XApply f a -> parenthesized (p > 2) (\tail -> typeChunks 2 f ((:) " " (typeChunks 3 a tail))) rest;
+    XForall a XBot b -> parenthesized (p > 0) (\tail -> (:) "forall " ((:) (variable a) ((:) ". " (typeChunks 0 b tail)))) rest;
+    XForall a bound b -> parenthesized (p > 0) (\tail -> (:) "forall (" ((:) (variable a) ((:) " >= " (typeChunks 0 bound ((:) "). " (typeChunks 0 b tail)))))) rest
+  };
+  computationChunks :: XComputation -> [] String -> [] String;
+  computationChunks p rest = case p of {
+    XRefl -> (:) "id" rest;
+    XBottom t -> (:) "bot(" (typeChunks 0 t ((:) ")" rest));
+    XHyp a -> (:) "hyp(" ((:) (variable a) ((:) ")" rest));
+    XInner q -> (:) "inner(" (computationChunks q ((:) ")" rest));
+    XOuter a q -> (:) "outer(" ((:) (variable a) ((:) ", " (computationChunks q ((:) ")" rest))));
+    XElim -> (:) "elim" rest;
+    XIntro a -> (:) "intro(" ((:) (variable a) ((:) ")" rest));
+    XIntroKind a k -> (:) "intro(" ((:) (variable a) ((:) " : " ((:) (prettyKind k) ((:) ")" rest))));
+    XThen a b -> computationChunks a ((:) "; " (computationChunks b rest))
+  };
+  termChunks :: Int -> XTerm -> [] String -> [] String;
+  termChunks p t rest = case t of {
+    XVarTerm n -> nameChunks n rest;
+    XAbs n ty b -> parenthesized (p > 0) (\tail -> (:) "\\(" (nameChunks n ((:) " : " (typeChunks 0 ty ((:) ") -> " (termChunks 0 b tail)))))) rest;
+    XApp f a -> parenthesized (p > 1) (\tail -> termChunks 1 f ((:) " " (termChunks 2 a tail))) rest;
+    XTypeAbs a bound b -> parenthesized (p > 0) (\tail -> (:) "/\\(" ((:) (variable a) ((:) " >= " (typeChunks 0 bound ((:) ") -> " (termChunks 0 b tail)))))) rest;
+    XTypeApp a phi -> termChunks 2 a ((:) "[" (computationChunks phi ((:) "]" rest)));
+    XLet n a b -> parenthesized (p > 0) (\tail -> (:) "let " (nameChunks n ((:) " = " (termChunks 0 a ((:) " in " (termChunks 0 b tail)))))) rest;
+    XLetRec ds b -> parenthesized (p > 0) (\tail -> (:) "letrec { " (separated "; " bindingChunks ds ((:) " } in " (termChunks 0 b tail)))) rest;
+    XIntTerm n -> (:) (showInt n) rest;
+    XDoubleTerm n -> (:) (prettyDouble n) rest;
+    XBoolTerm b -> (:) (if b then "true" else "false") rest;
+    XStringTerm s -> (:) (prettyString s) rest;
+    XPrimitive primitive ts -> (:) "primitive " ((:) (P.primitiveName primitive) ((:) "(" (separated ", " (typeChunks 0) ts ((:) ")" rest))));
+    XConstructor c ts -> (:) "construct " ((:) c ((:) "(" (separated ", " (typeChunks 0) ts ((:) ")" rest))));
+    XCase a result bs -> parenthesized (p > 0) (\tail -> (:) "case " (termChunks 0 a ((:) " return " (typeChunks 0 result ((:) " of { " (separated "; " alternativeChunks bs ((:) " }" tail))))))) rest;
+    XWithData ds b -> L.foldr (\d tail -> (:) (D.prettyDeclaration d) ((:) "\n" tail)) (termChunks 0 b rest) ds
+  };
+  bindingChunks :: (,,) XName XType XTerm -> [] String -> [] String;
+  bindingChunks ((,,) n ty a) rest = nameChunks n ((:) " : " (typeChunks 0 ty ((:) " = " (termChunks 0 a rest))));
+  alternativeChunks :: XAlternative -> [] String -> [] String;
+  alternativeChunks (XAlternative pat b) rest = patternChunks pat ((:) " -> " (termChunks 0 b rest));
+  patternChunks :: XPattern -> [] String -> [] String;
+  patternChunks pattern rest = case pattern of {
+    XConstructorPattern c ns -> (:) c (separatedTail " " (\n tail -> maybeNameChunks n tail) ns rest);
+    XDefaultPattern n -> maybeNameChunks n rest
+  };
   prettyString :: String -> String;
   prettyString s = ("\"" ++ (escapeFrom s 0 ++ "\""));
   escapeFrom :: String -> Int -> String;

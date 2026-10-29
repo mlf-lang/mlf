@@ -18,7 +18,20 @@ module Bootstrap.LLVM.Codegen where {
   import qualified Bootstrap.LLVM.Result as R;
   import qualified Bootstrap.LLVM.LazyProducer as V;
   generate :: Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
-  generate cs term =
+  generate = generateWithClosedConstructors True;
+  -- Separately compiled units can receive constructor fields allocated by
+  -- other units. Local construction sites cannot prove those fields are WHNF.
+  generateOpen :: Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
+  generateOpen = generateWithClosedConstructors False;
+  generateWithClosedConstructors :: Bool -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
+  generateWithClosedConstructors closed = generateWithConstructorPolicy closed S.empty;
+  -- Callers may close only constructors that cannot be created independently
+  -- outside this unit. Bare/partial constructor escapes still invalidate the
+  -- usual all-site field proof; this set does not itself prove field strictness.
+  generateWithPrivate :: Set String -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
+  generateWithPrivate names = generateWithConstructorPolicy False names;
+  generateWithConstructorPolicy :: Bool -> Set String -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
+  generateWithConstructorPolicy closed names cs term =
     let {
       fs = A.analyze term
     } in
@@ -36,10 +49,12 @@ module Bootstrap.LLVM.Codegen where {
           M.empty
           M.empty
           M.empty
-          (F.infer (M.map L.snd cs) fs term)
+          (if closed then F.infer (M.map L.snd cs) fs term else if S.null names then M.empty
+           else M.filterWithKey (\name _ -> S.member compareString name names)
+             (F.infer (M.map L.snd cs) fs term))
           S.empty
           rs
-          (V.plan cs fs (S.union O.compareName ks (M.keysSet rs)) term)
+          (V.plan cs fs (S.union O.compareName ks (M.keysSet rs)) term) M.empty
     } in
     case runBuild (callback [] Nothing term) output of {
       Left error -> Left error;
@@ -115,7 +130,115 @@ module Bootstrap.LLVM.Codegen where {
   -- Drop those slots after loading them, before entering its possibly long body.
   -- Reusable function and IO environments must keep their captures intact.
   callbackWithClear :: Bool -> [] XName -> Maybe XName -> XErased -> Build String;
-  callbackWithClear private captures argument body =
+  callbackWithClear private captures argument body = do {
+    state <- get;
+    let { key = callbackKey state private captures argument body };
+    case key of {
+      Just fields -> case M.lookup (L.compareList compareString) fields (callbacks state) of {
+        Just name -> cgPure name;
+        Nothing -> do {
+          name <- callbackFresh private captures argument body;
+          modify (\current -> withCallbacks
+            (M.insert (L.compareList compareString) fields name (callbacks current)) current);
+          cgPure name
+        }
+      };
+      Nothing -> callbackFresh private captures argument body
+    }
+  };
+  -- Code alone is shared; every use still allocates its own closure/environment.
+  -- Keys are exact token lists, never hashes. Local identities denote capture
+  -- slots or lexical binders, while static workers retain their identity AND
+  -- the slot mapping of their implicit captures. Definition entry resets all
+  -- flow facts; primitive inlining is the remaining variable emission mode.
+  -- Bound workers/producer recipes and recursive groups are deliberately
+  -- ineligible: their global analyses are indexed by original binder identity.
+  callbackKey :: Output -> Bool -> [] XName -> Maybe XName -> XErased -> Maybe ([] String);
+  callbackKey state private captured argument body =
+    if O.remainingSize 128 body < 0 ||
+       L.any (\name -> M.member O.compareName name (functions state)) captured
+    then Nothing
+    else do {
+      let { scope = M.fromList O.compareName
+              (L.zip captured (L.range 0 (L.length captured - 1))) };
+      local <- case argument of {
+        Nothing -> Just scope;
+        Just name -> callbackBind state scope name
+      };
+      fields <- callbackTerm state local body;
+      Just (L.append [if private then "clear" else "keep",
+        if inlinePrimitives state then "inline" else "calls",
+        showInt (L.length captured), case argument of { Nothing -> "thunk"; Just _ -> "function" }]
+        fields)
+    };
+  callbackBind :: Output -> Map XName Int -> XName -> Maybe (Map XName Int);
+  callbackBind state scope name =
+    if M.member O.compareName name (functions state) ||
+       M.member O.compareName name (producerPlans state)
+    then Nothing
+    else Just (M.insert O.compareName name (M.size scope) scope);
+  callbackVariable :: Map XName Int -> XName -> [] String;
+  callbackVariable scope name = case M.lookup O.compareName name scope of {
+    Just slot -> ["local", showInt slot];
+    Nothing -> ["global", showInt (O.nameId name)]
+  };
+  callbackTerm :: Output -> Map XName Int -> XErased -> Maybe ([] String);
+  callbackTerm state scope expression = case expression of {
+    XEVar name -> case M.lookup O.compareName name (functions state) of {
+      Nothing -> Just (callbackVariable scope name);
+      Just worker -> Just (L.append ["worker", showInt (O.nameId name), showInt (L.length (A.captures worker))]
+        (L.concatMap (callbackVariable scope) (A.captures worker)))
+    };
+    XEAbs name body -> do {
+      local <- callbackBind state scope name;
+      fields <- callbackTerm state local body;
+      Just ((:) "lambda" fields)
+    };
+    XEApp function argument -> do {
+      first <- callbackTerm state scope function;
+      second <- callbackTerm state scope argument;
+      Just ((:) "apply" (L.append first second))
+    };
+    XELet name value body -> do {
+      local <- callbackBind state scope name;
+      first <- callbackTerm state scope value;
+      second <- callbackTerm state local body;
+      Just ((:) "let" (L.append first second))
+    };
+    XELetRec _ _ -> Nothing;
+    XEInt value -> Just ["integer", showInt value];
+    XEDouble value -> Just ["double", showInt (doubleToBits value)];
+    XEBool value -> Just ["boolean", if value then "true" else "false"];
+    XEString value -> Just ["string", value];
+    XEPrimitive primitive -> Just ["primitive", showInt (P.primitiveCode primitive)];
+    XEConstructor name -> Just ["constructor", name];
+    XEEvidenceHole _ -> Nothing;
+    XECase subject alternatives -> do {
+      first <- callbackTerm state scope subject;
+      rest <- L.mapM (callbackAlternative state scope) alternatives;
+      Just (L.append ["case", showInt (L.length alternatives)] (L.append first (L.concat rest)))
+    }
+  };
+  callbackAlternative :: Output -> Map XName Int -> XErasedAlternative -> Maybe ([] String);
+  callbackAlternative state scope (XErasedAlternative pattern body) = do {
+    let { names = case pattern of {
+      XConstructorPattern _ fields -> fields;
+      XDefaultPattern name -> [name]
+    } };
+    local <- L.foldM (\current optional -> case optional of {
+      Nothing -> Just current;
+      Just name -> callbackBind state current name
+    }) scope names;
+    fields <- callbackTerm state local body;
+    let { header = case pattern of {
+      XConstructorPattern name _ -> ["constructor-pattern", name, showInt (L.length names)];
+      XDefaultPattern _ -> ["default-pattern"]
+    } };
+    Just (L.append header (L.append
+      (L.map (\optional -> case optional of { Nothing -> "ignored"; Just _ -> "bound" }) names) fields))
+  };
+  callbackFresh :: Bool -> [] XName -> Maybe XName -> XErased -> Build String;
+  callbackFresh private captures argument body =
     do {
       name <- fresh "@mlf.code.";
       definition name (args2 "ptr %env" "ptr %arg")
@@ -584,7 +707,24 @@ module Bootstrap.LLVM.Codegen where {
       call "@mlf_native_io" (args2 (pointer entry) (pointer env))
     };
   suspended :: Map XName CGBinding -> XErased -> Build String;
+  -- An application cell already suspends and memoizes its evaluation. For
+  -- an unknown local function applied to a variable, both operands can be
+  -- captured without demand; an extra thunk and callback add no laziness.
+  -- Known workers retain their direct-call and specialization path.
   suspended scope expression =
+    case expression of {
+      XEApp (XEVar function) (XEVar argument) -> do {
+        fs <- gets functions;
+        if M.notMember O.compareName function fs then do {
+          f <- thunk scope (XEVar function);
+          a <- thunk scope (XEVar argument);
+          call "@mlf_application" (args2 (pointer f) (pointer a))
+        } else suspendedGeneral scope expression
+      };
+      _ -> suspendedGeneral scope expression
+    };
+  suspendedGeneral :: Map XName CGBinding -> XErased -> Build String;
+  suspendedGeneral scope expression =
     do {
       fs <- gets functions;
       let {
@@ -1513,20 +1653,26 @@ module Bootstrap.LLVM.Codegen where {
       else case values of {
              (:) a ((:) b []) ->
                case p of {
-                 PAddInt -> integerOperation p a b;
-                 PSubInt -> integerOperation p a b;
+                 PAddInt -> N.numericInteger p a b;
+                 PSubInt -> N.numericInteger p a b;
                  PMulInt -> N.numericProduct p a b;
                  PQuotInt -> N.numericProduct p a b;
                  PRemInt -> N.numericProduct p a b;
-                 PEqInt -> integerOperation p a b;
-                 PLtInt -> integerOperation p a b;
+                 PEqInt -> N.numericInteger p a b;
+                 PLtInt -> N.numericInteger p a b;
                  PAddDouble -> doubleOperation p a b;
                  PSubDouble -> doubleOperation p a b;
                  PMulDouble -> doubleOperation p a b;
                  PDivDouble -> doubleOperation p a b;
                  PEqDouble -> doubleOperation p a b;
                  PLtDouble -> doubleOperation p a b;
-                 PStringCodeAt -> stringCodeAtValue a b;
+                 PStringCodeAt -> do {
+                   value <- stringCodeAtValue a b;
+                   -- The checked Unicode helper can fail; every successful
+                   -- return is a scalar value representable as a compact Int.
+                   recordRange value ((,) 0 1114111);
+                   cgPure value
+                 };
                  _ -> primitiveCall p values
                };
              (:) a [] ->
@@ -1595,98 +1741,70 @@ module Bootstrap.LLVM.Codegen where {
   -- A single thunk can use its own update root directly. Mark it busy before
   -- calling, clear captures through its callback, then force and memoize its
   -- result. Runtime fallback preserves null/cycle errors and longer spines.
+  -- Keep the immediate, WHNF and one-forwarding tests inline. Thunk entry
+  -- performs the same busy marking, callback, forcing and memoization once
+  -- out of line, instead of duplicating that sequence at every force site.
   forceDefinition :: [] String;
   forceDefinition =
-    (:) "define private ptr @mlf.force(ptr %value) alwaysinline {"
-      ((:) "entry:"
-         ((:) "  %null = icmp eq ptr %value, null"
-            ((:) "  br i1 %null, label %slow, label %test"
-               ((:) "test:"
-                  ((:) "  %bits = ptrtoint ptr %value to i64"
-                     ((:) "  %kind = and i64 %bits, 7"
-                        ((:) "  %immediate = icmp ne i64 %kind, 0"
-                           ((:) "  br i1 %immediate, label %done, label %tagged"
-                              ((:) "tagged:"
-                                 ((:) "  %tag = load i32, ptr %value, align 4"
-                                    ((:) "  %ready = icmp uge i32 %tag, 5"
-                                       ((:) "  br i1 %ready, label %done, label %deferred"
-                                          ((:) "deferred:"
-                                             ((:) "  %isthunk = icmp eq i32 %tag, 3"
-                                                ((:)
-                                                   "  br i1 %isthunk, label %enter, label %indirect"
-                                                   ((:) "indirect:"
-                                                      ((:) "  %forwarded = icmp eq i32 %tag, 2"
-                                                         ((:)
-                                                            "  br i1 %forwarded, label %next, label %slow"
-                                                            ((:) "next:"
-                                                               ((:)
-                                                                  "  %slot = getelementptr i8, ptr %value, i64 8"
-                                                                  ((:)
-                                                                     "  %p = load ptr, ptr %slot, align 8"
-                                                                     ((:)
-                                                                        "  %missing = icmp eq ptr %p, null"
-                                                                        ((:)
-                                                                           "  br i1 %missing, label %slow, label %nexttest"
-                                                                           ((:) "nexttest:"
-                                                                              ((:)
-                                                                                 "  %pbits = ptrtoint ptr %p to i64"
-                                                                                 ((:)
-                                                                                    "  %pkind = and i64 %pbits, 7"
-                                                                                    ((:)
-                                                                                       "  %pimm = icmp ne i64 %pkind, 0"
-                                                                                       ((:)
-                                                                                          "  br i1 %pimm, label %forward, label %ptagged"
-                                                                                          ((:)
-                                                                                             "ptagged:"
-                                                                                             ((:)
-                                                                                                "  %ptag = load i32, ptr %p, align 4"
-                                                                                                ((:)
-                                                                                                   "  %pready = icmp uge i32 %ptag, 5"
-                                                                                                   ((:)
-                                                                                                      "  br i1 %pready, label %forward, label %slow"
-                                                                                                      ((:)
-                                                                                                         "forward:"
-                                                                                                         ((:)
-                                                                                                            "  ret ptr %p"
-                                                                                                            ((:)
-                                                                                                               "done:"
-                                                                                                               ((:)
-                                                                                                                  "  ret ptr %value"
-                                                                                                                  ((:)
-                                                                                                                     "enter:"
-                                                                                                                     ((:)
-                                                                                                                        "  %code.slot = getelementptr i8, ptr %value, i64 8"
-                                                                                                                        ((:)
-                                                                                                                           "  %env.slot = getelementptr i8, ptr %value, i64 16"
-                                                                                                                           ((:)
-                                                                                                                              "  %code = load ptr, ptr %code.slot, align 8"
-                                                                                                                              ((:)
-                                                                                                                                 "  %env = load ptr, ptr %env.slot, align 8"
-                                                                                                                                 ((:)
-                                                                                                                                    "  store i32 1, ptr %value, align 4"
-                                                                                                                                    ((:)
-                                                                                                                                       "  store ptr null, ptr %code.slot, align 8"
-                                                                                                                                       ((:)
-                                                                                                                                          "  store ptr null, ptr %env.slot, align 8"
-                                                                                                                                          ((:)
-                                                                                                                                             "  %returned = call ptr %code(ptr %env, ptr null)"
-                                                                                                                                             ((:)
-                                                                                                                                                "  %canonical = call ptr @mlf_force(ptr %returned)"
-                                                                                                                                                ((:)
-                                                                                                                                                   "  store i32 2, ptr %value, align 4"
-                                                                                                                                                   ((:)
-                                                                                                                                                      "  store ptr %canonical, ptr %code.slot, align 8"
-                                                                                                                                                      ((:)
-                                                                                                                                                         "  ret ptr %canonical"
-                                                                                                                                                         ((:)
-                                                                                                                                                            "slow:"
-                                                                                                                                                            ((:)
-                                                                                                                                                               "  %result = tail call ptr @mlf_force(ptr %value)"
-                                                                                                                                                               ((:)
-                                                                                                                                                                  "  ret ptr %result"
-                                                                                                                                                                  ((:)
-                                                                                                                                                                     "}"
-                                                                                                                                                                     [])))))))))))))))))))))))))))))))))))))))))))))))))))));
+    ["define private ptr @mlf.force(ptr %value) alwaysinline {",
+     "entry:",
+     "  %null = icmp eq ptr %value, null",
+     "  br i1 %null, label %slow, label %test",
+     "test:",
+     "  %bits = ptrtoint ptr %value to i64",
+     "  %kind = and i64 %bits, 7",
+     "  %immediate = icmp ne i64 %kind, 0",
+     "  br i1 %immediate, label %done, label %tagged",
+     "tagged:",
+     "  %tag = load i32, ptr %value, align 4",
+     "  %ready = icmp uge i32 %tag, 5",
+     "  br i1 %ready, label %done, label %deferred",
+     "deferred:",
+     "  %isthunk = icmp eq i32 %tag, 3",
+     "  br i1 %isthunk, label %enter, label %indirect",
+     "indirect:",
+     "  %forwarded = icmp eq i32 %tag, 2",
+     "  br i1 %forwarded, label %next, label %slow",
+     "next:",
+     "  %slot = getelementptr i8, ptr %value, i64 8",
+     "  %p = load ptr, ptr %slot, align 8",
+     "  %missing = icmp eq ptr %p, null",
+     "  br i1 %missing, label %slow, label %nexttest",
+     "nexttest:",
+     "  %pbits = ptrtoint ptr %p to i64",
+     "  %pkind = and i64 %pbits, 7",
+     "  %pimm = icmp ne i64 %pkind, 0",
+     "  br i1 %pimm, label %forward, label %ptagged",
+     "ptagged:",
+     "  %ptag = load i32, ptr %p, align 4",
+     "  %pready = icmp uge i32 %ptag, 5",
+     "  br i1 %pready, label %forward, label %slow",
+     "forward:",
+     "  ret ptr %p",
+     "done:",
+     "  ret ptr %value",
+     "enter:",
+     "  %entered = tail call ptr @mlf.force.enter(ptr %value)",
+     "  ret ptr %entered",
+     "slow:",
+     "  %result = tail call ptr @mlf_force(ptr %value)",
+     "  ret ptr %result",
+     "}",
+     "define private ptr @mlf.force.enter(ptr %value) noinline {",
+     "entry:",
+     "  %code.slot = getelementptr i8, ptr %value, i64 8",
+     "  %env.slot = getelementptr i8, ptr %value, i64 16",
+     "  %code = load ptr, ptr %code.slot, align 8",
+     "  %env = load ptr, ptr %env.slot, align 8",
+     "  store i32 1, ptr %value, align 4",
+     "  store ptr null, ptr %code.slot, align 8",
+     "  store ptr null, ptr %env.slot, align 8",
+     "  %returned = call ptr %code(ptr %env, ptr null)",
+     "  %canonical = call ptr @mlf_force(ptr %returned)",
+     "  store i32 2, ptr %value, align 4",
+     "  store ptr %canonical, ptr %code.slot, align 8",
+     "  ret ptr %canonical",
+     "}"];
   aliasMetadata :: [] String;
   aliasMetadata =
     (:) "!0 = !{!\"MLF storage\"}"
@@ -1798,13 +1916,15 @@ module Bootstrap.LLVM.Codegen where {
                                                                                                                                                                            ((:)
                                                                                                                                                                               ""
                                                                                                                                                                               []))))))))))))))))))))))))))))))))))))))))))))))))))))))));
-  -- Shared helpers keep emitted modules small; LLVM inlines their fast paths.
+  -- Share allocation and constructor initialization instead of duplicating
+  -- them at each construction site. Managed field parameters remain live
+  -- across allocation until the initialized object contains those fields.
   allocationDefinition :: [] String;
   allocationDefinition =
     (:) "@mlf_constructor_pending = external global [33 x ptr]"
       ((:) "declare ptr @mlf_constructor_allocate(i64, i64)"
          ((:)
-            "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) alwaysinline {"
+            "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) noinline {"
             ((:) "entry:"
                ((:) "  %small = icmp ule i64 %size, 256"
                   ((:) "  br i1 %small, label %batch, label %slow"
@@ -1826,7 +1946,7 @@ module Bootstrap.LLVM.Codegen where {
                                                             ((:) "  ret ptr %allocated"
                                                                ((:) "}"
                                                                   ((:)
-                                                                     "define private ptr @mlf.construct.1(i64 %identity, ptr %a) alwaysinline {"
+                                                                     "define private ptr @mlf.construct.1(i64 %identity, ptr %a) noinline {"
                                                                      ((:) "entry:"
                                                                         ((:)
                                                                            "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 1, i64 24)"
@@ -1845,7 +1965,7 @@ module Bootstrap.LLVM.Codegen where {
                                                                                              ((:)
                                                                                                 "}"
                                                                                                 ((:)
-                                                                                                   "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) alwaysinline {"
+                                                                                                   "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) noinline {"
                                                                                                    ((:)
                                                                                                       "entry:"
                                                                                                       ((:)
@@ -1869,7 +1989,7 @@ module Bootstrap.LLVM.Codegen where {
                                                                                                                                  ((:)
                                                                                                                                     "}"
                                                                                                                                     ((:)
-                                                                                                                                       "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) alwaysinline {"
+                                                                                                                                       "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) noinline {"
                                                                                                                                        ((:)
                                                                                                                                           "entry:"
                                                                                                                                           ((:)
@@ -1899,7 +2019,7 @@ module Bootstrap.LLVM.Codegen where {
   thunkAllocationDefinition :: [] String;
   thunkAllocationDefinition =
     (:) "@mlf_compact_pending = external global [17 x ptr]"
-      ((:) "define private ptr @mlf.allocate.thunk(ptr %code, i64 %count) alwaysinline {"
+      ((:) "define private ptr @mlf.allocate.thunk(ptr %code, i64 %count) noinline {"
          ((:) "entry:"
             ((:) "  %words = add i64 %count, 4"
                ((:) "  %index = lshr i64 %words, 1"

@@ -97,11 +97,11 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_123_modules_13_executables(self):
+    def test_closed_corpus_has_matching_126_modules_13_executables(self):
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 123)
+        self.assertEqual(len(manifest['modules']), 126)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 123)
+        self.assertEqual(len(modules), 126)
         for name, path, role in (
             ('Bootstrap.CrateSession', 'libraries/mlf-crates/Bootstrap/CrateSession.hs', 'implementation'),
             ('Bootstrap.Graph.IndexStore', 'libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs', 'implementation'),
@@ -119,6 +119,8 @@ class ManifestParity(unittest.TestCase):
             ('MLF.BuiltinPreludeData', 'bootstrap/MLF/BuiltinPreludeData.hs', 'implementation'),
             ('MLF.Entry.BuiltinPrelude', 'bootstrap/MLF/Entry/BuiltinPrelude.hs', 'implementation'),
             ('MLF.PreparedCompiler', 'bootstrap/MLF/PreparedCompiler.hs', 'implementation'),
+            ('Bootstrap.LLVM.Library', 'libraries/mlf-llvm/Bootstrap/LLVM/Library.hs', 'implementation'),
+            ('MLF.PreparedNativeData', 'bootstrap/MLF/PreparedNativeData.hs', 'implementation'),
             ('MLF.PreparedLibraryData', 'bootstrap/MLF/PreparedLibraryData.hs', 'implementation'),
         ):
             self.assertEqual(modules[name], {
@@ -254,7 +256,7 @@ class ProducerPreflight(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='mlf-preflight-control-') as temporary:
             output = Path(temporary)
             (output / 'receipt.json').write_text('{"complete":true}')
-            with patch.object(sys, 'argv', ['build.py', '--build-dir', str(output)]), patch.object(
+            with patch.object(sys, 'argv', ['build.py', '--bootstrap-only', '--build-dir', str(output)]), patch.object(
                     build, 'load_manifest', side_effect=RuntimeError('injected invalid manifest')):
                 with self.assertRaisesRegex(RuntimeError, 'injected invalid manifest'):
                     build.main()
@@ -347,6 +349,10 @@ class DirectProducerReceipt(unittest.TestCase):
         self.receipt['toolchain'] = {'actual_ghc': direct.identified(actual), 'files': {str(actual): direct.sha(actual)}}
         self.receipt['builtin_verification_helpers'] = {
             name: direct.identified(self.root / name) for name in builtin_controls.verifier.HELPERS}
+        self.file('bootstrap/MLF/PreparedLibraryData.hs', (ROOT / 'bootstrap/MLF/PreparedLibraryData.hs').read_text())
+        helper = self.file('tools/shared/verify_prepared_libraries.py', (ROOT / 'tools/shared/verify_prepared_libraries.py').read_text())
+        self.receipt['prepared_verification_helper'] = direct.identified(helper)
+        self.receipt['prepared_verification'] = direct.prepared_verifier().verify(self.root)
         self.receipt['builtin_verification'] = direct.identified(self.builtin.verify())
 
     def file(self, relative, contents='fixture\n'):

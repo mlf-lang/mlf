@@ -9,14 +9,13 @@ its source dependencies participate in the integrity checks.
 
 ## Current shared compiler and native runner
 
-The existing runner and positional CLI below are unchanged. On Linux, build the
-current shared compiler and package manager with GHC 9.14.1 (Python 3 is used
-only for this build helper), or supply an already qualified shared-native pair.
-`tools/shared/build.py` currently requires a Linux toolchain; installing the
-dependencies below does not make that builder a macOS qualification route.
-The benchmark runner itself also runs on macOS when supplied with a compatible,
-independently validated compiler/package-manager pair. A legacy release seed is
-not a substitute for the current shared sources.
+The existing runner and positional CLI below are unchanged. Build the current
+shared compiler and package manager with GHC 9.14.1 (Python 3 is used only for
+this build helper), or supply an already qualified shared-native pair. The public
+`tools/shared/build.py` installation supports the qualified macOS and Linux host
+paths and requires Clang plus GMP/BDWGC development dependencies. Its normal
+source, toolchain, and independent-generation gates still apply on either host.
+A legacy release seed is not a substitute for the current shared sources.
 
 On macOS, install Clang/LLVM, GMP, pkg-config and BDWGC; for example:
 
@@ -168,6 +167,13 @@ fall back to the Clang driver. Both MLF compiler variants use this backend; the 
 baseline invokes the real Clang executable with the original manifest flags.
 Retain the configuration and verify its toolchain hashes alongside the report.
 
+For a paired backend investigation, set `MLF_BENCH_BASELINE_CLANG` to the
+absolute baseline backend executable. The baseline lane uses that executable;
+the candidate lane continues to use `MLF_BENCH_MLF_CLANG`. If unset, both lanes
+use the candidate backend as before. The runner records the setting and hashes
+both selected backend executables. Keep streaming and runtime-splitting settings
+compatible with both backends.
+
 Set `MLF_BENCH_SPLIT_RUNTIME=1` to compile the runtime core and process supervisor
 as two fresh translation units in parallel. This option applies to both MLF
 compiler variants and works with the ordinary Clang backend as well as the
@@ -288,3 +294,43 @@ command. Pass it as `./mlfpkg --clang /absolute/path/to/clang-mlf ... build` to
 use this backend for other programs. The compiler itself is built at O2 (with
 optional PGO); this latency-oriented backend is an explicit choice for compiled
 programs. Flags outside the supported link form retain Clang's normal driver.
+
+## Default executable build comparison
+
+`native-default.py` measures the direct `emlf SOURCE -o EXE --build-dir DIR`
+command, including process startup, installed-library validation, fresh user
+frontend and LLVM generation, one ordinary Clang O2 object compilation and a
+fresh link. Fixed library installation is excluded and its separately measured
+receipt and timing are recorded. This is a distinct measurement boundary from
+the fresh-runtime runner above. Every workload must use the installed standard
+library path; a zero native-export count is allowed and recorded. The report
+separately records fixed runtime reuse, native library export reuse and checked
+builtin unfolding; these are distinct mechanisms.
+
+Supply a prebuilt independent oracle executable that implements
+`ORACLE WORKLOAD SIZE OUTPUT` by calling `Package.Benchmark.validateOutput`;
+`Oracle.hs` is a thin GHC-hosted adapter. Supply a complete check-only result
+directory from the existing runner for fixture evidence and its checked input
+files. Supply a baseline directory containing a `results.json` correctness
+report with compiler fingerprints and one independently checked executable at
+`WORKLOAD/program` per canonical workload. Run from the repository root, with
+fresh output and no other measured work:
+
+```sh
+python3 tools/bench/native-default.py \
+  --compiler /absolute/path/to/emlf \
+  --install-receipt /absolute/path/to/native/receipt.json \
+  --install-timing /absolute/path/to/install-timing.json \
+  --oracle /absolute/path/to/independent-oracle \
+  --baseline-dir /absolute/path/to/checked-baseline \
+  --check-dir /absolute/path/to/check-only-results \
+  --clang /absolute/path/to/clang \
+  --output "$PWD/.mlf-build/default-native-comparison"
+```
+
+Each workload has an excluded warmup and five fresh paired candidate/C builds,
+plus candidate/C/baseline runtime processes. The report retains exact commands,
+receipts, correctness cases, medians, reuse counts and input identities. Its
+`complete` status means collection and correctness succeeded; evaluate ratios
+against the desired limits separately. Do not describe it as the ten-workload
+fresh-runtime gate.

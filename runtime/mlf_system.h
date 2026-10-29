@@ -144,6 +144,9 @@ static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *speci
 
 #endif
 /* SHA-256, streaming binary files; independent of text encoding and tools. */
+#if defined(__APPLE__) && !defined(MLF_TEST_FORCE_PORTABLE_SHA256)
+#include <CommonCrypto/CommonDigest.h>
+#else
 static uint32_t os_rotr(uint32_t x, unsigned n) { return (x>>n)|(x<<(32-n)); }
 static void os_sha_block(uint32_t h[8], const unsigned char block[64]) {
     static const uint32_t k[64] = {
@@ -162,9 +165,27 @@ static void os_sha_block(uint32_t h[8], const unsigned char block[64]) {
     for(int i=0;i<64;++i) {uint32_t t=v+(os_rotr(e,6)^os_rotr(e,11)^os_rotr(e,25))+((e&f)^(~e&g))+k[i]+w[i];uint32_t u=(os_rotr(a,2)^os_rotr(a,13)^os_rotr(a,22))+((a&b)^(a&c)^(b&c)); v=g;g=f;f=e;e=d+t;d=c;c=b;b=a;a=t+u;}
     h[0]+=a;h[1]+=b;h[2]+=c;h[3]+=d;h[4]+=e;h[5]+=f;h[6]+=g;h[7]+=v;
 }
+#endif
 static MLF_NOINLINE MlfValue *os_fileDigest(MlfValue *name) {
     FILE *file = fopen(file_path(name),"rb");
     if (!file) fail("IO error: fileDigest failed");
+#if defined(__APPLE__) && !defined(MLF_TEST_FORCE_PORTABLE_SHA256)
+    CC_SHA256_CTX context;
+    if (!CC_SHA256_Init(&context)) { fclose(file); fail("IO error: fileDigest failed"); }
+    unsigned char buffer[65536], digest[CC_SHA256_DIGEST_LENGTH];
+    size_t n; int failed=0;
+    while ((n=fread(buffer,1,sizeof(buffer),file))) {
+        if (!CC_SHA256_Update(&context,buffer,(CC_LONG)n)) { failed=1; break; }
+    }
+    if(ferror(file))failed=1;
+    if(fclose(file))failed=1;
+    if(failed || !CC_SHA256_Final(digest,&context))fail("IO error: fileDigest failed");
+    char hex[65];
+    static const char digits[]="0123456789abcdef";
+    for(int i=0;i<CC_SHA256_DIGEST_LENGTH;++i){hex[2*i]=digits[digest[i]>>4];hex[2*i+1]=digits[digest[i]&15];}
+    hex[64]=0;
+    return mlf_string(hex,64);
+#else
     uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
     unsigned char buffer[65536],tail[128]={0};
     size_t n,remaining=0; uint64_t total=0;
@@ -181,5 +202,6 @@ static MLF_NOINLINE MlfValue *os_fileDigest(MlfValue *name) {
     os_sha_block(h,tail);if(size==128)os_sha_block(h,tail+64);
     char hex[65];for(int i=0;i<8;++i)snprintf(hex+8*i,9,"%08" PRIx32,h[i]);
     return mlf_string(hex,64);
+#endif
 }
 #endif

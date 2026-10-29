@@ -541,6 +541,54 @@ module Bootstrap.Separate where {
     seq nextA (seq nextB ((,) nextA nextB));
   fingerprintAfter :: (,) Int Int -> String -> String;
   fingerprintAfter ((,) a b) text = fingerprintFrom text 0 a b;
+  -- Exact compositional summaries of actual serialized scalar text.
+  data FingerprintEncoding = FingerprintEncoding Int Int Int Int Int;
+  encodingLength (FingerprintEncoding count _ _ _ _) = count;
+  encodingText text = case fingerprintPart text of {
+    (,,,) pa pb a b -> FingerprintEncoding (stringLength text) pa pb a b
+  };
+  encodingEmpty = FingerprintEncoding 0 1 1 0 0;
+  encodingAppend (FingerprintEncoding n pa pb a b) (FingerprintEncoding m qa qb c d) =
+    case fingerprintAppend ((,) a b) ((,,,) qa qb c d) of {
+      (,) x y -> FingerprintEncoding (n + m) ((pa * qa) % 2147483647)
+        ((pb * qb) % 2147483629) x y
+    };
+  encodingConcat values = foldlStrict encodingAppend encodingEmpty values;
+  encodingPack values = encodingConcat (concatMap (\value ->
+    [encodingText (showInt (encodingLength value) ++ ":"), value]) values);
+  -- Composition requires canonical nonnegative residues, as produced above.
+  encodingState state (FingerprintEncoding _ pa pb a b) =
+    fingerprintAppend state ((,,,) pa pb a b);
+  encodingAfter state value = case encodingState state value of {
+    (,) a b -> showInt a ++ "-" ++ showInt b
+  };
+  encodingFingerprint value = encodingAfter ((,) 0 1) value;
+  -- The pool lasts for one admitted object and keys exact scalar text, never
+  -- names, inferred types or caller-provided digests. Punctuation is reusable too.
+  -- Advance the two residues per chunk. Aggregate powers depend only on the
+  -- total scalar length, so compute them once rather than once per token.
+  encodingChunks pool chunks (FingerprintEncoding count pa pb a b) =
+    case encodingChunkState pool chunks 0 ((,) a b) of {
+      (,,) next added ((,) x y) -> let {
+        powerA = (pa * fingerprintPower 65599 added 2147483647) % 2147483647;
+        powerB = (pb * fingerprintPower 131 added 2147483629) % 2147483629;
+        total = count + added
+      } in seq total (seq powerA (seq powerB
+        ((,) next (FingerprintEncoding total powerA powerB x y))))
+    };
+  encodingChunkState pool chunks count state = case chunks of {
+    [] -> (,,) pool count state;
+    (:) text rest -> let {
+      selected = case M.lookup compareString text pool of {
+        Just encoded -> (,) pool encoded;
+        Nothing -> let { encoded = encodingText text }
+          in (,) (M.insert compareString text encoded pool) encoded
+      };
+      next = count + encodingLength (snd selected)
+    } in case encodingState state (snd selected) of {
+      (,) x y -> seq next (seq x (seq y (encodingChunkState (fst selected) rest next ((,) x y))))
+    }
+  };
   -- A per-compilation pool contains only pure encodings, never inferred results.
   -- Entries remain lazy. A name lookup is not an identity proof: lowering may
   -- change a layout, so reuse requires equality of the actual full declaration.
@@ -767,6 +815,21 @@ module Bootstrap.Separate where {
                ((:) metadata ((:) (pack (map fst (unitInstances i))) ((:) bindings []))))));
   interfaceFingerprint i = fingerprint (pack (interfaceFields i));
   encodeInterface i = pack (snoc (interfaceFields i) (unitObjectFingerprint i));
+  -- Preserve encodeInterface's exact eight framed fields, reusing only the
+  -- rendered name/type text summaries from this object's local pool.
+  encodingBindings pool bindings = case bindings of {
+    [] -> (,) pool [];
+    (:) ((,) name ty) rest -> let {
+      named = encodingChunks pool [name] encodingEmpty;
+      typed = encodingChunks (fst named) (Pretty.typeChunks 0 (normalType ty) []) encodingEmpty;
+      remaining = encodingBindings (fst typed) rest
+    } in (,) (fst remaining) ((:) (encodingPack [snd named, snd typed]) (snd remaining))
+  };
+  encodingInterface pool iface = let {
+    bindings = encodingBindings pool (unitBindings iface);
+    prefix = map encodingText (take 6 (interfaceFields iface));
+    fields = append prefix [encodingPack (snd bindings), encodingText (unitObjectFingerprint iface)]
+  } in (,) (fst bindings) (encodingPack fields);
   decodePair text =
     do {
       fields <- unpack text;

@@ -7,7 +7,9 @@ module Bootstrap.PreparedLibraries
    librarySchema, prepareFresh, inputIdentity, librarySources, libraryObjects,
    sourceName, sourcePath, sourceText, sourceHash, sourceSyntax,
    metadataHash, objectHash, libraryObject, compileLoaded, checkedTerm,
-   sourceType, reused, nameMap) where {
+   sourceType, reused, nameMap, NativeRoot, nativeCheckedWrapper, nativeSignatures,
+   nativeSourceType, nativeInferredType, nativeDeclarations, nativeBuiltinCount, compileNativeRoot, compileNativeRootUsing,
+   nativeLibrary, nativeLibraryDeclarations, nativeExportSignatures) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -15,6 +17,7 @@ module Bootstrap.PreparedLibraries
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Lexer as Lexer;
+  import qualified Bootstrap.Parser as Parser;
   import qualified Bootstrap.Primitive as Primitive;
   import qualified Bootstrap.Compiler as Compiler;
   import qualified Bootstrap.CompilerCore as Core;
@@ -105,6 +108,9 @@ module Bootstrap.PreparedLibraries
   -- Runtime admission uses the same fragment checker, dependency boundary and
   -- capture-free freshening as ordinary .mlfco linking. SHA fields authenticate
   -- the fixed build artifact; they do not replace independent target checking.
+  data CheckedLibrary = CheckedLibrary Artifact.FragmentState (Either String Checked.LinkedSpine);
+  libraryState (CheckedLibrary state _) = state;
+  librarySpine (CheckedLibrary _ proof) = proof;
   checkedLibrary raw = do {
     validateRegistry raw;
     let { ifaces = interfaces raw; byName = Artifact.interfaceMap ifaces;
@@ -116,10 +122,11 @@ module Bootstrap.PreparedLibraries
     Artifact.validateLayouts ordered;
     let { layouts = M.fromList compareString (map (\d ->
       (,) (D.datatypeName d) (Artifact.datatypePart d)) (concatMap Artifact.crateLoweredData ordered)) };
-    foldEither (\state iface -> case M.lookup compareString (Artifact.crateId iface) objects of {
+    linked <- foldEither (\state iface -> case M.lookup compareString (Artifact.crateId iface) objects of {
       Nothing -> Left "prepared library object disappeared";
-      Just object -> Artifact.linkCrate byName layouts state object
-    }) (Artifact.FragmentState 0 M.empty [] [] S.empty) ordered
+      Just object -> Artifact.linkCrateWithSpine byName layouts state object
+    }) ((,) (Artifact.FragmentState 0 M.empty [] [] S.empty) (Right Checked.emptySpine)) ordered;
+    Right (CheckedLibrary (fst linked) (snd linked))
   };
   prepareFresh identity mode sources objects = do {
     let { raw = RawLibrary identity librarySchema mode sources objects [Modules.preludeSource, Modules.primitiveSource] };
@@ -165,7 +172,8 @@ module Bootstrap.PreparedLibraries
     entries = Modules.loadedEntries loaded;
     candidates = sortBy (\a b -> compareInt (length (librarySources b)) (length (librarySources a)))
       (filter (matches mode entries) registry);
-    resolution = Modules.resolveCrateWithAllocator mode M.empty Modules.freshNames sources;
+    planned = Modules.prepareCrateResolution mode M.empty sources;
+    resolution = bindEither planned (Modules.resolveCratePlan Modules.freshNames);
     -- The normal result does not force this qualification-only name inventory.
     -- An ineligible program must not pay for a second module resolution.
     ordinaryNames = case resolution of {
@@ -181,7 +189,7 @@ module Bootstrap.PreparedLibraries
         -- cannot bypass ordinary namespace checking before artifact admission.
         Core.atPhase ModuleResolution resolution;
         if collision raw sources then fallback else
-          case Modules.resolveCrateWithAllocator mode M.empty (mixedNames raw) sources of {
+          case bindEither planned (Modules.resolveCratePlan (mixedNames raw)) of {
             Left _ -> fallback;
             Right prepared -> case validatePrepared raw prepared of {
               Left _ -> fallback;
@@ -255,8 +263,194 @@ module Bootstrap.PreparedLibraries
       }
     }) (zip (range 0 (length (Modules.resolvedCrateInstances resolution) - 1))
       (Modules.resolvedCrateInstances resolution));
-  compilePrepared raw linked resolution = do {
+  -- This value authenticates the freshly checked user wrapper only. Installed
+  -- native code identity and file pins are enforced by the compiler consumer.
+  -- Raw library metadata does not manufacture a checked library implementation.
+  data NativeRoot = NativeRoot Checked.CheckedTerm (Map String XType) String XType ([] DataDecl) Int;
+  nativeCheckedWrapper (NativeRoot value _ _ _ _ _) = value;
+  nativeSignatures (NativeRoot _ value _ _ _ _) = value;
+  nativeSourceType (NativeRoot _ _ value _ _ _) = value;
+  nativeInferredType (NativeRoot _ _ _ value _ _) = value;
+  nativeDeclarations (NativeRoot _ _ _ _ value _) = value;
+  nativeBuiltinCount (NativeRoot _ _ _ _ _ value) = value;
+  nativeLibraryDeclarations raw = foldEither Separate.mergeDeclaration []
+    (concatMap Artifact.crateLoweredData (interfaces raw));
+  nativeExportSignatures raw = M.toList (M.fromList compareString
+    (concatMap Artifact.crateBindings (interfaces raw)));
+  nativeLibrary raw = do {
+    admitted <- checkedLibrary raw;
+    proof <- librarySpine admitted;
+    declarations <- nativeLibraryDeclarations raw;
+    Right ((,,) proof (nativeExportSignatures raw) declarations)
+  };
+  nativeHeaders raw = do {
+    validateRegistry raw;
+    let { ifaces = interfaces raw; byName = Artifact.interfaceMap ifaces };
+    ordered <- Artifact.dependencyClosure byName [] [] (map Artifact.crateId ifaces);
+    traverseEither Artifact.validateInterface ordered;
+    traverseEither (Artifact.validateDependencies byName) ordered;
+    traverseEither (Artifact.validateExportBoundary byName) ordered;
+    Artifact.validateLayouts ordered;
+    Right ()
+  };
+  -- Completion supplies only the fixed installed implementation's namespace
+  -- metadata. Actual loaded modules are checked before any missing module is
+  -- filled; user declarations and import reach remain the visibility authority.
+  nativeLoadedMatches raw mode loaded = let {
+    entries = Modules.loadedEntries loaded;
+    recorded = librarySources raw;
+    selected = map sourceName recorded
+  } in sameMode mode (libraryMode raw) && not (null entries) &&
+    not (elem eqString (Modules.moduleIdentity (Modules.loadedSource (last entries))) selected) &&
+    all (\entry -> let { name = Modules.moduleIdentity (Modules.loadedSource entry) } in
+      case find (\source -> eqString name (sourceName source)) recorded of {
+        Nothing -> True;
+        Just source -> sourceMatches [entry] source
+      }) entries;
+  -- Missing installed modules supply nominal and export namespace metadata,
+  -- but their instances are not part of the actual imported program. Class
+  -- lowering checks overlap globally before per-owner scope filtering, so
+  -- retaining those absent instances would reject otherwise legal programs.
+  nativeNamespaceOnly (SourceModule path name exports imports declarations classes _ values body syntax) =
+    SourceModule path name exports imports declarations classes [] values body syntax;
+  completeNativeSources parseSource raw loaded = do {
+    let { entries = Modules.loadedEntries loaded;
+          selected = map sourceName (librarySources raw) };
+    installed <- traverseEither (\recorded -> case find (\entry ->
+      eqString (Modules.moduleIdentity (Modules.loadedSource entry)) (sourceName recorded)) entries of {
+      Just actual -> Right (Modules.loadedSource actual);
+      Nothing -> do {
+        parsed <- parseSource (sourcePath recorded) (sourceText recorded);
+        ensure (eqString (Modules.moduleIdentity parsed) (sourceName recorded) &&
+          eqString (Modules.sourcePath parsed) (sourcePath recorded) &&
+          sameSyntax (Modules.sourceSyntax parsed) (sourceSyntax recorded) &&
+          not (isJust (Modules.sourceBody parsed))) "installed source completion identity mismatch";
+        Right (nativeNamespaceOnly parsed)
+      }
+    }) (librarySources raw);
+    -- Recorded fixed modules are already in the producer's dependency order.
+    -- Keeping all actual noninstalled entries afterward preserves the real
+    -- user's root-last contract and does not add any import edge.
+    Right (append installed (map Modules.loadedSource (filter (\entry ->
+      not (elem eqString (Modules.moduleIdentity (Modules.loadedSource entry)) selected)) entries)))
+  };
+  compileNativeRoot raw mode loaded = compileNativeRootUsing Parser.parseModule raw mode loaded;
+  nativeClosedSources sources = let {
+    names = map Modules.moduleIdentity sources
+  } in length names == length (nubBy eqString names) && all
+    (\source -> all (\entry -> let { name = Modules.importedModule entry } in
+      Modules.isBuiltinModule name || elem eqString name names) (Modules.sourceImports source)) sources;
+  compileNativeRootUsing parseSource raw mode loaded = do {
+    let { sources = Modules.loadedSources loaded;
+      ordinary = Modules.resolveCrateWithAllocator mode M.empty Modules.freshNames sources };
+    Core.atPhase Verification (ensure (nativeLoadedMatches raw mode loaded)
+      "installed native library requires exact loaded library source reads");
+    if nativeClosedSources sources then Right () else do {
+      Core.atPhase ModuleResolution ordinary;
+      Right ()
+    };
+    let { attempt = do {
+      Core.atPhase Verification (ensure (not (collision raw sources)) "installed native library source identity collision");
+      completed <- Core.atPhase Verification (completeNativeSources parseSource raw loaded);
+      prepared <- Core.atPhase ModuleResolution
+        (Modules.resolveCrateWithAllocator mode M.empty (mixedNames raw) completed);
+      Core.atPhase Verification (validatePrepared raw prepared);
+      Core.atPhase Verification (nativeHeaders raw);
+      compileNativeResolvedRoot raw prepared
+    } };
+    case attempt of {
+      Right value -> Right value;
+      Left failure -> do { Core.atPhase ModuleResolution ordinary; Left failure }
+    }
+  };
+  -- Only the canonical builtin crate is eligible for local materialization.
+  -- Ownership comes from validated crate metadata, never a spelling or hint.
+  nativeBuiltinState selected raw = case filter (\entry -> eqString
+      (Artifact.crateId (Artifact.objectInterface (libraryObject entry))) Artifact.builtinCrateIdentity)
+      (libraryObjects raw) of {
+    [entry] -> let { object = libraryObject entry; iface = Artifact.objectInterface object;
+      layouts = M.fromList compareString (map (\d -> (,) (D.datatypeName d) (Artifact.datatypePart d))
+        (Artifact.crateLoweredData iface)) } in do {
+      Artifact.validateInterface iface;
+      Artifact.validateLayouts [iface];
+      Artifact.linkSelectedCrateWithSpine selected (Artifact.interfaceMap [iface]) layouts
+        ((,) (Artifact.FragmentState 0 M.empty [] [] S.empty) (Right Checked.emptySpine)) object
+    };
+    _ -> Left "native library requires one canonical builtin implementation"
+  };
+  compileNativeResolvedRoot raw resolution = do {
     let { display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
+          sourcePhase phase result = Core.atPhase phase (mapLeft display result);
+          resolved = Modules.resolvedCrateModules resolution;
+          ownership = owners raw;
+          own = filter (\entry -> not (M.member compareString
+            (Modules.moduleIdentity (Modules.resolvedSource entry)) ownership)) resolved;
+          values = concatMap (compose Modules.renamedValues Modules.resolvedContents) own;
+          entryModule = last resolved;
+          source = Modules.resolvedSource entryModule };
+    entry <- sourcePhase ModuleResolution (case Modules.renamedBody (Modules.resolvedContents entryModule) of {
+      Just expression -> Right expression;
+      Nothing -> if any (\value -> eqString (Modules.valueName value) "main") (Modules.sourceValues source)
+        then mapEither SVar (Modules.resolvedName (Modules.resolvedCrateNames resolution)
+          (Modules.Entity (Modules.moduleIdentity source) "main" Modules.Value))
+        else Modules.resolveExpr (Modules.resolvedCrateNames resolution) (Modules.resolvedScope entryModule) (SVar "main")
+    });
+    body <- sourcePhase ModuleResolution (Surface.bindValues values entry);
+    parts <- sourcePhase Inference (canonicalParts resolution);
+    instances <- sourcePhase Inference (instanceRows raw resolution values);
+    let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
+          dictionaries = M.fromList compareString
+            (map (\klass -> (,) ("Dict_" ++ Modules.className klass) (Modules.className klass)) (snd parts));
+          sourceValues = S.fromList compareString (concatMap
+            (\entry -> map (\((,,) name _ _) -> name) (Modules.renamedValues (Modules.resolvedContents entry)))
+            (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
+          externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
+            then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
+    full <- sourcePhase Inference (Classes.lowerSeparateClassesWithScopes externals (map fst instances)
+      (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
+      (SClassProgram (fst parts) (snd parts) (map snd instances) body));
+    selected <- sourcePhase Verification (Parameters.select signatures full);
+    let { lowered = fst selected; selectedSignatures = snd selected;
+          diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
+            (Modules.resolvedCrateDisplayNames resolution)) };
+    compiled <- mapLeft (\(CompileError phase message) -> CompileError phase (diagnostic message))
+      (Imported.finishCompilation selectedSignatures lowered);
+    let { wrapper = Imported.checkedWrapper compiled;
+          declarations = case Checked.term wrapper of { XWithData ds _ -> ds; _ -> [] } };
+    Core.atPhase Verification (do {
+      combined <- foldEither Separate.mergeDeclaration declarations
+        (concatMap Artifact.crateLoweredData (interfaces raw));
+      ensure (length combined == length declarations) "installed native library added an unowned datatype layout";
+      -- Fresh user declarations are checked in the wrapper. The native backend
+      -- additionally checks their names against the installation's sealed
+      -- nominal-use census before extending its fixed constructor-tag prefix.
+      Right ()
+    });
+    usedSignatures <- sourcePhase Verification (Imported.usedImportSignatures selectedSignatures compiled);
+    let { builtinKeys = S.fromList compareString (concatMap (\iface ->
+      if eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity
+        then map fst (Artifact.crateBindings iface) else []) (interfaces raw));
+      needsBuiltin = any (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures) };
+    local <- if not needsBuiltin then sourcePhase Verification
+      (Imported.materializeLinked Checked.emptySpine selectedSignatures compiled) else do {
+      admitted <- sourcePhase Verification (nativeBuiltinState (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures)) raw);
+      let { builtins = fst admitted;
+        fallback = Imported.materializeImports selectedSignatures compiled
+          (Artifact.fragmentSerial builtins) (Artifact.fragmentBindings builtins) (Artifact.fragmentBodies builtins) };
+      sourcePhase Verification (case snd admitted of {
+        Left _ -> fallback;
+        Right proof -> case Imported.materializeLinked proof selectedSignatures compiled of {
+          Left _ -> fallback;
+          Right result -> Right result
+        }
+      })
+    };
+    Right (NativeRoot (fst local) (snd local) (display (Imported.sourceType compiled))
+      (Imported.inferredType compiled) declarations (length (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures))))
+  };
+  compilePrepared raw admitted resolution = do {
+    let { linked = libraryState admitted;
+          display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
           sourcePhase phase result = Core.atPhase phase (mapLeft display result);
           resolved = Modules.resolvedCrateModules resolution;
           ownership = owners raw;
@@ -301,7 +495,15 @@ module Bootstrap.PreparedLibraries
       "prepared library added an unowned datatype layout");
     grafted <- sourcePhase Verification (foldEither (\rest spine -> Separate.graft spine rest)
       actual (Artifact.fragmentBodies linked));
-    checked <- sourcePhase Verification (Checked.check (XWithData declarations grafted));
+    let { ordinaryCheck = Checked.check (XWithData declarations grafted);
+          composed = case librarySpine admitted of {
+            Left _ -> ordinaryCheck;
+            Right spine -> case Imported.finishLinked spine selectedSignatures compiled of {
+              Left _ -> ordinaryCheck;
+              Right proof -> Right proof
+            }
+          } };
+    checked <- sourcePhase Verification composed;
     sourcePhase Verification (ensure (T.alphaEq (Checked.typeOf checked) (Imported.inferredType compiled))
       "prepared library graft changed the user root type");
     Right (Compilation checked (display (Imported.sourceType compiled)) True (Modules.resolvedCrateNames resolution))

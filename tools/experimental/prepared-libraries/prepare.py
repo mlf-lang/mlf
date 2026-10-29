@@ -95,9 +95,9 @@ def main() -> None:
     # The generated registry cannot be an input to its own regeneration.
     # It remains snapshotted for consumer builds, but is excluded from this key.
     semantic_inputs = {key: value["sha256"] for key, value in recorded.items()
-                       if key != DATA_PATH.as_posix()}
+                       if key not in {DATA_PATH.as_posix(), "bootstrap/MLF/PreparedNativeData.hs"}}
     identity_input = {"format": "MLF-PREPARED-LIBRARY-JOB-1", "source_hashes": semantic_inputs,
-                      "roots": args.modules, "source_package": "main",
+                      "roots": args.modules, "source_root": lexical_root, "source_package": "main",
                       "mode": "NoImplicitPrelude" if args.no_prelude else "ImplicitPrelude",
                       "library_inventory": libraries,
                       "primitive_abi": source_description["primitive_abi"],
@@ -113,7 +113,7 @@ def main() -> None:
     request = {"format": "MLF-PREPARED-LIBRARY-JOB-1", "input_identity": identity,
                "library_identity": "mlf:prepared-library:" + identity,
                "source_package": "main", "mode": identity_input["mode"],
-               "roots": args.modules, "library_inventory": libraries,
+               "roots": args.modules, "source_root": lexical_root, "library_inventory": libraries,
                "output_directory": str(artifacts), "generated_source": str(generated),
                "primitive_abi": source_description["primitive_abi"],
                "frontend_semantics": source_description["frontend_semantics"]}

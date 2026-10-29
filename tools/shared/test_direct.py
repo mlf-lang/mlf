@@ -59,6 +59,14 @@ ORACLES = ['tests/async-task/suite.stdout', 'tests/async-task/processes.stdout',
            'tests/async-task/wait-graph.stdout', 'tests/async-process/suite.stdout']
 
 
+def prepared_verifier():
+    path = Path(__file__).resolve().with_name('verify_prepared_libraries.py')
+    module = types.ModuleType('verify_prepared_libraries')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
+
+
 def builtin_verifier():
     path = Path(__file__).resolve().with_name('verify_builtin_prelude.py')
     module = types.ModuleType('verify_builtin_prelude')
@@ -190,6 +198,8 @@ def authenticate_build(receipt_path, binaries, root=ROOT):
         raise ValueError('missing canonical builtin verifier/generator outputs')
     builtin_verifier().authenticate(producer.get('builtin_verification'), root,
                                    binaries / 'emlf', binaries / 'builtin-prelude')
+    verify_file(producer.get('prepared_verification_helper'), root / 'tools/shared/verify_prepared_libraries.py')
+    prepared_verifier().authenticate(producer.get('prepared_verification'), root)
     return producer
 
 

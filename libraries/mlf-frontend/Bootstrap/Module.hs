@@ -228,7 +228,10 @@ module Bootstrap.Module where {
       result <- fetchFileWithEvidence paths name;
       ioReturn (mapEither loadedSource result)
     };
-  fetchFileWithEvidence paths name =
+  fetchFileWithEvidence paths name = fetchFileWithEvidenceUsing Parser.parseModule paths name;
+  -- The callback returns raw syntax, not authenticated evidence. Graph and
+  -- compiler checks remain mandatory, including for caller-supplied parsers.
+  fetchFileWithEvidenceUsing parseSource paths name =
     do {
       let {
         stem = intercalate "/" (components name)
@@ -262,7 +265,7 @@ module Bootstrap.Module where {
              (:) file _ ->
                do {
                  source <- readFile file;
-                 ioReturn (mapEither (\parsed -> LoadedModule parsed source) (Parser.parseModule file source))
+                 ioReturn (mapEither (\parsed -> LoadedModule parsed source) (parseSource file source))
                }
            }
     };
@@ -278,8 +281,27 @@ module Bootstrap.Module where {
   } in nubBy eqString ((:) directory (append includes ((:) hierarchy ((:) "." []))));
   loadModuleFilesWithEvidence :: [] String -> SourceModule -> String ->
     IO (Either String LoadedModules);
-  loadModuleFilesWithEvidence includes root input = do {
-    result <- loadGraphBy loadedSource (fetchFileWithEvidence (moduleSearchPaths includes root))
+  loadModuleFilesWithEvidence includes root input =
+    loadModuleFilesWithEvidenceUsing Parser.parseModule includes root input;
+  loadModuleFilesWithEvidenceUsing parseSource includes root input = do {
+    result <- loadGraphBy loadedSource (fetchFileWithEvidenceUsing parseSource (moduleSearchPaths includes root))
+      (LoadedModule root input);
+    ioReturn (mapEither LoadedModules result)
+  };
+  -- Installed defaults have lower precedence than actual user search roots.
+  -- Presence is decided before parsing, so an explicit malformed or ambiguous
+  -- source never silently falls through to a different installed definition.
+  fetchFileWithEvidenceUsingFallback parseSource paths defaults name = do {
+    let { stem = intercalate "/" (components name);
+          files = concatMap (\path ->
+            [joinPath path (stem ++ ".emlf"), joinPath path (stem ++ ".hs")]) paths };
+    found <- findFiles files;
+    if null found then fetchFileWithEvidenceUsing parseSource defaults name
+      else fetchFileWithEvidenceUsing parseSource paths name
+  };
+  loadModuleFilesWithEvidenceUsingFallback parseSource includes defaults root input = do {
+    result <- loadGraphBy loadedSource
+      (fetchFileWithEvidenceUsingFallback parseSource (moduleSearchPaths includes root) defaults)
       (LoadedModule root input);
     ioReturn (mapEither LoadedModules result)
   };
@@ -1592,13 +1614,19 @@ module Bootstrap.Module where {
            (M.fromList compareEntity
               (map (\entity -> (,) entity (mangle entity)) (Set.toList entities))))
       supplied;
+  data CrateResolution = CrateResolution PreludeMode ([] SourceModule)
+    (Map String Interface) (Map String Interface) (Set Entity);
   resolveCrateWithAllocator :: PreludeMode ->
                                Map String Interface ->
                                ([] SourceModule -> Set Entity -> Names) ->
                                [] SourceModule -> Either String ResolvedCrate;
   -- An instance implements its class's methods even when those method names
   -- are intentionally omitted from the class's imported source namespace.
-  resolveCrateWithAllocator mode external allocate supplied =
+  resolveCrateWithAllocator mode external allocate supplied = do {
+    plan <- prepareCrateResolution mode external supplied;
+    resolveCratePlan allocate plan
+  };
+  prepareCrateResolution mode external supplied =
     if null supplied
     then Left "no entry module"
     else do {
@@ -1707,6 +1735,9 @@ module Bootstrap.Module where {
                        (append (map visible (M.elems external))
                           ((:) (Set.fromList compareEntity (concat methodEntities)) []))))
            };
+           Right (CrateResolution mode modules localMap exports allEntities)
+         };
+  resolveCratePlan allocate (CrateResolution mode modules localMap exports allEntities) = do {
            let {
              names = allocate modules allEntities
            };
