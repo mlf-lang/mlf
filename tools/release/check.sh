@@ -22,6 +22,7 @@ node tools/release/test-benchmark-gate.mjs
 node tools/release/test-ci-policy.mjs
 python3 tools/shared/test_provenance.py
 python3 tools/performance/a1-private-index/test_platform.py
+python3 tools/performance/fingerprint-fusion/test_controls.py
 python3 tools/shared/test_perf_inference.py
 python3 tools/shared/test_io_action_sharing_controls.py
 python3 tools/shared/test_framework_controls.py

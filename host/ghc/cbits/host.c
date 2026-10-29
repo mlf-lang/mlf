@@ -1,6 +1,10 @@
 /* Byte/integer-only FFI adapter. These private transport objects never contain
  * a Haskell or MLF heap pointer. Reuse the native OS and process protocol code
  * without linking mlf_runtime.c, GMP allocator hooks, or BDWGC. */
+/* Expose the existing syscall ABI for optional Linux child readiness. */
+#if defined(__linux__) && !defined(_DEFAULT_SOURCE)
+#define _DEFAULT_SOURCE 1
+#endif
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 700
 #endif
