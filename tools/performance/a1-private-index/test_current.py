@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Cheap fail-closed contract checks; these do not claim compiled A1 coverage."""
 import importlib.util
+import copy
 import json
 from pathlib import Path
 import unittest
@@ -86,6 +87,115 @@ class CurrentCompatibilityTests(unittest.TestCase):
             self.assertIn(required, code)
         self.assertEqual(code.count('reject "'), 7)
         self.assertIn("require_builtin_result(code, so, se)", (HERE / 'run_current_controls.py').read_text())
+
+    def test_cf39_transition_preserves_previous_anchor_and_other_inputs(self):
+        self.assertEqual(current.sha(current.COMPATIBILITY), current.COMPATIBILITY_SHA256)
+        self.assertEqual(current.sha(current.MIGRATION), current.MIGRATION_SHA256)
+        result = current.migrate_source_hashes(current.PREVIOUS_SHARED_HASHES,
+                                               current.migration, current.COMPATIBILITY_SHA256)
+        self.assertEqual(result, current.SHARED_HASHES)
+        self.assertEqual(len(result), 126)
+        self.assertEqual({name for name in result
+                          if result[name] != current.PREVIOUS_SHARED_HASHES[name]},
+                         current.MIGRATED_MODULES)
+        self.assertEqual(len(set(result) - current.MIGRATED_MODULES), 120)
+        self.assertEqual(len(current.compatibility['changed_shared_inputs']), 15)
+        self.assertEqual(len(current.compatibility['added_shared_inputs']), 3)
+
+    def test_each_cf39_input_is_required_and_not_stale(self):
+        for name in sorted(current.MIGRATED_MODULES):
+            for mutation in ('missing', 'zero', 'previous'):
+                producer = self.producer()
+                if mutation == 'missing':
+                    producer['shared_inputs'].pop(name)
+                else:
+                    producer['shared_inputs'][name]['sha256'] = (
+                        '0' * 64 if mutation == 'zero' else current.PREVIOUS_SHARED_HASHES[name])
+                with self.subTest(module=name, mutation=mutation), self.assertRaises(ValueError):
+                    current.authenticate_current_source(producer)
+        producer = self.producer()
+        producer['shared_inputs'] = {name: {'sha256': digest}
+                                    for name, digest in current.PREVIOUS_SHARED_HASHES.items()}
+        with self.assertRaises(ValueError):
+            current.authenticate_current_source(producer)
+
+    def test_exact_resolved_and_inferred_keysets(self):
+        for field in ('resolved_modules', 'inferred_shared_interfaces'):
+            for mutation in ('missing', 'extra', 'same_count_wrong_name'):
+                producer = self.producer()
+                if mutation != 'extra':
+                    producer[field].pop('Bootstrap.BuiltinPreludeLiteral')
+                if mutation != 'missing':
+                    producer[field]['Unexpected'] = None
+                with self.subTest(field=field, mutation=mutation), self.assertRaises(ValueError):
+                    current.authenticate_current_source(producer)
+
+    def test_cf39_migration_wrong_metadata_rejected(self):
+        mutations = {
+            'format': 'unreviewed', 'from_ref': '0' * 40, 'from_tree': '0' * 40,
+            'to_ref': '0' * 40, 'to_tree': '0' * 40,
+            'prior_compatibility_sha256': '0' * 64, 'module_count': 125,
+            'unchanged_shared_input_count': 119, 'historical_changed_count': 15,
+            'historical_added_count': 4, 'added_shared_inputs': {'Unexpected': '0' * 64},
+            'removed_shared_inputs': ['Bootstrap.Map']}
+        for key, replacement in mutations.items():
+            value = copy.deepcopy(current.migration)
+            value[key] = replacement
+            with self.subTest(field=key), self.assertRaises(ValueError):
+                current.migrate_source_hashes(current.PREVIOUS_SHARED_HASHES, value,
+                                              current.COMPATIBILITY_SHA256)
+        for mutation in ('missing_field', 'extra_field', 'wrong_base_anchor', 'wrong_base_input'):
+            value, base = copy.deepcopy(current.migration), dict(current.PREVIOUS_SHARED_HASHES)
+            digest = current.COMPATIBILITY_SHA256
+            if mutation == 'missing_field':
+                value.pop('module_count')
+            elif mutation == 'extra_field':
+                value['unexpected'] = True
+            elif mutation == 'wrong_base_anchor':
+                digest = '0' * 64
+            else:
+                base['Bootstrap.Map'] = '0' * 64
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                current.migrate_source_hashes(base, value, digest)
+
+    def test_cf39_migration_exact_delta_and_old_hashes(self):
+        for name in sorted(current.MIGRATED_MODULES):
+            for mutation in ('missing', 'wrong_old', 'same_as_old', 'zero_new', 'bad_hex', 'extra_row_key'):
+                value = copy.deepcopy(current.migration)
+                row = value['changed_shared_inputs'][name]
+                if mutation == 'missing':
+                    value['changed_shared_inputs'].pop(name)
+                elif mutation == 'wrong_old':
+                    row['old'] = '0' * 64
+                elif mutation == 'same_as_old':
+                    row['new'] = row['old']
+                elif mutation == 'zero_new':
+                    row['new'] = '0' * 64
+                elif mutation == 'bad_hex':
+                    row['new'] = 'z' * 64
+                else:
+                    row['extra'] = True
+                with self.subTest(module=name, mutation=mutation), self.assertRaises(ValueError):
+                    current.migrate_source_hashes(current.PREVIOUS_SHARED_HASHES, value,
+                                                  current.COMPATIBILITY_SHA256)
+        for mutation in ('extra', 'same_count_wrong_name'):
+            value = copy.deepcopy(current.migration)
+            row = value['changed_shared_inputs']['Bootstrap.BuiltinPreludeLiteral']
+            if mutation == 'same_count_wrong_name':
+                value['changed_shared_inputs'].pop('Bootstrap.BuiltinPreludeLiteral')
+            value['changed_shared_inputs']['Unexpected'] = row
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                current.migrate_source_hashes(current.PREVIOUS_SHARED_HASHES, value,
+                                              current.COMPATIBILITY_SHA256)
+
+    def test_cf39_manifest_tamper_is_not_a_new_expected_snapshot(self):
+        raw = current.MIGRATION.read_bytes()
+        self.assertEqual(current.parse_migration(raw), current.migration)
+        altered = copy.deepcopy(current.migration)
+        altered['changed_shared_inputs']['Bootstrap.BuiltinPreludeLiteral']['new'] = '1' * 64
+        for mutation in (raw + b' ', json.dumps(altered).encode(), b'{}'):
+            with self.subTest(mutation_bytes=len(mutation)), self.assertRaises(ValueError):
+                current.parse_migration(mutation)
 
 
 if __name__ == '__main__':
