@@ -19,6 +19,10 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <time.h>
+#if defined(__linux__)
+#include <poll.h>
+#include <sys/syscall.h>
+#endif
 
 static MlfValue *os_getEnv(MlfValue *name) {
     const char *key = file_path(name);
@@ -125,20 +129,45 @@ static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *speci
     free(parts);
     struct timespec start,now,pause = {0,10000000};
     if (clock_gettime(CLOCK_MONOTONIC,&start)) { kill(-pid,SIGKILL); kill(pid,SIGKILL); waitpid(pid,NULL,0); fail("IO error: runProcess failed"); }
+    /* Readiness only shortens the existing pause. waitpid remains the sole
+     * status/reaping authority; unsupported hosts retain the old path. */
+    int ready_fd = -1;
+#if defined(__linux__) && defined(SYS_pidfd_open)
+    struct sigaction child_action;
+    if (!sigaction(SIGCHLD,NULL,&child_action) &&
+        child_action.sa_handler == SIG_DFL && !(child_action.sa_flags & SA_NOCLDWAIT))
+        ready_fd = (int)syscall(SYS_pidfd_open,(long)pid,0L);
+#endif
     int status;
     for (;;) {
         pid_t done = waitpid(pid,&status,WNOHANG);
         if (done == pid) break;
-        if (done<0 && errno!=EINTR) fail("IO error: runProcess failed");
+        if (done<0 && errno!=EINTR) {
+            if (ready_fd>=0) close(ready_fd);
+            fail("IO error: runProcess failed");
+        }
         clock_gettime(CLOCK_MONOTONIC,&now);
         if (now.tv_sec-start.tv_sec >= seconds && (now.tv_sec-start.tv_sec>seconds || now.tv_nsec>=start.tv_nsec)) {
             /* A timed-out supervised subprocess invalidates the whole action.
              * Killing its enclosing scope also stops grandchildren. */
+            if (ready_fd>=0) close(ready_fd);
             kill(supervised ? -getpgrp() : -pid,SIGKILL); kill(pid,SIGKILL); while (waitpid(pid,&status,0)<0 && errno==EINTR) {}
             return small(124);
         }
+#if defined(__linux__) && defined(SYS_pidfd_open)
+        if (ready_fd>=0) {
+            struct pollfd event = {ready_fd,POLLIN,0};
+            int ready = poll(&event,1,10);
+            if (ready>=0 && !(event.revents & (POLLERR|POLLNVAL))) continue;
+            if (ready<0 && errno==EINTR) continue;
+            /* Disable an unusable wake source, without repeated-error spins.
+             * Linux close is not retried: its fd number may already be free. */
+            close(ready_fd); ready_fd = -1;
+        }
+#endif
         nanosleep(&pause,NULL);
     }
+    if (ready_fd>=0) close(ready_fd);
     return small(WIFEXITED(status) ? WEXITSTATUS(status) : 128+WTERMSIG(status));
 }
 
