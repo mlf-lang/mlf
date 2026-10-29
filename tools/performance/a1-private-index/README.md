@@ -46,9 +46,10 @@ repository holding those commits, not an alternate source overlay.
 This fixed-ref experiment is **not the integrated-HEAD correctness gate**.
 To check the current checkout, build its maintained O2 producer and run
 `check_integrated.py --producer /absolute/producer --output /absolute/fresh/checks`.
-The latter prepares one tiny fresh builtin fixture and runs the independent
-finite A1 controls; it does not benchmark, select a historical ref, or establish
-a speedup. The P1–P3 controls have their own current-producer runner in
+The latter prepares one tiny fresh builtin fixture and uses the explicit
+[current representation compatibility gate](current/README.md) before running
+the unchanged independent finite A1 controls. It does not benchmark, select a
+historical ref, regenerate expectations, or establish a speedup. The P1–P3 controls have their own current-producer runner in
 `../crate-optimizations/`.
 
 ```sh

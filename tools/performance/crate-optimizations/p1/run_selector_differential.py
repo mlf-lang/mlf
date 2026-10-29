@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build only two test modules against an authenticated, read-only GHC producer.
+"""Build isolated test modules against an authenticated, read-only GHC producer.
 
 Run serially under the task's process-tree resource watchdog. This does not
 build the compiler, change its sources, or invoke native/MLF bootstrap.
@@ -20,7 +20,55 @@ HERE = Path(__file__).resolve().parent
 
 
 def sha(path):
-    return hashlib.file_digest(Path(path).open('rb'), 'sha256').hexdigest()
+    with Path(path).open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def replace_once(contents, old, new):
+    if contents.count(old) != 1:
+        raise ValueError('oracle adaptation must replace exactly one occurrence: ' + old.decode())
+    return contents.replace(old, new)
+
+
+def authenticate_oracle(source, here=HERE):
+    """Check literal fixtures and narrowly adapted independent dependencies."""
+    manifest_path = here / 'oracle-manifest.json'
+    oracle = json.loads(manifest_path.read_text())
+    original = (here / 'FrozenSelectors.hs').read_bytes()
+    if hashlib.sha256(original).hexdigest() != oracle['oracle_sha256']:
+        raise ValueError('frozen oracle changed')
+    if sha(here / 'original-selector-excerpts.txt') != oracle['excerpt_sha256']:
+        raise ValueError('frozen original excerpts changed')
+    for path, digest in oracle['shared_dependency_pins'].items():
+        if sha(source / path) != digest:
+            raise ValueError('oracle dependency changed; independent re-audit required: ' + path)
+    layer = oracle['collection_dependency_reaudit']
+    for path, digest in layer['candidate_dependency_pins'].items():
+        if sha(source / path) != digest:
+            raise ValueError('reviewed collection dependency changed; independent re-audit required: ' + path)
+    adaptations = {
+        'FrozenSelectorMap.hs': [(b'module Bootstrap.Map where {', b'module FrozenSelectorMap where {')],
+        'FrozenSelectorSet.hs': [(b'module Bootstrap.Set where {', b'module FrozenSelectorSet where {'),
+                                 (b'import qualified Bootstrap.Map as M;', b'import qualified FrozenSelectorMap as M;')],
+    }
+    if (len(layer['frozen_modules']) != len(adaptations) or
+            {item['file'] for item in layer['frozen_modules']} != set(adaptations)):
+        raise ValueError('frozen collection module inventory changed')
+    for item in layer['frozen_modules']:
+        contents = (here / item['file']).read_bytes()
+        if hashlib.sha256(contents).hexdigest() != item['oracle_sha256']:
+            raise ValueError('frozen collection oracle changed: ' + item['file'])
+        for old, new in reversed(adaptations[item['file']]):
+            contents = replace_once(contents, new, old)
+        if hashlib.sha256(contents).hexdigest() != item['baseline_sha256']:
+            raise ValueError('frozen collection body differs from historical baseline: ' + item['file'])
+    adapted = replace_once(original, b'import qualified Bootstrap.Map as M;',
+                            b'import qualified FrozenSelectorMap as M;')
+    adapted = replace_once(adapted, b'import qualified Bootstrap.Set as Set;',
+                            b'import qualified FrozenSelectorSet as Set;')
+    if hashlib.sha256(adapted).hexdigest() != layer['adapted_selector_sha256']:
+        raise ValueError('import-only selector adaptation changed')
+    return oracle, adapted
 
 
 def main():
@@ -55,17 +103,16 @@ def main():
         if producer['optimization'] != '2':
             raise ValueError('this acceptance harness requires the candidate O2 producer')
         manifest_path = HERE / 'oracle-manifest.json'
-        oracle = json.loads(manifest_path.read_text())
-        if sha(HERE / 'FrozenSelectors.hs') != oracle['oracle_sha256']:
-            raise ValueError('frozen oracle changed')
-        if sha(HERE / 'original-selector-excerpts.txt') != oracle['excerpt_sha256']:
-            raise ValueError('frozen original excerpts changed')
-        for path, digest in oracle['shared_dependency_pins'].items():
-            if sha(source / path) != digest:
-                raise ValueError('oracle dependency changed; independent re-audit required: ' + path)
+        oracle, adapted_selectors = authenticate_oracle(source)
+        oracle_sources = output / 'oracle-sources'
+        oracle_sources.mkdir()
+        adapted_selector_path = oracle_sources / 'FrozenSelectors.hs'
+        adapted_selector_path.write_bytes(adapted_selectors)
         inputs = {str(path): sha(path) for path in
                   [Path(__file__), HERE / 'SelectorDifferential.hs', HERE / 'FrozenSelectors.hs',
-                   HERE / 'original-selector-excerpts.txt', manifest_path, receipt_path, direct_path]}
+                   HERE / 'original-selector-excerpts.txt', HERE / 'FrozenSelectorMap.hs',
+                   HERE / 'FrozenSelectorSet.hs', manifest_path, receipt_path, direct_path,
+                   adapted_selector_path]}
         shutil.copy2(__file__, output / 'runner-used.py')
         # GHC one-shot home-module lookup uses the requested interface output
         # directory. Populate that directory from the authenticated producer,
@@ -96,7 +143,10 @@ def main():
 
         record.update(producer_receipt_sha256=sha(receipt_path), source_root=str(source),
                       producer_directory=str(producer_dir), inputs=inputs,
-                      expected_checks=154072, oracle_shared_dependencies=oracle['shared_dependency_pins'],
+                      expected_checks=154072, expected_collection_checks=6162,
+                      oracle_shared_dependencies=oracle['shared_dependency_pins'],
+                      oracle_collection_dependency_layer=oracle['collection_dependency_reaudit'],
+                      selector_adaptation='Map/Set imports only; original literal fixture unchanged',
                       copied_dependency_files=copied_dependencies,
                       producer_main_objects_excluded=True,
                       compiler_sources_on_search_path=False)
@@ -142,18 +192,24 @@ def main():
         import_flags = ['-i', '-i'+str(objects)]
         # One-shot compilation: only copied, pinned .hi files are searchable. No
         # implementation source root is on the module search path.
+        for module in ['FrozenSelectorMap', 'FrozenSelectorSet']:
+            run('compile-'+module, [ghc, '-c', *flags, *import_flags, '-odir', objects, '-hidir', objects,
+                                    HERE / (module + '.hs')])
         run('compile-oracle', [ghc, '-c', *flags, *import_flags, '-odir', objects, '-hidir', objects,
-                               HERE / 'FrozenSelectors.hs'])
+                               adapted_selector_path])
         run('compile-harness', [ghc, '-c', *flags, *import_flags, '-odir', objects, '-hidir', objects,
                                 '-o', objects / 'SelectorDifferential.o',
                                 '-ohi', objects / 'Main.hi', HERE / 'SelectorDifferential.hs'])
         verify_copied_dependencies()
         actual_object_files = {str(path.relative_to(objects)) for path in objects.rglob('*') if path.is_file()}
-        expected_test_files = {'FrozenSelectors.o', 'FrozenSelectors.hi', 'SelectorDifferential.o', 'Main.hi'}
+        expected_test_files = {'FrozenSelectorMap.o', 'FrozenSelectorMap.hi',
+                               'FrozenSelectorSet.o', 'FrozenSelectorSet.hi',
+                               'FrozenSelectors.o', 'FrozenSelectors.hi', 'SelectorDifferential.o', 'Main.hi'}
         if actual_object_files != set(copied_dependencies) | expected_test_files:
-            raise ValueError('Haskell compilation output was not exactly two test modules')
-        record['new_haskell_modules'] = ['FrozenSelectors', 'Main (SelectorDifferential.hs)']
-        record['only_two_test_modules_compiled'] = True
+            raise ValueError('Haskell compilation output was not exactly four test modules')
+        record['new_haskell_modules'] = ['FrozenSelectorMap', 'FrozenSelectorSet',
+                                         'FrozenSelectors', 'Main (SelectorDifferential.hs)']
+        record['only_four_test_modules_compiled'] = True
         transport = []
         for label, path in [('host', 'host/ghc/cbits/host.c'), ('supervisor', 'runtime/mlf_process_supervisor.c')]:
             target = objects / (label + '.o')
@@ -163,14 +219,15 @@ def main():
         link_objects = [objects / path for path in sorted(copied_dependencies) if path.endswith('.o')]
         executable = output / 'selector-differential'
         run('link', [ghc, *flags, '-rtsopts=ignoreAll', objects / 'SelectorDifferential.o',
-                     objects / 'FrozenSelectors.o', *link_objects, *transport, '-o', executable])
+                     objects / 'FrozenSelectors.o', objects / 'FrozenSelectorMap.o',
+                     objects / 'FrozenSelectorSet.o', *link_objects, *transport, '-o', executable])
         stdout = run('execute', [executable], timeout=600)
         lines = stdout.splitlines()
         if len(lines) != 2 or lines[1] != b'Frozen selector differential, ordered identity/error and lazy-demand controls passed.':
             raise ValueError('completion output changed')
         observed = json.loads(lines[0])
         expected = {'format': 'selector-differential-v1', 'complete': True, 'checks': 154072,
-                    'exhaustive_interfaces': 512, 'authored_interfaces': 20,
+                    'collection_checks': 6162, 'exhaustive_interfaces': 512, 'authored_interfaces': 20,
                     'stress_interfaces': 4, 'scope': 'partial'}
         if observed != expected or (output / 'execute.stderr').read_bytes():
             raise ValueError('actual test inventory/status/stderr changed')

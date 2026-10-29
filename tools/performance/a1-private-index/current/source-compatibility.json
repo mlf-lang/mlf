@@ -1,0 +1,31 @@
+{
+  "added_shared_inputs": {
+    "Bootstrap.LLVM.Library": "244afc9ea229ba99505e6ffaff992e1a2966341db5214f2d9b8b4461452a69f7",
+    "MLF.NativeBuild": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
+    "MLF.PreparedNativeData": "908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33"
+  },
+  "changed_shared_inputs": {
+    "Bootstrap.CrateArtifact": "b5dbdb8dffea1eaffadc9c369dde29b8a259edad2ded8a475e7a7553cc9422a5",
+    "Bootstrap.Data": "5eea0898ba2e6fd7fbbef826fae73fd9705a13b7e635c302d5a1bcd4ea5a9818",
+    "Bootstrap.ImportedRoot": "a4918d46204194016461c72406877b33a9bd31466d168e5274791eabd8eafa24",
+    "Bootstrap.LLVM.Build": "a2ce7074f82495ae72256c392e42f2649c312d823021b285d2c906d7423fd8a9",
+    "Bootstrap.LLVM.Codegen": "8d01370b45427075823f502de249a994e98ddd5b1baf901fec3da33cb4193654",
+    "Bootstrap.Map": "1fdf24d3b3874c76d246f098ee9361a7f93e7eb01f741e064347452976cdaf0a",
+    "Bootstrap.Module": "14f258fd098e1ef3d261833d20bfadc2b4b4c6cb2dcc0f0e9cba0218ab08d2e3",
+    "Bootstrap.PreparedLibraries": "0df6fa9d2b6a0b8134eb9afbbe7d042feac894f4ddba8384966b833f71fc97b8",
+    "Bootstrap.Separate": "daeca3932643556ad27021819fc850ba05f8314342513fdade36c310edd2b6e4",
+    "Bootstrap.X.Checked": "9c3a1f3221c09d5d745a14dcb7fadc9d2406b0fb4d405135692aeff89d5c6b0d",
+    "Bootstrap.X.Pretty": "e306974ba25d17632dcefeae0c38c396e15f78f5373647df93da29e8f35a03b6",
+    "MLF.BuiltinPreludeData": "6e28bdd5400fd2281246b0b5c8f19ca21f1840f2dbfda9bc52eaf0a8749f3a6d",
+    "MLF.Entry.Emlf": "d5da6a564e6227a65ddb88a0c328495256e0ad817ca94f32957ba2d64b13ee19",
+    "MLF.PreparedCompiler": "9a36850ff04404b488316feb169b869b28acaf9c226b33c6810a0a3eecb95c47",
+    "MLF.PreparedLibraryData": "eececfa9f5b0ef2901e749b4a1798ac2cf78bea3378d9e33fcbc0a0ded94c6b1"
+  },
+  "format": "a1-current-source-compatibility-v1",
+  "historical_runner_sha256": "ea838a551230d1ea89e2eac1fe9948111f24dcb88f539152b1e25f5ccde410cc",
+  "historical_source_ref": "5a89143ecbcaaef152a7e88331583660192e106d",
+  "module_count": 126,
+  "policy": "Source identity migration only; no behavioral oracle or expected stdout regenerated. Historical runner, frozen fixture bytes, and builtin pair hashes remain unchanged.",
+  "removed_shared_inputs": [],
+  "reviewed_source_ref": "1f4c2f817cc2de2b3b5f3ceb6b35120d7a0976c1"
+}

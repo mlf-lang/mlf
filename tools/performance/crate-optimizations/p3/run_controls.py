@@ -26,15 +26,26 @@ try:
  direct=S/'tools/shared/test_direct.py';m=types.ModuleType('prefix_control_authentication');m.__file__=str(direct)
  exec(compile(direct.read_bytes(),str(direct),'exec'),m.__dict__)
  m.authenticate_build(receipt,P/'bin',root=S)
+ compatibility_path=D.parent/'p2/native_compatibility.py'
+ compatibility=types.ModuleType('native_p3_compatibility');compatibility.__file__=str(compatibility_path)
+ exec(compile(compatibility_path.read_bytes(),str(compatibility_path),'exec'),compatibility.__dict__)
+ native_manifest,historical_sources=compatibility.authenticate(S)
  helper_manifest=json.loads((D/'controls-manifest.json').read_text())
  assert helper_manifest['expected_differential_controls']==EXPECTED_CONTROLS
  assert set(helper_manifest['expected_compiled_modules'])==EXPECTED_MODULES
- assert all(sha(D/n)==h for n,h in helper_manifest['inputs'].items()),'frozen helper input changed'
+ # Retain the historical runner bytes/pin as provenance; the new runner and
+ # exact source projection are pinned by the later compatibility manifest.
+ assert all(sha(D/('historical-run-controls.py.txt' if n=='run_controls.py' else n))==h
+            for n,h in helper_manifest['inputs'].items()),'frozen helper input changed'
  oracle=json.loads((D/'oracle-manifest.json').read_text())
  assert all(sha(D/n)==h for n,h in oracle['frozen'].items())
  candidate=json.loads((D/'candidate.json').read_text())
- assert all(sha(S/n)==h for n,h in candidate['source_sha256'].items())
+ assert all(hashlib.sha256(historical_sources.get(n,(S/n).read_bytes())).hexdigest()==h
+            for n,h in candidate['source_sha256'].items())
  inputs=[D/n for n in ['FrozenPrefix.hs','FrozenInferenceUnit.hs','PrefixControls.hs','oracle-manifest.json','candidate.json','controls-manifest.json','run_controls.py']]
+ inputs += [compatibility.MANIFEST,compatibility_path,*[S/n for n in native_manifest['inputs']]]
+ j['historical_candidate_pins_verified_after_exact_native_projection']=True
+ j['native_compatibility_source_pins']={n:e['current_sha256'] for n,e in native_manifest['sources'].items()}
  j['test_input_sha256']={str(f):sha(f) for f in inputs};j['authentication_before']=True
  objects=out/'objects';shutil.copytree(P/'objects',objects)
  for ext in ['hi','o']:(objects/('Main.'+ext)).unlink(missing_ok=True)

@@ -6,6 +6,15 @@ semantic proof, a performance result, or acceptance of A1. P3 remains the accept
 optimization. The runner is A1-only; it cannot qualify a P3 producer lacking the
 registered private owner and index store.
 
+## Historical versus current source
+
+The commands below describe the frozen historical runner. Current integrated
+checks use `check_integrated.py` and its separate `run_current_controls.py`
+[representation compatibility contract](current/README.md). The current path
+retains these exact authored controls while authenticating the reviewed 126-module
+source inventory and checking the actual builtin against its committed canonical
+structural literal. It does not replace these historical source or builtin pins.
+
 ## Run locally
 
 Use the same Python interpreter that created the official build receipt. Python

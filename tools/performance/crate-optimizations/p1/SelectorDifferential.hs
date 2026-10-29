@@ -10,8 +10,10 @@ import Data.List (isInfixOf, subsequences)
 import qualified Bootstrap.Module as Candidate
 import qualified FrozenSelectors as Oracle
 import qualified Bootstrap.Types as T
-import qualified Bootstrap.Map as Map
-import qualified Bootstrap.Set as Set
+import qualified FrozenSelectorMap as Map
+import qualified Bootstrap.Map as CandidateMap
+import qualified FrozenSelectorSet as Set
+import qualified Bootstrap.Set as CandidateSet
 import qualified Bootstrap.Primitive as Primitive
 import qualified MLF.Host.Base as Host
 
@@ -46,7 +48,9 @@ resultImage result = case result of
   T.Right interface -> Right (interfaceImage interface)
 
 -- Build both implementations' input through frozen comparators, not candidate
--- interface/visible. The same original identity may occur under many aliases.
+-- interface/visible or collections. Frozen and candidate collections share
+-- Bootstrap.Types datatypes, so no conversion (or candidate setup) is needed.
+-- The same original identity may occur under many aliases.
 environment :: [Entry] -> Candidate.Interface
 environment entries = Candidate.Interface $
   Map.fromListWith Oracle.compareKey (Set.union Oracle.compareEntity)
@@ -245,6 +249,95 @@ fixedExpectations count = do
   compareValue count "fixed/unknown-hidden-type" (Left "name is not exported: Missing")
     (resultImage (Candidate.selectItem True env (T.ExportType "Missing" T.Abstract)))
 
+-- Equal ranks deliberately have different observable key representatives.
+-- List-authored expectations neither call candidate operations nor derive from
+-- the frozen map result; they check both implementations independently.
+type CollectionKey = (Integer, String)
+
+compareCollectionKey :: CollectionKey -> CollectionKey -> Integer
+compareCollectionKey (a, _) (b, _) = if a < b then -1 else if a > b then 1 else 0
+
+collectionControls :: IORef Integer -> IO ()
+collectionControls count = do
+  let ranks = [0..4] :: [Integer]
+      leftKey rank = (rank, "left-" ++ show rank)
+      rightKey rank = (rank, "right-" ++ show rank)
+      leftValue rank = "L" ++ show rank
+      rightValue rank = "R" ++ show rank
+      combine left right = left ++ ">" ++ right
+      cmp = compareCollectionKey
+  forM_ (subsequences ranks) $ \left -> forM_ (subsequences ranks) $ \right -> do
+    let a = Map.fromList cmp [(leftKey rank, leftValue rank) | rank <- left]
+        b = Map.fromList cmp [(rightKey rank, rightValue rank) | rank <- reverse right]
+        aset = Set.fromList cmp (map leftKey left)
+        bset = Set.fromList cmp (map rightKey (reverse right))
+        selected = [rank | rank <- ranks, rank `elem` left || rank `elem` right]
+        key rank = if rank `elem` left then leftKey rank else rightKey rank
+        value rank
+          | rank `elem` left && rank `elem` right = combine (leftValue rank) (rightValue rank)
+          | rank `elem` left = leftValue rank
+          | otherwise = rightValue rank
+        leftBiased rank = if rank `elem` left then leftValue rank else rightValue rank
+        wantCombined = [(key rank, value rank) | rank <- selected]
+        wantUnion = [(key rank, leftBiased rank) | rank <- selected]
+        wantSet = map key selected
+        expectedSize = toInteger (length selected)
+        mapImage tree = (Map.toList tree, Map.valid cmp tree, Map.size tree)
+        setImage values@(T.Set tree) = (Set.toList values, Map.valid cmp tree, Map.size tree)
+        label = "collections/" ++ show left ++ "/" ++ show right
+    -- The historical validator checks every cached subtree size, ordering and
+    -- size-balance invariant independently of candidate operations. Correct
+    -- enumeration alone must not hide a malformed persistent result tree.
+    compareValue count (label ++ "/frozen/unionWith") (wantCombined, True, expectedSize)
+      (mapImage (Map.unionWith cmp combine a b))
+    compareValue count (label ++ "/candidate/unionWith") (wantCombined, True, expectedSize)
+      (mapImage (CandidateMap.unionWith cmp combine a b))
+    compareValue count (label ++ "/frozen/union") (wantUnion, True, expectedSize)
+      (mapImage (Map.union cmp a b))
+    compareValue count (label ++ "/candidate/union") (wantUnion, True, expectedSize)
+      (mapImage (CandidateMap.union cmp a b))
+    compareValue count (label ++ "/frozen/set-union") (wantSet, True, expectedSize)
+      (setImage (Set.union cmp aset bset))
+    compareValue count (label ++ "/candidate/set-union") (wantSet, True, expectedSize)
+      (setImage (CandidateSet.union cmp aset bset))
+  -- Valid tree shapes and total comparators; values/combining functions stay
+  -- lazy. Deliberately do not claim equivalence for a bottom comparator:
+  -- candidate's empty-right fast path can avoid old reconstruction comparisons.
+  let cmp = compareCollectionKey
+      a = Map.fromList cmp [((0,"left-0"), "L"),
+                            ((1,"left-1"), error "stored value poison"),
+                            ((2,"left-2"), "T")]
+      b = Map.singleton (0,"right-0") (error "right value poison")
+      small = Map.singleton (0,"small-left") "S"
+      large = Map.fromList cmp [((0,"right-0"), error "right value poison"),
+                                ((1,"right-1"), error "stored value poison"),
+                                ((2,"right-2"), "U")]
+      leftKeys = [(0,"left-0"),(1,"left-1"),(2,"left-2")]
+      rightKeys = [(0,"small-left"),(1,"right-1"),(2,"right-2")]
+      unusedCombine = error "combine poison"
+  forM_ [("frozen", Map.unionWith), ("candidate", CandidateMap.unionWith)] $ \(label, unionWith) -> do
+    let check suffix = compareValue count ("collections/lazy/" ++ label ++ "/" ++ suffix)
+        joined = unionWith cmp const a b
+    check "left-larger-keys" leftKeys (Map.keys (unionWith cmp unusedCombine a b))
+    check "right-larger-keys" rightKeys (Map.keys (unionWith cmp unusedCombine small large))
+    check "left-larger-left-value" "L" (Map.get cmp (0, "lookup") joined)
+    check "right-larger-left-value" "S" (Map.get cmp (0, "lookup") (unionWith cmp const small large))
+    check "empty-left-keys" leftKeys (Map.keys (unionWith cmp unusedCombine Map.empty a))
+    check "empty-right-keys" leftKeys (Map.keys (unionWith cmp unusedCombine a Map.empty))
+    check "disjoint-unused-combiner" [((0,"a"),"A"),((1,"b"),"B")]
+      (Map.toList (unionWith cmp unusedCombine (Map.singleton (0,"a") "A") (Map.singleton (1,"b") "B")))
+    expectCollectionPoison count (label ++ "/stored-value-sensitive") "stored value poison"
+      (Map.get cmp (1, "lookup") joined == "unused")
+    expectCollectionPoison count (label ++ "/combiner-sensitive") "combine poison"
+      (Map.get cmp (0, "lookup") (unionWith cmp unusedCombine a b) == "unused")
+
+expectCollectionPoison :: IORef Integer -> String -> String -> Bool -> IO ()
+expectCollectionPoison count label message value = do
+  outcome <- try (evaluate value) :: IO (Either SomeException Bool)
+  case outcome of
+    Left exception | message `isInfixOf` show exception -> modifyIORef' count (+1)
+    _ -> error (label ++ ": collection poison control did not raise the expected exception")
+
 main :: IO ()
 main = do
   checks <- newIORef 0
@@ -263,8 +356,12 @@ main = do
       ["T0", "Q.T0", "T17", "Q.T17", "Missing"] ordered
   lazyControls checks
   fixedExpectations checks
+  collections <- newIORef 0
+  collectionControls collections
+  collectionCount <- readIORef collections
+  unless (collectionCount == 6162) (error ("collection test inventory changed: " ++ show collectionCount))
   count <- readIORef checks
   unless (count == 154072) (error ("test inventory changed: " ++ show count))
   putStrLn ("{\"format\":\"selector-differential-v1\",\"complete\":true,\"checks\":" ++ show count ++
-    ",\"exhaustive_interfaces\":512,\"authored_interfaces\":20,\"stress_interfaces\":4,\"scope\":\"partial\"}")
+    ",\"collection_checks\":" ++ show collectionCount ++ ",\"exhaustive_interfaces\":512,\"authored_interfaces\":20,\"stress_interfaces\":4,\"scope\":\"partial\"}")
   putStrLn "Frozen selector differential, ordered identity/error and lazy-demand controls passed."

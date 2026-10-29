@@ -12,8 +12,6 @@ import types
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-BUILTIN = {'.mlfci': 'e7e79d5aba844f4eeb426bb65c65a4a52831b5274df4bd217ced55a9703f099b',
-           '.mlfco': '3d0e214228cb180d8cee9fb3fd21c5ec6abd8348e1ddd131517831d1f5c2d799'}
 
 
 def require(condition, message):
@@ -45,7 +43,7 @@ def main():
     before = auth.authenticate_build(producer / 'receipt.json', producer / 'bin', root=ROOT)
     require(before['optimization'] == '2', 'current complete O2 producer required')
     out.mkdir(parents=True)
-    record = {'format': 'integrated-a1-controls-v1', 'complete': False,
+    record = {'format': 'integrated-a1-controls-v2', 'complete': False,
               'historical_ref_selected': False, 'performance_measured': False,
               'optimization_accepted': False, 'native_bootstrap_executed': False,
               'producer_receipt_sha256': sha(producer / 'receipt.json'),
@@ -90,20 +88,26 @@ def main():
         spec.write_text(pack(['MLF-CRATE-1', 'a1-integrated-controls/fixture', '', 'false',
                               pack([pack(['Fixture', str(fixture)])]), '', str(queries), str(builtin)]))
         pins = {str(p): sha(p) for p in [Path(__file__), auth_path, fixture, spec,
-                                        HERE / 'run_controls.py', producer / 'receipt.json']}
+                                        HERE / 'run_current_controls.py', producer / 'receipt.json']}
         run('prepare-builtin', [producer / 'bin/emlf', '--compile-crate', spec, '-o', target])
-        for suffix, digest in BUILTIN.items():
+        # Hash only for immutability. The current control runner must admit the
+        # actual decoded pair against the committed canonical RawPrelude literal;
+        # historical byte hashes remain exclusive to run_controls.py.
+        for suffix in ['.mlfci', '.mlfco']:
             path = Path(str(builtin) + suffix)
-            require(sha(path) == digest, 'fresh canonical builtin byte identity')
-            pins[str(path)] = digest
+            pins[str(path)] = sha(path)
         report = json.loads(Path(str(target) + '.queries').read_text())
         require(report['inferred_groups'] == 1 and report['reused_groups'] == 0 and
                 len(report['groups']) == 1 and report['groups'][0]['cached'] is False,
                 'one genuinely fresh fixture source group required')
-        run('controls', [sys.executable, '-B', HERE / 'run_controls.py', '--source-root', ROOT,
+        run('controls', [sys.executable, '-B', HERE / 'run_current_controls.py', '--source-root', ROOT,
                          '--producer', producer, '--builtin-prefix', builtin, '--output', out / 'controls'])
         result = json.loads((out / 'controls/receipt.json').read_text())
         require(result.get('complete') is True and result.get('all_controls_passed') is True and
+                result.get('format') == 'current-a1-controls-v1' and
+                result.get('builtin_controls_passed') is True and
+                result.get('builtin_malformed_rejections') == 7 and
+                result.get('historical_builtin_identity_claimed') is False and
                 result.get('session_groups_passed') == 6 and result.get('finite_trace_cases') == 28 and
                 result.get('admission_controls_passed') is True and len(result.get('file_cases', [])) == 9 and
                 result.get('negative_cases_passed') == 4, 'complete exact finite A1 gate required')

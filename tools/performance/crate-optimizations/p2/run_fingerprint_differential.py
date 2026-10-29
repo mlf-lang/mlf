@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build only two test modules against an authenticated, read-only GHC producer.
+"""Build frozen P2 controls and a later native-compatibility test module.
 
 Run serially under the task's process-tree resource watchdog. This does not
 build the compiler, change its sources, or invoke native/MLF bootstrap.
@@ -54,6 +54,11 @@ def main():
         producer = direct.authenticate_build(receipt_path, producer_dir / 'bin', root=source)
         if producer['optimization'] != '2':
             raise ValueError('this acceptance harness requires the candidate O2 producer')
+        compatibility_path = HERE / 'native_compatibility.py'
+        compatibility = types.ModuleType('native_p2_compatibility')
+        compatibility.__file__ = str(compatibility_path)
+        exec(compile(compatibility_path.read_bytes(), str(compatibility_path), 'exec'), compatibility.__dict__)
+        native_manifest, historical_sources = compatibility.authenticate(source)
         manifest_path = HERE / 'oracle-manifest.json'
         oracle = json.loads(manifest_path.read_text())
         if sha(HERE / 'FrozenFingerprint.hs') != oracle['oracle_sha256']:
@@ -61,7 +66,7 @@ def main():
         if sha(HERE / 'original-fingerprint-excerpts.txt') != oracle['excerpts_sha256']:
             raise ValueError('frozen original excerpts changed')
         for path, digest in oracle['shared_dependency_pins'].items():
-            if sha(source / path) != digest:
+            if hashlib.sha256(historical_sources.get(path, (source / path).read_bytes())).hexdigest() != digest:
                 raise ValueError('oracle dependency changed; independent re-audit required: ' + path)
         changed_oracles = oracle['changed_dependency_oracles']
         if set(changed_oracles) != {'libraries/mlf-crates/Bootstrap/Separate.hs'}:
@@ -82,11 +87,11 @@ def main():
             changed_inputs.append(p2_file)
             if sha(p2_file) != frozen['candidate_sha256']:
                 raise ValueError('frozen P2 Separate bridge changed')
-            if sha(source / path) != oracle['integrated_p3_sha256']:
+            if hashlib.sha256(historical_sources[path]).hexdigest() != oracle['integrated_p3_sha256']:
                 raise ValueError('integrated Separate differs from reviewed P3')
             before = original_file.read_text()
             after = p2_file.read_text()
-            integrated = (source / path).read_text()
+            integrated = historical_sources[path].decode('utf-8')
             start = frozen['permitted_start_marker']
             end = frozen['permitted_end_marker']
             def unchanged(text):
@@ -111,7 +116,8 @@ def main():
         inputs = {str(path): sha(path) for path in
                   [Path(__file__), HERE / 'FingerprintDifferential.hs', HERE / 'FrozenFingerprint.hs',
                    HERE / 'original-fingerprint-excerpts.txt', manifest_path, receipt_path, direct_path,
-                   *changed_inputs]}
+                   compatibility_path, compatibility.MANIFEST,
+                   *[source / name for name in native_manifest['inputs']], *changed_inputs]}
         shutil.copy2(__file__, output / 'runner-used.py')
         # GHC one-shot home-module lookup uses the requested interface output
         # directory. Populate that directory from the authenticated producer,
@@ -144,6 +150,9 @@ def main():
                       producer_directory=str(producer_dir), inputs=inputs,
                       expected_checks=2503, oracle_shared_dependencies=oracle['shared_dependency_pins'],
                       changed_dependency_oracles=changed_oracles,
+                      native_compatibility_source_pins={name: entry['current_sha256']
+                        for name, entry in native_manifest['sources'].items()},
+                      historical_bridges_verified_after_exact_native_projection=True,
                       copied_dependency_files=copied_dependencies,
                       producer_main_objects_excluded=True,
                       compiler_sources_on_search_path=False)
@@ -212,7 +221,7 @@ def main():
         if actual_object_files != set(copied_dependencies) | expected_test_files:
             raise ValueError('Haskell compilation output was not exactly two test modules')
         record['new_haskell_modules'] = ['FrozenFingerprint', 'Main (FingerprintDifferential.hs)']
-        record['only_two_test_modules_compiled'] = True
+        record['legacy_exactly_two_test_modules_compiled'] = True
         transport = []
         for label, path in [('host', 'host/ghc/cbits/host.c'), ('supervisor', 'runtime/mlf_process_supervisor.c')]:
             target = objects / (label + '.o')
@@ -231,6 +240,29 @@ def main():
         expected = {'format': 'fingerprint-differential-v1', 'complete': True, 'checks': 2503}
         if observed != expected or (output / 'execute.stderr').read_bytes():
             raise ValueError('actual test inventory/status/stderr changed')
+        # Keep the legacy count, executable and frozen oracle unmodified. The
+        # later layer tests new summary/chunk APIs against the same old digest.
+        native_source = HERE / 'NativeCompatibilityControls.hs'
+        run('compile-native-controls', [ghc, '-c', *flags, *import_flags,
+                                        '-main-is', 'NativeCompatibilityControls',
+                                        '-odir', objects, '-hidir', objects, native_source])
+        native_executable = output / 'native-compatibility-controls'
+        run('link-native-controls', [ghc, *flags, '-rtsopts=ignoreAll',
+                                     '-main-is', 'NativeCompatibilityControls',
+                                     objects / 'NativeCompatibilityControls.o',
+                                     objects / 'FrozenFingerprint.o', *link_objects,
+                                     *transport, '-o', native_executable])
+        native_stdout = run('execute-native-controls', [native_executable], timeout=600)
+        native_observed = json.loads(native_stdout)
+        native_expected = {'complete': True, 'native_compatibility_controls': 1243}
+        if native_observed != native_expected or (output / 'execute-native-controls.stderr').read_bytes():
+            raise ValueError('native compatibility result/count/stderr changed')
+        all_test_files = expected_test_files | {'NativeCompatibilityControls.o',
+          'NativeCompatibilityControls.hi', 'host.o', 'supervisor.o'}
+        if {str(path.relative_to(objects)) for path in objects.rglob('*') if path.is_file()} != set(copied_dependencies) | all_test_files:
+            raise ValueError('native compatibility compilation changed object inventory')
+        record['new_haskell_modules'].append('NativeCompatibilityControls')
+        record['native_compatibility_observed'] = native_observed
         direct.authenticate_build(receipt_path, producer_dir / 'bin', root=source)
         for path, digest in inputs.items():
             if sha(path) != digest:
@@ -242,7 +274,7 @@ def main():
         record.update(complete=True, observed=observed, immutable_inputs_verified_after=True,
                       copied_dependency_files_unchanged=True,
                       artifacts={str(path.relative_to(output)): sha(path)
-                                 for path in [executable, *objects.glob('*.o'), *objects.glob('*.hi')]})
+                                 for path in [executable, native_executable, *objects.glob('*.o'), *objects.glob('*.hi')]})
     except BaseException as error:
         record['error'] = {'type': type(error).__name__, 'message': str(error)}
         raise
