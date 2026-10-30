@@ -5,7 +5,9 @@
 This ports the two algorithm files from research commit
 `6be0c51f93ae8f31e4048aebe4c9a9bba3ce0a88` (parent P3
 `875e483de49655030c4ffba1995b60610a50273a`) onto PR #25's
-`d3906cbaefc9d5965ee59bb87b6be8f730ec3204`. It does not merge the divergent
+`d96f67726599fa4e21f236462886106434c8e417`. It preserves the intervening
+query-v6 source-key compaction and its independent P2/P3/A1 compatibility controls.
+It does not merge the divergent
 research branch history, stack C1/C2/C3, modify the sealed A1 implementation,
 change fingerprint/serialization algorithms, or cache target inference.
 

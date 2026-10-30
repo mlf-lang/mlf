@@ -11,7 +11,7 @@ performance retry is launched by `run_controls.py`.
 ## Two oracle responsibilities
 
 The integration-before reference is commit
-`d3906cbaefc9d5965ee59bb87b6be8f730ec3204`. Its complete Graph, Solver and Constraint
+`d96f67726599fa4e21f236462886106434c8e417`. Its complete Graph, Solver and Constraint
 algorithms are byte-identical to P3
 `875e483de49655030c4ffba1995b60610a50273a`. The three local `Frozen*` modules are
 the original independently frozen algorithms, with only the declared module and
@@ -19,6 +19,25 @@ internal Graph/Solver import renames. `manifest.json` records their literal
 hashes and reversible substitutions. The full runner verifies the inverse
 against the actual before source; focused mode checks the fixed inverse hashes,
 never substitutes the candidate for the before source.
+
+`source-basis-query-v6.json` records the explicit migration from the earlier
+integration-before commit `d3906cbaefc9d5965ee59bb87b6be8f730ec3204`. Of the 179
+authenticated input paths, exactly one changed: `Bootstrap.CrateQuery` now has
+SHA256 `61201909b9874944a650153af3492a3a7b5ae953b678b22113d8278c222e9712`.
+All other 178 inputs are unchanged. Both complete contract digests were derived
+from the named immutable Git sources, not candidate output; cheap refusal tests
+reject another changed, added or missing input. This retains the already-reviewed
+query-v6 implementation on **both** sides rather than reverting its namespace or
+silently accepting arbitrary source changes. The actual runners, qualifier,
+resource guards, complete frozen algorithms, authored expectations and v10
+entrypoints remain unchanged. Historical P3/C4 provenance is not relabelled d96.
+
+The new machine must rebuild and authenticate both ordinary producers, rerun the
+full controls and fixed-14 qualification, and compare its own raw checked bytes.
+Old-machine results and incomplete/restored receipts are not new passes. Query
+keys remain side-specific: the 544-group projection, absent initial caches,
+544 fresh / 0 reused checks and exact 544-key-files-plus-two-sidecars contract do
+not change with query-v6.
 
 These modules intentionally use the **same current collections, Types and host
 primitives** as the integration. This isolates the C4 change from earlier PR #25

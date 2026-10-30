@@ -1,6 +1,6 @@
 {
   "format": "c4-integration-controls-source-v1",
-  "base_commit": "d3906cbaefc9d5965ee59bb87b6be8f730ec3204",
+  "base_commit": "d96f67726599fa4e21f236462886106434c8e417",
   "historical_p3_commit": "875e483de49655030c4ffba1995b60610a50273a",
   "historical_c4_commit": "6be0c51f93ae8f31e4048aebe4c9a9bba3ce0a88",
   "source_only_expected": true,
@@ -224,7 +224,8 @@
     "entrypoints/TransactionMain.hs": "3917d177602fd047409ff0a43d458011279a58b2a36cfce5fb2777409254e7ac",
     "fixtures/GraphUnification.original.emlf.txt": "77b11f87fe4601617470eaad419c09597e08e19aef7bc76cb66c75e8c6a3a790",
     "fixtures/file-cases.json": "b7878c17609b3c7bf59e4b9a8942b0df61ea2d691edab7de97b102fabe1a94f8",
-    "fixtures/program-oracles.json": "6d223a9505870c3b02494914762171f99e94e02b56c5809563d4098f01ce72b9"
+    "fixtures/program-oracles.json": "6d223a9505870c3b02494914762171f99e94e02b56c5809563d4098f01ce72b9",
+    "source-basis-query-v6.json": "5f1ee74e93cd1bc223de1a5e0604270312b0debfe5e08dd3ffe330f32d55898b"
   },
   "authored_matrix_fixtures": [
     {
@@ -356,7 +357,7 @@
     "libraries/mlf-crates/Bootstrap/Crate.hs": "594af7881473256dcf2bdbb5f57289cfd8cb6cfd471f95f088748d63b1f6150a",
     "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": "b5dbdb8dffea1eaffadc9c369dde29b8a259edad2ded8a475e7a7553cc9422a5",
     "libraries/mlf-crates/Bootstrap/CrateCodegen.hs": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
-    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "cf29431eb01eaeb287b89444f80b45fc88de79a2d43f006411821c180647f8eb",
+    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "61201909b9874944a650153af3492a3a7b5ae953b678b22113d8278c222e9712",
     "libraries/mlf-crates/Bootstrap/CrateSession.hs": "8900a34bf977eaec0d44948be816ca2b5ddb8955170908e7df8fa93967d179df",
     "libraries/mlf-crates/Bootstrap/ImportParameters.hs": "16efe338a956ef66deda14c67251b999dc7934cbe5bd7dfffebbec8b03a2fbcf",
     "libraries/mlf-crates/Bootstrap/ImportedRoot.hs": "a4918d46204194016461c72406877b33a9bd31466d168e5274791eabd8eafa24",
@@ -499,5 +500,6 @@
     "tools/shared/builtin_prelude_identity.py": "d8e453392552bd90fd0bcd7f6581a4353e9d5354080eed37f00718654480774a",
     "tools/shared/verify_builtin_prelude.py": "778fedebd6a038b6d1b67026f5ca8a4f0da1c13e126948f428b9f912fcacf07d"
   },
-  "builtin_semantic_payload_sha256": "c8e0ead3b186d151ab431c724dc6decc44a9fe30f492fb01001ff218ec458875"
+  "builtin_semantic_payload_sha256": "c8e0ead3b186d151ab431c724dc6decc44a9fe30f492fb01001ff218ec458875",
+  "source_basis_migration": "source-basis-query-v6.json"
 }

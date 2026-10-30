@@ -18,6 +18,39 @@ HERE = Path(__file__).resolve().parent
 MANIFEST = json.loads((HERE/'manifest.json').read_text())
 
 
+def verify_source_basis(manifest, migration):
+    """One immutable-source migration, not permission to refresh arbitrary pins."""
+    old_digest = '53928815c964c95bcf05a64f8f3053bb4c7b07c4e5a0d56890992a4cd8a37e3a'
+    new_digest = '914d336f1611028f4484c647ca66cd62af44b5946631092bfb2fb1503d8880f2'
+    path = 'libraries/mlf-crates/Bootstrap/CrateQuery.hs'
+    delta = {path:dict(old='cf29431eb01eaeb287b89444f80b45fc88de79a2d43f006411821c180647f8eb',
+                     new='61201909b9874944a650153af3492a3a7b5ae953b678b22113d8278c222e9712')}
+    C.require(manifest['source_basis_migration'] == 'source-basis-query-v6.json', 'fixed migration file')
+    C.require(migration['from_ref'] == 'd3906cbaefc9d5965ee59bb87b6be8f730ec3204' and
+              migration['to_ref'] == manifest['base_commit'] == 'd96f67726599fa4e21f236462886106434c8e417',
+              'exact before source identity, not a candidate-derived baseline')
+    C.require(migration['format'] == 'c4-current-source-basis-migration-v1' and
+              migration['changed_inputs'] == delta and migration['added_inputs'] == {} and
+              migration['removed_inputs'] == [], 'only the independently reviewed query-v6 delta')
+    C.require(type(migration['input_count']) is int and migration['input_count'] == 179 and
+              type(migration['unchanged_input_count']) is int and migration['unchanged_input_count'] == 178,
+              'exact changed/unchanged inventory')
+    def digest(values):
+        return C.sha_bytes(json.dumps(values, sort_keys=True, separators=(',', ':')).encode())
+    current = manifest['before_input_sha256']
+    C.require(len(current) == 179 and digest(current) == migration['new_input_contract_sha256'] == new_digest,
+              'all 179 new before inputs exactly match independent Git evidence')
+    previous = dict(current)
+    C.require(previous[path] == delta[path]['new'], 'retain exact new query-v6 source')
+    previous[path] = delta[path]['old']
+    C.require(digest(previous) == migration['old_input_contract_sha256'] == old_digest,
+              'inverse migration preserves every one of the other 178 inputs')
+    C.require(manifest['historical_p3_commit'] == migration['historical_p3_commit'] ==
+              '875e483de49655030c4ffba1995b60610a50273a' and
+              manifest['historical_c4_commit'] == migration['historical_c4_commit'] ==
+              '6be0c51f93ae8f31e4048aebe4c9a9bba3ce0a88', 'historical provenance is not rewritten')
+
+
 def synthetic_layout():
     lines = []
     rows = []
@@ -43,6 +76,27 @@ def synthetic_layout():
 
 
 class StaticControls(unittest.TestCase):
+    def test_exact_query_v6_source_basis(self):
+        migration=json.loads((HERE/'source-basis-query-v6.json').read_text())
+        verify_source_basis(MANIFEST,migration)
+
+    def test_source_basis_refuses_unreviewed_changes(self):
+        migration=json.loads((HERE/'source-basis-query-v6.json').read_text())
+        bad=[]
+        changed=copy.deepcopy(MANIFEST);changed['base_commit']=migration['from_ref'];bad.append(changed)
+        changed=copy.deepcopy(MANIFEST);changed['before_input_sha256']['libraries/mlf-foundation/Bootstrap/Map.hs']='0'*64;bad.append(changed)
+        changed=copy.deepcopy(MANIFEST);changed['before_input_sha256']['libraries/mlf-crates/Bootstrap/CrateQuery.hs']=migration['changed_inputs']['libraries/mlf-crates/Bootstrap/CrateQuery.hs']['old'];bad.append(changed)
+        changed=copy.deepcopy(MANIFEST);changed['before_input_sha256']['unexpected/source.hs']='0'*64;bad.append(changed)
+        changed=copy.deepcopy(MANIFEST);del changed['before_input_sha256']['host/ghc/MLF/Host/IO.hs'];bad.append(changed)
+        changed=copy.deepcopy(MANIFEST);changed['historical_p3_commit']=changed['base_commit'];bad.append(changed)
+        for i,changed in enumerate(bad):
+            with self.subTest(manifest_mutation=i),self.assertRaises(ValueError):verify_source_basis(changed,migration)
+        for field,value in [('unchanged_input_count',177),('added_inputs',{'unexpected/source.hs':'0'*64}),
+                            ('removed_inputs',['host/ghc/MLF/Host/IO.hs']),('new_input_contract_sha256','0'*64),
+                            ('old_input_contract_sha256','0'*64),('changed_inputs',{})]:
+            changed=copy.deepcopy(migration);changed[field]=value
+            with self.subTest(migration_mutation=field),self.assertRaises(ValueError):verify_source_basis(MANIFEST,changed)
+
     def test_fixed_source_inventory(self):
         for path, digest in MANIFEST['pins'].items():
             self.assertEqual(C.sha_bytes((HERE/path).read_bytes()), digest, path)
