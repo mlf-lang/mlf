@@ -26,6 +26,8 @@ VALIDATION_DIR = HERE.parent / 'validation-reuse'
 VALIDATION_PINS = {
     'source_contract.py': '039bb8833ef6a232e80458b584005ad88bb46cd9797459d6ef813b7b378cddc6',
     'source-contract.json': 'ec83da63b4021b65a882c0edd9bd5b7f39d4fcb14f47af61655389d1caeea6c5'}
+SPAWN_CONTRACT = HERE.parent / 'process-spawn/source_contract.py'
+SPAWN_CONTRACT_SHA = '5ce3dfbc559445ba91096453939b198faa717f7c86be40c515a0b0abe2bcbc15'
 BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
 
 
@@ -85,6 +87,8 @@ def main():
     validation_pins = {str(VALIDATION_DIR/name): digest for name,digest in VALIDATION_PINS.items()}
     H.check_pins(validation_pins)
     validation_contract = H.module(VALIDATION_DIR/'source_contract.py', 'validation_reuse_source_contract')
+    H.check_pins({str(SPAWN_CONTRACT): SPAWN_CONTRACT_SHA})
+    spawn_contract = H.module(SPAWN_CONTRACT, 'spawn_source_contract')
     sources = {'candidate': args.source_candidate.resolve(strict=True)}
     producers = {'candidate': args.producer_candidate.resolve(strict=True)}
     if not args.focused_only:
@@ -114,6 +118,7 @@ def main():
         save()
         try:
             input_pins = H.file_pins(HERE)
+            input_pins[str(SPAWN_CONTRACT)] = SPAWN_CONTRACT_SHA
             input_pins.update(validation_pins)
             for relative, expected in manifest['pins'].items():
                 H.require(H.sha(HERE/relative) == expected, 'fixed independent input '+relative)
@@ -142,6 +147,7 @@ def main():
                 if side == 'candidate':
                     expected.update(manifest['candidate_algorithm_sha256'])
                     expected = validation_contract.candidate_dependencies(expected, sources[side])
+                    expected = spawn_contract.candidate_dependencies(expected, sources[side])
                     # The authenticated maintained generator independently checks
                     # this literal; allow only its one source-identity token.
                     expected[BUILTIN_PATH] = actual[BUILTIN_PATH]

@@ -23,7 +23,7 @@ def require(value, message):
         raise RuntimeError(message)
 
 
-def main():
+def main(validate_change=None, extra_fault_flags=(), extra_fault_sources=(), extra_pins=()):
     p = argparse.ArgumentParser(description=__doc__)
     for name in ['baseline-root', 'baseline-producer', 'producer', 'output', 'gc-prefix', 'gmp-prefix']:
         p.add_argument('--' + name, type=Path, required=True)
@@ -38,17 +38,20 @@ def main():
     require(before[0]['ghc'] == before[1]['ghc'] and before[0]['cc'] == before[1]['cc'], 'same toolchains')
     # An exact reverse projection proves the Linux and fallback source text is
     # unchanged. It never transforms a production build or expected output.
-    header = (ROOT / 'runtime/mlf_system.h').read_text()
-    lines, kept, arms, skipping = header.splitlines(keepends=True), [], 0, False
-    for line in lines:
-        if line == '#elif defined(__APPLE__)\n':
-            require(not skipping, 'nested Darwin arm'); arms += 1; skipping = True
-        elif skipping and line == '#endif\n':
-            skipping = False; kept.append(line)
-        elif not skipping:
-            kept.append(line)
-    require(arms == 3 and not skipping and ''.join(kept) == (base / 'runtime/mlf_system.h').read_text(),
-            'only three additive Darwin arms allowed')
+    if validate_change is not None:
+        validate_change(base, ROOT)
+    else:
+        header = (ROOT / 'runtime/mlf_system.h').read_text()
+        lines, kept, arms, skipping = header.splitlines(keepends=True), [], 0, False
+        for line in lines:
+            if line == '#elif defined(__APPLE__)\n':
+                require(not skipping, 'nested Darwin arm'); arms += 1; skipping = True
+            elif skipping and line == '#endif\n':
+                skipping = False; kept.append(line)
+            elif not skipping:
+                kept.append(line)
+        require(arms == 3 and not skipping and ''.join(kept) == (base / 'runtime/mlf_system.h').read_text(),
+                'only three additive Darwin arms allowed')
     for field in ['resolved_modules', 'resolved_host_modules', 'host_inputs', 'configuration_inputs']:
         require(before[0][field].keys() == before[1][field].keys(), 'same input inventory: ' + field)
         for name, row in before[0][field].items():
@@ -59,6 +62,7 @@ def main():
     pins = {str(f): H.sha(f) for f in [helper, Path(__file__), HERE/'Faults.c', HERE/'Eligibility.hs',
             HERE/'EligibilityHooks.c', HERE/'NativeProbe.c', ROOT/'runtime/mlf_system.h',
             base/'runtime/mlf_system.h', old/'receipt.json', new/'receipt.json']}
+    pins.update({str(f): H.sha(f) for f in extra_pins})
     fixtures = HERE.parent / 'fixtures'
     inventory = H.load(HERE.parent/'CONTROL-INVENTORY.json')
     for name in ['Probe.c', 'Tree.c']:
@@ -121,9 +125,9 @@ def main():
                 if name=='mv':require(not (d/'move λ.new').exists(), 'mv source removed')
                 record['transport'].append({'case':name,'side':side});save()
         macros=['fork','clock_gettime','waitpid','kqueue','kevent','fcntl','close','nanosleep','kill']
-        flags=['-D'+n+'=mlf_mock_'+n for n in macros]+['-Dsigaction(...)=mlf_mock_sigaction(__VA_ARGS__)']
+        flags=['-D'+n+'=mlf_mock_'+n for n in macros]+['-Dsigaction(...)=mlf_mock_sigaction(__VA_ARGS__)']+list(extra_fault_flags)
         run('mock-host',[cc,'-O2','-std=c11','-I'+str(ROOT/'runtime'),*flags,'-c',ROOT/'host/ghc/cbits/host.c','-o',out/'mock-host.o'])
-        run('mock-probe',[cc,'-O2','-std=c11',fixtures/'Probe.c',HERE/'Faults.c',out/'mock-host.o',new/'supervisor.o','-o',out/'mock-probe'])
+        run('mock-probe',[cc,'-O2','-std=c11',fixtures/'Probe.c',HERE/'Faults.c',*extra_fault_sources,out/'mock-host.o',new/'supervisor.o','-o',out/'mock-probe'])
         (out/'a').write_bytes(b'');(out/'b').write_bytes(spec('/usr/bin/true',timeout='1'))
         prefix='fork,clock,sigaction,open,cloexec,register,'
         cases={name:(expected(0,7),prefix+'wait,close') for name in ['immediate','deadline-ready']}

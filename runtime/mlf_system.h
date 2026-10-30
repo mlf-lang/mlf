@@ -24,6 +24,8 @@
 #include <sys/syscall.h>
 #elif defined(__APPLE__)
 #include <sys/event.h>
+#include <crt_externs.h>
+#include <spawn.h>
 #endif
 
 static MlfValue *os_getEnv(MlfValue *name) {
@@ -110,7 +112,29 @@ static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *speci
     long scope_id = scope && *scope ? strtol(scope,&scope_end,10) : 0;
     int supervised = scope_id > 0 && scope_end && !*scope_end && scope_id == (long)getpgrp();
     fflush(NULL);
+#if defined(__APPLE__)
+    pid_t pid = -1;
+    /* Cache publications inherit cwd/stdio. Spawn avoids copying the compiler's
+     * address space, while retaining the command and the existing wait path.
+     * Other forms, or any spawn failure, keep fork/execvp (including its shell
+     * fallback for executable text files without a shebang). */
+    if (!*cwd && !*parts[1] && !*parts[2] && !*parts[3]) {
+        posix_spawnattr_t attributes;
+        if (!posix_spawnattr_init(&attributes)) {
+            int ready = supervised ||
+                (!posix_spawnattr_setpgroup(&attributes,0) &&
+                 !posix_spawnattr_setflags(&attributes,POSIX_SPAWN_SETPGROUP));
+            pid_t spawned;
+            if (ready && !posix_spawnp(&spawned,parts[4],NULL,&attributes,
+                                      parts+4,*_NSGetEnviron())) pid = spawned;
+            /* A failed spawn leaves its PID unspecified; never use it. */
+            posix_spawnattr_destroy(&attributes);
+        }
+    }
+    if (pid < 0) pid = fork();
+#else
     pid_t pid = fork();
+#endif
     if (pid < 0) { free(parts); fail("IO error: runProcess failed"); }
     if (!pid) {
         /* Only the child establishes its group. Concurrent parent/child
