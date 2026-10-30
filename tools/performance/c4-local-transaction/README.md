@@ -203,9 +203,11 @@ report keys named `<query_key>.mlfq`, plus exactly two source-defined sidecars:
 `query-key.new` and `.lock` (546 files total). The directory and every entry are
 checked with `lstat`: no symlink, subdirectory, device, FIFO or arbitrary extra
 file is admitted. The lock file must be empty. `query-key.new` must hash to the
-**last ordered report key** on that same side. `CrateQuery.hs` writes this scratch
-file before each digest/cache publication and never removes it; its enclosing
-lock operation creates `.lock`, and the host releases it by close without writes
+**last ordered report key** on that same side. The actual `--compile-crate` entry
+in `bootstrap/MLF/Entry/Emlf.hs` calls `CrateSession.compileSpecFile`. Both that
+sealed-session route and the separate public `CrateQuery.hs` route write this
+scratch file before each digest/cache publication and never remove it. Their
+enclosing lock operation creates `.lock`, and the host releases it by close without writes
 or unlink. Empty lock contents do not prove lock ownership or process termination;
 the unchanged process runner still supplies the normal-exit/descendant guard.
 Compiler-dependent query keys need not match across before/candidate. No cache

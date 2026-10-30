@@ -9,7 +9,7 @@ This ports the two algorithm files from research commit
 research branch history, stack C1/C2/C3, modify the sealed A1 implementation,
 change fingerprint/serialization algorithms, or cache target inference.
 
-The current Graph, Solver and Constraint originals equal P3 byte-for-byte.
+The integration-before Graph, Solver and Constraint originals equal P3 byte-for-byte.
 Current host/library integration is nevertheless different. In particular,
 generic Map.unionWith and the generated builtin representation changed. C4's
 Solver alias/node unions use the unchanged IntMap.union implementation, not

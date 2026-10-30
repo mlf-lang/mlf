@@ -19,7 +19,8 @@ LIMITS = dict(process_tree_rss_bytes=5*1024**3,
 def query_cache_inventory(directory, report):
     """Exact fresh-cache publication contract; no arbitrary sidecar allowance.
 
-    CrateQuery.runSourceGroupsWithEncodings writes query-key.new, hashes its
+    CrateSession (the actual crate entry) and public CrateQuery both write
+    query-key.new in runSourceGroupsWithEncodings, hash its
     bytes, and publishes digest.mlfq before recording that digest in order.
     The last scratch digest therefore equals the last successful report key.
     Its enclosing operation creates .lock; the host releases it by close only.
