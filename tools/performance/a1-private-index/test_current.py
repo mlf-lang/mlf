@@ -419,7 +419,8 @@ class CurrentCompatibilityTests(unittest.TestCase):
                          set(current.C4_NEW_HASHES) | {'Bootstrap.CrateQuery'})
         self.assertEqual({name for name in current.SHARED_HASHES
                           if current.SHARED_HASHES[name] != current.CF39_SHARED_HASHES[name]},
-                         set(current.C4_NEW_HASHES) | {'Bootstrap.CrateQuery', 'Bootstrap.Map'})
+                         set(current.C4_NEW_HASHES) |
+                         {'Bootstrap.CrateQuery', 'Bootstrap.Map', 'Bootstrap.CrateSession'})
 
     def test_composed_migration_pins_and_receipt_bind_all_stages(self):
         self.assertEqual(current.c4_migration['parent_ref'],
@@ -440,7 +441,7 @@ class CurrentCompatibilityTests(unittest.TestCase):
     def test_balance_source_delta_preserves_old_anchors_and_other_inputs(self):
         raw = current.BALANCE_MIGRATION.read_bytes()
         result = current.balance_source_hashes(current.C4_SHARED_HASHES, raw)
-        self.assertEqual(result, current.SHARED_HASHES)
+        self.assertEqual(result, current.BALANCE_SHARED_HASHES)
         self.assertEqual({n for n in result if result[n] != current.C4_SHARED_HASHES[n]},
                          {'Bootstrap.Map', 'MLF.BuiltinPreludeData'})
         self.assertEqual(current.sha(current.C4_MIGRATION), current.C4_MIGRATION_SHA256)
@@ -461,6 +462,19 @@ class CurrentCompatibilityTests(unittest.TestCase):
             producer['shared_inputs'][name]['sha256'] = current.C4_SHARED_HASHES[name]
             with self.subTest(module=name), self.assertRaises(ValueError):
                 current.authenticate_current_source(producer)
+
+    def test_validation_reuse_preserves_every_other_source_and_frozen_owner(self):
+        contract = current.validation_contract
+        self.assertEqual(contract.source_hashes(current.BALANCE_SHARED_HASHES), current.SHARED_HASHES)
+        self.assertEqual({n for n in current.SHARED_HASHES
+                          if current.SHARED_HASHES[n] != current.BALANCE_SHARED_HASHES[n]},
+                         {'Bootstrap.CrateSession'})
+        restored = contract.restore_previous_owner((ROOT / contract.OWNER).read_bytes())
+        self.assertEqual(contract.sha(restored), current.historical.OWNER_SHA)
+        producer = self.producer()
+        producer['shared_inputs']['Bootstrap.CrateSession']['sha256'] = contract.OLD_OWNER_SHA
+        with self.assertRaises(ValueError):
+            current.authenticate_current_source(producer)
 
 
 if __name__ == '__main__':

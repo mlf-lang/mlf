@@ -155,3 +155,14 @@ python3 -B tools/performance/a1-private-index/check_integrated.py \
 Keep failed output trees and use a fresh path for each attempt. No bootstrap,
 benchmark, expectation regeneration, source replacement or optimization
 qualification is part of this gate.
+
+## Generated-validation owner extension
+
+After the Map dependency migration, the current source inventory changes only
+`Bootstrap.CrateSession` for the private successful-generation boundary.
+The [source contract](../../validation-reuse/source-contract.json) reverses three
+exact edits to the entire previous A1 owner hash. The original session,
+admission, file, transaction and privacy controls above are unchanged.
+The [additional boundary controls](../../validation-reuse/README.md) compare
+that restored owner with the integrated one and reject exports of all three new
+helpers. The arbitrary-constraint solver still runs the original validation.

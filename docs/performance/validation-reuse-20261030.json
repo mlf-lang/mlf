@@ -1,0 +1,311 @@
+{
+  "schema": "validation-reuse-integration-v1",
+  "date": "2026-10-30",
+  "accepted_as": "redundant validation removal; no measured speedup or noninferiority claim",
+  "parent_commit": "76c6eac4f13ca39ae45590281fe4ced8c07512e8",
+  "source": {
+    "owner": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+    "previous_sha256": "8900a34bf977eaec0d44948be816ca2b5ddb8955170908e7df8fa93967d179df",
+    "integrated_sha256": "e6ffa2603d73f4df1bc69858487168dd53991a8a6243cb046cb1f00e8fbadc13",
+    "screened_sha256": "574a98d5b0db73b77b030715781cdb9e140c856ce66346256a7beab03a2be12c",
+    "screen_to_integration_changes": "comments and layout only",
+    "contract": {
+      "path": "tools/performance/validation-reuse/source-contract.json",
+      "sha256": "ec83da63b4021b65a882c0edd9bd5b7f39d4fcb14f47af61655389d1caeea6c5"
+    },
+    "contract_helper": {
+      "path": "tools/performance/validation-reuse/source_contract.py",
+      "sha256": "039bb8833ef6a232e80458b584005ad88bb46cd9797459d6ef813b7b378cddc6"
+    }
+  },
+  "ordinary_producer": {
+    "host": "GHC",
+    "optimization": "2",
+    "ghc": {
+      "path": "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+      "sha256": "39fd1ee0cf7eb5739a595d5c238a95a7a062942397cc6d2a16425d6eeb18283e",
+      "version": "9.14.1"
+    },
+    "relevant_flags": [
+      "-O2",
+      "-fpedantic-bottoms",
+      "-fno-state-hack"
+    ],
+    "executable_sha256": "be787a8d66f3ba1ea83c438031b635924da60f62a1273b4f75819b22f59b2f69",
+    "receipt": {
+      "path": ".mlf-build/validation-reuse-integration-20261030/producer/receipt.json",
+      "sha256": "0261c87b457bed9b56ffa7b6b57341d60890166200fee8d28adfc4b2c2832ad5"
+    },
+    "authentication": {
+      "path": ".mlf-build/validation-reuse-integration-20261030/producer-authentication.json",
+      "sha256": "80d61d9ad026d85be8fbe60883e64f371a5caa0f7cb42d26f770fb69c1155e6c"
+    },
+    "diagnostic_counters": false
+  },
+  "correctness": {
+    "gates": [
+      {
+        "name": "boundary",
+        "passed": true,
+        "receipt": {
+          "path": ".mlf-build/validation-reuse-integration-20261030/boundary/receipt.json",
+          "sha256": "f576d28d1c815d0bedcf760208844da36028d0d6139fe019f94070466e13caea"
+        }
+      },
+      {
+        "name": "p123",
+        "passed": true,
+        "receipt": {
+          "path": ".mlf-build/validation-reuse-integration-20261030/p123/receipt.json",
+          "sha256": "992fad1dbe9c2d7b6ed74d89334a028e2e44cb16bf67c1cb70c376f8647e9229"
+        }
+      },
+      {
+        "name": "a1",
+        "passed": true,
+        "receipt": {
+          "path": ".mlf-build/validation-reuse-integration-20261030/a1/receipt.json",
+          "sha256": "f0cccd05ade4da40d8df22dbf902349c6680d8ace37346418056ba426c95669f"
+        }
+      },
+      {
+        "name": "f1",
+        "passed": true,
+        "receipt": {
+          "path": ".mlf-build/validation-reuse-integration-20261030/f1/receipt.json",
+          "sha256": "a985c1cd672efb1942de4483f61ccb9be5987c1511f937e09e7eec0cf9a405fe"
+        }
+      },
+      {
+        "name": "map",
+        "passed": true,
+        "receipt": {
+          "path": ".mlf-build/validation-reuse-integration-20261030/map/receipt.json",
+          "sha256": "c712d95a7cdfb98b7e2917d57d16a0c2549728427bf9a5e55f648f2e7a291b86"
+        }
+      },
+      {
+        "name": "query-encoding",
+        "passed": true,
+        "receipt": {
+          "path": ".mlf-build/validation-reuse-integration-20261030/query-encoding/receipt.json",
+          "sha256": "f38f08b8865b3fe697c3d042224bf262871b101f07a1c6600afd59443e655582"
+        }
+      },
+      {
+        "name": "c4",
+        "passed": true,
+        "receipt": {
+          "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/evidence/validation-reuse-c4-full/receipt.json",
+          "sha256": "bad203a70634bea4825a10acd8a0c47940411910b47e2e6062a0e3eba3697cad"
+        }
+      }
+    ],
+    "historical_oracle_bodies_changed": false,
+    "historical_expected_results_changed": false,
+    "boundary_authored_programs": 20,
+    "boundary_raw_rejections": 3,
+    "boundary_partial_value_orders": 4,
+    "boundary_export_rejections": 3,
+    "c4_scope": "full, including nine before/after file cases and builtin admission",
+    "gate_aggregate": {
+      "path": ".mlf-build/validation-reuse-integration-20261030/gates.json",
+      "sha256": "149bf8534e8a7837a4035bb1963020c59c5f2dec41d4aaece8020cc178b082d9"
+    }
+  },
+  "target_qualification": {
+    "receipt": {
+      "path": ".mlf-build/validation-reuse-integration-20261030/target-qualification.json",
+      "sha256": "6689f7dbdb763f43ca3269dd02202e93fbf991469dca219315bdcdda2474a839"
+    },
+    "workload": {
+      "path": ".mlf-build/balance-integration/workload.json",
+      "sha256": "64a74f5d01d63c2e9039c9e5be8af6faddcc5bea11f22b215b139cea67246e54"
+    },
+    "target_modules": 15,
+    "fresh": 711,
+    "reused": 0,
+    "ordered_groups_equal": true,
+    "checked": {
+      ".mlfci": {
+        "bytes": 1104956,
+        "sha256": "c05de89df7d6153b798e109b227c2778a686183965f707416ce46eef9ff44c76",
+        "reference": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/selfcompile-opt-20261030/mlf-fresh-cache/856cea5daf8c38698fdfd7ad2ec5e3cfb7f3bef3c9f52ab326d9818509f12d06/unit.mlfci",
+        "raw_bytes_equal": true
+      },
+      ".mlfco": {
+        "bytes": 26366830,
+        "sha256": "daf0f02b4ed9be9905320cc66c3fef7c8e55915e42b7ad2b6d9cfe4b2782aa88",
+        "reference": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/selfcompile-opt-20261030/mlf-fresh-cache/856cea5daf8c38698fdfd7ad2ec5e3cfb7f3bef3c9f52ab326d9818509f12d06/unit.mlfco",
+        "raw_bytes_equal": true
+      }
+    },
+    "performance_samples_added": 0,
+    "limits": {
+      "address_space_per_process_bytes": 6442450944,
+      "disk_free_floor_bytes": 5368709120,
+      "host_available_floor_bytes": 3221225472,
+      "max_work_bytes": 536870912,
+      "process_tree_rss_bytes": 5368709120,
+      "wall_seconds": 600
+    },
+    "host": {
+      "affinity": "not exposed by macOS",
+      "cpu": "Apple M1 Max",
+      "logical_cpus": 10,
+      "machine": "arm64",
+      "node": "aress-MacBook-Pro-2.local",
+      "os_cache_flush": false,
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "python": "3.14.8 (main, Sep 30 2026, 17:55:09) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "qualification": "macOS experimental; sampled RSS, no hard address-space limit"
+    },
+    "resource_qualification": {
+      "address_space_limit": "not enforced: user accepted sampled RSS protection",
+      "host_available": "vm_stat free + inactive + speculative estimate; not Linux MemAvailable",
+      "process_group_rss": "ps RSS sampled every 100 ms; short peaks may be missed"
+    }
+  },
+  "ordinary_object_review": {
+    "complete": true,
+    "object_sha256": "071a9fb09cf4522ad6beab722d2cb94c4bda93a816c047e4287b6ba69d2a37ed",
+    "relocations_sha256": "a9e5b916861e0aafe9ac76d86fe56a408761114e620b3998b217a7873d3823e6",
+    "direct_graph_validator_relocations": 0,
+    "generate_program_relocations": 2,
+    "scope": "direct relocations in ordinary owner; no phase-wall or speedup inference"
+  },
+  "discovery_screen": {
+    "receipt": {
+      "path": ".mlf-build/validation-reuse-20261030/screen/receipt.json",
+      "sha256": "c8a526ab39b94d6eb024cc1b947519fa658ea7b75c1f1bf3793e27b57dc9a706"
+    },
+    "analysis": {
+      "path": ".mlf-build/validation-reuse-20261030/screen-analysis.json",
+      "sha256": "44f5ae21017b1cad9e04877cc046b978026bac752b20df3b46e15cf523a9acdb"
+    },
+    "candidate_card": {
+      "path": ".mlf-build/validation-reuse-20261030/candidate-card.json",
+      "sha256": "1f03efdcd5a2cbadc75b276769aa32a11cd29285a55b207ca780926d8cc52e49"
+    },
+    "predeclared_rule": "at least 0.5% pooled wall improvement and both block effects positive",
+    "proceed_to_confirmation": false,
+    "screen_decision_unchanged": true,
+    "pooled_block_log_wall_improvement": 0.0024783143513290584,
+    "blocks": [
+      {
+        "block": 0,
+        "improvement": -0.0038196367510507923,
+        "log_ratio": 0.0038123604612327004,
+        "order": "ABBA"
+      },
+      {
+        "block": 1,
+        "improvement": 0.00873675219192771,
+        "log_ratio": -0.008775141372755233,
+        "order": "BAAB"
+      }
+    ],
+    "auxiliary_child_cpu_improvement": 0.008711644415947517,
+    "chronological_runs": [
+      {
+        "block": 0,
+        "position": 0,
+        "side": "A",
+        "wall_seconds": 81.120392709,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "ordered_groups_equal": true
+      },
+      {
+        "block": 0,
+        "position": 1,
+        "side": "B",
+        "wall_seconds": 82.687982208,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "ordered_groups_equal": true
+      },
+      {
+        "block": 0,
+        "position": 2,
+        "side": "B",
+        "wall_seconds": 79.188887916,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "ordered_groups_equal": true
+      },
+      {
+        "block": 0,
+        "position": 3,
+        "side": "A",
+        "wall_seconds": 80.106031959,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "ordered_groups_equal": true
+      },
+      {
+        "block": 1,
+        "position": 0,
+        "side": "B",
+        "wall_seconds": 77.608159291,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "ordered_groups_equal": true
+      },
+      {
+        "block": 1,
+        "position": 1,
+        "side": "A",
+        "wall_seconds": 76.940383708,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "ordered_groups_equal": true
+      },
+      {
+        "block": 1,
+        "position": 2,
+        "side": "A",
+        "wall_seconds": 77.491338541,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "ordered_groups_equal": true
+      },
+      {
+        "block": 1,
+        "position": 3,
+        "side": "B",
+        "wall_seconds": 75.488037792,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "ordered_groups_equal": true
+      }
+    ]
+  },
+  "ci_wiring": {
+    "workflow_sha256": "dd0ac2137a5e54748c29bcb2b077c7243e6f4aebe4157ad3dc20832722b0488c",
+    "yaml_syntax_valid": true,
+    "new_gate_contract": {
+      "path": ".mlf-build/validation-reuse-integration-20261030/ci-policy/new-gate.json",
+      "sha256": "185c5d03bfae3c3996efb190b2ab4f2e78238c123d59a22d59e5862f4d753265"
+    },
+    "full_policy_local_status": "blocked by macOS Bash 3 empty-array nounset behavior; baseline and current stderr are byte-identical",
+    "baseline_current_comparison": {
+      "path": ".mlf-build/validation-reuse-integration-20261030/ci-policy/receipt.json",
+      "sha256": "00749c0e2a7bb525f2b9403c14ed77ce4c8fa3274e8acfbcabe13546af1d9b5c"
+    }
+  },
+  "scope_exclusions": [
+    "No new confirmation cohort",
+    "No full compiler versus GHC speed ratio",
+    "No rerun of ten native benchmark-game workloads",
+    "Raw evidence paths identify local retained files; hashes do not replace executed raw-byte comparisons"
+  ]
+}

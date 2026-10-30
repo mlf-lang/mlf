@@ -203,7 +203,19 @@ def balance_source_hashes(base, raw):
     return result
 
 
-SHARED_HASHES = balance_source_hashes(C4_SHARED_HASHES, BALANCE_MIGRATION.read_bytes())
+BALANCE_SHARED_HASHES = balance_source_hashes(C4_SHARED_HASHES, BALANCE_MIGRATION.read_bytes())
+VALIDATION_DIR = HERE.parent / 'validation-reuse'
+VALIDATION_PINS = {
+    'source_contract.py': '039bb8833ef6a232e80458b584005ad88bb46cd9797459d6ef813b7b378cddc6',
+    'source-contract.json': 'ec83da63b4021b65a882c0edd9bd5b7f39d4fcb14f47af61655389d1caeea6c5'}
+verify({str(VALIDATION_DIR / name): digest for name, digest in VALIDATION_PINS.items()})
+validation_contract = types.ModuleType('validation_reuse_source_contract')
+validation_contract.__file__ = str(VALIDATION_DIR / 'source_contract.py')
+exec(compile((VALIDATION_DIR / 'source_contract.py').read_bytes(),
+             validation_contract.__file__, 'exec'), validation_contract.__dict__)
+SHARED_HASHES = validation_contract.source_hashes(BALANCE_SHARED_HASHES)
+req(validation_contract.OLD_OWNER_SHA == historical.OWNER_SHA, 'original A1 owner retained')
+OWNER_SHA = validation_contract.NEW_OWNER_SHA
 CURRENT_MODULES = {'CurrentBuiltinControls', 'CurrentC4TransactionOracle', 'CurrentC4OracleControls'}
 CURRENT_SOURCE_HASHES = {'CurrentBuiltinControls.hs': 'eb512024358872e69ce2df3b429a28ef6f12755c0c5d194147ddc36a627c944d', 'CurrentC4TransactionOracle.hs': '04819913a2b842aad5a20a3ec95f36755609b16b7ef5e7cae517e937e9f3c43a', 'CurrentC4OracleControls.hs': 'c92530ef213706972465b7d30fff0875fd8ccf6104d7fe190960ceecec3133da', 'c4_session_adapter.py': 'c3e5243e069b7d61eb6911b449c4b0308e0d31c252f9cbdf0067c2da5d2b25d8'}
 CURRENT_BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
@@ -262,6 +274,7 @@ def main():
     req(runner == source / 'tools/performance/a1-private-index/run_current_controls.py', 'runner/source-root binding')
     controls = runner.parent / 'controls'
     pins = {str(controls / rel): digest for rel, digest in CONTROL_HASHES.items()}
+    pins.update({str(VALIDATION_DIR / name): digest for name, digest in VALIDATION_PINS.items()})
     current = runner.parent / 'current'
     pins.update({str(COMPATIBILITY): COMPATIBILITY_SHA256, str(MIGRATION): MIGRATION_SHA256,
                  str(QUERY_MIGRATION): QUERY_MIGRATION_SHA256,
@@ -296,6 +309,7 @@ def main():
     kernel = source / 'libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs'
     req(sha(owner) == OWNER_SHA and sha(kernel) == KERNEL_SHA, 'exact controlled private implementation')
     raw = owner.read_bytes()
+    validation_contract.restore_previous_owner(raw)
     req(raw.count(OLD_HEADER) == 1 and NEW_HEADER not in raw, 'sole sealed production header')
     copied_raw = raw.replace(OLD_HEADER, NEW_HEADER)
     req(copied_raw.count(NEW_HEADER) == 1 and copied_raw.replace(NEW_HEADER, OLD_HEADER) == raw,
@@ -400,6 +414,7 @@ def main():
                    query_source_migration_sha256=sha(QUERY_MIGRATION),
                    c4_source_migration_sha256=sha(C4_MIGRATION),
                    balance_source_migration_sha256=sha(BALANCE_MIGRATION),
+                   validation_reuse_source_contract_sha256=sha(validation_contract.MANIFEST),
                    c4_representation_relation='Only reverse-map and reverse-bucket tree shape may differ; graph/aliases/counter/scopes physical; independent full edge/invariant/validator/finish checks on both',
                    builtin_provenance='Exact committed RawPrelude literal and canonical wire validation; pair hashes are immutable observations, not generated expectations',
                    c_object_provenance='Successful authenticated producer C commands, actual local hashes pinned before/after; producer schema does not itself store C object digests',

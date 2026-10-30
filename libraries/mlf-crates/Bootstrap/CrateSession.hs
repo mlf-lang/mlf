@@ -465,7 +465,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
       SProgram declarations expression ->
         do {
           constraints <- Compiler.atPhase Inference (C.generateProgram program);
-          solved <- Compiler.atPhase Inference (solvePrepared constraints);
+          solved <- Compiler.atPhase Inference (solveGenerated constraints);
           let {
             graph = S.solverGraph solved
           };
@@ -519,14 +519,18 @@ module Bootstrap.CrateSession (compileSpecFile) where {
   prepareGraph :: Graph -> Either String Graph;
   prepareGraph input =
     G.bindE (G.validateGraph input)
-      (\ignored ->
-         if L.any (\n -> IM.member n (G.links input)) (IM.keys (G.nodes input))
-         then Left "live graph identities cannot also be aliases"
-         else if L.any (\n -> (n >= G.nextId input)) (IM.keys (G.nodes input))
-              then Left "fresh identity counter overlaps graph nodes"
-              else if L.any (\n -> (n >= G.nextId input)) (IM.keys (G.links input))
-                   then Left "fresh identity counter overlaps graph aliases"
-                   else Right (G.canonicalize input));
+      (\ignored -> prepareValidatedGraph input);
+  -- Both callers have already validated this unchanged graph. Identity, alias
+  -- and index admission still happens before opening a session.
+  prepareValidatedGraph :: Graph -> Either String Graph;
+  prepareValidatedGraph input =
+    if L.any (\n -> IM.member n (G.links input)) (IM.keys (G.nodes input))
+    then Left "live graph identities cannot also be aliases"
+    else if L.any (\n -> (n >= G.nextId input)) (IM.keys (G.nodes input))
+         then Left "fresh identity counter overlaps graph nodes"
+         else if L.any (\n -> (n >= G.nextId input)) (IM.keys (G.links input))
+              then Left "fresh identity counter overlaps graph aliases"
+              else Right (G.canonicalize input);
   openPreparedSession :: forall s. Graph -> ST s (Session s);
   openPreparedSession canonical =
     stBind (K.importIndices IM.empty IM.empty)
@@ -556,7 +560,16 @@ module Bootstrap.CrateSession (compileSpecFile) where {
   audit :: forall s. Session s -> ST s (Either String (Session s));
   audit state = ST.bindE (finish state) (\checked -> ST.pureE state);
   solvePrepared :: Constraints -> Either String Solver;
-  solvePrepared constraints = G.bindE (prepareGraph (C.initialGraph constraints))
+  solvePrepared constraints =
+    solvePreparedGraph (prepareGraph (C.initialGraph constraints)) constraints;
+  -- This private route is used only immediately after generateProgram succeeds;
+  -- it has already validated exactly initialGraph. Arbitrary constraints retain
+  -- solvePrepared's original validation, and final validation is unchanged.
+  solveGenerated :: Constraints -> Either String Solver;
+  solveGenerated constraints =
+    solvePreparedGraph (prepareValidatedGraph (C.initialGraph constraints)) constraints;
+  solvePreparedGraph :: Either String Graph -> Constraints -> Either String Solver;
+  solvePreparedGraph prepared constraints = G.bindE prepared
     (\canonical -> runST
       (stBind (openPreparedSession canonical)
         (\initial -> ST.bindE (solverUnify (C.equalities constraints) initial)
