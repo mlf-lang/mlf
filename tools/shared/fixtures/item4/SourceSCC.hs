@@ -100,7 +100,7 @@ main=do
  let exactKey=fields!!1
  _<-expect "counterexample generic validator accepts compact with same dependency context"(Q.decodeCached exactKey groupId rawParameters (U.unitData rawIface) ["sameDeps"] (Q.encodeCached exactKey compact))
  keyFields<-expect "source query framing"(U.unpack exactKey)
- assert "raw cache uses exact new source namespace"(head keyFields=="MLF-SOURCE-CRATE-QUERY-5")
+ assert "raw cache uses exact new source namespace"(head keyFields=="MLF-SOURCE-CRATE-QUERY-6")
  assert "raw provisional is not compact final object"(Q.encodeCached exactKey compact/=rawText)
  writeFile cacheFile(B.unpack(Q.encodeCached exactKey compact))
  (repairedObjects,repaired,_)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "reject normalized-as-raw cache"

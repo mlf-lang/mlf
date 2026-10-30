@@ -167,6 +167,122 @@ module Bootstrap.CrateQuery where {
   encodeMember ((,,) n annotation body) =
     node "member"
       ((:) n ((:) (optional encodeAnnotation annotation) ((:) (encodeExpression body) [])));
+  -- Query keys are finite parser-owned syntax. Retain field lengths in a tree
+  -- and flatten once, instead of copying every enclosing expression at each
+  -- node. The ordinary encoders above remain independent format oracles.
+  data SourceKey = KeyText String | KeyFields ([] SourceKey)
+    | KeyScope ([] ((,) EvidenceRole String));
+  data FramedKey = FramedText String | FramedFields Int ([] FramedKey);
+  keyNode :: String -> [] SourceKey -> SourceKey;
+  keyNode tag fields = KeyFields ((:) (KeyText tag) fields);
+  keyList :: forall a. (a -> SourceKey) -> [] a -> SourceKey;
+  keyList encode values = KeyFields (map encode values);
+  inlineScopeKey :: [] ((,) EvidenceRole String) -> SourceKey;
+  inlineScopeKey candidates = keyList (\candidate -> KeyText (encodeCandidate candidate)) candidates;
+  expressionKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SExpr -> SourceKey;
+  expressionKey scope expression = let { child = expressionKey scope } in case expression of {
+    SVar n -> keyNode "variable" [KeyText n];
+    SConstructor n -> keyNode "constructor" [KeyText n];
+    SLam n annotation body -> keyNode "lambda"
+      [KeyText n, KeyText (optional encodeAnnotation annotation), child body];
+    SApp a b -> keyNode "apply" [child a, child b];
+    SLet n a b -> keyNode "let" [KeyText n, child a, child b];
+    SAnn a annotation -> keyNode "annotate" [child a, KeyText (encodeAnnotation annotation)];
+    SSignature a annotation -> keyNode "signature" [child a, KeyText (encodeAnnotation annotation)];
+    SIntLit n -> keyNode "integer" [KeyText (showInt n)];
+    SDoubleLit n -> keyNode "double-bits" [KeyText (showInt (doubleToBits n))];
+    SBoolLit b -> keyNode "boolean" [KeyText (boolean b)];
+    SStringLit s -> keyNode "string" [KeyText s];
+    SPrimitive p -> keyNode "primitive" [KeyText (Primitive.primitiveName p)];
+    SCase a branches -> keyNode "case" [child a, keyList (alternativeKey scope) branches];
+    SSourceDefinition body -> keyNode "source-definition" [child body];
+    SCallSite label span body -> keyNode "call-site" [KeyText label, KeyText (encodeSourceSpan span), child body];
+    SSharedBind pattern action continuation bindMethod failure -> keyNode "shared-bind"
+      [KeyText (encodePattern pattern), child action, child continuation, child bindMethod, child failure];
+    SDo statements body -> keyNode "do" [keyList (statementKey scope) statements, child body];
+    SEquations rows -> keyNode "equations" [keyList (equationKey scope) rows];
+    SLetRec definitions body -> keyNode "letrec" [keyList (recursiveKey scope) definitions, child body];
+    SWanted dictionary candidates -> keyNode "wanted" [KeyText dictionary, scope candidates];
+    SChecked ty body -> keyNode "checked" [KeyText (encodeType ty), child body]
+  };
+  alternativeKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SAlternative -> SourceKey;
+  alternativeKey scope (SAlternative pattern body) =
+    keyNode "alternative" [KeyText (encodePattern pattern), expressionKey scope body];
+  equationKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> (,) ([] SPattern) SExpr -> SourceKey;
+  equationKey scope ((,) patterns body) =
+    keyNode "equation" [KeyText (list encodePattern patterns), expressionKey scope body];
+  recursiveKey :: ([] ((,) EvidenceRole String) -> SourceKey) ->
+    (,,) String RecursiveMode SExpr -> SourceKey;
+  recursiveKey scope ((,,) name mode body) = case mode of {
+    InferRecursive -> keyNode "recursive-infer" [KeyText name, expressionKey scope body];
+    CheckRecursive annotation -> keyNode "recursive"
+      [KeyText name, KeyText (encodeAnnotation annotation), expressionKey scope body]
+  };
+  statementKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SStatement -> SourceKey;
+  statementKey scope statement = case statement of {
+    SDoBind pattern body -> keyNode "do-bind" [KeyText (encodePattern pattern), expressionKey scope body];
+    SDoThen body -> keyNode "do-then" [expressionKey scope body];
+    SDoLet name annotation body -> keyNode "do-let"
+      [KeyText name, KeyText (optional encodeAnnotation annotation), expressionKey scope body];
+    SDoLetRec definitions -> keyNode "do-letrec" [keyList (recursiveKey scope) definitions]
+  };
+  memberKey :: ([] ((,) EvidenceRole String) -> SourceKey) ->
+    (,,) String (Maybe SAnnotation) SExpr -> SourceKey;
+  memberKey scope ((,,) name annotation body) = keyNode "member"
+    [KeyText name, KeyText (optional encodeAnnotation annotation), expressionKey scope body];
+  compareCandidateScopes :: [] ((,) EvidenceRole String) -> [] ((,) EvidenceRole String) -> Int;
+  compareCandidateScopes left right = case left of {
+    [] -> if null right then 0 else 0 - 1;
+    (:) ((,) role name) rest -> case right of {
+      [] -> 1;
+      (:) ((,) otherRole otherName) following -> let {
+        roleOrder = compareString (encodeRole role) (encodeRole otherRole);
+        nameOrder = compareString name otherName
+      } in if roleOrder /= 0 then roleOrder else if nameOrder /= 0 then nameOrder
+        else compareCandidateScopes rest following
+    }
+  };
+  keyScopes :: SourceKey -> Set ([] ((,) EvidenceRole String)) -> Set ([] ((,) EvidenceRole String));
+  keyScopes key known = case key of {
+    KeyText _ -> known;
+    KeyScope candidates -> S.insert compareCandidateScopes candidates known;
+    KeyFields fields -> foldlStrict (\found field -> keyScopes field found) known fields
+  };
+  framedLength :: FramedKey -> Int;
+  framedLength key = case key of {
+    FramedText text -> stringLength text;
+    FramedFields size _ -> size
+  };
+  frameKey :: Map ([] ((,) EvidenceRole String)) Int -> SourceKey -> FramedKey;
+  frameKey scopes key = case key of {
+    KeyText text -> FramedText text;
+    KeyScope candidates -> case M.lookup compareCandidateScopes candidates scopes of {
+      Nothing -> panic "query key scope missing from its own inventory";
+      Just index -> FramedText (showInt index)
+    };
+    KeyFields children -> let { fields = map (frameKey scopes) children } in let {
+      size = foldlStrict (\total field -> let { count = framedLength field }
+        in total + stringLength (showInt count) + 1 + count) 0 fields
+    } in seq size (FramedFields size fields)
+  };
+  framedChunks :: FramedKey -> [] String -> [] String;
+  framedChunks key rest = case key of {
+    FramedText text -> (:) text rest;
+    FramedFields _ fields -> foldr (\field tail ->
+      (:) (showInt (framedLength field) ++ ":") (framedChunks field tail)) rest fields
+  };
+  renderKey :: Map ([] ((,) EvidenceRole String)) Int -> SourceKey -> String;
+  renderKey scopes key = concatStringList (framedChunks (frameKey scopes key) []);
+  -- Pool exact ordered (role, canonical binding) lists, not just class names
+  -- or hashes. The table is itself part of the authenticated query key. No
+  -- candidate is removed, reordered, or selected here, and no inference or
+  -- checked-object admission path consumes these references as authority.
+  pooledSourceKey :: [] SourceKey -> String;
+  pooledSourceKey fields = let {
+    candidates = S.toList (keyScopes (KeyFields fields) S.empty);
+    scopes = M.fromList compareCandidateScopes (zip candidates (range 0 (length candidates - 1)));
+    table = keyList inlineScopeKey candidates
+  } in renderKey scopes (KeyFields (snoc fields table));
   encodeField :: Field -> String;
   encodeField field =
     case field of {
@@ -980,6 +1096,9 @@ module Bootstrap.CrateQuery where {
         ((:) (boolean (Source.contractProtected contract)) [])));
   encodeSourceGroup prepared = node "prepared-source-group"
     ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupOriginal prepared))
+      (sourceGroupMetadata prepared));
+  sourceGroupMetadata :: Source.PreparedGroup -> [] String;
+  sourceGroupMetadata prepared =
       ((:) (list (\((,) name dictionary) -> node "class-dictionary" ((:) name ((:) dictionary [])))
         (M.toList (Source.groupRegistry prepared)))
       ((:) (list (\((,,) name classes protected) -> node "result-contract"
@@ -995,7 +1114,11 @@ module Bootstrap.CrateQuery where {
               ((:) (encodeRole role) ((:) (encodeBinding ((,) candidate ty))
                 ((:) (boolean (elem eqString candidate protectedCandidates)) [])))) candidates) []))))
       }) ((:) (list (\((,) name flag) -> node "raw-parameter-protection"
-        ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) [])))));
+        ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) []))));
+  sourceGroupKey :: Source.PreparedGroup -> SourceKey;
+  sourceGroupKey prepared = keyNode "prepared-source-group"
+    ((:) (keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupOriginal prepared))
+      (map KeyText (sourceGroupMetadata prepared)));
   sourceQueryKey crateId compilerHash prepared contracts datatypes =
     sourceQueryKeyWithContext crateId compilerHash prepared contracts (encodeDatatypeContext datatypes);
   sourceQueryKeyWithContext :: String -> String -> Source.PreparedGroup ->
@@ -1007,13 +1130,11 @@ module Bootstrap.CrateQuery where {
           (concatMap (\member -> Dependency.valueNames (Dependency.observeDeclaration member))
             (Source.groupOriginal prepared)))) } in
     let { relevant = M.filterWithKey (\name _ -> S.member compareString name observed) contracts } in
-    node "MLF-SOURCE-CRATE-QUERY-5"
-      ((:) crateId ((:) compilerHash
-        ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupMembers prepared))
-        ((:) (list encodeBinding (Source.groupBindings prepared))
-        ((:) datatypeContext
-        ((:) (encodeSourceGroup prepared)
-        ((:) (list encodeSourceContract (M.toList relevant)) [])))))));
+    pooledSourceKey
+      [KeyText "MLF-SOURCE-CRATE-QUERY-6", KeyText crateId, KeyText compilerHash,
+       keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupMembers prepared),
+       KeyText (list encodeBinding (Source.groupBindings prepared)), KeyText datatypeContext,
+       sourceGroupKey prepared, KeyText (list encodeSourceContract (M.toList relevant))];
   -- Raw checked inference payloads retain their established validator. A new
   -- source key deliberately uses self-contained cache format1: the old compact
   -- key parser must not be tricked into supplying a different context.
