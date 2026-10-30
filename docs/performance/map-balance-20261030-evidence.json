@@ -1217,5 +1217,21 @@
       "sha256": "a259fdcc5d5674ef9b2fde439fdc752dc264e866db1878a772658e277b9ae1fa"
     },
     "discovery_card_correction": "The frozen card says no new production branch count. The rewrite actually adds one source-level conditional, with the same terminal node/rotate functions and no new representation/cache/fallback. Original card preserved."
+  },
+  "benchmark_dependency_pin_followup": {
+    "trigger_commit": "ac78bf1883602a90341638c188ff4666ce08a273",
+    "failing_job_url": "https://github.com/mlf-lang/mlf/actions/runs/41050134783/job/124043855650",
+    "cause": "Active benchmark manifest retained the prior Map source hash.",
+    "changed_path": "benchmarks/manifest.json",
+    "changed_key": "pinned_sha256/libraries/mlf-foundation/Bootstrap/Map.hs",
+    "new_sha256": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30",
+    "benchmark_sources_expected_outputs_thresholds_unchanged": true,
+    "measured_producer_still_authenticates": true,
+    "provenance_check": {
+      "passed": true,
+      "log": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/benchmark-provenance-corrected.log",
+      "log_sha256": "90bb2821aa86fb37ff0656f2743b5f715ea992b3885e28a28645b590840bdd93",
+      "stdout": "Benchmark provenance passed: all pinned hashes and 19 exact patch reconstructions."
+    }
   }
 }
