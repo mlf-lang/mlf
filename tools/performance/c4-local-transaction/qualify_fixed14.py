@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Finite fixed-14 correctness qualification. No performance estimate/cohort."""
 from pathlib import Path
-import argparse, hashlib, json, os, shutil, sys
+import argparse, hashlib, json, os, re, shutil, stat, sys
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -14,6 +14,71 @@ LIMITS = dict(process_tree_rss_bytes=5*1024**3,
               host_available_floor_bytes=3*1024**3,
               disk_free_floor_bytes=4*1024**3,
               max_work_bytes=16*1024**3, wall_seconds=21600)
+
+
+def query_cache_inventory(directory, report):
+    """Exact fresh-cache publication contract; no arbitrary sidecar allowance.
+
+    CrateQuery.runSourceGroupsWithEncodings writes query-key.new, hashes its
+    bytes, and publishes digest.mlfq before recording that digest in order.
+    The last scratch digest therefore equals the last successful report key.
+    Its enclosing operation creates .lock; the host releases it by close only.
+    An initially absent cache makes that file empty, not proof of lock ownership.
+    """
+    directory = Path(directory)
+    H.require(stat.S_ISDIR(directory.lstat().st_mode), 'query cache is a real non-symlink directory')
+    groups = report['groups']
+    H.require(type(report['inferred_groups']) is int and report['inferred_groups'] == 544 and
+              type(report['reused_groups']) is int and report['reused_groups'] == 0 and
+              len(groups) == 544 and all(g['cached'] is False for g in groups),
+              'exactly 544 fresh, zero reused query groups')
+    keys = [g['query_key'] for g in groups]
+    H.require(all(type(key) is str and re.fullmatch(r'[0-9a-f]{64}', key) for key in keys) and
+              len(set(keys)) == 544, '544 distinct canonical report digests')
+    expected = {key+'.mlfq' for key in keys} | {'.lock', 'query-key.new'}
+    paths = list(directory.iterdir())
+    H.require({p.name for p in paths} == expected and len(paths) == 546,
+              'exact 544 report-named query files and two source-defined sidecars')
+    H.require(all(stat.S_ISREG(p.lstat().st_mode) for p in paths),
+              'every cache entry is a regular non-symlink file')
+    H.require((directory/'.lock').lstat().st_size == 0, 'fresh persistent lock file is empty')
+    digest = H.sha(directory/'query-key.new')
+    H.require(digest == keys[-1], 'scratch key SHA256 equals last ordered report digest')
+    return dict(query_files=544, sidecars=['.lock', 'query-key.new'], total_regular_files=546,
+                report_named_query_files=True, lock_file_empty=True,
+                scratch_key_sha256=digest, scratch_matches_last_report=True)
+
+
+def run_observed(runner, record, step, argv, cwd, output, save):
+    """Persist launch and successful native completion BEFORE any postcheck.
+
+    The caller attaches step to the receipt before invoking this function.
+    A failed/guarded command's own actual receipt is retained when available.
+    This does not convert native exit zero into successful semantic admission.
+    """
+    step.update(phase='native-launch-requested', native_launch_requested=True, native_completed=False,
+                postchecks_complete=False)
+    save()
+    try:
+        command = runner.run(argv, cwd, output)
+    except BaseException:
+        command_path = Path(output)/'command.json'
+        if command_path.is_file():
+            command = H.load(command_path)
+            step['command'] = command
+            record['commands'].append(command)
+        step['phase'] = 'native-failed-or-interrupted'
+        save()
+        raise
+    step['command'] = command
+    record['commands'].append(command)
+    step['phase'] = 'native-returned'
+    save()
+    H.require(command.get('complete') is True and type(command.get('exit_code')) is int and
+              command['exit_code'] == 0, 'actual normal native completion required')
+    step.update(native_completed=True, phase='postchecks-pending')
+    save()
+    return command
 
 
 def main():
@@ -91,12 +156,15 @@ def main():
                 dependencies = [Path(str(prefixes[k])+'.mlfci') for k in provider['dependencies']]
                 spec = folder/'crate.spec'; queries = folder/'queries'
                 R.crate_spec(spec,name+'/'+provider['version']+'/library',provider['modules'],dependencies,queries,builtin)
-                record['commands'].append(runner.run([producers['base']/'bin/emlf','--compile-crate',spec,'-o',prefixes[name]],folder,folder/'command'))
+                step = dict(name=name)
+                record['provider_steps'].append(step)
+                run_observed(runner,record,step,[producers['base']/'bin/emlf','--compile-crate',spec,'-o',prefixes[name]],folder,folder/'command',save)
                 query = R.validate_query(Path(str(prefixes[name])+'.queries'))
                 H.require(query['inferred_groups'] > 0, 'nonempty fresh provider')
                 H.check_pins(artifacts); artifacts.update(R.artifacts(prefixes[name]))
-                record['provider_steps'].append(dict(name=name,query=query,artifacts=R.artifacts(prefixes[name])))
-                unchanged(); save()
+                step.update(query=query, artifacts=R.artifacts(prefixes[name]))
+                unchanged()
+                step.update(phase='complete',postchecks_complete=True); save()
             H.require(len(artifacts) == 14, 'six provider pairs plus shared builtin')
             dependencies = dict(complete=True,artifacts=artifacts,
                                 provider_prefixes={k:str(v) for k,v in prefixes.items()},
@@ -115,31 +183,38 @@ def main():
                 spec=folder/'crate.spec'; queries=folder/'queries'
                 fields=R.crate_spec(spec,data['target']['crate_id'],data['target']['modules'],dependencies['target_dependencies'],queries,builtin)
                 H.save(folder/'spec-fields.json',fields)
-                H.require(not queries.exists(), 'target inference cache absent')
-                command=runner.run([producers[side]/'bin/emlf','--compile-crate',spec,'-o',folder/'unit'],folder,folder/'command')
+                H.require(not os.path.lexists(queries), 'target inference cache absent, including dangling links')
+                step = dict(side=side,target_cache_initially_absent=True)
+                record['target_steps'].append(step)
+                command=run_observed(runner,record,step,[producers[side]/'bin/emlf','--compile-crate',spec,'-o',folder/'unit'],folder,folder/'command',save)
                 query=R.validate_query(folder/'unit.queries',data)
-                query_files = list(queries.iterdir())
-                H.require(len(query_files) == 544 and all(p.is_file() and not p.is_symlink() and p.suffix == '.mlfq'
-                                                        for p in query_files),
-                          'exactly 544 regular non-symlink newly materialized query files')
+                step.update(inferred_groups=544,reused_groups=0,exact_fixed_projection=True,
+                            query_sha256=H.sha(folder/'unit.queries'),phase='cache-postcheck-pending')
+                save()
+                inventory = query_cache_inventory(queries,query)
+                step.update(cache_inventory=inventory,new_query_files=544,phase='artifact-postcheck-pending')
+                save()
                 current={suffix:Path(str(folder/'unit')+suffix).read_bytes() for suffix in R.SUFFIXES}
                 if reference is None: reference=current
                 H.require(current == reference, 'complete raw checked byte equality, no normalization')
-                record['target_steps'].append(dict(side=side,command=command,inferred_groups=544,reused_groups=0,
-                    target_cache_initially_absent=True,new_query_files=544,exact_fixed_projection=True,
+                step.update(
                     byte_identical_to_current_before=True,query_sha256=H.sha(folder/'unit.queries'),
-                    artifacts={k:hashlib.sha256(v).hexdigest() for k,v in current.items()}))
-                unchanged(); H.check_pins(artifacts); save()
+                    artifacts={k:hashlib.sha256(v).hexdigest() for k,v in current.items()})
+                unchanged(); H.check_pins(artifacts)
+                step.update(phase='complete',postchecks_complete=True); save()
             folder=out/'target-GHC';folder.mkdir();objects=folder/'objects'
             shutil.copytree(ghc['reusable_directory'],objects)
             H.require(len(H.file_pins(objects)) == 112, '56 reusable dependencies only')
-            command=runner.run(R.ghc_argv(ghc['ghc'],objects,data),folder,folder/'command')
+            step = dict()
+            record['ghc_control'] = step
+            command=run_observed(runner,record,step,R.ghc_argv(ghc['ghc'],objects,data),folder,folder/'command',save)
             rows=R.compiled(folder/'command')
             expected={n:H.below(R.FIXTURES,row['path']) for n,row in data['target']['modules'].items()}
             H.require(len(rows)==14 and dict(rows)==expected,'exact 14 fresh GHC targets; no dependency rebuild')
             H.check_pins({str(objects/rel):sha for rel,sha in ghc['reusable_dependency_files'].items()})
-            record['ghc_control']=dict(command=command,fresh_target_modules=14,reused_dependency_modules=56)
+            step.update(fresh_target_modules=14,reused_dependency_modules=56)
             unchanged();H.check_pins(artifacts)
+            step.update(phase='complete',postchecks_complete=True)
             record.update(complete=True,raw_checked_byte_comparison_passed=True,immutable_inputs_verified_after=True,
                           stable_host_after=stable_host(),
                           outputs={str(p):H.sha(p) for p in out.rglob('*') if p.is_file() and p != out/'receipt.json'})

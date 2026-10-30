@@ -198,6 +198,31 @@ and actual whole checked-output byte equality. The supplied current builtin's fu
 literal/checked admission replaces only the inapplicable historical pair hash;
 historical fixed-ref reproduction retains its original byte oracle.
 
+The fresh cache directory must contain exactly the 544 distinct lowercase SHA256
+report keys named `<query_key>.mlfq`, plus exactly two source-defined sidecars:
+`query-key.new` and `.lock` (546 files total). The directory and every entry are
+checked with `lstat`: no symlink, subdirectory, device, FIFO or arbitrary extra
+file is admitted. The lock file must be empty. `query-key.new` must hash to the
+**last ordered report key** on that same side. `CrateQuery.hs` writes this scratch
+file before each digest/cache publication and never removes it; its enclosing
+lock operation creates `.lock`, and the host releases it by close without writes
+or unlink. Empty lock contents do not prove lock ownership or process termination;
+the unchanged process runner still supplies the normal-exit/descendant guard.
+Compiler-dependent query keys need not match across before/candidate. No cache
+entry is deleted or normalized to make an inventory pass.
+
+Provider, target and final GHC native launch requests/completions are saved before
+their postchecks, with separate `native_launch_requested`, `native_completed`,
+`phase` and `postchecks_complete`
+fields. A successful native command followed by a failed cache/artifact check
+therefore remains visibly executed but **unqualified**, not an empty target list
+or an accepted sample. The initial integration attempt exposed the old harness's
+incorrect total-directory-count assumption after a normal before execution;
+that failed attempt is retained and must not be resumed or relabelled successful.
+An initial launch request does not prove that a child started: the unchanged
+runner may refuse on its pre-launch resource guard. The actual command receipt
+and successful completion are recorded separately.
+
 Its GHC control checks the frozen closure/dependency reuse boundary, requiring
 14 freshly compiled targets and 56 unchanged reusable dependency modules. These
 are bounded correctness checks, **not a new timing cohort or speedup estimate**.

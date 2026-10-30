@@ -3,12 +3,16 @@
 import ast
 import copy
 import json
+import hashlib
+import os
 from pathlib import Path
 import re
+import tempfile
 import unittest
 
 import contracts as C
 import run_controls as R
+import qualify_fixed14 as Q
 
 HERE = Path(__file__).resolve().parent
 MANIFEST = json.loads((HERE/'manifest.json').read_text())
@@ -157,6 +161,134 @@ class OutputRefusals(unittest.TestCase):
         for key,value in [('exit_code',1),('cwd','/different'),('argv',command+['-O0'])]:
             bad=copy.deepcopy(official);bad['commands'][0][key]=value
             with self.assertRaises(ValueError):R.compile_argv(bad,source,producer,folder,folder/'Main.hs',folder/'controls')
+
+
+class Fixed14CacheContract(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='c4-fixed14-pure-')
+        self.root = Path(self.temporary.name)
+        self.cache = self.root/'queries'
+        self.cache.mkdir()
+        keys = [hashlib.sha256(('independent synthetic key '+str(i)).encode()).hexdigest() for i in range(544)]
+        self.report = dict(inferred_groups=544,reused_groups=0,
+            groups=[dict(query_key=key,cached=False) for key in keys])
+        for key in keys:
+            (self.cache/(key+'.mlfq')).write_bytes(b'synthetic cache fixture; not a real compiler output')
+        self.scratch = b'independent synthetic key 543'
+        (self.cache/'query-key.new').write_bytes(self.scratch)
+        (self.cache/'.lock').write_bytes(b'')
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def check(self, report=None, directory=None):
+        return Q.query_cache_inventory(directory or self.cache,report or self.report)
+
+    def test_exact_source_defined_success(self):
+        result=self.check()
+        self.assertEqual(result['query_files'],544)
+        self.assertEqual(result['total_regular_files'],546)
+        self.assertEqual(result['scratch_key_sha256'],self.report['groups'][-1]['query_key'])
+
+    def test_report_mutations_refused(self):
+        for field,value in [('inferred_groups',543),('inferred_groups',True),('reused_groups',1),('reused_groups',False)]:
+            bad=copy.deepcopy(self.report);bad[field]=value
+            with self.subTest(field=field,value=value),self.assertRaises(RuntimeError):self.check(bad)
+        mutations=[]
+        bad=copy.deepcopy(self.report);bad['groups'].pop();mutations.append(bad)
+        bad=copy.deepcopy(self.report);bad['groups'].append(bad['groups'][-1]);mutations.append(bad)
+        bad=copy.deepcopy(self.report);bad['groups'][0]['cached']=True;mutations.append(bad)
+        bad=copy.deepcopy(self.report);bad['groups'][0]['cached']=0;mutations.append(bad)
+        bad=copy.deepcopy(self.report);bad['groups'][0]['query_key']=bad['groups'][1]['query_key'];mutations.append(bad)
+        bad=copy.deepcopy(self.report);bad['groups'][0]['query_key']=bad['groups'][0]['query_key'].upper();mutations.append(bad)
+        bad=copy.deepcopy(self.report);bad['groups'][0]['query_key']='../escape';mutations.append(bad)
+        bad=copy.deepcopy(self.report);bad['groups'].reverse();mutations.append(bad)
+        for i,bad in enumerate(mutations):
+            with self.subTest(mutation=i),self.assertRaises(RuntimeError):self.check(bad)
+
+    def test_missing_extra_and_wrong_names_refused(self):
+        first=self.cache/(self.report['groups'][0]['query_key']+'.mlfq')
+        original=first.read_bytes()
+        for path in [first,self.cache/'.lock',self.cache/'query-key.new']:
+            data=path.read_bytes();path.unlink()
+            try:
+                with self.subTest(missing=path.name),self.assertRaises(RuntimeError):self.check()
+            finally:path.write_bytes(data)
+        for name in ['unexpected',first.name+'.new','f'*64+'.mlfq']:
+            extra=self.cache/name;extra.write_bytes(b'extra')
+            try:
+                with self.subTest(extra=name),self.assertRaises(RuntimeError):self.check()
+            finally:extra.unlink()
+        first.unlink();wrong=self.cache/('e'*64+'.mlfq');wrong.write_bytes(original)
+        with self.assertRaises(RuntimeError):self.check()
+
+    def test_sidecar_content_refusals(self):
+        for path,data in [(self.cache/'.lock',b'not empty'),(self.cache/'query-key.new',b''),
+                          (self.cache/'query-key.new',b'independent synthetic key 0')]:
+            old=path.read_bytes();path.write_bytes(data)
+            try:
+                with self.subTest(file=path.name,value=data),self.assertRaises(RuntimeError):self.check()
+            finally:path.write_bytes(old)
+
+    def test_nonregular_and_symlink_refusals(self):
+        first=self.cache/(self.report['groups'][0]['query_key']+'.mlfq')
+        for path in [first,self.cache/'.lock',self.cache/'query-key.new']:
+            data=path.read_bytes();path.unlink()
+            for kind in ['directory','symlink','dangling','fifo']:
+                if kind=='directory':path.mkdir()
+                elif kind=='fifo':os.mkfifo(path)
+                else:path.symlink_to(self.root/('absent' if kind=='dangling' else 'regular'))
+                (self.root/'regular').write_bytes(data)
+                try:
+                    with self.subTest(file=path.name,kind=kind),self.assertRaises(RuntimeError):self.check()
+                finally:
+                    if kind=='directory':path.rmdir()
+                    else:path.unlink()
+            path.write_bytes(data)
+        link=self.root/'alias';link.symlink_to(self.cache,target_is_directory=True)
+        with self.assertRaises(RuntimeError):self.check(directory=link)
+
+
+class Fixed14PartialReceipt(unittest.TestCase):
+    def test_native_success_saved_before_postcheck_failure(self):
+        record=dict(commands=[],target_steps=[])
+        step=dict(side='base');record['target_steps'].append(step)
+        snapshots=[]
+        def save():snapshots.append(copy.deepcopy(record))
+        class Fake:
+            def run(self,*args):return dict(complete=True,exit_code=0,argv=['synthetic-only'])
+        Q.run_observed(Fake(),record,step,[],Path('/unused'),Path('/unused'),save)
+        with self.assertRaisesRegex(RuntimeError,'synthetic postcheck'):
+            raise RuntimeError('synthetic postcheck')
+        self.assertTrue(snapshots[-1]['target_steps'][0]['native_completed'])
+        self.assertFalse(snapshots[-1]['target_steps'][0]['postchecks_complete'])
+        self.assertEqual(snapshots[-1]['target_steps'][0]['phase'],'postchecks-pending')
+        self.assertEqual(len(snapshots[-1]['commands']),1)
+        self.assertEqual(snapshots[0]['target_steps'][0]['phase'],'native-launch-requested')
+
+    def test_failed_native_receipt_preserved(self):
+        with tempfile.TemporaryDirectory(prefix='c4-partial-pure-') as name:
+            out=Path(name);record=dict(commands=[],target_steps=[]);step=dict(side='candidate')
+            record['target_steps'].append(step);snapshots=[]
+            class Fake:
+                def run(self,*args):
+                    (out/'command.json').write_text(json.dumps(dict(complete=False,exit_code=7)))
+                    raise RuntimeError('synthetic native failure')
+            with self.assertRaisesRegex(RuntimeError,'synthetic native failure'):
+                Q.run_observed(Fake(),record,step,[],out,out,lambda:snapshots.append(copy.deepcopy(record)))
+            self.assertEqual(snapshots[-1]['target_steps'][0]['phase'],'native-failed-or-interrupted')
+            self.assertEqual(snapshots[-1]['commands'][0]['exit_code'],7)
+            self.assertFalse(snapshots[-1]['target_steps'][0]['native_completed'])
+
+    def test_truthy_or_guarded_completion_refused(self):
+        for complete,code in [(1,0),(False,0),(True,False),(True,1)]:
+            record=dict(commands=[],target_steps=[]);step={};record['target_steps'].append(step)
+            class Fake:
+                def run(self,*args):return dict(complete=complete,exit_code=code)
+            with self.subTest(complete=complete,code=code),self.assertRaises(RuntimeError):
+                Q.run_observed(Fake(),record,step,[],Path('/unused'),Path('/unused'),lambda:None)
+            self.assertFalse(step['native_completed'])
+            self.assertFalse(step['postchecks_complete'])
 
 
 if __name__ == '__main__':
