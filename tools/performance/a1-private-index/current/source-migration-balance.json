@@ -1,0 +1,20 @@
+{
+  "format": "a1-map-balance-source-migration-v1",
+  "base_ref": "51953cb8a61e755943eda95666746b2599ab2b9f",
+  "base_tree": "4a1498673e6909b75bc988086a9242216569088a",
+  "module_count": 126,
+  "unchanged_shared_input_count": 124,
+  "added_shared_inputs": {},
+  "removed_shared_inputs": [],
+  "changed_shared_inputs": {
+    "Bootstrap.Map": {
+      "old": "1fdf24d3b3874c76d246f098ee9361a7f93e7eb01f741e064347452976cdaf0a",
+      "new": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30"
+    },
+    "MLF.BuiltinPreludeData": {
+      "old": "3659f0e24183e601d8b78392d6744c5d2c63137becdf47e5b52f359ecd1ddf95",
+      "new": "8d47cf66d586e82fe481cef352a944205e8c393567592433a372d52294dfdc0c"
+    }
+  },
+  "prior_c4_migration_sha256": "0cbe2a1ab0076f57aba13eabca9111bacdce1d05e5846df8208cf5510e46e4a4"
+}

@@ -15,7 +15,31 @@ import run_controls as R
 import qualify_fixed14 as Q
 
 HERE = Path(__file__).resolve().parent
-MANIFEST = json.loads((HERE/'manifest.json').read_text())
+CURRENT_MANIFEST = json.loads((HERE/'manifest.json').read_text())
+
+
+def inverse_map_balance_dependency(manifest, raw):
+    C.require(C.sha_bytes(raw) == 'c3fbbae1fdd44a4a8ec344ec321e0063a5d2e309fc907161fae109927a89555b',
+              'immutable reviewed Map dependency migration')
+    migration = json.loads(raw)
+    C.require(C.sha_bytes((json.dumps(manifest, indent=2)+'\n').encode()) ==
+              migration['current_manifest_sha256'], 'exact current C4 dependency contract')
+    previous = copy.deepcopy(manifest)
+    path = migration['candidate_map_path']
+    C.require(previous['map_balance_dependency_migration'] == 'source-dependency-balance.json' and
+              previous['candidate_algorithm_sha256'][path] == migration['new_map_sha256'] and
+              previous['before_input_sha256'][path] == migration['old_map_sha256'],
+              'exact candidate-only Map dependency delta')
+    del previous['candidate_algorithm_sha256'][path]
+    del previous['map_balance_dependency_migration']
+    C.require(C.sha_bytes((json.dumps(previous, indent=2)+'\n').encode()) ==
+              migration['prior_manifest_sha256'], 'entire earlier C4 contract preserved')
+    return previous
+
+
+# All existing source-basis tests continue checking the complete unaltered C4
+# contract. The new tests below check its exact candidate dependency extension.
+MANIFEST = inverse_map_balance_dependency(CURRENT_MANIFEST, (HERE/'source-dependency-balance.json').read_bytes())
 
 
 def inverse_darwin_source_basis(manifest, raw):
@@ -98,6 +122,23 @@ def synthetic_layout():
 
 
 class StaticControls(unittest.TestCase):
+    def test_map_dependency_preserves_complete_previous_contract(self):
+        actual = inverse_map_balance_dependency(CURRENT_MANIFEST, (HERE/'source-dependency-balance.json').read_bytes())
+        self.assertEqual(actual, MANIFEST)
+        path = 'libraries/mlf-foundation/Bootstrap/Map.hs'
+        self.assertEqual(set(CURRENT_MANIFEST['candidate_algorithm_sha256']) - set(actual['candidate_algorithm_sha256']), {path})
+        self.assertEqual(C.sha_bytes((HERE.parents[2]/path).read_bytes()), CURRENT_MANIFEST['candidate_algorithm_sha256'][path])
+
+    def test_map_dependency_refuses_stale_and_unrelated_mutations(self):
+        raw = (HERE/'source-dependency-balance.json').read_bytes()
+        path = 'libraries/mlf-foundation/Bootstrap/Map.hs'
+        for section, key in [('candidate_algorithm_sha256', path), ('candidate_algorithm_sha256', 'libraries/mlf-inference/Bootstrap/Graph/Solver.hs'), ('before_input_sha256', path), ('before_input_sha256', 'runtime/mlf_system.h')]:
+            changed = copy.deepcopy(CURRENT_MANIFEST); changed[section][key] = '0'*64
+            with self.subTest(section=section, key=key), self.assertRaises(ValueError):
+                inverse_map_balance_dependency(changed, raw)
+        for bad in [raw+b' ', b'{}']:
+            with self.assertRaises(ValueError): inverse_map_balance_dependency(CURRENT_MANIFEST, bad)
+
     def test_exact_darwin_source_basis(self):
         previous = inverse_darwin_source_basis(MANIFEST, (HERE/'source-basis-darwin.json').read_bytes())
         self.assertEqual(previous['base_commit'], 'd96f67726599fa4e21f236462886106434c8e417')

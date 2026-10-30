@@ -189,7 +189,8 @@
   },
   "candidate_algorithm_sha256": {
     "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": "482d1752c7e1a219f32841d7c609c69cc228c33dc4c4ffe5f645f434487af69f",
-    "libraries/mlf-inference/Bootstrap/Constraint.hs": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852"
+    "libraries/mlf-inference/Bootstrap/Constraint.hs": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852",
+    "libraries/mlf-foundation/Bootstrap/Map.hs": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30"
   },
   "historical_a1_pins": {
     "controls/FrozenGraph.hs": "b0729713649072696451523a459efbfa5a528a4f0a71a8421f7daa268f5f9faa",
@@ -502,5 +503,6 @@
   },
   "builtin_semantic_payload_sha256": "c8e0ead3b186d151ab431c724dc6decc44a9fe30f492fb01001ff218ec458875",
   "source_basis_migration": "source-basis-query-v6.json",
-  "runtime_source_basis_migration": "source-basis-darwin.json"
+  "runtime_source_basis_migration": "source-basis-darwin.json",
+  "map_balance_dependency_migration": "source-dependency-balance.json"
 }

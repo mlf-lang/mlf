@@ -223,7 +223,7 @@ class CurrentCompatibilityTests(unittest.TestCase):
         self.assertEqual(current.parse_c4_migration(current.C4_MIGRATION.read_bytes()), current.c4_migration)
         result = current.migrate_c4_source_hashes(current.QUERY_SHARED_HASHES,
                                                 current.c4_migration, current.QUERY_MIGRATION_SHA256)
-        self.assertEqual(result, current.SHARED_HASHES)
+        self.assertEqual(result, current.C4_SHARED_HASHES)
         self.assertEqual({name for name in result if result[name] != current.QUERY_SHARED_HASHES[name]},
                          set(current.C4_NEW_HASHES))
         self.assertEqual(len(result), 126)
@@ -414,9 +414,12 @@ class CurrentCompatibilityTests(unittest.TestCase):
                          current.QUERY_SHARED_HASHES['Bootstrap.CrateQuery'])
         self.assertNotEqual(current.SHARED_HASHES['Bootstrap.CrateQuery'],
                             current.CF39_SHARED_HASHES['Bootstrap.CrateQuery'])
+        self.assertEqual({name for name in current.C4_SHARED_HASHES
+                          if current.C4_SHARED_HASHES[name] != current.CF39_SHARED_HASHES[name]},
+                         set(current.C4_NEW_HASHES) | {'Bootstrap.CrateQuery'})
         self.assertEqual({name for name in current.SHARED_HASHES
                           if current.SHARED_HASHES[name] != current.CF39_SHARED_HASHES[name]},
-                         set(current.C4_NEW_HASHES) | {'Bootstrap.CrateQuery'})
+                         set(current.C4_NEW_HASHES) | {'Bootstrap.CrateQuery', 'Bootstrap.Map'})
 
     def test_composed_migration_pins_and_receipt_bind_all_stages(self):
         self.assertEqual(current.c4_migration['parent_ref'],
@@ -432,6 +435,32 @@ class CurrentCompatibilityTests(unittest.TestCase):
                               ('c4_source_migration_sha256', 'C4_MIGRATION')]:
             self.assertIn(key + '=sha(' + constant + ')', code)
 
+
+
+    def test_balance_source_delta_preserves_old_anchors_and_other_inputs(self):
+        raw = current.BALANCE_MIGRATION.read_bytes()
+        result = current.balance_source_hashes(current.C4_SHARED_HASHES, raw)
+        self.assertEqual(result, current.SHARED_HASHES)
+        self.assertEqual({n for n in result if result[n] != current.C4_SHARED_HASHES[n]},
+                         {'Bootstrap.Map', 'MLF.BuiltinPreludeData'})
+        self.assertEqual(current.sha(current.C4_MIGRATION), current.C4_MIGRATION_SHA256)
+        self.assertEqual(len(result), 126)
+
+    def test_balance_source_migration_tamper_and_wrong_base_rejected(self):
+        raw = current.BALANCE_MIGRATION.read_bytes()
+        for base, value in [(current.C4_SHARED_HASHES, raw + b' '),
+                            (current.C4_SHARED_HASHES, b'{}'),
+                            (current.CF39_SHARED_HASHES, raw),
+                            ({**current.C4_SHARED_HASHES, 'Bootstrap.Map': '0' * 64}, raw)]:
+            with self.subTest(length=len(value)), self.assertRaises(ValueError):
+                current.balance_source_hashes(base, value)
+
+    def test_balance_rejects_each_previous_source_hash(self):
+        for name in ['Bootstrap.Map', 'MLF.BuiltinPreludeData']:
+            producer = self.producer()
+            producer['shared_inputs'][name]['sha256'] = current.C4_SHARED_HASHES[name]
+            with self.subTest(module=name), self.assertRaises(ValueError):
+                current.authenticate_current_source(producer)
 
 
 if __name__ == '__main__':

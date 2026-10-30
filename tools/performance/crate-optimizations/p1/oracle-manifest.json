@@ -26,7 +26,7 @@
   "collection_dependency_reaudit": {
     "baseline_sha": "af9ea26a2d2d76630a58e82e9e12940a03cfb5f0",
     "candidate_dependency_pins": {
-      "libraries/mlf-foundation/Bootstrap/Map.hs": "1fdf24d3b3874c76d246f098ee9361a7f93e7eb01f741e064347452976cdaf0a",
+      "libraries/mlf-foundation/Bootstrap/Map.hs": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30",
       "libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
     },
     "frozen_modules": [
@@ -47,6 +47,14 @@
     "production_delta": "Map.unionWith now folds the smaller input, using insertRightWith to preserve the left key representative and combine order, and has empty-input fast paths. Set definitions are unchanged but call the changed Map transitively.",
     "independence": "FrozenSelectors.hs and all selector/helper bodies remain literal historical fixtures. The runner adapts only its Map/Set imports. FrozenSelectorMap is the complete historical Map with only its module name changed; FrozenSelectorSet is historical Set with only its module name and Map import changed. Inverse adaptations must reproduce the historical dependency hashes. Both oracle collection modules share only the pinned Bootstrap.Types datatypes, Std and host primitives, never candidate collection functions.",
     "demand_scope": "Controls cover valid map shapes, lazy stored values, unused combining functions, left key representatives and noncommutative combining order in both size directions. Empty fast paths can avoid old comparator demands even with valid trees (for example a multi-key left map and empty right map); no equivalence for bottom comparators or malformed/partial internal trees is claimed.",
-    "coverage": "Historical 154072 selector checks are retained. Additional collection checks use independently authored ordered-list and size expectations over all pairs of five-key subsets, plus the historical Map.valid validator for cached subtree sizes, ordering and balance on both Map and Set results, and explicit demand/poison controls."
+    "coverage": "Historical 154072 selector checks are retained. Additional collection checks use independently authored ordered-list and size expectations over all pairs of five-key subsets, plus the historical Map.valid validator for cached subtree sizes, ordering and balance on both Map and Set results, and explicit demand/poison controls.",
+    "balance_dependency_reaudit": {
+      "prior_candidate_map_sha256": "1fdf24d3b3874c76d246f098ee9361a7f93e7eb01f741e064347452976cdaf0a",
+      "candidate_map_sha256": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30",
+      "production_delta": "After unchanged total<=1, compare leftSize<rightSize and test only the possible heavy side. No other Map function changes.",
+      "independence": "FrozenSelectorMap/Set and FrozenSelectors remain byte-identical. Their imports resolve only to independently frozen collections and the same pinned Types, Std and host primitives. The candidate Map never supplies an oracle operation. Inverse module/import adaptations and historical hashes are still required.",
+      "semantic_obligation": "For any Integer L,R with L+R>1: L<R implies R>0 and L<=3R; L>=R implies L>0 and R<=3L. This preserves the selected branch for signed, inconsistent or huge cached sizes. The unchanged total test already forces sizes in the original order. No additional payload or descendant demand.",
+      "additional_controls": "24649 unfiltered complete raw-shape pairs against original FrozenMap; 400 complete mutation tree comparisons against the qualified pre-change Map; 30 manual demand/error-order cases. Candidate and unchanged baseline both pass. This finite coverage supplements, and does not replace, the full historical selector checks."
+    }
   }
 }

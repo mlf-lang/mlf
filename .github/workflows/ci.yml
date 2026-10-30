@@ -101,6 +101,11 @@ jobs:
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/crate-optimizations/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/a1-private-index/check_integrated.py --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/f1-integrated-guard python3 -B tools/performance/fingerprint-fusion/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/f1-integrated-controls
+      - name: Check Map balance tree and demand semantics
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B tools/performance/map-balance/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls
       - name: Check C4 prepared-transaction graph controls
         if: matrix.optimization == '2'
         run: |

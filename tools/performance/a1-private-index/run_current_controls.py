@@ -175,7 +175,35 @@ def migrate_c4_source_hashes(base, value, prior_digest):
 
 
 c4_migration = parse_c4_migration(C4_MIGRATION.read_bytes())
-SHARED_HASHES = migrate_c4_source_hashes(QUERY_SHARED_HASHES, c4_migration, sha(QUERY_MIGRATION))
+C4_SHARED_HASHES = migrate_c4_source_hashes(QUERY_SHARED_HASHES, c4_migration, sha(QUERY_MIGRATION))
+BALANCE_MIGRATION = HERE / 'current/source-migration-balance.json'
+BALANCE_MIGRATION_SHA256 = '44e1aee620640e25f4453b553eb7a91e180fc7b3bfee2508c90eca9879eb798c'
+
+
+def balance_source_hashes(base, raw):
+    # Source admission only: original oracle bytes and expected results stay fixed.
+    req(hashlib.sha256(raw).hexdigest() == BALANCE_MIGRATION_SHA256,
+        'fixed map-balance source migration changed')
+    value = json.loads(raw)
+    req(base == C4_SHARED_HASHES and len(base) == 126 and
+        value['prior_c4_migration_sha256'] == C4_MIGRATION_SHA256 and
+        value['format'] == 'a1-map-balance-source-migration-v1' and
+        value['base_ref'] == '51953cb8a61e755943eda95666746b2599ab2b9f',
+        'exact qualified base for map-balance source migration')
+    delta = value['changed_shared_inputs']
+    req(set(delta) == {'Bootstrap.Map', 'MLF.BuiltinPreludeData'} and
+        value['module_count'] == 126 and value['unchanged_shared_input_count'] == 124 and
+        value['added_shared_inputs'] == {} and value['removed_shared_inputs'] == [],
+        'exact map-balance and freshly regenerated Prelude source delta')
+    result = dict(base)
+    for name, row in delta.items():
+        req(row['old'] == base[name] and row['new'] != row['old'],
+            'exact prior map-balance source input: ' + name)
+        result[name] = row['new']
+    return result
+
+
+SHARED_HASHES = balance_source_hashes(C4_SHARED_HASHES, BALANCE_MIGRATION.read_bytes())
 CURRENT_MODULES = {'CurrentBuiltinControls', 'CurrentC4TransactionOracle', 'CurrentC4OracleControls'}
 CURRENT_SOURCE_HASHES = {'CurrentBuiltinControls.hs': 'eb512024358872e69ce2df3b429a28ef6f12755c0c5d194147ddc36a627c944d', 'CurrentC4TransactionOracle.hs': '04819913a2b842aad5a20a3ec95f36755609b16b7ef5e7cae517e937e9f3c43a', 'CurrentC4OracleControls.hs': 'c92530ef213706972465b7d30fff0875fd8ccf6104d7fe190960ceecec3133da', 'c4_session_adapter.py': 'c3e5243e069b7d61eb6911b449c4b0308e0d31c252f9cbdf0067c2da5d2b25d8'}
 CURRENT_BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
@@ -238,6 +266,7 @@ def main():
     pins.update({str(COMPATIBILITY): COMPATIBILITY_SHA256, str(MIGRATION): MIGRATION_SHA256,
                  str(QUERY_MIGRATION): QUERY_MIGRATION_SHA256,
                  str(C4_MIGRATION): C4_MIGRATION_SHA256,
+                 str(BALANCE_MIGRATION): BALANCE_MIGRATION_SHA256,
                  str(historical_path): sha(historical_path)})
     current_manifest = current / 'manifest.json'
     pins[str(current_manifest)] = sha(current_manifest)
@@ -370,6 +399,7 @@ def main():
                    source_migration_sha256=sha(MIGRATION),
                    query_source_migration_sha256=sha(QUERY_MIGRATION),
                    c4_source_migration_sha256=sha(C4_MIGRATION),
+                   balance_source_migration_sha256=sha(BALANCE_MIGRATION),
                    c4_representation_relation='Only reverse-map and reverse-bucket tree shape may differ; graph/aliases/counter/scopes physical; independent full edge/invariant/validator/finish checks on both',
                    builtin_provenance='Exact committed RawPrelude literal and canonical wire validation; pair hashes are immutable observations, not generated expectations',
                    c_object_provenance='Successful authenticated producer C commands, actual local hashes pinned before/after; producer schema does not itself store C object digests',

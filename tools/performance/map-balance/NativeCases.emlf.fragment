@@ -1,0 +1,26 @@
+
+nativeLeaf : Int -> Int -> Map Int Int
+nativeLeaf n k = MapNode n k 7 MapEmpty MapEmpty
+nativeShape : Map Int Int -> String
+nativeShape tree = case tree of
+  MapEmpty -> "."
+  MapNode n k v l r -> concatStringList ["(", showInt n, ":", showInt k, ":", showInt v, ":", nativeShape l, ":", nativeShape r, ")"]
+nativeFinite = do
+  putStrLn (nativeShape (M.balance 0 9 MapEmpty MapEmpty))
+  putStrLn (nativeShape (M.balance 0 9 (nativeLeaf 1 (-1)) (nativeLeaf 1 1)))
+  putStrLn (nativeShape (M.balance 0 9 MapEmpty (nativeLeaf 3 10)))
+  putStrLn (nativeShape (M.balance 0 9 (nativeLeaf 3 (-10)) MapEmpty))
+  putStrLn (nativeShape (M.balance 0 9 MapEmpty (MapNode 3 20 7 (nativeLeaf 1 10) MapEmpty)))
+  putStrLn (nativeShape (M.balance 0 9 (MapNode 3 (-20) 7 MapEmpty (nativeLeaf 1 (-10))) MapEmpty))
+  putStrLn (nativeShape (M.balance 0 9 (nativeLeaf (-3) (-10)) (nativeLeaf 6 10)))
+  putStrLn (nativeShape (M.balance 0 9 (nativeLeaf 340282366920938463463374607431768211456 (-1)) (nativeLeaf 340282366920938463463374607431768211456 1)))
+  putStrLn (nativeShape (M.balance 0 9 (nativeLeaf (-100) (-1)) (nativeLeaf 101 1)))
+  printInt (M.size (M.balance 0 (panic "unused value") MapEmpty MapEmpty))
+  semantics
+nativeMain = do
+  mode <- getArg 0
+  if eqString mode "finite" then nativeFinite else
+    if eqString mode "left" then printInt (M.size (M.balance (panic "root") 9 (panic "left") (panic "right"))) else
+    if eqString mode "right" then printInt (M.size (M.balance (panic "root") 9 (nativeLeaf 1 0) (panic "right"))) else
+    if eqString mode "root" then printInt (M.size (M.balance (panic "root") 9 MapEmpty MapEmpty)) else
+    printInt (M.size (M.balance (panic "root") 9 MapEmpty (MapNode 3 (panic "promoted") 7 (panic "inner") MapEmpty)))

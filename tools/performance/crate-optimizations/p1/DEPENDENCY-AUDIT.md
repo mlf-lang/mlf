@@ -76,3 +76,7 @@ These check preserved historical hashes and import-only adaptation, and mutate
 selector/excerpt/dependency bytes, module inventory, imports and superficial
 pins to verify that the independent historical checks still fail closed. They
 do not replace the compiled differential against an authenticated O2 producer.
+
+## Balance direction re-audit (2026-10-30)
+
+The candidate changes only the ordering of the two balance bounds, after the unchanged total-size guard. The new manifest entry records the signed-Integer proof and focused controls. FrozenSelectorMap, FrozenSelectorSet, FrozenSelectors and their expected outputs remain unchanged. Their only shared dependencies are still pinned Types, Std and host primitives; candidate Map is never imported into the oracle. Inverse adaptations continue to reproduce the historical hashes. Both the old full selector suite and the new raw-tree/demand controls remain required.

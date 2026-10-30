@@ -1,0 +1,1221 @@
+{
+  "format": "map-balance-performance-evidence-v1",
+  "date": "2026-10-30",
+  "production_delta": "Direction-first bound selection after the unchanged total-size guard; no new representation/cache/fallback.",
+  "target": {
+    "source_commit": "d96f67726599fa4e21f236462886106434c8e417",
+    "modules": 15,
+    "fresh_groups_per_execution": 711,
+    "reused_groups_per_execution": 0,
+    "dependency_cache_reuse": true,
+    "target_inference_cache_reuse": false,
+    "reference_scope": "Independently qualified pre-candidate/d96 reference for this local target; original P3 semantic oracles retained separately, not a new P3 target rebuild."
+  },
+  "map_source": {
+    "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/libraries/mlf-foundation/Bootstrap/Map.hs",
+    "sha256": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30"
+  },
+  "canonical_builtin": {
+    "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/bootstrap/MLF/BuiltinPreludeData.hs",
+    "sha256": "8d47cf66d586e82fe481cef352a944205e8c393567592433a372d52294dfdc0c"
+  },
+  "objects_and_producers": {
+    "confirmation_A": {
+      "map_object": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/darwin-ready/integrated-producer/objects/Bootstrap/Map.o",
+        "sha256": "e4e78aef500b7448d6392c0a028eeec4e823c8e81f190702bed699be5e27b9ab"
+      },
+      "ordinary_producer_receipt": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/darwin-ready/integrated-producer/receipt.json",
+        "sha256": "5932fc90a00b7aa86e897dcda653834bc54537844e35ec8a2f9deb2e6550bbd9"
+      },
+      "compiler": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/darwin-ready/integrated-producer/bin/emlf",
+        "sha256": "0f4fd05ad575d6803053eebbb70a468a705c221d95e496c231e2c5c218408ac9"
+      }
+    },
+    "confirmation_B": {
+      "map_object": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/producer/objects/Bootstrap/Map.o",
+        "sha256": "51a31c911083eca058f4c1c204e92ea343473e452aaa888b683809ed6c475153"
+      },
+      "ordinary_producer_receipt": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/producer/receipt.json",
+        "sha256": "9077447b8bc928c395ac3ae4e756d03608e81858d92806d255549cb7e6084223"
+      },
+      "compiler": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/producer/bin/emlf",
+        "sha256": "fc4fd9d2fa06504eabdc2b797180a5226abdb535232a0d8c37f8a35b5418eec5"
+      }
+    },
+    "integration_A": {
+      "map_object": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-c4-integration/base-producer/objects/Bootstrap/Map.o",
+        "sha256": "e4e78aef500b7448d6392c0a028eeec4e823c8e81f190702bed699be5e27b9ab"
+      },
+      "ordinary_producer_receipt": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-c4-integration/base-producer/receipt.json",
+        "sha256": "677921b8d0bd6c4cdf90124c5269274ed258298548166ff8d11a6a7a8cf1e272"
+      },
+      "compiler": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-c4-integration/base-producer/bin/emlf",
+        "sha256": "085bb1059407dcd27ccd5727a090695497850efcc8cdfab374bd914b76e99e21"
+      }
+    },
+    "integration_B": {
+      "map_object": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/producer/objects/Bootstrap/Map.o",
+        "sha256": "51a31c911083eca058f4c1c204e92ea343473e452aaa888b683809ed6c475153"
+      },
+      "ordinary_producer_receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/producer/receipt.json",
+        "sha256": "46b9cbc7ff6559be5a1751237479360b8a76862f973f85c52dd3a5334f84229b"
+      },
+      "compiler": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/producer/bin/emlf",
+        "sha256": "d108b91b8b6a2afd29f1e85fdc9be8542046bba381fc067046ae0d0660642283"
+      }
+    }
+  },
+  "shape_diagnostic": {
+    "receipt": {
+      "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-shapes/receipt.json",
+      "sha256": "efa543dd5f1ca36233ca1af9217eb1de89a885491843b1e22e39228e96ce7263"
+    },
+    "counts": {
+      "small": 30558276,
+      "right_heavy": 16216552,
+      "left_heavy": 4002761,
+      "balanced": 193159967
+    },
+    "scope": "Separate counter relink only; logical-call shape evidence, not ordinary CPU/wall attribution or allocation measurement."
+  },
+  "confirmation": {
+    "receipt": {
+      "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/receipt.json",
+      "sha256": "f38ccd8dec92d92e39e4c942a563dff9a6a000df77c69b331080dda6b37d5671"
+    },
+    "plan": {
+      "format": "fixed-map-balance-confirmation-v1",
+      "frozen_at_utc": "2026-10-30T09:56:36.949851+00:00",
+      "random_seed": 202610300731,
+      "orders": [
+        "BAAB",
+        "ABBA",
+        "ABBA",
+        "ABBA",
+        "BAAB",
+        "BAAB"
+      ],
+      "runs": 24,
+      "blocks": 6,
+      "workload": "15 mlf-crates modules, 711 fresh / 0 reused per execution; prepared dependencies allowed; every checked .mlfci/.mlfco raw-byte compared to the pre-candidate qualified reference",
+      "estimand": "Mean of six block means, each containing two log(B/A) paired wall ratios; exp transform. Blocks, not modules or groups or legs, are the six analysis units.",
+      "interval": "Nominal two-sided 95% Student-t confidence interval over six block means; conditional on this fixed artifact/host cohort, not a family-wide search guarantee.",
+      "acceptance": {
+        "minimum_point_improvement": 0.01,
+        "minimum_interval_lower_exclusive": 0.0,
+        "both_AB_BA_point_improvements_positive": true,
+        "all_correctness_resource_gates_pass": true
+      },
+      "stop": "Exactly this fixed 24-run window. No extra samples to chase significance. Any incomplete, failed, guarded, stale-input or wrong-byte execution aborts without replacing it. An inconclusive interval is inconclusive.",
+      "environment_boundary": "Record kernel boot time and host identity before the cohort; require the same boot time at each block boundary. No builds/diagnostics/uploads/directory-wide scans during timed legs. Keep existing resource limits.",
+      "scope": "Ordinary GHC 9.14.1 -O2 compiler, single lane; not a complete compiler build, GHC endpoint ratio, cross-machine estimate or native runtime performance claim. Native correctness separately checked at ordinary Clang -O2.",
+      "source_change_sha256": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30",
+      "boot_time": "{ sec = 1791537457, usec = 802602 } Fri Oct  9 17:17:37 2026",
+      "qualifications": {
+        "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/oracle-a1/receipt.json": {
+          "sha256": "efd496e2cef595ec26570cd73cff14bb59b39a99ad6fdf8f12672ea3f997e542",
+          "status": "passed"
+        },
+        "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/oracle-p1-2/receipt.json": {
+          "sha256": "985fdbe0449c9dcecfc19d217dbc7a941076a1b0549bf2d43275aa18437a0e2c",
+          "status": "passed"
+        },
+        "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/oracle-p2/receipt.json": {
+          "sha256": "3dec88c8b781bf6382da94585532c1c38c00cd7c36a87d40ca736d466e2d8b04",
+          "status": "passed"
+        },
+        "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/oracle-p3/receipt.json": {
+          "sha256": "47d5788052d6c1d3b19851dad8af57af439296d8be926e36268d9634b92319b5",
+          "status": "passed"
+        },
+        "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/oracle-encoding/receipt.json": {
+          "sha256": "790dd5dc6409123e2e8a329852722dcf1cb9943ca2e00f81b6dc75dadb285873",
+          "status": "passed"
+        },
+        "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/controls-3/receipt.json": {
+          "sha256": "33958d1dc4220b560664f87dffd4c939b73bc3afde418949ec2ffba2f8902884",
+          "status": "passed"
+        },
+        "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/baseline-controls-2/receipt.json": {
+          "sha256": "9f3e5573ac3482152754696df4bc7ed87ed47b1cdad9052d58baf63360e6a4a9",
+          "status": "passed"
+        },
+        "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/native-controls-2/receipt.json": {
+          "sha256": "91d13418c90015774b8d2046424113686b6315b194ca1a29b440e025cdf8e89e",
+          "status": "passed"
+        }
+      }
+    },
+    "plan_artifact": {
+      "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation-plan.json",
+      "sha256": "6627ba8f6e89a65f46f4e93fd99b26094b83405c73999973ffac6ff752167e45"
+    },
+    "analysis": {
+      "phase": "confirmation",
+      "ordinary_runs": 24,
+      "blocks": 6,
+      "block_log_ratios": [
+        -0.013153096445348435,
+        -0.006585973326537356,
+        -0.007675437218773011,
+        -0.024711254351765653,
+        -0.005177918196421704,
+        -0.016349266643449087
+      ],
+      "block_improvements": [
+        0.01306697248473776,
+        0.006564333337067962,
+        0.0076460562691240685,
+        0.02440843081720745,
+        0.005164535885464061,
+        0.016216342772042536
+      ],
+      "point_improvement": 0.012200454540777228,
+      "per_direction_improvement": {
+        "AB": 0.010246516449061938,
+        "BA": 0.014150535233524164
+      },
+      "wall_arithmetic_mean": {
+        "A": 71.41826225,
+        "B": 70.5459333575
+      },
+      "cpu_arithmetic_mean": {
+        "A": 70.07861,
+        "B": 69.15949975
+      },
+      "libraries": {
+        "scipy": "1.16.3",
+        "numpy": "2.5.4"
+      },
+      "conditional_scope": "fixed ordinary binaries, 15 modules / 711 fresh groups, this macOS host; no whole-selfcompiler or cross-machine claim",
+      "nominal_95_percent_improvement_interval": [
+        0.004469631863928236,
+        0.019871243268714256
+      ],
+      "acceptance_passed": true,
+      "fixed_budget_complete": true,
+      "additional_samples_allowed": false
+    },
+    "analysis_artifact": {
+      "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/analysis.json",
+      "sha256": "251f9d2eb6a27b1b0efef493ca7d7b81a8787c03499783c6c382bdf772d078f0"
+    },
+    "compilers": {
+      "A": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/darwin-ready/integrated-producer/bin/emlf",
+        "sha256": "0f4fd05ad575d6803053eebbb70a468a705c221d95e496c231e2c5c218408ac9"
+      },
+      "B": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/producer/bin/emlf",
+        "sha256": "fc4fd9d2fa06504eabdc2b797180a5226abdb535232a0d8c37f8a35b5418eec5"
+      }
+    },
+    "host": {
+      "affinity": "not exposed by macOS",
+      "cpu": "Apple M1 Max",
+      "logical_cpus": 10,
+      "machine": "arm64",
+      "node": "aress-MacBook-Pro-2.local",
+      "os_cache_flush": false,
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "python": "3.14.8 (main, Sep 30 2026, 17:55:09) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "qualification": "macOS experimental; sampled RSS, no hard address-space limit"
+    },
+    "limits": {
+      "address_space_per_process_bytes": 6442450944,
+      "disk_free_floor_bytes": 5368709120,
+      "host_available_floor_bytes": 3221225472,
+      "max_work_bytes": 536870912,
+      "process_tree_rss_bytes": 5368709120,
+      "wall_seconds": 600
+    },
+    "timing_boundary": "Unmodified authenticated helper.Runner exact child wait4; fresh preparation, immutable-input checks and raw-byte comparison outside timing",
+    "directory_guard": "Unchanged Runner scans only the active leg with a 512 MiB cap. Maximum active block is 4 legs / 2 GiB. After each block, retain raw checked outputs, group reports, receipts and per-cache-file size/SHA256 inventories, then release only that block's owned disposable query caches. No target cache is reused. The 5 GiB global disk floor and all memory/process guards remain enabled; archive work never overlaps a timed leg.",
+    "chronological_runs": [
+      {
+        "ordinal": 0,
+        "block": 0,
+        "index": 0,
+        "side": "B",
+        "started_utc": "2026-10-30T09:56:56Z",
+        "wall_seconds": 70.451288667,
+        "child_user_seconds": 64.260318,
+        "child_system_seconds": 4.719601,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/00-0-B/command/command.json",
+          "sha256": "6f5644b2e1c1f59c06e35d2386f707e1aed483e0629450c584714dfcad4482cf"
+        },
+        "spec_sha256": "9142d11d069f785ac12547cc85a0d4be15de6b57ccbbb31dc774c636406496cc",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 1,
+        "block": 0,
+        "index": 1,
+        "side": "A",
+        "started_utc": "2026-10-30T09:58:06Z",
+        "wall_seconds": 71.355950208,
+        "child_user_seconds": 65.270219,
+        "child_system_seconds": 4.634005,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/00-1-A/command/command.json",
+          "sha256": "b61922553af0a23a469529b7723fd52a94a6c33f54f6e547267de12e23611dcd"
+        },
+        "spec_sha256": "bbf8efaa0c1c610d6cd4d8f53e8356e687f545c6bd012530c01442ddef7aafd3",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 2,
+        "block": 0,
+        "index": 2,
+        "side": "A",
+        "started_utc": "2026-10-30T09:59:18Z",
+        "wall_seconds": 71.350880458,
+        "child_user_seconds": 65.450589,
+        "child_system_seconds": 4.606299,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/00-2-A/command/command.json",
+          "sha256": "a315aa6b4bf0d398956e3657ab5f17bf8214d7ba2344045c1a00c302aadc85ed"
+        },
+        "spec_sha256": "b68b3ef05646a79c119e6108711843ae70fa8605e8e270921aa01fef0c073f5e",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 3,
+        "block": 0,
+        "index": 3,
+        "side": "B",
+        "started_utc": "2026-10-30T10:00:29Z",
+        "wall_seconds": 70.390808666,
+        "child_user_seconds": 64.400825,
+        "child_system_seconds": 4.664891,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/00-3-B/command/command.json",
+          "sha256": "2e328faeb04929a971f55541da0a3f09df4da657b88ea9ee9ae6fc3cd2a069ea"
+        },
+        "spec_sha256": "fc647e9fbb57f525e65182e968099b59ae9a49d67a85ae3f5379f0465d5c92c9",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 4,
+        "block": 1,
+        "index": 0,
+        "side": "A",
+        "started_utc": "2026-10-30T10:01:42Z",
+        "wall_seconds": 70.901633333,
+        "child_user_seconds": 65.226751,
+        "child_system_seconds": 4.490002,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/01-0-A/command/command.json",
+          "sha256": "cc2ddf9123a74915b483a1c82894ec9bfe3724002c023d946e58c8102d42f851"
+        },
+        "spec_sha256": "79b6a8da6ee5c26e121a4bc30e87648a202eb41964df0c63cd6ef6bb50479915",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 5,
+        "block": 1,
+        "index": 1,
+        "side": "B",
+        "started_utc": "2026-10-30T10:02:53Z",
+        "wall_seconds": 70.991300583,
+        "child_user_seconds": 64.421174,
+        "child_system_seconds": 4.797297,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/01-1-B/command/command.json",
+          "sha256": "1eb46c54fa008b33716a4ded90a071607f76c0f5fcea0261dc8ebe90ebe23fe2"
+        },
+        "spec_sha256": "6c2b5a506b1867008a0758d103981044eb55f98541cf5ce9d4e0668c4a5a65ad",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 6,
+        "block": 1,
+        "index": 2,
+        "side": "B",
+        "started_utc": "2026-10-30T10:04:04Z",
+        "wall_seconds": 70.250664667,
+        "child_user_seconds": 64.284939,
+        "child_system_seconds": 4.712109,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/01-2-B/command/command.json",
+          "sha256": "1899d212636f3a67a8768b13e7acdcbd59a4fd75b6e1198d67c14e38f695af30"
+        },
+        "spec_sha256": "cf9df9ea540e7faf5cd25220732c427199d2f2eb27985538eee28e27f13d2b93",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 7,
+        "block": 1,
+        "index": 3,
+        "side": "A",
+        "started_utc": "2026-10-30T10:05:15Z",
+        "wall_seconds": 71.27214575,
+        "child_user_seconds": 65.26729,
+        "child_system_seconds": 4.704985,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/01-3-A/command/command.json",
+          "sha256": "be50709860154fc64813fc6ab6cfd9cc645d154c868f2a25fc65f6a5c5fd2545"
+        },
+        "spec_sha256": "a1f25c8c9e4c54896784742f633e6a3e6df038aa09b0d7e780eaf81ee9810e87",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 8,
+        "block": 2,
+        "index": 0,
+        "side": "A",
+        "started_utc": "2026-10-30T10:06:29Z",
+        "wall_seconds": 70.934874167,
+        "child_user_seconds": 65.185004,
+        "child_system_seconds": 4.564124,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/02-0-A/command/command.json",
+          "sha256": "5040193b933a2aa8c9a6a70db3a0e03ab0730cff1b1ceea58266231b494ed75e"
+        },
+        "spec_sha256": "0af4edad503970fb7245b953fc92e0059bf62dd38533ec62621d33eaaa66d27a",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 9,
+        "block": 2,
+        "index": 1,
+        "side": "B",
+        "started_utc": "2026-10-30T10:07:40Z",
+        "wall_seconds": 70.5054245,
+        "child_user_seconds": 64.354853,
+        "child_system_seconds": 4.759643,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/02-1-B/command/command.json",
+          "sha256": "7473a59f4cc038104a003f6f5c18001f25a91b704148431a565854b470b8a7cc"
+        },
+        "spec_sha256": "fe81af10d7fb9cddea87d64fcd470de05d65ee506e2277d589eadfe9215417f0",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 10,
+        "block": 2,
+        "index": 2,
+        "side": "B",
+        "started_utc": "2026-10-30T10:08:51Z",
+        "wall_seconds": 70.644779791,
+        "child_user_seconds": 64.350492,
+        "child_system_seconds": 4.775862,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/02-2-B/command/command.json",
+          "sha256": "87ea8497963dbd6b71ac904c32d8d8682a614387880fb80a024b035f461a795e"
+        },
+        "spec_sha256": "ed51691dbdc081a56235828667acd73ff3bbc8cabb74545a4cee0361d1d4647f",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 11,
+        "block": 2,
+        "index": 3,
+        "side": "A",
+        "started_utc": "2026-10-30T10:10:01Z",
+        "wall_seconds": 71.303295875,
+        "child_user_seconds": 65.290847,
+        "child_system_seconds": 4.745402,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/02-3-A/command/command.json",
+          "sha256": "d37fdfc95eef2f66aa546585f980e5381458b44e8fba26f2fb7493eddb550fe1"
+        },
+        "spec_sha256": "0567f5747105247f06f69c93a6fbfa16a05589ecb633f24f00a10280568b8aac",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 12,
+        "block": 3,
+        "index": 0,
+        "side": "A",
+        "started_utc": "2026-10-30T10:16:14Z",
+        "wall_seconds": 71.386421042,
+        "child_user_seconds": 65.23947,
+        "child_system_seconds": 4.702965,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/03-0-A/command/command.json",
+          "sha256": "a8ec09b606d95b67a49865873e2ea55ed83ebda7c7794f8ab3a61f26b902654e"
+        },
+        "spec_sha256": "4ae9c820250d4d5197880c40a5cb7463960b3b46c49ff6886d1ffe1e8d580d7d",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 13,
+        "block": 3,
+        "index": 1,
+        "side": "B",
+        "started_utc": "2026-10-30T10:17:26Z",
+        "wall_seconds": 70.463339708,
+        "child_user_seconds": 64.322509,
+        "child_system_seconds": 4.752471,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/03-1-B/command/command.json",
+          "sha256": "5db37f5df7e8a947ccdc3ab72dc57e2d1f4a6d5e7a78adbd67d4aaca1e818e94"
+        },
+        "spec_sha256": "0860e8329a3ee7b930f70aa4a43d5b6c3d4ee2f24768d33a363d97279c573564",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 14,
+        "block": 3,
+        "index": 2,
+        "side": "B",
+        "started_utc": "2026-10-30T10:18:36Z",
+        "wall_seconds": 70.553957125,
+        "child_user_seconds": 64.398843,
+        "child_system_seconds": 4.771063,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/03-2-B/command/command.json",
+          "sha256": "e4305ce09669b98782510bca12acb4ae7e022820e0dd8b67d4da7ae228fae243"
+        },
+        "spec_sha256": "e2017aac91ea24013fb35a3dc2a4d7d06bb19c4aa6ae295716f2a0645a3b06e9",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 15,
+        "block": 3,
+        "index": 3,
+        "side": "A",
+        "started_utc": "2026-10-30T10:19:47Z",
+        "wall_seconds": 73.169976208,
+        "child_user_seconds": 66.372387,
+        "child_system_seconds": 5.064918,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/03-3-A/command/command.json",
+          "sha256": "60cbc0e38dbc6debcd77805e48e19e56967141e9bf383064c20850c0a2041f45"
+        },
+        "spec_sha256": "1fe6288f39d0382ccbac6ef66567ce72660c091e9a93e454cbdbb657b37af2c6",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 16,
+        "block": 4,
+        "index": 0,
+        "side": "B",
+        "started_utc": "2026-10-30T10:21:03Z",
+        "wall_seconds": 71.622649125,
+        "child_user_seconds": 65.354189,
+        "child_system_seconds": 4.857302,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/04-0-B/command/command.json",
+          "sha256": "2f95d6ebce4f516ec6dfcad36c7d067e96b372f008aa8390600d8e631131d4cb"
+        },
+        "spec_sha256": "659875f8694853d5459b0913945866efa935d9bde5c54b943d534f5eef86a8b4",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 17,
+        "block": 4,
+        "index": 1,
+        "side": "A",
+        "started_utc": "2026-10-30T10:22:15Z",
+        "wall_seconds": 71.287729917,
+        "child_user_seconds": 65.293901,
+        "child_system_seconds": 4.70157,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/04-1-A/command/command.json",
+          "sha256": "1c39cf22b2d326acfd9abb03571b65665e2b8f41115cf059b4241d36507a1a5f"
+        },
+        "spec_sha256": "92199dcc8fbb9ee221ca84c777a21ea24e76acf0e1b3874dcebe899044810406",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 18,
+        "block": 4,
+        "index": 2,
+        "side": "A",
+        "started_utc": "2026-10-30T10:23:26Z",
+        "wall_seconds": 71.437540417,
+        "child_user_seconds": 65.243907,
+        "child_system_seconds": 4.751307,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/04-2-A/command/command.json",
+          "sha256": "a4e9ed829a6b2e05cec7fe3b6aec888f2125ad6b61ee06f0d23d07620dec6336"
+        },
+        "spec_sha256": "eefa396ebb178da6c7b8c08288fb1e87532c90633aa97c0bdf6755f77318d82e",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 19,
+        "block": 4,
+        "index": 3,
+        "side": "B",
+        "started_utc": "2026-10-30T10:24:38Z",
+        "wall_seconds": 70.370950292,
+        "child_user_seconds": 64.290258,
+        "child_system_seconds": 4.793796,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/04-3-B/command/command.json",
+          "sha256": "95bf4f83386ab42e81d043beabce71ed856024bfba85dc66bc4bb902a759f77f"
+        },
+        "spec_sha256": "8ece8d89055c8c5bd611fe956ccf603d5e12ea3204d38b2b8b0d3519d353094c",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 20,
+        "block": 5,
+        "index": 0,
+        "side": "B",
+        "started_utc": "2026-10-30T10:25:51Z",
+        "wall_seconds": 70.071909083,
+        "child_user_seconds": 64.251365,
+        "child_system_seconds": 4.615663,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/05-0-B/command/command.json",
+          "sha256": "8786c5e84108fb24892ac0c7c09aeef2c9ae5165f51849eecba9e25d03baec2b"
+        },
+        "spec_sha256": "45def9214786c630647ea4c4a3d7eb462a82fc2ac8a0d57a0646f5580f283375",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      },
+      {
+        "ordinal": 21,
+        "block": 5,
+        "index": 1,
+        "side": "A",
+        "started_utc": "2026-10-30T10:27:01Z",
+        "wall_seconds": 71.295841625,
+        "child_user_seconds": 65.315098,
+        "child_system_seconds": 4.730594,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/05-1-A/command/command.json",
+          "sha256": "00a9c0c97aed25e8131b00bd3a6e65e33e30ea34030e1efee01d880bd509cf87"
+        },
+        "spec_sha256": "e9886b5ff1d25787f818f12b16a66ee061334a28ac7447d01a681248002dc5d0",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 22,
+        "block": 5,
+        "index": 2,
+        "side": "A",
+        "started_utc": "2026-10-30T10:28:13Z",
+        "wall_seconds": 71.322858,
+        "child_user_seconds": 65.379627,
+        "child_system_seconds": 4.712059,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/05-2-A/command/command.json",
+          "sha256": "e2a71637a8b3b82e81126b365ee531d69ee80956c9b64adcd6a7663a590e3a7f"
+        },
+        "spec_sha256": "b5c6d334452d1d23b3eb281ea9be642c39a2a9e259b32a3955d895da86a1e421",
+        "cache_inventory_sha256": "e88e320e92aa99765f5391c50f370af9af139c61774e5703b09e211cc2dc7199"
+      },
+      {
+        "ordinal": 23,
+        "block": 5,
+        "index": 3,
+        "side": "B",
+        "started_utc": "2026-10-30T10:29:24Z",
+        "wall_seconds": 70.234128083,
+        "child_user_seconds": 64.271759,
+        "child_system_seconds": 4.732775,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/05-3-B/command/command.json",
+          "sha256": "e7d710504c8bd2e16952faa4741a9fa1ff27db41aee8fd544fbe0fe9d33bbfc1"
+        },
+        "spec_sha256": "9ded6a5ece216a7ffad744cb1a2e2959cb792a068cfcb2da3363ea4d98289287",
+        "cache_inventory_sha256": "b426b19362e9659d63479a7c9adaab4ac87234d0215906c2c7193a77eecca5d1"
+      }
+    ],
+    "reference_checked_outputs": {
+      ".mlfci": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/selfcompile-opt-20261030/mlf-fresh-cache/856cea5daf8c38698fdfd7ad2ec5e3cfb7f3bef3c9f52ab326d9818509f12d06/unit.mlfci",
+        "sha256": "c05de89df7d6153b798e109b227c2778a686183965f707416ce46eef9ff44c76"
+      },
+      ".mlfco": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/selfcompile-opt-20261030/mlf-fresh-cache/856cea5daf8c38698fdfd7ad2ec5e3cfb7f3bef3c9f52ab326d9818509f12d06/unit.mlfco",
+        "sha256": "daf0f02b4ed9be9905320cc66c3fef7c8e55915e42b7ad2b6d9cfe4b2782aa88"
+      }
+    },
+    "raw_output_comparisons_rechecked_during_summary": true,
+    "compiler_baseline_commit": "823f3060ea379ddb7d865764ae2b097e8fcf29bc",
+    "candidate_description": "Same source basis plus only the Map.balance change and independently regenerated canonical Prelude.",
+    "protocol_deviation": "False kern.boottime-text reboot guard between completed blocks 2 and 3. Preserve all 24 planned samples; remaining boundaries use kern.bootsessionuuid. No sample replacement/addition or change of source/acceptance/estimand.",
+    "recovery_artifacts": [
+      {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation-recovery.json",
+        "sha256": "7adfa71c45530c64acace0f31a5c3627fbb8f4c34bf295535b177a47a301a7f1"
+      },
+      {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation-recovery-parent-evidence.json",
+        "sha256": "cdb841af03b178d9d986639c2ea1da79cea6a52737df682a28f5e6b6abfb57f9"
+      },
+      {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation/receipt-before-boot-guard-recovery.json",
+        "sha256": "0efcb6c28e2180315ed7440addeed70262d3793548485962a76e65f5f689aa68"
+      },
+      {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/confirmation-runner.used.py",
+        "sha256": "7be641b4b64d54d49d24d26337b7c5a66d0ff96bbc4704bdc4397ae678ace5b8"
+      },
+      {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/resume_confirmation.py",
+        "sha256": "715718859b337af6493cb7cb62bab068d25f2010863e2d1c3453bfb19bdc3aab"
+      },
+      {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/analyze.py",
+        "sha256": "ca330938ce59646e5734bcf0c6d870c32c385ef7e6b59231faee0107f8880579"
+      }
+    ]
+  },
+  "integration": {
+    "receipt": {
+      "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration/receipt.json",
+      "sha256": "befc63e03b16f6ecfe4b5966057b7207a67ee7537dec7204c405b9897c1923bb"
+    },
+    "plan": {
+      "orders": [
+        "ABBA"
+      ],
+      "runs": 4,
+      "target": "Unchanged fixed 15 modules / 711 fresh / 0 reused; original raw checked reference",
+      "acceptance": "All correctness, source provenance and resource checks pass; observed paired block-log improvement is positive. Otherwise do not ship or extend this window.",
+      "scope": "Integration interaction check only, no new confidence claim, never pool with the prior independent confirmation."
+    },
+    "plan_artifact": {
+      "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration-plan.json",
+      "sha256": "368f6ca508a222ba465919bc973dd538f721d0902d22e1085a83164a4d69f7c2"
+    },
+    "analysis": {
+      "phase": "integration",
+      "ordinary_runs": 4,
+      "blocks": 1,
+      "block_log_ratios": [
+        -0.009503002008196
+      ],
+      "block_improvements": [
+        0.009457991176791913
+      ],
+      "point_improvement": 0.009457991176791913,
+      "per_direction_improvement": {
+        "AB": 0.005143045752785347,
+        "BA": 0.013754221594653449
+      },
+      "wall_arithmetic_mean": {
+        "A": 71.7206905415,
+        "B": 71.0423362295
+      },
+      "cpu_arithmetic_mean": {
+        "A": 70.345384,
+        "B": 69.39802650000001
+      },
+      "libraries": {
+        "scipy": "1.16.3",
+        "numpy": "2.5.4"
+      },
+      "conditional_scope": "fixed ordinary binaries, 15 modules / 711 fresh groups, this macOS host; no whole-selfcompiler or cross-machine claim",
+      "integration_passed": true,
+      "inferential_claim": false
+    },
+    "analysis_artifact": {
+      "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration/analysis.json",
+      "sha256": "8df86950e3cf924b4b9540de6af01bab7ce521765562599712cec680a78f7322"
+    },
+    "compilers": {
+      "A": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-c4-integration/base-producer/bin/emlf",
+        "sha256": "085bb1059407dcd27ccd5727a090695497850efcc8cdfab374bd914b76e99e21"
+      },
+      "B": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/producer/bin/emlf",
+        "sha256": "d108b91b8b6a2afd29f1e85fdc9be8542046bba381fc067046ae0d0660642283"
+      }
+    },
+    "host": {
+      "affinity": "not exposed by macOS",
+      "cpu": "Apple M1 Max",
+      "logical_cpus": 10,
+      "machine": "arm64",
+      "node": "aress-MacBook-Pro-2.local",
+      "os_cache_flush": false,
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "python": "3.14.8 (main, Sep 30 2026, 17:55:09) [Clang 21.0.0 (clang-2100.3.34.2)]",
+      "qualification": "macOS experimental; sampled RSS, no hard address-space limit"
+    },
+    "limits": {
+      "address_space_per_process_bytes": 6442450944,
+      "disk_free_floor_bytes": 5368709120,
+      "host_available_floor_bytes": 3221225472,
+      "max_work_bytes": 536870912,
+      "process_tree_rss_bytes": 5368709120,
+      "wall_seconds": 600
+    },
+    "timing_boundary": "Unmodified authenticated helper.Runner exact child wait4; fresh preparation, immutable-input checks and raw-byte comparison outside timing",
+    "directory_guard": "Unchanged Runner scans only the active leg with a 512 MiB cap. Maximum active block is 4 legs / 2 GiB. After each block, retain raw checked outputs, group reports, receipts and per-cache-file size/SHA256 inventories, then release only that block's owned disposable query caches. No target cache is reused. The 5 GiB global disk floor and all memory/process guards remain enabled; archive work never overlaps a timed leg.",
+    "chronological_runs": [
+      {
+        "ordinal": 0,
+        "block": 0,
+        "index": 0,
+        "side": "A",
+        "started_utc": "2026-10-30T11:05:42Z",
+        "wall_seconds": 71.560020208,
+        "child_user_seconds": 65.268817,
+        "child_system_seconds": 4.854439,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration/00-0-A/command/command.json",
+          "sha256": "f96a2247b19933934d0bd434bc7317091e06d18cca078ec92353618080eda1e0"
+        },
+        "spec_sha256": "2112e9258e0372ef36bf07083bcda7ac68bcc58e9c60048685c5cd68075458ea",
+        "cache_inventory_sha256": "49f009e1bab73bec20276244a4d06d7dd111ad468e57b845d3689e6a9a9f4866"
+      },
+      {
+        "ordinal": 1,
+        "block": 0,
+        "index": 1,
+        "side": "B",
+        "started_utc": "2026-10-30T11:06:53Z",
+        "wall_seconds": 71.19198375,
+        "child_user_seconds": 64.36551,
+        "child_system_seconds": 4.931987,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration/00-1-B/command/command.json",
+          "sha256": "0366968312730981520bffff6fb938deb5f7f1c696e75f4552ee4192e9d2b5e0"
+        },
+        "spec_sha256": "94a219052291ef86d30898a6bfea4d8d1106541d7d7814b8552e8c5f035e9a1c",
+        "cache_inventory_sha256": "3b88713001ff9854e0cc736af93d486105e4b7be1e15a486d836b77602bc2e98"
+      },
+      {
+        "ordinal": 2,
+        "block": 0,
+        "index": 2,
+        "side": "B",
+        "started_utc": "2026-10-30T11:08:04Z",
+        "wall_seconds": 70.892688709,
+        "child_user_seconds": 64.506174,
+        "child_system_seconds": 4.992382,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration/00-2-B/command/command.json",
+          "sha256": "da90efd7556cdba19f44ca8bf873cf9f3ea73e5b599cd7ac5e1fabd13cb75c7f"
+        },
+        "spec_sha256": "aceec4d1ee679702215e11df7a1d600a9bf2fa6157853709a4e9242a518df006",
+        "cache_inventory_sha256": "3b88713001ff9854e0cc736af93d486105e4b7be1e15a486d836b77602bc2e98"
+      },
+      {
+        "ordinal": 3,
+        "block": 0,
+        "index": 3,
+        "side": "A",
+        "started_utc": "2026-10-30T11:09:15Z",
+        "wall_seconds": 71.881360875,
+        "child_user_seconds": 65.486517,
+        "child_system_seconds": 5.080995,
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": {
+          ".mlfci": true,
+          ".mlfco": true
+        },
+        "command_receipt": {
+          "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration/00-3-A/command/command.json",
+          "sha256": "bab61b1c2918b1683f92293ba1a796a098f97f7fbad05b2614cdf55fb4832a49"
+        },
+        "spec_sha256": "6ea73d5a8cadac021ae38e43e8b3c67d385890dbd87b3e54b4a63e7494793486",
+        "cache_inventory_sha256": "49f009e1bab73bec20276244a4d06d7dd111ad468e57b845d3689e6a9a9f4866"
+      }
+    ],
+    "reference_checked_outputs": {
+      ".mlfci": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/selfcompile-opt-20261030/mlf-fresh-cache/856cea5daf8c38698fdfd7ad2ec5e3cfb7f3bef3c9f52ab326d9818509f12d06/unit.mlfci",
+        "sha256": "c05de89df7d6153b798e109b227c2778a686183965f707416ce46eef9ff44c76"
+      },
+      ".mlfco": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/selfcompile-opt-20261030/mlf-fresh-cache/856cea5daf8c38698fdfd7ad2ec5e3cfb7f3bef3c9f52ab326d9818509f12d06/unit.mlfco",
+        "sha256": "daf0f02b4ed9be9905320cc66c3fef7c8e55915e42b7ad2b6d9cfe4b2782aa88"
+      }
+    },
+    "raw_output_comparisons_rechecked_during_summary": true,
+    "compiler_baseline_commit": "51953cb8a61e755943eda95666746b2599ab2b9f",
+    "producer_authentication": {
+      "A": {
+        "binary_sha256": "085bb1059407dcd27ccd5727a090695497850efcc8cdfab374bd914b76e99e21",
+        "ordinary_O2_authenticated": true,
+        "producer": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-c4-integration/base-producer",
+        "receipt_sha256": "677921b8d0bd6c4cdf90124c5269274ed258298548166ff8d11a6a7a8cf1e272",
+        "source": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-c4-integration/base-source"
+      },
+      "B": {
+        "binary_sha256": "d108b91b8b6a2afd29f1e85fdc9be8542046bba381fc067046ae0d0660642283",
+        "ordinary_O2_authenticated": true,
+        "producer": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/producer",
+        "receipt_sha256": "46b9cbc7ff6559be5a1751237479360b8a76862f973f85c52dd3a5334f84229b",
+        "source": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf"
+      }
+    },
+    "metadata_correction": {
+      "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/metadata-correction.json",
+      "sha256": "c41b0fc648b26acc7f04401616067541aec2b2951ebd9b8d85d89633abd6e041"
+    },
+    "metadata_correction_summary": {
+      "format": "integration-metadata-correction-v1",
+      "original_workload": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/workload.json",
+        "sha256": "64a74f5d01d63c2e9039c9e5be8af6faddcc5bea11f22b215b139cea67246e54"
+      },
+      "original_field": "compiler_baseline_commit",
+      "original_value": "823f3060ea379ddb7d865764ae2b097e8fcf29bc",
+      "correct_value": "51953cb8a61e755943eda95666746b2599ab2b9f",
+      "reason": "The workload label was copied from the previous experiment; the actual compiler paths, binary hashes, authenticated sources and command receipts already identify the C4 baseline. No measured operation or sample changes. Original workload preserved.",
+      "pre_run_authentication": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration-authentication.json",
+        "sha256": "3e3281c6e97c662dbb1dbbe0fbe17af1caa313a047f0a0160c3053e0fdca70cd"
+      },
+      "baseline_producer_receipt": {
+        "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-c4-integration/base-producer/receipt.json",
+        "sha256": "677921b8d0bd6c4cdf90124c5269274ed258298548166ff8d11a6a7a8cf1e272"
+      }
+    },
+    "baseline_source_inputs_verified_against_git_count": 181,
+    "scope": "One ABBA interaction check only; no new inference and no pooling with the separate six-block confirmation.",
+    "runner": {
+      "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/bench.py",
+      "sha256": "426c2a90dc67e1b9205eb76d3c13803cc78da8ab8c622e7dd8e6dcafa5d4550a"
+    },
+    "authentication": {
+      "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/integration-authentication.json",
+      "sha256": "3e3281c6e97c662dbb1dbbe0fbe17af1caa313a047f0a0160c3053e0fdca70cd"
+    }
+  },
+  "actual_integrated_product_gates": {
+    "balance-controls": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/balance-controls/receipt.json",
+        "sha256": "07130d3fb99226e6db94757730eab70a64cab74a4c1fbd806549f1dbfaba5a0b"
+      },
+      "result": {
+        "complete": true,
+        "raw_shape_pairs": 24649,
+        "mutation_steps": 400,
+        "independent_demand_order_cases": 30,
+        "ordinary_dependencies_unchanged": true
+      }
+    },
+    "oracle-a1": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/oracle-a1/receipt.json",
+        "sha256": "bd9f7cc7b32c5d0d67d204ad3ed6d8e1a7494d644c823d482b016d46a2760f9f"
+      },
+      "result": {
+        "complete": true,
+        "performance_measured": false
+      }
+    },
+    "oracle-p1": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/oracle-p1/receipt.json",
+        "sha256": "cee191b301d095f7a79ffb18106b6616f0149f3232912b321350c15dc5ed7d99"
+      },
+      "result": {
+        "complete": true,
+        "scope": "partial selector differential and lazy-demand controls",
+        "expected_checks": 154072,
+        "expected_collection_checks": 6162,
+        "native_execution": false,
+        "performance_assertion": false,
+        "compiler_modules_rebuilt": false
+      }
+    },
+    "oracle-p2": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/oracle-p2/receipt.json",
+        "sha256": "496446e9cdceaaf27f7d1545fc1582bba49df030380074ce95e85187e24f6265"
+      },
+      "result": {
+        "complete": true,
+        "scope": "fingerprint byte/error/lazy and write-order controls",
+        "expected_checks": 2503,
+        "native_execution": false,
+        "performance_assertion": false,
+        "compiler_modules_rebuilt": false
+      }
+    },
+    "oracle-p3": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/oracle-p3/receipt.json",
+        "sha256": "2df2ba0b85abb58d9657a0d80d140afcaf15bf3b6f947de081d1ff6963f95a3a"
+      },
+      "result": {
+        "complete": true,
+        "scope": "P3 prefix sharing byte/digest/error/lazy controls; no performance assertion",
+        "expected_control_count": 922,
+        "compiler_modules_rebuilt": false
+      }
+    },
+    "oracle-f1": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/oracle-f1/receipt.json",
+        "sha256": "421ca32206f020a7ce7473f0d1979e50cd302cef96c8b03c5316e759a078c8a7"
+      },
+      "result": {
+        "complete": true,
+        "performance_measured": false
+      }
+    },
+    "oracle-encoding": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/oracle-encoding/receipt.json",
+        "sha256": "b4e388b9c39fbeab43c6f0f8d3fab975ad0cf4809a38f5da979daaa6ea7cbd8c"
+      },
+      "result": {
+        "status": "passed",
+        "scope": "focused-item4-optimized-query-encoding"
+      }
+    },
+    "native-controls": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/native-controls/receipt.json",
+        "sha256": "2f4e2b32bc3fb0622b172cec33c7e54ebd7b5f116c57340aa0d877a3198fc256"
+      },
+      "result": {
+        "complete": true,
+        "scope": "Selected binary and source/header closure, static BDWGC and pkg-config GMP flags; not full native toolchain closure or compiler corpus qualification",
+        "performance_claim": false,
+        "optimization": "ordinary Clang -O2",
+        "compiler_source_provenance_authenticated": false
+      }
+    },
+    "c4-full": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/evidence/c4-balance-full-2/receipt.json",
+        "sha256": "35eb1a54f846a9fe908db57d8331608657643446f0a4d8cadd4481c5c789783a"
+      },
+      "result": {
+        "complete": true,
+        "all_controls_passed": true,
+        "full_gate_passed": true,
+        "nine_file_comparison_passed": true,
+        "builtin_admission_passed": true
+      }
+    },
+    "root-locked-plan": {
+      "receipt": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/locked-plan-receipt.json",
+        "sha256": "4356fd3c0f1d3963770ab0e7a8adbe769b7b3b0f898622ebb6b9fb754cfb5f16"
+      },
+      "stdout": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/locked-plan.json",
+        "sha256": "fe13f408766379781da509065db7c0e7f85aa595cce8187e93569e405d81d22d"
+      },
+      "result": {
+        "complete": true,
+        "exit_code": 0,
+        "manifest": "mlf-package.json",
+        "lock": "mlf.lock"
+      }
+    }
+  },
+  "local_ci_policy": {
+    "status": "existing failure reproduced on unchanged C4 baseline",
+    "message": "bash: line 7: suite_args[@]: unbound variable",
+    "baseline_log": {
+      "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/baseline-ci-policy.log",
+      "sha256": "a946124178d45dc5c1644b010ba8fc6f28bbf2eb9b13f9181d2d2319746163ef"
+    },
+    "full_ci_pass_claim": false,
+    "current_log": {
+      "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/current-ci-policy.log",
+      "sha256": "9699a21ced175c2fed60492c4d099374d4549978266a5273eb10b05ac5413976"
+    },
+    "linux_watchdog": "The new CI control step uses the existing Linux resource_watchdog wrapper; the inner control runner was qualified locally. No local Linux-wrapper execution claim."
+  },
+  "archive_scope": "Compact timing/provenance summary. Large raw checked outputs, ordinary objects, complete input inventories and raw logs remain at the recorded local paths; not a self-contained full recovery archive. The old experimental checkout is preserved.",
+  "ordinary_mechanism": {
+    "source": "Ordinary GHC -O2 Map objects; exact same side-specific object bytes before and after C4 integration.",
+    "disassembler": "xcrun llvm-objdump -dr with start/stop symbol addresses",
+    "artifacts": {
+      "A": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/map-A-relocations.asm",
+        "sha256": "cb37933c72ad3598bf2d4c7fee7adff2b6eed158c407fba63431c0ca514ae08d"
+      },
+      "B": {
+        "path": "/Users/ares/.codex/worktrees/map-balance-c4-integration/mlf/.mlf-build/balance-integration/map-B-relocations.asm",
+        "sha256": "abe0a90b18ae5abfb6407a60783ce13a60a4692d14eb32f6f0ce1dd089e88692"
+      }
+    },
+    "symbol_region": "balance_info to minViewWithKey_info; includes local continuations and info tables",
+    "region_bytes": {
+      "A": 1528,
+      "B": 1928
+    },
+    "inspection": "Candidate direction integerLt# at 0x5368 selects alternative integerMul sites at 0x53cc and 0x55f4. Both static multiplication sites remain; executed balanced/left-heavy paths avoid one multiplication.",
+    "discovery_card": {
+      "path": "/Users/ares/.codex/worktrees/f4e3/mlf/.mlf-build/compiler-next-20261030/balance-direction/candidate.json",
+      "sha256": "a259fdcc5d5674ef9b2fde439fdc752dc264e866db1878a772658e277b9ae1fa"
+    },
+    "discovery_card_correction": "The frozen card says no new production branch count. The rewrite actually adds one source-level conditional, with the same terminal node/rotate functions and no new representation/cache/fallback. Original card preserved."
+  }
+}
