@@ -1,0 +1,42 @@
+{
+  "source_commit": "875e483de49655030c4ffba1995b60610a50273a",
+  "source_path": "tests/Tests/GraphUnification.emlf",
+  "source_sha256": "77b11f87fe4601617470eaad419c09597e08e19aef7bc76cb66c75e8c6a3a790",
+  "source_line": 104,
+  "expectation_path": "graphUnificationTests successive scoped expansions -> programs; exact handwritten accepted Boolean is asserted after reference unification and all solveSteps",
+  "not_candidate_derived": true,
+  "programs": [
+    {
+      "source": "\\x -> x",
+      "accepted": true
+    },
+    {
+      "source": "\\x -> x x",
+      "accepted": false
+    },
+    {
+      "source": "\\f x -> f x",
+      "accepted": true
+    },
+    {
+      "source": "let id = \\x -> x in let a = id 42 in id true",
+      "accepted": true
+    },
+    {
+      "source": "(\\(f : forall a. a -> a) -> f f) (\\x -> x)",
+      "accepted": true
+    },
+    {
+      "source": "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in let g = choose id in g g",
+      "accepted": true
+    },
+    {
+      "source": "(\\x -> x) : forall (a >= forall b. b -> b). a -> a",
+      "accepted": true
+    },
+    {
+      "source": "(\\x -> x) : Int -> Bool",
+      "accepted": false
+    }
+  ]
+}

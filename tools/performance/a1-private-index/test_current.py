@@ -72,7 +72,8 @@ class CurrentCompatibilityTests(unittest.TestCase):
     def test_missing_extra_current_fixture_rejected(self):
         manifest = json.loads((HERE / 'current/manifest.json').read_text())
         expected = current.current_fixture_pins(HERE / 'current', manifest)
-        self.assertEqual(set(expected), {str(HERE / 'current/CurrentBuiltinControls.hs')})
+        self.assertEqual(set(expected), {str(HERE / 'current' / name)
+                                         for name in current.CURRENT_SOURCE_HASHES})
         for bad in [{}, {**manifest, 'Unpinned.hs': '0' * 64}, {'../controls/FileMain.hs': '0' * 64}]:
             with self.subTest(manifest=bad), self.assertRaises(ValueError):
                 current.current_fixture_pins(HERE / 'current', bad)
@@ -200,7 +201,7 @@ class CurrentCompatibilityTests(unittest.TestCase):
     def test_query_v6_source_delta_is_exact_and_previous_anchors_survive(self):
         raw = current.QUERY_MIGRATION.read_bytes()
         result = current.query_source_hashes(current.CF39_SHARED_HASHES, raw)
-        self.assertEqual(result, current.SHARED_HASHES)
+        self.assertEqual(result, current.QUERY_SHARED_HASHES)
         self.assertEqual({name for name in result if result[name] != current.CF39_SHARED_HASHES[name]},
                          {'Bootstrap.CrateQuery'})
         self.assertEqual(current.sha(current.MIGRATION), current.MIGRATION_SHA256)
@@ -217,6 +218,220 @@ class CurrentCompatibilityTests(unittest.TestCase):
             producer['shared_inputs'][name]['sha256'] = current.CF39_SHARED_HASHES[name]
             with self.subTest(module=name), self.assertRaises(ValueError):
                 current.authenticate_current_source(producer)
+    def test_c4_chain_has_only_three_authored_source_changes(self):
+        self.assertEqual(current.sha(current.C4_MIGRATION), current.C4_MIGRATION_SHA256)
+        self.assertEqual(current.parse_c4_migration(current.C4_MIGRATION.read_bytes()), current.c4_migration)
+        result = current.migrate_c4_source_hashes(current.QUERY_SHARED_HASHES,
+                                                current.c4_migration, current.QUERY_MIGRATION_SHA256)
+        self.assertEqual(result, current.SHARED_HASHES)
+        self.assertEqual({name for name in result if result[name] != current.QUERY_SHARED_HASHES[name]},
+                         set(current.C4_NEW_HASHES))
+        self.assertEqual(len(result), 126)
+        self.assertEqual(len(set(result) - set(current.C4_NEW_HASHES)), 123)
+        for name in ['Bootstrap.CrateSession', 'Bootstrap.Graph.IndexStore']:
+            self.assertEqual(result[name], current.historical.SHARED_HASHES[name])
+
+    def test_c4_migration_rejects_every_metadata_change_and_bad_base(self):
+        for name in set(current.c4_migration) - {'changed_shared_inputs'}:
+            for replacement in (None, 'unreviewed'):
+                value = copy.deepcopy(current.c4_migration)
+                value[name] = replacement
+                with self.subTest(field=name, replacement=replacement), self.assertRaises(ValueError):
+                    current.migrate_c4_source_hashes(current.QUERY_SHARED_HASHES, value,
+                                                    current.QUERY_MIGRATION_SHA256)
+        for kind in ('missing_field', 'extra_field', 'wrong_prior_digest', 'wrong_base'):
+            value, base, digest = copy.deepcopy(current.c4_migration), dict(current.QUERY_SHARED_HASHES), current.QUERY_MIGRATION_SHA256
+            if kind == 'missing_field':
+                value.pop('parent_ref')
+            elif kind == 'extra_field':
+                value['extra'] = True
+            elif kind == 'wrong_prior_digest':
+                digest = current.COMPATIBILITY_SHA256
+            else:
+                base['Bootstrap.Map'] = '0' * 64
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                current.migrate_c4_source_hashes(base, value, digest)
+
+    def test_c4_exact_delta_and_all_old_new_hashes_required(self):
+        for name in current.C4_NEW_HASHES:
+            for kind in ('missing', 'wrong_old', 'wrong_new', 'same_as_old', 'extra_row_key'):
+                value = copy.deepcopy(current.c4_migration)
+                row = value['changed_shared_inputs'][name]
+                if kind == 'missing':
+                    value['changed_shared_inputs'].pop(name)
+                elif kind == 'wrong_old':
+                    row['old'] = '0' * 64
+                elif kind == 'wrong_new':
+                    row['new'] = '1' * 64
+                elif kind == 'same_as_old':
+                    row['new'] = row['old']
+                else:
+                    row['extra'] = True
+                with self.subTest(module=name, kind=kind), self.assertRaises(ValueError):
+                    current.migrate_c4_source_hashes(current.QUERY_SHARED_HASHES, value,
+                                                    current.QUERY_MIGRATION_SHA256)
+        for kind in ('extra', 'same_count_wrong_name'):
+            value = copy.deepcopy(current.c4_migration)
+            row = value['changed_shared_inputs']['Bootstrap.Constraint']
+            if kind == 'same_count_wrong_name':
+                value['changed_shared_inputs'].pop('Bootstrap.Constraint')
+            value['changed_shared_inputs']['Unexpected'] = row
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                current.migrate_c4_source_hashes(current.QUERY_SHARED_HASHES, value,
+                                                current.QUERY_MIGRATION_SHA256)
+
+    def test_c4_manifest_byte_mutation_cannot_define_a_new_expectation(self):
+        raw = current.C4_MIGRATION.read_bytes()
+        for altered in (raw + b' ', b'{}', raw.replace(b'123', b'122', 1)):
+            with self.subTest(length=len(altered)), self.assertRaises(ValueError):
+                current.parse_c4_migration(altered)
+
+    def test_each_c4_source_stale_missing_or_wrong_hash_rejected(self):
+        for name in current.C4_NEW_HASHES:
+            for kind in ('missing', 'zero', 'prior'):
+                producer = self.producer()
+                if kind == 'missing':
+                    producer['shared_inputs'].pop(name)
+                else:
+                    producer['shared_inputs'][name]['sha256'] = (
+                        '0' * 64 if kind == 'zero' else current.QUERY_SHARED_HASHES[name])
+                with self.subTest(module=name, kind=kind), self.assertRaises(ValueError):
+                    current.authenticate_current_source(producer)
+        producer = self.producer()
+        producer['shared_inputs'] = {name: {'sha256': digest}
+                                    for name, digest in current.QUERY_SHARED_HASHES.items()}
+        with self.assertRaises(ValueError):
+            current.authenticate_current_source(producer)
+
+    def test_c4_adapter_is_exactly_one_call_plus_one_import_and_inverse(self):
+        adapter = current.load_c4_adapter(HERE / 'current')
+        original = (HERE / 'controls/SessionTests.hs').read_bytes()
+        adapted = adapter.adapt_session(original)
+        self.assertEqual(adapted, original.replace(adapter.OLD_IMPORT, adapter.NEW_IMPORT)
+                                          .replace(adapter.OLD_CALL, adapter.NEW_CALL))
+        self.assertEqual(adapter.restore_session(adapted), original)
+        self.assertEqual(adapted.count(b'C4.checkTransactionalOutcome('), 1)
+        self.assertIn(b'checkOutcome(label++"/private closed final route")False expected(N.solvePrepared input)', adapted)
+        self.assertEqual((HERE / 'controls/SessionTests.hs').read_bytes(), original)
+        with self.assertRaises(ValueError):
+            adapter.adapt_session(adapted)
+
+    def test_c4_adapter_rejects_changed_original_and_ambiguous_sites(self):
+        adapter = current.load_c4_adapter(HERE / 'current')
+        original = (HERE / 'controls/SessionTests.hs').read_bytes()
+        for altered in (original+b' ', original.replace(adapter.OLD_IMPORT,b''),
+                        original.replace(adapter.OLD_CALL,b''), original+adapter.OLD_CALL,
+                        original+adapter.OLD_IMPORT,
+                        original.replace(b'False expected(N.solvePrepared input)',b'True expected(N.solvePrepared input)')):
+            with self.subTest(length=len(altered)), self.assertRaises(ValueError):
+                adapter.adapt_session(altered)
+
+    def test_c4_inverse_rejects_extra_changes_private_edits_and_weaker_comparison(self):
+        adapter = current.load_c4_adapter(HERE / 'current')
+        original = (HERE / 'controls/SessionTests.hs').read_bytes()
+        adapted = adapter.adapt_session(original)
+        for altered in (adapted+b' ', adapted+adapter.NEW_CALL, adapted+adapter.NEW_IMPORT,
+                        adapted.replace(adapter.NEW_CALL, adapter.OLD_CALL),
+                        adapted.replace(adapter.NEW_CALL, adapter.OLD_CALL.replace(b'True',b'False')),
+                        adapted.replace(b'False expected(N.solvePrepared input)',b'True expected(N.solvePrepared input)'),
+                        adapted.replace(b'/delayed P0',b'/modified P0')):
+            with self.subTest(length=len(altered)), self.assertRaises(ValueError):
+                adapter.restore_session(altered)
+
+    def test_c4_complete_transaction_oracle_is_only_module_renamed(self):
+        adapter = current.load_c4_adapter(HERE / 'current')
+        raw = (HERE / 'current/CurrentC4TransactionOracle.hs').read_bytes()
+        original = adapter.verify_transaction_oracle(raw)
+        self.assertEqual(adapter.digest(original), adapter.FROZEN_ORACLE_SHA256)
+        for before, after in [(b'O.sameGraphPhysical',b'O.sameGraphLogical'),
+                              (b'O.sameScopesPhysical',b'O.sameScopesLogical'),
+                              (b'FS.finish value',b'T.Right graph'),
+                              (b'O.validSolverMaps value',b'True'),
+                              (b'FG.validateGraph graph',b'T.Right ()'),
+                              (b'G.validateGraph graph',b'T.Right ()'),
+                              (b'== O.indexOracle',b'/= O.indexOracle')]:
+            self.assertIn(before, raw)
+            with self.subTest(before=before), self.assertRaises(ValueError):
+                adapter.verify_transaction_oracle(raw.replace(before,after))
+        for malformed in (raw+b' ', raw+adapter.NEW_ORACLE_HEADER, original):
+            with self.assertRaises(ValueError):
+                adapter.verify_transaction_oracle(malformed)
+
+    def test_c4_adapter_and_native_controls_have_fixed_manifest_pins(self):
+        manifest = json.loads((HERE / 'current/manifest.json').read_text())
+        self.assertEqual(manifest, current.CURRENT_SOURCE_HASHES)
+        for name in manifest:
+            altered = dict(manifest)
+            altered[name] = '0' * 64
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                current.current_fixture_pins(HERE / 'current', altered)
+        with patch.object(current,'sha',return_value='0'*64), self.assertRaises(ValueError):
+            current.load_c4_adapter(HERE / 'current')
+        raw = (HERE / 'current/CurrentC4OracleControls.hs').read_text()
+        self.assertIn('(FS.prepare graph)',raw)
+        self.assertIn('not (O.sameSolverPhysical old changed)',raw)
+        self.assertIn('C4.checkTransactional "self size" parentCount parentCount',raw)
+        self.assertIn('C4.checkTransactional "self bucket" binderBucket binderBucket',raw)
+        self.assertIn(current.CURRENT_C4_STDOUT.decode().strip(), raw)
+
+    def test_c4_exact_build_closures_and_post_copy_inverse_are_wired(self):
+        code = (HERE / 'run_current_controls.py').read_text()
+        for expected in ["build_driver('CurrentBuiltinControls', {'CurrentBuiltinControls'})",
+                         "build_driver('SessionTests', TEST_MODULES | {'CurrentC4TransactionOracle'})",
+                         "build_driver('CurrentC4OracleControls', {'CurrentC4OracleControls'})",
+                         "contract['module_sources']['SessionTests'] = str(session_copy)",
+                         "len(rows) == len(expected) and actual == expected",
+                         "so == CURRENT_C4_STDOUT and se == b''",
+                         "'post-control frozen session inverse'",
+                         "receipt['c4_comparator_rejections'] = 13"]:
+            self.assertIn(expected,code)
+
+
+    def test_composed_migration_rejects_skipped_reversed_and_repeated_stages(self):
+        for base, digest in [
+                (current.CF39_SHARED_HASHES, current.QUERY_MIGRATION_SHA256),
+                (current.PREVIOUS_SHARED_HASHES, current.QUERY_MIGRATION_SHA256),
+                (current.historical.SHARED_HASHES, current.QUERY_MIGRATION_SHA256),
+                (current.SHARED_HASHES, current.QUERY_MIGRATION_SHA256),
+                (current.QUERY_SHARED_HASHES, current.MIGRATION_SHA256),
+                (current.QUERY_SHARED_HASHES, current.COMPATIBILITY_SHA256)]:
+            with self.subTest(base=base.get('Bootstrap.CrateQuery'), digest=digest), self.assertRaises(ValueError):
+                current.migrate_c4_source_hashes(base, current.c4_migration, digest)
+        for base in (current.QUERY_SHARED_HASHES, current.SHARED_HASHES):
+            with self.subTest(stage='query repeated or after C4'), self.assertRaises(ValueError):
+                current.query_source_hashes(base, current.QUERY_MIGRATION.read_bytes())
+
+    def test_final_inventory_rejects_old_c4_and_uncomposed_query_producers(self):
+        old_c4 = {**current.CF39_SHARED_HASHES, **current.C4_NEW_HASHES}
+        for snapshot in (old_c4, current.QUERY_SHARED_HASHES, current.CF39_SHARED_HASHES,
+                         current.PREVIOUS_SHARED_HASHES):
+            producer = self.producer()
+            producer['shared_inputs'] = {name: {'sha256': digest} for name, digest in snapshot.items()}
+            with self.subTest(query=snapshot['Bootstrap.CrateQuery'],
+                              solver=snapshot['Bootstrap.Graph.Solver']), self.assertRaises(ValueError):
+                current.authenticate_current_source(producer)
+        self.assertEqual(current.SHARED_HASHES['Bootstrap.CrateQuery'],
+                         current.QUERY_SHARED_HASHES['Bootstrap.CrateQuery'])
+        self.assertNotEqual(current.SHARED_HASHES['Bootstrap.CrateQuery'],
+                            current.CF39_SHARED_HASHES['Bootstrap.CrateQuery'])
+        self.assertEqual({name for name in current.SHARED_HASHES
+                          if current.SHARED_HASHES[name] != current.CF39_SHARED_HASHES[name]},
+                         set(current.C4_NEW_HASHES) | {'Bootstrap.CrateQuery'})
+
+    def test_composed_migration_pins_and_receipt_bind_all_stages(self):
+        self.assertEqual(current.c4_migration['parent_ref'],
+                         'd96f67726599fa4e21f236462886106434c8e417')
+        self.assertEqual(current.c4_migration['prior_cf39_migration_sha256'], current.MIGRATION_SHA256)
+        self.assertEqual(current.c4_migration['prior_migration_sha256'], current.QUERY_MIGRATION_SHA256)
+        code = (HERE / 'run_current_controls.py').read_text()
+        for constant in ('COMPATIBILITY', 'MIGRATION', 'QUERY_MIGRATION', 'C4_MIGRATION'):
+            self.assertIn('str(' + constant + '): ' + constant + '_SHA256', code)
+        for key, constant in [('source_compatibility_sha256', 'COMPATIBILITY'),
+                              ('source_migration_sha256', 'MIGRATION'),
+                              ('query_source_migration_sha256', 'QUERY_MIGRATION'),
+                              ('c4_source_migration_sha256', 'C4_MIGRATION')]:
+            self.assertIn(key + '=sha(' + constant + ')', code)
+
 
 
 if __name__ == '__main__':

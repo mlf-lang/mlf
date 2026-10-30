@@ -84,6 +84,31 @@ const verifyFiniteGate = workflow => {
     }
   }
 };
+// C4 runs only its finite current-producer graph gate in CI. The local full
+// two-producer nine-file/544-fresh qualifications are separately documented.
+const c4Gate = `      - name: Check C4 prepared-transaction graph controls
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/c4-focused-guard python3 -B tools/performance/c4-local-transaction/run_controls.py --focused-only --source-candidate "$PWD" --producer-candidate .mlf-build/shared-ghc --output "$RUNNER_TEMP/c4-focused-controls"
+`;
+const verifyC4Gate = workflow => {
+  assert.ok(workflow.includes(c4Gate), 'Exact O2 C4 graph gate with unchanged resource bounds');
+  for (const artifact of [
+    '.mlf-build/c4-focused-guard/',
+    '${{ runner.temp }}/c4-focused-controls/**/*.json',
+    '${{ runner.temp }}/c4-focused-controls/**/stdout',
+    '${{ runner.temp }}/c4-focused-controls/**/stderr',
+    '${{ runner.temp }}/c4-focused-controls/**/*.hs',
+  ]) assert.ok(workflow.includes('            ' + artifact + '\n'), 'C4 failure/evidence preservation: ' + artifact);
+};
+verifyC4Gate(ciJob('native'));
+assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, '')));
+assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace("if: matrix.optimization == '2'", 'if: false'))));
+assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('--rss-mib 5120', '--rss-mib 99999'))));
+assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('set -euo pipefail', 'set +e'))));
+assert.throws(() => verifyC4Gate(ciJob('native').replace('${{ runner.temp }}/c4-focused-controls/**/stderr', 'discarded')));
+
 verifyFiniteGate(ciJob('native'));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, '')));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace("if: matrix.optimization == '2'", 'if: false'))));

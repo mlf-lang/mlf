@@ -24,6 +24,70 @@ existing printer oracles remain independent.
 Both prior manifests and all behavioral oracles remain pinned independently;
 the current gate rejects stale inputs from either earlier source snapshot.
 
+### Additive C4 integration compatibility
+
+The original `source-compatibility.json`, six-module
+`source-migration-cf39.json` and one-module `source-migration-query-v6.json`
+remain byte-identical. The new, separately pinned `source-migration-c4.json`
+chains **after query-v6**, from the exact 126-module snapshot at reviewed
+PR #25 parent `d96f67726599fa4e21f236462886106434c8e417`. The migration binds
+both earlier migration hashes; it cannot skip query-v6 or restore the old
+`Bootstrap.CrateQuery` source. It changes exactly
+`Bootstrap.Constraint`, `Bootstrap.Graph.Solver` and `MLF.BuiltinPreludeData`;
+the other **123** module hashes are unchanged. The latter changes only its one
+source-identity token: the current split literal, all 74 split term declarations
+and every other byte remain the parent's representation. A fresh ordinary
+producer must still prove full literal regeneration and independent checking;
+this source inventory is not a generated behavioral oracle.
+
+C4 changes the prepared **public** solver route, not A1's private index
+algorithm. Its permitted representation relation allows the two reverse-index
+outer trees and their bucket trees to rebalance. It does **not** permit changing
+any graph node, alias tree, fresh counter or scope-index tree, nor any ordered
+reverse-edge set. This is C4 representation compatibility, not a new A1
+optimization, benchmark, historical speed claim or acceptance of A1.
+
+`c4_session_adapter.py` creates a test-only copy of the frozen `SessionTests.hs`.
+The only edits are one qualified import and replacement of the **single**
+`C.solvePrepared` comparison in `runCase` by
+`CurrentC4TransactionOracle.checkTransactionalOutcome`. It is not a `True` to
+`False` change: the old `False` comparator still fixes bucket shape and is not
+the C4 relation. The adapter requires the exact frozen input hash and an exact
+inverse restoring every original byte, checks the written copy again, and
+rechecks that inverse after execution. The private route, all other public
+assertions, 28 traces, old expected stdout and all original controls stay intact.
+
+`CurrentC4TransactionOracle.hs` is the independently authored complete C4
+transaction comparator (original SHA-256
+`bf5000014cc1aa4d97a98ee1380a9307796182dc1cfd433522308521b1a1cd8c`), with
+**only** its module name changed. The adapter reverses that header and verifies
+the original hash. It checks physical graph/alias/counter/scope equality,
+complete independent structural and binding edge enumeration, cached sizes,
+BST order, balance and nonempty buckets, both frozen and public full graph
+validators, and frozen `finish` on **both** results. Left results must have the
+same exact first error; a changed success/failure category is rejected.
+
+The separate `CurrentC4OracleControls.hs` supplies a handwritten graph prepared
+by the frozen solver, a genuinely different valid reverse-map/bucket shape,
+exact-error success, and **13** authored rejections: graph counter/alias/node
+tree, scope tree, structural/binding edges, outer/bucket cached counts, invalid
+self-comparisons and changed error/result categories. These have their own
+fixed stdout; they do not replace any original session group or expectation.
+The runner pins all new helper sources and verifies exact newly compiled module
+closures and unchanged copied production objects. The builtin driver runs
+first, session driver compiles the additional transaction oracle, then the
+separate comparator controls reuse those exact objects.
+
+The cheap Python suite tests migration metadata/deltas, stale producer inputs,
+all helper pins, skipped/reversed/double-applied migration stages, stale
+query-v6 plus old-C4 combinations, inverse/repeated/ambiguous adaptations,
+private/other-byte mutations, and weakening/removal of comparator checks. These tests do **not**
+execute Haskell or claim the 13 native rejections passed. The actual maintained
+gate must compile and run every control against a **new, authenticated current
+GHC 9.14.1 O2 producer**; old cloud receipts or historical C4 objects cannot be
+relocated/relabelled as that producer. Keep failures, use fresh output paths,
+and preserve the existing resource guard.
+
 The native-library integration intentionally changed the canonical builtin from
 one declaration fragment to an SCC-split object. Its old `.mlfci`/`.mlfco` hashes
 cannot be an integrated-current expectation. The historical hashes remain
@@ -75,8 +139,9 @@ independent public/private outcomes and byte-identical artifacts, checked types,
 raw target rechecking, pretty/parse/erasure comparisons and malformed/privacy
 rejection. Expected stdout is not re-recorded from the candidate.
 
-The only new Haskell control is pinned in `manifest.json`. Its malformed controls
-are additional to the original finite inventory. `../test_current.py` provides
+The canonical builtin control and the two C4 compatibility controls are pinned
+in `manifest.json`, together with the exact reversible adapter. All additional
+controls supplement the original finite inventory. `../test_current.py` provides
 cheap static/mutation checks for source/oracle separation and fail-closed
 admission wiring; it does **not** replace compiling/running the control drivers.
 

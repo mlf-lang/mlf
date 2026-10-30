@@ -130,14 +130,70 @@ def query_source_hashes(base, raw):
     return result
 
 
-SHARED_HASHES = query_source_hashes(CF39_SHARED_HASHES, QUERY_MIGRATION.read_bytes())
-CURRENT_MODULES = {'CurrentBuiltinControls'}
+QUERY_SHARED_HASHES = query_source_hashes(CF39_SHARED_HASHES, QUERY_MIGRATION.read_bytes())
+C4_MIGRATION = HERE / 'current/source-migration-c4.json'
+C4_MIGRATION_SHA256 = '0cbe2a1ab0076f57aba13eabca9111bacdce1d05e5846df8208cf5510e46e4a4'
+C4_NEW_HASHES = {
+    'Bootstrap.Constraint': 'ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852',
+    'Bootstrap.Graph.Solver': '482d1752c7e1a219f32841d7c609c69cc228c33dc4c4ffe5f645f434487af69f',
+    'MLF.BuiltinPreludeData': '3659f0e24183e601d8b78392d6744c5d2c63137becdf47e5b52f359ecd1ddf95'}
+
+
+def parse_c4_migration(raw):
+    req(hashlib.sha256(raw).hexdigest() == C4_MIGRATION_SHA256,
+        'fixed C4 source migration manifest changed')
+    return json.loads(raw)
+
+
+def migrate_c4_source_hashes(base, value, prior_digest):
+    metadata = {
+        'format': 'a1-current-source-migration-c4-query-v6-v1',
+        'parent_ref': 'd96f67726599fa4e21f236462886106434c8e417',
+        'prior_compatibility_sha256': COMPATIBILITY_SHA256,
+        'prior_cf39_migration_sha256': MIGRATION_SHA256,
+        'prior_migration_sha256': QUERY_MIGRATION_SHA256,
+        'module_count': 126, 'unchanged_shared_input_count': 123,
+        'added_shared_inputs': {}, 'removed_shared_inputs': [],
+        'scope': 'C4 prepared-public representation compatibility only; original A1 private algorithm and all frozen expectations unchanged'}
+    req(isinstance(value, dict) and set(value) == set(metadata) | {'changed_shared_inputs'},
+        'exact C4 migration schema')
+    req(all(value[name] == expected for name, expected in metadata.items()) and
+        prior_digest == QUERY_MIGRATION_SHA256, 'exact C4 parent and prior query-v6 migration binding')
+    req(base == QUERY_SHARED_HASHES and len(base) == 126, 'exact prior query-v6 source snapshot')
+    delta = value['changed_shared_inputs']
+    req(isinstance(delta, dict) and set(delta) == set(C4_NEW_HASHES),
+        'exact three reviewed C4 source modules')
+    result = dict(base)
+    for name, expected in C4_NEW_HASHES.items():
+        req(delta[name] == {'old': base[name], 'new': expected},
+            'exact authored C4 old/new source hashes: ' + name)
+        result[name] = expected
+    req(len(set(base) - set(delta)) == 123 and
+        all(result[name] == base[name] for name in set(base) - set(delta)),
+        'other 123 source inputs unchanged')
+    return result
+
+
+c4_migration = parse_c4_migration(C4_MIGRATION.read_bytes())
+SHARED_HASHES = migrate_c4_source_hashes(QUERY_SHARED_HASHES, c4_migration, sha(QUERY_MIGRATION))
+CURRENT_MODULES = {'CurrentBuiltinControls', 'CurrentC4TransactionOracle', 'CurrentC4OracleControls'}
+CURRENT_SOURCE_HASHES = {'CurrentBuiltinControls.hs': 'eb512024358872e69ce2df3b429a28ef6f12755c0c5d194147ddc36a627c944d', 'CurrentC4TransactionOracle.hs': '04819913a2b842aad5a20a3ec95f36755609b16b7ef5e7cae517e937e9f3c43a', 'CurrentC4OracleControls.hs': 'c92530ef213706972465b7d30fff0875fd8ccf6104d7fe190960ceecec3133da', 'c4_session_adapter.py': 'c3e5243e069b7d61eb6911b449c4b0308e0d31c252f9cbdf0067c2da5d2b25d8'}
 CURRENT_BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
+CURRENT_C4_STDOUT = b'PASS current C4 comparator: allowed reverse rebalance, exact errors, 13 authored rejections\n'
+
+
+def load_c4_adapter(current):
+    path = current / 'c4_session_adapter.py'
+    req(sha(path) == CURRENT_SOURCE_HASHES[path.name], 'pinned C4 session adapter source')
+    module = types.ModuleType('current_c4_session_adapter')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    module.verify_transaction_oracle((current / 'CurrentC4TransactionOracle.hs').read_bytes())
+    return module
 
 
 def current_fixture_pins(directory, manifest):
-    req(set(manifest) == {name + '.hs' for name in CURRENT_MODULES},
-        'exact current fixture source inventory')
+    req(manifest == CURRENT_SOURCE_HASHES, 'exact pinned current fixture/adapter source inventory')
     return {str(directory / relative): digest for relative, digest in manifest.items()}
 
 
@@ -181,11 +237,15 @@ def main():
     current = runner.parent / 'current'
     pins.update({str(COMPATIBILITY): COMPATIBILITY_SHA256, str(MIGRATION): MIGRATION_SHA256,
                  str(QUERY_MIGRATION): QUERY_MIGRATION_SHA256,
+                 str(C4_MIGRATION): C4_MIGRATION_SHA256,
                  str(historical_path): sha(historical_path)})
     current_manifest = current / 'manifest.json'
     pins[str(current_manifest)] = sha(current_manifest)
     pins.update(current_fixture_pins(current, json.loads(current_manifest.read_text())))
     verify(pins)
+    c4_adapter = load_c4_adapter(current)
+    original_session = (controls / 'SessionTests.hs').read_bytes()
+    adapted_session = c4_adapter.adapt_session(original_session)
     req((controls / 'session.expected.stdout').read_bytes().count(b'PASS ') == 6,
         'six original finite session groups')
     original_cases = json.loads((controls / 'file-cases.json').read_text())
@@ -265,9 +325,23 @@ def main():
          original=str(owner), original_sha256=OWNER_SHA, copy=str(test_copy), copy_sha256=sha(test_copy),
          old_header=OLD_HEADER.decode(), new_header=NEW_HEADER.decode(),
          only_module_name_and_export_list_changed=True, byte_exact_inverse_verified=True))
+    session_copy = generated / 'SessionTests.hs'
+    session_copy.write_bytes(adapted_session)
+    req(c4_adapter.restore_session(session_copy.read_bytes()) == original_session and
+        (controls / 'SessionTests.hs').read_bytes() == original_session,
+        'written C4 session copy inverse and frozen source unchanged')
+    inputs[str(session_copy)] = sha(session_copy)
+    save(out / 'c4-session-copy-receipt.json', dict(complete=True,
+         original=str(controls / 'SessionTests.hs'), original_sha256=sha(controls / 'SessionTests.hs'),
+         copy=str(session_copy), copy_sha256=sha(session_copy),
+         adapter_sha256=sha(current / 'c4_session_adapter.py'),
+         independent_oracle_sha256=c4_adapter.FROZEN_ORACLE_SHA256,
+         only_one_prepared_public_comparator_changed=True,
+         private_and_other_public_assertions_unchanged=True, byte_exact_inverse_verified=True))
     contract['module_sources'] = {name: str(controls / (name + '.hs'))
                                   for name in TEST_MODULES | {'FileMain', 'AdmissionTests'}}
     contract['module_sources']['SessionUnderTest'] = str(test_copy)
+    contract['module_sources']['SessionTests'] = str(session_copy)
     contract['module_sources'].update({name: str(current / (name + '.hs')) for name in CURRENT_MODULES})
     objects = out / 'objects'
     shutil.copytree(build / 'objects', objects)
@@ -295,6 +369,8 @@ def main():
                    source_compatibility_sha256=sha(COMPATIBILITY),
                    source_migration_sha256=sha(MIGRATION),
                    query_source_migration_sha256=sha(QUERY_MIGRATION),
+                   c4_source_migration_sha256=sha(C4_MIGRATION),
+                   c4_representation_relation='Only reverse-map and reverse-bucket tree shape may differ; graph/aliases/counter/scopes physical; independent full edge/invariant/validator/finish checks on both',
                    builtin_provenance='Exact committed RawPrelude literal and canonical wire validation; pair hashes are immutable observations, not generated expectations',
                    c_object_provenance='Successful authenticated producer C commands, actual local hashes pinned before/after; producer schema does not itself store C object digests',
                    c_object_sha256=c_objects)
@@ -341,18 +417,25 @@ def main():
         return out / module
 
     try:
-        builtin_driver = build_driver('CurrentBuiltinControls', CURRENT_MODULES)
+        builtin_driver = build_driver('CurrentBuiltinControls', {'CurrentBuiltinControls'})
         code, so, se = run('current-builtin', [str(builtin_driver), builtin_prefix])
         require_builtin_result(code, so, se)
         receipt['builtin_controls_passed'] = True
         receipt['builtin_malformed_rejections'] = 7
         save(out / 'receipt.json', receipt)
-        session_driver = build_driver('SessionTests', TEST_MODULES)
+        session_driver = build_driver('SessionTests', TEST_MODULES | {'CurrentC4TransactionOracle'})
         code, so, se = run('session-tests', [str(session_driver)])
         req(code == 0 and so == contract['expected_stdout'].encode() and se == b'',
             'six independent finite session groups')
         receipt['session_groups_passed'] = 6
         receipt['finite_trace_cases'] = 28
+        save(out / 'receipt.json', receipt)
+        c4_driver = build_driver('CurrentC4OracleControls', {'CurrentC4OracleControls'})
+        code, so, se = run('current-c4-comparator', [str(c4_driver)])
+        req(code == 0 and so == CURRENT_C4_STDOUT and se == b'',
+            'complete C4 comparator positive/error/13 rejection controls')
+        receipt['c4_comparator_controls_passed'] = True
+        receipt['c4_comparator_rejections'] = 13
         save(out / 'receipt.json', receipt)
         admission_driver = build_driver('AdmissionTests', {'AdmissionTests'})
         code, so, se = run('admission-tests', [str(admission_driver)])
@@ -444,6 +527,8 @@ def main():
                                                           'parse error']), 'unrelated failure is not interface proof')
             verify(object_pins)
         verify(inputs)
+        req(c4_adapter.restore_session(session_copy.read_bytes()) ==
+            (controls / 'SessionTests.hs').read_bytes(), 'post-control frozen session inverse')
         verify(immutable_objects)
         authenticate()
         req(sha(owner) == OWNER_SHA and sha(kernel) == KERNEL_SHA, 'post-control source freeze')

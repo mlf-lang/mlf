@@ -136,7 +136,7 @@ module Bootstrap.Constraint where {
              do {
                prepared <- Solver.prepare graph;
                initial <- Solver.solverUnify (reverse eqs) prepared;
-               solved <- evaluateSteps initial (reverse es);
+               solved <- evaluatePreparedSteps initial (reverse es);
                finished <- Solver.finish solved;
                Right ((,) () (Generation finished [] []))
              }
@@ -172,6 +172,16 @@ module Bootstrap.Constraint where {
     };
   evaluateSteps :: Solver -> [] SolveStep -> Either String Solver;
   evaluateSteps initial steps = foldM evaluateStep initial steps;
+  -- Internal fold: both callers have completed prepare and solverUnify.
+  -- Existing public evaluateStep/evaluateSteps retain the original route.
+  evaluatePreparedStep :: Solver -> SolveStep -> Either String Solver;
+  evaluatePreparedStep solver step =
+    case step of {
+      Instantiate e -> Solver.instantiateClosedPrepared (fromGen e) (toNode e) solver;
+      ProjectCase fields -> Solver.projectCaseFields fields solver
+    };
+  evaluatePreparedSteps :: Solver -> [] SolveStep -> Either String Solver;
+  evaluatePreparedSteps initial steps = foldM evaluatePreparedStep initial steps;
   generalization (Typed gen _) = gen;
   form (Typed _ f) = f;
   fromGen (Edge gen _) = gen;
@@ -1197,7 +1207,7 @@ module Bootstrap.Constraint where {
     do {
       prepared <- Solver.prepare (initialGraph constraints);
       initial <- Solver.solverUnify (equalities constraints) prepared;
-      solved <- evaluateSteps initial (solveSteps constraints);
+      solved <- evaluatePreparedSteps initial (solveSteps constraints);
       Solver.finishNormalized solved
     };
   eraseSource typed = eraseSourceWith IM.empty typed;

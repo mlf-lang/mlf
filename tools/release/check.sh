@@ -23,6 +23,7 @@ node tools/release/test-ci-policy.mjs
 python3 tools/shared/test_provenance.py
 python3 tools/performance/a1-private-index/test_platform.py
 python3 -B tools/performance/a1-private-index/test_current.py
+python3 -B tools/performance/c4-local-transaction/test_controls.py
 python3 -B tools/performance/crate-optimizations/p1/test_oracle_authentication.py
 python3 -B tools/performance/crate-optimizations/p2/test_native_compatibility.py
 python3 tools/performance/fingerprint-fusion/test_controls.py

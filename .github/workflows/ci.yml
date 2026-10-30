@@ -101,6 +101,11 @@ jobs:
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/crate-optimizations/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/a1-private-index/check_integrated.py --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/f1-integrated-guard python3 -B tools/performance/fingerprint-fusion/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/f1-integrated-controls
+      - name: Check C4 prepared-transaction graph controls
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/c4-focused-guard python3 -B tools/performance/c4-local-transaction/run_controls.py --focused-only --source-candidate "$PWD" --producer-candidate .mlf-build/shared-ghc --output "$RUNNER_TEMP/c4-focused-controls"
       - name: Execute the actual shared suite-receipt helpers
         if: matrix.suite == 'all' || matrix.suite == 'direct'
         run: |
@@ -200,6 +205,11 @@ jobs:
             .mlf-build/a1-integrated-controls/**/*.stdout
             .mlf-build/a1-integrated-controls/**/*.stderr
             .mlf-build/f1-integrated-guard/
+            .mlf-build/c4-focused-guard/
+            ${{ runner.temp }}/c4-focused-controls/**/*.json
+            ${{ runner.temp }}/c4-focused-controls/**/stdout
+            ${{ runner.temp }}/c4-focused-controls/**/stderr
+            ${{ runner.temp }}/c4-focused-controls/**/*.hs
             .mlf-build/f1-integrated-controls/**/*.json
             .mlf-build/f1-integrated-controls/**/*.stdout
             .mlf-build/f1-integrated-controls/**/*.stderr

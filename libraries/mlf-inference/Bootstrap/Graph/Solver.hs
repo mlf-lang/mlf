@@ -1900,4 +1900,310 @@ module Bootstrap.Graph.Solver where {
                   G.bindE (solverUnify ((:) ((,) root target) []) frontierSolved)
                     (\result -> Right ((,) copies result)))
          })
+
+  ;
+  -- A prepared fallback transaction. The two Constraint drivers establish
+  -- prepare and preserve its canonical live fields, allocation separation and
+  -- complete indexes. Existing public Solver routes retain their P3 behavior.
+  -- The full expanded Graph and full local validation are not omitted. Only
+  -- fresh intermediate reverse indexes and their component rediscovery are
+  -- avoided, after an ordered negative prefix proves every graft must fail.
+  expandedGraphPrepared :: Int ->
+              Int -> Solver -> Either String ((,,,) Int (IntMap Int) ([] ((,) Int Int)) Graph);
+  expandedGraphPrepared source target solver =
+    let {
+      old = graph solver
+    } in
+    case IM.lookup (G.resolve old source) (G.nodes old) of {
+      Nothing -> Left "missing instance source";
+      Just sourceNode ->
+        if L.not (G.isGen (G.tag sourceNode))
+        then Left "instance source must be a gen node"
+        else case IM.lookup (G.resolve old target) (G.nodes old) of {
+               Nothing -> Left "missing instance target";
+               Just targetNode ->
+                 case G.binder targetNode of {
+                   Nothing -> Left "instance target has no binder";
+                   Just destination ->
+                     G.bindE
+                       (G.expandWithScopes (scopeIntervals (scopeIndex solver)) source destination
+                          old)
+                       (\answer ->
+                          case answer of {
+                            (,) ((,,) root copies frontier) next ->
+                              Right ((,,,) root copies frontier next)
+                          })
+                 }
+             }
+    };
+  forceExpansionChildIds :: [] Int -> ();
+  forceExpansionChildIds children = case children of {
+    [] -> ();
+    (:) child rest -> seq child (forceExpansionChildIds rest)
+  };
+  forceExpansionEdges :: [] ((,) Int Node) -> ();
+  forceExpansionEdges entries = case entries of {
+    [] -> ();
+    (:) ((,) identity node) rest ->
+      seq (forceExpansionChildIds (G.children (G.tag node)))
+        (seq (case G.binder node of {
+          Nothing -> ();
+          Just parent -> seq parent ()
+        }) (forceExpansionEdges rest))
+  };
+
+  fallbackStageEligible :: Int -> Int -> Int -> [] ((,) Int Int) -> Graph -> Bool;
+  fallbackStageEligible first root target frontier current =
+    case IM.lookup target (G.nodes current) of {
+      Nothing -> False;
+      Just old -> L.not (G.isBottom (G.tag old)) &&
+        (case frontier of {
+          (:) ((,) original proxy) [] ->
+            L.not (original == target && proxy == root && root >= first && target < first);
+          _ -> True
+        })
+    };
+  -- Never skip an unknown payload comparison to look for a later conflict.
+  -- This is the exact safe prefix of congruentExpansionMap, not a type matcher.
+  fallbackPrefixRejected :: Graph -> Int -> IntMap Int -> [] ((,) Int Int) -> Bool;
+  fallbackPrefixRejected current first images pending = case pending of {
+    [] -> False;
+    (:) ((,) source target) rest ->
+      if source < first || target >= first then False else
+      case IM.lookup source images of {
+        Just previous -> if previous == target
+          then fallbackPrefixRejected current first images rest else True;
+        Nothing -> case IM.lookup source (G.nodes current) of {
+          Nothing -> False;
+          Just copy -> case IM.lookup target (G.nodes current) of {
+            Nothing -> False;
+            Just old ->
+              if G.isGen (G.tag old) || G.isGen (G.tag copy) then False else
+              if G.isBottom (G.tag old) && L.not (G.isBottom (G.tag copy)) then True else
+              let { next = IM.insert source target images } in
+              if G.isBottom (G.tag copy)
+              then fallbackPrefixRejected current first next rest
+              else case G.tag copy of {
+                GArr a b -> case G.tag old of {
+                  GArr c d -> fallbackPrefixRejected current first next
+                    ((:) ((,) a c) ((:) ((,) b d) rest));
+                  _ -> False
+                };
+                GTyApp a b -> case G.tag old of {
+                  GTyApp c d -> fallbackPrefixRejected current first next
+                    ((:) ((,) a c) ((:) ((,) b d) rest));
+                  _ -> False
+                };
+                _ -> False
+              }
+          }
+        }
+      }
+  };
+  -- Every fresh node is reachable from copied root and is not a Gen boundary.
+  -- Old component entry points cover equations and all external fresh edges.
+  -- No Solver containing an expanded Graph with incomplete indexes is built.
+  expandedOldSeeds :: Int -> [] ((,) Int Node) -> [] Int;
+  expandedOldSeeds first fresh =
+    L.concatMap
+      (\((,) identity node) -> L.filter (\n -> n < first)
+        (L.append (G.children (G.tag node)) (L.maybeToList (G.binder node)))) fresh;
+  expandedCompact :: Int -> Int -> Map Int Node -> Int -> Int;
+  expandedCompact first stop oldSelected identity =
+    if identity < first then rankIdentity identity 0 oldSelected
+    else if identity < stop then M.size oldSelected + (identity - first)
+    else panic "map key not found";
+  expandedOriginal :: Int -> Int -> Map Int Node -> Int -> Either String Int;
+  expandedOriginal first count oldSelected position =
+    let { oldCount = M.size oldSelected } in
+    if position < oldCount then selectIdentity position oldSelected
+    else if position < count then Right (first + (position - oldCount))
+    else Left "scope placeholder escaped local unification";
+  projectExpandedNodes :: Int -> Int -> Map Int Node -> IntMap (Maybe Int) -> IntMap Int ->
+                          Int -> [] ((,) Int Node) -> [] ((,) Int Node);
+  projectExpandedNodes first stop selected scopes stubs position originals =
+    case originals of {
+      [] -> [];
+      (:) ((,) n node) rest ->
+        let { compact = expandedCompact first stop selected } in
+        (:) ((,) position
+          (G.mkNode
+            (case IM.lookup n stubs of {
+              Just stub -> GGen stub;
+              Nothing -> G.mapTag compact (G.tag node)
+            })
+            (G.mapMaybeInt compact
+              (if G.isGen (G.tag node) then IM.get n scopes else G.binder node))
+            (G.flag node)))
+          (projectExpandedNodes first stop selected scopes stubs (position + 1) rest)
+    };
+  -- Returned local graph/equations are the actual inputs to unchanged G.unify.
+  -- Original ascending IDs consist of oldSelected followed by [first,stop).
+  preparedFallbackProjection :: Solver -> Graph -> Int -> [] ((,) Int Node) ->
+                                [] ((,) Int Int) ->
+                                Either String
+                                  ((,,,) Graph ([] ((,) Int Int)) ([] ((,) Int Node))
+                                    ((,,) (Map Int Node) (IntMap (Maybe Int)) (IntMap Int)));
+  preparedFallbackProjection solver current first fresh equations =
+    G.bindE
+      (componentCanonicalNodesVisit solver IM.empty IS.empty
+        (L.append (L.filter (\n -> n < first) (L.concatMap G.equationNodes equations))
+          (expandedOldSeeds first fresh)))
+      (\((,) connected boundaries) ->
+        let { scopes = projectScopes (scopeIndex solver) boundaries } in
+        let { selected = L.foldlStrict
+          (\found n -> if IM.member n found then found
+            else IM.insert n (IM.get n (G.nodes current)) found)
+          connected (IM.keys scopes) } in
+        let { oldOriginals = IM.toList selected } in
+        let { originals = L.append oldOriginals fresh } in
+        let { count = L.length originals } in
+        let { forward = case selected of { IntMap tree -> tree } } in
+        let { compact = \n -> expandedCompact first (G.nextId current) forward (G.resolve current n) } in
+        let { hiddenRoots = L.filter
+          (\((,) n v) -> case G.tag v of {
+            GGen root -> L.not (IM.member root selected);
+            _ -> False
+          }) oldOriginals } in
+        let { stubIds = L.range count ((count + L.length hiddenRoots) - 1) } in
+        let { stubs = IM.fromDistinctAscList (L.zip (L.map L.fst hiddenRoots) stubIds) } in
+        let { existing = projectExpandedNodes first (G.nextId current) forward scopes stubs 0 originals } in
+        let { placeholders = L.map
+          (\((,) original stub) ->
+            (,) stub (G.mkNode GBot (Just (rankIdentity original 0 forward)) Flexible))
+          (IM.toList stubs) } in
+        let { local = G.mkGraph
+          (G.nodesFromDistinctAscList (L.append existing placeholders)) IM.empty
+          (count + L.length hiddenRoots) } in
+        Right ((,,,) local
+          (L.map (\((,) a b) -> (,) (compact a) (compact b)) equations)
+          originals ((,,) forward scopes stubs)));
+  restoreExpandedKnownNode :: Graph -> (Int -> Either String Int) ->
+                              Int -> Node -> Node -> Either String ((,) Int Node);
+  restoreExpandedKnownNode withAliases backward original previous node =
+    G.bindE
+      (case G.tag previous of {
+        GGen root -> Right (GGen (G.resolve withAliases root));
+        _ -> traverseTag backward (G.tag node)
+      })
+      (\restoredTag -> G.bindE
+        (if G.isGen (G.tag previous) then Right (G.binder previous)
+         else case G.binder node of {
+           Nothing -> Right Nothing;
+           Just b -> G.bindE (backward b) (\parent -> Right (Just parent))
+         })
+        (\restoredBinder -> Right
+          ((,) original (G.mkNode restoredTag restoredBinder (G.flag node)))));
+  restoreExpandedNodes :: Graph -> (Int -> Either String Int) -> Int ->
+                          [] ((,) Int Node) -> [] ((,) Int Node) ->
+                          Either String ([] ((,) Int Node));
+  restoreExpandedNodes withAliases backward position originals solved =
+    case solved of {
+      [] -> Right [];
+      (:) ((,) n node) remaining -> case originals of {
+        [] -> Left "scope placeholder escaped local unification";
+        (:) ((,) original previous) rest ->
+          if n < position then Left "scope placeholder escaped local unification"
+          else if n > position
+          then restoreExpandedNodes withAliases backward (position + 1) rest solved
+          else G.bindE (restoreExpandedKnownNode withAliases backward original previous node)
+            (\restored -> G.bindE
+              (restoreExpandedNodes withAliases backward (position + 1) rest remaining)
+              (\following -> Right ((:) restored following)))
+      }
+    };
+  restoreExpandedProjection :: Solver -> Graph -> Int -> [] ((,) Int Node) ->
+                               Map Int Node -> Int -> Graph -> Either String Solver;
+  restoreExpandedProjection solver originalGraph first originals oldSelected count solved =
+    let { backward = expandedOriginal first count oldSelected } in
+    G.bindE
+      (G.mapE (\((,) a b) -> G.bindE (backward a)
+        (\left -> G.bindE (backward b) (\right -> Right ((,) left right))))
+        (IM.toList (G.links solved)))
+      (\aliases ->
+        let { withAliases = G.mkGraph (G.nodes originalGraph)
+          (IM.union (IM.fromDistinctAscList aliases) (G.links originalGraph))
+          (G.nextId originalGraph) } in
+        G.bindE
+          (restoreExpandedNodes withAliases backward 0 originals
+            (L.filter (\((,) n v) -> n < count) (IM.toList (G.nodes solved))))
+          (\restored ->
+            -- Do not drop fresh equalNode comparisons: their payload demand
+            -- and the complete original deletion/insertion order are retained.
+            case projectionChanges originals restored of {
+              (,,) removedNodes changedNodes deleted ->
+                let { retained = L.foldlStrict (\ns n -> IM.delete n ns)
+                  (G.nodes originalGraph) deleted } in
+                let { updated = L.foldlStrict (\ns ((,) n v) -> G.insertNodeMap n v ns)
+                  retained changedNodes } in
+                let { patched = G.mkGraph updated (G.links withAliases) (G.nextId originalGraph) } in
+                let { indexedOld = patchIndexedNodes solver
+                  (L.filter (\((,) n v) -> n < first) removedNodes)
+                  (L.filter (\((,) n v) -> n < first) changedNodes) } in
+                -- Unchanged fresh survivors also need their FIRST publication.
+                -- Deleted fresh edges were never published and are not removed.
+                let { indexed = L.foldlStrict addNode indexedOld
+                  (L.filter (\((,) n v) -> n >= first) restored) } in
+                Right (withGraph patched indexed)
+            }));
+  unifyPreparedFallback :: [] ((,) Int Int) -> Solver -> Graph -> Int ->
+                           [] ((,) Int Node) -> Either String Solver;
+  unifyPreparedFallback equations solver current first fresh =
+    let { canonical = L.map
+      (\((,) a b) -> (,) (G.resolve current a) (G.resolve current b)) equations } in
+    G.bindE
+      (G.mapE_ (\n -> G.check (IM.member n (G.nodes current))
+        ("missing graph node " ++ showInt n)) (L.concatMap G.equationNodes canonical))
+      (\checked ->
+        let { pending = L.filter (\((,) a b) -> L.not (a == b)) canonical } in
+        case pending of {
+          [] -> Right (L.foldlStrict addNode (withGraph current solver) fresh);
+          (:) head tail -> G.bindE
+            (preparedFallbackProjection solver current first fresh pending)
+            (\((,,,) local localEquations originals ((,,) forward scopes stubs)) ->
+              G.bindE (G.unify localEquations local)
+                (\solved -> G.bindE
+                  (G.mapE_ (\stub -> G.check
+                    (matchesNode (G.nodes solved) stub (G.nodeAt local stub) &&
+                      G.resolve solved stub == stub)
+                    "local unification changed a hidden scope root") (IM.elems stubs))
+                  (\checkedStubs -> G.bindE
+                    (G.mapE_ (checkPreservedScope current solved forward scopes) originals)
+                    (\checkedScopes -> restoreExpandedProjection solver current first
+                      originals forward (L.length originals) solved))))
+        });
+  instantiateExpandedPrepared :: Int -> Int -> Solver -> Either String Solver;
+  instantiateExpandedPrepared source target solver =
+    G.bindE (expandedGraphPrepared source target solver)
+      (\((,,,) root copies frontier current) ->
+        let { first = G.nextId (graph solver);
+          fresh = allocatedNodes first (G.nextId current) (G.nodes current);
+          indexed = L.foldlStrict addNode (withGraph current solver) fresh;
+          equations = L.append frontier ((:) ((,) root target) []);
+          fallback = \next -> solverUnify equations next;
+          oldTarget = G.resolve current target;
+          ordinary = case expansionBottomGraft first target root frontier indexed of {
+            Just grafted -> Right grafted;
+            Nothing -> fallback indexed
+          }
+        } in
+        seq (G.strictGraph current)
+          (if fallbackStageEligible first root oldTarget frontier current
+           then seq (forceExpansionEdges fresh)
+             (if fallbackPrefixRejected current first
+                   (IM.fromList (L.map (\((,) original proxy) -> (,) proxy original) frontier))
+                   ((:) ((,) root oldTarget) [])
+              then unifyPreparedFallback equations solver current first fresh
+              else ordinary)
+           else ordinary));
+  -- Actual callers complete prepare and solverUnify before this internal fold.
+  -- Public instantiateClosed/evaluateStep remain unchanged for arbitrary input.
+  -- No reusable certificate survives an operation or accepts a mutated graph.
+  instantiateClosedPrepared :: Int -> Int -> Solver -> Either String Solver;
+  instantiateClosedPrepared source target solver =
+    case groundGraft source target solver of {
+      Just grafted -> Right grafted;
+      Nothing -> if groundInstance (graph solver) source target
+        then Right solver else instantiateExpandedPrepared source target solver
+    }
 }
