@@ -1,5 +1,9 @@
 # Process-readiness (W1): finite regression controls
 
+For the separately qualified macOS extension, see [Darwin controls](darwin/README.md)
+and [its independent measurements](darwin/MEASUREMENTS.md). The W1 study below
+remains the historical Linux study with its original fixtures and expectations.
+
 W1 changes only `host/ghc/cbits/host.c` and `runtime/mlf_system.h`. On an eligible
 Linux host it uses a CLOEXEC pidfd for the child just created and polls for up to
 the original 10 ms pause. `waitpid` remains the only exit/status authority;
