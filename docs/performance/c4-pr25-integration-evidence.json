@@ -1,0 +1,269 @@
+{
+  "format": "c4-pr25-query-v6-local-integration-v1",
+  "date_utc": "2026-10-30",
+  "before_commit": "d96f67726599fa4e21f236462886106434c8e417",
+  "historical_P3": "875e483de49655030c4ffba1995b60610a50273a",
+  "historical_C4": "6be0c51f93ae8f31e4048aebe4c9a9bba3ce0a88",
+  "previous_port_source_checkpoint": "05a421798f30576bc7b75b69eff06303b51623a1",
+  "old_d390_qualification_reused": false,
+  "candidate_algorithm_sha256": {
+    "libraries/mlf-inference/Bootstrap/Constraint.hs": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852",
+    "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": "482d1752c7e1a219f32841d7c609c69cc228c33dc4c4ffe5f645f434487af69f"
+  },
+  "producer_receipt_sha256": {
+    "base": "ce8c5927705c0ec59d95862a8055c83f8df7328d92520a90c03a087aa28f2cc1",
+    "candidate": "714aa1b8bff017f141da5306f46b864242f63600148edfe9325f86c30c08eeb2"
+  },
+  "ordinary_ghc": "9.14.1",
+  "optimization": 2,
+  "same_machine_and_toolchain": true,
+  "performance_measured": false,
+  "current_head_speedup_claimed": false,
+  "full_compiler_qualification_claimed": false,
+  "hosted_CI_covered_by_this_record": false,
+  "full_C4": {
+    "commands": 30,
+    "public_controls": {
+      "accepted": 1433,
+      "changed_binders": 96,
+      "frozen_errors": "PASS frozen dense-rebind permission rejection inventory=[(\"cannot instantiate a rigid or protected type variable\",16),(\"cannot raise a protected type variable\",24),(\"cannot weaken a protected type variable\",10),(\"cannot merge distinct protected type variables\",5)]",
+      "frozen_premise_buckets": [
+        1361,
+        31,
+        72,
+        24
+      ],
+      "summary": {
+        "a1_private_controls_applicable": false,
+        "authored_permission_cases": 4,
+        "candidate_output_used_for_expectations": false,
+        "complete": true,
+        "parsed_expression_cases": 8,
+        "public_trace_cases": 28,
+        "renamed_cases": 400,
+        "validation_cases": 12000
+      },
+      "unchanged_binders": 1392,
+      "unification_cases": 5616
+    },
+    "transaction_controls": {
+      "admitted_fixtures": 23,
+      "arbitrary_forged_prepared_equivalence_claimed": false,
+      "authored_fixtures": 18,
+      "candidate_chooses_expected": false,
+      "complete": true,
+      "direct_restore_outcomes": 4,
+      "exact_compact_projections": 23,
+      "fallback_equation_branches": 5,
+      "fixture_and_trace_flush_drivers": 56,
+      "fixture_and_trace_solve_drivers": 56,
+      "fixture_rejections": 9,
+      "fixture_successes": 19,
+      "force_edge_probes": 5,
+      "invalid_driver_graphs": 5,
+      "isolated_restore_payload_probe": 1,
+      "literal_compact_graphs": 1,
+      "literal_full_graphs": 2,
+      "mixed_project_sequences": 1,
+      "nonadmitted_fixtures": 5,
+      "old_public_physical_oracle_weakened": false,
+      "oracle_boundary_checks": 9,
+      "original_traces": 28,
+      "prefix_payload_barriers": 2,
+      "prepared_original_payload_demand_probes": 2,
+      "prepared_unused_payload_probes": 3,
+      "public_partial_probes": 3,
+      "renamed_fixtures": 10,
+      "seen_prefix_probes": 2,
+      "source_target_error_boundaries": 4,
+      "unchanged_fresh_survivor_assertions": 3
+    },
+    "nonmonotone": {
+      "admitted": 156,
+      "admitted_root_first": 78,
+      "admitted_root_last": 42,
+      "admitted_root_middle": 36,
+      "candidate_selected_inputs": false,
+      "cases": 216,
+      "complete": true,
+      "ordinary_timing_samples_added": 0,
+      "rejections": 60,
+      "root_first": 114,
+      "root_last": 60,
+      "root_middle": 42,
+      "successes": 156
+    },
+    "nine_files": [
+      {
+        "name": "polymorphic-two-uses",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      },
+      {
+        "name": "higher-rank-argument",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      },
+      {
+        "name": "project-polymorphic-field",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      },
+      {
+        "name": "recursive-import-cycle",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      },
+      {
+        "name": "field-not-generalisable",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      },
+      {
+        "name": "annotation-mismatch",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      },
+      {
+        "name": "missing-else",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      },
+      {
+        "name": "empty-crate-identity",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      },
+      {
+        "name": "missing-source-file",
+        "complete": true,
+        "raw_artifact_bytes_equal": true
+      }
+    ]
+  },
+  "fixed14": {
+    "provider_crates": 6,
+    "independent_dependency_validation_passed": true,
+    "targets": [
+      {
+        "side": "base",
+        "native_completed": true,
+        "postchecks_complete": true,
+        "inferred_groups": 544,
+        "reused_groups": 0,
+        "target_cache_initially_absent": true,
+        "new_query_files": 544,
+        "cache_inventory": {
+          "lock_file_empty": true,
+          "query_files": 544,
+          "report_named_query_files": true,
+          "scratch_key_sha256": "839ec280faea4ad72eabe6e70c133b8032b6f78866d2b4cdaa633197b6270913",
+          "scratch_matches_last_report": true,
+          "sidecars": [
+            ".lock",
+            "query-key.new"
+          ],
+          "total_regular_files": 546
+        },
+        "exact_fixed_projection": true,
+        "byte_identical_to_current_before": true,
+        "artifacts": {
+          ".mlfci": "654d173897492445a009706328c46017728403d9240f36f61925a3735cc599c3",
+          ".mlfco": "2a2ad8822c398cd93874756d3b24e3ecbe111e9228073644491207c030db8d9e"
+        }
+      },
+      {
+        "side": "candidate",
+        "native_completed": true,
+        "postchecks_complete": true,
+        "inferred_groups": 544,
+        "reused_groups": 0,
+        "target_cache_initially_absent": true,
+        "new_query_files": 544,
+        "cache_inventory": {
+          "lock_file_empty": true,
+          "query_files": 544,
+          "report_named_query_files": true,
+          "scratch_key_sha256": "cf8f8a5ce4bbe7072550d1f1888ecf3dc21fde98e73328c7ccf3eba1fc41c350",
+          "scratch_matches_last_report": true,
+          "sidecars": [
+            ".lock",
+            "query-key.new"
+          ],
+          "total_regular_files": 546
+        },
+        "exact_fixed_projection": true,
+        "byte_identical_to_current_before": true,
+        "artifacts": {
+          ".mlfci": "654d173897492445a009706328c46017728403d9240f36f61925a3735cc599c3",
+          ".mlfco": "2a2ad8822c398cd93874756d3b24e3ecbe111e9228073644491207c030db8d9e"
+        }
+      }
+    ],
+    "ghc": {
+      "native_completed": true,
+      "postchecks_complete": true,
+      "fresh_target_modules": 14,
+      "reused_dependency_modules": 56
+    },
+    "raw_checked_byte_comparison_passed": true
+  },
+  "other_gates": {
+    "A1_current_complete": true,
+    "A1_current_native_commands": 32,
+    "A1_cheap_methods": 30,
+    "P1_P2_P3_complete": true,
+    "F1_complete": true,
+    "direct_complete": true,
+    "direct_commands": 12,
+    "release_metadata_complete": true,
+    "C4_cheap_methods": 22
+  },
+  "failed_preparation": {
+    "name": "common-builtin",
+    "native_exit": 1,
+    "reason": "authored seed lacked approved shared-haskell-v1 LANGUAGE extension set",
+    "source_rejected_before_builtin_materialization": true,
+    "corrected_fresh_attempt": "common-builtin-attempt-2",
+    "old_attempt_preserved": true,
+    "guards_or_oracles_relaxed": false
+  },
+  "historical_failure": {
+    "name": "old-host fixed14-attempt-1",
+    "reason": "harness rejected required query-key.new and .lock sidecars after 544 fresh/0 reused before-side success",
+    "source_fix": "strict exact report-named 544 .mlfq + exactly two regular sidecars with empty lock and matching last scratch digest",
+    "old_raw_after_reset": "unavailable; recovered checkpoint retains failure summary and reviewed fix; not used as new qualification"
+  },
+  "source_basis": {
+    "current_CrateQuery_sha256": "61201909b9874944a650153af3492a3a7b5ae953b678b22113d8278c222e9712",
+    "before_inventory": 179,
+    "unchanged_from_previous_basis": 178,
+    "candidate_production_files_changed": 3,
+    "independent_review_pins": 416
+  },
+  "qualification_scripts_sha256": {
+    "test_controls.py": "5e083782429f510a8e03d2e549287e24aedb7d5453785d065a6a60130cfd71e3",
+    "run_controls.py": "0b7b84b894a9044872680c96b8d90725346ba1c4d15875a9cb6986d5b82cc75c",
+    "qualify_fixed14.py": "6b5fb2c3b0ece5ebe8b025243bf8c3911bd199b82a1b2d423e10467c7851ffb6",
+    "contracts.py": "cf4fca75972c0c4bae2a48eed6f7eb6b40c9cded109d671a3dcca32229565fc9"
+  },
+  "limits": {
+    "address_space_per_process_bytes": 6442450944,
+    "disk_free_floor_bytes": 4294967296,
+    "host_available_floor_bytes": 3221225472,
+    "max_work_bytes": 17179869184,
+    "process_tree_rss_bytes": 5368709120,
+    "wall_seconds": 21600
+  },
+  "original_receipt_sha256": {
+    "c4-full-1": "5da027be9766aa81b4fee7f863731e73adad789337446b8768fff3d848f327e4",
+    "fixed14-current-1": "e8d6ea031641fe92beee01e85d495b763868049468d4104ee0a7d12a86bc98da",
+    "a1-current-1": "5d80f1a3adc6345d48a8a76c3ee68e740262e5d841a0745ce8cfdf59f02a96b1",
+    "p1p3-current-1": "0c92804007b83652c3205faedf99e1cf30f3f398be6649f520b8682f7b1543c0",
+    "f1-current-1": "9ed8d6dfd896dae6010e8adb085ad66d2a34c49925c4ac260d89a7fc61734be6",
+    "direct-current-1": "88af63845e608ad28ce3d3738b5bb648f22601807714130b2097da116f31ea97"
+  },
+  "release_receipt_sha256": "c1d51573e029c9bf7426cc484f2062913573114f1a1935518c0a0424234c2746",
+  "terminal_audit_sha256": "5da8aaa37c88a3ff2bf983aaff785f948c43eaa7dd27f2bbb83e0c84ea1794ee",
+  "raw_payload_scope": "Raw checked bytes were compared in execution; repository summary and external evidence package include hashes/reports/captures, not bulky .mlfci/.mlfco/.mlfq copies."
+}

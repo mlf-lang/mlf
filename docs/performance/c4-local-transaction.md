@@ -139,6 +139,43 @@ add acceleration percentages, or repeat the historical timing campaign.
 
 ## Integration validation record
 
-The final integration evidence summary is added only after the actual local
-gates complete. This section is not an assertion that pending native tests or
-hosted CI already passed.
+On 2026-10-30, a new same-cloud-machine ordinary GHC 9.14.1 O2 pair qualified
+this C4 port against exact `d96f67726599fa4e21f236462886106434c8e417`, preserving
+query-v6 and its current independent oracles. The previous d390-machine results
+were not reused or spliced into this qualification.
+
+- Both canonical 126-module / 13-output producers passed full source/object
+  authentication, fresh exact builtin literal generation and independent checks.
+- Full C4 gate: 30 native commands, all original public controls, all 28 C4
+  fixtures, all 216 nonmonotone executions and nine before/candidate source-file
+  outcomes with exact diagnostics and complete raw checked-artifact comparison.
+- Fixed historical slice: six common provider crates and independent object
+  reload/malformed rejection; **544 fresh / 0 reused on each target side**;
+  exact ordered group projection and whole `.mlfci`/`.mlfco` byte equality.
+  The GHC control compiled exactly 14 fresh targets using 56 unchanged reusable
+  dependency modules. These are correctness checks, not a timing cohort.
+- Current A1 composition (CF39 → query-v6 → C4), including the 13 comparator
+  rejection cases, passed its 32 native commands and 30 cheap methods. P1/P2/P3,
+  F1, all 12 maintained direct async/frontend/native-semantics commands, release
+  metadata and 22 cheap C4 methods also passed. Original guards remain unchanged.
+
+One preparation attempt was rejected normally because an authored builtin-seed
+module lacked the approved shared-Haskell LANGUAGE header. It was preserved;
+a corrected seed used a wholly fresh output. The full C4 gate subsequently
+independently admitted the actual common builtin pair on both producers. No
+parser, guard, oracle or algorithm was adjusted to make that seed pass.
+
+An earlier host also exposed a harness mistake: 544 query objects plus the
+required `query-key.new` and `.lock` files were incorrectly counted as more than
+544 queries. The recovered, independently reviewed helper now requires exact
+report-named objects plus precisely those two regular sidecars, an empty lock
+and the last ordered scratch digest. The old failure summary survives in the
+recovery checkpoint; later old-host raw logs did not survive the platform reset.
+Neither the old failure nor old reported success is counted as this new pass.
+
+[The compact evidence record](c4-pr25-integration-evidence.json) binds actual
+algorithm/script/producer identities, counts, checked artifact hashes and
+original receipt hashes. Bulk checked/cache bytes are not copied into the repo.
+Hosted checks of the eventual published commit are tracked separately in PR #25;
+this local record does not pre-claim CI, complete-compiler/native-bootstrap
+qualification or any current-head performance gain.
