@@ -22,6 +22,8 @@
 #if defined(__linux__)
 #include <poll.h>
 #include <sys/syscall.h>
+#elif defined(__APPLE__)
+#include <sys/event.h>
 #endif
 
 static MlfValue *os_getEnv(MlfValue *name) {
@@ -137,6 +139,20 @@ static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *speci
     if (!sigaction(SIGCHLD,NULL,&child_action) &&
         child_action.sa_handler == SIG_DFL && !(child_action.sa_flags & SA_NOCLDWAIT))
         ready_fd = (int)syscall(SYS_pidfd_open,(long)pid,0L);
+#elif defined(__APPLE__)
+    struct sigaction child_action;
+    if (!sigaction(SIGCHLD,NULL,&child_action) &&
+        child_action.sa_handler == SIG_DFL && !(child_action.sa_flags & SA_NOCLDWAIT)) {
+        ready_fd = kqueue();
+        if (ready_fd>=0) {
+            struct kevent change;
+            EV_SET(&change,(uintptr_t)pid,EVFILT_PROC,EV_ADD|EV_ONESHOT,NOTE_EXIT,0,NULL);
+            if (fcntl(ready_fd,F_SETFD,FD_CLOEXEC)<0 ||
+                kevent(ready_fd,&change,1,NULL,0,NULL)<0) {
+                close(ready_fd); ready_fd = -1;
+            }
+        }
+    }
 #endif
     int status;
     for (;;) {
@@ -162,6 +178,16 @@ static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *speci
             if (ready<0 && errno==EINTR) continue;
             /* Disable an unusable wake source, without repeated-error spins.
              * Linux close is not retried: its fd number may already be free. */
+            close(ready_fd); ready_fd = -1;
+        }
+#elif defined(__APPLE__)
+        if (ready_fd>=0) {
+            struct kevent event;
+            int ready = kevent(ready_fd,NULL,0,&event,1,&pause);
+            if (ready==0 || (ready==1 && event.ident==(uintptr_t)pid &&
+                event.filter==EVFILT_PROC && !(event.flags&EV_ERROR) &&
+                (event.fflags&NOTE_EXIT))) continue;
+            if (ready<0 && errno==EINTR) continue;
             close(ready_fd); ready_fd = -1;
         }
 #endif
