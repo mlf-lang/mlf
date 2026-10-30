@@ -18,6 +18,28 @@ HERE = Path(__file__).resolve().parent
 MANIFEST = json.loads((HERE/'manifest.json').read_text())
 
 
+def inverse_darwin_source_basis(manifest, raw):
+    """Recover the exact earlier contract, never relabel an old producer receipt."""
+    C.require(C.sha_bytes(raw) ==
+              'b1a190ef1720acb364ef4b96c71fbc20cecc366a018fd8a3760c6985c2bdaca4',
+              'immutable independently reviewed Darwin source migration')
+    migration = json.loads(raw)
+    C.require(manifest['runtime_source_basis_migration'] == 'source-basis-darwin.json' and
+              manifest['base_commit'] == migration['to_ref'], 'exact new upstream source basis')
+    current = manifest['before_input_sha256']
+    C.require(C.sha_bytes(json.dumps(current, sort_keys=True, separators=(',', ':')).encode()) ==
+              migration['current_input_contract_sha256'], 'exact complete new input contract')
+    previous = copy.deepcopy(manifest)
+    previous['base_commit'] = migration['from_ref']
+    del previous['runtime_source_basis_migration']
+    for path, row in migration['changed_inputs'].items():
+        C.require(previous['before_input_sha256'][path] == row['new'], 'exact new runtime input')
+        previous['before_input_sha256'][path] = row['old']
+    C.require(C.sha_bytes((json.dumps(previous, indent=2)+'\n').encode()) ==
+              migration['previous_manifest_sha256'], 'every earlier manifest field preserved')
+    return previous
+
+
 def verify_source_basis(manifest, migration):
     """One immutable-source migration, not permission to refresh arbitrary pins."""
     old_digest = '53928815c964c95bcf05a64f8f3053bb4c7b07c4e5a0d56890992a4cd8a37e3a'
@@ -76,26 +98,54 @@ def synthetic_layout():
 
 
 class StaticControls(unittest.TestCase):
+    def test_exact_darwin_source_basis(self):
+        previous = inverse_darwin_source_basis(MANIFEST, (HERE/'source-basis-darwin.json').read_bytes())
+        self.assertEqual(previous['base_commit'], 'd96f67726599fa4e21f236462886106434c8e417')
+
+    def test_darwin_basis_refuses_stale_or_unrelated_changes(self):
+        raw = (HERE/'source-basis-darwin.json').read_bytes()
+        bad = []
+        for field, value in [('base_commit', 'd96f67726599fa4e21f236462886106434c8e417'),
+                             ('runtime_source_basis_migration', 'source-basis-query-v6.json'),
+                             ('historical_c4_commit', '0'*40)]:
+            changed = copy.deepcopy(MANIFEST); changed[field] = value; bad.append(changed)
+        for path, value in [('runtime/mlf_system.h', 'b3ea6d3c5d4d0f6ebf116bf272fc1636c4dcf8ae266c86f86c6ac621cf323ac7'),
+                            ('libraries/mlf-crates/Bootstrap/CrateQuery.hs', 'cf29431eb01eaeb287b89444f80b45fc88de79a2d43f006411821c180647f8eb'),
+                            ('libraries/mlf-foundation/Bootstrap/Map.hs', '0'*64),
+                            ('unexpected/source.hs', '0'*64)]:
+            changed = copy.deepcopy(MANIFEST); changed['before_input_sha256'][path] = value; bad.append(changed)
+        changed = copy.deepcopy(MANIFEST); del changed['before_input_sha256']['host/ghc/MLF/Host/IO.hs']; bad.append(changed)
+        for index, changed in enumerate(bad):
+            with self.subTest(manifest_mutation=index), self.assertRaises(ValueError):
+                inverse_darwin_source_basis(changed, raw)
+        for field, value in [('to_ref', '0'*40), ('input_count', 178), ('changed_inputs', {}),
+                             ('previous_manifest_sha256', '0'*64)]:
+            changed = json.loads(raw); changed[field] = value
+            with self.subTest(migration_mutation=field), self.assertRaises(ValueError):
+                inverse_darwin_source_basis(MANIFEST, (json.dumps(changed, indent=2)+'\n').encode())
+
     def test_exact_query_v6_source_basis(self):
         migration=json.loads((HERE/'source-basis-query-v6.json').read_text())
-        verify_source_basis(MANIFEST,migration)
+        previous=inverse_darwin_source_basis(MANIFEST,(HERE/'source-basis-darwin.json').read_bytes())
+        verify_source_basis(previous,migration)
 
     def test_source_basis_refuses_unreviewed_changes(self):
         migration=json.loads((HERE/'source-basis-query-v6.json').read_text())
+        original=inverse_darwin_source_basis(MANIFEST,(HERE/'source-basis-darwin.json').read_bytes())
         bad=[]
-        changed=copy.deepcopy(MANIFEST);changed['base_commit']=migration['from_ref'];bad.append(changed)
-        changed=copy.deepcopy(MANIFEST);changed['before_input_sha256']['libraries/mlf-foundation/Bootstrap/Map.hs']='0'*64;bad.append(changed)
-        changed=copy.deepcopy(MANIFEST);changed['before_input_sha256']['libraries/mlf-crates/Bootstrap/CrateQuery.hs']=migration['changed_inputs']['libraries/mlf-crates/Bootstrap/CrateQuery.hs']['old'];bad.append(changed)
-        changed=copy.deepcopy(MANIFEST);changed['before_input_sha256']['unexpected/source.hs']='0'*64;bad.append(changed)
-        changed=copy.deepcopy(MANIFEST);del changed['before_input_sha256']['host/ghc/MLF/Host/IO.hs'];bad.append(changed)
-        changed=copy.deepcopy(MANIFEST);changed['historical_p3_commit']=changed['base_commit'];bad.append(changed)
+        changed=copy.deepcopy(original);changed['base_commit']=migration['from_ref'];bad.append(changed)
+        changed=copy.deepcopy(original);changed['before_input_sha256']['libraries/mlf-foundation/Bootstrap/Map.hs']='0'*64;bad.append(changed)
+        changed=copy.deepcopy(original);changed['before_input_sha256']['libraries/mlf-crates/Bootstrap/CrateQuery.hs']=migration['changed_inputs']['libraries/mlf-crates/Bootstrap/CrateQuery.hs']['old'];bad.append(changed)
+        changed=copy.deepcopy(original);changed['before_input_sha256']['unexpected/source.hs']='0'*64;bad.append(changed)
+        changed=copy.deepcopy(original);del changed['before_input_sha256']['host/ghc/MLF/Host/IO.hs'];bad.append(changed)
+        changed=copy.deepcopy(original);changed['historical_p3_commit']=changed['base_commit'];bad.append(changed)
         for i,changed in enumerate(bad):
             with self.subTest(manifest_mutation=i),self.assertRaises(ValueError):verify_source_basis(changed,migration)
         for field,value in [('unchanged_input_count',177),('added_inputs',{'unexpected/source.hs':'0'*64}),
                             ('removed_inputs',['host/ghc/MLF/Host/IO.hs']),('new_input_contract_sha256','0'*64),
                             ('old_input_contract_sha256','0'*64),('changed_inputs',{})]:
             changed=copy.deepcopy(migration);changed[field]=value
-            with self.subTest(migration_mutation=field),self.assertRaises(ValueError):verify_source_basis(MANIFEST,changed)
+            with self.subTest(migration_mutation=field),self.assertRaises(ValueError):verify_source_basis(original,changed)
 
     def test_fixed_source_inventory(self):
         for path, digest in MANIFEST['pins'].items():

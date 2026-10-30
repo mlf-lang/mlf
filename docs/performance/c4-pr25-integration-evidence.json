@@ -265,5 +265,42 @@
   },
   "release_receipt_sha256": "c1d51573e029c9bf7426cc484f2062913573114f1a1935518c0a0424234c2746",
   "terminal_audit_sha256": "5da8aaa37c88a3ff2bf983aaff785f948c43eaa7dd27f2bbb83e0c84ea1794ee",
-  "raw_payload_scope": "Raw checked bytes were compared in execution; repository summary and external evidence package include hashes/reports/captures, not bulky .mlfci/.mlfco/.mlfq copies."
+  "raw_payload_scope": "Raw checked bytes were compared in execution; repository summary and external evidence package include hashes/reports/captures, not bulky .mlfci/.mlfco/.mlfq copies.",
+  "subsequent_upstream_linux_equivalence": {
+    "upstream_before_commit": "823f3060ea379ddb7d865764ae2b097e8fcf29bc",
+    "qualified_candidate_commit": "ecfcd7d3f60adb3a657205d57ff3b62959f4e38e",
+    "merge_commit": "722a15c5c55daef9d0e2236cd2d6a6151727901d",
+    "ordered_parents": [
+      "ecfcd7d3f60adb3a657205d57ff3b62959f4e38e",
+      "823f3060ea379ddb7d865764ae2b097e8fcf29bc"
+    ],
+    "receipt_sha256": "4ae5b9b2285ffc082f36741e1b379a9724a57c9f17fee30b731a89a8718f0e24",
+    "changed_production_inputs": {
+      "runtime/mlf_system.h": {
+        "new": "9254a1d28a0718ef100916020a96d860ee559e797d311cd4569f887d5fec841e",
+        "old": "b3ea6d3c5d4d0f6ebf116bf272fc1636c4dcf8ae266c86f86c6ac621cf323ac7"
+      }
+    },
+    "unchanged_production_inputs": 178,
+    "all_upstream_paths_preserved_verbatim": true,
+    "complete_active_cpp_bytes_equal": true,
+    "ordinary_C_objects": {
+      "host": {
+        "exact_new_old_producer_equality": true,
+        "sha256": "8e3732ddf7b19d06d28d6e91b6e93f74e1ef4053ac9019917c47f989e90ec443"
+      },
+      "supervisor": {
+        "exact_new_old_producer_equality": true,
+        "sha256": "f5585ba93a0b0ef062b93a9ce40e87cc74f89b56198872c641978048b1244b55"
+      }
+    },
+    "commands": 8,
+    "old_producers_reauthenticated": true,
+    "old_receipts_modified": false,
+    "new_ordinary_producer_created": false,
+    "new_fixed14_run": false,
+    "macos_execution": false,
+    "hosted_CI_claimed": false,
+    "source_contract_migration": "../../tools/performance/c4-local-transaction/source-basis-darwin.json"
+  }
 }

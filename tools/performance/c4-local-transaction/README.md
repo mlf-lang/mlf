@@ -11,7 +11,7 @@ performance retry is launched by `run_controls.py`.
 ## Two oracle responsibilities
 
 The integration-before reference is commit
-`d96f67726599fa4e21f236462886106434c8e417`. Its complete Graph, Solver and Constraint
+`823f3060ea379ddb7d865764ae2b097e8fcf29bc`. Its complete Graph, Solver and Constraint
 algorithms are byte-identical to P3
 `875e483de49655030c4ffba1995b60610a50273a`. The three local `Frozen*` modules are
 the original independently frozen algorithms, with only the declared module and
@@ -31,6 +31,15 @@ query-v6 implementation on **both** sides rather than reverting its namespace or
 silently accepting arbitrary source changes. The actual runners, qualifier,
 resource guards, complete frozen algorithms, authored expectations and v10
 entrypoints remain unchanged. Historical P3/C4 provenance is not relabelled d96.
+
+`source-basis-darwin.json` adds one further explicit source migration from d96
+to 823: only `runtime/mlf_system.h` changes among the same 179 inputs. Its pinned
+inverse recovers the **entire** d96 manifest, before checking the unchanged
+query-v6 migration above. Both native runners still require exact source input
+identity; no old producer receipt is modified or accepted for a new source tree.
+The recorded d96 full qualification and the later limited Linux host-object
+comparison are distinct evidence; see the [integration record](../../../docs/performance/c4-local-transaction.md#subsequent-upstream-darwin-runtime-preservation).
+This is not a macOS execution claim and does not relax fresh-machine qualification.
 
 The new machine must rebuild and authenticate both ordinary producers, rerun the
 full controls and fixed-14 qualification, and compare its own raw checked bytes.

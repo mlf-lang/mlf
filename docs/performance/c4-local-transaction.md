@@ -5,8 +5,11 @@
 This ports the two algorithm files from research commit
 `6be0c51f93ae8f31e4048aebe4c9a9bba3ce0a88` (parent P3
 `875e483de49655030c4ffba1995b60610a50273a`) onto PR #25's
-`d96f67726599fa4e21f236462886106434c8e417`. It preserves the intervening
-query-v6 source-key compaction and its independent P2/P3/A1 compatibility controls.
+`d96f67726599fa4e21f236462886106434c8e417`, subsequently preserving upstream
+`823f3060ea379ddb7d865764ae2b097e8fcf29bc` by a non-lossy merge. It preserves the
+intervening query-v6 source-key compaction and its independent P2/P3/A1 controls.
+The executed full qualification below remains on d96; the later Darwin-only
+runtime change has separate, explicitly limited Linux object-equivalence evidence.
 It does not merge the divergent
 research branch history, stack C1/C2/C3, modify the sealed A1 implementation,
 change fingerprint/serialization algorithms, or cache target inference.
@@ -179,3 +182,30 @@ original receipt hashes. Bulk checked/cache bytes are not copied into the repo.
 Hosted checks of the eventual published commit are tracked separately in PR #25;
 this local record does not pre-claim CI, complete-compiler/native-bootstrap
 qualification or any current-head performance gain.
+
+## Subsequent upstream Darwin runtime preservation
+
+After the full d96 qualification, PR #25 advanced to
+`823f3060ea379ddb7d865764ae2b097e8fcf29bc`. Its ten changed paths are preserved
+verbatim. The only changed production input among the 179 authenticated inputs
+is `runtime/mlf_system.h`, adding three Darwin conditional branches; all C4,
+query-v6, collection, host Haskell and generated builtin inputs are unchanged.
+
+A bounded Linux-only check reauthenticated both original ordinary producers
+before and after. Removing precisely the three additive Darwin arms recovers
+the old header byte-for-byte. Actual GCC 14 preprocessing of the complete host
+and supervisor translation units (`-O2 -std=c11 -E -P`, with no token filtering)
+is byte-identical between the old and merged trees. Recompiling both with the
+original ordinary C flags yields `.o` files byte-identical to each other and to
+the already-qualified candidate producer's objects. Eight actual C commands
+completed with empty stderr. This supports retaining the earlier Linux evidence
+without another fixed-14 campaign; it does **not** create a new ordinary producer
+receipt, claim a new 544-group run, or test the new Darwin branches on macOS.
+
+The future/current-source C4 manifest moves only that header hash and the exact
+before reference to 823. A separately pinned migration reverses to the entire
+previous manifest byte-for-byte before applying the unchanged query-v6 source
+proof. Twelve additional stale/unrelated-source and migration mutations reject.
+The production authentication and native runners are unchanged: an old receipt
+still cannot authenticate the changed source tree. A fresh current-source CI
+producer remains required; hosted CI results are not implied by this local note.
