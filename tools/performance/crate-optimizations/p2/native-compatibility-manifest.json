@@ -239,10 +239,32 @@
           "after": "          (concatMap (\\member -> Dependency.valueNames (Dependency.observeDeclaration member))\n            (Source.groupOriginal prepared)))) } in\n    let { relevant = M.filterWithKey (\\name _ -> S.member compareString name observed) contracts } in\n    pooledSourceKey\n      [KeyText \"MLF-SOURCE-CRATE-QUERY-6\", KeyText crateId, KeyText compilerHash,\n       keyList (\\member -> memberKey KeyScope (canonicalMember member)) (Source.groupMembers prepared),\n       KeyText (list encodeBinding (Source.groupBindings prepared)), KeyText datatypeContext,\n       sourceGroupKey prepared, KeyText (list encodeSourceContract (M.toList relevant))];\n  -- Raw checked inference payloads retain their established validator. A new\n  -- source key deliberately uses self-contained cache format1: the old compact\n  -- key parser must not be tricked into supplying a different context.\n"
         }
       ]
+    },
+    "host/ghc/MLF/Host/Base.hs": {
+      "historical_sha256": "b9663c40059791bfb99e9f302d4eab94452379653db3e951ee02c8ff45933de3",
+      "current_sha256": "eac4d08662fcadeb78678e3cb0fb4efdbdd9698e78baa0d39e79cea89b566d5e",
+      "review": "Only v_ltInt and its private fallback change, with explicit IS imports. Preserve pseq order and unbounded comparison. Frozen P2/P3 manifests and oracle bodies remain unchanged; separate O0 Prelude Integer controls qualify current shared host semantics.",
+      "hunks": [
+        {
+          "current_start": 0,
+          "before": "{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds #-}\n",
+          "after": "{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds, MagicHash #-}\n"
+        },
+        {
+          "current_start": 37,
+          "before": "",
+          "after": "import GHC.Exts (isTrue#, (<#))\nimport GHC.Num.Integer (Integer(IS))\n"
+        },
+        {
+          "current_start": 205,
+          "before": "v_ltInt = strict2 (<)\n",
+          "after": "-- Keep the language's ordered demand, then expose the common small-Integer\n-- representation to callers. Large operands retain arbitrary-precision order;\n-- no conversion or range truncation is involved in the small case.\nv_ltInt a b = a `pseq` b `pseq` case a of\n  IS x# -> case b of\n    IS y# -> isTrue# (x# <# y#)\n    _ -> integerLtFallback a b\n  _ -> integerLtFallback a b\n{-# INLINE v_ltInt #-}\n\n-- Keep uncommon arbitrary-precision cases out of each caller's hot path.\nintegerLtFallback :: Integer -> Integer -> Bool\nintegerLtFallback = (<)\n{-# NOINLINE integerLtFallback #-}\n"
+        }
+      ]
     }
   },
   "inputs": {
-    "tools/performance/crate-optimizations/p2/native_compatibility.py": "f977510ae656cc44e1f9f3dc284cfccb8a76a52e5c48ee86f2c30a7c0113ffed",
+    "tools/performance/crate-optimizations/p2/native_compatibility.py": "9db0cf2d5d794f2306a7a0bab20e34eae6bc5ca3a2e4062f95822dc50c553a87",
     "tools/performance/crate-optimizations/p2/NativeCompatibilityControls.hs": "54ec6908d8ef2e94e3853dc6f7f46c37b9028e9c7e4678ddf4d859b0265f264a",
     "tools/performance/crate-optimizations/p2/run_fingerprint_differential.py": "7f8162d806977de5c7f52707b85b210c99ccadec2f2ef924e568105e99bb7f7d",
     "tools/performance/crate-optimizations/p2/test_native_compatibility.py": "6c050b1e2e35d623709432c3e1d39500dd3ddb51c0c74befa7c05eb59629b068",

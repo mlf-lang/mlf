@@ -80,3 +80,20 @@ do not replace the compiled differential against an authenticated O2 producer.
 ## Balance direction re-audit (2026-10-30)
 
 The candidate changes only the ordering of the two balance bounds, after the unchanged total-size guard. The new manifest entry records the signed-Integer proof and focused controls. FrozenSelectorMap, FrozenSelectorSet, FrozenSelectors and their expected outputs remain unchanged. Their only shared dependencies are still pinned Types, Std and host primitives; candidate Map is never imported into the oracle. Inverse adaptations continue to reproduce the historical hashes. Both the old full selector suite and the new raw-tree/demand controls remain required.
+
+## Small-Integer comparison re-audit (2026-10-31)
+
+The GHC host now exposes only the `IS`/`IS` less-than comparison, after the same
+ordered `pseq` demands. All other constructor pairs call an out-of-line Prelude
+Integer comparison. No conversion, truncation or change to public aliases is
+introduced. `integer-compare/source_contract.py` admits only the reviewed host
+hash and restores the complete previous file, whose historical pin remains in
+the unchanged P1 oracle manifest. The runner records the actual current host
+hash separately. No selector, frozen collection, or expected result changes.
+
+The oracle still shares current host primitives. The separate comparison gate
+therefore uses an O0 Prelude Integer specification, not the optimized helper,
+for all nine constructor pairs, machine-integer boundaries, large positive and
+negative values, error order, divergence, partial applications and map demand.
+That gate supplements the full existing selector differential; source inversion
+by itself is an identity check, not evidence of semantic equivalence.

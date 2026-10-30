@@ -11,6 +11,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 MANIFEST = HERE / 'native-compatibility-manifest.json'
 SOURCE_PATHS = {
+    'host/ghc/MLF/Host/Base.hs',
     'libraries/mlf-foundation/Bootstrap/Map.hs',
     'libraries/mlf-language-core/Bootstrap/Data.hs',
     'libraries/mlf-frontend/Bootstrap/Module.hs',

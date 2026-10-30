@@ -17,6 +17,8 @@ import time
 import types
 
 HERE = Path(__file__).resolve().parent
+COMPARISON_CONTRACT = HERE.parents[1] / 'integer-compare/source_contract.py'
+COMPARISON_CONTRACT_SHA = '912676a53b8059b334018f186290490f7675e8f79eab8315c03c2fc401adef8a'
 
 
 def sha(path):
@@ -39,8 +41,15 @@ def authenticate_oracle(source, here=HERE):
         raise ValueError('frozen oracle changed')
     if sha(here / 'original-selector-excerpts.txt') != oracle['excerpt_sha256']:
         raise ValueError('frozen original excerpts changed')
+    if sha(COMPARISON_CONTRACT) != COMPARISON_CONTRACT_SHA:
+        raise ValueError('reviewed host-comparison source contract changed')
+    comparison = types.ModuleType('integer_comparison_source_contract')
+    exec(compile(COMPARISON_CONTRACT.read_bytes(), str(COMPARISON_CONTRACT), 'exec'), comparison.__dict__)
     for path, digest in oracle['shared_dependency_pins'].items():
-        if sha(source / path) != digest:
+        raw = (source / path).read_bytes()
+        if path == comparison.OWNER:
+            raw = comparison.historical(raw)
+        if hashlib.sha256(raw).hexdigest() != digest:
             raise ValueError('oracle dependency changed; independent re-audit required: ' + path)
     layer = oracle['collection_dependency_reaudit']
     for path, digest in layer['candidate_dependency_pins'].items():
@@ -112,7 +121,7 @@ def main():
                   [Path(__file__), HERE / 'SelectorDifferential.hs', HERE / 'FrozenSelectors.hs',
                    HERE / 'original-selector-excerpts.txt', HERE / 'FrozenSelectorMap.hs',
                    HERE / 'FrozenSelectorSet.hs', manifest_path, receipt_path, direct_path,
-                   adapted_selector_path]}
+                   adapted_selector_path, COMPARISON_CONTRACT]}
         shutil.copy2(__file__, output / 'runner-used.py')
         # GHC one-shot home-module lookup uses the requested interface output
         # directory. Populate that directory from the authenticated producer,
@@ -145,6 +154,8 @@ def main():
                       producer_directory=str(producer_dir), inputs=inputs,
                       expected_checks=154072, expected_collection_checks=6162,
                       oracle_shared_dependencies=oracle['shared_dependency_pins'],
+                      current_host_comparison_sha256=sha(source / 'host/ghc/MLF/Host/Base.hs'),
+                      host_comparison_historical_source_restored=True,
                       oracle_collection_dependency_layer=oracle['collection_dependency_reaudit'],
                       selector_adaptation='Map/Set imports only; original literal fixture unchanged',
                       copied_dependency_files=copied_dependencies,

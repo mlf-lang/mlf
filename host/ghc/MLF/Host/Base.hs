@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds #-}
+{-# LANGUAGE RankNTypes, KindSignatures, FlexibleInstances, ForeignFunctionInterface, ConstraintKinds, MagicHash #-}
 module MLF.Host.Base
   ( Int, Bool(..), Double, Char, IO, String, ST, STArray
   , MLFCallStack, MLFHasCallStack, MLFStackFrame(..), MLFStackEvidence(..)
@@ -35,6 +35,8 @@ import qualified Data.Array.ST as A
 import qualified Data.Array.Base as AB
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 import GHC.Conc (pseq)
+import GHC.Exts (isTrue#, (<#))
+import GHC.Num.Integer (Integer(IS))
 import Foreign.C (CInt(..), CDouble(..), CString, peekCStringLen)
 import Foreign.Marshal.Alloc (allocaBytes)
 import System.IO.Unsafe (unsafeDupablePerformIO)
@@ -201,7 +203,20 @@ fingerprintIntegerStep multiplier modulus state code =
   #-}
 v_eqInt, v_ltInt, neInt, leInt, gtInt, geInt :: Int -> Int -> Bool
 v_eqInt = strict2 (==)
-v_ltInt = strict2 (<)
+-- Keep the language's ordered demand, then expose the common small-Integer
+-- representation to callers. Large operands retain arbitrary-precision order;
+-- no conversion or range truncation is involved in the small case.
+v_ltInt a b = a `pseq` b `pseq` case a of
+  IS x# -> case b of
+    IS y# -> isTrue# (x# <# y#)
+    _ -> integerLtFallback a b
+  _ -> integerLtFallback a b
+{-# INLINE v_ltInt #-}
+
+-- Keep uncommon arbitrary-precision cases out of each caller's hot path.
+integerLtFallback :: Integer -> Integer -> Bool
+integerLtFallback = (<)
+{-# NOINLINE integerLtFallback #-}
 neInt a b = not (v_eqInt a b)
 leInt a b = not (v_ltInt b a)
 gtInt a b = v_ltInt b a

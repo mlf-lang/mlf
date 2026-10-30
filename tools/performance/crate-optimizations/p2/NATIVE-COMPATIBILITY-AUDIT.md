@@ -110,3 +110,19 @@ On the authenticated cloud GHC **9.14.1**, O2 producer for reviewed source head
 Retained local receipts are `../pr25-ci-validation/{p2,p3}/receipt.json` and
 `../pr25-ci-validation/{p2-guard,p3-guard}/bounded-receipt.json` relative to the
 repair checkout. These are finite host controls, not a full CI or speed claim.
+
+## Small-Integer host comparison extension (2026-10-31)
+
+The additive source projection now also covers `host/ghc/MLF/Host/Base.hs`.
+Reversing its three exact edits reconstructs the complete previous host hash
+`b9663c40059791bfb99e9f302d4eab94452379653db3e951ee02c8ff45933de3`.
+The P2 and P3 oracle manifests, their historical pins, all oracle bodies and
+all expected outputs remain unchanged. The current host hash is recorded in
+the compatibility source pins; the historical host is used only for source
+authentication, while compiled controls retain actual current interfaces.
+
+This extension changes no native primitive implementation. Current host
+comparison semantics require the separate independent O0 Prelude Integer gate
+in `integer-compare`, including demand/error order and all Integer constructor
+pairs. Exact source projection does not replace that semantic qualification or
+the full original P2/P3 controls.

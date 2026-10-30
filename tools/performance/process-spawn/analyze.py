@@ -122,14 +122,14 @@ def main():
         for i,s in enumerate('AB'):
             y = [j+(i-.5)*.32 for j in range(len(shape['cases']))]
             v = [c['medians'][s]['wall_seconds'] for c in shape['cases']]
-            left.barh(y,v,height=.29,color=colors[s],label='Before' if s=='A' else 'Spawn')
+            left.barh(y,v,height=.29,color=colors[s],label='Before' if s=='A' else plan.get('candidate_label','Candidate'))
             for height,value in zip(y,v):left.text(value+.07,height,f'{value:.2f}',va='center',fontsize=9)
         left.set_yticks(range(len(shape['cases'])),[labels[c['case']] for c in shape['cases']]);left.invert_yaxis()
         left.set_xlim(0,max(c['medians']['A']['wall_seconds'] for c in shape['cases'])*1.2)
         left.set_xlabel('Seconds, median of 2 fresh native builds');left.set_title('Discovery: n = 512');left.legend(frameon=False)
         for s in 'AB':
             xs = [i+1 for i,r in enumerate(rows) if r['side']==s];ys = [r['command']['wall_seconds'] for r in rows if r['side']==s]
-            right.plot(xs,ys,'o-',color=colors[s],linewidth=1,label='Before' if s=='A' else 'Spawn')
+            right.plot(xs,ys,'o-',color=colors[s],linewidth=1,label='Before' if s=='A' else plan.get('candidate_label','Candidate'))
         for i in range(1,len(plan['blocks'])):right.axvline(i*4+.5,color='#dddddd',linewidth=.8)
         right.set_xlabel('Actual run order, four legs per block');right.set_ylabel('Compiler task wall, seconds')
         right.set_title('Independent confirmation: 711 fresh / 0 reused');right.legend(frameon=False)
