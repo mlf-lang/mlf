@@ -17,6 +17,23 @@ that generic unionWith. The prepared differential is checked under the same
 current collections/runtime on both sides. The separate complete historical
 P3 algorithm/collection oracle remains untouched in the A1 controls.
 
+## Current user goal (not a retrospective protocol change)
+
+The final goal is approximately **1x**: a GHC-built MLF compiler compiling the
+**complete compiler** should take roughly the time that GHC takes to compile
+that compiler workload. Three times GHC is only an intermediate milestone;
+the fixed 14-module slice is a quick screen, not final acceptance.
+
+The next research phase must first define the complete source/module and fresh
+work inventory, same-machine configuration, reusable dependencies, output
+artifacts and start/end boundaries of both compilation chains. In particular,
+checked MLF/xMLF crates versus GHC `--make -no-link` objects are different
+endpoints. Do not silently omit checks, code generation or linking from one
+side or claim parity from that asymmetric slice. Map the screen's cost coverage
+to the full task and confirm outcomes on the full compiler with new evidence.
+No single optimization is promised to reach parity. This clarification does not
+change the completed historical C4 protocol or add a benchmark to this integration.
+
 ## One mechanism and its lifetime
 
 C4 retains the full expanded persistent Graph. For a narrowly admitted
@@ -110,7 +127,7 @@ controls. Its block-log estimate was 2.9963% faster, with nominal 95% improvemen
 interval [0.7480%, 5.1937%], nine of 12 faster and both orientations positive.
 Order effects and shared-cloud noise remained; the nominal interval is not
 familywise coverage over the candidate search. C4 remained about 10.59 times
-the GHC endpoint, not the long-term three-times target. A separate diagnostic
+the slice's GHC endpoint, short of the historical study's three-times milestone. A separate diagnostic
 observed 2.8068% fewer allocated bytes; that is not a wall-clock speedup claim.
 
 Those numbers describe only the historical exact-P3 inputs and cohort. Current
