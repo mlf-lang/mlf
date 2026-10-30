@@ -18,6 +18,7 @@ SOURCE_PATHS = {
     'libraries/mlf-xmlf/Bootstrap/X/Checked.hs',
     'libraries/mlf-crates/Bootstrap/Separate.hs',
     'libraries/mlf-crates/Bootstrap/CrateArtifact.hs',
+    'libraries/mlf-crates/Bootstrap/CrateQuery.hs',
 }
 INPUT_PATHS = {'tools/performance/crate-optimizations/' + name for name in [
     'p2/native_compatibility.py', 'p2/NativeCompatibilityControls.hs',
@@ -25,6 +26,7 @@ INPUT_PATHS = {'tools/performance/crate-optimizations/' + name for name in [
     'p2/oracle-manifest.json', 'p3/run_controls.py',
     'p3/historical-run-controls.py.txt', 'p3/controls-manifest.json',
     'p3/candidate.json', 'p3/oracle-manifest.json',
+    'p3/QueryV6Bridge.hs',
 ]}
 
 def digest(value):

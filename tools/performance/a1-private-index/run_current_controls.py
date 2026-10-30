@@ -23,6 +23,8 @@ COMPATIBILITY = HERE / 'current/source-compatibility.json'
 COMPATIBILITY_SHA256 = '44ce8da0daba21192d997b0167d89a07f0ebcedd057a044175b2ca6681b31bd2'
 MIGRATION = HERE / 'current/source-migration-cf39.json'
 MIGRATION_SHA256 = '4ebe8a70eb2cfe9072f43ed5c0b0c327e2ca155a45bef272a644632af7c3cf82'
+QUERY_MIGRATION = HERE / 'current/source-migration-query-v6.json'
+QUERY_MIGRATION_SHA256 = '1fa270c2f1b27be978b0bf796a20af89a9311d9b680389c3569c92798f0a6923'
 if hashlib.sha256(COMPATIBILITY.read_bytes()).hexdigest() != COMPATIBILITY_SHA256:
     raise ValueError('previous A1 source compatibility anchor changed')
 compatibility = json.loads(COMPATIBILITY.read_text())
@@ -102,7 +104,33 @@ def migrate_source_hashes(base, value, prior_digest):
 
 
 migration = parse_migration(MIGRATION.read_bytes())
-SHARED_HASHES = migrate_source_hashes(PREVIOUS_SHARED_HASHES, migration, sha(COMPATIBILITY))
+CF39_SHARED_HASHES = migrate_source_hashes(PREVIOUS_SHARED_HASHES, migration, sha(COMPATIBILITY))
+
+
+def query_source_hashes(base, raw):
+    # This exact committed source delta does not change any behavioral oracle.
+    req(hashlib.sha256(raw).hexdigest() == QUERY_MIGRATION_SHA256,
+        'fixed query-v6 source migration changed')
+    value = json.loads(raw)
+    req(base == CF39_SHARED_HASHES and len(base) == 126 and
+        value['from_ref'] == migration['to_ref'] and
+        value['from_tree'] == migration['to_tree'] and
+        value['prior_migration_sha256'] == MIGRATION_SHA256,
+        'exact cf39 base for query-v6 source migration')
+    delta = value['changed_shared_inputs']
+    req(set(delta) == {'Bootstrap.CrateQuery'} and
+        value['module_count'] == 126 and value['unchanged_shared_input_count'] == 125 and
+        value['added_shared_inputs'] == {} and value['removed_shared_inputs'] == [],
+        'exact query-v6 source delta')
+    result = dict(base)
+    for name, row in delta.items():
+        req(row['old'] == base[name] and row['new'] != row['old'],
+            'exact prior query-v6 source input: ' + name)
+        result[name] = row['new']
+    return result
+
+
+SHARED_HASHES = query_source_hashes(CF39_SHARED_HASHES, QUERY_MIGRATION.read_bytes())
 CURRENT_MODULES = {'CurrentBuiltinControls'}
 CURRENT_BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
 
@@ -152,6 +180,7 @@ def main():
     pins = {str(controls / rel): digest for rel, digest in CONTROL_HASHES.items()}
     current = runner.parent / 'current'
     pins.update({str(COMPATIBILITY): COMPATIBILITY_SHA256, str(MIGRATION): MIGRATION_SHA256,
+                 str(QUERY_MIGRATION): QUERY_MIGRATION_SHA256,
                  str(historical_path): sha(historical_path)})
     current_manifest = current / 'manifest.json'
     pins[str(current_manifest)] = sha(current_manifest)
@@ -264,6 +293,8 @@ def main():
                    format='current-a1-controls-v1', historical_ref_selected=False,
                    historical_builtin_identity_claimed=False,
                    source_compatibility_sha256=sha(COMPATIBILITY),
+                   source_migration_sha256=sha(MIGRATION),
+                   query_source_migration_sha256=sha(QUERY_MIGRATION),
                    builtin_provenance='Exact committed RawPrelude literal and canonical wire validation; pair hashes are immutable observations, not generated expectations',
                    c_object_provenance='Successful authenticated producer C commands, actual local hashes pinned before/after; producer schema does not itself store C object digests',
                    c_object_sha256=c_objects)

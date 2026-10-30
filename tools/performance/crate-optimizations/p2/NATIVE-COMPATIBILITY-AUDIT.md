@@ -37,6 +37,20 @@ shared `validateInterface`. These tests establish old digest/byte/error/laziness
 controls over their finite inputs, not complete historical semantic validation.
 No source edit transcript is used to manufacture expected output.
 
+The query-v6 integration adds `CrateQuery` to the exact source transcript while
+retaining its original P3 pin. The proposed public printer routing change was
+withdrawn; the historical printer bodies used by these controls remain intact.
+The frozen `PrefixControls.hs` still has all 922 original checks. Its executing
+copy redirects only the `Q` import and runs seven bridge admission controls.
+For its 45 empty-source-group query-key cases, `QueryV6Bridge` changes the v6
+version tag back to v5 and removes the required-empty candidate table, preserving
+every other field. It rejects nonempty lowered/original groups and scope tables.
+All checked-object and other raw-byte comparisons remain unchanged. The separate
+54-check `QueryEncoding` suite covers nonempty source expressions, pooled
+candidate scopes, exact reconstruction and identity-sensitive invalidation.
+Receipts identify the copied fixture, inverse-checked edits, bridge and four
+compiled test modules; no compatibility projection is applied to production.
+
 ## Supplemental 1243 controls
 
 `NativeCompatibilityControls.hs` is a separate executable after the unmodified

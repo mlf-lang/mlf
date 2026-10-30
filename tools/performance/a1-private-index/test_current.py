@@ -93,7 +93,7 @@ class CurrentCompatibilityTests(unittest.TestCase):
         self.assertEqual(current.sha(current.MIGRATION), current.MIGRATION_SHA256)
         result = current.migrate_source_hashes(current.PREVIOUS_SHARED_HASHES,
                                                current.migration, current.COMPATIBILITY_SHA256)
-        self.assertEqual(result, current.SHARED_HASHES)
+        self.assertEqual(result, current.CF39_SHARED_HASHES)
         self.assertEqual(len(result), 126)
         self.assertEqual({name for name in result
                           if result[name] != current.PREVIOUS_SHARED_HASHES[name]},
@@ -196,6 +196,27 @@ class CurrentCompatibilityTests(unittest.TestCase):
         for mutation in (raw + b' ', json.dumps(altered).encode(), b'{}'):
             with self.subTest(mutation_bytes=len(mutation)), self.assertRaises(ValueError):
                 current.parse_migration(mutation)
+
+    def test_query_v6_source_delta_is_exact_and_previous_anchors_survive(self):
+        raw = current.QUERY_MIGRATION.read_bytes()
+        result = current.query_source_hashes(current.CF39_SHARED_HASHES, raw)
+        self.assertEqual(result, current.SHARED_HASHES)
+        self.assertEqual({name for name in result if result[name] != current.CF39_SHARED_HASHES[name]},
+                         {'Bootstrap.CrateQuery'})
+        self.assertEqual(current.sha(current.MIGRATION), current.MIGRATION_SHA256)
+        for base, text in [(current.CF39_SHARED_HASHES, raw + b' '),
+                           (current.CF39_SHARED_HASHES, b'{}'),
+                           (current.PREVIOUS_SHARED_HASHES, raw),
+                           ({**current.CF39_SHARED_HASHES, 'Bootstrap.Map': '0' * 64}, raw)]:
+            with self.subTest(size=len(text)), self.assertRaises(ValueError):
+                current.query_source_hashes(base, text)
+
+    def test_query_v6_rejects_stale_source_for_each_changed_module(self):
+        for name in ['Bootstrap.CrateQuery']:
+            producer = self.producer()
+            producer['shared_inputs'][name]['sha256'] = current.CF39_SHARED_HASHES[name]
+            with self.subTest(module=name), self.assertRaises(ValueError):
+                current.authenticate_current_source(producer)
 
 
 if __name__ == '__main__':

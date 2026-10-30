@@ -1,0 +1,18 @@
+{
+  "added_shared_inputs": {},
+  "changed_shared_inputs": {
+    "Bootstrap.CrateQuery": {
+      "new": "61201909b9874944a650153af3492a3a7b5ae953b678b22113d8278c222e9712",
+      "old": "cf29431eb01eaeb287b89444f80b45fc88de79a2d43f006411821c180647f8eb"
+    }
+  },
+  "format": "a1-current-source-migration-v1",
+  "from_ref": "cf39c68ecb3bf861a7c910356684e01f014af1f0",
+  "from_tree": "f0bee12bb2bb457144ed7952b15162170b764ae7",
+  "module_count": 126,
+  "prior_migration_sha256": "4ebe8a70eb2cfe9072f43ed5c0b0c327e2ca155a45bef272a644632af7c3cf82",
+  "removed_shared_inputs": [],
+  "to_ref": "8fe77dc802d3cda08738536d07c57a70e19a4ecb",
+  "to_tree": "8d6837669a6ab02ca131b1669ff802e27a062031",
+  "unchanged_shared_input_count": 125
+}

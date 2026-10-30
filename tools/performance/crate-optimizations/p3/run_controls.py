@@ -10,7 +10,8 @@ if not __debug__:
 D=Path(__file__).resolve().parent
 EXPECTED_CONTROLS=922
 EXPECTED_MODULES={'FrozenPrefix','FrozenInferenceUnit','Main'}
-EXPECTED_NEW_FILES={name+suffix for name in EXPECTED_MODULES for suffix in ['.hi','.o']}
+CURRENT_MODULES=EXPECTED_MODULES|{'QueryV6Bridge'}
+EXPECTED_NEW_FILES={name+suffix for name in CURRENT_MODULES for suffix in ['.hi','.o']}
 sha=lambda p:hashlib.file_digest(Path(p).open('rb'),'sha256').hexdigest()
 p=argparse.ArgumentParser();p.add_argument('--serial-slot-granted',action='store_true',required=True)
 p.add_argument('--build-receipt',type=Path,required=True);p.add_argument('--source-root',type=Path,required=True)
@@ -42,18 +43,35 @@ try:
  candidate=json.loads((D/'candidate.json').read_text())
  assert all(hashlib.sha256(historical_sources.get(n,(S/n).read_bytes())).hexdigest()==h
             for n,h in candidate['source_sha256'].items())
- inputs=[D/n for n in ['FrozenPrefix.hs','FrozenInferenceUnit.hs','PrefixControls.hs','oracle-manifest.json','candidate.json','controls-manifest.json','run_controls.py']]
+ inputs=[D/n for n in ['FrozenPrefix.hs','FrozenInferenceUnit.hs','PrefixControls.hs','QueryV6Bridge.hs','oracle-manifest.json','candidate.json','controls-manifest.json','run_controls.py']]
  inputs += [compatibility.MANIFEST,compatibility_path,*[S/n for n in native_manifest['inputs']]]
  j['historical_candidate_pins_verified_after_exact_native_projection']=True
  j['native_compatibility_source_pins']={n:e['current_sha256'] for n,e in native_manifest['sources'].items()}
  j['test_input_sha256']={str(f):sha(f) for f in inputs};j['authentication_before']=True
+ # Keep the complete frozen control and oracle files unchanged. Only its Q
+ # import is redirected in an owned copy, so the 45 empty source-key cases can
+ # compare the explicitly changed wire envelope. All other Q exports are the
+ # production functions, and all checked-object byte comparisons stay raw.
+ original=(D/'PrefixControls.hs').read_bytes()
+ old_import=b'import qualified Bootstrap.CrateQuery as Q\n'
+ new_import=b'import qualified QueryV6Bridge as Q\n'
+ assert original.count(old_import)==1 and new_import not in original
+ current_control=out/'PrefixControls.hs'
+ old_main=b'main = do\n';new_main=old_main+b'  Q.validateBridge\n'
+ assert original.count(old_main)==1 and new_main not in original
+ current_control.write_bytes(original.replace(old_import,new_import).replace(old_main,new_main))
+ assert current_control.read_bytes().replace(new_import,old_import).replace(new_main,old_main)==original
+ j['test_input_sha256'][str(current_control)]=sha(current_control)
+ j['query_key_compatibility']={'version':'v6-to-v5-empty-group-only','cases':45,'bridge_controls':7,
+   'frozen_control_sha256':sha(D/'PrefixControls.hs'),'copy_sha256':sha(current_control),
+   'checked_output_normalized':False}
  objects=out/'objects';shutil.copytree(P/'objects',objects)
  for ext in ['hi','o']:(objects/('Main.'+ext)).unlink(missing_ok=True)
  pins={str(f.relative_to(objects)):sha(f) for f in objects.rglob('*') if f.is_file()}
  j['copied_object_file_sha256']=pins
  r=json.loads(receipt.read_text())
  argv=next(c['argv'] for c in r['commands'] if any('app/emlf/Main.hs' in x for x in c['argv']))
- argv=[x.replace(str(P/'objects'),str(objects)).replace(str(P/'bin/emlf'),str(out/'check')).replace(str(S/'host/ghc/app/emlf/Main.hs'),str(D/'PrefixControls.hs')) for x in argv]
+ argv=[x.replace(str(P/'objects'),str(objects)).replace(str(P/'bin/emlf'),str(out/'check')).replace(str(S/'host/ghc/app/emlf/Main.hs'),str(current_control)) for x in argv]
  argv.insert(argv.index('-i')+1,'-i'+str(D));save()
  def command(label,argv):
   with (out/(label+'.stdout')).open('wb') as stdout,(out/(label+'.stderr')).open('wb') as stderr:
@@ -71,7 +89,7 @@ try:
   match=re.fullmatch(r'\[\s*\d+\s+of\s+\d+\] Compiling ([A-Za-z0-9_.]+)\s+\( .* \)',line)
   assert match,'unknown compiler build record: '+line
   modules.append(match.group(1))
- assert len(modules)==3 and set(modules)==EXPECTED_MODULES,'compiler module rebuilt or test module missing'
+ assert len(modules)==4 and set(modules)==CURRENT_MODULES,'compiler module rebuilt or test module missing'
  j.update(compiled_modules=modules,new_object_files=sorted(after_files-set(pins)),expected_control_count=EXPECTED_CONTROLS)
  save()
  command('controls',[str(out/'check')])

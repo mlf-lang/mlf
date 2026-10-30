@@ -16,6 +16,14 @@ the actual GHC 9.14.1 O2 toolchain, inferred interfaces, builtin verification,
 outputs and complete copied object inventory before/after execution. Source
 hashes are reviewed inputs, never expectations generated from compiler output.
 
+`source-migration-cf39.json` preserves the subsequent six-module transition to
+`cf39c68e`. `source-migration-query-v6.json` then records the sole changed
+input `Bootstrap.CrateQuery` at `8fe77dc8`. The other 125 shared inputs are
+unchanged. The separately proposed printer routing change was withdrawn so
+existing printer oracles remain independent.
+Both prior manifests and all behavioral oracles remain pinned independently;
+the current gate rejects stale inputs from either earlier source snapshot.
+
 The native-library integration intentionally changed the canonical builtin from
 one declaration fragment to an SCC-split object. Its old `.mlfci`/`.mlfco` hashes
 cannot be an integrated-current expectation. The historical hashes remain
