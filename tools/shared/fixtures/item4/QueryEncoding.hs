@@ -10,7 +10,6 @@ import qualified Bootstrap.Map as M
 import qualified Bootstrap.Set as Set
 import qualified Bootstrap.Dependency as Dependency
 import qualified Bootstrap.Separate as U
-import qualified Bootstrap.X.Pretty as Pretty
 import qualified MLF.Host.Base as B
 import qualified MLF.Primitive as P
 
@@ -128,16 +127,5 @@ main = do
   check "one exact candidate table for 256 uses" (length (unpack (last fields))==1)
   check "materially bounded repeated-scope encoding" (P.stringLength compact*20<P.stringLength old)
   check "large pooled key exact reconstruction" (expandQuery compact==old)
-  let n=T.XName 1 "name"; a=T.XTyVar 2; int=T.XCon "Int" []
-      terms=[T.XVarTerm n,T.XAbs n int (T.XVarTerm n),T.XApp (T.XVarTerm n) (T.XIntTerm 2),
-        T.XTypeAbs a T.XBot (T.XIntTerm 2),T.XTypeApp (T.XIntTerm 2) (T.XThen T.XRefl (T.XBottom int)),
-        T.XLet n (T.XIntTerm 2) (T.XVarTerm n),T.XLetRec [(n,int,T.XIntTerm 2)] (T.XVarTerm n),
-        T.XDoubleTerm (-0.0),T.XBoolTerm True,T.XStringTerm "α😀\0\n\"\\",T.XPrimitive T.PAddInt [],
-        T.XConstructor "()" [],T.XCase (T.XIntTerm 2) int [T.XAlternative (T.XDefaultPattern T.Nothing) (T.XIntTerm 3)],
-        T.XWithData [T.DataDecl "Box" [] [T.ConstructorDecl "Box" [T.Applied "Int" []]]] (T.XConstructor "()" [])]
-  forM_ (zip [0::Int ..] terms) $ \(index,term)->
-    check ("linear xMLF serialization "++show index) (Pretty.prettyTerm term==Pretty.termAt 0 term)
-  forM_ ["","α😀\0\n\"\\",B.literal [toEnum c|c<-[0..127]],B.literal (replicate 4096 'x')] $ \text->
-    check "string escaping preserves exact old scalar output" (Pretty.prettyString text==P.concatString "\"" (P.concatString (Pretty.escapeFrom text 0) "\""))
   total<-readIORef count
   putStrLn ("Query encoding audit: "++show total++" checks passed")

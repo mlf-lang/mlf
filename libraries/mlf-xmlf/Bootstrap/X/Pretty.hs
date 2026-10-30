@@ -43,7 +43,7 @@ module Bootstrap.X.Pretty where {
       XThen a b -> (prettyComputation a ++ ("; " ++ prettyComputation b))
     };
   prettyTerm :: XTerm -> String;
-  prettyTerm t = concatStringList (termChunks 0 t []);
+  prettyTerm t = termAt 0 t;
   termAt :: Int -> XTerm -> String;
   termAt p t =
     case t of {
@@ -161,9 +161,7 @@ module Bootstrap.X.Pretty where {
     XDefaultPattern n -> maybeNameChunks n rest
   };
   prettyString :: String -> String;
-  prettyString s = concatStringList
-    ((:) "\"" (L.foldr (\c rest -> (:) (escapeScalar (charCode c)) rest)
-      ((:) "\"" []) (textToChars s)));
+  prettyString s = ("\"" ++ (escapeFrom s 0 ++ "\""));
   escapeFrom :: String -> Int -> String;
   escapeFrom s i =
     if (i >= stringLength s) then "" else (escapeScalar (stringCodeAt s i) ++ escapeFrom s (i + 1));

@@ -169,7 +169,7 @@ def main():
         arguments.extend(['+RTS', '-M700m', '-RTS'])
         run(arguments, 'positive')
         if args.suite == 'query-encoding':
-            if (out / 'positive.log').read_text() != 'Query encoding audit: 72 checks passed\n':
+            if (out / 'positive.log').read_text() != 'Query encoding audit: 54 checks passed\n':
                 raise RuntimeError('query encoding audit completion inventory changed')
         if args.suite in {'pattern-do', 'source'}:
             expected = {'pattern-do': 34, 'source': 18}[args.suite]
