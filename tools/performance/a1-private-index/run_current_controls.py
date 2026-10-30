@@ -20,6 +20,11 @@ import types
 
 HERE = Path(__file__).resolve().parent
 COMPATIBILITY = HERE / 'current/source-compatibility.json'
+COMPATIBILITY_SHA256 = '44ce8da0daba21192d997b0167d89a07f0ebcedd057a044175b2ca6681b31bd2'
+MIGRATION = HERE / 'current/source-migration-cf39.json'
+MIGRATION_SHA256 = '4ebe8a70eb2cfe9072f43ed5c0b0c327e2ca155a45bef272a644632af7c3cf82'
+if hashlib.sha256(COMPATIBILITY.read_bytes()).hexdigest() != COMPATIBILITY_SHA256:
+    raise ValueError('previous A1 source compatibility anchor changed')
 compatibility = json.loads(COMPATIBILITY.read_text())
 historical_path = HERE / 'run_controls.py'
 if hashlib.sha256(historical_path.read_bytes()).hexdigest() != compatibility['historical_runner_sha256']:
@@ -41,8 +46,63 @@ req(compatibility['format'] == 'a1-current-source-compatibility-v1' and
 req(set(compatibility['changed_shared_inputs']) <= set(historical.SHARED_HASHES) and
     not (set(compatibility['added_shared_inputs']) & set(historical.SHARED_HASHES)),
     'source migration categories')
-SHARED_HASHES = {**historical.SHARED_HASHES, **compatibility['changed_shared_inputs'],
-                 **compatibility['added_shared_inputs']}
+PREVIOUS_SHARED_HASHES = {**historical.SHARED_HASHES, **compatibility['changed_shared_inputs'],
+                         **compatibility['added_shared_inputs']}
+MIGRATED_MODULES = frozenset({'Bootstrap.BuiltinPreludeLiteral', 'Bootstrap.LLVM.Build',
+    'Bootstrap.LLVM.Codegen', 'Bootstrap.PreparedLibraryLiteral', 'MLF.BuiltinPreludeData',
+    'MLF.Entry.BuiltinPrelude'})
+NEWLY_CHANGED_MODULES = frozenset({'Bootstrap.BuiltinPreludeLiteral',
+    'Bootstrap.PreparedLibraryLiteral', 'MLF.Entry.BuiltinPrelude'})
+
+
+def parse_migration(raw):
+    # This is a reviewed source inventory, never an observed behavioral oracle.
+    req(hashlib.sha256(raw).hexdigest() == MIGRATION_SHA256,
+        'fixed cf39 source migration manifest changed')
+    return json.loads(raw)
+
+
+def migrate_source_hashes(base, value, prior_digest):
+    metadata = {
+        'format': 'a1-current-source-migration-v1',
+        'from_ref': 'c4b0132aa9daeb068d6628e2668accb17078958d',
+        'from_tree': 'ac3108587a5b2406efcf8d5586d9950c39eebe13',
+        'to_ref': 'cf39c68ecb3bf861a7c910356684e01f014af1f0',
+        'to_tree': 'f0bee12bb2bb457144ed7952b15162170b764ae7',
+        'prior_compatibility_sha256': COMPATIBILITY_SHA256,
+        'module_count': 126, 'unchanged_shared_input_count': 120,
+        'historical_changed_count': 18, 'historical_added_count': 3,
+        'added_shared_inputs': {}, 'removed_shared_inputs': []}
+    req(isinstance(value, dict) and set(value) == set(metadata) | {'changed_shared_inputs'},
+        'exact cf39 migration schema')
+    req(all(value[name] == expected for name, expected in metadata.items()) and
+        prior_digest == COMPATIBILITY_SHA256, 'exact cf39 migration refs, trees and base anchor')
+    req(base == PREVIOUS_SHARED_HASHES and len(base) == 126,
+        'exact previous 126-module source snapshot')
+    delta = value['changed_shared_inputs']
+    req(isinstance(delta, dict) and set(delta) == MIGRATED_MODULES,
+        'exact six reviewed cf39 changed modules')
+    result = dict(base)
+    for name, row in delta.items():
+        req(isinstance(row, dict) and set(row) == {'old', 'new'} and row['old'] == base[name],
+            'exact previous source hash: ' + name)
+        req(isinstance(row['new'], str) and re.fullmatch('[0-9a-f]{64}', row['new']) is not None and
+            row['new'] not in (row['old'], '0' * 64), 'distinct valid target source hash: ' + name)
+        result[name] = row['new']
+    unchanged = set(base) - MIGRATED_MODULES
+    req(len(unchanged) == 120 and all(result[name] == base[name] for name in unchanged),
+        'other 120 shared inputs unchanged')
+    changed = {name for name, digest in result.items()
+               if name in historical.SHARED_HASHES and digest != historical.SHARED_HASHES[name]}
+    added = set(result) - set(historical.SHARED_HASHES)
+    req(changed == set(compatibility['changed_shared_inputs']) | NEWLY_CHANGED_MODULES and
+        len(changed) == 18 and added == set(compatibility['added_shared_inputs']) and
+        len(added) == 3 and len(result) == 126, 'explicit 18 changed plus three added projection')
+    return result
+
+
+migration = parse_migration(MIGRATION.read_bytes())
+SHARED_HASHES = migrate_source_hashes(PREVIOUS_SHARED_HASHES, migration, sha(COMPATIBILITY))
 CURRENT_MODULES = {'CurrentBuiltinControls'}
 CURRENT_BUILTIN_STDOUT = b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n'
 
@@ -54,8 +114,9 @@ def current_fixture_pins(directory, manifest):
 
 
 def authenticate_current_source(value):
-    req(value['optimization'] == '2' and len(value['resolved_modules']) == 126 and
-        len(value['inferred_shared_interfaces']) == 126, 'complete official O2 126-module producer')
+    req(value['optimization'] == '2' and set(value['resolved_modules']) == set(SHARED_HASHES) and
+        set(value['inferred_shared_interfaces']) == set(SHARED_HASHES),
+        'complete official O2 exact 126-module producer inventory')
     req({name: row['sha256'] for name, row in value['shared_inputs'].items()} == SHARED_HASHES,
         'exact reviewed current A1 production source snapshot')
 
@@ -90,7 +151,8 @@ def main():
     controls = runner.parent / 'controls'
     pins = {str(controls / rel): digest for rel, digest in CONTROL_HASHES.items()}
     current = runner.parent / 'current'
-    pins.update({str(COMPATIBILITY): sha(COMPATIBILITY), str(historical_path): sha(historical_path)})
+    pins.update({str(COMPATIBILITY): COMPATIBILITY_SHA256, str(MIGRATION): MIGRATION_SHA256,
+                 str(historical_path): sha(historical_path)})
     current_manifest = current / 'manifest.json'
     pins[str(current_manifest)] = sha(current_manifest)
     pins.update(current_fixture_pins(current, json.loads(current_manifest.read_text())))
