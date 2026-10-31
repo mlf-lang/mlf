@@ -6,8 +6,8 @@ module Bootstrap.Graph where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
-  import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntTree as IT;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.ST as ST;
   -- Persistent graph operations. Identities are retained through aliases, while
@@ -77,49 +77,24 @@ module Bootstrap.Graph where {
   -- the generic lazy map builder, every graph node retains strictNode's demand.
   nodesFromDistinctAscList :: [] ((,) Int Node) -> IntMap Node;
   nodesFromDistinctAscList entries =
-    case buildNodeTree (L.length entries) entries of {
-      (,) tree remaining -> seq tree (IntMap tree)
-    };
-  buildNodeTree :: Int -> [] ((,) Int Node) -> (,) (Map Int Node) ([] ((,) Int Node));
-  -- Keep each completed subtree strict while consuming the list.
-  -- A lazy Pair field otherwise retains a second construction
-  -- spine until the final root demands all its child maps.
-  buildNodeTree count entries =
-    if (count <= 0)
-    then (,) MapEmpty entries
-    else case buildNodeTree (quotInt count 2) entries of {
-           (,) left rest ->
-             case rest of {
-               [] -> panic "invalid sorted graph entries";
-               (:) ((,) key value) following ->
-                 let {
-                   node = strictNode value
-                 } in
-                 seq node
-                   (case buildNodeTree ((count - quotInt count 2) - 1) following of {
-                      (,) right after ->
-                        let {
-                          tree = M.node count key node left right
-                        } in
-                        seq tree ((,) tree after)
-                    })
-             }
-         };
-  mapNodeTree :: (Int -> Node -> Node) -> Map Int Node -> Map Int Node;
+    seq (L.length entries)
+      (case L.foldlStrict
+        (\state -> \entry -> case entry of {
+          (,) key value -> seq (strictNode value) (IM.ascInsert state entry)
+        }) IM.NoState entries of {
+        IM.NoState -> IM.empty;
+        IM.State key value stack -> IM.wrap (IM.ascLinkStack stack key (IM.tip key value))
+      });
+  mapNodeTree :: (Int -> Node -> Node) -> IntMapTree Node -> IntMapTree Node;
   mapNodeTree action tree =
     case tree of {
-      MapEmpty -> MapEmpty;
-      MapNode count key value left right ->
-        let {
-          result = strictNode (action key value)
-        } in
-        let {
-          leftTree = mapNodeTree action left
-        } in
-        let {
-          rightTree = mapNodeTree action right
-        } in
-        seq result (M.node count key result leftTree rightTree)
+      IntMapNil -> IntMapNil;
+      IntMapTip key value ->
+        let { result = strictNode (action key value) } in
+        seq result (IM.tip key result);
+      IntMapBin count prefix left right ->
+        let { leftTree = mapNodeTree action left; rightTree = mapNodeTree action right } in
+        seq leftTree (seq rightTree (IntMapBin count prefix leftTree rightTree))
     };
   mapNodesWithKey :: (Int -> Node -> Node) -> IntMap Node -> IntMap Node;
   mapNodesWithKey action (IntMap tree) =
@@ -327,7 +302,7 @@ module Bootstrap.Graph where {
       Just n -> Just (f n)
     };
   freshId :: Graph -> (,) Int Graph;
-  freshId (Graph ns ls fresh) = (,) fresh (mkGraph ns ls (fresh + 1));
+  freshId (Graph ns ls fresh) = (,) fresh (mkGraph ns ls (L.advanceIdentity fresh 1));
   resolve :: Graph -> Int -> Int;
   resolve graph identity =
     case IM.lookup identity (links graph) of {
@@ -759,7 +734,7 @@ module Bootstrap.Graph where {
     else bindE (mapE_ (validateChild graph intervals identity) (children (tag node)))
            (\ignored -> Right ());
   -- A bounded span keeps local scratch storage proportional to the graph even
-  -- when public graph identities are sparse or arbitrary-precision integers.
+  -- when public graph identities span the full signed 64-bit domain.
   denseDisjoint :: forall a b. IntMap a -> IntMap b -> Bool;
   denseDisjoint left right =
     case left of {
@@ -771,12 +746,12 @@ module Bootstrap.Graph where {
             else denseNoKeys rightTree leftTree
         }
     };
-  denseNoKeys :: forall a b. Map Int a -> Map Int b -> Bool;
+  denseNoKeys :: forall a b. IntMapTree a -> IntMapTree b -> Bool;
   denseNoKeys smaller larger =
     case smaller of {
-      MapEmpty -> True;
-      MapNode count key value left right ->
-        (L.not (IM.memberTree key larger) && (denseNoKeys left larger && denseNoKeys right larger))
+      IntMapNil -> True;
+      IntMapTip key value -> L.not (IM.memberTree key larger);
+      IntMapBin count prefix left right -> denseNoKeys left larger && denseNoKeys right larger
     };
   denseBounds :: Graph -> Maybe ((,) Int Int);
   denseBounds graph =
@@ -786,7 +761,9 @@ module Bootstrap.Graph where {
         case IM.lookupMax (nodes graph) of {
           Nothing -> Nothing;
           Just ((,) high last) ->
-            if (((high - low) <= (8 * IM.size (nodes graph))) &&
+            -- A mathematical span of at least 2^63 wraps negative. It cannot
+            -- qualify for bounded scratch storage, even when the keys fit.
+            if (((high - low) >= 0) && ((high - low) <= (8 * IM.size (nodes graph))) &&
                 denseDisjoint (nodes graph) (links graph))
             then Just ((,) low high)
             else Nothing
@@ -1206,6 +1183,22 @@ module Bootstrap.Graph where {
       (:) ((,) next node) rest ->
         ((previous < next) && (simpleKindTag node && orderedSimpleKindsAfter next rest))
     };
+  -- Signed-order payload traversal plus a linear proof of every routing edge.
+  -- This replaces the temporary ascending-entry list and also rejects forged
+  -- prefixes whose sorted leaves would otherwise hide a missing-child error.
+  simpleKindTree :: IntMapTree Node -> Bool;
+  simpleKindTree tree = case tree of {
+    IntMapNil -> True;
+    IntMapTip key node -> simpleKindTag node;
+    IntMapBin count prefix left right ->
+      let { reversed = IT.signBranch prefix;
+            first = if reversed then right else left;
+            second = if reversed then left else right } in
+      prefix /= 0 && IM.childRouting (L.not reversed) prefix first && simpleKindTree first &&
+      IM.childRouting reversed prefix second && simpleKindTree second
+  };
+  simpleKinds :: IntMap Node -> Bool;
+  simpleKinds (IntMap tree) = simpleKindTree tree;
   firstOrderValidated :: Graph -> Graph -> (,) Int Int -> Either String Graph;
   firstOrderValidated original graph ((,) left right) =
     let {
@@ -1252,7 +1245,7 @@ module Bootstrap.Graph where {
   -- any merge. Preserve that error priority even when an earlier pair would
   -- fail constructor/kind equality. All structural premises were validated.
   checkedFirstOrder equations before =
-    if (IM.null (links before) && orderedSimpleKinds (IM.toList (nodes before)))
+    if (IM.null (links before) && simpleKinds (nodes before))
     then bindE
            (mapE_ (\n -> bindE (require before n) (\ignored -> Right ()))
               (L.concatMap equationNodes equations))
@@ -2170,7 +2163,7 @@ module Bootstrap.Graph where {
     case originals of {
       [] -> [];
       (:) original rest ->
-        seq first ((:) ((,) original first) (freshCopyEntries (first + 1) rest))
+        seq first ((:) ((,) original first) (freshCopyEntries (L.advanceIdentity first 1) rest))
     };
   allocateCopies :: Graph -> [] Int -> (,) (IntMap Int) Graph;
   allocateCopies graph originals =
@@ -2189,7 +2182,7 @@ module Bootstrap.Graph where {
                copied = IM.fromDistinctAscList entries
              } in
              let {
-               next = mkGraph (nodes graph) (links graph) (first + L.length originals)
+               next = mkGraph (nodes graph) (links graph) (L.advanceIdentity first (L.length originals))
              } in
              seq first (strictPair copied (strictGraph next))
     };

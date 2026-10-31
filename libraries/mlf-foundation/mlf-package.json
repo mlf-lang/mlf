@@ -8,6 +8,7 @@
       "Bootstrap.Host": "Bootstrap/Host.hs",
       "Bootstrap.IntMap": "Bootstrap/IntMap.hs",
       "Bootstrap.IntSet": "Bootstrap/IntSet.hs",
+      "Bootstrap.IntTree": "Bootstrap/IntTree.hs",
       "Bootstrap.Map": "Bootstrap/Map.hs",
       "Bootstrap.Regex": "Bootstrap/Regex.hs",
       "Bootstrap.ST": "Bootstrap/ST.hs",

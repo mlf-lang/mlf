@@ -1154,7 +1154,7 @@ module Bootstrap.Parser where {
          let {
            value = readDouble spelling
          };
-         if (((doubleToBits value / 4503599627370496) % 2048) == 2047)
+         if ((andInt (doubleToBits value) 9218868437227405312) == 9218868437227405312)
          then pFail "non-finite Double literal"
          else pPure value
        });

@@ -33,8 +33,10 @@ FIXTURES = {
             ('sparse-astral', ['01234567890123456789😀Z', '20'], b'128512\n', b''),
             ('sparse-after-astral', ['01234567890123456789😀Z', '21'], b'90\n', b''),
             ('negative', ['abc', '-1'], b'', BOUNDS),
-            ('huge-positive', ['abc', '18446744073709551616'], b'', BOUNDS),
-            ('huge-negative', ['abc', '-18446744073709551616'], b'', BOUNDS),
+            ('wrapped-positive', ['abc', '18446744073709551616'], b'97\n', b''),
+            ('wrapped-negative', ['abc', '-18446744073709551616'], b'97\n', b''),
+            ('signed-maximum', ['abc', '9223372036854775807'], b'', BOUNDS),
+            ('signed-minimum', ['abc', '-9223372036854775808'], b'', BOUNDS),
             ('empty', ['', '0'], b'', BOUNDS),
             ('past-ascii-end', ['abc', '3'], b'', BOUNDS),
             ('scalar-not-byte-bound', ['Aé😀Z', '4'], b'', BOUNDS),
@@ -55,8 +57,10 @@ FIXTURES = {
         'ioBind (printInt (stringLength text)) (\\a -> '
         'printInt (stringCodeAt text (readInt position)))))\n', True, [
             ('cached-negative', ['abc', '-1'], b'3\n', BOUNDS),
-            ('cached-huge-positive', ['abc', '18446744073709551616'], b'3\n', BOUNDS),
-            ('cached-huge-negative', ['abc', '-18446744073709551616'], b'3\n', BOUNDS),
+            ('cached-wrapped-positive', ['abc', '18446744073709551616'], b'3\n97\n', b''),
+            ('cached-wrapped-negative', ['abc', '-18446744073709551616'], b'3\n97\n', b''),
+            ('cached-signed-maximum', ['abc', '9223372036854775807'], b'3\n', BOUNDS),
+            ('cached-signed-minimum', ['abc', '-9223372036854775808'], b'3\n', BOUNDS),
             ('cached-past-end', ['abc', '3'], b'3\n', BOUNDS),
         ]),
     'constructed-nul': (
@@ -235,9 +239,9 @@ def main():
                     require(result.stderr == diagnostic, 'native diagnostic differs: ' + execution)
                     record['cases'].append({'case': execution, 'passed': True,
                                             'stdout': expected.decode(), 'stderr': diagnostic.decode()})
-        require(len(record['cases']) == 60, 'native case completion inventory differs')
+        require(len(record['cases']) == 68, 'native case completion inventory differs')
         integrity()
-        record.update(complete=True, status='passed', fixtures=12, native_cases=60,
+        record.update(complete=True, status='passed', fixtures=12, native_cases=68,
                       optimizations=['0', '2'])
     except BaseException as error:
         record.update(complete=False, status='failed', error=type(error).__name__ + ': ' + str(error))

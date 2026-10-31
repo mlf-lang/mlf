@@ -4,7 +4,7 @@
 -- Ordinary Haskell syntax uses the standard class identities and desugaring.
 -- Only value representations and primitive operations are host adaptations.
 module MLF.Primitive
-  ( Int, Bool(..), Double, Char, IO, IOError, String, ST, STArray, Functor(..), Applicative(..), Monad(..), MonadFail(..), IsString(..), Eq(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
+  ( Int, Integer, Bool(..), Double, Char, IO, IOError, String, ST, STArray, Functor(..), Applicative(..), Monad(..), MonadFail(..), IsString(..), Eq(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
   , HasCallStack, CallStack, callStack, prettyCallStack
   , MLFHasCallStack, MLFCallStack, MLFStackFrame(..), MLFStackEvidence(..)
   , mlfEmptyCallStack, mlfPushCallStack, mlfPrettyCallStack, mlfIOErrorWithStack
@@ -24,6 +24,7 @@ module MLF.Primitive
   , listDirectory, directoryExists, fileDigest, acquireFileLock, releaseFileLock, processSupervisor, asyncScopeNew
   , asyncScopeClose, asyncNewCompletion, asyncResolveCompletion, asyncReadCompletion, asyncSubscribeCompletion, asyncSubscriptionStatus, asyncCancelSubscription
   , asyncStep, asyncEnqueue, asyncDelay, asyncWait
+  , orInt, xorInt, shiftLInt, shiftRInt, unsignedShiftRInt, countLeadingZerosInt, countTrailingZerosInt, popCountInt, intToInteger, integerToInt, addInteger, subInteger, mulInteger, quotInteger, remInteger, eqInteger, ltInteger, showInteger, readInteger, integerToDouble, unsignedLtInt
   , implementationHost, bind, negate, otherwise
   , (+), (-), (*), (/), (%), (<), (<=), (>), (>=), (++), (&&), (||)
   ) where
@@ -35,7 +36,7 @@ import Data.String (IsString(..))
 import GHC.Stack (HasCallStack, CallStack, callStack, prettyCallStack)
 import System.IO.Error (ioError)
 import MLF.Host.Base (MLFHasCallStack, MLFCallStack, MLFStackFrame(..), MLFStackEvidence(..))
-import MLF.Host.Base (Int, Bool(..), Double, IO, String, ST, STArray)
+import MLF.Host.Base (Int, Integer, Bool(..), Double, IO, String, ST, STArray)
 import MLF.Host.IO (IntArray, DoubleArray, ByteArray, IntTable)
 import MLF.Host.Async (AsyncScope, Completion, AsyncSubscription)
 import qualified MLF.Host.Base as Base
@@ -395,3 +396,48 @@ infixl 7 *, /, %
 (&&), (||) :: Bool -> Bool -> Bool
 (&&) a b = if a then b else False
 (||) a b = if a then True else b
+
+-- Fixed-width bit operations and explicit arbitrary-precision arithmetic.
+orInt :: Int -> Int -> Int
+orInt = Base.v_orInt
+xorInt :: Int -> Int -> Int
+xorInt = Base.v_xorInt
+shiftLInt :: Int -> Int -> Int
+shiftLInt = Base.v_shiftLInt
+shiftRInt :: Int -> Int -> Int
+shiftRInt = Base.v_shiftRInt
+unsignedShiftRInt :: Int -> Int -> Int
+unsignedShiftRInt = Base.v_unsignedShiftRInt
+countLeadingZerosInt :: Int -> Int
+countLeadingZerosInt = Base.v_countLeadingZerosInt
+countTrailingZerosInt :: Int -> Int
+countTrailingZerosInt = Base.v_countTrailingZerosInt
+popCountInt :: Int -> Int
+popCountInt = Base.v_popCountInt
+intToInteger :: Int -> Integer
+intToInteger = Base.v_intToInteger
+integerToInt :: Integer -> Int
+integerToInt = Base.v_integerToInt
+addInteger :: Integer -> Integer -> Integer
+addInteger = Base.v_addInteger
+subInteger :: Integer -> Integer -> Integer
+subInteger = Base.v_subInteger
+mulInteger :: Integer -> Integer -> Integer
+mulInteger = Base.v_mulInteger
+quotInteger :: Integer -> Integer -> Integer
+quotInteger = Base.v_quotInteger
+remInteger :: Integer -> Integer -> Integer
+remInteger = Base.v_remInteger
+eqInteger :: Integer -> Integer -> Bool
+eqInteger = Base.v_eqInteger
+ltInteger :: Integer -> Integer -> Bool
+ltInteger = Base.v_ltInteger
+showInteger :: Integer -> String
+showInteger = Base.v_showInteger
+readInteger :: String -> Integer
+readInteger = Base.v_readInteger
+integerToDouble :: Integer -> Double
+integerToDouble = Base.v_integerToDouble
+
+unsignedLtInt :: Int -> Int -> Bool
+unsignedLtInt = Base.v_unsignedLtInt

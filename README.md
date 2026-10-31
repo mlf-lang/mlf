@@ -260,7 +260,8 @@ Known saturated functions use native workers, with conservative demand
 analysis to avoid unnecessary thunks. Partial applications and lazy fields
 retain their call-by-need behavior. Small integers and nullary constructors
 use tagged immediate values; unary/binary data has inline fields.
-GMP preserves the language's unbounded `Int`; strings use length-delimited
+`Int` uses signed 64-bit arithmetic; GMP supports the separate unbounded
+`Integer` type. Strings use length-delimited
 UTF-8, including embedded NULs. Invalid Unicode scalar literals are rejected.
 
 The runtime memoizes pure thunks and executes shared IO actions afresh on
@@ -683,7 +684,7 @@ binds below the operators, so `x + 1 : Int` annotates the sum.
 The annotation/cons distinction for `:` is described below; `::` always
 introduces an annotation.
 
-Arithmetic and comparisons use the existing arbitrary-precision `Int`
+Arithmetic and comparisons use signed 64-bit `Int`
 primitives. `/` truncates toward zero and `%` has the dividend's sign.
 They are not overloaded: use `addDouble`, `ltDouble`, or `eqString` for other
 types. Signed `Double` literals such as `-2.5e-2` remain supported; negating a
@@ -1091,14 +1092,24 @@ and cause a nonzero exit. Console output is flushed before the next action.
 | `eqString` | `String -> String -> Bool` |
 | `ifThenElse` | `forall a. Bool -> a -> a -> a` |
 
-Integer arithmetic uses arbitrary-precision signed integers. `ltInt` is strict
+`Int` follows Haskell `Int64`: literals, decimal `readInt`, addition,
+subtraction, multiplication and negation wrap modulo 2^64, interpreted as
+signed two's complement. Its range is -9223372036854775808 through
+9223372036854775807. `ltInt` is strict
 less-than. `quotInt` truncates toward zero, `remInt` has the dividend's sign,
-and division by zero fails at runtime. `andInt` is strict bitwise AND with
-unbounded two's-complement semantics. `readInt` accepts an optional sign and
+and division by zero fails at runtime. The minimum value divided by -1 raises
+`integer division overflow`; its remainder with -1 is zero. `andInt`, `orInt` and
+`xorInt` operate on 64 bits. `readInt` accepts an optional sign and
 one or more ASCII decimal digits, with no whitespace or trailing characters.
 String equality is case-sensitive. `ifThenElse condition yes no`
 evaluates only the selected branch; it also works with functions, datatypes,
 and IO actions. Selecting an IO action does not execute it until it is sequenced.
+
+For unbounded arithmetic, use the separate `Integer` type and explicit
+`intToInteger`, `integerToInt`, `addInteger`, `subInteger`, `mulInteger`,
+`quotInteger`, `remInteger`, `eqInteger`, `ltInteger`, `showInteger`,
+`readInteger` and `integerToDouble` primitives. Conversion back to `Int`
+wraps. Ordinary numeric operators remain specific to `Int`.
 
 `Double` is IEEE binary64, distinct from `Int`: use `1.0`, `-2.5`, or `3e2`
 and convert integers explicitly with `intToDouble`. Literals must be finite;
@@ -1123,7 +1134,7 @@ do {
 
 Both backends implement these operations. The LLVM backend emits floating
 arithmetic directly and stores Double array elements unboxed; Int array cells
-retain arbitrary precision. See [numeric semantics](docs/numeric-arrays.txt).
+store signed 64-bit values. See [numeric semantics](docs/numeric-arrays.txt).
 
 `ByteArray` stores unsigned bytes. Reads return `Int`; writes and initial
 values must be between 0 and 255. `byteArrayFromString` allocates a fresh
@@ -1134,7 +1145,7 @@ buffers and binary formats such as Mandelbrot's PBM bitmap on both backends.
 
 `getByteLine` reads raw bytes through LF, preserving the newline and invalid
 UTF-8; EOF returns an empty fresh array. A blank line contains one LF byte.
-`IntTable` is a mutable library hash table with arbitrary integer keys and
+`IntTable` is a mutable library hash table with signed 64-bit integer keys and
 values. Missing keys read as zero; writes insert or replace. Reads return
 snapshots, and each execution of `newIntTable` creates a fresh table.
 These operations are available in both backends.
@@ -1273,7 +1284,7 @@ Movement and food placement are pure functions; only the interface uses IO.
 
 [`examples/SnakeBaseline.hs`](examples/SnakeBaseline.hs) implements the same
 game with Haskell ADTs, standard lists and `Maybe`, ordinary recursion, and
-the standard `IO` monad with `do`. It uses `Integer` to match eMLF's unbounded
+the standard `IO` monad with `do`. It uses `Int64` to match eMLF's fixed-width
 `Int`, and preserves the rules, deterministic food search, prompts, board
 format, and flushing after each write. Only the `base` package is needed.
 
@@ -1300,6 +1311,10 @@ LLVM native code. It also checks eleven pure-rule outcomes, including the
 departing tail and full-board win.
 
 ## Compiler performance
+
+See [Int64 and Patricia collection qualification](docs/int64-patricia-qualification.md)
+for this numeric/collection migration, its retained correctness controls, and
+the measured compilation and runtime results, including unmet performance targets.
 
 See [C4 prepared-transaction integration and validation](docs/performance/c4-local-transaction.md)
 and [performance-optimization research workflow and literature](docs/performance/optimization-workflow-research.md).
@@ -1340,9 +1355,9 @@ permissions, target typing, and source erasure.
 The native backend lowers eligible first-order numeric IO functions to direct,
 bounds-checked array loops with unboxed Double intermediates and recursive
 arguments. Specialized workers preserve proven integer ranges, while checked
-machine multiplication/division retain GMP fallback. A non-forcing argument
+machine multiplication/division retain the full Int64 runtime fallback. A non-forcing argument
 guard preserves the lazy fallback; actions remain repeatable. GMP
-arithmetic reads immutable operands directly and collection also accounts for
+arithmetic for explicit `Integer` values reads immutable operands directly and collection also accounts for
 large-integer limb storage. Allocating byte/array/table IO uses explicitly
 rooted native calls. Adjacent table count updates fuse, and guarded copy loops
 use LLVM memory intrinsics. See [backend design](docs/llvm-backend.txt).

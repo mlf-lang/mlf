@@ -117,7 +117,28 @@ module Bootstrap.Primitive where {
       PPushCallStack -> 104;
       PPrettyCallStack -> 105;
       PIOErrorWithStack -> 106;
-      PConcatStringList -> 107
+      PConcatStringList -> 107;
+      POrInt -> 108;
+      PXorInt -> 109;
+      PShiftLInt -> 110;
+      PShiftRInt -> 111;
+      PUnsignedShiftRInt -> 112;
+      PCountLeadingZerosInt -> 113;
+      PCountTrailingZerosInt -> 114;
+      PPopCountInt -> 115;
+      PIntToInteger -> 116;
+      PIntegerToInt -> 117;
+      PAddInteger -> 118;
+      PSubInteger -> 119;
+      PMulInteger -> 120;
+      PQuotInteger -> 121;
+      PRemInteger -> 122;
+      PEqInteger -> 123;
+      PLtInteger -> 124;
+      PShowInteger -> 125;
+      PReadInteger -> 126;
+      PIntegerToDouble -> 127;
+      PUnsignedLtInt -> 128
     };
   primitiveName :: Primitive -> String;
   primitiveName p =
@@ -229,7 +250,28 @@ module Bootstrap.Primitive where {
       PPushCallStack -> "mlfPushCallStack";
       PPrettyCallStack -> "mlfPrettyCallStack";
       PIOErrorWithStack -> "mlfIOErrorWithStack";
-      PConcatStringList -> "concatStringList"
+      PConcatStringList -> "concatStringList";
+      POrInt -> "orInt";
+      PXorInt -> "xorInt";
+      PShiftLInt -> "shiftLInt";
+      PShiftRInt -> "shiftRInt";
+      PUnsignedShiftRInt -> "unsignedShiftRInt";
+      PCountLeadingZerosInt -> "countLeadingZerosInt";
+      PCountTrailingZerosInt -> "countTrailingZerosInt";
+      PPopCountInt -> "popCountInt";
+      PIntToInteger -> "intToInteger";
+      PIntegerToInt -> "integerToInt";
+      PAddInteger -> "addInteger";
+      PSubInteger -> "subInteger";
+      PMulInteger -> "mulInteger";
+      PQuotInteger -> "quotInteger";
+      PRemInteger -> "remInteger";
+      PEqInteger -> "eqInteger";
+      PLtInteger -> "ltInteger";
+      PShowInteger -> "showInteger";
+      PReadInteger -> "readInteger";
+      PIntegerToDouble -> "integerToDouble";
+      PUnsignedLtInt -> "unsignedLtInt"
     };
   legacyPrimitives :: [] Primitive;
   legacyPrimitives =
@@ -399,7 +441,7 @@ module Bootstrap.Primitive where {
                                                                                                                                                                                                                                                                                                 []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   allPrimitives :: [] Primitive;
   allPrimitives = S.append legacyPrimitives
-    ((:) PTextToChars ((:) PTextFromChars ((:) PCharCode ((:) PCharFromCode ((:) PUserError ((:) PIOError ((:) PCatchIOError ((:) PIOErrorString ((:) PEmptyCallStack ((:) PPushCallStack ((:) PPrettyCallStack ((:) PIOErrorWithStack ((:) PConcatStringList [])))))))))))));
+    [PTextToChars, PTextFromChars, PCharCode, PCharFromCode, PUserError, PIOError, PCatchIOError, PIOErrorString, PEmptyCallStack, PPushCallStack, PPrettyCallStack, PIOErrorWithStack, PConcatStringList, POrInt, PXorInt, PShiftLInt, PShiftRInt, PUnsignedShiftRInt, PCountLeadingZerosInt, PCountTrailingZerosInt, PPopCountInt, PIntToInteger, PIntegerToInt, PAddInteger, PSubInteger, PMulInteger, PQuotInteger, PRemInteger, PEqInteger, PLtInteger, PShowInteger, PReadInteger, PIntegerToDouble, PUnsignedLtInt];
   lookupTargetPrimitive :: String -> Maybe Primitive;
   lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives;
   lookupPrimitive :: String -> Maybe Primitive;
@@ -727,7 +769,28 @@ module Bootstrap.Primitive where {
         (Function (Applied "[]" ((:) (Applied "String" []) [])) (Applied "String" []));
       PIOErrorWithStack -> (,) ((:) ((,) "a" Star) [])
         (Function (Applied "IOError" [])
-          (Function (Applied "MLFCallStack" []) (Applied "IO" ((:) (Parameter "a") []))))
+          (Function (Applied "MLFCallStack" []) (Applied "IO" ((:) (Parameter "a") []))));
+      POrInt -> (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
+      PXorInt -> (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
+      PShiftLInt -> (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
+      PShiftRInt -> (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
+      PUnsignedShiftRInt -> (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Int" [])));
+      PCountLeadingZerosInt -> (,) [] (Function (Applied "Int" []) (Applied "Int" []));
+      PCountTrailingZerosInt -> (,) [] (Function (Applied "Int" []) (Applied "Int" []));
+      PPopCountInt -> (,) [] (Function (Applied "Int" []) (Applied "Int" []));
+      PIntToInteger -> (,) [] (Function (Applied "Int" []) (Applied "Integer" []));
+      PIntegerToInt -> (,) [] (Function (Applied "Integer" []) (Applied "Int" []));
+      PAddInteger -> (,) [] (Function (Applied "Integer" []) (Function (Applied "Integer" []) (Applied "Integer" [])));
+      PSubInteger -> (,) [] (Function (Applied "Integer" []) (Function (Applied "Integer" []) (Applied "Integer" [])));
+      PMulInteger -> (,) [] (Function (Applied "Integer" []) (Function (Applied "Integer" []) (Applied "Integer" [])));
+      PQuotInteger -> (,) [] (Function (Applied "Integer" []) (Function (Applied "Integer" []) (Applied "Integer" [])));
+      PRemInteger -> (,) [] (Function (Applied "Integer" []) (Function (Applied "Integer" []) (Applied "Integer" [])));
+      PEqInteger -> (,) [] (Function (Applied "Integer" []) (Function (Applied "Integer" []) (Applied "Bool" [])));
+      PLtInteger -> (,) [] (Function (Applied "Integer" []) (Function (Applied "Integer" []) (Applied "Bool" [])));
+      PShowInteger -> (,) [] (Function (Applied "Integer" []) (Applied "String" []));
+      PReadInteger -> (,) [] (Function (Applied "String" []) (Applied "Integer" []));
+      PIntegerToDouble -> (,) [] (Function (Applied "Integer" []) (Applied "Double" []));
+      PUnsignedLtInt -> (,) [] (Function (Applied "Int" []) (Function (Applied "Int" []) (Applied "Bool" [])))
     };
   primitiveArity :: Primitive -> Int;
   -- Runtime application asks for arity on every partial and saturated call.
@@ -842,7 +905,28 @@ module Bootstrap.Primitive where {
       PPushCallStack -> 2;
       PPrettyCallStack -> 1;
       PIOErrorWithStack -> 2;
-      PConcatStringList -> 1
+      PConcatStringList -> 1;
+      POrInt -> 2;
+      PXorInt -> 2;
+      PShiftLInt -> 2;
+      PShiftRInt -> 2;
+      PUnsignedShiftRInt -> 2;
+      PCountLeadingZerosInt -> 1;
+      PCountTrailingZerosInt -> 1;
+      PPopCountInt -> 1;
+      PIntToInteger -> 1;
+      PIntegerToInt -> 1;
+      PAddInteger -> 2;
+      PSubInteger -> 2;
+      PMulInteger -> 2;
+      PQuotInteger -> 2;
+      PRemInteger -> 2;
+      PEqInteger -> 2;
+      PLtInteger -> 2;
+      PShowInteger -> 1;
+      PReadInteger -> 1;
+      PIntegerToDouble -> 1;
+      PUnsignedLtInt -> 2
     };
   fieldArity :: Field -> Int;
   fieldArity field =
@@ -852,7 +936,7 @@ module Bootstrap.Primitive where {
     };
   primitiveStrict :: Primitive -> Bool;
   primitiveStrict p =
-    (((primitiveCode p >= 95) && (primitiveCode p <= 98)) ||
+    ((primitiveCode p >= 108) || ((primitiveCode p >= 95) && (primitiveCode p <= 98)) ||
      (primitiveCode p == 68) || (primitiveCode p == 107) ||
      S.elem eqInt (primitiveCode p)
        ((:) 6

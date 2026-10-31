@@ -1,18 +1,30 @@
 Numbers, mutable arrays and binary output
 ========================================
 
-Int remains an arbitrary-precision signed integer. mulInt, quotInt and remInt
-are strict, curried Int -> Int -> Int operations. For nonzero y:
-  x == quotInt x y * y + remInt x y
-Quotient truncates toward zero; nonzero remainder has x's sign. Both division
-operations fail with "integer division by zero" for a zero divisor, including
-on the GMP path. Multiplication checks the tagged 63-bit range and overflow
-before falling back to GMP. Results that fit return to the tagged range.
+Int is a signed 64-bit integer, with Haskell Int64 arithmetic semantics.
+Literals, readInt, addition, subtraction, multiplication and negation wrap
+modulo 2^64; the result is interpreted in [-2^63, 2^63-1]. Int is fixed at
+64 bits even on platforms where Haskell's machine-sized Int differs.
+mulInt, quotInt and remInt are strict, curried Int -> Int -> Int operations.
+Quotient truncates toward zero; nonzero remainder has the dividend's sign.
+Division by zero reports "integer division by zero". The exceptional quotient
+(-2^63)/(-1) reports "integer division overflow"; its remainder is zero.
 
-andInt : Int -> Int -> Int is strict bitwise AND over unbounded signed
-integers, using infinite two's-complement semantics. For example,
-andInt (-1) x == x, andInt (-2) (-3) == -4. Tagged operands use machine AND;
-large operands use GMP. A zero mask still demands both operands in order.
+andInt, orInt and xorInt operate on 64-bit two's-complement bit patterns.
+shiftLInt, shiftRInt and unsignedShiftRInt take a nonnegative shift count;
+negative counts fail. Counts >=64 produce zero, except that arithmetic right
+shift of a negative value produces -1. countLeadingZerosInt and
+countTrailingZerosInt return 64 for zero; popCountInt counts all 64 bits.
+unsignedLtInt compares the same 64 bits as unsigned words, without allocating
+intermediate integers; ordinary Int comparisons remain signed.
+Both operands are demanded in order, including a zero mask.
+
+Integer is a distinct unbounded type, backed by GHC Integer or native GMP.
+Use intToInteger, integerToInt, addInteger, subInteger, mulInteger,
+quotInteger, remInteger, eqInteger, ltInteger, showInteger, readInteger and
+integerToDouble explicitly. integerToInt wraps; ordinary operators and
+integer literals still have type Int. readInteger uses readInt's decimal
+grammar without narrowing. This is used by pidigits and exact float printing.
 
 readInt : String -> Int accepts [+-]?[0-9]+ with at least one digit, and consumes
 the entire string. Whitespace, embedded NUL, fractions and trailing characters
@@ -24,7 +36,8 @@ or exponent, for example 1.0, -2.5, 3e2, 1.2e-10. Source and xMLF literals are
 finite IEEE binary64 values; overflowed literals and forged non-finite AST
 literals are rejected before execution. Underflow and signed zero follow
 binary64 conversion. Int literals are not overloaded; intToDouble converts an
-arbitrary Int with nearest-even rounding (possibly to infinity).
+signed Int64 with nearest-even rounding. integerToDouble converts an
+unbounded Integer with nearest-even rounding (possibly to infinity).
 
 addDouble, subDouble, mulDouble, divDouble : Double -> Double -> Double
 sqrtDouble : Double -> Double
@@ -77,16 +90,16 @@ the numeric value before storing, preventing a thunk from capturing a mutable
 location. No unsafe pure read, resize, raw pointer, or whole-workload helper is
 exposed. Numeric arrays support all current class/prelude/do machinery.
 
-The interpreter uses IOArray Int Integer and IOUArray Int Double. The native
-runtime uses contiguous arrays of tagged-or-GMP integer values and unboxed
+The interpreter uses IOArray Int Int64 and IOUArray Int Double. The native
+runtime uses contiguous arrays of tagged-or-boxed Int64 values and unboxed
 doubles. The collector marks every boxed integer cell and releases both array
-buffers at reclamation/exit. Managed values retain the 48-byte ABI, so adding
+buffers at reclamation/exit. Managed values retain the 32-byte ABI, so adding
 arrays does not enlarge existing tree nodes. The IO driver can dispatch an
 eligible first-order numeric region that directly executes array effects in
 order, with unboxed Double intermediates, specialized scalar arguments across
 native recursive calls, and checked indices. Proven nonnegative counters keep
 their range through countdown branches; multiplication/division/remainder have
-checked machine paths with arbitrary-precision fallback. Its public argument
+64-bit wrapping arithmetic. Its public argument
 guard never forces an unknown thunk; unsuccessful guards use the ordinary
 lazy implementation. Each execution of an action runs the region again.
 Allocating IO regions may collect at worker entry using explicit roots for
@@ -157,7 +170,7 @@ newIntTable   : IO IntTable
 readIntTable  : IntTable -> Int -> IO Int
 writeIntTable : IntTable -> Int -> Int -> IO Unit
 A missing key reads as zero. Writes insert or replace one value. Keys and
-values are arbitrary signed Int values, including GMP values. Every operation
+values are signed 64-bit Int values. Every operation
 is sequenced by IO; creating/sharing an action never performs it. Reexecuting
 newIntTable creates a distinct empty table; aliases share writes. A previous
 read remains an immutable snapshot. Writes demand the key before the value
@@ -166,7 +179,7 @@ and store evaluated integers. Unused failing IO operands remain lazy.
 The interpreter uses hashtables; the native runtime instantiates the pinned
 khash library (runtime/THIRD_PARTY.md). Tables start with a tagged-key
 representation and promote all entries on the first large key; values remain
-arbitrary integers in both representations. The collector traces every live
+signed 64-bit integers in both representations. The collector traces every live
 managed key and value, and frees table storage at reclamation/exit. Native
 regions fuse adjacent read/add/write operations on the same table and key,
 retaining the old value as a snapshot. Existing-key updates use the library's

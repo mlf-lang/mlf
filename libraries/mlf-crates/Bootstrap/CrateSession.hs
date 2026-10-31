@@ -664,7 +664,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
   };
 
   unifyProjection :: [] ((,) Int Int) -> Graph -> ScopeIndex -> IntMap Node -> IntSet ->
-    Either String ((,,,) ([] ((,) Int Node)) (Map Int Node) Int Graph);
+    Either String ((,,,) ([] ((,) Int Node)) (IntMapTree Node) Int Graph);
   unifyProjection equations current scopeValue connected boundaries =
          let {
            old = current
@@ -767,7 +767,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                      (\checkedScopes ->
                         Right ((,,,) originals backward count solved))));
 
-  restoreProjectionPlan :: Graph -> [] ((,) Int Node) -> Map Int Node -> Int -> Graph ->
+  restoreProjectionPlan :: Graph -> [] ((,) Int Node) -> IntMapTree Node -> Int -> Graph ->
     Either String ((,,) Graph ([] ((,) Int Node)) ([] ((,) Int Node)));
   restoreProjectionPlan current originals backward count solved =
     G.bindE (G.mapE (S.restoreAliases backward) (IM.toList (G.links solved)))
@@ -813,7 +813,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                   Right ((,,) patched removedNodes changedNodes)
               }));
 
-  restoreProjection :: forall s. Session s -> [] ((,) Int Node) -> Map Int Node -> Int -> Graph ->
+  restoreProjection :: forall s. Session s -> [] ((,) Int Node) -> IntMapTree Node -> Int -> Graph ->
     ST s (Either String (Session s));
   restoreProjection state originals backward count solved =
     ST.bindE (stReturn (restoreProjectionPlan (graph state) originals backward count solved))

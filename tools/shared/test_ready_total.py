@@ -101,7 +101,8 @@ FIXTURES = {
             # The first iteration forces next, but the base case does not need
             # its square. The shape assertion below proves it remains lazy;
             # this bound is a completion guard, not a timing qualification.
-            ('unused-large-product', ['1', '9' * 8192], b'-1\n', b''),
+            ('unused-wrapped-product', ['1', '9' * 8191 + '8'], b'-1\n', b''),
+            ('wrapped-stop-branch', ['1', '9' * 8192], b'1\n', b''),
         ]),
     'branch-dominance': (
         'choose flag value = if flag then 7 else value\n'
@@ -285,9 +286,13 @@ FIXTURES = {
         'seq value (ioBind (printInt (addInt value 1)) (\\ignored -> '
         'ioBind (printInt (subInt value 1)) (\\ignored2 -> printInt (mulInt value 3)))))\n', [
             ('positive-boundary', ['4611686018427387903'],
-             b'4611686018427387904\n4611686018427387902\n13835058055282163709\n', b''),
+             b'4611686018427387904\n4611686018427387902\n-4611686018427387907\n', b''),
             ('negative-boundary', ['-4611686018427387904'],
-             b'-4611686018427387903\n-4611686018427387905\n-13835058055282163712\n', b''),
+             b'-4611686018427387903\n-4611686018427387905\n4611686018427387904\n', b''),
+            ('signed-maximum', ['9223372036854775807'],
+             b'-9223372036854775808\n9223372036854775806\n9223372036854775805\n', b''),
+            ('signed-minimum', ['-9223372036854775808'],
+             b'-9223372036854775807\n9223372036854775807\n-9223372036854775808\n', b''),
         ]),
 }
 
@@ -432,7 +437,7 @@ def main():
                                         expected=expected, status=1 if diagnostic else 0, timeout=30)
                     require(result.stderr == diagnostic, 'diagnostic differs: ' + name)
                     record['cases'].append({'case': label + '/' + name + '/O' + optimization, 'passed': True})
-        require(len(record['cases']) == 152 and len(record['interpreted_cases']) == 76,
+        require(len(record['cases']) == 158 and len(record['interpreted_cases']) == 79,
                 'execution case inventory differs')
         record.update(status='passed', complete=True)
     except BaseException as error:

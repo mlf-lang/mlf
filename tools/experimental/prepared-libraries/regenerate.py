@@ -37,7 +37,8 @@ def main() -> None:
         raise ValueError("first generation receipt changed")
     source_pins = json.loads((job / "source-pins.json").read_text())
     inputs = {value["snapshot"]: value["sha256"] for value in source_pins.values()}
-    inputs[first["canonical_snapshot_registry"]] = product["generated_sha256"]
+    inputs[first["canonical_snapshot_registry"]] = first.get("canonical_string_pool", {}).get(
+        "pooled_sha256", product["generated_sha256"])
     inputs.update(first["tools"])
     inputs[first["generator"]["path"]] = first["generator"]["sha256"]
     for path, digest in inputs.items():

@@ -79,7 +79,7 @@ module Bootstrap.Data where {
       }
     };
   scalarPrimitiveKinds :: Map String Kind;
-  scalarPrimitiveKinds =
+  scalarPrimitiveKinds = M.insert compareString "Integer" Star (
     M.fromList compareString
       ((:) ((,) "AsyncScope" Star)
          ((:) ((,) "Completion" (KArrow Star Star))
@@ -96,7 +96,7 @@ module Bootstrap.Data where {
                                           ((:) ((,) "ByteArray" Star)
                                              ((:) ((,) "IntTable" Star)
                                                 ((:) ((,) "IO" (KArrow Star Star))
-                                                   [])))))))))))))));
+                                                   []))))))))))))))));
   -- Wired source identities are independent of Bootstrap.Types' temporary
   -- List/Pair/Unit implementation ADTs. Never normalize a user ADT to these.
   sourceUnitDeclaration :: DataDecl;
@@ -228,7 +228,10 @@ module Bootstrap.Data where {
   memberString name names = any (eqString name) names;
   distinct :: String -> [] String -> Either String ();
   distinct what xs =
-    if (length xs == Set.size (Set.fromList compareString xs)) then Right () else Left ("duplicate " ++ what);
+    -- Complete the spine before demanding names. Int64 worker arguments can
+    -- otherwise evaluate the Set side before the ordered comparison is entered.
+    let { count = length xs } in
+    seq count (if (count == Set.size (Set.fromList compareString xs)) then Right () else Left ("duplicate " ++ what));
   fieldKind :: [] DataDecl -> DataEnv -> Map String Kind -> Field -> Either String Kind;
   fieldKind declarations env ps field =
     case field of {

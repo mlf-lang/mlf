@@ -46,11 +46,14 @@ syntax operations.
 * `pure` is the standard `Applicative` method, not an IO-only primitive alias.
   `ioReturn` and `stReturn` remain their explicit primitive operations.
 * Numeric literals and negation use the standard GHC numeric desugaring.
-  Native `Int` is represented by GHC `Integer`, and native `Double` by GHC
+  Native `Int` is represented by GHC `Data.Int.Int64`, and native `Double` by GHC
   `Double`; source annotations fix the actual intended types. Any ambiguous
   numeric or string binding found by the real corpus build receives a local,
   reviewed annotation. No global defaulting or overlapping-instance trick is
   used to conceal an inference difference.
+  The October 31 numeric revision changes the former unbounded `Int` to
+  Haskell-compatible signed 64-bit arithmetic; explicit `Integer` primitives
+  retain unbounded arithmetic. See [numeric semantics](../numeric-arrays.txt).
 * Overloaded strings use a genuine `Data.String.IsString` instance for the
   opaque host `String`. UTF-8/scalar validation and the native string model stay
   in that representation adapter. There is no source-local `fromString` hook.

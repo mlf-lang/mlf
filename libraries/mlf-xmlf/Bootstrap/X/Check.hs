@@ -199,7 +199,7 @@ module Bootstrap.X.Check where {
       XIntTerm _ -> Right (XCon "Int" []);
       XDoubleTerm n ->
         do {
-          ensure (remInt (quotInt (doubleToBits n) 4503599627370496) 2048 /= 2047)
+          ensure (andInt (doubleToBits n) 9218868437227405312 /= 9218868437227405312)
             "non-finite Double literal";
           return (XCon "Double" [])
         };

@@ -120,10 +120,10 @@ module Bootstrap.X.Checked (CheckedTerm, check, term, typeOf, declarationBinding
   };
   compositionFresh serial source = let {
     ids = IS.toList (compositionTermIdentities source IS.empty);
-    replacements = IM.fromDistinctAscList (zip ids (range serial (serial + length ids - 1)));
+    replacements = IM.fromDistinctAscList (zip ids (range serial (advanceIdentity serial (length ids) - 1)));
     identity = \n -> IM.get n replacements;
     name = \(XName n hint) -> XName (identity n) hint
-  } in (,,) (serial + length ids)
+  } in (,,) (advanceIdentity serial (length ids))
     (compositionMapTerm name (\(XTyVar n) -> XTyVar (identity n)) source) name;
   compositionParameters source = case source of {
     XAbs name ty body -> let { next = compositionParameters body }

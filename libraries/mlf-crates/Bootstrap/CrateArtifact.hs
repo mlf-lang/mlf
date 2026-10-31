@@ -333,7 +333,7 @@ module Bootstrap.CrateArtifact where {
            ensure declared ("crate exports an undeclared entity: " ++ Modules.label entity)
          };
   builtinCrateIdentity :: String;
-  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:9";
+  builtinCrateIdentity = "mlf:builtin-shared-haskell-v1:10";
   validateBuiltinOwnership iface =
     if (any Modules.isBuiltinModule (crateModules iface) ||
         ((stringLength (crateId iface) >= stringLength "mlf:builtin-shared-haskell-v1:") &&

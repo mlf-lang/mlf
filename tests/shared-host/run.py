@@ -38,9 +38,9 @@ try:
     run('ghc-version',[a.ghc,'--version'])
     for opt in ['O0','O2']:
         b=build('contracts','ContractProbe.hs',opt)
-        run('contracts-'+opt,[b],text='TOTAL 87 FAILED 0')
+        run('contracts-'+opt,[b],text='TOTAL 89 FAILED 0')
         b=build('numeric','NumericProbe.hs',opt,[tests/'NumericOracle.c'])
-        run('numeric-'+opt,[b],text='TOTAL 590 FAILED 0')
+        run('numeric-'+opt,[b],text='TOTAL 722 FAILED 0')
         b=build('identity','IdentityProbe.hs',opt)
         run('identity-'+opt,[b],text='PASS actual Prelude.Bool')
         b=build('filesystem','FilesystemProbe.hs',opt)

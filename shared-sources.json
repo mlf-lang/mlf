@@ -1,8 +1,8 @@
 {
   "format": 1,
   "source_syntax": "shared-haskell-v1",
-  "frontend_semantics": "mlf-frontend/shared-haskell-v1/7",
-  "primitive_abi": "mlf-primitive-108-v5",
+  "frontend_semantics": "mlf-frontend/shared-haskell-v1/8",
+  "primitive_abi": "mlf-primitive-129-v6",
   "source_roots": [
     "libraries/mlf-async",
     "libraries/mlf-crates",
@@ -186,6 +186,11 @@
     {
       "module": "Bootstrap.IntSet",
       "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.IntTree",
+      "path": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
       "role": "implementation"
     },
     {
@@ -750,5 +755,5 @@
     "host/ghc/app/source-smoke/Main.hs",
     "host/ghc/app/builtin-prelude/Main.hs"
   ],
-  "builtin_interface": "mlf-primitive/shared-haskell-v1/9"
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/10"
 }

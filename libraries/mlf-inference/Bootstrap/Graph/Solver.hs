@@ -6,7 +6,6 @@ module Bootstrap.Graph.Solver where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
-  import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Graph as G;
@@ -51,44 +50,27 @@ module Bootstrap.Graph.Solver where {
     mkSolver graph parents descendants scopes;
   insertIndex :: Int -> Int -> IntMap IntSet -> IntMap IntSet;
   insertIndex key value (IntMap tree) = IM.wrap (insertIndexTree key value tree);
-  -- Find and update the reverse edge in one map traversal. Force each changed
-  -- set root as before, while preserving unrelated lazy values and balancing.
-  insertIndexTree :: Int -> Int -> Map Int IntSet -> Map Int IntSet;
+  -- One Patricia traversal updates a reverse edge. Changed set roots remain
+  -- strict, while unrelated map values retain their existing laziness.
+  insertIndexTree :: Int -> Int -> IntMapTree IntSet -> IntMapTree IntSet;
   insertIndexTree key value tree =
-    case tree of {
-      MapEmpty ->
-        let {
-          updated = IS.singleton value
-        } in
-        seq (forceIntSet updated) (M.singleton key updated);
-      MapNode count oldKey oldValue left right ->
-        if (key < oldKey)
-        then M.balance oldKey oldValue (insertIndexTree key value left) right
-        else if (key > oldKey)
-             then M.balance oldKey oldValue left (insertIndexTree key value right)
-             else let {
-                    updated = IS.insert value oldValue
-                  } in
-                  seq (forceIntSet updated) (M.node count key updated left right)
-    };
+    IM.alterTree
+      (\previous ->
+        let { updated = case previous of {
+          Nothing -> IS.singleton value;
+          Just old -> IS.insert value old
+        } } in
+        seq (forceIntSet updated) (Just updated)) key tree;
   removeIndex :: Int -> Int -> IntMap IntSet -> IntMap IntSet;
   removeIndex key value (IntMap tree) = IM.wrap (removeIndexTree key value tree);
-  removeIndexTree :: Int -> Int -> Map Int IntSet -> Map Int IntSet;
+  removeIndexTree :: Int -> Int -> IntMapTree IntSet -> IntMapTree IntSet;
   removeIndexTree key value tree =
-    case tree of {
-      MapEmpty -> MapEmpty;
-      MapNode count oldKey oldValue left right ->
-        if (key < oldKey)
-        then M.balance oldKey oldValue (removeIndexTree key value left) right
-        else if (key > oldKey)
-             then M.balance oldKey oldValue left (removeIndexTree key value right)
-             else let {
-                    remaining = IS.delete value oldValue
-                  } in
-                  if (IS.size remaining == 0)
-                  then M.glue left right
-                  else M.node count key remaining left right
-    };
+    IM.alterTree
+      (\previous -> case previous of {
+        Nothing -> Nothing;
+        Just old -> let { remaining = IS.delete value old } in
+          if IS.size remaining == 0 then Nothing else Just remaining
+      }) key tree;
   addNode :: Solver -> (,) Int Node -> Solver;
   addNode (Solver graph parents descendants scopes) ((,) n v) =
     mkSolver graph
@@ -115,7 +97,7 @@ module Bootstrap.Graph.Solver where {
       (,) end final -> G.strictPair end (IM.insert n (G.strictPair start end) final)
     };
   scopeLevels :: Int -> Int;
-  scopeLevels count = if (count <= 1) then 1 else (1 + scopeLevels (quotInt (count + 1) 2));
+  scopeLevels count = if (count <= 1) then 1 else (1 + scopeLevels (quotInt count 2 + remInt count 2));
   scopeJumps :: Int -> IntMap Int -> [] (IntMap Int);
   scopeJumps count parents =
     if (count <= 0)
@@ -670,20 +652,21 @@ module Bootstrap.Graph.Solver where {
   -- The ordered component set already stores subtree cardinalities. Its ranks
   -- and selection are the two inverse compact renamings; avoid constructing two
   -- more persistent maps for every local unification. Identities remain Int.
-  rankIdentity :: forall a. Int -> Int -> Map Int a -> Int;
+  rankIdentity :: forall a. Int -> Int -> IntMapTree a -> Int;
   rankIdentity wanted offset tree =
-    case tree of {
-      MapEmpty -> panic "map key not found";
-      MapNode count key value left right ->
-        if (wanted < key)
-        then rankIdentity wanted offset left
-        else if (wanted > key)
-             then rankIdentity wanted ((offset + M.size left) + 1) right
-             else (offset + M.size left)
+    case IM.lookupIndexTree wanted offset tree of {
+      Nothing -> panic "map key not found";
+      Just position -> position
+    };
+  rankSetIdentity :: Int -> IntSetTree -> Int;
+  rankSetIdentity wanted tree =
+    case IS.lookupIndexTree wanted 0 tree of {
+      Nothing -> panic "map key not found";
+      Just position -> position
     };
   compactIdentity :: Graph -> IntSet -> Int -> Int;
   compactIdentity graph (IntSet selected) original =
-    rankIdentity (G.resolve graph original) 0 selected;
+    rankSetIdentity (G.resolve graph original) selected;
   projectedBinder :: Graph -> IntSet -> IntMap (Maybe Int) -> Int -> Node -> Maybe Int;
   projectedBinder graph forward scopes n node =
     G.mapMaybeInt (compactIdentity graph forward)
@@ -712,8 +695,8 @@ module Bootstrap.Graph.Solver where {
           (projectNodes graph selected scopes stubs (position + 1) rest)
     };
   compactCanonical :: IntSet -> Int -> Int;
-  compactCanonical (IntSet selected) identity = rankIdentity identity 0 selected;
-  localCanonicalNode :: Map Int Node -> IntMap (Maybe Int) -> IntMap Int -> Int -> Node -> Node;
+  compactCanonical (IntSet selected) identity = rankSetIdentity identity selected;
+  localCanonicalNode :: IntMapTree Node -> IntMap (Maybe Int) -> IntMap Int -> Int -> Node -> Node;
   localCanonicalNode forward scopes stubs n node =
     G.mkNode
       (case IM.lookup n stubs of {
@@ -723,7 +706,7 @@ module Bootstrap.Graph.Solver where {
       (G.mapMaybeInt (\n -> rankIdentity n 0 forward)
          (if G.isGen (G.tag node) then IM.get n scopes else G.binder node))
       (G.flag node);
-  projectCanonicalNodes :: Map Int Node ->
+  projectCanonicalNodes :: IntMapTree Node ->
                            IntMap (Maybe Int) ->
                            IntMap Int -> Int -> [] ((,) Int Node) -> [] ((,) Int Node);
   projectCanonicalNodes selected scopes stubs position originals =
@@ -739,22 +722,18 @@ module Bootstrap.Graph.Solver where {
       Nothing -> False;
       Just other -> G.equalNode node other
     };
-  selectIdentity :: forall a. Int -> Map Int a -> Either String Int;
+  selectIdentity :: forall a. Int -> IntMapTree a -> Either String Int;
   selectIdentity position tree =
-    case tree of {
-      MapEmpty -> Left "scope placeholder escaped local unification";
-      MapNode count key value left right ->
-        let {
-          before = M.size left
-        } in
-        if (position < before)
-        then selectIdentity position left
-        else if (position > before)
-             then selectIdentity ((position - before) - 1) right
-             else Right key
+    case IM.elemAtTree position tree of {
+      Nothing -> Left "scope placeholder escaped local unification";
+      Just ((,) key value) -> Right key
     };
   originalIdentity :: IntSet -> Int -> Either String Int;
-  originalIdentity (IntSet selected) n = selectIdentity n selected;
+  originalIdentity (IntSet selected) n =
+    case IS.elemAtTree n selected of {
+      Nothing -> Left "scope placeholder escaped local unification";
+      Just key -> Right key
+    };
   traverseTag :: (Int -> Either String Int) -> GTag -> Either String GTag;
   traverseTag action t =
     case t of {
@@ -767,17 +746,19 @@ module Bootstrap.Graph.Solver where {
   restoreNode :: Graph -> Graph -> IntSet -> (,) Int Node -> Either String ((,) Int Node);
   restoreNode old withAliases backward ((,) n node) =
     G.bindE (originalIdentity backward n)
-      (\original ->
-         case backward of {
-           IntSet tree -> restoreKnownNode withAliases tree original (G.nodeAt old original) node
-         });
+      (\original -> restoreKnownUsing withAliases (originalIdentity backward)
+        original (G.nodeAt old original) node);
   restoreKnownNode :: forall a. Graph ->
-                                Map Int a -> Int -> Node -> Node -> Either String ((,) Int Node);
+                                IntMapTree a -> Int -> Node -> Node -> Either String ((,) Int Node);
   restoreKnownNode withAliases backward original previous node =
+    restoreKnownUsing withAliases (\n -> selectIdentity n backward) original previous node;
+  restoreKnownUsing :: Graph -> (Int -> Either String Int) ->
+                       Int -> Node -> Node -> Either String ((,) Int Node);
+  restoreKnownUsing withAliases restore original previous node =
     G.bindE
       (case G.tag previous of {
          GGen root -> Right (GGen (G.resolve withAliases root));
-         _ -> traverseTag (\n -> selectIdentity n backward) (G.tag node)
+         _ -> traverseTag restore (G.tag node)
        })
       (\restoredTag ->
          G.bindE
@@ -785,7 +766,7 @@ module Bootstrap.Graph.Solver where {
             then Right (G.binder previous)
             else case G.binder node of {
                    Nothing -> Right Nothing;
-                   Just b -> G.bindE (selectIdentity b backward) (\parent -> Right (Just parent))
+                   Just b -> G.bindE (restore b) (\parent -> Right (Just parent))
                  })
            (\restoredBinder ->
               Right ((,) original (G.mkNode restoredTag restoredBinder (G.flag node)))));
@@ -793,7 +774,7 @@ module Bootstrap.Graph.Solver where {
   -- skip deleted positions and reuse the saved identity and original node. Field
   -- identities still use the checked inverse, and Gen roots still resolve aliases.
   restoreProjectedNodes :: forall a. Graph ->
-                                     Map Int a ->
+                                     IntMapTree a ->
                                      Int ->
                                      [] ((,) Int Node) ->
                                      [] ((,) Int Node) -> Either String ([] ((,) Int Node));
@@ -816,13 +797,13 @@ module Bootstrap.Graph.Solver where {
                              (\following -> Right ((:) restored following)))
         }
     };
-  restoreAliases :: forall a. Map Int a -> (,) Int Int -> Either String ((,) Int Int);
+  restoreAliases :: forall a. IntMapTree a -> (,) Int Int -> Either String ((,) Int Int);
   restoreAliases backward ((,) a b) =
     G.bindE (selectIdentity a backward)
       (\left -> G.bindE (selectIdentity b backward) (\right -> Right ((,) left right)));
   checkPreservedScope :: Graph ->
                          Graph ->
-                         Map Int Node -> IntMap (Maybe Int) -> (,) Int Node -> Either String ();
+                         IntMapTree Node -> IntMap (Maybe Int) -> (,) Int Node -> Either String ();
   checkPreservedScope original solved forward scopes ((,) n node) =
     if L.not (G.isGen (G.tag node))
     then Right ()
@@ -939,7 +920,7 @@ module Bootstrap.Graph.Solver where {
         }
     };
   restoreProjection :: Solver ->
-                       [] ((,) Int Node) -> Map Int Node -> Int -> Graph -> Either String Solver;
+                       [] ((,) Int Node) -> IntMapTree Node -> Int -> Graph -> Either String Solver;
   -- Compact identities and their inverse both preserve ascending order.
   restoreProjection solver originals backward count solved =
     G.bindE (G.mapE (restoreAliases backward) (IM.toList (G.links solved)))
@@ -1700,12 +1681,15 @@ module Bootstrap.Graph.Solver where {
                                 count = L.length descendants
                               } in
                               let {
+                                freshLimit = L.advanceIdentity (G.nextId current) count
+                              } in
+                              let {
                                 copies =
                                   IM.insert root target
                                     (IM.fromDistinctAscList
                                        (L.zip descendants
                                           (L.range (G.nextId current)
-                                             ((G.nextId current + count) - 1))))
+                                             (freshLimit - 1))))
                               } in
                               let {
                                 image = \n -> IM.get (G.resolve current n) copies
@@ -1733,7 +1717,7 @@ module Bootstrap.Graph.Solver where {
                                        (IM.union (G.nodesFromDistinctAscList fresh)
                                           (G.nodes current)))
                                     (G.links current)
-                                    (G.nextId current + count)
+                                    freshLimit
                               } in
                               let {
                                 indexed =
@@ -2008,18 +1992,18 @@ module Bootstrap.Graph.Solver where {
     L.concatMap
       (\((,) identity node) -> L.filter (\n -> n < first)
         (L.append (G.children (G.tag node)) (L.maybeToList (G.binder node)))) fresh;
-  expandedCompact :: Int -> Int -> Map Int Node -> Int -> Int;
+  expandedCompact :: Int -> Int -> IntMapTree Node -> Int -> Int;
   expandedCompact first stop oldSelected identity =
     if identity < first then rankIdentity identity 0 oldSelected
-    else if identity < stop then M.size oldSelected + (identity - first)
+    else if identity < stop then IM.sizeTree oldSelected + (identity - first)
     else panic "map key not found";
-  expandedOriginal :: Int -> Int -> Map Int Node -> Int -> Either String Int;
+  expandedOriginal :: Int -> Int -> IntMapTree Node -> Int -> Either String Int;
   expandedOriginal first count oldSelected position =
-    let { oldCount = M.size oldSelected } in
+    let { oldCount = IM.sizeTree oldSelected } in
     if position < oldCount then selectIdentity position oldSelected
     else if position < count then Right (first + (position - oldCount))
     else Left "scope placeholder escaped local unification";
-  projectExpandedNodes :: Int -> Int -> Map Int Node -> IntMap (Maybe Int) -> IntMap Int ->
+  projectExpandedNodes :: Int -> Int -> IntMapTree Node -> IntMap (Maybe Int) -> IntMap Int ->
                           Int -> [] ((,) Int Node) -> [] ((,) Int Node);
   projectExpandedNodes first stop selected scopes stubs position originals =
     case originals of {
@@ -2043,7 +2027,7 @@ module Bootstrap.Graph.Solver where {
                                 [] ((,) Int Int) ->
                                 Either String
                                   ((,,,) Graph ([] ((,) Int Int)) ([] ((,) Int Node))
-                                    ((,,) (Map Int Node) (IntMap (Maybe Int)) (IntMap Int)));
+                                    ((,,) (IntMapTree Node) (IntMap (Maybe Int)) (IntMap Int)));
   preparedFallbackProjection solver current first fresh equations =
     G.bindE
       (componentCanonicalNodesVisit solver IM.empty IS.empty
@@ -2113,7 +2097,7 @@ module Bootstrap.Graph.Solver where {
       }
     };
   restoreExpandedProjection :: Solver -> Graph -> Int -> [] ((,) Int Node) ->
-                               Map Int Node -> Int -> Graph -> Either String Solver;
+                               IntMapTree Node -> Int -> Graph -> Either String Solver;
   restoreExpandedProjection solver originalGraph first originals oldSelected count solved =
     let { backward = expandedOriginal first count oldSelected } in
     G.bindE

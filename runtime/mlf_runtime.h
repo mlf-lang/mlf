@@ -9,10 +9,10 @@
  * byte 8, packed fields at byte 16, wide fields at byte 24 and environment
  * slots at byte 8. The runtime requires GMP and BDWGC. Old standard-layout
  * LLVM/object files must be regenerated; their ABI guard is not exported. */
-/* Boundary v3: true unit is constructor tag1, tuple arities2..64, source
- * stack frames7/evidence8. No earlier ABI guard is exported: old generated
+/* Boundary v4: signed Int64 payloads, explicit GMP Integer, true unit tag1,
+ * tuple arities2..64, and source stack frames7/evidence8. No earlier ABI guard is exported: old generated
  * objects must use their frozen old runtime, not silently cross this boundary. */
-void mlf_require_haskell_boundary_v3_abi(void);
+void mlf_require_haskell_boundary_v4_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;

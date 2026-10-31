@@ -71,9 +71,9 @@ const finiteGate = `      - name: Check finite P1-P3, A1 and F1 correctness
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/crate-optimizations/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/a1-private-index/check_integrated.py --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/f1-integrated-guard python3 -B tools/performance/fingerprint-fusion/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/f1-integrated-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/patricia/run_integrated.py --suite p123 --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/patricia/run_integrated.py --suite graph --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/f1-integrated-guard python3 -B tools/performance/patricia/run_fingerprint.py --producer .mlf-build/shared-ghc --output .mlf-build/f1-integrated-controls
 `;
 const verifyFiniteGate = workflow => {
   assert.ok(workflow.includes(finiteGate), 'Current-source P1-P3/A1/F1 gate, bounds and failure propagation must remain exact');
@@ -84,22 +84,17 @@ const verifyFiniteGate = workflow => {
     }
   }
 };
-// C4 runs only its finite current-producer graph gate in CI. The local full
-// two-producer nine-file/544-fresh qualifications are separately documented.
-const c4Gate = `      - name: Check C4 prepared-transaction graph controls
-        if: matrix.optimization == '2'
-        run: |
-          set -euo pipefail
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/c4-focused-guard python3 -B tools/performance/c4-local-transaction/run_controls.py --focused-only --source-candidate "$PWD" --producer-candidate .mlf-build/shared-ghc --output "$RUNNER_TEMP/c4-focused-controls"
-`;
+// C4's full retained graph/transaction controls now run in the explicit ABI
+// adapter's graph suite inside this finite gate. Preserve its evidence too.
+const c4Gate = finiteGate;
 const verifyC4Gate = workflow => {
   assert.ok(workflow.includes(c4Gate), 'Exact O2 C4 graph gate with unchanged resource bounds');
   for (const artifact of [
-    '.mlf-build/c4-focused-guard/',
-    '${{ runner.temp }}/c4-focused-controls/**/*.json',
-    '${{ runner.temp }}/c4-focused-controls/**/stdout',
-    '${{ runner.temp }}/c4-focused-controls/**/stderr',
-    '${{ runner.temp }}/c4-focused-controls/**/*.hs',
+    '.mlf-build/a1-integrated-guard/',
+    '.mlf-build/a1-integrated-controls/**/*.json',
+    '.mlf-build/a1-integrated-controls/**/stdout',
+    '.mlf-build/a1-integrated-controls/**/stderr',
+    '.mlf-build/a1-integrated-controls/**/*.hs',
   ]) assert.ok(workflow.includes('            ' + artifact + '\n'), 'C4 failure/evidence preservation: ' + artifact);
 };
 verifyC4Gate(ciJob('native'));
@@ -107,7 +102,17 @@ assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, '')));
 assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace("if: matrix.optimization == '2'", 'if: false'))));
 assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('--rss-mib 5120', '--rss-mib 99999'))));
 assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('set -euo pipefail', 'set +e'))));
-assert.throws(() => verifyC4Gate(ciJob('native').replace('${{ runner.temp }}/c4-focused-controls/**/stderr', 'discarded')));
+assert.throws(() => verifyC4Gate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/stderr', 'discarded')));
+const verifyNumericEvidence = workflow => {
+  for (const root of ['patricia-*', 'int64-*', 'llp64-*']) {
+    for (const suffix of ['**/*.json', '**/stdout', '**/stderr', '**/*.hs']) {
+      assert.ok(workflow.includes(`            .mlf-build/${root}/${suffix}\n`),
+        `Keep numeric/collection failure evidence: ${root}/${suffix}`);
+    }
+  }
+};
+verifyNumericEvidence(ciJob('native'));
+assert.throws(() => verifyNumericEvidence(ciJob('native').replace('.mlf-build/llp64-*/**/stderr', 'discarded')));
 
 verifyFiniteGate(ciJob('native'));
 assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, '')));

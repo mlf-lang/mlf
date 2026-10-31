@@ -20,6 +20,7 @@ module Bootstrap.Runtime where {
     RRecursive (Map XName (Either String RValue)) REnv;
   data RValue =
     RInteger Int |
+    RBigInteger Integer |
     RDouble Double |
     RBoolean Bool |
     RString String |
@@ -56,6 +57,7 @@ module Bootstrap.Runtime where {
   forceValue value =
     case value of {
       RInteger n -> seq n value;
+      RBigInteger n -> seq n value;
       RDouble n -> seq n value;
       RBoolean b -> seq b value;
       RString text -> seq text value;
@@ -285,6 +287,11 @@ module Bootstrap.Runtime where {
            RInteger n -> Right n;
            _ -> Left "runtime primitive expected Int"
          });
+  bigInteger :: Either String RValue -> Either String Integer;
+  bigInteger thunk = bindEither thunk (\value -> case value of {
+    RBigInteger n -> Right n;
+    _ -> Left "runtime primitive expected Integer"
+  });
   floating :: Either String RValue -> Either String Double;
   floating thunk =
     bindEither thunk
@@ -530,13 +537,32 @@ module Bootstrap.Runtime where {
       y <- floating b;
       Right (RBoolean (f x y))
     };
-  divide f a b =
+  divide overflow f a b =
     do {
       x <- integer a;
       y <- integer b;
       ensure (y /= 0) "integer division by zero";
+      ensure (not overflow || x /= (-9223372036854775808) || y /= (-1)) "integer division overflow";
       Right (RInteger (f x y))
     };
+  integerShift f a b = do {
+    x <- integer a; y <- integer b;
+    ensure (y >= 0) "integer shift overflow";
+    Right (RInteger (f x y))
+  };
+  bigInteger2 f a b = do {
+    x <- bigInteger a; y <- bigInteger b;
+    Right (RBigInteger (f x y))
+  };
+  bigIntegerCompare f a b = do {
+    x <- bigInteger a; y <- bigInteger b;
+    Right (RBoolean (f x y))
+  };
+  bigIntegerDivide f a b = do {
+    x <- bigInteger a; y <- bigInteger b;
+    ensure (not (eqInteger y (intToInteger 0))) "integer division by zero";
+    Right (RBigInteger (f x y))
+  };
   isAction primitive =
     let {
       n = P.primitiveCode primitive
@@ -610,14 +636,36 @@ module Bootstrap.Runtime where {
       PSubInt -> integer2 subInt a b;
       PMulInt -> integer2 mulInt a b;
       PAndInt -> integer2 andInt a b;
-      PQuotInt -> divide quotInt a b;
-      PRemInt -> divide remInt a b;
+      POrInt -> integer2 orInt a b;
+      PXorInt -> integer2 xorInt a b;
+      PShiftLInt -> integerShift shiftLInt a b;
+      PShiftRInt -> integerShift shiftRInt a b;
+      PUnsignedShiftRInt -> integerShift unsignedShiftRInt a b;
+      PCountLeadingZerosInt -> mapEither (\n -> RInteger (countLeadingZerosInt n)) (integer a);
+      PCountTrailingZerosInt -> mapEither (\n -> RInteger (countTrailingZerosInt n)) (integer a);
+      PPopCountInt -> mapEither (\n -> RInteger (popCountInt n)) (integer a);
+      PIntToInteger -> mapEither (\n -> RBigInteger (intToInteger n)) (integer a);
+      PIntegerToInt -> mapEither (\n -> RInteger (integerToInt n)) (bigInteger a);
+      PAddInteger -> bigInteger2 addInteger a b;
+      PSubInteger -> bigInteger2 subInteger a b;
+      PMulInteger -> bigInteger2 mulInteger a b;
+      PQuotInteger -> bigIntegerDivide quotInteger a b;
+      PRemInteger -> bigIntegerDivide remInteger a b;
+      PEqInteger -> bigIntegerCompare eqInteger a b;
+      PLtInteger -> bigIntegerCompare ltInteger a b;
+      PShowInteger -> mapEither (\n -> RString (showInteger n)) (bigInteger a);
+      PReadInteger -> bindEither (string a) (\s ->
+        if validInteger s then Right (RBigInteger (readInteger s)) else Left "invalid integer input");
+      PIntegerToDouble -> mapEither (\n -> RDouble (integerToDouble n)) (bigInteger a);
+      PQuotInt -> divide True quotInt a b;
+      PRemInt -> divide False remInt a b;
       PReadInt ->
         bindEither (string a)
           (\s ->
              if validInteger s then Right (RInteger (readInt s)) else Left "invalid integer input");
       PEqInt -> intCompare eqInt a b;
       PLtInt -> intCompare ltInt a b;
+      PUnsignedLtInt -> intCompare unsignedLtInt a b;
       PAddDouble -> double2 addDouble a b;
       PSubDouble -> double2 subDouble a b;
       PMulDouble -> double2 mulDouble a b;
@@ -680,7 +728,6 @@ module Bootstrap.Runtime where {
       PDoubleFromBits ->
         do {
           n <- integer a;
-          ensure ((n >= 0) && (n <= 18446744073709551615)) "Double bit pattern out of bounds";
           Right (RDouble (doubleFromBits n))
         };
       PSeq -> bindEither a (\value -> seq (forceValue value) b);

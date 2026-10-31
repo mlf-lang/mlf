@@ -163,6 +163,7 @@ mkdir -p "$bundle/evidence/campaign-runner"
 cp "$producer" "$bundle/evidence/campaign-runner/build-report.json"
 cp "$package_artifact/candidate-manifest.json" "$bundle/evidence/candidate-manifest.json"
 cp runtime/khash.h "$bundle/licenses/khash.h"
+cp tools/release/licenses/containers-0.8.1.txt "$bundle/licenses/containers-0.8.1.txt"
 for group in $groups; do
   mkdir -p "$bundle/evidence/$group"
   cp "$build/compiler-tests/$group/verification.json" "$bundle/evidence/$group/"
@@ -234,7 +235,7 @@ absolute paths in those reports identify the
 validation run; they are not runtime dependencies. The raw native executables
 are unchanged from validation; installed shell launchers add --version support.
 
-MLF sources use BSD-3-Clause; bundled khash and BDWGC notices are in licenses/.
+MLF sources use BSD-3-Clause; bundled containers, khash and BDWGC notices are in licenses/.
 GMP is a separately installed dependency under its own license.
 README
 # CHECKSUMS is explicitly excluded from the input list.

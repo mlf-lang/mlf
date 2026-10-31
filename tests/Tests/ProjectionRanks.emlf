@@ -28,10 +28,10 @@ ranks : IO ()
 ranks = do
  -- Empty has no identity renaming or distinct filtered-set variant.
  checkRanks 0 0 1
- L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (checkRanks count offset) ((:) 1 ((:) 17 []))) ((:) 0 ((:) (-10000) ((:) 1000000000000000000000000000000000000000000000000000000000000001 [])))) ((:) 1 ((:) 2 ((:) 3 ((:) 5 ((:) 17 [])))))
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (checkRanks count offset) ((:) 1 ((:) 17 []))) ((:) 0 ((:) (-10000) ((:) 1152921504606846976 [])))) ((:) 1 ((:) 2 ((:) 3 ((:) 5 ((:) 17 [])))))
  checkRanks 65 0 1
  checkRanks 257 0 1
- checkRanks 257 1000000000000000000000000000000000000000000000000000000000000001 17
+ checkRanks 257 1152921504606846976 17
 
 
 

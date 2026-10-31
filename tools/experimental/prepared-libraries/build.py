@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import runpy
 import subprocess
 import time
 
@@ -95,8 +96,11 @@ def main() -> None:
                 if sha(Path(artifact[field + "_path"])) != artifact[field + "_sha256"]:
                     raise ValueError("generated artifact digest mismatch")
         canonical = snapshot / "bootstrap/MLF/PreparedLibraryData.hs"
-        canonical.write_bytes(generated.read_bytes())
-        expected[str(canonical)] = product["generated_sha256"]
+        pool = runpy.run_path(str(snapshot / "tools/shared/pool_generated_strings.py"))["pool"]
+        pooled, proof = pool(generated.read_bytes().decode("utf-8"))
+        canonical.write_bytes(pooled.encode("utf-8"))
+        expected[str(canonical)] = proof["pooled_sha256"]
+        receipt["canonical_string_pool"] = proof
         receipt["generated_product"] = product
         receipt["canonical_snapshot_registry"] = str(canonical)
         receipt["generator"] = {"path": str(generator), "sha256": sha(generator)}

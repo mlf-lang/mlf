@@ -1,10 +1,11 @@
 -- Sequential unbounded spigot: both extract(3) and extract(4) are evaluated.
--- Arithmetic is implemented by language primitives, not a foreign pi helper.
+-- Explicit Integer retains the unbounded arithmetic; loop counters use Int64.
+-- Arithmetic uses language primitives, not a foreign pi helper.
 
 spaces : Int -> String
 spaces n = if n == 0 then "" else " " ++ spaces (n - 1)
 
-digits : Int -> Int -> Int -> Int -> Int -> Int -> String -> IO ()
+digits : Int -> Int -> Int -> Integer -> Integer -> Integer -> String -> IO ()
 digits wanted produced k num acc den row =
   if produced == wanted then
     if produced % 10 == 0 then return ()
@@ -13,23 +14,23 @@ digits wanted produced k num acc den row =
     let
       nextK = k + 1
       twice = nextK * 2 + 1
-      n = num * nextK
-      a = (acc + num * 2) * twice
-      d = den * twice
-    in if a < n then digits wanted produced nextK n a d row
+      n = mulInteger num (intToInteger nextK)
+      a = mulInteger (addInteger acc (mulInteger num (intToInteger 2))) (intToInteger twice)
+      d = mulInteger den (intToInteger twice)
+    in if ltInteger a n then digits wanted produced nextK n a d row
     else
       let
-        q = (n * 3 + a) / d
-        r = (n * 4 + a) / d
-      in if q == r then
+        q = quotInteger (addInteger (mulInteger n (intToInteger 3)) a) d
+        r = quotInteger (addInteger (mulInteger n (intToInteger 4)) a) d
+      in if eqInteger q r then
         let
           count = produced + 1
-          text = row ++ showInt q
+          text = row ++ showInteger q
         in do
           if count % 10 == 0 then putStrLn (text ++ "\t:" ++ showInt count) else return ()
-          digits wanted count nextK (n * 10) ((a - d * q) * 10) d (if count % 10 == 0 then "" else text)
+          digits wanted count nextK (mulInteger n (intToInteger 10)) (mulInteger (subInteger a (mulInteger d q)) (intToInteger 10)) d (if count % 10 == 0 then "" else text)
       else digits wanted produced nextK n a d row
 
 main = do
   input <- getLine
-  digits (readInt input) 0 0 1 0 1 ""
+  digits (readInt input) 0 0 (intToInteger 1) (intToInteger 0) (intToInteger 1) ""

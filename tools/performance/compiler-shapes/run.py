@@ -25,7 +25,7 @@ def main():
     hp=ROOT/'tools/performance/a1-private-index/helper.py'
     H=types.ModuleType('unchanged_resource_helper');H.__file__=str(hp);exec(compile(hp.read_bytes(),str(hp),'exec'),H.__dict__)
     setup=H.load(args.setup.resolve()); H.require(setup['complete'],'qualified fixed dependencies')
-    auth=H.authenticate(Path(setup['producer']),ROOT)
+    auth=H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))
     sizes=args.size or ((8,) if args.pilot else (8,32,128))
     H.require(all(0<n<=1024 for n in sizes),'bounded positive sizes')
     cases=G.generate(out/'sources',sizes=sizes,families=args.family)
@@ -108,7 +108,7 @@ def main():
                     H.save(leg/'query-cache-inventory.json',{str(p.relative_to(query)):{'bytes':p.stat().st_size,'sha256':H.sha(p)} for p in sorted(query.rglob('*')) if p.is_file()})
                     shutil.rmtree(query)
         H.check_pins(inputs)
-        H.require(H.authenticate(Path(setup['producer']),ROOT)==auth,'ordinary producer unchanged')
+        H.require(H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))==auth,'ordinary producer unchanged')
     record.update(complete=True,all_cases_passed=not blocked,failed_cases=sorted(blocked));save()
     print('Completed; failures retained:',len(record['failures']),flush=True)
 

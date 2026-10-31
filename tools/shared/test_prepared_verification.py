@@ -34,6 +34,9 @@ class VerificationTests(unittest.TestCase):
         self.data = self.root / V.DATA
         self.data.parent.mkdir(parents=True)
         self.data.write_bytes(b'generated registry')
+        pool_helper = self.root / 'tools/shared/pool_generated_strings.py'
+        pool_helper.parent.mkdir(parents=True)
+        pool_helper.write_bytes((HERE / 'pool_generated_strings.py').read_bytes())
         dump(self.root / 'shared-sources.json', {'primitive_abi': 'mlf-primitive-108-v5', 'frontend_semantics': 'semantics', 'builtin_interface': 'builtin', 'source_roots': ['libraries']})
         (self.root / 'library.hs').write_bytes(b'raw\r\nsource')
         pins = {}
@@ -97,6 +100,53 @@ class VerificationTests(unittest.TestCase):
         V.authenticate(record, self.root)
         with self.assertRaises(ValueError):
             V.authenticate(None, self.root)
+
+    def install_pooled_fixture(self):
+        pooler = load('pool_generated_strings.py')
+        raw = pooler.PROFILE + pooler.MODULE + '\nlibraries = ["x", "x"];\n}\n'
+        pooled, proof = pooler.pool(raw)
+        first = V.read(self.job / 'build/receipt.json')
+        product = first['generated_product']
+        generated = Path(product['generated_source'])
+        generated.write_bytes(raw.encode('utf-8'))
+        self.data.write_bytes(pooled.encode('utf-8'))
+        product['generated_sha256'] = V.sha(generated)
+        first['canonical_string_pool'] = proof
+        second = V.read(self.job / 'regeneration/receipt.json')
+        second['inputs'][str(self.data)] = V.sha(self.data)
+        backup = second['first_outputs'][str(generated)]
+        Path(backup['path']).write_bytes(generated.read_bytes())
+        backup['sha256'] = V.sha(generated)
+        for row in second['comparisons']:
+            if row['path'] == str(generated):
+                row['first_sha256'] = row['second_sha256'] = V.sha(generated)
+        for name, record in [('build/receipt.json', first), ('artifacts/generation.json', product),
+                             ('regeneration/receipt.json', second)]:
+            dump(self.job / name, record)
+        return generated, Path(backup['path'])
+
+    def test_pooled_registry_preserves_raw_regeneration_contract(self):
+        generated, backup = self.install_pooled_fixture()
+        V.verify(self.root)
+        self.assertEqual(generated.read_bytes(), backup.read_bytes())
+        self.assertNotEqual(generated.read_bytes(), self.data.read_bytes())
+        backup.write_bytes(self.data.read_bytes())
+        with self.assertRaises(ValueError):
+            V.verify(self.root)
+
+    def test_pooled_registry_and_proof_mutations_rejected(self):
+        self.install_pooled_fixture()
+        original = self.data.read_bytes()
+        self.data.write_bytes(original.replace(b'= "x"', b'= "y"'))
+        with self.assertRaises(ValueError):
+            V.verify(self.root)
+        self.data.write_bytes(original)
+        path = self.job / 'build/receipt.json'
+        first = V.read(path)
+        first['canonical_string_pool']['references'] += 1
+        dump(path, first)
+        with self.assertRaises(ValueError):
+            V.verify(self.root)
 
     def test_nongenerated_source_mutation(self):
         (self.root / 'library.hs').write_bytes(b'normalized\nsource')

@@ -9,6 +9,7 @@ static MlfValue *text(const char *s) { return mlf_string(s,strlen(s)); }
 static int eq(MlfValue *s, const char *expected) {
     return s->as.string.length==strlen(expected) && !memcmp(s->as.string.bytes,expected,strlen(expected));
 }
+#include "numeric_width_contract.h"
 static MlfValue *packed(const char **fields) {
     char data[32768]; size_t n=0;
     for (;*fields;++fields) {
@@ -94,12 +95,7 @@ int main(int argc, char **argv) {
         require(CreateProcessW(NULL,line,NULL,NULL,FALSE,CREATE_NO_WINDOW,NULL,NULL,&startup,&child),"spawn descendant");
         free(line); CloseHandle(child.hThread); CloseHandle(child.hProcess); Sleep(30000); return 0;
     }
-    require(eq(show_integer(mlf_add_int(mlf_integer("4294967296"),mlf_integer("4611686018427387903"))),"4611686022722355199"),"64-bit tagged/big addition");
-    require(eq(show_integer(mlf_sub_int(mlf_integer("-4611686018427387904"),mlf_integer("4294967296"))),"-4611686022722355200"),"64-bit tagged/big subtraction");
-    require(eq(show_integer(integer_extended(MUL_INT,mlf_integer("4294967296"),mlf_integer("4294967296"))),"18446744073709551616"),"64-bit multiplication");
-    require(integer_compare(mlf_integer("4294967296"),mlf_integer("18446744073709551616"))<0,"wide comparison");
-    require(bounded_integer(mlf_integer("18446744073709551615"),UINT64_MAX,"wide bound")==UINT64_MAX,"64-bit unsigned conversion");
-    require(eq(show_integer(double_to_bits(mlf_double(-1.0))),"13830554455654793216"),"double bit conversion");
+    check_numeric_widths();
     const char *unicode="windows-runtime-\xce\xbb data.txt";
     write_file(text(unicode),text("abc"));
     require(eq(read_file(text(unicode)),"abc"),"UTF-8 file roundtrip");

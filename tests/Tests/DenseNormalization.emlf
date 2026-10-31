@@ -66,5 +66,5 @@ normalization = do
   let actual = G.normalize graph
   _ <- H.right (G.validateGraph actual)
   H.assert (H.eq actual expected && H.eq (G.normalize actual) actual) "normalization changed flags, identities, structure, aliases or binders")
-  ((:) 0 ((:) 340282366920938463463374607431768211456 ((:) (-340282366920938463463374607431768211456) []))))
+  ((:) 0 ((:) 1152921504606846976 ((:) (-1152921504606846976) []))))
   ((:) 1 ((:) 100003 []))) (S.range 0 31)

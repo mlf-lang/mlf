@@ -1,0 +1,20 @@
+{
+  "upstream": "containers",
+  "version": "0.8.1",
+  "archive_url": "https://hackage-content.haskell.org/package/containers-0.8.1/containers-0.8.1.tar.gz",
+  "archive_sha256": "9bd0f5156306b04a799c32ff49a6129f7c8dd6ec96c6ddeb7885975ffffc9e99",
+  "source_sha256": {
+    "src/Data/IntMap/Internal.hs": "d971060df57d8621112d3c2891424d17ca4dc601310cf73b66cd8efd33c84c1a",
+    "src/Data/IntSet/Internal.hs": "ded71a1c8db8467dda3bdbc50dcdcc358da4c483e54c8516e402f4b542528bcb",
+    "src/Data/IntSet/Internal/IntTreeCommons.hs": "f3ce85bf19f6f48baa7a8cb61fe4a477582b65d76cd173baadc969019e187150",
+    "LICENSE": "7904b49880da042ab0e3125ef4da8ba2322b7b5e13de13bc6a322e5e2670bc5c"
+  },
+  "adaptations": [
+    "shared Haskell subset and fixed Int64 bit primitives",
+    "cached cardinalities preserve existing constant-time size and rank/select",
+    "lazy IntMap payloads and existing public operation names",
+    "64-bit bitmap IntSet leaves",
+    "compiler graph-node demand and reverse-index update adapters"
+  ],
+  "performance_status": "unmeasured candidate"
+}

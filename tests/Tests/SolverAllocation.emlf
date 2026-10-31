@@ -21,7 +21,7 @@ checkBuilder count offset = do
 builders : IO ()
 builders = do
  checkBuilder 0 0
- S.mapM_ (\count -> S.mapM_ (checkBuilder count) ((:) (-340282366920938463463374607431768211456) ((:) 0 ((:) 340282366920938463463374607431768211456 [])))) ((:) 1 ((:) 2 ((:) 3 ((:) 17 []))))
+ S.mapM_ (\count -> S.mapM_ (checkBuilder count) ((:) (-1152921504606846976) ((:) 0 ((:) 1152921504606846976 [])))) ((:) 1 ((:) 2 ((:) 3 ((:) 17 []))))
  checkBuilder 257 0
  checkBuilder 4096 0
 
@@ -30,14 +30,14 @@ nodeDemand = do
  let lazyNode = G.strictNode (Node (GCon "Lazy" (panic "forced constructor child list")) (Just (panic "forced optional binder contents")) Flexible)
  let lazyTable = G.nodesFromDistinctAscList ((:) ((,) 42 lazyNode) [])
  H.assert (IM.size lazyTable == 1 && G.equalFlag (G.flag (IM.get 42 lazyTable)) Flexible) "graph node demand changed"
- let graph = G.strictGraph (Graph (IM.singleton 42 (panic "forced graph map value")) IM.empty 340282366920938463463374607431768211456)
- H.assert (G.nextId graph == 340282366920938463463374607431768211456 && IM.size (G.nodes graph) == 1) "graph wrapper forcing changed"
+ let graph = G.strictGraph (Graph (IM.singleton 42 (panic "forced graph map value")) IM.empty 1152921504606846976)
+ H.assert (G.nextId graph == 1152921504606846976 && IM.size (G.nodes graph) == 1) "graph wrapper forcing changed"
  let scopes = Solver.strictScopes (ScopeIndex IM.empty ((:) (panic "forced unused scope jump") []))
  H.assert (IM.null (Solver.scopeIntervals scopes)) "scope wrapper forcing changed"
  S.mapM_ (\node -> H.assert (G.equalNode node (G.strictNode node)) "forcing changed a graph node")
-  ((:) (Node (GArr (-340282366920938463463374607431768211456) 340282366920938463463374607431768211456) Nothing Rigid)
-  ((:) (Node (GTyApp 0 9223372036854775808) (Just 7) Flexible)
-  ((:) (Node (GGen 340282366920938463463374607431768211456) Nothing Flexible) [])))
+  ((:) (Node (GArr (-1152921504606846976) 1152921504606846976) Nothing Rigid)
+  ((:) (Node (GTyApp 0 4611686018427387921) (Just 7) Flexible)
+  ((:) (Node (GGen 1152921504606846976) Nothing Flexible) [])))
 
 expansions : IO ()
 expansions = S.mapM_ (\next -> S.mapM_ (\source -> do
@@ -46,4 +46,4 @@ expansions = S.mapM_ (\next -> S.mapM_ (\source -> do
  (,) actual actualGraph <- H.right (G.expand source 0 original)
  H.assert (H.eq expected actual && H.eq expectedGraph actualGraph && IM.valid (G.nodes actualGraph)) "expansion changed graph or identity budget")
  ((:) 2 ((:) 6 [])))
- ((:) 10 ((:) 9223372036854775805 ((:) 340282366920938463463374607431768211456 [])))
+ ((:) 10 ((:) 9223372036854775791 ((:) 1152921504606846976 [])))

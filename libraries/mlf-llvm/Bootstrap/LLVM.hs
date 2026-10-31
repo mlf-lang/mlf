@@ -339,7 +339,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   entryCode :: String -> Bool -> [] String;
   entryCode entry executeIO =
     let {
-      abi = "mlf_require_haskell_boundary_v3_abi"
+      abi = "mlf_require_haskell_boundary_v4_abi"
     } in
     (:) ("declare void @" ++ (abi ++ "()"))
       ((:) "define ptr @mlf_entry() {"

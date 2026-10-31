@@ -41,10 +41,10 @@ module Bootstrap.Map where {
     } in
     if (total <= 1)
     then node (1 + total) k v l r
-    -- With total > 1, the larger size is positive; the smaller side
-    -- cannot exceed three times it, even with inconsistent cached sizes.
-    else if (leftSize < rightSize)
-         then if (rightSize > (3 * leftSize)) then rotateL k v l r else node (1 + total) k v l r
+    -- Keep the original ordered tests for all cached sizes. The larger-side
+    -- shortcut assumed unbounded arithmetic, which Int64 no longer provides.
+    else if (rightSize > (3 * leftSize))
+         then rotateL k v l r
          else if (leftSize > (3 * rightSize)) then rotateR k v l r else node (1 + total) k v l r;
   rotateL :: forall k v. k -> v -> Map k v -> Map k v -> Map k v;
   rotateL k v l r =

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Bounded ABI controls against the actual pinned 2916 runtime (not a mutant).
 
-Materializes immutable Git blobs into a fresh output directory. Four old guard
-families must fail against current v3, and v3 must fail against old 2916. Two
+Materializes immutable Git blobs into a fresh output directory. Five old guard
+families must fail against current v4, and v4 must fail against old 2916. Two
 positive links prove both runtimes are otherwise linkable. This does not qualify
 old compiler output, the full corpus, bootstrap, or cross-platform execution.
 """
@@ -20,9 +20,9 @@ ROOT = Path(__file__).resolve().parents[2]
 # Preserve original provenance while pinning identical content across history transport.
 LEGACY_COMMIT = '2916c477468efaa24ae2c76e8b2f41e5f15236a6'
 LEGACY_SOURCE_TREE = '7efa13e6a64c0445ebcf891c4e15694321a43780'
-CURRENT_GUARD = 'mlf_require_haskell_boundary_v3_abi'
+CURRENT_GUARD = 'mlf_require_haskell_boundary_v4_abi'
 OLD_GUARDS = ['mlf_require_compact_gc_abi', 'mlf_require_process_supervisor_v1_abi',
-              'mlf_require_async_completion_v2_abi', 'mlf_require_haskell_boundary_v2_abi']
+              'mlf_require_async_completion_v2_abi', 'mlf_require_haskell_boundary_v2_abi', 'mlf_require_haskell_boundary_v3_abi']
 
 
 def sha(path):

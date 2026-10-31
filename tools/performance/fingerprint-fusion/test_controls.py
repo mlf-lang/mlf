@@ -199,7 +199,14 @@ class FrozenInputs(unittest.TestCase):
         self.assertFalse(self.inventory['candidate_output_used_for_expectations'])
 
     def test_only_reviewed_host_patch_is_under_test(self):
-        for path, wanted in HOST.items():
+        expected = HOST
+        if (ROOT / 'libraries/mlf-foundation/Bootstrap/IntTree.hs').exists():
+            path = ROOT / 'tools/performance/patricia/source_migration.py'
+            migration = types.ModuleType('explicit_numeric_migration')
+            migration.__file__ = str(path)
+            exec(compile(path.read_bytes(), str(path), 'exec'), migration.__dict__)
+            expected = migration.host_sources(HOST)
+        for path, wanted in expected.items():
             self.assertEqual(RUNNER.sha(ROOT / path), wanted, path)
 
     def test_oracle_uses_unbounded_prelude_arithmetic_not_candidate_arithmetic(self):

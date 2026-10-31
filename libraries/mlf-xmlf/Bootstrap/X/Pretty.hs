@@ -9,7 +9,7 @@ module Bootstrap.X.Pretty where {
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Primitive as P;
   import Bootstrap.Kind;
-  variable (XTyVar n) = if (n < 0) then ("z" ++ showInt (0 - n)) else ("a" ++ showInt n);
+  variable (XTyVar n) = if (n < 0) then ("z" ++ (if n == (-9223372036854775808) then "9223372036854775808" else showInt (0 - n))) else ("a" ++ showInt n);
   name (XName i hint) = (hint ++ ("_" ++ showInt i));
   parenthesize condition s = if condition then ("(" ++ (s ++ ")")) else s;
   prettyType :: XType -> String;
@@ -188,10 +188,10 @@ module Bootstrap.X.Pretty where {
       bits = doubleToBits x
     } in
     let {
-      negative = (bits >= 9223372036854775808)
+      negative = (bits < 0)
     } in
     let {
-      magnitude = remInt bits 9223372036854775808
+      magnitude = andInt bits 9223372036854775807
     } in
     let {
       exponent = quotInt magnitude 4503599627370496
@@ -216,17 +216,25 @@ module Bootstrap.X.Pretty where {
            half = powerInt base (quotInt exponent 2)
          } in
          ((half * half) * (if (remInt exponent 2 == 0) then 1 else base));
+  -- Exact decimal formatting needs unbounded intermediate powers even though
+  -- the source literal and its IEEE bit pattern have a fixed 64-bit width.
+  powerInteger :: Integer -> Int -> Integer;
+  powerInteger base exponent =
+    if exponent == 0 then intToInteger 1
+    else let { half = powerInteger base (quotInt exponent 2) } in
+      mulInteger (mulInteger half half)
+        (if remInt exponent 2 == 0 then intToInteger 1 else base);
   decimalDyadic :: Int -> Int -> String;
   decimalDyadic mantissa power =
     if (mantissa == 0)
     then "0.0"
     else if (power >= 0)
-         then (showInt (mantissa * powerInt 2 power) ++ ".0")
+         then (showInteger (mulInteger (intToInteger mantissa) (powerInteger (intToInteger 2) power)) ++ ".0")
          else let {
                 places = (0 - power)
               } in
               let {
-                digits = showInt (mantissa * powerInt 5 places)
+                digits = showInteger (mulInteger (intToInteger mantissa) (powerInteger (intToInteger 5) places))
               } in
               let {
                 count = stringLength digits

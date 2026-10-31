@@ -228,7 +228,7 @@ module Bootstrap.LLVM.Build where {
   fresh prefix =
     do {
       n <- gets serial;
-      modify (withSerial (n + 1));
+      modify (withSerial (L.advanceIdentity n 1));
       cgPure (prefix ++ showInt n)
     };
   emit :: String -> Build ();
@@ -612,7 +612,8 @@ module Bootstrap.LLVM.Build where {
   hexDigit :: Int -> String;
   hexDigit n = stringSlice "0123456789abcdef" n 1;
   hex :: Int -> String;
-  hex n = if (n < 16) then hexDigit n else (hex (quotInt n 16) ++ hexDigit (remInt n 16));
+  hex n = let { rest = unsignedShiftRInt n 4; digit = hexDigit (andInt n 15) } in
+    if rest == 0 then digit else hex rest ++ digit;
   hexByte :: Int -> String;
   hexByte n = ("\\" ++ ((if (n < 16) then "0" else "") ++ hex n));
   repeatString :: Int -> String -> String;

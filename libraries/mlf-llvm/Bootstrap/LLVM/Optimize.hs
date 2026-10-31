@@ -35,7 +35,7 @@ module Bootstrap.LLVM.Optimize where {
     (>>=) = freshBind
   };
   freshName :: Fresh XName;
-  freshName = Fresh (\seed -> (,) (XName seed "native") (seed + 1));
+  freshName = Fresh (\seed -> (,) (XName seed "native") (L.advanceIdentity seed 1));
   nameId :: XName -> Int;
   nameId (XName n hint) = n;
   compareName :: XName -> XName -> Int;
@@ -1203,7 +1203,7 @@ module Bootstrap.LLVM.Optimize where {
   specializeHigherOrder expression =
     do {
       seed <- freshSeed;
-      specializeVisit (seed + 16384) (specializationDefinitions expression) expression
+      specializeVisit (L.advanceIdentity seed 16384) (specializationDefinitions expression) expression
     };
   specializeVisit :: Int -> Map XName XErased -> XErased -> Fresh XErased;
   specializeVisit limit definitions expression =
@@ -1285,7 +1285,7 @@ module Bootstrap.LLVM.Optimize where {
     };
   optimize :: XErased -> XErased;
   optimize expression =
-    case runFresh (optimizeWork expression) (1 + maxIdentity expression) of {
+    case runFresh (optimizeWork expression) (L.advanceIdentity 1 (maxIdentity expression)) of {
       (,) normalized seed ->
         case runFresh (copy M.empty normalized) 0 of {
           (,) result next -> result

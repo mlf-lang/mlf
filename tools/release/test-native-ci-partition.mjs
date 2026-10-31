@@ -72,16 +72,40 @@ const validate = text => {
     'tools/shared/test_direct.py',
     'tools/shared/test_figure12_direct.py',
   ];
+  // The ABI migration retains the frozen semantic algorithms behind explicit
+  // adapters. Check each suite argument, since several now share one driver.
+  const migrated = [
+    'tools/performance/patricia/run_integrated.py --suite p123',
+    'tools/performance/patricia/run_integrated.py --suite graph',
+    'tools/performance/patricia/run_fingerprint.py',
+    'tools/performance/patricia/run_integrated.py --suite map-balance',
+    'tools/performance/patricia/run_integrated.py --suite validation',
+    'tools/performance/patricia/run_integrated.py --suite builtin',
+    'tools/performance/patricia/run_file_controls.py',
+    'tools/performance/patricia/run_controls.py',
+    'tools/performance/patricia/run_native.py',
+    'tools/performance/int64/run_llp64.py',
+    'tools/performance/int64/run_controls.py',
+  ];
+  for (const command of migrated) {
+    const lines = commandStep(command).split('\n').filter(line => line.includes(command));
+    assert.equal(lines.length, 1, `One guarded command for ${command}`);
+    assert.match(lines[0], /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 /);
+  }
+  const numeric = commandStep('tools/performance/int64/run_controls.py');
+  assert.match(numeric, /for suite in host native legacy; do/);
+  assert.match(numeric, /run_controls.py --suite "\$suite" --producer \.mlf-build\/shared-ghc/);
+  assert.match(commandStep('tools/performance/patricia/run_native.py'), /--mode standalone\n/);
   const o2Only = [
-    'tools/performance/crate-optimizations/run_controls.py',
-    'tools/performance/a1-private-index/check_integrated.py',
-    'tools/performance/fingerprint-fusion/run_controls.py',
+    ...migrated,
+    'python3 -B tools/performance/patricia/test_adapters.py',
+    'python3 -O -B tools/performance/patricia/test_adapters.py',
     'tools/shared/test_recursive_managed.py',
     'tools/shared/test_guest_framework.py',
     'tools/shared/test_guest_state_laws.py',
   ];
   const framework = commandStep('tools/shared/test_framework_direct.py');
-  assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite '\$\{\{ matrix.suite \}\}' "\$\{suite_args\[@\]\}"\n/);
+  assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite '\$\{\{ matrix.suite \}\}' \$\{suite_args\[@\]\+"\$\{suite_args\[@\]\}"\}\n/);
   assert.doesNotMatch(native, /--frontend-timeout|--native-timeout/,
     'Direct per-mode defaults must come from the authenticated producer receipt');
   assert.doesNotMatch(native.replace(framework, ''), /--suite-timeout/,
@@ -150,6 +174,14 @@ const controls = [
   ['direct budget override', 'python3 tools/shared/test_direct.py --bin-dir', 'python3 tools/shared/test_direct.py --suite-timeout 5400 --bin-dir'],
   ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
   ['O2 guest omitted', "if: matrix.optimization == '2'", 'if: false'],
+  ['retained P123 omitted', 'run_integrated.py --suite p123', 'run_integrated.py --suite graph'],
+  ['retained graph omitted', 'run_integrated.py --suite graph', 'run_integrated.py --suite builtin'],
+  ['retained validation omitted', 'run_integrated.py --suite validation', 'run_integrated.py --suite builtin'],
+  ['numeric native suite omitted', 'for suite in host native legacy; do', 'for suite in host legacy; do'],
+  ['numeric selector ignored', '--suite "$suite"', '--suite host'],
+  ['LLP64 controls omitted', 'tools/performance/int64/run_llp64.py', 'tools/performance/int64/omitted.py'],
+  ['collection native route omitted', '--mode standalone\n', '--mode installed\n'],
+  ['resource guard relaxed', '--rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard', '--rss-mib 6144 --disk-free-mib 4096 .mlf-build/patricia-focused-guard'],
   ['artifact collision', '-${{ matrix.suite }}\n', '\n'],
   ['aggregate missing matrix', 'needs: [metadata, native, windows-runtime', 'needs: [metadata, windows-runtime'],
   ['aggregate accepts skipped', '.result == "success"', '.result != "failure"'],

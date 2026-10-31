@@ -85,7 +85,7 @@ module Bootstrap.ImportedRoot
             declarations = case expression of { XWithData ds _ -> ds; _ -> [] };
             parameters = map (\((,) index ((,) key ty)) ->
               (,,) key (XName index (C.targetNameHint key)) ty)
-              (zip (range (fst fresh) (fst fresh + M.size remaining - 1)) (M.toList remaining));
+              (zip (range (fst fresh) (advanceIdentity (fst fresh) (M.size remaining) - 1)) (M.toList remaining));
             external = M.fromList compareString (map (\((,,) key name ty) -> (,) key ((,) name ty)) parameters) };
       inner <- remove signatures (M.union compareString available external) expression;
       grafted <- foldEither (\rest spine -> Separate.graft spine rest) inner bodies;

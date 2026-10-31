@@ -621,11 +621,13 @@ module Bootstrap.Separate where {
   datatypeEncodingLength :: DatatypeEncoding -> Int;
   datatypeEncodingLength (DatatypeEncoding _ _ count _) = count;
   appendDatatypeEncoding :: (,) Int Int -> DatatypeEncoding -> (,) Int Int;
-  -- Internal callers reach only nonnegative rolling states. Keep signed seeds
-  -- exact for direct callers too: truncating remainder is not modular addition
-  -- across a sign change, so a negative seed must use the original recurrence.
+  -- Internal callers reach canonical residues. Other signed Int64 seeds need
+  -- the original recurrence: a negative seed can cross zero, and a large
+  -- positive seed can wrap before the first remainder. Composing the summary
+  -- is exact only when both seeds are already within their residue ranges.
   appendDatatypeEncoding state (DatatypeEncoding _ text _ part) = case state of {
-    (,) a b -> if (a < 0 || b < 0) then fingerprintStateFrom text 0 a b
+    (,) a b -> if (a < 0 || a >= 2147483647 || b < 0 || b >= 2147483629)
+      then fingerprintStateFrom text 0 a b
       else fingerprintAppend state part
   };
   prettyTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
@@ -1250,12 +1252,12 @@ module Bootstrap.Separate where {
       ids = Set.toList (termIdentities term Set.empty)
     } in
     let {
-      replacements = M.fromList compareInt (zip ids (range serial ((serial + length ids) - 1)))
+      replacements = M.fromList compareInt (zip ids (range serial ((advanceIdentity serial (length ids)) - 1)))
     } in
     let {
       rename = \n -> M.findWithDefault compareInt (panic "missing object identity") n replacements
     } in
-    (,) (serial + length ids)
+    (,) (advanceIdentity serial (length ids))
       (mapTerm (\(XName n hint) -> XName (rename n) hint) (\(XTyVar n) -> XTyVar (rename n)) term);
   -- The same injective renaming applies to the term and its exported names.
   -- Inferred types may contain fresh quantified identities from datatype
@@ -1269,12 +1271,12 @@ module Bootstrap.Separate where {
     let {
       term = Checked.term checked;
       ids = Set.toList (termIdentities term Set.empty);
-      replacements = M.fromList compareInt (zip ids (range serial ((serial + length ids) - 1)));
+      replacements = M.fromList compareInt (zip ids (range serial ((advanceIdentity serial (length ids)) - 1)));
       rename = \n -> M.findWithDefault compareInt (panic "missing object identity") n replacements;
       name = \(XName n hint) -> XName (rename n) hint;
       variable = \(XTyVar n) -> XTyVar (rename n)
     } in
-    (,,) (serial + length ids) (mapTerm name variable term)
+    (,,) (advanceIdentity serial (length ids)) (mapTerm name variable term)
       (mapEither (map (\((,) n ty) -> (,) (name n) (normalType ty)))
         (Checked.declarationBindings checked));
   splitParameters :: XTerm -> (,) ([] ((,) XName XType)) XTerm;

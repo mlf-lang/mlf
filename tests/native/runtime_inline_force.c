@@ -31,7 +31,7 @@ static MlfValue *suspend(MlfValue *value, MlfCode code) {
 int main(int argc, char **argv) {
     assert(argc == 2);
     GC_set_all_interior_pointers(0);
-    mlf_require_haskell_boundary_v3_abi();
+    mlf_require_haskell_boundary_v4_abi();
     if (!strcmp(argv[1], "null")) { probe_force(NULL); return 99; }
     if (!strcmp(argv[1], "failure-order")) {
         probe_force(mlf_thunk(failed, NULL));

@@ -13,8 +13,11 @@ module Bootstrap.Types where {
   data Either e a = Left e | Right a;
   data Map k v = MapEmpty | MapNode Int k v (Map k v) (Map k v);
   data Set a = Set (Map a ());
-  data IntMap a = IntMap (Map Int a);
-  data IntSet = IntSet (Map Int ());
+  data IntMapTree a = IntMapNil | IntMapTip Int a | IntMapBin Int Int (IntMapTree a) (IntMapTree a);
+  data IntMap a = IntMap (IntMapTree a);
+  data IntSetTree = IntSetNil | IntSetTip Int Int Int | IntSetBin Int Int IntSetTree IntSetTree;
+  data IntSet = IntSet IntSetTree;
+  data IntTreeRelation = IntTreeABL | IntTreeABR | IntTreeBAL | IntTreeBAR | IntTreeEQL | IntTreeNOM;
   data Kind = Star | KArrow Kind Kind;
   data Flag = Flexible | Rigid;
   data Field =
@@ -137,7 +140,28 @@ module Bootstrap.Types where {
     PPushCallStack |
     PPrettyCallStack |
     PIOErrorWithStack |
-    PConcatStringList;
+    PConcatStringList |
+    POrInt |
+    PXorInt |
+    PShiftLInt |
+    PShiftRInt |
+    PUnsignedShiftRInt |
+    PCountLeadingZerosInt |
+    PCountTrailingZerosInt |
+    PPopCountInt |
+    PIntToInteger |
+    PIntegerToInt |
+    PAddInteger |
+    PSubInteger |
+    PMulInteger |
+    PQuotInteger |
+    PRemInteger |
+    PEqInteger |
+    PLtInteger |
+    PShowInteger |
+    PReadInteger |
+    PIntegerToDouble |
+    PUnsignedLtInt;
   data SType =
     STVar String |
     SBottom |

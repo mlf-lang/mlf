@@ -127,7 +127,14 @@ class StaticControls(unittest.TestCase):
         self.assertEqual(actual, MANIFEST)
         path = 'libraries/mlf-foundation/Bootstrap/Map.hs'
         self.assertEqual(set(CURRENT_MANIFEST['candidate_algorithm_sha256']) - set(actual['candidate_algorithm_sha256']), {path})
-        self.assertEqual(C.sha_bytes((HERE.parents[2]/path).read_bytes()), CURRENT_MANIFEST['candidate_algorithm_sha256'][path])
+        # Keep the entire historical C4 contract above. The Int64 migration
+        # explicitly restores ordered balance comparisons for wrapped sizes.
+        raw = (HERE.parent/'patricia/source-migration.json').read_bytes()
+        self.assertEqual(C.sha_bytes(raw), '35feca71afa2d2c392df2d920b890f61a5dce84fd85c8c61909f5da32d31fea6')
+        delta = json.loads(raw)['changed_sources']['Bootstrap.Map']
+        self.assertEqual(delta['old'], CURRENT_MANIFEST['candidate_algorithm_sha256'][path])
+        self.assertTrue(delta['reviewed_change'])
+        self.assertEqual(C.sha_bytes((HERE.parents[2]/path).read_bytes()), delta['new'])
 
     def test_map_dependency_refuses_stale_and_unrelated_mutations(self):
         raw = (HERE/'source-dependency-balance.json').read_bytes()

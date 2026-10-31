@@ -17,12 +17,15 @@ reference solver = G.bindE (G.validateGraph (S.graph solver)) (\ignored ->
  if IM.eqIntMap IS.eqIntSet (S.structuralParents solver) (S.structuralParents rebuilt) && IM.eqIntMap IS.eqIntSet (S.bindingChildren solver) (S.bindingChildren rebuilt) && S.equalScopes (S.scopeIndex solver) (S.scopeIndex rebuilt)
  then Right (S.graph solver) else Left "incremental graph index disagrees with the graph")
 
+-- Representation corruption remains explicit under Patricia/bitmap storage.
 sizeWrong (IntMap tree) = IntMap (case tree of
- MapEmpty -> MapNode 1 0 IS.empty MapEmpty MapEmpty
- MapNode count key value left right -> MapNode (count + 1) key value left right)
+ IntMapNil -> IntMapBin 1 1 IntMapNil IntMapNil
+ IntMapTip key value -> IntMapBin 2 (key + 1) (IntMapTip key value) IntMapNil
+ IntMapBin count prefix left right -> IntMapBin (count + 1) prefix left right)
 setSizeWrong (IntSet tree) = IntSet (case tree of
- MapEmpty -> MapNode 1 0 () MapEmpty MapEmpty
- MapNode count key value left right -> MapNode (count + 1) key value left right)
+ IntSetNil -> IntSetTip 1 0 0
+ IntSetTip count prefix bitmap -> IntSetTip (count + 1) prefix bitmap
+ IntSetBin count prefix left right -> IntSetBin (count + 1) prefix left right)
 variants index = case IM.toList index of
  [] -> (:) index []
  (:) ((,) key values) rest ->
@@ -30,7 +33,7 @@ variants index = case IM.toList index of
   ((:) (IM.insert key (IS.insert 999999 values) index)
   ((:) (IM.insert 999999 values index) ((:) (sizeWrong index)
   ((:) (IM.insert key (setSizeWrong values) index)
-  ((:) (IntMap (MapNode 2 key values MapEmpty (MapNode 1 key values MapEmpty MapEmpty))) [])))))))
+  ((:) (IntMap (IntMapBin 2 (key + 1) (IntMapTip key values) (IntMapTip key values))) [])))))))
 
 check solver = H.assert (H.eq (S.finish solver) (reference solver)) "incremental index audit changed acceptance or returned graph"
 audits : IO ()
@@ -49,4 +52,4 @@ audits = L.mapM_ (\scale -> L.mapM_ (\shift -> do
  L.mapM_ (\d -> check (Solver graph parents d scopes)) (L.tail descendantVariants)
  check (Solver graph parents descendants (ScopeIndex IM.empty []))
  check (Solver (Graph IM.empty IM.empty 0) parents descendants scopes))
- ((:) 0 ((:) 340282366920938463463374607431768211456 ((:) (-340282366920938463463374607431768211456) [])))) ((:) 1 ((:) 100003 []))
+ ((:) 0 ((:) 1152921504606846976 ((:) (-1152921504606846976) [])))) ((:) 1 ((:) 100003 []))

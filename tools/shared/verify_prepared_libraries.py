@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import runpy
 import stat
 from pathlib import Path
 
@@ -155,8 +156,16 @@ def verify(root):
     for artifact in product['artifacts']:
         for field in ['metadata', 'object']:
             outputs[artifact[field + '_path']] = artifact[field + '_sha256']
-    require(registry_hash == product['generated_sha256'], 'compiled canonical module differs from generated output')
-    require(registry.read_bytes() == Path(product['generated_source']).read_bytes(), 'canonical registry bytes differ')
+    raw = Path(product['generated_source']).read_bytes()
+    if 'canonical_string_pool' in first:
+        pool = runpy.run_path(str(root / 'tools/shared/pool_generated_strings.py'))['pool']
+        pooled, proof = pool(raw.decode('utf-8'))
+        require(proof == first['canonical_string_pool'], 'canonical string-pool proof mismatch')
+        require(proof['original_sha256'] == product['generated_sha256'], 'string-pool source mismatch')
+        require(registry.read_bytes() == pooled.encode('utf-8'), 'pooled canonical registry bytes differ')
+    else:
+        require(registry_hash == product['generated_sha256'], 'compiled canonical module differs from generated output')
+        require(registry.read_bytes() == raw, 'canonical registry bytes differ')
     require(set(second['first_outputs']) == set(outputs), 'regeneration output inventory mismatch')
     comparisons = second['comparisons']
     require(len(comparisons) == len(outputs) and {row['path'] for row in comparisons} == set(outputs), 'regeneration comparison inventory mismatch')

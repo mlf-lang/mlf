@@ -289,7 +289,8 @@ module Bootstrap.Prelude where {
                          collectionUnitEquality)
                   ((:) (simpleInstance "IsString" (SCon "String" []) "fromString" (SPrimitive PTextFromChars))
                     ((:) (simpleInstance "IsString" charListType "fromString" (SLam "$chars" Nothing (SVar "$chars"))) []))))))))
-      (L.append canonicalCollectionInstances ((:) ioFailInstance hierarchyInstances));
+      ((:) (simpleInstance "Eq" (SCon "Integer" []) "==" (SPrimitive PEqInteger))
+        (L.append canonicalCollectionInstances ((:) ioFailInstance hierarchyInstances)));
   standardMethodClass :: String -> String;
   standardMethodClass name =
     if L.elem eqString name ((:) "==" ((:) "/=" [])) then "Eq"

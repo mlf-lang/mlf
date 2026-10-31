@@ -96,7 +96,7 @@
     "benchmarks/regex-redux/rust/upstream.rs": "4c6b9ac11ef0f5044532388ae18c97e2ba70e19f904405d2fd974bfa5055c6a5",
     "benchmarks/regex-redux/haskell/cabal.project.freeze": "086a4595bc0130b4f19d49d25b686f94cfb7166365ba2ce233506ef4fdaad345",
     "benchmarks/binary-trees/mlf/main.emlf": "0ece600365aec9c44657a73a8258d516d7511d597c1ef1b798c1195850ff0aea",
-    "benchmarks/pidigits/mlf/main.emlf": "70f76f4dc5a36aed09a89d1ffc29ea5f0bcc59391cdd340161f7576423118764",
+    "benchmarks/pidigits/mlf/main.emlf": "a5b90141e811ddf5f8e4e7075896a0d5b261b9b96bc24cb2111571cf4887ed7d",
     "benchmarks/n-body/mlf/main.emlf": "2d4bc4be2c05de6fddd632c0cbfc22d02347a76a4cdba0c5514da7c102e7e8e4",
     "benchmarks/fannkuch-redux/mlf/main.emlf": "e5250786bbdf5ed50d1f150cc4a68bdc4871d8ecbe90d319673b528e1d796125",
     "benchmarks/spectral-norm/mlf/main.emlf": "de85acb0607bd2f52211cec4470a7e8ce0c13710e8cd2083509ad7fb99c2c64b",
@@ -106,11 +106,12 @@
     "benchmarks/k-nucleotide/mlf/main.emlf": "f5be5957e29a02603b9b632d5169111a035002364e1464c79a055456055d4884",
     "benchmarks/regex-redux/mlf/main.emlf": "f8ade352362ffce016e22e9df99834777eaf2f731996d39e73ae7e89cfedefc4",
     "libraries/mlf-foundation/Bootstrap/Regex.hs": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d",
-    "libraries/mlf-foundation/Bootstrap/Types.hs": "c8bf3c734fa5c7e4c9b1f546774fb7dbfac9cc872fc7194f18cacb53d332132a",
-    "libraries/mlf-foundation/Bootstrap/Std.hs": "0eb137b5935bdf13ed6807c2a4aa96bb558bfce37fd39c9fb08897bb63eedbff",
-    "libraries/mlf-foundation/Bootstrap/IntMap.hs": "2bd9dae62e6d44e611e5b4adb216efffe9d275c05d249f2904f2e076d12b23de",
-    "libraries/mlf-foundation/Bootstrap/IntSet.hs": "324d2bfd384485c0008c80f6567862d572afeae0da4d839cbbbe8cba7748d1d6",
-    "libraries/mlf-foundation/Bootstrap/Map.hs": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30"
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "9eb67b3a3e7f3591f051a8627bb466209a3be39436d58f48db8efc89f936fbac",
+    "libraries/mlf-foundation/Bootstrap/Std.hs": "d8ac87643ba3c81b1a87a46f59386f4a8f27eaad3515100b5374737f9747ca17",
+    "libraries/mlf-foundation/Bootstrap/IntMap.hs": "f846b19c7f7ec12ee716919f45e866c16a625bb4af5cfeca8df94519862ecbac",
+    "libraries/mlf-foundation/Bootstrap/IntSet.hs": "1a76228fcf4ce346b3de4bf030321c79001cdd6fd711e2f1468aa62aa69f047d",
+    "libraries/mlf-foundation/Bootstrap/Map.hs": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+    "libraries/mlf-foundation/Bootstrap/IntTree.hs": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
   },
   "workloads": [
     {
@@ -869,7 +870,8 @@
         "libraries/mlf-foundation/Bootstrap/Std.hs",
         "libraries/mlf-foundation/Bootstrap/IntMap.hs",
         "libraries/mlf-foundation/Bootstrap/IntSet.hs",
-        "libraries/mlf-foundation/Bootstrap/Map.hs"
+        "libraries/mlf-foundation/Bootstrap/Map.hs",
+        "libraries/mlf-foundation/Bootstrap/IntTree.hs"
       ],
       "output_comparison": "Exact bytes: nine ordered pattern/count lines, separator, and all three lengths against independent MLF scanner oracle and pinned upstream fixture",
       "haskell_lockfile": "benchmarks/regex-redux/haskell/cabal.project.freeze"

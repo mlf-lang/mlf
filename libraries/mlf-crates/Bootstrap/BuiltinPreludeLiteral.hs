@@ -199,7 +199,28 @@ module Bootstrap.BuiltinPreludeLiteral where {
     PPushCallStack -> "PPushCallStack";
     PPrettyCallStack -> "PPrettyCallStack";
     PIOErrorWithStack -> "PIOErrorWithStack";
-    PConcatStringList -> "PConcatStringList"
+    PConcatStringList -> "PConcatStringList";
+    POrInt -> "POrInt";
+    PXorInt -> "PXorInt";
+    PShiftLInt -> "PShiftLInt";
+    PShiftRInt -> "PShiftRInt";
+    PUnsignedShiftRInt -> "PUnsignedShiftRInt";
+    PCountLeadingZerosInt -> "PCountLeadingZerosInt";
+    PCountTrailingZerosInt -> "PCountTrailingZerosInt";
+    PPopCountInt -> "PPopCountInt";
+    PIntToInteger -> "PIntToInteger";
+    PIntegerToInt -> "PIntegerToInt";
+    PAddInteger -> "PAddInteger";
+    PSubInteger -> "PSubInteger";
+    PMulInteger -> "PMulInteger";
+    PQuotInteger -> "PQuotInteger";
+    PRemInteger -> "PRemInteger";
+    PEqInteger -> "PEqInteger";
+    PLtInteger -> "PLtInteger";
+    PShowInteger -> "PShowInteger";
+    PReadInteger -> "PReadInteger";
+    PIntegerToDouble -> "PIntegerToDouble";
+    PUnsignedLtInt -> "PUnsignedLtInt"
   };
   sourceType :: SType -> String;
   sourceType value = case value of {

@@ -458,7 +458,7 @@ module Bootstrap.Module where {
   legacyPrimitiveTypeNames :: [] String;
   legacyPrimitiveTypeNames =
     ["AsyncScope", "Completion", "AsyncSubscription", "ST", "STArray",
-     "Int", "Double", "Bool", "String", "IO", "IntArray", "DoubleArray",
+     "Int", "Integer", "Double", "Bool", "String", "IO", "IntArray", "DoubleArray",
      "ByteArray", "IntTable"];
   primitiveEntities =
     append (map (\p -> Entity "Prelude" (P.primitiveName p) (Primitive p)) P.allPrimitives)
