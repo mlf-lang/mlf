@@ -1,0 +1,703 @@
+{
+  "format": "historical-offline-query-read-update-results-v1",
+  "source_result_sha256": "29002151e3b3e9e162b484240ffa9cd7e55a9edabbd292d15698e3732259229a",
+  "source_guard_sha256": "3d0095708ac1d63f1282338d1bdd4a7c849d742dbe2d5cc5a4a26a21d8a54bec",
+  "measurement_execution_count": 1,
+  "portable_wrapper_measurement_executed": false,
+  "population": {
+    "records": 12,
+    "legacy_bytes": 5167282,
+    "target": "d6595c38cb6e3e5204df3f9a0bf4361acff0b616e5433c84c92fd5216efe6f57.mlfq",
+    "source_population_commit": "14e031730cd01999ce39260227757a73efac5f4d"
+  },
+  "base_files": [
+    {
+      "name": "objects.pack",
+      "bytes": 2146709,
+      "sha256": "a31a1e9385efb6b8d203159d1376d68e071dbadae1d2587dec70ade259470b19"
+    },
+    {
+      "name": "objects.index",
+      "bytes": 31862,
+      "sha256": "3e970e8fef4afbb52a9ccf02f7039a36a280ba0f121816319b607fb71e9c1c27"
+    },
+    {
+      "name": "manifest.json",
+      "bytes": 3457,
+      "sha256": "b2774a3859348abf12bb307e14472c64e4c2ae3a478b3b27c6890ba2f9876eec"
+    }
+  ],
+  "code_sha256": {
+    "representation.py": "5676ef360ec21a4c5ace9185fc23a907a0995f50c54fac7934f171f656c8c783",
+    "overlay.py": "a54c41438366f3a2c8fb2688ddb33ebf170f9d8664b9693753aa6ec08e2cfed1",
+    "read_update_experiment.py": "54f56ff317f2d844228f7d0b3d9fe6c8479e8eca7a37f73509b11aeebb407edc"
+  },
+  "mutation": {
+    "field": "source-query-v6 key[2] compiler identity",
+    "previous": "caefb17bbedef06ddc218fe331c834fcaa8a85aef70c65b657eed829e6808e38",
+    "replacement": "9f5a04097588b0de6432c231f00f0bc172f965187c82321a534f1abc45a24089",
+    "synthetic_only": true,
+    "meaning": "Single-record storage/identity exercise, not a real compiler upgrade or semantic-checker pass."
+  },
+  "new_nodes": 3,
+  "reused_nodes_in_changed_record": 188,
+  "dead_base_nodes": 2,
+  "delta_files": {
+    "objects.pack": 488,
+    "objects.index": 207,
+    "manifest.json": 3635
+  },
+  "new_logical_file_bytes": 4330,
+  "current_snapshot_complete_physical_file_bytes": 2182901,
+  "old_and_new_pinned_complete_physical_file_bytes": 2186358,
+  "full_rewrite": {
+    "files": {
+      "objects.pack": 2146773,
+      "objects.index": 31927,
+      "manifest.json": 3457
+    },
+    "complete_reachable_bytes": 2182157,
+    "reachable_nodes": 491,
+    "orphan_nodes": 0,
+    "padding_bytes": 0,
+    "external_dependencies": 0,
+    "allocated_file_bytes": 2187264,
+    "allocated_directory_bytes": 4096,
+    "note": "All payloads, reference hashes, index entries and manifest counted; no compression or external dictionary."
+  },
+  "reachable_payload_bytes": 2146773,
+  "reachable_index_entry_bytes": 31915,
+  "dead_base_payload_bytes": 424,
+  "dead_base_index_entry_bytes": 130,
+  "write_reduction_fraction": 0.9980157248080683,
+  "exact_validation": {
+    "old_snapshot_records": 12,
+    "updated_snapshot_records": 12,
+    "compact_snapshot_records": 12,
+    "negative_controls": {
+      "passed": 6,
+      "cases": [
+        "old-reader-refuses-overlay-version",
+        "missing-base-is-not-silently-fetched",
+        "wrong-base-identity",
+        "duplicate-identity-across-layers",
+        "hash-valid-dangling-cross-layer-reference",
+        "recursive-base-descriptor-refused"
+      ]
+    },
+    "all_20_read_observations_exact": true
+  },
+  "overlay_reads_old_manifest": false,
+  "read_summaries": [
+    {
+      "layout": "base",
+      "mode": "single",
+      "observations": 5,
+      "nanoseconds": {
+        "init_ns": {
+          "median": 14553365,
+          "minimum": 14019017,
+          "maximum": 15495921
+        },
+        "restore_ns": {
+          "median": 6599847,
+          "minimum": 6444235,
+          "maximum": 7449955
+        },
+        "total_ns": {
+          "median": 21086341,
+          "minimum": 20982346,
+          "maximum": 22095768
+        }
+      },
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "logical_counts_identical": true
+    },
+    {
+      "layout": "base",
+      "mode": "all",
+      "observations": 5,
+      "nanoseconds": {
+        "init_ns": {
+          "median": 14616208,
+          "minimum": 13294145,
+          "maximum": 17704395
+        },
+        "restore_ns": {
+          "median": 77010803,
+          "minimum": 66266281,
+          "maximum": 92680547
+        },
+        "total_ns": {
+          "median": 90304948,
+          "minimum": 81436916,
+          "maximum": 107296755
+        }
+      },
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "logical_counts_identical": true
+    },
+    {
+      "layout": "overlay",
+      "mode": "single",
+      "observations": 5,
+      "nanoseconds": {
+        "init_ns": {
+          "median": 17888541,
+          "minimum": 14289460,
+          "maximum": 18230120
+        },
+        "restore_ns": {
+          "median": 7272701,
+          "minimum": 5211506,
+          "maximum": 7372790
+        },
+        "total_ns": {
+          "median": 25261331,
+          "minimum": 19500966,
+          "maximum": 25564913
+        }
+      },
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "logical_counts_identical": true
+    },
+    {
+      "layout": "overlay",
+      "mode": "all",
+      "observations": 5,
+      "nanoseconds": {
+        "init_ns": {
+          "median": 17804585,
+          "minimum": 13532491,
+          "maximum": 35022273
+        },
+        "restore_ns": {
+          "median": 67418470,
+          "minimum": 46830894,
+          "maximum": 69392467
+        },
+        "total_ns": {
+          "median": 85051440,
+          "minimum": 60363385,
+          "maximum": 87197052
+        }
+      },
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "logical_counts_identical": true
+    }
+  ],
+  "read_observations": [
+    {
+      "repetition": 1,
+      "layout": "base",
+      "mode": "single",
+      "init_ns": 14019017,
+      "restore_ns": 7048096,
+      "total_ns": 21067113,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 1,
+      "layout": "base",
+      "mode": "all",
+      "init_ns": 15500718,
+      "restore_ns": 85121815,
+      "total_ns": 100622533,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 1,
+      "layout": "overlay",
+      "mode": "single",
+      "init_ns": 15288977,
+      "restore_ns": 5407769,
+      "total_ns": 20696746,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 1,
+      "layout": "overlay",
+      "mode": "all",
+      "init_ns": 35022273,
+      "restore_ns": 48178815,
+      "total_ns": 83201088,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 2,
+      "layout": "overlay",
+      "mode": "all",
+      "init_ns": 13532491,
+      "restore_ns": 46830894,
+      "total_ns": 60363385,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 2,
+      "layout": "overlay",
+      "mode": "single",
+      "init_ns": 14289460,
+      "restore_ns": 5211506,
+      "total_ns": 19500966,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 2,
+      "layout": "base",
+      "mode": "all",
+      "init_ns": 13304961,
+      "restore_ns": 68131955,
+      "total_ns": 81436916,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 2,
+      "layout": "base",
+      "mode": "single",
+      "init_ns": 15495921,
+      "restore_ns": 6599847,
+      "total_ns": 22095768,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 3,
+      "layout": "base",
+      "mode": "single",
+      "init_ns": 14594756,
+      "restore_ns": 6491585,
+      "total_ns": 21086341,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 3,
+      "layout": "base",
+      "mode": "all",
+      "init_ns": 13294145,
+      "restore_ns": 77010803,
+      "total_ns": 90304948,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 3,
+      "layout": "overlay",
+      "mode": "single",
+      "init_ns": 17888541,
+      "restore_ns": 7372790,
+      "total_ns": 25261331,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 3,
+      "layout": "overlay",
+      "mode": "all",
+      "init_ns": 17453902,
+      "restore_ns": 67597538,
+      "total_ns": 85051440,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 4,
+      "layout": "overlay",
+      "mode": "all",
+      "init_ns": 18284141,
+      "restore_ns": 67418470,
+      "total_ns": 85702611,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 4,
+      "layout": "overlay",
+      "mode": "single",
+      "init_ns": 18196390,
+      "restore_ns": 7272701,
+      "total_ns": 25469091,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 4,
+      "layout": "base",
+      "mode": "all",
+      "init_ns": 17704395,
+      "restore_ns": 66266281,
+      "total_ns": 83970676,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 4,
+      "layout": "base",
+      "mode": "single",
+      "init_ns": 14553365,
+      "restore_ns": 7449955,
+      "total_ns": 22003320,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 5,
+      "layout": "base",
+      "mode": "single",
+      "init_ns": 14538111,
+      "restore_ns": 6444235,
+      "total_ns": 20982346,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 5,
+      "layout": "base",
+      "mode": "all",
+      "init_ns": 14616208,
+      "restore_ns": 92680547,
+      "total_ns": 107296755,
+      "init_logical_reads": {
+        "bytes": 4328737,
+        "calls": 493,
+        "file_calls": 3,
+        "node_calls": 490
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 5,
+      "layout": "overlay",
+      "mode": "single",
+      "init_ns": 18230120,
+      "restore_ns": 7334793,
+      "total_ns": 25564913,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 367800,
+        "calls": 191,
+        "file_calls": 0,
+        "node_calls": 191
+      },
+      "records": 1,
+      "restored_bytes": 367706,
+      "exact_bytes": true
+    },
+    {
+      "repetition": 5,
+      "layout": "overlay",
+      "mode": "all",
+      "init_ns": 17804585,
+      "restore_ns": 69392467,
+      "total_ns": 87197052,
+      "init_logical_reads": {
+        "bytes": 4330098,
+        "calls": 498,
+        "file_calls": 5,
+        "node_calls": 493
+      },
+      "restore_logical_reads": {
+        "bytes": 4967953,
+        "calls": 2284,
+        "file_calls": 0,
+        "node_calls": 2284
+      },
+      "records": 12,
+      "restored_bytes": 5167282,
+      "exact_bytes": true
+    }
+  ],
+  "limitations": [
+    "Logical read bytes are bytes returned to Python, not physical disk IO; no cache flush was performed.",
+    "Five fixed repetitions are small observed diagnostics, not cold/warm OS-cache or compiler performance qualification.",
+    "Initialization reads complete packs for SHA and then validates every node; single-record restore is not single-record-only initialization.",
+    "Full physical closure includes dead base nodes retained inside immutable packs. No GC, deletion, compaction in place, or reclamation is claimed.",
+    "Synthetic compiler identity changes only one record here; a real compiler upgrade can invalidate all queries.",
+    "No MLF semantic checker, production cache integration, fsync/crash-safety or concurrent writer qualification is performed."
+  ]
+}
