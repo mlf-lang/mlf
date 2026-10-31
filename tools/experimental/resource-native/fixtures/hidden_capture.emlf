@@ -1,0 +1,1 @@
+data Ring = Ring (() -> ()) Ring; let rec r : Ring = Ring (let f : () -> () = \x -> case r of { Ring f t -> x } in f) r in case r of { Ring f t -> f () }

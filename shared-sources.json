@@ -662,6 +662,11 @@
       "module": "Tests.TupleListLegacy",
       "path": "tests/Tests/TupleListLegacy.hs",
       "role": "implementation"
+    },
+    {
+      "module": "MLF.ResourceExport",
+      "path": "bootstrap/MLF/ResourceExport.hs",
+      "role": "implementation"
     }
   ],
   "executables": [

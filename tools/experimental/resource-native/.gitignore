@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+build/
+validation/compiler-build.json
+validation/test-results.json

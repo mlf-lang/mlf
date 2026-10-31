@@ -1,0 +1,90 @@
+{
+  "status": "accepted",
+  "audit_gate_allows_source_integration": true,
+  "runtime_root": "/workspace/scratch/c43337ba2cad/resource-ir-native-runtime-20261031",
+  "source_sha256": {
+    "rir_runtime.h": "9c6727371b21b1d762f1d48244504d9be970a2a47f666bc8321081e232c8bf43",
+    "rir_runtime.c": "67a96b47737c96ff904f93ad0e47b0d3a729b5ca4a1fe73d4d6bbb3e58f85be2"
+  },
+  "implementation_manifest_sha256": "7ca3697fc484645e1003ca4bbe9639ad2ee08e240cba2c33617ba18444f6fad3",
+  "prerequisite_receipt_sha256": "02dafc79b312569108106805ecea5efa474b3f68ddea5d305d011a2164e833ee",
+  "scope": "Bounded native Repeat-only runtime plus handwritten C controls. Actual checked source to C provenance/translation requires separate acceptance.",
+  "evidence": {
+    "author_aggregate_tests": 10,
+    "author_normal_controls": 12,
+    "author_reference_pairs": 11,
+    "independent_C_controls": 26,
+    "independent_valid_normal_completions": 18,
+    "independent_BUSY": 2,
+    "independent_HOLE": 1,
+    "independent_STACK_LIMIT": 1,
+    "deliberate_native_INVARIANT_controls": 3,
+    "unchecked_static_invalid_C_completion": 1,
+    "handwritten_reference_IR_programs": 25,
+    "exact_normal_metric_event_pairs": 17,
+    "exact_semantic_fault_pairs": 3,
+    "static_rejection_controls": 4,
+    "semantic_ledger_boundaries": 2002,
+    "semantic_ledger_programs": 25,
+    "actual_allocation_reconciliation_controls": 26,
+    "allocation_failure_and_one_past_controls": 139,
+    "silent_context_repetitions": 1000,
+    "cascade_groups": 10001,
+    "unexpected_faults": 0
+  },
+  "tested_build": {
+    "compiler_version": "gcc (Debian 14.2.0-19) 14.2.0",
+    "compiler_driver_sha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f",
+    "target": "x86_64-linux-gnu",
+    "stack_limit_bytes": [
+      8388608,
+      -1
+    ],
+    "max_frame_bytes": {
+      "handcases-allocation_wrap.su": 80,
+      "handcases-handcases.su": 928,
+      "handcases-rir_runtime.su": 1920,
+      "handcases_sanitized-allocation_wrap.su": 128,
+      "handcases_sanitized-handcases.su": 1168,
+      "handcases_sanitized-rir_runtime.su": 2384
+    },
+    "required_flags": [
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-pedantic",
+      "-fstack-usage",
+      "-Werror=frame-larger-than=4096"
+    ],
+    "optimized_flags": [
+      "-O2"
+    ],
+    "sanitizer_flags": [
+      "-O1",
+      "-g",
+      "-fno-omit-frame-pointer",
+      "-fsanitize=address,undefined",
+      "-fno-sanitize-recover=all"
+    ],
+    "sanitizer_environment": "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1",
+    "leak_sanitizer": "Not run; known ptrace restriction retained, no bypass/no pass claimed",
+    "runtime_sources": {
+      "rir_runtime.c": "67a96b47737c96ff904f93ad0e47b0d3a729b5ca4a1fe73d4d6bbb3e58f85be2",
+      "rir_runtime.h": "9c6727371b21b1d762f1d48244504d9be970a2a47f666bc8321081e232c8bf43"
+    }
+  },
+  "requirements": [
+    "Verify this receipt, manifest and both runtime source hashes before compiling fresh immutable snapshots; changed bytes close this gate.",
+    "Actual original-source provenance and actual emitted IR must pass separate gates and public static checking before code generation. Native descriptors/artifact hashes alone are not proof.",
+    "Accept only the explicit Repeat-only subset; reject Once/direct IR call/loop/choose/unknown schema or representation before C emission.",
+    "Preserve complete downward support, exact loan anchors, original fill tickets and all-path ownership through translation; raw C does not reconstruct these static proofs.",
+    "Use fail-closed generated-frame limits (agreed <=512 pointer cells per body, no VLA/alloca) plus <=4096-byte bounded compiler stack-frame evidence for the actual chosen optimized and sanitized binaries. Record stack limit/compiler/flags; current depth128 guards are platform-tested only.",
+    "Use independently measured actual allocator requests including headers/metadata; do not call them RSS/native speed or claim borrowing saves malloc bytes here.",
+    "BUSY/HOLE/STACK_LIMIT/FUEL/OOM/invariant faults are terminal with no unwind or cleanup promise.",
+    "ASan/UBSan evidence does not imply LSan passed; retain known ptrace restriction, do not bypass.",
+    "Any broad Perceus/Koka comparison, generated-source semantics or native performance claim requires separate controlled evidence."
+  ],
+  "evidence_directory": "/workspace/scratch/c43337ba2cad/resource-ir-native-runtime-audit-20261031/results",
+  "review": "/workspace/scratch/c43337ba2cad/resource-ir-native-runtime-audit-20261031/INDEPENDENT_REVIEW.md"
+}
