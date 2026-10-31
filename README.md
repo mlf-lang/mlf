@@ -194,7 +194,10 @@ passes. Failed correctness or performance checks remain failures.
 The Haskell compiler, Cabal project, and old Haskell/Python test and build
 harnesses have been removed. Native MLF is the supported build and test path.
 Pinned C/Rust/Haskell benchmark sources, the independent Snake baseline,
-golden oracle data, and archived measurements remain available.
+golden oracle data, and archived measurements remain available. Compiler-level
+classification measurements, which compile identical generated sources with GHC
+and MLF instead of pinned applications, live in the
+[compiler shape benchmark](tools/performance/compiler-shapes/README.md).
 
 ## Native compilation with LLVM
 
@@ -1397,6 +1400,37 @@ directory must be new. Run measured jobs alone. The
 [results](benchmarks/RESULTS.md) retain raw samples, medians, variation, source
 and toolchain hashes; [self-compilation profiling](tools/profile/README.md)
 reports the separate frozen-source comparison and diagnostic timing boundaries.
+
+### Compiler shape classification benchmark
+
+The [compiler shape benchmark](tools/performance/compiler-shapes/README.md)
+answers a different question from the C/MLF Benchmark Game above. It compiles the
+same generated shared-Haskell program with GHC and with MLF for ten program shapes
+at sizes 8, 32 and 128, and reports where compile time goes per shape instead of
+gating pinned application workloads. One entry point drives the whole benchmark:
+
+```sh
+python3 -B tools/performance/compiler-shapes/bench.py list
+python3 -B tools/performance/compiler-shapes/bench.py all \
+  --workdir .mlf-build/compiler-shapes --cohort default-20261031 \
+  --producer .mlf-build/shared-ghc --build-builtin
+```
+
+`--family` and `--size` filter the matrix, `--matrix smoke` is the 18-compilation
+check that ordinary pull requests run, and `analyze.py` writes `summary.json`,
+`summary.csv`, `samples.csv` and a human `summary.md`. The measured endpoint is the
+bootstrap crate route (`--compile-crate`, then `--crate-to-llvm-gc`, then Clang
+`-O2`), not the installed `emlf SOURCE -o` driver; the setup, plan and report state
+that endpoint, and the analyzer refuses cohorts that differ in endpoint, toolchain,
+host or repeat count. The runner contract in [tools/bench](tools/bench/README.md)
+is unchanged.
+
+The current cohort (2026-10-31, `b81f9b0a`) completed the full 31-cell, 186-compilation
+matrix with no failures: MLF was slower in all 30 shaped cells, with ratios from
+2.28 to 5.03 and a mean that rises from 2.57 at n=8 to 3.19 at n=128. The minimal
+program alone costs 1.133 s versus 0.445 s for GHC, and the group-heavy families
+grow with their fresh target-group count. Three repetitions describe spread on one
+host; they are not a confidence interval, and no universal speed claim follows.
 
 ### Preserved benchmark baselines
 
