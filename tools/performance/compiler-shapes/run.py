@@ -87,7 +87,12 @@ def main():
         Path(setup['builtin']+'.mlfco')]}
     inputs.update(H.file_pins(Path(setup['package_db']).parent))
     inputs.update({c['source']:c['source_sha256'] for c in cases})
-    limits={**setup['limits'],'wall_seconds':90,'max_work_bytes':512*1024**2}
+    # Per-command output stays bounded at 512 MiB; the cohort bound covers the
+    # deliberately retained evidence (69 native executables, LLVM IR and GHC
+    # objects for 31 cells). It is a bound, not a target: a 31-cell cohort uses
+    # about 2.6 GiB, and the earlier 2 GiB carry-over stopped a run at leg 149.
+    limits={**setup['limits'],'wall_seconds':90,'max_work_bytes':512*1024**2,
+            'aggregate_cohort_bytes':8*1024**3}
     identity=source_identity(out)
     cohort=args.cohort or out.name
     plan={'purpose':'generator/transport qualification' if args.pilot else 'fixed measured shape matrix; descriptive medians only',
@@ -126,7 +131,11 @@ def main():
     with H.SerialLock(ROOT/'.mlf-build'):
         for index,item in enumerate(schedule):
             if item['case'] in blocked:continue
-            H.require(H.tree_bytes(out)<=setup['limits']['max_work_bytes'],'aggregate experiment output budget between legs')
+            if H.tree_bytes(out)>limits['aggregate_cohort_bytes']:
+                # Stop before writing more evidence, but leave the reason inside
+                # the receipt so an incomplete cohort is self-describing.
+                record['stop_reason']='aggregate cohort output budget between legs';save()
+                raise RuntimeError(record['stop_reason'])
             case=next(c for c in cases if c['id']==item['case']);lane=item['lane']
             leg=out/'legs'/f'{index:03d}-{case["id"]}-{lane}';leg.mkdir(parents=True)
             build=leg/'build';r={'case':case['id'],'position':item['position'],'lane':lane,'complete':False}
