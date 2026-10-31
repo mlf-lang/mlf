@@ -31,6 +31,17 @@ class CurrentCompatibilityTests(unittest.TestCase):
             migration = importlib.util.module_from_spec(migration_spec)
             migration_spec.loader.exec_module(migration)
             expected = migration.migrate(expected)
+        if 'MLF.ResourceExport' in actual:
+            # The PR25 opt-in target adds only this reviewed exporter and its
+            # entry hook. This is an exact repository-inventory transition,
+            # NOT new compiled A1 evidence or admission of a new producer.
+            # Keep run_current_controls.py and all historical producer pins
+            # unchanged; their full-compiler coverage has not been rerun here.
+            self.assertEqual(expected['MLF.Entry.Emlf'],
+                'd5da6a564e6227a65ddb88a0c328495256e0ad817ca94f32957ba2d64b13ee19')
+            expected = {**expected,
+                'MLF.Entry.Emlf': '22a4cf544bad6727adc2d4a502c29131e59b123ccbceadf4713b92ae96d6c8b4',
+                'MLF.ResourceExport': 'c3a3ca74a4531863fe7ca94c91bfb23dbd256881ee59176a130064eeb01d655e'}
         self.assertEqual(actual, expected)
 
     def test_source_and_literal_mutations_rejected(self):

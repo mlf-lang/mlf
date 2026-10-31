@@ -55,6 +55,7 @@ module MLF.ResourceExport where {
     XStringTerm _ -> Left "String payloads are outside the resource-native fragment";
     XPrimitive _ _ -> Left "primitive/FFI contracts are outside the resource-native fragment"
   };
+  patternNode :: XPattern -> Either String J.Json;
   patternNode p = case p of {
     XConstructorPattern c fields -> Right (J.Object [("constructor", J.String c), ("fields", J.Array (L.map fieldName fields))]);
     XDefaultPattern _ -> Left "default patterns are outside the single-constructor resource-native fragment"
@@ -100,6 +101,7 @@ module MLF.ResourceExport where {
     XWithData ds _ -> D.validateDeclarations ds;
     _ -> Right D.emptyDataEnv
   };
+  fieldType :: Field -> Either String XType;
   fieldType field = case field of {
     Applied c [] -> Right (XCon c []);
     Function a b -> do { aa <- fieldType a; bb <- fieldType b; Right (XArrow aa bb) };

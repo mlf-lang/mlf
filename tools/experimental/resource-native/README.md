@@ -23,7 +23,13 @@ explicit choice, not an invisible compiler fallback.
 
 From repository root, with the already installed official GHC9.14.1 and GCC:
 
-```
+The minimal builder also records GHC's actual inferred interfaces for every
+resolved shared module and applies the unchanged upstream literal-overloading
+audit. The exporter explicitly fixes its two error channels to `Either String`;
+an inferred host `IsString`, `Num` or `Fractional` constraint is not admitted.
+Missing, stale or rehashed overloaded interface evidence fails preflight.
+
+```sh
 python tools/experimental/resource-native/build_compiler.py \
   --ghc /absolute/path/to/ghc-9.14.1 \
   --build-dir /absolute/path/to/a-new-empty-build-directory

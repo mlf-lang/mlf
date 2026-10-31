@@ -6,8 +6,8 @@ BASE=Path(__file__).resolve().parent
 ROOT=BASE.parents[2]
 PINNED_COMMIT='7bf7ac6db5e3db2daff2e0a1c249e68ae0db2d0c'
 SOURCE_MANIFEST_SHA='bd918d20b7bf4c0fa794d12e22788a9c2f55d1ae721f1d87f58258b808a99dbc'
-COMPILER_CONTRACT_SHA='dc2e70de78c34c4aeb167ce17bf278d2d0d3bb6288cbc6eae6c02cb1ba058f14'
-BUILD_SCRIPT_SHA='0a3d40de4deaf1d83685c622006111b208bd5757f7acb438b858333143196145'
+COMPILER_CONTRACT_SHA='132aa66e8597da232cff4cde91fea2eb86c4f2235fcc7a85a88e27896adc8fb1'
+BUILD_SCRIPT_SHA='85f0984ba33ef2efebb5bd8b361a393a20da51771cb516100892c6ee52590c33'
 KERNEL_ACCEPTANCE='f71991ae6c2c476d772f5c13036a3f6bf5187e32a0318792fd7d8aa59e7389c9'
 REUSED=json.loads((BASE/'provenance/reused-files.json').read_text())
 PLANNER_SHA='0c2b6426123c7a78a34b84ca0e47804cc44bf7d4838083a6d1aa35b0691ac1ff'
@@ -69,6 +69,16 @@ def build_identity():
     if not required<=set(resolved):raise ValueError('actual compiler resolved closure missing')
     for name,item in resolved.items():
         if item.get('path') not in expected or item.get('sha256')!=expected[item['path']]:raise ValueError('actual compiler resolved-source evidence differs: '+name)
+    manifest=json.loads((ROOT/'shared-sources.json').read_text())
+    shared_names={item['module'] for item in manifest['modules']}
+    interfaces=receipt.get('inferred_shared_interfaces',{})
+    if set(interfaces)!=set(resolved)&shared_names:raise ValueError('actual compiler inferred-interface inventory differs')
+    for name,item in interfaces.items():
+        signatures=item.get('signatures')
+        if type(signatures) is not str or item.get('unresolved_literal_constraints') is not False or sha_bytes(signatures.encode())!=item.get('sha256'):
+            raise ValueError('actual compiler inferred-interface evidence differs: '+name)
+        import re
+        if re.search(r'\b(?:Num|Fractional|IsString)\b',signatures):raise ValueError('unresolved host literal overloading: '+name)
     commands=receipt.get('commands',[])
     if len(commands)!=3 or any(c.get('exit_code')!=0 for c in commands):raise ValueError('actual compiler successful build commands missing')
     if receipt.get('status')!='built' or not receipt.get('immutable_inputs_verified_after'):raise ValueError('no successful actual PR25 compiler build receipt')

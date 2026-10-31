@@ -26,4 +26,17 @@ class Preflight(unittest.TestCase):
     def test_changed_native_gate_rejected(self):
         t=self.copy();p=t/'provenance/NATIVE_RUNTIME_ACCEPTANCE.json';p.write_text('{}')
         x=self.run_import(t,'import run_native; run_native.native_identity()');self.assertNotEqual(x.returncode,0);self.assertIn('pinned accepted receipt',x.stderr)
+    def test_missing_inferred_interfaces_rejected(self):
+        t=self.copy();p=t/'validation/compiler-build.json';r=json.loads(p.read_text());r.pop('inferred_shared_interfaces');p.write_text(json.dumps(r))
+        code='from pathlib import Path; import prepare; prepare.ROOT=Path('+repr(str(BASE.parents[2]))+'); prepare.build_identity()'
+        x=self.run_import(t,code);self.assertNotEqual(x.returncode,0);self.assertIn('inferred-interface inventory differs',x.stderr)
+    def test_rehashed_host_literal_overloading_rejected(self):
+        t=self.copy();p=t/'validation/compiler-build.json';r=json.loads(p.read_text());item=r['inferred_shared_interfaces']['MLF.ResourceExport']
+        item['signatures']='  bad :: IsString e => Either e ()\n';item['sha256']=hashlib.sha256(item['signatures'].encode()).hexdigest();p.write_text(json.dumps(r))
+        code='from pathlib import Path; import prepare; prepare.ROOT=Path('+repr(str(BASE.parents[2]))+'); prepare.build_identity()'
+        x=self.run_import(t,code);self.assertNotEqual(x.returncode,0);self.assertIn('unresolved host literal overloading',x.stderr)
+    def test_stale_inferred_signature_hash_rejected(self):
+        t=self.copy();p=t/'validation/compiler-build.json';r=json.loads(p.read_text());r['inferred_shared_interfaces']['MLF.ResourceExport']['sha256']='0'*64;p.write_text(json.dumps(r))
+        code='from pathlib import Path; import prepare; prepare.ROOT=Path('+repr(str(BASE.parents[2]))+'); prepare.build_identity()'
+        x=self.run_import(t,code);self.assertNotEqual(x.returncode,0);self.assertIn('inferred-interface evidence differs',x.stderr)
 if __name__=='__main__':unittest.main()

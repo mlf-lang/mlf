@@ -8,7 +8,7 @@ BASE=Path(__file__).resolve().parent
 ROOT=BASE.parents[2]
 PINNED_COMMIT='7bf7ac6db5e3db2daff2e0a1c249e68ae0db2d0c'
 SOURCE_MANIFEST_SHA='bd918d20b7bf4c0fa794d12e22788a9c2f55d1ae721f1d87f58258b808a99dbc'
-COMPILER_CONTRACT_SHA='dc2e70de78c34c4aeb167ce17bf278d2d0d3bb6288cbc6eae6c02cb1ba058f14'
+COMPILER_CONTRACT_SHA='132aa66e8597da232cff4cde91fea2eb86c4f2235fcc7a85a88e27896adc8fb1'
 def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--ghc',required=True,type=Path);p.add_argument('--build-dir',required=True,type=Path);args=p.parse_args()
@@ -50,7 +50,7 @@ def main():
         cobjects=[]
         for name,source in [('host','host/ghc/cbits/host.c'),('supervisor','runtime/mlf_process_supervisor.c')]:
             out=objects/(name+'.o');run([cc,'-O0','-std=c11','-I'+str(ROOT/'runtime'),'-c',ROOT/source,'-o',out],name);cobjects.append(out)
-        flags=['-XHaskell2010','-O0','-fpedantic-bottoms','-fno-state-hack','-Werror=incomplete-patterns','-Werror=incomplete-uni-patterns','-Wno-star-is-type','-Wno-overlapping-patterns','-Wno-deprecations','-package-env','-','-clear-package-db','-global-package-db','-no-user-package-db','-hide-all-packages','-i']+['-i'+str(ROOT/r) for r in manifest['source_roots']]+['-odir',objects,'-hidir',objects,'-rtsopts=ignoreAll']
+        flags=['-v','-ddump-types','-XHaskell2010','-O0','-fpedantic-bottoms','-fno-state-hack','-Werror=incomplete-patterns','-Werror=incomplete-uni-patterns','-Wno-star-is-type','-Wno-overlapping-patterns','-Wno-deprecations','-package-env','-','-clear-package-db','-global-package-db','-no-user-package-db','-hide-all-packages','-i']+['-i'+str(ROOT/r) for r in manifest['source_roots']]+['-odir',objects,'-hidir',objects,'-rtsopts=ignoreAll']
         for package in ['base','array','bytestring','text','containers','directory']:flags+=['-package',package]
         binary=build/'emlf';run([ghc,'--make','-j1','-fforce-recomp',*flags,ROOT/'host/ghc/app/emlf/Main.hs',*cobjects,'-o',binary],'compile')
         resolved={}
@@ -59,7 +59,10 @@ def main():
             if name in resolved:raise ValueError('duplicate compiled module: '+name)
             resolved[name]={'path':mapping[name],'sha256':inputs[mapping[name]]}
         if not {'MLF.Entry.Emlf','MLF.ResourceExport','MLF.PreparedCompiler','Bootstrap.CompilerCore','Bootstrap.X.Checked','Bootstrap.X.Check','Bootstrap.Parser'}<=set(resolved):raise ValueError('actual compiler proof closure missing')
-        report.update(status='built',binary=str(binary),binary_sha256=sha(binary),resolved_modules=resolved)
+        shared_names={m['module'] for m in manifest['modules']}
+        shared_inputs={name:item for name,item in resolved.items() if name in shared_names}
+        interfaces=upstream.audit_inferred_interfaces((build/'compile.log').read_text(),shared_inputs)
+        report.update(status='built',binary=str(binary),binary_sha256=sha(binary),resolved_modules=resolved,inferred_shared_interfaces=interfaces)
     finally:
         report['immutable_inputs_verified_after']=all(sha(ROOT/p)==digest for p,digest in inputs.items())
         if not report['immutable_inputs_verified_after']:report['status']='invalidated'
