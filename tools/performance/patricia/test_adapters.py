@@ -28,7 +28,10 @@ sparse=importlib.util.module_from_spec(sparse_spec)
 sparse_spec.loader.exec_module(sparse)
 
 def before_sparse_registry(base):
-    return migration.apply_changes(migration.migrate(base),
+    previous=migration.apply_changes(migration.migrate(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.batch_delta()['changed_sources'].items()})
+    return migration.apply_changes(previous,
         {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
          for name,row in migration.sparse_delta()['changed_sources'].items()})
 
@@ -216,6 +219,30 @@ class AdapterTests(unittest.TestCase):
                 (root/'sparse-contracts/source-migration.json').write_bytes(value)
                 with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
                     migration.sparse_delta()
+
+    def test_batch_layer_preserves_parent_and_exact_current_owners(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.batch_delta()
+        result=migration.migrate(base)
+        self.assertEqual(delta['parent_manifest_sha256'],migration.SPARSE_MANIFEST_SHA)
+        paths={'Bootstrap.LLVM':'libraries/mlf-llvm/Bootstrap/LLVM.hs',
+               'Bootstrap.LLVM.Library':'libraries/mlf-llvm/Bootstrap/LLVM/Library.hs',
+               'Bootstrap.LLVM.Optimize':'libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs'}
+        self.assertEqual(set(delta['changed_sources']),set(paths))
+        for name,row in delta['changed_sources'].items():
+            self.assertEqual(result[name],row['new'])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),row['new'])
+        bad=json.loads(json.dumps(delta))
+        bad['changed_sources']['Bootstrap.LLVM.Optimize']['old']='0'*64
+        with patch.object(migration,'batch_delta',return_value=bad),self.assertRaises(ValueError):
+            migration.migrate(base)
+        original=(migration.HERE.parent/'batch-replacement/source-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'batch-replacement').mkdir()
+            for value in [original+b' ',b'{}']:
+                (root/'batch-replacement/source-migration.json').write_bytes(value)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
+                    migration.batch_delta()
 
     def test_sparse_projection_rejects_owner_or_edit_corruption(self):
         source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()

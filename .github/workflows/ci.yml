@@ -115,6 +115,8 @@ jobs:
           set -euo pipefail
           python3 -B tools/performance/patricia/test_adapters.py
           python3 -O -B tools/performance/patricia/test_adapters.py
+          python3 -B tools/performance/patricia/test_native_batches.py
+          python3 -O -B tools/performance/patricia/test_native_batches.py
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard python3 -B tools/performance/patricia/run_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-focused
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-design-guard python3 -B tools/performance/patricia/run_design_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-design
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-native-guard python3 -B tools/performance/patricia/run_native.py --producer .mlf-build/shared-ghc --output .mlf-build/patricia-native --mode standalone
@@ -200,6 +202,10 @@ jobs:
       - name: Check source field normalization and exact imported layouts
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_source_field_layouts.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-field-layouts
+      - name: Check batched inlining against frozen optimizer
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/batch-replacement-guard python3 -B tools/performance/batch-replacement/run.py --producer .mlf-build/shared-ghc --output .mlf-build/batch-replacement-20261101/ci-controls
       - name: Check shared-value specialization admission and lazy semantics
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_common_calls.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/common-calls
@@ -330,6 +336,11 @@ jobs:
             .mlf-build/parameter-field-graph/*.json
             .mlf-build/parameter-field-graph/*.stdout
             .mlf-build/parameter-field-graph/*.stderr
+            .mlf-build/batch-replacement-guard/
+            .mlf-build/batch-replacement-20261101/ci-controls/**/*.json
+            .mlf-build/batch-replacement-20261101/ci-controls/**/stdout
+            .mlf-build/batch-replacement-20261101/ci-controls/**/stderr
+            .mlf-build/batch-replacement-20261101/ci-controls/**/*.hs
             .mlf-build/common-calls/**/*.json
             .mlf-build/common-calls/**/*.stdout
             .mlf-build/common-calls/**/*.stderr

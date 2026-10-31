@@ -9,6 +9,22 @@ CONTRACT_MANIFEST_SHA='762b056350c72a204a5edfb4e5a65af7a0d1b4da603226a90f8ebb2b7
 SPARSE_MANIFEST_SHA='f925cbc17365a534db21e66ec806820ed7957fc2942dd9b1eb5d789f12b1b4cf'
 DATATYPE_MANIFEST_SHA='6b819d779d924972f8123f258abbf0f97c410485bc97995ef0f8d9aee49bb9c2'
 
+BATCH_MANIFEST_SHA='10f2da2458cbda85d61787be112fcb09e28d93cf97ebbd7b974eaccac5466f6b'
+
+def batch_delta():
+    raw=(HERE.parent/'batch-replacement/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=BATCH_MANIFEST_SHA:
+        raise ValueError('fixed reviewed batch-replacement source migration required')
+    value=json.loads(raw)
+    if (value['format']!='batch-replacement-source-migration-v1'
+        or value['parent_manifest_sha256']!=SPARSE_MANIFEST_SHA
+        or value['parent_ref']!='7bf7ac6db5e3db2daff2e0a1c249e68ae0db2d0c'
+        or set(value['changed_sources'])!={'Bootstrap.LLVM','Bootstrap.LLVM.Library','Bootstrap.LLVM.Optimize'}
+        or value['module_count']!=128 or value['unchanged_sources']!=125
+        or value['added_sources'] or value['removed_sources'] or value['host_sources']):
+        raise ValueError('exact three-owner batch-replacement source migration')
+    return value
+
 def datatype_delta():
     raw=(HERE.parent/'datatype-context/source-migration.json').read_bytes()
     if hashlib.sha256(raw).hexdigest()!=DATATYPE_MANIFEST_SHA:
@@ -93,7 +109,8 @@ def migrate(base):
     if len(result)!=128:raise ValueError('128-module index-design source registry')
     result=apply_changes(result,datatype_delta()['changed_sources'])
     result=apply_changes(result,contract_delta()['changed_sources'])
-    return apply_changes(result,sparse_delta()['changed_sources'])
+    result=apply_changes(result,sparse_delta()['changed_sources'])
+    return apply_changes(result,batch_delta()['changed_sources'])
 
 
 def host_sources(base):

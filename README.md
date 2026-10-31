@@ -1321,8 +1321,10 @@ the measured compilation and runtime results, including unmet performance target
 
 See [C4 prepared-transaction integration and validation](docs/performance/c4-local-transaction.md)
 and [performance-optimization research workflow and literature](docs/performance/optimization-workflow-research.md).
-The latter is a set of future recommendations, not an activated measurement
-protocol or a claim of new performance results.
+The workflow records the current user-directed rule for structural improvements:
+positive measured whole-run gain (>0), with correctness and regression checks
+retained. Its remaining research recommendations are not automatically activated
+measurement protocols or claims of new performance results.
 
 Graph validation uses indexed scratch tables for densely numbered graphs,
 numbers the binding tree once, and checks kinds, scope, and structural cycles
