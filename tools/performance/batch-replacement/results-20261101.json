@@ -4887,6 +4887,21 @@
     }
   ],
   "formal_confirmation_run": false,
-  "decision": "Engineering adoption for the explicitly requested removal of quadratic ancestor reconstruction on admitted chains; not acceptance of the failed 5 percent whole-run performance advancement rule. No formal wall-time confirmation was launched.",
-  "integration": "integration-20261101.json"
+  "decision": "Accepted under the user-directed structural-positive-gain-v1 rule: both required primary gains are strictly positive, correctness and mechanism qualification passed, and retained regression guards passed. The original 5 percent discovery outcome remains historical; no new timing samples or formal statistical confirmation were added.",
+  "integration": "integration-20261101.json",
+  "current_acceptance": {
+    "acceptance_rule": "structural-positive-gain-v1",
+    "both_2048_gain_positive": true,
+    "guard_and_smaller_meaningful_regressions": [],
+    "timing_rule_pass": true,
+    "decision_date": "2026-11-01",
+    "authorized_by": "User: structural improvements require measured improvement greater than zero; use this rule going forward.",
+    "metric": "unrounded fixed-block geometric whole-compilation time ratio for each required primary case",
+    "evaluated_existing_samples": true,
+    "new_performance_samples": 0,
+    "correctness_and_mechanism_qualification_passed": true,
+    "engineering_adoption_passed": true,
+    "historical_5_percent_gate_passed": false,
+    "statistical_significance_claimed": false
+  }
 }

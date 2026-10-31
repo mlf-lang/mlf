@@ -18,6 +18,19 @@ def geometric(values):
     return math.exp(statistics.mean(math.log(v) for v in values))
 
 
+def timing_decision(cases):
+    """Current structural-adoption rule; use unrounded whole-run point estimates."""
+    by_case = {c['case']: c for c in cases}
+    primary = [by_case[f + '-2048'] for f in ('dependency_chain', 'inferred_chain')]
+    positive = all(c['B_over_A'] < 1.0 for c in primary)
+    guards = [c for c in cases if not c['case'].endswith('-2048')]
+    regressions = [c['case'] for c in guards if c['B_over_A'] > 1.05 and c['difference_seconds'] > .1]
+    return {'acceptance_rule': 'structural-positive-gain-v1',
+            'both_2048_gain_positive': positive,
+            'guard_and_smaller_meaningful_regressions': regressions,
+            'timing_rule_pass': positive and not regressions}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--window', type=Path, required=True)
@@ -50,17 +63,10 @@ def main():
         stage_medians = {side: {stage: statistics.median(next(t for t in r['stages']['stages'] if t['name'] == stage)['wall_seconds'] for r in rows if r['case'] == case and r['side'] == side) for stage in ('source-to-checked', 'checked-to-llvm', 'llvm-to-executable')} for side in 'AB'}
         cases.append({'case': case, 'blocks': blocks, 'stage_wall_medians_seconds': stage_medians, 'A_geometric_seconds': a, 'B_geometric_seconds': b,
                       'B_over_A': b / a, 'gain_fraction': 1 - b / a, 'difference_seconds': b - a})
-    by_case = {c['case']: c for c in cases}
-    large = [by_case[f + '-2048'] for f in ('dependency_chain', 'inferred_chain')]
-    large_pass = all(c['B_over_A'] <= .95 for c in large)
-    small = [c for c in cases if not c['case'].endswith('-2048')]
-    regressions = [c['case'] for c in small if c['B_over_A'] > 1.05 and c['difference_seconds'] > .1]
     report = {'purpose': plan['purpose'], 'plan_sha256': prior.sha(args.window / 'plan.json'),
               'receipt_sha256': prior.sha(args.window / 'receipt.json'),
               'analyzer_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-              'cases': cases, 'both_2048_gain_at_least_5_percent': large_pass,
-              'guard_and_smaller_meaningful_regressions': regressions,
-              'timing_rule_pass': large_pass and not regressions,
+              'cases': cases, **timing_decision(cases),
               'interpretation': 'Descriptive fixed-block geometric ratios; one or two blocks per cell do not support a strong confidence interval. Mechanism, qualification, semantic gates and final decision require separate review.'}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open('x') as out:

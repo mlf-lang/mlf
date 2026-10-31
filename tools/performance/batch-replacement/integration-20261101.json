@@ -1,7 +1,7 @@
 {
   "complete": true,
-  "decision": "Engineering adoption for the explicitly requested removal of quadratic ancestor reconstruction on admitted chains; not acceptance of the failed 5 percent whole-run performance advancement rule. No formal wall-time confirmation was launched.",
-  "performance_gate_passed": false,
+  "decision": "Accepted under the user-directed structural-positive-gain-v1 rule: both required primary gains are strictly positive, correctness and mechanism qualification passed, and retained regression guards passed. The original 5 percent discovery outcome remains historical; no new timing samples or formal statistical confirmation were added.",
+  "performance_gate_passed": true,
   "formal_confirmation_run": false,
   "correctness_suites": [
     "p123",
@@ -74,5 +74,22 @@
     "No stable or portable speedup claim; no confidence interval from the discovery blocks.",
     "No new installed self-bootstrap or 711-group compiler inference performance comparison.",
     "The source-path counts establish this admitted chain mechanism, not linear complexity of all compiler work."
-  ]
+  ],
+  "historical_decision": "Engineering adoption for the explicitly requested removal of quadratic ancestor reconstruction on admitted chains; not acceptance of the failed 5 percent whole-run performance advancement rule. No formal wall-time confirmation was launched.",
+  "historical_5_percent_gate_passed": false,
+  "current_acceptance": {
+    "acceptance_rule": "structural-positive-gain-v1",
+    "both_2048_gain_positive": true,
+    "guard_and_smaller_meaningful_regressions": [],
+    "timing_rule_pass": true,
+    "decision_date": "2026-11-01",
+    "authorized_by": "User: structural improvements require measured improvement greater than zero; use this rule going forward.",
+    "metric": "unrounded fixed-block geometric whole-compilation time ratio for each required primary case",
+    "evaluated_existing_samples": true,
+    "new_performance_samples": 0,
+    "correctness_and_mechanism_qualification_passed": true,
+    "engineering_adoption_passed": true,
+    "historical_5_percent_gate_passed": false,
+    "statistical_significance_claimed": false
+  }
 }
