@@ -1113,6 +1113,171 @@ module Bootstrap.LLVM.Optimize where {
       result <- passRaw expression;
       freshPure (useTerm result)
     };
+  -- This route is reserved for finite checked input, after the optimizer's
+  -- initial copy establishes globally unique binders. Legacy raw/partial tree
+  -- entry points above retain their original traversal and demand behavior.
+  -- A witness records a free callee directly applied to a non-variable first
+  -- argument. Every complete spine containing it fails commonCalls, for every
+  -- positive arity. Missing witnesses merely take the ordinary fallback.
+  negativeCalls :: UseTree -> Set XName;
+  negativeCalls tree =
+    case useChildren tree of {
+      UseLeaf -> S.empty;
+      UseAbs name body -> S.delete compareName name (negativeCalls body);
+      UseApp function argument ->
+        let { nested = S.union compareName (negativeCalls function) (negativeCalls argument) } in
+        case useTerm function of {
+          XEVar name -> case useTerm argument of {
+            XEVar _ -> nested;
+            _ -> S.insert compareName name nested
+          };
+          _ -> nested
+        };
+      UseLet name value body ->
+        S.union compareName (negativeCalls value)
+          (S.delete compareName name (negativeCalls body));
+      UseRec bindings body ->
+        S.difference compareName
+          (S.unions compareName ((:) (negativeCalls body) (L.map (\entry -> negativeCalls (L.snd entry)) bindings)))
+          (S.fromList compareName (L.map L.fst bindings));
+      UseCase subject alternatives ->
+        S.union compareName (negativeCalls subject)
+          (S.unions compareName
+             (L.map
+                (\((,) pattern body) ->
+                   S.difference compareName (negativeCalls body)
+                     (S.fromList compareName (X.patternNames pattern)))
+                alternatives))
+    };
+  -- The base skeleton is immutable. Entries are already fresh-copied at the
+  -- original inner-to-outer let decision, never when materializing. Counts and
+  -- witnesses describe the effective expanded body, not just the skeleton.
+  data PendingBody = PendingBody UseTree (Map XName UseTree) (Map XName Int) (Set XName);
+  pendingCounts :: PendingBody -> Map XName Int;
+  pendingCounts (PendingBody _ _ counts _) = counts;
+  pendingCalls :: PendingBody -> Set XName;
+  pendingCalls (PendingBody _ _ _ calls) = calls;
+  beginPending :: UseTree -> PendingBody;
+  beginPending body = PendingBody body M.empty (useCounts body) (negativeCalls body);
+  -- Expand each delayed occurrence once, including outer replacements inside
+  -- earlier copied RHSs. Scope uniqueness makes masking unnecessary: a copied
+  -- RHS cannot mention an eliminated inner let's binder. The dependency graph
+  -- therefore points strictly outward and is acyclic. No rewrite or Fresh
+  -- action runs during this walk; freshly exposed redexes wait for the next pass.
+  materializeBody :: Map XName UseTree -> UseTree -> UseTree;
+  materializeBody replacements tree =
+    case useChildren tree of {
+      UseLeaf -> case useTerm tree of {
+        XEVar name -> case M.lookup compareName name replacements of {
+          Nothing -> tree;
+          Just value -> materializeBody replacements value
+        };
+        _ -> tree
+      };
+      UseAbs name body -> useAbs name (materializeBody replacements body);
+      UseApp function argument ->
+        useApp (materializeBody replacements function) (materializeBody replacements argument);
+      UseLet name value body ->
+        useLet name (materializeBody replacements value) (materializeBody replacements body);
+      UseRec bindings body ->
+        useRec
+          (L.map (\((,) name value) -> (,) name (materializeBody replacements value)) bindings)
+          (materializeBody replacements body);
+      UseCase subject alternatives ->
+        useCase (materializeBody replacements subject)
+          (L.map (\((,) pattern body) -> (,) pattern (materializeBody replacements body)) alternatives)
+    };
+  materializePending :: PendingBody -> UseTree;
+  materializePending (PendingBody body replacements _ _) =
+    if M.null replacements then body else materializeBody replacements body;
+  delayOwnedLet :: XName -> UseTree -> PendingBody -> Fresh PendingBody;
+  delayOwnedLet name value pending =
+    let {
+      eligible = case useTerm value of {
+        XEAbs _ _ ->
+          smallValue (useTerm value) &&
+          (M.findWithDefault compareName 0 name (pendingCounts pending) == 1 &&
+           S.member compareName name (pendingCalls pending));
+        _ -> False
+      }
+    } in
+    if eligible
+    then do {
+      copied <- copy M.empty (useTerm value);
+      let { replacement = indexUses copied };
+      case pending of {
+        PendingBody body replacements counts calls ->
+          freshPure
+            (PendingBody body (M.insert compareName name replacement replacements)
+               (mergeUses (M.delete compareName name counts) (useCounts replacement))
+               (S.union compareName (S.delete compareName name calls) (negativeCalls replacement)))
+      }
+    }
+    else do {
+      let { body = materializePending pending };
+      result <- rewriteUsed (useLet name value body);
+      freshPure (beginPending result)
+    };
+  -- Delay only while unwinding a contiguous nonrecursive let-body chain.
+  -- Every other constructor and every unsupported let observes a fully
+  -- materialized body. RHS normalization still precedes body normalization.
+  passPendingRaw :: XErased -> Fresh PendingBody;
+  passPendingRaw expression = case expression of {
+    XELet name value body -> do {
+      normalized <- passOwnedRaw value;
+      pending <- passPendingRaw body;
+      delayOwnedLet name normalized pending
+    };
+    _ -> do {
+      result <- passOwnedRaw expression;
+      freshPure (beginPending result)
+    }
+  };
+  passOwnedRaw :: XErased -> Fresh UseTree;
+  passOwnedRaw expression = case expression of {
+    XELet _ _ _ -> do {
+      pending <- passPendingRaw expression;
+      freshPure (materializePending pending)
+    };
+    _ -> do {
+      normalized <- case expression of {
+        XEAbs name body -> do {
+          result <- passOwnedRaw body;
+          freshPure (useAbs name result)
+        };
+        XEApp function argument -> do {
+          a <- passOwnedRaw function;
+          b <- passOwnedRaw argument;
+          freshPure (useApp a b)
+        };
+        XELetRec bindings body -> do {
+          values <- traverseFresh
+            (\((,) name value) -> do {
+              result <- passOwnedRaw value;
+              freshPure ((,) name result)
+            }) bindings;
+          result <- passOwnedRaw body;
+          freshPure (useRec values result)
+        };
+        XECase subject alternatives -> do {
+          value <- passOwnedRaw subject;
+          branches <- traverseFresh
+            (\(XErasedAlternative pattern body) -> do {
+              result <- passOwnedRaw body;
+              freshPure ((,) pattern result)
+            }) alternatives;
+          freshPure (useCase value branches)
+        };
+        _ -> freshPure (indexUses expression)
+      };
+      rewriteUsed normalized
+    }
+  };
+  passOwned :: XErased -> Fresh XErased;
+  passOwned expression = do {
+    result <- passOwnedRaw expression;
+    freshPure (useTerm result)
+  };
   maxIdentity :: XErased -> Int;
   maxIdentity expression =
     case expression of {
@@ -1269,6 +1434,43 @@ module Bootstrap.LLVM.Optimize where {
       XEVar name -> if eqName name key then copy M.empty callback else freshPure expression;
       _ -> children (specializeBody original specialized key arity callback) expression
     };
+  iterationsOwned :: Map String (Maybe Int) -> Int -> XErased -> Fresh XErased;
+  iterationsOwned arities count expression =
+    if (count == 0)
+    then freshPure expression
+    else do {
+           let {
+             facts = constructorFacts arities expression
+           };
+           projected <-
+             if M.null facts then freshPure expression else projectConstructors facts expression;
+           next <- passOwned projected;
+           if X.equalErased expression next
+           then freshPure expression
+           else iterationsOwned arities (count - 1) next
+         };
+  optimizeOwnedWork :: XErased -> Fresh XErased;
+  optimizeOwnedWork expression =
+    do {
+      unique <- copy M.empty expression;
+      clean <- identities unique;
+      recursive <- fixedPoints clean;
+      let {
+        arities = constructorArities recursive
+      };
+      lifted <- liftConstructorFields arities recursive;
+      simple <- iterationsOwned arities 16 lifted;
+      specialized <- specializeHigherOrder simple;
+      iterationsOwned arities 16 specialized
+    };
+  optimizeOwned :: XErased -> XErased;
+  optimizeOwned expression =
+    case runFresh (optimizeOwnedWork expression) (L.advanceIdentity 1 (maxIdentity expression)) of {
+      (,) normalized seed ->
+        case runFresh (copy M.empty normalized) 0 of {
+          (,) result next -> result
+        }
+    };
   optimizeWork :: XErased -> Fresh XErased;
   optimizeWork expression =
     do {
@@ -1291,4 +1493,5 @@ module Bootstrap.LLVM.Optimize where {
           (,) result next -> result
         }
     }
+
 }

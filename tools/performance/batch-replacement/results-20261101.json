@@ -1,0 +1,4892 @@
+{
+  "baseline_ref": "7bf7ac6db5e3db2daff2e0a1c249e68ae0db2d0c",
+  "discovery": {
+    "purpose": "discovery",
+    "plan_sha256": "a996caf2d5b875a92f151b3b7f14da3d650d01f65ed61f179c22db0bcf8a291e",
+    "receipt_sha256": "4e346bc4c14390cbae8d4ed0ef74c6ad2474a57a8ed81b13e823d41423cabc1a",
+    "analyzer_sha256": "165af3942efaeb8b7591beb9652b057af7f05e39c38641623db696f37f0a9db3",
+    "cases": [
+      {
+        "case": "dependency_chain-2048",
+        "blocks": [
+          {
+            "index": 0,
+            "order": "ABBA",
+            "A_seconds": [
+              19.077154084,
+              18.904109583
+            ],
+            "B_seconds": [
+              18.500036542,
+              18.287543084
+            ],
+            "A_geometric_seconds": 18.990434732667705,
+            "B_geometric_seconds": 18.393482957759776,
+            "log_B_over_A": -0.03193900248007021,
+            "B_over_A": 0.9685656603805367
+          }
+        ],
+        "stage_wall_medians_seconds": {
+          "A": {
+            "source-to-checked": 10.521882729000001,
+            "checked-to-llvm": 7.744025125,
+            "llvm-to-executable": 0.6444075419999999
+          },
+          "B": {
+            "source-to-checked": 10.574617604,
+            "checked-to-llvm": 7.1053518545,
+            "llvm-to-executable": 0.625710771
+          }
+        },
+        "A_geometric_seconds": 18.990434732667705,
+        "B_geometric_seconds": 18.393482957759776,
+        "B_over_A": 0.9685656603805367,
+        "gain_fraction": 0.03143433961946329,
+        "difference_seconds": -0.5969517749079287
+      },
+      {
+        "case": "flat_functions-512",
+        "blocks": [
+          {
+            "index": 1,
+            "order": "ABBA",
+            "A_seconds": [
+              3.892760042,
+              3.79352725
+            ],
+            "B_seconds": [
+              3.873106167,
+              3.800307417
+            ],
+            "A_geometric_seconds": 3.842823349705024,
+            "B_geometric_seconds": 3.8365341251288956,
+            "log_B_over_A": -0.0016379563011235374,
+            "B_over_A": 0.9983633844171861
+          }
+        ],
+        "stage_wall_medians_seconds": {
+          "A": {
+            "source-to-checked": 2.591564042,
+            "checked-to-llvm": 0.7636352085,
+            "llvm-to-executable": 0.411597292
+          },
+          "B": {
+            "source-to-checked": 2.5753527915000003,
+            "checked-to-llvm": 0.7784130204999999,
+            "llvm-to-executable": 0.411706312
+          }
+        },
+        "A_geometric_seconds": 3.842823349705024,
+        "B_geometric_seconds": 3.8365341251288956,
+        "B_over_A": 0.9983633844171861,
+        "gain_fraction": 0.0016366155828139162,
+        "difference_seconds": -0.0062892245761285714
+      },
+      {
+        "case": "inferred_chain-2048",
+        "blocks": [
+          {
+            "index": 2,
+            "order": "BAAB",
+            "A_seconds": [
+              20.164372875,
+              19.837015958
+            ],
+            "B_seconds": [
+              19.063550333,
+              18.910591
+            ],
+            "A_geometric_seconds": 20.000024662595724,
+            "B_geometric_seconds": 18.986916636338737,
+            "log_B_over_A": -0.05198336279656743,
+            "B_over_A": 0.9493446611517579
+          }
+        ],
+        "stage_wall_medians_seconds": {
+          "A": {
+            "source-to-checked": 11.5013086245,
+            "checked-to-llvm": 7.7725896875,
+            "llvm-to-executable": 0.6496159370000001
+          },
+          "B": {
+            "source-to-checked": 11.1280970835,
+            "checked-to-llvm": 7.152624729,
+            "llvm-to-executable": 0.63321275
+          }
+        },
+        "A_geometric_seconds": 20.000024662595724,
+        "B_geometric_seconds": 18.986916636338737,
+        "B_over_A": 0.9493446611517579,
+        "gain_fraction": 0.05065533884824214,
+        "difference_seconds": -1.0131080262569867
+      },
+      {
+        "case": "higher_order_chain-128",
+        "blocks": [
+          {
+            "index": 3,
+            "order": "BAAB",
+            "A_seconds": [
+              0.954788709,
+              0.919399292
+            ],
+            "B_seconds": [
+              0.991710083,
+              0.974388291
+            ],
+            "A_geometric_seconds": 0.93692692514635,
+            "B_geometric_seconds": 0.9830110339878378,
+            "log_B_over_A": 0.0480150538007936,
+            "B_over_A": 1.0491864494493948
+          }
+        ],
+        "stage_wall_medians_seconds": {
+          "A": {
+            "source-to-checked": 0.2361049785,
+            "checked-to-llvm": 0.454789646,
+            "llvm-to-executable": 0.17645922949999998
+          },
+          "B": {
+            "source-to-checked": 0.2352814165,
+            "checked-to-llvm": 0.4806172915,
+            "llvm-to-executable": 0.1849913955
+          }
+        },
+        "A_geometric_seconds": 0.93692692514635,
+        "B_geometric_seconds": 0.9830110339878378,
+        "B_over_A": 1.0491864494493948,
+        "gain_fraction": -0.049186449449394765,
+        "difference_seconds": 0.046084108841487836
+      }
+    ],
+    "both_2048_gain_at_least_5_percent": false,
+    "guard_and_smaller_meaningful_regressions": [],
+    "timing_rule_pass": false,
+    "interpretation": "Descriptive fixed-block geometric ratios; one or two blocks per cell do not support a strong confidence interval. Mechanism, qualification, semantic gates and final decision require separate review."
+  },
+  "mechanism": [
+    {
+      "case": {
+        "case": "dependency_chain-32",
+        "family": "dependency_chain",
+        "interface": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-default-c1b802bd/legs/109-dependency_chain-32-mlf/build/unit.mlfci",
+        "object": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-default-c1b802bd/legs/109-dependency_chain-32-mlf/build/unit.mlfco",
+        "size": 32
+      },
+      "complete": true,
+      "counters": {
+        "batch.admitted": {
+          "depth_sum": 0,
+          "events": 32,
+          "max_depth": 0
+        },
+        "batch.flush.empty": {
+          "depth_sum": 0,
+          "events": 1136,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.1": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.31": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_size": {
+          "depth_sum": 32,
+          "events": 2,
+          "max_depth": 31
+        },
+        "batch.flush.nonempty": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.base_visits": {
+          "depth_sum": 194,
+          "events": 42,
+          "max_depth": 11
+        },
+        "batch.materialize.expanded_var": {
+          "depth_sum": 1679,
+          "events": 32,
+          "max_depth": 99
+        },
+        "batch.materialize.replacement_visits": {
+          "depth_sum": 14050,
+          "events": 250,
+          "max_depth": 103
+        },
+        "batch.materialize.roots": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.visits": {
+          "depth_sum": 14244,
+          "events": 292,
+          "max_depth": 103
+        },
+        "batch.negative.roots": {
+          "depth_sum": 0,
+          "events": 57,
+          "max_depth": 0
+        },
+        "batch.negative.visits": {
+          "depth_sum": 2971,
+          "events": 706,
+          "max_depth": 14
+        },
+        "batch.owned.visits": {
+          "depth_sum": 0,
+          "events": 54020,
+          "max_depth": 0
+        },
+        "batch.pending.visits": {
+          "depth_sum": 0,
+          "events": 1170,
+          "max_depth": 0
+        },
+        "commonCalls.positive": {
+          "depth_sum": 192,
+          "events": 96,
+          "max_depth": 6
+        },
+        "commonCalls.pruned": {
+          "depth_sum": 107,
+          "events": 37,
+          "max_depth": 5
+        },
+        "commonCalls.roots": {
+          "depth_sum": 0,
+          "events": 25,
+          "max_depth": 0
+        },
+        "commonCalls.visits": {
+          "depth_sum": 299,
+          "events": 133,
+          "max_depth": 6
+        },
+        "copy.batch_admitted.fresh_binder": {
+          "depth_sum": 0,
+          "events": 32,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_abs": {
+          "depth_sum": 0,
+          "events": 32,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_app": {
+          "depth_sum": 184,
+          "events": 93,
+          "max_depth": 3
+        },
+        "copy.batch_admitted.reuse_leaf": {
+          "depth_sum": 215,
+          "events": 62,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.roots": {
+          "depth_sum": 0,
+          "events": 32,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.variable_lookup": {
+          "depth_sum": 187,
+          "events": 63,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.visits": {
+          "depth_sum": 586,
+          "events": 250,
+          "max_depth": 4
+        },
+        "copy.higher_order_callback.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_callback.variable_lookup": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_callback.visits": {
+          "depth_sum": 3,
+          "events": 3,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.fresh_pattern_binder": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.rebuild_alternative": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_app": {
+          "depth_sum": 21,
+          "events": 5,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.rebuild_case": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.reuse_leaf": {
+          "depth_sum": 8,
+          "events": 2,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_rhs.variable_lookup": {
+          "depth_sum": 32,
+          "events": 6,
+          "max_depth": 6
+        },
+        "copy.higher_order_rhs.visits": {
+          "depth_sum": 64,
+          "events": 16,
+          "max_depth": 6
+        },
+        "copy.identities_alias.fresh_binder": {
+          "depth_sum": 9373,
+          "events": 1612,
+          "max_depth": 23
+        },
+        "copy.identities_alias.fresh_pattern_binder": {
+          "depth_sum": 74793,
+          "events": 6189,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_abs": {
+          "depth_sum": 9238,
+          "events": 1585,
+          "max_depth": 23
+        },
+        "copy.identities_alias.rebuild_alternative": {
+          "depth_sum": 7910,
+          "events": 814,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_app": {
+          "depth_sum": 470336,
+          "events": 19601,
+          "max_depth": 59
+        },
+        "copy.identities_alias.rebuild_case": {
+          "depth_sum": 6738,
+          "events": 725,
+          "max_depth": 25
+        },
+        "copy.identities_alias.rebuild_rec": {
+          "depth_sum": 101,
+          "events": 19,
+          "max_depth": 9
+        },
+        "copy.identities_alias.reuse_leaf": {
+          "depth_sum": 165837,
+          "events": 7134,
+          "max_depth": 57
+        },
+        "copy.identities_alias.roots": {
+          "depth_sum": 0,
+          "events": 351,
+          "max_depth": 0
+        },
+        "copy.identities_alias.variable_lookup": {
+          "depth_sum": 354102,
+          "events": 13659,
+          "max_depth": 60
+        },
+        "copy.identities_alias.visits": {
+          "depth_sum": 1006352,
+          "events": 42723,
+          "max_depth": 60
+        },
+        "copy.owned_final_numbering.fresh_binder": {
+          "depth_sum": 11722,
+          "events": 474,
+          "max_depth": 76
+        },
+        "copy.owned_final_numbering.fresh_pattern_binder": {
+          "depth_sum": 31123,
+          "events": 823,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_abs": {
+          "depth_sum": 8124,
+          "events": 358,
+          "max_depth": 49
+        },
+        "copy.owned_final_numbering.rebuild_alternative": {
+          "depth_sum": 15680,
+          "events": 365,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_app": {
+          "depth_sum": 70704,
+          "events": 1739,
+          "max_depth": 86
+        },
+        "copy.owned_final_numbering.rebuild_case": {
+          "depth_sum": 14581,
+          "events": 339,
+          "max_depth": 87
+        },
+        "copy.owned_final_numbering.rebuild_let": {
+          "depth_sum": 2096,
+          "events": 41,
+          "max_depth": 76
+        },
+        "copy.owned_final_numbering.rebuild_rec": {
+          "depth_sum": 1201,
+          "events": 57,
+          "max_depth": 40
+        },
+        "copy.owned_final_numbering.reuse_leaf": {
+          "depth_sum": 33760,
+          "events": 813,
+          "max_depth": 85
+        },
+        "copy.owned_final_numbering.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_final_numbering.variable_lookup": {
+          "depth_sum": 60611,
+          "events": 1408,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.visits": {
+          "depth_sum": 191077,
+          "events": 4755,
+          "max_depth": 88
+        },
+        "copy.owned_initial_uniqueness.fresh_binder": {
+          "depth_sum": 64651,
+          "events": 1515,
+          "max_depth": 114
+        },
+        "copy.owned_initial_uniqueness.fresh_pattern_binder": {
+          "depth_sum": 30815,
+          "events": 598,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_abs": {
+          "depth_sum": 43215,
+          "events": 1033,
+          "max_depth": 114
+        },
+        "copy.owned_initial_uniqueness.rebuild_alternative": {
+          "depth_sum": 6781,
+          "events": 140,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_app": {
+          "depth_sum": 148283,
+          "events": 2649,
+          "max_depth": 116
+        },
+        "copy.owned_initial_uniqueness.rebuild_case": {
+          "depth_sum": 5594,
+          "events": 116,
+          "max_depth": 81
+        },
+        "copy.owned_initial_uniqueness.rebuild_let": {
+          "depth_sum": 17803,
+          "events": 385,
+          "max_depth": 112
+        },
+        "copy.owned_initial_uniqueness.rebuild_rec": {
+          "depth_sum": 3427,
+          "events": 91,
+          "max_depth": 76
+        },
+        "copy.owned_initial_uniqueness.reuse_leaf": {
+          "depth_sum": 49612,
+          "events": 820,
+          "max_depth": 117
+        },
+        "copy.owned_initial_uniqueness.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_initial_uniqueness.variable_lookup": {
+          "depth_sum": 134293,
+          "events": 2452,
+          "max_depth": 117
+        },
+        "copy.owned_initial_uniqueness.visits": {
+          "depth_sum": 402227,
+          "events": 7546,
+          "max_depth": 117
+        },
+        "copy.projection.fresh_binder": {
+          "depth_sum": 69,
+          "events": 38,
+          "max_depth": 6
+        },
+        "copy.projection.fresh_pattern_binder": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_abs": {
+          "depth_sum": 55,
+          "events": 23,
+          "max_depth": 4
+        },
+        "copy.projection.rebuild_alternative": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_app": {
+          "depth_sum": 140,
+          "events": 30,
+          "max_depth": 8
+        },
+        "copy.projection.rebuild_case": {
+          "depth_sum": 5,
+          "events": 1,
+          "max_depth": 5
+        },
+        "copy.projection.rebuild_let": {
+          "depth_sum": 12,
+          "events": 14,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.projection.reuse_leaf": {
+          "depth_sum": 89,
+          "events": 18,
+          "max_depth": 8
+        },
+        "copy.projection.roots": {
+          "depth_sum": 0,
+          "events": 12,
+          "max_depth": 0
+        },
+        "copy.projection.variable_lookup": {
+          "depth_sum": 191,
+          "events": 41,
+          "max_depth": 9
+        },
+        "copy.projection.visits": {
+          "depth_sum": 494,
+          "events": 128,
+          "max_depth": 9
+        },
+        "copy.substitute.fresh_binder": {
+          "depth_sum": 194,
+          "events": 408,
+          "max_depth": 7
+        },
+        "copy.substitute.fresh_pattern_binder": {
+          "depth_sum": 728,
+          "events": 313,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_abs": {
+          "depth_sum": 169,
+          "events": 394,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_alternative": {
+          "depth_sum": 607,
+          "events": 275,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_app": {
+          "depth_sum": 919,
+          "events": 205,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_case": {
+          "depth_sum": 324,
+          "events": 273,
+          "max_depth": 9
+        },
+        "copy.substitute.rebuild_let": {
+          "depth_sum": 23,
+          "events": 12,
+          "max_depth": 5
+        },
+        "copy.substitute.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.substitute.reuse_leaf": {
+          "depth_sum": 532,
+          "events": 103,
+          "max_depth": 11
+        },
+        "copy.substitute.roots": {
+          "depth_sum": 0,
+          "events": 622,
+          "max_depth": 0
+        },
+        "copy.substitute.variable_lookup": {
+          "depth_sum": 2124,
+          "events": 1013,
+          "max_depth": 11
+        },
+        "copy.substitute.visits": {
+          "depth_sum": 4093,
+          "events": 2002,
+          "max_depth": 11
+        },
+        "identities.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "identities.visits": {
+          "depth_sum": 402227,
+          "events": 7546,
+          "max_depth": 117
+        },
+        "indexUses.roots": {
+          "depth_sum": 0,
+          "events": 25903,
+          "max_depth": 0
+        },
+        "indexUses.visits": {
+          "depth_sum": 4679,
+          "events": 27501,
+          "max_depth": 11
+        },
+        "singleUseBranchPath.roots": {
+          "depth_sum": 0,
+          "events": 379,
+          "max_depth": 0
+        },
+        "singleUseBranchPath.visits": {
+          "depth_sum": 2,
+          "events": 381,
+          "max_depth": 1
+        },
+        "singleUseIOPath.roots": {
+          "depth_sum": 0,
+          "events": 380,
+          "max_depth": 0
+        },
+        "singleUseIOPath.visits": {
+          "depth_sum": 867,
+          "events": 965,
+          "max_depth": 2
+        },
+        "substituteUsed.positive": {
+          "depth_sum": 93198,
+          "events": 3600,
+          "max_depth": 91
+        },
+        "substituteUsed.pruned": {
+          "depth_sum": 67928,
+          "events": 2597,
+          "max_depth": 91
+        },
+        "substituteUsed.rebuild_parent": {
+          "depth_sum": 79840,
+          "events": 2978,
+          "max_depth": 90
+        },
+        "substituteUsed.roots": {
+          "depth_sum": 0,
+          "events": 405,
+          "max_depth": 0
+        },
+        "substituteUsed.visits": {
+          "depth_sum": 161126,
+          "events": 6197,
+          "max_depth": 91
+        },
+        "useApplications.roots": {
+          "depth_sum": 0,
+          "events": 3935,
+          "max_depth": 0
+        },
+        "useApplications.visits": {
+          "depth_sum": 1093,
+          "events": 4643,
+          "max_depth": 7
+        }
+      },
+      "exact_ordinary_llvm_equal": true,
+      "llvm_bytes": 157443,
+      "llvm_sha256": "d9b9d1230208dced79dea87bf0dbfc8ae477cf7d67c36fbf5e3b5804d2c425b7"
+    },
+    {
+      "case": {
+        "case": "dependency_chain-128",
+        "family": "dependency_chain",
+        "interface": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-default-c1b802bd/legs/134-dependency_chain-128-mlf/build/unit.mlfci",
+        "object": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-default-c1b802bd/legs/134-dependency_chain-128-mlf/build/unit.mlfco",
+        "size": 128
+      },
+      "complete": true,
+      "counters": {
+        "batch.admitted": {
+          "depth_sum": 0,
+          "events": 128,
+          "max_depth": 0
+        },
+        "batch.flush.empty": {
+          "depth_sum": 0,
+          "events": 2000,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.1": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.127": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_size": {
+          "depth_sum": 128,
+          "events": 2,
+          "max_depth": 127
+        },
+        "batch.flush.nonempty": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.base_visits": {
+          "depth_sum": 194,
+          "events": 42,
+          "max_depth": 11
+        },
+        "batch.materialize.expanded_var": {
+          "depth_sum": 25151,
+          "events": 128,
+          "max_depth": 387
+        },
+        "batch.materialize.replacement_visits": {
+          "depth_sum": 203842,
+          "events": 1018,
+          "max_depth": 391
+        },
+        "batch.materialize.roots": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.visits": {
+          "depth_sum": 204036,
+          "events": 1060,
+          "max_depth": 391
+        },
+        "batch.negative.roots": {
+          "depth_sum": 0,
+          "events": 153,
+          "max_depth": 0
+        },
+        "batch.negative.visits": {
+          "depth_sum": 4795,
+          "events": 1474,
+          "max_depth": 14
+        },
+        "batch.owned.visits": {
+          "depth_sum": 0,
+          "events": 59780,
+          "max_depth": 0
+        },
+        "batch.pending.visits": {
+          "depth_sum": 0,
+          "events": 2130,
+          "max_depth": 0
+        },
+        "commonCalls.positive": {
+          "depth_sum": 192,
+          "events": 96,
+          "max_depth": 6
+        },
+        "commonCalls.pruned": {
+          "depth_sum": 107,
+          "events": 37,
+          "max_depth": 5
+        },
+        "commonCalls.roots": {
+          "depth_sum": 0,
+          "events": 25,
+          "max_depth": 0
+        },
+        "commonCalls.visits": {
+          "depth_sum": 299,
+          "events": 133,
+          "max_depth": 6
+        },
+        "copy.batch_admitted.fresh_binder": {
+          "depth_sum": 0,
+          "events": 128,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_abs": {
+          "depth_sum": 0,
+          "events": 128,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_app": {
+          "depth_sum": 760,
+          "events": 381,
+          "max_depth": 3
+        },
+        "copy.batch_admitted.reuse_leaf": {
+          "depth_sum": 887,
+          "events": 254,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.roots": {
+          "depth_sum": 0,
+          "events": 128,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.variable_lookup": {
+          "depth_sum": 763,
+          "events": 255,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.visits": {
+          "depth_sum": 2410,
+          "events": 1018,
+          "max_depth": 4
+        },
+        "copy.higher_order_callback.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_callback.variable_lookup": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_callback.visits": {
+          "depth_sum": 3,
+          "events": 3,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.fresh_pattern_binder": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.rebuild_alternative": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_app": {
+          "depth_sum": 21,
+          "events": 5,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.rebuild_case": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.reuse_leaf": {
+          "depth_sum": 8,
+          "events": 2,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_rhs.variable_lookup": {
+          "depth_sum": 32,
+          "events": 6,
+          "max_depth": 6
+        },
+        "copy.higher_order_rhs.visits": {
+          "depth_sum": 64,
+          "events": 16,
+          "max_depth": 6
+        },
+        "copy.identities_alias.fresh_binder": {
+          "depth_sum": 9373,
+          "events": 1612,
+          "max_depth": 23
+        },
+        "copy.identities_alias.fresh_pattern_binder": {
+          "depth_sum": 74793,
+          "events": 6189,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_abs": {
+          "depth_sum": 9238,
+          "events": 1585,
+          "max_depth": 23
+        },
+        "copy.identities_alias.rebuild_alternative": {
+          "depth_sum": 7910,
+          "events": 814,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_app": {
+          "depth_sum": 470624,
+          "events": 19889,
+          "max_depth": 59
+        },
+        "copy.identities_alias.rebuild_case": {
+          "depth_sum": 6738,
+          "events": 725,
+          "max_depth": 25
+        },
+        "copy.identities_alias.rebuild_rec": {
+          "depth_sum": 101,
+          "events": 19,
+          "max_depth": 9
+        },
+        "copy.identities_alias.reuse_leaf": {
+          "depth_sum": 166317,
+          "events": 7326,
+          "max_depth": 57
+        },
+        "copy.identities_alias.roots": {
+          "depth_sum": 0,
+          "events": 447,
+          "max_depth": 0
+        },
+        "copy.identities_alias.variable_lookup": {
+          "depth_sum": 354486,
+          "events": 13851,
+          "max_depth": 60
+        },
+        "copy.identities_alias.visits": {
+          "depth_sum": 1007504,
+          "events": 43395,
+          "max_depth": 60
+        },
+        "copy.owned_final_numbering.fresh_binder": {
+          "depth_sum": 23674,
+          "events": 570,
+          "max_depth": 172
+        },
+        "copy.owned_final_numbering.fresh_pattern_binder": {
+          "depth_sum": 31123,
+          "events": 823,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_abs": {
+          "depth_sum": 8124,
+          "events": 358,
+          "max_depth": 49
+        },
+        "copy.owned_final_numbering.rebuild_alternative": {
+          "depth_sum": 15680,
+          "events": 365,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_app": {
+          "depth_sum": 95088,
+          "events": 1931,
+          "max_depth": 174
+        },
+        "copy.owned_final_numbering.rebuild_case": {
+          "depth_sum": 14581,
+          "events": 339,
+          "max_depth": 87
+        },
+        "copy.owned_final_numbering.rebuild_let": {
+          "depth_sum": 14048,
+          "events": 137,
+          "max_depth": 172
+        },
+        "copy.owned_final_numbering.rebuild_rec": {
+          "depth_sum": 1201,
+          "events": 57,
+          "max_depth": 40
+        },
+        "copy.owned_final_numbering.reuse_leaf": {
+          "depth_sum": 58336,
+          "events": 1005,
+          "max_depth": 175
+        },
+        "copy.owned_final_numbering.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_final_numbering.variable_lookup": {
+          "depth_sum": 72947,
+          "events": 1504,
+          "max_depth": 175
+        },
+        "copy.owned_final_numbering.visits": {
+          "depth_sum": 264325,
+          "events": 5331,
+          "max_depth": 175
+        },
+        "copy.owned_initial_uniqueness.fresh_binder": {
+          "depth_sum": 141787,
+          "events": 1995,
+          "max_depth": 210
+        },
+        "copy.owned_initial_uniqueness.fresh_pattern_binder": {
+          "depth_sum": 30815,
+          "events": 598,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_abs": {
+          "depth_sum": 89631,
+          "events": 1321,
+          "max_depth": 210
+        },
+        "copy.owned_initial_uniqueness.rebuild_alternative": {
+          "depth_sum": 6781,
+          "events": 140,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_app": {
+          "depth_sum": 226283,
+          "events": 3129,
+          "max_depth": 212
+        },
+        "copy.owned_initial_uniqueness.rebuild_case": {
+          "depth_sum": 5594,
+          "events": 116,
+          "max_depth": 81
+        },
+        "copy.owned_initial_uniqueness.rebuild_let": {
+          "depth_sum": 48523,
+          "events": 577,
+          "max_depth": 208
+        },
+        "copy.owned_initial_uniqueness.rebuild_rec": {
+          "depth_sum": 3427,
+          "events": 91,
+          "max_depth": 76
+        },
+        "copy.owned_initial_uniqueness.reuse_leaf": {
+          "depth_sum": 81388,
+          "events": 1012,
+          "max_depth": 213
+        },
+        "copy.owned_initial_uniqueness.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_initial_uniqueness.variable_lookup": {
+          "depth_sum": 212869,
+          "events": 2932,
+          "max_depth": 213
+        },
+        "copy.owned_initial_uniqueness.visits": {
+          "depth_sum": 667715,
+          "events": 9178,
+          "max_depth": 213
+        },
+        "copy.projection.fresh_binder": {
+          "depth_sum": 69,
+          "events": 38,
+          "max_depth": 6
+        },
+        "copy.projection.fresh_pattern_binder": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_abs": {
+          "depth_sum": 55,
+          "events": 23,
+          "max_depth": 4
+        },
+        "copy.projection.rebuild_alternative": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_app": {
+          "depth_sum": 140,
+          "events": 30,
+          "max_depth": 8
+        },
+        "copy.projection.rebuild_case": {
+          "depth_sum": 5,
+          "events": 1,
+          "max_depth": 5
+        },
+        "copy.projection.rebuild_let": {
+          "depth_sum": 12,
+          "events": 14,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.projection.reuse_leaf": {
+          "depth_sum": 89,
+          "events": 18,
+          "max_depth": 8
+        },
+        "copy.projection.roots": {
+          "depth_sum": 0,
+          "events": 12,
+          "max_depth": 0
+        },
+        "copy.projection.variable_lookup": {
+          "depth_sum": 191,
+          "events": 41,
+          "max_depth": 9
+        },
+        "copy.projection.visits": {
+          "depth_sum": 494,
+          "events": 128,
+          "max_depth": 9
+        },
+        "copy.substitute.fresh_binder": {
+          "depth_sum": 194,
+          "events": 408,
+          "max_depth": 7
+        },
+        "copy.substitute.fresh_pattern_binder": {
+          "depth_sum": 728,
+          "events": 313,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_abs": {
+          "depth_sum": 169,
+          "events": 394,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_alternative": {
+          "depth_sum": 607,
+          "events": 275,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_app": {
+          "depth_sum": 919,
+          "events": 205,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_case": {
+          "depth_sum": 324,
+          "events": 273,
+          "max_depth": 9
+        },
+        "copy.substitute.rebuild_let": {
+          "depth_sum": 23,
+          "events": 12,
+          "max_depth": 5
+        },
+        "copy.substitute.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.substitute.reuse_leaf": {
+          "depth_sum": 532,
+          "events": 103,
+          "max_depth": 11
+        },
+        "copy.substitute.roots": {
+          "depth_sum": 0,
+          "events": 622,
+          "max_depth": 0
+        },
+        "copy.substitute.variable_lookup": {
+          "depth_sum": 2124,
+          "events": 1013,
+          "max_depth": 11
+        },
+        "copy.substitute.visits": {
+          "depth_sum": 4093,
+          "events": 2002,
+          "max_depth": 11
+        },
+        "identities.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "identities.visits": {
+          "depth_sum": 667715,
+          "events": 9178,
+          "max_depth": 213
+        },
+        "indexUses.roots": {
+          "depth_sum": 0,
+          "events": 29263,
+          "max_depth": 0
+        },
+        "indexUses.visits": {
+          "depth_sum": 6503,
+          "events": 31533,
+          "max_depth": 11
+        },
+        "singleUseBranchPath.roots": {
+          "depth_sum": 0,
+          "events": 1243,
+          "max_depth": 0
+        },
+        "singleUseBranchPath.visits": {
+          "depth_sum": 2,
+          "events": 1245,
+          "max_depth": 1
+        },
+        "singleUseIOPath.roots": {
+          "depth_sum": 0,
+          "events": 1244,
+          "max_depth": 0
+        },
+        "singleUseIOPath.visits": {
+          "depth_sum": 3459,
+          "events": 3557,
+          "max_depth": 2
+        },
+        "substituteUsed.positive": {
+          "depth_sum": 93198,
+          "events": 3600,
+          "max_depth": 91
+        },
+        "substituteUsed.pruned": {
+          "depth_sum": 67928,
+          "events": 2597,
+          "max_depth": 91
+        },
+        "substituteUsed.rebuild_parent": {
+          "depth_sum": 79840,
+          "events": 2978,
+          "max_depth": 90
+        },
+        "substituteUsed.roots": {
+          "depth_sum": 0,
+          "events": 405,
+          "max_depth": 0
+        },
+        "substituteUsed.visits": {
+          "depth_sum": 161126,
+          "events": 6197,
+          "max_depth": 91
+        },
+        "useApplications.roots": {
+          "depth_sum": 0,
+          "events": 4799,
+          "max_depth": 0
+        },
+        "useApplications.visits": {
+          "depth_sum": 3685,
+          "events": 7235,
+          "max_depth": 7
+        }
+      },
+      "exact_ordinary_llvm_equal": true,
+      "llvm_bytes": 248451,
+      "llvm_sha256": "b8ee998715a53ca8ab62761e68b8d3945a79b067e233fa920a54d55ba50d4ae5"
+    },
+    {
+      "case": {
+        "case": "dependency_chain-512",
+        "family": "dependency_chain",
+        "interface": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-scale512-c1b802bd/legs/061-dependency_chain-512-mlf/build/unit.mlfci",
+        "object": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-scale512-c1b802bd/legs/061-dependency_chain-512-mlf/build/unit.mlfco",
+        "size": 512
+      },
+      "complete": true,
+      "counters": {
+        "batch.admitted": {
+          "depth_sum": 0,
+          "events": 512,
+          "max_depth": 0
+        },
+        "batch.flush.empty": {
+          "depth_sum": 0,
+          "events": 5456,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.1": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.511": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_size": {
+          "depth_sum": 512,
+          "events": 2,
+          "max_depth": 511
+        },
+        "batch.flush.nonempty": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.base_visits": {
+          "depth_sum": 194,
+          "events": 42,
+          "max_depth": 11
+        },
+        "batch.materialize.expanded_var": {
+          "depth_sum": 395519,
+          "events": 512,
+          "max_depth": 1539
+        },
+        "batch.materialize.replacement_visits": {
+          "depth_sum": 3174850,
+          "events": 4090,
+          "max_depth": 1543
+        },
+        "batch.materialize.roots": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.visits": {
+          "depth_sum": 3175044,
+          "events": 4132,
+          "max_depth": 1543
+        },
+        "batch.negative.roots": {
+          "depth_sum": 0,
+          "events": 537,
+          "max_depth": 0
+        },
+        "batch.negative.visits": {
+          "depth_sum": 12091,
+          "events": 4546,
+          "max_depth": 14
+        },
+        "batch.owned.visits": {
+          "depth_sum": 0,
+          "events": 82820,
+          "max_depth": 0
+        },
+        "batch.pending.visits": {
+          "depth_sum": 0,
+          "events": 5970,
+          "max_depth": 0
+        },
+        "commonCalls.positive": {
+          "depth_sum": 192,
+          "events": 96,
+          "max_depth": 6
+        },
+        "commonCalls.pruned": {
+          "depth_sum": 107,
+          "events": 37,
+          "max_depth": 5
+        },
+        "commonCalls.roots": {
+          "depth_sum": 0,
+          "events": 25,
+          "max_depth": 0
+        },
+        "commonCalls.visits": {
+          "depth_sum": 299,
+          "events": 133,
+          "max_depth": 6
+        },
+        "copy.batch_admitted.fresh_binder": {
+          "depth_sum": 0,
+          "events": 512,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_abs": {
+          "depth_sum": 0,
+          "events": 512,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_app": {
+          "depth_sum": 3064,
+          "events": 1533,
+          "max_depth": 3
+        },
+        "copy.batch_admitted.reuse_leaf": {
+          "depth_sum": 3575,
+          "events": 1022,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.roots": {
+          "depth_sum": 0,
+          "events": 512,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.variable_lookup": {
+          "depth_sum": 3067,
+          "events": 1023,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.visits": {
+          "depth_sum": 9706,
+          "events": 4090,
+          "max_depth": 4
+        },
+        "copy.higher_order_callback.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_callback.variable_lookup": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_callback.visits": {
+          "depth_sum": 3,
+          "events": 3,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.fresh_pattern_binder": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.rebuild_alternative": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_app": {
+          "depth_sum": 21,
+          "events": 5,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.rebuild_case": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.reuse_leaf": {
+          "depth_sum": 8,
+          "events": 2,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_rhs.variable_lookup": {
+          "depth_sum": 32,
+          "events": 6,
+          "max_depth": 6
+        },
+        "copy.higher_order_rhs.visits": {
+          "depth_sum": 64,
+          "events": 16,
+          "max_depth": 6
+        },
+        "copy.identities_alias.fresh_binder": {
+          "depth_sum": 9373,
+          "events": 1612,
+          "max_depth": 23
+        },
+        "copy.identities_alias.fresh_pattern_binder": {
+          "depth_sum": 74793,
+          "events": 6189,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_abs": {
+          "depth_sum": 9238,
+          "events": 1585,
+          "max_depth": 23
+        },
+        "copy.identities_alias.rebuild_alternative": {
+          "depth_sum": 7910,
+          "events": 814,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_app": {
+          "depth_sum": 471776,
+          "events": 21041,
+          "max_depth": 59
+        },
+        "copy.identities_alias.rebuild_case": {
+          "depth_sum": 6738,
+          "events": 725,
+          "max_depth": 25
+        },
+        "copy.identities_alias.rebuild_rec": {
+          "depth_sum": 101,
+          "events": 19,
+          "max_depth": 9
+        },
+        "copy.identities_alias.reuse_leaf": {
+          "depth_sum": 168237,
+          "events": 8094,
+          "max_depth": 57
+        },
+        "copy.identities_alias.roots": {
+          "depth_sum": 0,
+          "events": 831,
+          "max_depth": 0
+        },
+        "copy.identities_alias.variable_lookup": {
+          "depth_sum": 356022,
+          "events": 14619,
+          "max_depth": 60
+        },
+        "copy.identities_alias.visits": {
+          "depth_sum": 1012112,
+          "events": 46083,
+          "max_depth": 60
+        },
+        "copy.owned_final_numbering.fresh_binder": {
+          "depth_sum": 163642,
+          "events": 954,
+          "max_depth": 556
+        },
+        "copy.owned_final_numbering.fresh_pattern_binder": {
+          "depth_sum": 31123,
+          "events": 823,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_abs": {
+          "depth_sum": 8124,
+          "events": 358,
+          "max_depth": 49
+        },
+        "copy.owned_final_numbering.rebuild_alternative": {
+          "depth_sum": 15680,
+          "events": 365,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_app": {
+          "depth_sum": 376944,
+          "events": 2699,
+          "max_depth": 558
+        },
+        "copy.owned_final_numbering.rebuild_case": {
+          "depth_sum": 14581,
+          "events": 339,
+          "max_depth": 87
+        },
+        "copy.owned_final_numbering.rebuild_let": {
+          "depth_sum": 154016,
+          "events": 521,
+          "max_depth": 556
+        },
+        "copy.owned_final_numbering.rebuild_rec": {
+          "depth_sum": 1201,
+          "events": 57,
+          "max_depth": 40
+        },
+        "copy.owned_final_numbering.reuse_leaf": {
+          "depth_sum": 340960,
+          "events": 1773,
+          "max_depth": 559
+        },
+        "copy.owned_final_numbering.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_final_numbering.variable_lookup": {
+          "depth_sum": 214451,
+          "events": 1888,
+          "max_depth": 559
+        },
+        "copy.owned_final_numbering.visits": {
+          "depth_sum": 1110277,
+          "events": 7635,
+          "max_depth": 559
+        },
+        "copy.owned_initial_uniqueness.fresh_binder": {
+          "depth_sum": 911131,
+          "events": 3915,
+          "max_depth": 594
+        },
+        "copy.owned_initial_uniqueness.fresh_pattern_binder": {
+          "depth_sum": 30815,
+          "events": 598,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_abs": {
+          "depth_sum": 551775,
+          "events": 2473,
+          "max_depth": 594
+        },
+        "copy.owned_initial_uniqueness.rebuild_alternative": {
+          "depth_sum": 6781,
+          "events": 140,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_app": {
+          "depth_sum": 999083,
+          "events": 5049,
+          "max_depth": 596
+        },
+        "copy.owned_initial_uniqueness.rebuild_case": {
+          "depth_sum": 5594,
+          "events": 116,
+          "max_depth": 81
+        },
+        "copy.owned_initial_uniqueness.rebuild_let": {
+          "depth_sum": 355723,
+          "events": 1345,
+          "max_depth": 592
+        },
+        "copy.owned_initial_uniqueness.rebuild_rec": {
+          "depth_sum": 3427,
+          "events": 91,
+          "max_depth": 76
+        },
+        "copy.owned_initial_uniqueness.reuse_leaf": {
+          "depth_sum": 392812,
+          "events": 1780,
+          "max_depth": 597
+        },
+        "copy.owned_initial_uniqueness.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_initial_uniqueness.variable_lookup": {
+          "depth_sum": 987973,
+          "events": 4852,
+          "max_depth": 597
+        },
+        "copy.owned_initial_uniqueness.visits": {
+          "depth_sum": 3296387,
+          "events": 15706,
+          "max_depth": 597
+        },
+        "copy.projection.fresh_binder": {
+          "depth_sum": 69,
+          "events": 38,
+          "max_depth": 6
+        },
+        "copy.projection.fresh_pattern_binder": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_abs": {
+          "depth_sum": 55,
+          "events": 23,
+          "max_depth": 4
+        },
+        "copy.projection.rebuild_alternative": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_app": {
+          "depth_sum": 140,
+          "events": 30,
+          "max_depth": 8
+        },
+        "copy.projection.rebuild_case": {
+          "depth_sum": 5,
+          "events": 1,
+          "max_depth": 5
+        },
+        "copy.projection.rebuild_let": {
+          "depth_sum": 12,
+          "events": 14,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.projection.reuse_leaf": {
+          "depth_sum": 89,
+          "events": 18,
+          "max_depth": 8
+        },
+        "copy.projection.roots": {
+          "depth_sum": 0,
+          "events": 12,
+          "max_depth": 0
+        },
+        "copy.projection.variable_lookup": {
+          "depth_sum": 191,
+          "events": 41,
+          "max_depth": 9
+        },
+        "copy.projection.visits": {
+          "depth_sum": 494,
+          "events": 128,
+          "max_depth": 9
+        },
+        "copy.substitute.fresh_binder": {
+          "depth_sum": 194,
+          "events": 408,
+          "max_depth": 7
+        },
+        "copy.substitute.fresh_pattern_binder": {
+          "depth_sum": 728,
+          "events": 313,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_abs": {
+          "depth_sum": 169,
+          "events": 394,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_alternative": {
+          "depth_sum": 607,
+          "events": 275,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_app": {
+          "depth_sum": 919,
+          "events": 205,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_case": {
+          "depth_sum": 324,
+          "events": 273,
+          "max_depth": 9
+        },
+        "copy.substitute.rebuild_let": {
+          "depth_sum": 23,
+          "events": 12,
+          "max_depth": 5
+        },
+        "copy.substitute.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.substitute.reuse_leaf": {
+          "depth_sum": 532,
+          "events": 103,
+          "max_depth": 11
+        },
+        "copy.substitute.roots": {
+          "depth_sum": 0,
+          "events": 622,
+          "max_depth": 0
+        },
+        "copy.substitute.variable_lookup": {
+          "depth_sum": 2124,
+          "events": 1013,
+          "max_depth": 11
+        },
+        "copy.substitute.visits": {
+          "depth_sum": 4093,
+          "events": 2002,
+          "max_depth": 11
+        },
+        "identities.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "identities.visits": {
+          "depth_sum": 3296387,
+          "events": 15706,
+          "max_depth": 597
+        },
+        "indexUses.roots": {
+          "depth_sum": 0,
+          "events": 42703,
+          "max_depth": 0
+        },
+        "indexUses.visits": {
+          "depth_sum": 13799,
+          "events": 47661,
+          "max_depth": 11
+        },
+        "singleUseBranchPath.roots": {
+          "depth_sum": 0,
+          "events": 4699,
+          "max_depth": 0
+        },
+        "singleUseBranchPath.visits": {
+          "depth_sum": 2,
+          "events": 4701,
+          "max_depth": 1
+        },
+        "singleUseIOPath.roots": {
+          "depth_sum": 0,
+          "events": 4700,
+          "max_depth": 0
+        },
+        "singleUseIOPath.visits": {
+          "depth_sum": 13827,
+          "events": 13925,
+          "max_depth": 2
+        },
+        "substituteUsed.positive": {
+          "depth_sum": 93198,
+          "events": 3600,
+          "max_depth": 91
+        },
+        "substituteUsed.pruned": {
+          "depth_sum": 67928,
+          "events": 2597,
+          "max_depth": 91
+        },
+        "substituteUsed.rebuild_parent": {
+          "depth_sum": 79840,
+          "events": 2978,
+          "max_depth": 90
+        },
+        "substituteUsed.roots": {
+          "depth_sum": 0,
+          "events": 405,
+          "max_depth": 0
+        },
+        "substituteUsed.visits": {
+          "depth_sum": 161126,
+          "events": 6197,
+          "max_depth": 91
+        },
+        "useApplications.roots": {
+          "depth_sum": 0,
+          "events": 8255,
+          "max_depth": 0
+        },
+        "useApplications.visits": {
+          "depth_sum": 14053,
+          "events": 17603,
+          "max_depth": 7
+        }
+      },
+      "exact_ordinary_llvm_equal": true,
+      "llvm_bytes": 619509,
+      "llvm_sha256": "4849cac149275542e23c25ea0a0c2408f29124252d2dd29d8e90c334014b6754"
+    },
+    {
+      "case": {
+        "case": "dependency_chain-2048",
+        "family": "dependency_chain",
+        "interface": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/references/dependency_chain-2048/build/unit.mlfci",
+        "object": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/references/dependency_chain-2048/build/unit.mlfco",
+        "size": 2048
+      },
+      "complete": true,
+      "counters": {
+        "batch.admitted": {
+          "depth_sum": 0,
+          "events": 2048,
+          "max_depth": 0
+        },
+        "batch.flush.empty": {
+          "depth_sum": 0,
+          "events": 19280,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.1": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.2047": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_size": {
+          "depth_sum": 2048,
+          "events": 2,
+          "max_depth": 2047
+        },
+        "batch.flush.nonempty": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.base_visits": {
+          "depth_sum": 194,
+          "events": 42,
+          "max_depth": 11
+        },
+        "batch.materialize.expanded_var": {
+          "depth_sum": 6300671,
+          "events": 2048,
+          "max_depth": 6147
+        },
+        "batch.materialize.replacement_visits": {
+          "depth_sum": 50448322,
+          "events": 16378,
+          "max_depth": 6151
+        },
+        "batch.materialize.roots": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.visits": {
+          "depth_sum": 50448516,
+          "events": 16420,
+          "max_depth": 6151
+        },
+        "batch.negative.roots": {
+          "depth_sum": 0,
+          "events": 2073,
+          "max_depth": 0
+        },
+        "batch.negative.visits": {
+          "depth_sum": 41275,
+          "events": 16834,
+          "max_depth": 14
+        },
+        "batch.owned.visits": {
+          "depth_sum": 0,
+          "events": 174980,
+          "max_depth": 0
+        },
+        "batch.pending.visits": {
+          "depth_sum": 0,
+          "events": 21330,
+          "max_depth": 0
+        },
+        "commonCalls.positive": {
+          "depth_sum": 192,
+          "events": 96,
+          "max_depth": 6
+        },
+        "commonCalls.pruned": {
+          "depth_sum": 107,
+          "events": 37,
+          "max_depth": 5
+        },
+        "commonCalls.roots": {
+          "depth_sum": 0,
+          "events": 25,
+          "max_depth": 0
+        },
+        "commonCalls.visits": {
+          "depth_sum": 299,
+          "events": 133,
+          "max_depth": 6
+        },
+        "copy.batch_admitted.fresh_binder": {
+          "depth_sum": 0,
+          "events": 2048,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_abs": {
+          "depth_sum": 0,
+          "events": 2048,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_app": {
+          "depth_sum": 12280,
+          "events": 6141,
+          "max_depth": 3
+        },
+        "copy.batch_admitted.reuse_leaf": {
+          "depth_sum": 14327,
+          "events": 4094,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.roots": {
+          "depth_sum": 0,
+          "events": 2048,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.variable_lookup": {
+          "depth_sum": 12283,
+          "events": 4095,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.visits": {
+          "depth_sum": 38890,
+          "events": 16378,
+          "max_depth": 4
+        },
+        "copy.higher_order_callback.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_callback.variable_lookup": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_callback.visits": {
+          "depth_sum": 3,
+          "events": 3,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.fresh_pattern_binder": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.rebuild_alternative": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_app": {
+          "depth_sum": 21,
+          "events": 5,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.rebuild_case": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.reuse_leaf": {
+          "depth_sum": 8,
+          "events": 2,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_rhs.variable_lookup": {
+          "depth_sum": 32,
+          "events": 6,
+          "max_depth": 6
+        },
+        "copy.higher_order_rhs.visits": {
+          "depth_sum": 64,
+          "events": 16,
+          "max_depth": 6
+        },
+        "copy.identities_alias.fresh_binder": {
+          "depth_sum": 9373,
+          "events": 1612,
+          "max_depth": 23
+        },
+        "copy.identities_alias.fresh_pattern_binder": {
+          "depth_sum": 74793,
+          "events": 6189,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_abs": {
+          "depth_sum": 9238,
+          "events": 1585,
+          "max_depth": 23
+        },
+        "copy.identities_alias.rebuild_alternative": {
+          "depth_sum": 7910,
+          "events": 814,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_app": {
+          "depth_sum": 476384,
+          "events": 25649,
+          "max_depth": 59
+        },
+        "copy.identities_alias.rebuild_case": {
+          "depth_sum": 6738,
+          "events": 725,
+          "max_depth": 25
+        },
+        "copy.identities_alias.rebuild_rec": {
+          "depth_sum": 101,
+          "events": 19,
+          "max_depth": 9
+        },
+        "copy.identities_alias.reuse_leaf": {
+          "depth_sum": 175917,
+          "events": 11166,
+          "max_depth": 57
+        },
+        "copy.identities_alias.roots": {
+          "depth_sum": 0,
+          "events": 2367,
+          "max_depth": 0
+        },
+        "copy.identities_alias.variable_lookup": {
+          "depth_sum": 362166,
+          "events": 17691,
+          "max_depth": 60
+        },
+        "copy.identities_alias.visits": {
+          "depth_sum": 1030544,
+          "events": 56835,
+          "max_depth": 60
+        },
+        "copy.owned_final_numbering.fresh_binder": {
+          "depth_sum": 2198074,
+          "events": 2490,
+          "max_depth": 2092
+        },
+        "copy.owned_final_numbering.fresh_pattern_binder": {
+          "depth_sum": 31123,
+          "events": 823,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_abs": {
+          "depth_sum": 8124,
+          "events": 358,
+          "max_depth": 49
+        },
+        "copy.owned_final_numbering.rebuild_alternative": {
+          "depth_sum": 15680,
+          "events": 365,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_app": {
+          "depth_sum": 4453488,
+          "events": 5771,
+          "max_depth": 2094
+        },
+        "copy.owned_final_numbering.rebuild_case": {
+          "depth_sum": 14581,
+          "events": 339,
+          "max_depth": 87
+        },
+        "copy.owned_final_numbering.rebuild_let": {
+          "depth_sum": 2188448,
+          "events": 2057,
+          "max_depth": 2092
+        },
+        "copy.owned_final_numbering.rebuild_rec": {
+          "depth_sum": 1201,
+          "events": 57,
+          "max_depth": 40
+        },
+        "copy.owned_final_numbering.reuse_leaf": {
+          "depth_sum": 4420576,
+          "events": 4845,
+          "max_depth": 2095
+        },
+        "copy.owned_final_numbering.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_final_numbering.variable_lookup": {
+          "depth_sum": 2255027,
+          "events": 3424,
+          "max_depth": 2095
+        },
+        "copy.owned_final_numbering.visits": {
+          "depth_sum": 13341445,
+          "events": 16851,
+          "max_depth": 2095
+        },
+        "copy.owned_initial_uniqueness.fresh_binder": {
+          "depth_sum": 11361307,
+          "events": 11595,
+          "max_depth": 2130
+        },
+        "copy.owned_initial_uniqueness.fresh_pattern_binder": {
+          "depth_sum": 30815,
+          "events": 598,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_abs": {
+          "depth_sum": 6824031,
+          "events": 7081,
+          "max_depth": 2130
+        },
+        "copy.owned_initial_uniqueness.rebuild_alternative": {
+          "depth_sum": 6781,
+          "events": 140,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_app": {
+          "depth_sum": 11463083,
+          "events": 12729,
+          "max_depth": 2132
+        },
+        "copy.owned_initial_uniqueness.rebuild_case": {
+          "depth_sum": 5594,
+          "events": 116,
+          "max_depth": 81
+        },
+        "copy.owned_initial_uniqueness.rebuild_let": {
+          "depth_sum": 4533643,
+          "events": 4417,
+          "max_depth": 2128
+        },
+        "copy.owned_initial_uniqueness.rebuild_rec": {
+          "depth_sum": 3427,
+          "events": 91,
+          "max_depth": 76
+        },
+        "copy.owned_initial_uniqueness.reuse_leaf": {
+          "depth_sum": 4587628,
+          "events": 4852,
+          "max_depth": 2133
+        },
+        "copy.owned_initial_uniqueness.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_initial_uniqueness.variable_lookup": {
+          "depth_sum": 11461189,
+          "events": 12532,
+          "max_depth": 2133
+        },
+        "copy.owned_initial_uniqueness.visits": {
+          "depth_sum": 38878595,
+          "events": 41818,
+          "max_depth": 2133
+        },
+        "copy.projection.fresh_binder": {
+          "depth_sum": 69,
+          "events": 38,
+          "max_depth": 6
+        },
+        "copy.projection.fresh_pattern_binder": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_abs": {
+          "depth_sum": 55,
+          "events": 23,
+          "max_depth": 4
+        },
+        "copy.projection.rebuild_alternative": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_app": {
+          "depth_sum": 140,
+          "events": 30,
+          "max_depth": 8
+        },
+        "copy.projection.rebuild_case": {
+          "depth_sum": 5,
+          "events": 1,
+          "max_depth": 5
+        },
+        "copy.projection.rebuild_let": {
+          "depth_sum": 12,
+          "events": 14,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.projection.reuse_leaf": {
+          "depth_sum": 89,
+          "events": 18,
+          "max_depth": 8
+        },
+        "copy.projection.roots": {
+          "depth_sum": 0,
+          "events": 12,
+          "max_depth": 0
+        },
+        "copy.projection.variable_lookup": {
+          "depth_sum": 191,
+          "events": 41,
+          "max_depth": 9
+        },
+        "copy.projection.visits": {
+          "depth_sum": 494,
+          "events": 128,
+          "max_depth": 9
+        },
+        "copy.substitute.fresh_binder": {
+          "depth_sum": 194,
+          "events": 408,
+          "max_depth": 7
+        },
+        "copy.substitute.fresh_pattern_binder": {
+          "depth_sum": 728,
+          "events": 313,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_abs": {
+          "depth_sum": 169,
+          "events": 394,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_alternative": {
+          "depth_sum": 607,
+          "events": 275,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_app": {
+          "depth_sum": 919,
+          "events": 205,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_case": {
+          "depth_sum": 324,
+          "events": 273,
+          "max_depth": 9
+        },
+        "copy.substitute.rebuild_let": {
+          "depth_sum": 23,
+          "events": 12,
+          "max_depth": 5
+        },
+        "copy.substitute.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.substitute.reuse_leaf": {
+          "depth_sum": 532,
+          "events": 103,
+          "max_depth": 11
+        },
+        "copy.substitute.roots": {
+          "depth_sum": 0,
+          "events": 622,
+          "max_depth": 0
+        },
+        "copy.substitute.variable_lookup": {
+          "depth_sum": 2124,
+          "events": 1013,
+          "max_depth": 11
+        },
+        "copy.substitute.visits": {
+          "depth_sum": 4093,
+          "events": 2002,
+          "max_depth": 11
+        },
+        "identities.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "identities.visits": {
+          "depth_sum": 38878595,
+          "events": 41818,
+          "max_depth": 2133
+        },
+        "indexUses.roots": {
+          "depth_sum": 0,
+          "events": 96463,
+          "max_depth": 0
+        },
+        "indexUses.visits": {
+          "depth_sum": 42983,
+          "events": 112173,
+          "max_depth": 11
+        },
+        "singleUseBranchPath.roots": {
+          "depth_sum": 0,
+          "events": 18523,
+          "max_depth": 0
+        },
+        "singleUseBranchPath.visits": {
+          "depth_sum": 2,
+          "events": 18525,
+          "max_depth": 1
+        },
+        "singleUseIOPath.roots": {
+          "depth_sum": 0,
+          "events": 18524,
+          "max_depth": 0
+        },
+        "singleUseIOPath.visits": {
+          "depth_sum": 55299,
+          "events": 55397,
+          "max_depth": 2
+        },
+        "substituteUsed.positive": {
+          "depth_sum": 93198,
+          "events": 3600,
+          "max_depth": 91
+        },
+        "substituteUsed.pruned": {
+          "depth_sum": 67928,
+          "events": 2597,
+          "max_depth": 91
+        },
+        "substituteUsed.rebuild_parent": {
+          "depth_sum": 79840,
+          "events": 2978,
+          "max_depth": 90
+        },
+        "substituteUsed.roots": {
+          "depth_sum": 0,
+          "events": 405,
+          "max_depth": 0
+        },
+        "substituteUsed.visits": {
+          "depth_sum": 161126,
+          "events": 6197,
+          "max_depth": 91
+        },
+        "useApplications.roots": {
+          "depth_sum": 0,
+          "events": 22079,
+          "max_depth": 0
+        },
+        "useApplications.visits": {
+          "depth_sum": 55525,
+          "events": 59075,
+          "max_depth": 7
+        }
+      },
+      "exact_ordinary_llvm_equal": true,
+      "llvm_bytes": 2217001,
+      "llvm_sha256": "2c5d8866118cef03323484f8fe0d0dcccb7c05d6b985402a80a3e1310c76031d"
+    },
+    {
+      "case": {
+        "case": "inferred_chain-32",
+        "family": "inferred_chain",
+        "interface": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-default-c1b802bd/legs/093-inferred_chain-32-mlf/build/unit.mlfci",
+        "object": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-default-c1b802bd/legs/093-inferred_chain-32-mlf/build/unit.mlfco",
+        "size": 32
+      },
+      "complete": true,
+      "counters": {
+        "batch.admitted": {
+          "depth_sum": 0,
+          "events": 32,
+          "max_depth": 0
+        },
+        "batch.flush.empty": {
+          "depth_sum": 0,
+          "events": 1136,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.1": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.31": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_size": {
+          "depth_sum": 32,
+          "events": 2,
+          "max_depth": 31
+        },
+        "batch.flush.nonempty": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.base_visits": {
+          "depth_sum": 194,
+          "events": 42,
+          "max_depth": 11
+        },
+        "batch.materialize.expanded_var": {
+          "depth_sum": 1679,
+          "events": 32,
+          "max_depth": 99
+        },
+        "batch.materialize.replacement_visits": {
+          "depth_sum": 14050,
+          "events": 250,
+          "max_depth": 103
+        },
+        "batch.materialize.roots": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.visits": {
+          "depth_sum": 14244,
+          "events": 292,
+          "max_depth": 103
+        },
+        "batch.negative.roots": {
+          "depth_sum": 0,
+          "events": 57,
+          "max_depth": 0
+        },
+        "batch.negative.visits": {
+          "depth_sum": 2971,
+          "events": 706,
+          "max_depth": 14
+        },
+        "batch.owned.visits": {
+          "depth_sum": 0,
+          "events": 54020,
+          "max_depth": 0
+        },
+        "batch.pending.visits": {
+          "depth_sum": 0,
+          "events": 1170,
+          "max_depth": 0
+        },
+        "commonCalls.positive": {
+          "depth_sum": 192,
+          "events": 96,
+          "max_depth": 6
+        },
+        "commonCalls.pruned": {
+          "depth_sum": 107,
+          "events": 37,
+          "max_depth": 5
+        },
+        "commonCalls.roots": {
+          "depth_sum": 0,
+          "events": 25,
+          "max_depth": 0
+        },
+        "commonCalls.visits": {
+          "depth_sum": 299,
+          "events": 133,
+          "max_depth": 6
+        },
+        "copy.batch_admitted.fresh_binder": {
+          "depth_sum": 0,
+          "events": 32,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_abs": {
+          "depth_sum": 0,
+          "events": 32,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_app": {
+          "depth_sum": 184,
+          "events": 93,
+          "max_depth": 3
+        },
+        "copy.batch_admitted.reuse_leaf": {
+          "depth_sum": 215,
+          "events": 62,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.roots": {
+          "depth_sum": 0,
+          "events": 32,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.variable_lookup": {
+          "depth_sum": 187,
+          "events": 63,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.visits": {
+          "depth_sum": 586,
+          "events": 250,
+          "max_depth": 4
+        },
+        "copy.higher_order_callback.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_callback.variable_lookup": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_callback.visits": {
+          "depth_sum": 3,
+          "events": 3,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.fresh_pattern_binder": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.rebuild_alternative": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_app": {
+          "depth_sum": 21,
+          "events": 5,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.rebuild_case": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.reuse_leaf": {
+          "depth_sum": 8,
+          "events": 2,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_rhs.variable_lookup": {
+          "depth_sum": 32,
+          "events": 6,
+          "max_depth": 6
+        },
+        "copy.higher_order_rhs.visits": {
+          "depth_sum": 64,
+          "events": 16,
+          "max_depth": 6
+        },
+        "copy.identities_alias.fresh_binder": {
+          "depth_sum": 9373,
+          "events": 1612,
+          "max_depth": 23
+        },
+        "copy.identities_alias.fresh_pattern_binder": {
+          "depth_sum": 74793,
+          "events": 6189,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_abs": {
+          "depth_sum": 9238,
+          "events": 1585,
+          "max_depth": 23
+        },
+        "copy.identities_alias.rebuild_alternative": {
+          "depth_sum": 7910,
+          "events": 814,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_app": {
+          "depth_sum": 470242,
+          "events": 19506,
+          "max_depth": 59
+        },
+        "copy.identities_alias.rebuild_case": {
+          "depth_sum": 6738,
+          "events": 725,
+          "max_depth": 25
+        },
+        "copy.identities_alias.rebuild_rec": {
+          "depth_sum": 101,
+          "events": 19,
+          "max_depth": 9
+        },
+        "copy.identities_alias.reuse_leaf": {
+          "depth_sum": 165679,
+          "events": 7070,
+          "max_depth": 57
+        },
+        "copy.identities_alias.roots": {
+          "depth_sum": 0,
+          "events": 319,
+          "max_depth": 0
+        },
+        "copy.identities_alias.variable_lookup": {
+          "depth_sum": 353976,
+          "events": 13596,
+          "max_depth": 60
+        },
+        "copy.identities_alias.visits": {
+          "depth_sum": 1005974,
+          "events": 42501,
+          "max_depth": 60
+        },
+        "copy.owned_final_numbering.fresh_binder": {
+          "depth_sum": 11722,
+          "events": 474,
+          "max_depth": 76
+        },
+        "copy.owned_final_numbering.fresh_pattern_binder": {
+          "depth_sum": 31123,
+          "events": 823,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_abs": {
+          "depth_sum": 8124,
+          "events": 358,
+          "max_depth": 49
+        },
+        "copy.owned_final_numbering.rebuild_alternative": {
+          "depth_sum": 15680,
+          "events": 365,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_app": {
+          "depth_sum": 70704,
+          "events": 1739,
+          "max_depth": 86
+        },
+        "copy.owned_final_numbering.rebuild_case": {
+          "depth_sum": 14581,
+          "events": 339,
+          "max_depth": 87
+        },
+        "copy.owned_final_numbering.rebuild_let": {
+          "depth_sum": 2096,
+          "events": 41,
+          "max_depth": 76
+        },
+        "copy.owned_final_numbering.rebuild_rec": {
+          "depth_sum": 1201,
+          "events": 57,
+          "max_depth": 40
+        },
+        "copy.owned_final_numbering.reuse_leaf": {
+          "depth_sum": 33760,
+          "events": 813,
+          "max_depth": 85
+        },
+        "copy.owned_final_numbering.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_final_numbering.variable_lookup": {
+          "depth_sum": 60611,
+          "events": 1408,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.visits": {
+          "depth_sum": 191077,
+          "events": 4755,
+          "max_depth": 88
+        },
+        "copy.owned_initial_uniqueness.fresh_binder": {
+          "depth_sum": 55419,
+          "events": 1419,
+          "max_depth": 114
+        },
+        "copy.owned_initial_uniqueness.fresh_pattern_binder": {
+          "depth_sum": 30815,
+          "events": 598,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_abs": {
+          "depth_sum": 37039,
+          "events": 969,
+          "max_depth": 114
+        },
+        "copy.owned_initial_uniqueness.rebuild_alternative": {
+          "depth_sum": 6781,
+          "events": 140,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_app": {
+          "depth_sum": 142013,
+          "events": 2585,
+          "max_depth": 116
+        },
+        "copy.owned_initial_uniqueness.rebuild_case": {
+          "depth_sum": 5594,
+          "events": 116,
+          "max_depth": 81
+        },
+        "copy.owned_initial_uniqueness.rebuild_let": {
+          "depth_sum": 14747,
+          "events": 353,
+          "max_depth": 112
+        },
+        "copy.owned_initial_uniqueness.rebuild_rec": {
+          "depth_sum": 3427,
+          "events": 91,
+          "max_depth": 76
+        },
+        "copy.owned_initial_uniqueness.reuse_leaf": {
+          "depth_sum": 49484,
+          "events": 820,
+          "max_depth": 117
+        },
+        "copy.owned_initial_uniqueness.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_initial_uniqueness.variable_lookup": {
+          "depth_sum": 124839,
+          "events": 2356,
+          "max_depth": 117
+        },
+        "copy.owned_initial_uniqueness.visits": {
+          "depth_sum": 377143,
+          "events": 7290,
+          "max_depth": 117
+        },
+        "copy.projection.fresh_binder": {
+          "depth_sum": 69,
+          "events": 38,
+          "max_depth": 6
+        },
+        "copy.projection.fresh_pattern_binder": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_abs": {
+          "depth_sum": 55,
+          "events": 23,
+          "max_depth": 4
+        },
+        "copy.projection.rebuild_alternative": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_app": {
+          "depth_sum": 140,
+          "events": 30,
+          "max_depth": 8
+        },
+        "copy.projection.rebuild_case": {
+          "depth_sum": 5,
+          "events": 1,
+          "max_depth": 5
+        },
+        "copy.projection.rebuild_let": {
+          "depth_sum": 12,
+          "events": 14,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.projection.reuse_leaf": {
+          "depth_sum": 89,
+          "events": 18,
+          "max_depth": 8
+        },
+        "copy.projection.roots": {
+          "depth_sum": 0,
+          "events": 12,
+          "max_depth": 0
+        },
+        "copy.projection.variable_lookup": {
+          "depth_sum": 191,
+          "events": 41,
+          "max_depth": 9
+        },
+        "copy.projection.visits": {
+          "depth_sum": 494,
+          "events": 128,
+          "max_depth": 9
+        },
+        "copy.substitute.fresh_binder": {
+          "depth_sum": 194,
+          "events": 408,
+          "max_depth": 7
+        },
+        "copy.substitute.fresh_pattern_binder": {
+          "depth_sum": 728,
+          "events": 313,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_abs": {
+          "depth_sum": 169,
+          "events": 394,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_alternative": {
+          "depth_sum": 607,
+          "events": 275,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_app": {
+          "depth_sum": 919,
+          "events": 205,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_case": {
+          "depth_sum": 324,
+          "events": 273,
+          "max_depth": 9
+        },
+        "copy.substitute.rebuild_let": {
+          "depth_sum": 23,
+          "events": 12,
+          "max_depth": 5
+        },
+        "copy.substitute.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.substitute.reuse_leaf": {
+          "depth_sum": 532,
+          "events": 103,
+          "max_depth": 11
+        },
+        "copy.substitute.roots": {
+          "depth_sum": 0,
+          "events": 622,
+          "max_depth": 0
+        },
+        "copy.substitute.variable_lookup": {
+          "depth_sum": 2124,
+          "events": 1013,
+          "max_depth": 11
+        },
+        "copy.substitute.visits": {
+          "depth_sum": 4093,
+          "events": 2002,
+          "max_depth": 11
+        },
+        "identities.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "identities.visits": {
+          "depth_sum": 377143,
+          "events": 7290,
+          "max_depth": 117
+        },
+        "indexUses.roots": {
+          "depth_sum": 0,
+          "events": 25903,
+          "max_depth": 0
+        },
+        "indexUses.visits": {
+          "depth_sum": 4679,
+          "events": 27501,
+          "max_depth": 11
+        },
+        "singleUseBranchPath.roots": {
+          "depth_sum": 0,
+          "events": 379,
+          "max_depth": 0
+        },
+        "singleUseBranchPath.visits": {
+          "depth_sum": 2,
+          "events": 381,
+          "max_depth": 1
+        },
+        "singleUseIOPath.roots": {
+          "depth_sum": 0,
+          "events": 380,
+          "max_depth": 0
+        },
+        "singleUseIOPath.visits": {
+          "depth_sum": 867,
+          "events": 965,
+          "max_depth": 2
+        },
+        "substituteUsed.positive": {
+          "depth_sum": 93198,
+          "events": 3600,
+          "max_depth": 91
+        },
+        "substituteUsed.pruned": {
+          "depth_sum": 67928,
+          "events": 2597,
+          "max_depth": 91
+        },
+        "substituteUsed.rebuild_parent": {
+          "depth_sum": 79840,
+          "events": 2978,
+          "max_depth": 90
+        },
+        "substituteUsed.roots": {
+          "depth_sum": 0,
+          "events": 405,
+          "max_depth": 0
+        },
+        "substituteUsed.visits": {
+          "depth_sum": 161126,
+          "events": 6197,
+          "max_depth": 91
+        },
+        "useApplications.roots": {
+          "depth_sum": 0,
+          "events": 3935,
+          "max_depth": 0
+        },
+        "useApplications.visits": {
+          "depth_sum": 1093,
+          "events": 4643,
+          "max_depth": 7
+        }
+      },
+      "exact_ordinary_llvm_equal": true,
+      "llvm_bytes": 157443,
+      "llvm_sha256": "d9b9d1230208dced79dea87bf0dbfc8ae477cf7d67c36fbf5e3b5804d2c425b7"
+    },
+    {
+      "case": {
+        "case": "inferred_chain-128",
+        "family": "inferred_chain",
+        "interface": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-default-c1b802bd/legs/181-inferred_chain-128-mlf/build/unit.mlfci",
+        "object": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-default-c1b802bd/legs/181-inferred_chain-128-mlf/build/unit.mlfco",
+        "size": 128
+      },
+      "complete": true,
+      "counters": {
+        "batch.admitted": {
+          "depth_sum": 0,
+          "events": 128,
+          "max_depth": 0
+        },
+        "batch.flush.empty": {
+          "depth_sum": 0,
+          "events": 2000,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.1": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.127": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_size": {
+          "depth_sum": 128,
+          "events": 2,
+          "max_depth": 127
+        },
+        "batch.flush.nonempty": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.base_visits": {
+          "depth_sum": 194,
+          "events": 42,
+          "max_depth": 11
+        },
+        "batch.materialize.expanded_var": {
+          "depth_sum": 25151,
+          "events": 128,
+          "max_depth": 387
+        },
+        "batch.materialize.replacement_visits": {
+          "depth_sum": 203842,
+          "events": 1018,
+          "max_depth": 391
+        },
+        "batch.materialize.roots": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.visits": {
+          "depth_sum": 204036,
+          "events": 1060,
+          "max_depth": 391
+        },
+        "batch.negative.roots": {
+          "depth_sum": 0,
+          "events": 153,
+          "max_depth": 0
+        },
+        "batch.negative.visits": {
+          "depth_sum": 4795,
+          "events": 1474,
+          "max_depth": 14
+        },
+        "batch.owned.visits": {
+          "depth_sum": 0,
+          "events": 59780,
+          "max_depth": 0
+        },
+        "batch.pending.visits": {
+          "depth_sum": 0,
+          "events": 2130,
+          "max_depth": 0
+        },
+        "commonCalls.positive": {
+          "depth_sum": 192,
+          "events": 96,
+          "max_depth": 6
+        },
+        "commonCalls.pruned": {
+          "depth_sum": 107,
+          "events": 37,
+          "max_depth": 5
+        },
+        "commonCalls.roots": {
+          "depth_sum": 0,
+          "events": 25,
+          "max_depth": 0
+        },
+        "commonCalls.visits": {
+          "depth_sum": 299,
+          "events": 133,
+          "max_depth": 6
+        },
+        "copy.batch_admitted.fresh_binder": {
+          "depth_sum": 0,
+          "events": 128,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_abs": {
+          "depth_sum": 0,
+          "events": 128,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_app": {
+          "depth_sum": 760,
+          "events": 381,
+          "max_depth": 3
+        },
+        "copy.batch_admitted.reuse_leaf": {
+          "depth_sum": 887,
+          "events": 254,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.roots": {
+          "depth_sum": 0,
+          "events": 128,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.variable_lookup": {
+          "depth_sum": 763,
+          "events": 255,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.visits": {
+          "depth_sum": 2410,
+          "events": 1018,
+          "max_depth": 4
+        },
+        "copy.higher_order_callback.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_callback.variable_lookup": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_callback.visits": {
+          "depth_sum": 3,
+          "events": 3,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.fresh_pattern_binder": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.rebuild_alternative": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_app": {
+          "depth_sum": 21,
+          "events": 5,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.rebuild_case": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.reuse_leaf": {
+          "depth_sum": 8,
+          "events": 2,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_rhs.variable_lookup": {
+          "depth_sum": 32,
+          "events": 6,
+          "max_depth": 6
+        },
+        "copy.higher_order_rhs.visits": {
+          "depth_sum": 64,
+          "events": 16,
+          "max_depth": 6
+        },
+        "copy.identities_alias.fresh_binder": {
+          "depth_sum": 9373,
+          "events": 1612,
+          "max_depth": 23
+        },
+        "copy.identities_alias.fresh_pattern_binder": {
+          "depth_sum": 74793,
+          "events": 6189,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_abs": {
+          "depth_sum": 9238,
+          "events": 1585,
+          "max_depth": 23
+        },
+        "copy.identities_alias.rebuild_alternative": {
+          "depth_sum": 7910,
+          "events": 814,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_app": {
+          "depth_sum": 470242,
+          "events": 19506,
+          "max_depth": 59
+        },
+        "copy.identities_alias.rebuild_case": {
+          "depth_sum": 6738,
+          "events": 725,
+          "max_depth": 25
+        },
+        "copy.identities_alias.rebuild_rec": {
+          "depth_sum": 101,
+          "events": 19,
+          "max_depth": 9
+        },
+        "copy.identities_alias.reuse_leaf": {
+          "depth_sum": 165679,
+          "events": 7070,
+          "max_depth": 57
+        },
+        "copy.identities_alias.roots": {
+          "depth_sum": 0,
+          "events": 319,
+          "max_depth": 0
+        },
+        "copy.identities_alias.variable_lookup": {
+          "depth_sum": 353976,
+          "events": 13596,
+          "max_depth": 60
+        },
+        "copy.identities_alias.visits": {
+          "depth_sum": 1005974,
+          "events": 42501,
+          "max_depth": 60
+        },
+        "copy.owned_final_numbering.fresh_binder": {
+          "depth_sum": 23674,
+          "events": 570,
+          "max_depth": 172
+        },
+        "copy.owned_final_numbering.fresh_pattern_binder": {
+          "depth_sum": 31123,
+          "events": 823,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_abs": {
+          "depth_sum": 8124,
+          "events": 358,
+          "max_depth": 49
+        },
+        "copy.owned_final_numbering.rebuild_alternative": {
+          "depth_sum": 15680,
+          "events": 365,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_app": {
+          "depth_sum": 95088,
+          "events": 1931,
+          "max_depth": 174
+        },
+        "copy.owned_final_numbering.rebuild_case": {
+          "depth_sum": 14581,
+          "events": 339,
+          "max_depth": 87
+        },
+        "copy.owned_final_numbering.rebuild_let": {
+          "depth_sum": 14048,
+          "events": 137,
+          "max_depth": 172
+        },
+        "copy.owned_final_numbering.rebuild_rec": {
+          "depth_sum": 1201,
+          "events": 57,
+          "max_depth": 40
+        },
+        "copy.owned_final_numbering.reuse_leaf": {
+          "depth_sum": 58336,
+          "events": 1005,
+          "max_depth": 175
+        },
+        "copy.owned_final_numbering.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_final_numbering.variable_lookup": {
+          "depth_sum": 72947,
+          "events": 1504,
+          "max_depth": 175
+        },
+        "copy.owned_final_numbering.visits": {
+          "depth_sum": 264325,
+          "events": 5331,
+          "max_depth": 175
+        },
+        "copy.owned_initial_uniqueness.fresh_binder": {
+          "depth_sum": 86427,
+          "events": 1611,
+          "max_depth": 210
+        },
+        "copy.owned_initial_uniqueness.fresh_pattern_binder": {
+          "depth_sum": 30815,
+          "events": 598,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_abs": {
+          "depth_sum": 52639,
+          "events": 1065,
+          "max_depth": 210
+        },
+        "copy.owned_initial_uniqueness.rebuild_alternative": {
+          "depth_sum": 6781,
+          "events": 140,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_app": {
+          "depth_sum": 188909,
+          "events": 2873,
+          "max_depth": 212
+        },
+        "copy.owned_initial_uniqueness.rebuild_case": {
+          "depth_sum": 5594,
+          "events": 116,
+          "max_depth": 81
+        },
+        "copy.owned_initial_uniqueness.rebuild_let": {
+          "depth_sum": 30155,
+          "events": 449,
+          "max_depth": 208
+        },
+        "copy.owned_initial_uniqueness.rebuild_rec": {
+          "depth_sum": 3427,
+          "events": 91,
+          "max_depth": 76
+        },
+        "copy.owned_initial_uniqueness.reuse_leaf": {
+          "depth_sum": 80876,
+          "events": 1012,
+          "max_depth": 213
+        },
+        "copy.owned_initial_uniqueness.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_initial_uniqueness.variable_lookup": {
+          "depth_sum": 156615,
+          "events": 2548,
+          "max_depth": 213
+        },
+        "copy.owned_initial_uniqueness.visits": {
+          "depth_sum": 518215,
+          "events": 8154,
+          "max_depth": 213
+        },
+        "copy.projection.fresh_binder": {
+          "depth_sum": 69,
+          "events": 38,
+          "max_depth": 6
+        },
+        "copy.projection.fresh_pattern_binder": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_abs": {
+          "depth_sum": 55,
+          "events": 23,
+          "max_depth": 4
+        },
+        "copy.projection.rebuild_alternative": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_app": {
+          "depth_sum": 140,
+          "events": 30,
+          "max_depth": 8
+        },
+        "copy.projection.rebuild_case": {
+          "depth_sum": 5,
+          "events": 1,
+          "max_depth": 5
+        },
+        "copy.projection.rebuild_let": {
+          "depth_sum": 12,
+          "events": 14,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.projection.reuse_leaf": {
+          "depth_sum": 89,
+          "events": 18,
+          "max_depth": 8
+        },
+        "copy.projection.roots": {
+          "depth_sum": 0,
+          "events": 12,
+          "max_depth": 0
+        },
+        "copy.projection.variable_lookup": {
+          "depth_sum": 191,
+          "events": 41,
+          "max_depth": 9
+        },
+        "copy.projection.visits": {
+          "depth_sum": 494,
+          "events": 128,
+          "max_depth": 9
+        },
+        "copy.substitute.fresh_binder": {
+          "depth_sum": 194,
+          "events": 408,
+          "max_depth": 7
+        },
+        "copy.substitute.fresh_pattern_binder": {
+          "depth_sum": 728,
+          "events": 313,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_abs": {
+          "depth_sum": 169,
+          "events": 394,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_alternative": {
+          "depth_sum": 607,
+          "events": 275,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_app": {
+          "depth_sum": 919,
+          "events": 205,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_case": {
+          "depth_sum": 324,
+          "events": 273,
+          "max_depth": 9
+        },
+        "copy.substitute.rebuild_let": {
+          "depth_sum": 23,
+          "events": 12,
+          "max_depth": 5
+        },
+        "copy.substitute.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.substitute.reuse_leaf": {
+          "depth_sum": 532,
+          "events": 103,
+          "max_depth": 11
+        },
+        "copy.substitute.roots": {
+          "depth_sum": 0,
+          "events": 622,
+          "max_depth": 0
+        },
+        "copy.substitute.variable_lookup": {
+          "depth_sum": 2124,
+          "events": 1013,
+          "max_depth": 11
+        },
+        "copy.substitute.visits": {
+          "depth_sum": 4093,
+          "events": 2002,
+          "max_depth": 11
+        },
+        "identities.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "identities.visits": {
+          "depth_sum": 518215,
+          "events": 8154,
+          "max_depth": 213
+        },
+        "indexUses.roots": {
+          "depth_sum": 0,
+          "events": 29263,
+          "max_depth": 0
+        },
+        "indexUses.visits": {
+          "depth_sum": 6503,
+          "events": 31533,
+          "max_depth": 11
+        },
+        "singleUseBranchPath.roots": {
+          "depth_sum": 0,
+          "events": 1243,
+          "max_depth": 0
+        },
+        "singleUseBranchPath.visits": {
+          "depth_sum": 2,
+          "events": 1245,
+          "max_depth": 1
+        },
+        "singleUseIOPath.roots": {
+          "depth_sum": 0,
+          "events": 1244,
+          "max_depth": 0
+        },
+        "singleUseIOPath.visits": {
+          "depth_sum": 3459,
+          "events": 3557,
+          "max_depth": 2
+        },
+        "substituteUsed.positive": {
+          "depth_sum": 93198,
+          "events": 3600,
+          "max_depth": 91
+        },
+        "substituteUsed.pruned": {
+          "depth_sum": 67928,
+          "events": 2597,
+          "max_depth": 91
+        },
+        "substituteUsed.rebuild_parent": {
+          "depth_sum": 79840,
+          "events": 2978,
+          "max_depth": 90
+        },
+        "substituteUsed.roots": {
+          "depth_sum": 0,
+          "events": 405,
+          "max_depth": 0
+        },
+        "substituteUsed.visits": {
+          "depth_sum": 161126,
+          "events": 6197,
+          "max_depth": 91
+        },
+        "useApplications.roots": {
+          "depth_sum": 0,
+          "events": 4799,
+          "max_depth": 0
+        },
+        "useApplications.visits": {
+          "depth_sum": 3685,
+          "events": 7235,
+          "max_depth": 7
+        }
+      },
+      "exact_ordinary_llvm_equal": true,
+      "llvm_bytes": 248451,
+      "llvm_sha256": "b8ee998715a53ca8ab62761e68b8d3945a79b067e233fa920a54d55ba50d4ae5"
+    },
+    {
+      "case": {
+        "case": "inferred_chain-512",
+        "family": "inferred_chain",
+        "interface": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-scale512-c1b802bd/legs/070-inferred_chain-512-mlf/build/unit.mlfci",
+        "object": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/compiler-shapes-c1b802bd-20261031/cohorts/macos-scale512-c1b802bd/legs/070-inferred_chain-512-mlf/build/unit.mlfco",
+        "size": 512
+      },
+      "complete": true,
+      "counters": {
+        "batch.admitted": {
+          "depth_sum": 0,
+          "events": 512,
+          "max_depth": 0
+        },
+        "batch.flush.empty": {
+          "depth_sum": 0,
+          "events": 5456,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.1": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.511": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_size": {
+          "depth_sum": 512,
+          "events": 2,
+          "max_depth": 511
+        },
+        "batch.flush.nonempty": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.base_visits": {
+          "depth_sum": 194,
+          "events": 42,
+          "max_depth": 11
+        },
+        "batch.materialize.expanded_var": {
+          "depth_sum": 395519,
+          "events": 512,
+          "max_depth": 1539
+        },
+        "batch.materialize.replacement_visits": {
+          "depth_sum": 3174850,
+          "events": 4090,
+          "max_depth": 1543
+        },
+        "batch.materialize.roots": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.visits": {
+          "depth_sum": 3175044,
+          "events": 4132,
+          "max_depth": 1543
+        },
+        "batch.negative.roots": {
+          "depth_sum": 0,
+          "events": 537,
+          "max_depth": 0
+        },
+        "batch.negative.visits": {
+          "depth_sum": 12091,
+          "events": 4546,
+          "max_depth": 14
+        },
+        "batch.owned.visits": {
+          "depth_sum": 0,
+          "events": 82820,
+          "max_depth": 0
+        },
+        "batch.pending.visits": {
+          "depth_sum": 0,
+          "events": 5970,
+          "max_depth": 0
+        },
+        "commonCalls.positive": {
+          "depth_sum": 192,
+          "events": 96,
+          "max_depth": 6
+        },
+        "commonCalls.pruned": {
+          "depth_sum": 107,
+          "events": 37,
+          "max_depth": 5
+        },
+        "commonCalls.roots": {
+          "depth_sum": 0,
+          "events": 25,
+          "max_depth": 0
+        },
+        "commonCalls.visits": {
+          "depth_sum": 299,
+          "events": 133,
+          "max_depth": 6
+        },
+        "copy.batch_admitted.fresh_binder": {
+          "depth_sum": 0,
+          "events": 512,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_abs": {
+          "depth_sum": 0,
+          "events": 512,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_app": {
+          "depth_sum": 3064,
+          "events": 1533,
+          "max_depth": 3
+        },
+        "copy.batch_admitted.reuse_leaf": {
+          "depth_sum": 3575,
+          "events": 1022,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.roots": {
+          "depth_sum": 0,
+          "events": 512,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.variable_lookup": {
+          "depth_sum": 3067,
+          "events": 1023,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.visits": {
+          "depth_sum": 9706,
+          "events": 4090,
+          "max_depth": 4
+        },
+        "copy.higher_order_callback.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_callback.variable_lookup": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_callback.visits": {
+          "depth_sum": 3,
+          "events": 3,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.fresh_pattern_binder": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.rebuild_alternative": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_app": {
+          "depth_sum": 21,
+          "events": 5,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.rebuild_case": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.reuse_leaf": {
+          "depth_sum": 8,
+          "events": 2,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_rhs.variable_lookup": {
+          "depth_sum": 32,
+          "events": 6,
+          "max_depth": 6
+        },
+        "copy.higher_order_rhs.visits": {
+          "depth_sum": 64,
+          "events": 16,
+          "max_depth": 6
+        },
+        "copy.identities_alias.fresh_binder": {
+          "depth_sum": 9373,
+          "events": 1612,
+          "max_depth": 23
+        },
+        "copy.identities_alias.fresh_pattern_binder": {
+          "depth_sum": 74793,
+          "events": 6189,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_abs": {
+          "depth_sum": 9238,
+          "events": 1585,
+          "max_depth": 23
+        },
+        "copy.identities_alias.rebuild_alternative": {
+          "depth_sum": 7910,
+          "events": 814,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_app": {
+          "depth_sum": 470242,
+          "events": 19506,
+          "max_depth": 59
+        },
+        "copy.identities_alias.rebuild_case": {
+          "depth_sum": 6738,
+          "events": 725,
+          "max_depth": 25
+        },
+        "copy.identities_alias.rebuild_rec": {
+          "depth_sum": 101,
+          "events": 19,
+          "max_depth": 9
+        },
+        "copy.identities_alias.reuse_leaf": {
+          "depth_sum": 165679,
+          "events": 7070,
+          "max_depth": 57
+        },
+        "copy.identities_alias.roots": {
+          "depth_sum": 0,
+          "events": 319,
+          "max_depth": 0
+        },
+        "copy.identities_alias.variable_lookup": {
+          "depth_sum": 353976,
+          "events": 13596,
+          "max_depth": 60
+        },
+        "copy.identities_alias.visits": {
+          "depth_sum": 1005974,
+          "events": 42501,
+          "max_depth": 60
+        },
+        "copy.owned_final_numbering.fresh_binder": {
+          "depth_sum": 163642,
+          "events": 954,
+          "max_depth": 556
+        },
+        "copy.owned_final_numbering.fresh_pattern_binder": {
+          "depth_sum": 31123,
+          "events": 823,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_abs": {
+          "depth_sum": 8124,
+          "events": 358,
+          "max_depth": 49
+        },
+        "copy.owned_final_numbering.rebuild_alternative": {
+          "depth_sum": 15680,
+          "events": 365,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_app": {
+          "depth_sum": 376944,
+          "events": 2699,
+          "max_depth": 558
+        },
+        "copy.owned_final_numbering.rebuild_case": {
+          "depth_sum": 14581,
+          "events": 339,
+          "max_depth": 87
+        },
+        "copy.owned_final_numbering.rebuild_let": {
+          "depth_sum": 154016,
+          "events": 521,
+          "max_depth": 556
+        },
+        "copy.owned_final_numbering.rebuild_rec": {
+          "depth_sum": 1201,
+          "events": 57,
+          "max_depth": 40
+        },
+        "copy.owned_final_numbering.reuse_leaf": {
+          "depth_sum": 340960,
+          "events": 1773,
+          "max_depth": 559
+        },
+        "copy.owned_final_numbering.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_final_numbering.variable_lookup": {
+          "depth_sum": 214451,
+          "events": 1888,
+          "max_depth": 559
+        },
+        "copy.owned_final_numbering.visits": {
+          "depth_sum": 1110277,
+          "events": 7635,
+          "max_depth": 559
+        },
+        "copy.owned_initial_uniqueness.fresh_binder": {
+          "depth_sum": 394779,
+          "events": 2379,
+          "max_depth": 594
+        },
+        "copy.owned_initial_uniqueness.fresh_pattern_binder": {
+          "depth_sum": 30815,
+          "events": 598,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_abs": {
+          "depth_sum": 207199,
+          "events": 1449,
+          "max_depth": 594
+        },
+        "copy.owned_initial_uniqueness.rebuild_alternative": {
+          "depth_sum": 6781,
+          "events": 140,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_app": {
+          "depth_sum": 652973,
+          "events": 4025,
+          "max_depth": 596
+        },
+        "copy.owned_initial_uniqueness.rebuild_case": {
+          "depth_sum": 5594,
+          "events": 116,
+          "max_depth": 81
+        },
+        "copy.owned_initial_uniqueness.rebuild_let": {
+          "depth_sum": 183947,
+          "events": 833,
+          "max_depth": 592
+        },
+        "copy.owned_initial_uniqueness.rebuild_rec": {
+          "depth_sum": 3427,
+          "events": 91,
+          "max_depth": 76
+        },
+        "copy.owned_initial_uniqueness.reuse_leaf": {
+          "depth_sum": 390764,
+          "events": 1780,
+          "max_depth": 597
+        },
+        "copy.owned_initial_uniqueness.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_initial_uniqueness.variable_lookup": {
+          "depth_sum": 468039,
+          "events": 3316,
+          "max_depth": 597
+        },
+        "copy.owned_initial_uniqueness.visits": {
+          "depth_sum": 1911943,
+          "events": 11610,
+          "max_depth": 597
+        },
+        "copy.projection.fresh_binder": {
+          "depth_sum": 69,
+          "events": 38,
+          "max_depth": 6
+        },
+        "copy.projection.fresh_pattern_binder": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_abs": {
+          "depth_sum": 55,
+          "events": 23,
+          "max_depth": 4
+        },
+        "copy.projection.rebuild_alternative": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_app": {
+          "depth_sum": 140,
+          "events": 30,
+          "max_depth": 8
+        },
+        "copy.projection.rebuild_case": {
+          "depth_sum": 5,
+          "events": 1,
+          "max_depth": 5
+        },
+        "copy.projection.rebuild_let": {
+          "depth_sum": 12,
+          "events": 14,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.projection.reuse_leaf": {
+          "depth_sum": 89,
+          "events": 18,
+          "max_depth": 8
+        },
+        "copy.projection.roots": {
+          "depth_sum": 0,
+          "events": 12,
+          "max_depth": 0
+        },
+        "copy.projection.variable_lookup": {
+          "depth_sum": 191,
+          "events": 41,
+          "max_depth": 9
+        },
+        "copy.projection.visits": {
+          "depth_sum": 494,
+          "events": 128,
+          "max_depth": 9
+        },
+        "copy.substitute.fresh_binder": {
+          "depth_sum": 194,
+          "events": 408,
+          "max_depth": 7
+        },
+        "copy.substitute.fresh_pattern_binder": {
+          "depth_sum": 728,
+          "events": 313,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_abs": {
+          "depth_sum": 169,
+          "events": 394,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_alternative": {
+          "depth_sum": 607,
+          "events": 275,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_app": {
+          "depth_sum": 919,
+          "events": 205,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_case": {
+          "depth_sum": 324,
+          "events": 273,
+          "max_depth": 9
+        },
+        "copy.substitute.rebuild_let": {
+          "depth_sum": 23,
+          "events": 12,
+          "max_depth": 5
+        },
+        "copy.substitute.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.substitute.reuse_leaf": {
+          "depth_sum": 532,
+          "events": 103,
+          "max_depth": 11
+        },
+        "copy.substitute.roots": {
+          "depth_sum": 0,
+          "events": 622,
+          "max_depth": 0
+        },
+        "copy.substitute.variable_lookup": {
+          "depth_sum": 2124,
+          "events": 1013,
+          "max_depth": 11
+        },
+        "copy.substitute.visits": {
+          "depth_sum": 4093,
+          "events": 2002,
+          "max_depth": 11
+        },
+        "identities.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "identities.visits": {
+          "depth_sum": 1911943,
+          "events": 11610,
+          "max_depth": 597
+        },
+        "indexUses.roots": {
+          "depth_sum": 0,
+          "events": 42703,
+          "max_depth": 0
+        },
+        "indexUses.visits": {
+          "depth_sum": 13799,
+          "events": 47661,
+          "max_depth": 11
+        },
+        "singleUseBranchPath.roots": {
+          "depth_sum": 0,
+          "events": 4699,
+          "max_depth": 0
+        },
+        "singleUseBranchPath.visits": {
+          "depth_sum": 2,
+          "events": 4701,
+          "max_depth": 1
+        },
+        "singleUseIOPath.roots": {
+          "depth_sum": 0,
+          "events": 4700,
+          "max_depth": 0
+        },
+        "singleUseIOPath.visits": {
+          "depth_sum": 13827,
+          "events": 13925,
+          "max_depth": 2
+        },
+        "substituteUsed.positive": {
+          "depth_sum": 93198,
+          "events": 3600,
+          "max_depth": 91
+        },
+        "substituteUsed.pruned": {
+          "depth_sum": 67928,
+          "events": 2597,
+          "max_depth": 91
+        },
+        "substituteUsed.rebuild_parent": {
+          "depth_sum": 79840,
+          "events": 2978,
+          "max_depth": 90
+        },
+        "substituteUsed.roots": {
+          "depth_sum": 0,
+          "events": 405,
+          "max_depth": 0
+        },
+        "substituteUsed.visits": {
+          "depth_sum": 161126,
+          "events": 6197,
+          "max_depth": 91
+        },
+        "useApplications.roots": {
+          "depth_sum": 0,
+          "events": 8255,
+          "max_depth": 0
+        },
+        "useApplications.visits": {
+          "depth_sum": 14053,
+          "events": 17603,
+          "max_depth": 7
+        }
+      },
+      "exact_ordinary_llvm_equal": true,
+      "llvm_bytes": 619509,
+      "llvm_sha256": "4849cac149275542e23c25ea0a0c2408f29124252d2dd29d8e90c334014b6754"
+    },
+    {
+      "case": {
+        "case": "inferred_chain-2048",
+        "family": "inferred_chain",
+        "interface": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/references/inferred_chain-2048/build/unit.mlfci",
+        "object": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/references/inferred_chain-2048/build/unit.mlfco",
+        "size": 2048
+      },
+      "complete": true,
+      "counters": {
+        "batch.admitted": {
+          "depth_sum": 0,
+          "events": 2048,
+          "max_depth": 0
+        },
+        "batch.flush.empty": {
+          "depth_sum": 0,
+          "events": 19280,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.1": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_histogram.2047": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "batch.flush.env_size": {
+          "depth_sum": 2048,
+          "events": 2,
+          "max_depth": 2047
+        },
+        "batch.flush.nonempty": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.base_visits": {
+          "depth_sum": 194,
+          "events": 42,
+          "max_depth": 11
+        },
+        "batch.materialize.expanded_var": {
+          "depth_sum": 6300671,
+          "events": 2048,
+          "max_depth": 6147
+        },
+        "batch.materialize.replacement_visits": {
+          "depth_sum": 50448322,
+          "events": 16378,
+          "max_depth": 6151
+        },
+        "batch.materialize.roots": {
+          "depth_sum": 0,
+          "events": 2,
+          "max_depth": 0
+        },
+        "batch.materialize.visits": {
+          "depth_sum": 50448516,
+          "events": 16420,
+          "max_depth": 6151
+        },
+        "batch.negative.roots": {
+          "depth_sum": 0,
+          "events": 2073,
+          "max_depth": 0
+        },
+        "batch.negative.visits": {
+          "depth_sum": 41275,
+          "events": 16834,
+          "max_depth": 14
+        },
+        "batch.owned.visits": {
+          "depth_sum": 0,
+          "events": 174980,
+          "max_depth": 0
+        },
+        "batch.pending.visits": {
+          "depth_sum": 0,
+          "events": 21330,
+          "max_depth": 0
+        },
+        "commonCalls.positive": {
+          "depth_sum": 192,
+          "events": 96,
+          "max_depth": 6
+        },
+        "commonCalls.pruned": {
+          "depth_sum": 107,
+          "events": 37,
+          "max_depth": 5
+        },
+        "commonCalls.roots": {
+          "depth_sum": 0,
+          "events": 25,
+          "max_depth": 0
+        },
+        "commonCalls.visits": {
+          "depth_sum": 299,
+          "events": 133,
+          "max_depth": 6
+        },
+        "copy.batch_admitted.fresh_binder": {
+          "depth_sum": 0,
+          "events": 2048,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_abs": {
+          "depth_sum": 0,
+          "events": 2048,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.rebuild_app": {
+          "depth_sum": 12280,
+          "events": 6141,
+          "max_depth": 3
+        },
+        "copy.batch_admitted.reuse_leaf": {
+          "depth_sum": 14327,
+          "events": 4094,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.roots": {
+          "depth_sum": 0,
+          "events": 2048,
+          "max_depth": 0
+        },
+        "copy.batch_admitted.variable_lookup": {
+          "depth_sum": 12283,
+          "events": 4095,
+          "max_depth": 4
+        },
+        "copy.batch_admitted.visits": {
+          "depth_sum": 38890,
+          "events": 16378,
+          "max_depth": 4
+        },
+        "copy.higher_order_callback.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_callback.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_callback.variable_lookup": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_callback.visits": {
+          "depth_sum": 3,
+          "events": 3,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.fresh_binder": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.fresh_pattern_binder": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_abs": {
+          "depth_sum": 1,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.higher_order_rhs.rebuild_alternative": {
+          "depth_sum": 6,
+          "events": 2,
+          "max_depth": 3
+        },
+        "copy.higher_order_rhs.rebuild_app": {
+          "depth_sum": 21,
+          "events": 5,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.rebuild_case": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.higher_order_rhs.reuse_leaf": {
+          "depth_sum": 8,
+          "events": 2,
+          "max_depth": 5
+        },
+        "copy.higher_order_rhs.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.higher_order_rhs.variable_lookup": {
+          "depth_sum": 32,
+          "events": 6,
+          "max_depth": 6
+        },
+        "copy.higher_order_rhs.visits": {
+          "depth_sum": 64,
+          "events": 16,
+          "max_depth": 6
+        },
+        "copy.identities_alias.fresh_binder": {
+          "depth_sum": 9373,
+          "events": 1612,
+          "max_depth": 23
+        },
+        "copy.identities_alias.fresh_pattern_binder": {
+          "depth_sum": 74793,
+          "events": 6189,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_abs": {
+          "depth_sum": 9238,
+          "events": 1585,
+          "max_depth": 23
+        },
+        "copy.identities_alias.rebuild_alternative": {
+          "depth_sum": 7910,
+          "events": 814,
+          "max_depth": 26
+        },
+        "copy.identities_alias.rebuild_app": {
+          "depth_sum": 470242,
+          "events": 19506,
+          "max_depth": 59
+        },
+        "copy.identities_alias.rebuild_case": {
+          "depth_sum": 6738,
+          "events": 725,
+          "max_depth": 25
+        },
+        "copy.identities_alias.rebuild_rec": {
+          "depth_sum": 101,
+          "events": 19,
+          "max_depth": 9
+        },
+        "copy.identities_alias.reuse_leaf": {
+          "depth_sum": 165679,
+          "events": 7070,
+          "max_depth": 57
+        },
+        "copy.identities_alias.roots": {
+          "depth_sum": 0,
+          "events": 319,
+          "max_depth": 0
+        },
+        "copy.identities_alias.variable_lookup": {
+          "depth_sum": 353976,
+          "events": 13596,
+          "max_depth": 60
+        },
+        "copy.identities_alias.visits": {
+          "depth_sum": 1005974,
+          "events": 42501,
+          "max_depth": 60
+        },
+        "copy.owned_final_numbering.fresh_binder": {
+          "depth_sum": 2198074,
+          "events": 2490,
+          "max_depth": 2092
+        },
+        "copy.owned_final_numbering.fresh_pattern_binder": {
+          "depth_sum": 31123,
+          "events": 823,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_abs": {
+          "depth_sum": 8124,
+          "events": 358,
+          "max_depth": 49
+        },
+        "copy.owned_final_numbering.rebuild_alternative": {
+          "depth_sum": 15680,
+          "events": 365,
+          "max_depth": 88
+        },
+        "copy.owned_final_numbering.rebuild_app": {
+          "depth_sum": 4453488,
+          "events": 5771,
+          "max_depth": 2094
+        },
+        "copy.owned_final_numbering.rebuild_case": {
+          "depth_sum": 14581,
+          "events": 339,
+          "max_depth": 87
+        },
+        "copy.owned_final_numbering.rebuild_let": {
+          "depth_sum": 2188448,
+          "events": 2057,
+          "max_depth": 2092
+        },
+        "copy.owned_final_numbering.rebuild_rec": {
+          "depth_sum": 1201,
+          "events": 57,
+          "max_depth": 40
+        },
+        "copy.owned_final_numbering.reuse_leaf": {
+          "depth_sum": 4420576,
+          "events": 4845,
+          "max_depth": 2095
+        },
+        "copy.owned_final_numbering.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_final_numbering.variable_lookup": {
+          "depth_sum": 2255027,
+          "events": 3424,
+          "max_depth": 2095
+        },
+        "copy.owned_final_numbering.visits": {
+          "depth_sum": 13341445,
+          "events": 16851,
+          "max_depth": 2095
+        },
+        "copy.owned_initial_uniqueness.fresh_binder": {
+          "depth_sum": 4577307,
+          "events": 5451,
+          "max_depth": 2130
+        },
+        "copy.owned_initial_uniqueness.fresh_pattern_binder": {
+          "depth_sum": 30815,
+          "events": 598,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_abs": {
+          "depth_sum": 2299999,
+          "events": 2985,
+          "max_depth": 2130
+        },
+        "copy.owned_initial_uniqueness.rebuild_alternative": {
+          "depth_sum": 6781,
+          "events": 140,
+          "max_depth": 82
+        },
+        "copy.owned_initial_uniqueness.rebuild_app": {
+          "depth_sum": 6932909,
+          "events": 8633,
+          "max_depth": 2132
+        },
+        "copy.owned_initial_uniqueness.rebuild_case": {
+          "depth_sum": 5594,
+          "events": 116,
+          "max_depth": 81
+        },
+        "copy.owned_initial_uniqueness.rebuild_let": {
+          "depth_sum": 2273675,
+          "events": 2369,
+          "max_depth": 2128
+        },
+        "copy.owned_initial_uniqueness.rebuild_rec": {
+          "depth_sum": 3427,
+          "events": 91,
+          "max_depth": 76
+        },
+        "copy.owned_initial_uniqueness.reuse_leaf": {
+          "depth_sum": 4579436,
+          "events": 4852,
+          "max_depth": 2133
+        },
+        "copy.owned_initial_uniqueness.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "copy.owned_initial_uniqueness.variable_lookup": {
+          "depth_sum": 4662855,
+          "events": 6388,
+          "max_depth": 2133
+        },
+        "copy.owned_initial_uniqueness.visits": {
+          "depth_sum": 20757895,
+          "events": 25434,
+          "max_depth": 2133
+        },
+        "copy.projection.fresh_binder": {
+          "depth_sum": 69,
+          "events": 38,
+          "max_depth": 6
+        },
+        "copy.projection.fresh_pattern_binder": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_abs": {
+          "depth_sum": 55,
+          "events": 23,
+          "max_depth": 4
+        },
+        "copy.projection.rebuild_alternative": {
+          "depth_sum": 12,
+          "events": 2,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_app": {
+          "depth_sum": 140,
+          "events": 30,
+          "max_depth": 8
+        },
+        "copy.projection.rebuild_case": {
+          "depth_sum": 5,
+          "events": 1,
+          "max_depth": 5
+        },
+        "copy.projection.rebuild_let": {
+          "depth_sum": 12,
+          "events": 14,
+          "max_depth": 6
+        },
+        "copy.projection.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 1,
+          "max_depth": 2
+        },
+        "copy.projection.reuse_leaf": {
+          "depth_sum": 89,
+          "events": 18,
+          "max_depth": 8
+        },
+        "copy.projection.roots": {
+          "depth_sum": 0,
+          "events": 12,
+          "max_depth": 0
+        },
+        "copy.projection.variable_lookup": {
+          "depth_sum": 191,
+          "events": 41,
+          "max_depth": 9
+        },
+        "copy.projection.visits": {
+          "depth_sum": 494,
+          "events": 128,
+          "max_depth": 9
+        },
+        "copy.substitute.fresh_binder": {
+          "depth_sum": 194,
+          "events": 408,
+          "max_depth": 7
+        },
+        "copy.substitute.fresh_pattern_binder": {
+          "depth_sum": 728,
+          "events": 313,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_abs": {
+          "depth_sum": 169,
+          "events": 394,
+          "max_depth": 7
+        },
+        "copy.substitute.rebuild_alternative": {
+          "depth_sum": 607,
+          "events": 275,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_app": {
+          "depth_sum": 919,
+          "events": 205,
+          "max_depth": 10
+        },
+        "copy.substitute.rebuild_case": {
+          "depth_sum": 324,
+          "events": 273,
+          "max_depth": 9
+        },
+        "copy.substitute.rebuild_let": {
+          "depth_sum": 23,
+          "events": 12,
+          "max_depth": 5
+        },
+        "copy.substitute.rebuild_rec": {
+          "depth_sum": 2,
+          "events": 2,
+          "max_depth": 1
+        },
+        "copy.substitute.reuse_leaf": {
+          "depth_sum": 532,
+          "events": 103,
+          "max_depth": 11
+        },
+        "copy.substitute.roots": {
+          "depth_sum": 0,
+          "events": 622,
+          "max_depth": 0
+        },
+        "copy.substitute.variable_lookup": {
+          "depth_sum": 2124,
+          "events": 1013,
+          "max_depth": 11
+        },
+        "copy.substitute.visits": {
+          "depth_sum": 4093,
+          "events": 2002,
+          "max_depth": 11
+        },
+        "identities.roots": {
+          "depth_sum": 0,
+          "events": 1,
+          "max_depth": 0
+        },
+        "identities.visits": {
+          "depth_sum": 20757895,
+          "events": 25434,
+          "max_depth": 2133
+        },
+        "indexUses.roots": {
+          "depth_sum": 0,
+          "events": 96463,
+          "max_depth": 0
+        },
+        "indexUses.visits": {
+          "depth_sum": 42983,
+          "events": 112173,
+          "max_depth": 11
+        },
+        "singleUseBranchPath.roots": {
+          "depth_sum": 0,
+          "events": 18523,
+          "max_depth": 0
+        },
+        "singleUseBranchPath.visits": {
+          "depth_sum": 2,
+          "events": 18525,
+          "max_depth": 1
+        },
+        "singleUseIOPath.roots": {
+          "depth_sum": 0,
+          "events": 18524,
+          "max_depth": 0
+        },
+        "singleUseIOPath.visits": {
+          "depth_sum": 55299,
+          "events": 55397,
+          "max_depth": 2
+        },
+        "substituteUsed.positive": {
+          "depth_sum": 93198,
+          "events": 3600,
+          "max_depth": 91
+        },
+        "substituteUsed.pruned": {
+          "depth_sum": 67928,
+          "events": 2597,
+          "max_depth": 91
+        },
+        "substituteUsed.rebuild_parent": {
+          "depth_sum": 79840,
+          "events": 2978,
+          "max_depth": 90
+        },
+        "substituteUsed.roots": {
+          "depth_sum": 0,
+          "events": 405,
+          "max_depth": 0
+        },
+        "substituteUsed.visits": {
+          "depth_sum": 161126,
+          "events": 6197,
+          "max_depth": 91
+        },
+        "useApplications.roots": {
+          "depth_sum": 0,
+          "events": 22079,
+          "max_depth": 0
+        },
+        "useApplications.visits": {
+          "depth_sum": 55525,
+          "events": 59075,
+          "max_depth": 7
+        }
+      },
+      "exact_ordinary_llvm_equal": true,
+      "llvm_bytes": 2217001,
+      "llvm_sha256": "2c5d8866118cef03323484f8fe0d0dcccb7c05d6b985402a80a3e1310c76031d"
+    }
+  ],
+  "formal_confirmation_run": false,
+  "decision": "Engineering adoption for the explicitly requested removal of quadratic ancestor reconstruction on admitted chains; not acceptance of the failed 5 percent whole-run performance advancement rule. No formal wall-time confirmation was launched.",
+  "integration": "integration-20261101.json"
+}
