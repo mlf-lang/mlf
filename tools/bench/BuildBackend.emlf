@@ -7,7 +7,7 @@ import qualified Package.Json as J
 main = do
  args <- O.allArguments
  case args of
-  Cons compiler (Cons llvm (Cons source (Cons output Nil))) -> do
+  (:) compiler ((:) llvm ((:) source ((:) output []))) -> do
    present <- directoryExists output
    O.require (S.not present) "backend build requires a fresh directory"
    cc <- canonicalPath compiler
@@ -16,9 +16,9 @@ main = do
    O.mkdir output
    directory <- canonicalPath output
    let binary = directory ++ "/mlf-llvm"
-   let command = S.append (Cons cc (O.words "-std=c11 -O2 -Wall -Wextra -Werror")) (Cons ("-I" ++ prefix ++ "/include") (Cons input (Cons ("-L" ++ prefix ++ "/lib") (Cons ("-Wl,-rpath," ++ prefix ++ "/lib") (Cons "-lLLVM" (Cons "-o" (Cons binary Nil)))))))
+   let command = S.append ((:) cc (O.words "-std=c11 -O2 -Wall -Wextra -Werror")) ((:) ("-I" ++ prefix ++ "/include") ((:) input ((:) ("-L" ++ prefix ++ "/lib") ((:) ("-Wl,-rpath," ++ prefix ++ "/lib") ((:) "-lLLVM" ((:) "-o" ((:) binary [])))))))
    O.run "" command
    headers <- O.files (prefix ++ "/include/llvm-c")
-   hashes <- S.mapM (\path -> do { real <- canonicalPath path; hash <- fileDigest real; return (Pair real (J.str hash)) }) (S.append (Cons cc (Cons input (Cons binary (Cons (prefix ++ "/lib/libLLVM.dylib") Nil)))) headers)
-   writeFile (directory ++ "/build.json") (J.render (J.Object (Cons (Pair "command" (J.stringArray command)) (Cons (Pair "sha256" (J.Object hashes)) Nil))) ++ "\n")
+   hashes <- S.mapM (\path -> do { real <- canonicalPath path; hash <- fileDigest real; return ((,) real (J.str hash)) }) (S.append ((:) cc ((:) input ((:) binary ((:) (prefix ++ "/lib/libLLVM.dylib") [])))) headers)
+   writeFile (directory ++ "/build.json") (J.render (J.Object ((:) ((,) "command" (J.stringArray command)) ((:) ((,) "sha256" (J.Object hashes)) []))) ++ "\n")
   _ -> O.fatal "build-backend CLANG LLVM_PREFIX SOURCE FRESH_OUTPUT_DIRECTORY"

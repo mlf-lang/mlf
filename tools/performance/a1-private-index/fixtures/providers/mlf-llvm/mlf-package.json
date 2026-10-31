@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "name": "mlf-llvm",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-language-core": {
+      "path": "../mlf-language-core"
+    },
+    "mlf-xmlf": {
+      "path": "../mlf-xmlf"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.LLVM": "Bootstrap/LLVM.hs",
+      "Bootstrap.LLVM.Analysis": "Bootstrap/LLVM/Analysis.hs",
+      "Bootstrap.LLVM.Build": "Bootstrap/LLVM/Build.hs",
+      "Bootstrap.LLVM.Codegen": "Bootstrap/LLVM/Codegen.hs",
+      "Bootstrap.LLVM.Kernel": "Bootstrap/LLVM/Kernel.hs",
+      "Bootstrap.LLVM.Native": "Bootstrap/LLVM/Native.hs",
+      "Bootstrap.LLVM.Optimize": "Bootstrap/LLVM/Optimize.hs",
+      "Bootstrap.LLVM.StrictFields": "Bootstrap/LLVM/StrictFields.hs",
+      "Bootstrap.LLVM.StrictWrappers": "Bootstrap/LLVM/StrictWrappers.hs",
+      "Bootstrap.LLVM.Result": "Bootstrap/LLVM/Result.hs",
+      "Bootstrap.LLVM.Argument": "Bootstrap/LLVM/Argument.hs",
+      "Bootstrap.LLVM.LazyProducer": "Bootstrap/LLVM/LazyProducer.hs"
+    }
+  },
+  "source-syntax": "shared-haskell-v1"
+}

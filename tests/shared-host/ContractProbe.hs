@@ -33,9 +33,9 @@ main :: IO ()
 main = do
   cs <- sequence
     [ cold "ioReturn" (F.ioReturn poison)
-    , cold "ioBind" (F.ioBind poison (\_ -> F.ioReturn F.Unit))
+    , cold "ioBind" (F.ioBind poison (\_ -> F.ioReturn ()))
     , cold "stReturn" (F.stReturn poison)
-    , cold "stBind" (F.stBind poison (\_ -> F.stReturn F.Unit))
+    , cold "stBind" (F.stBind poison (\_ -> F.stReturn ()))
     , cold "newSTArray" (F.newSTArray poison poison)
     , cold "readSTArray" (F.readSTArray poison poison)
     , cold "writeSTArray" (F.writeSTArray poison poison poison)
@@ -89,7 +89,9 @@ main = do
     , cold "asyncWait" (F.asyncWait poison poison)
     ]
   rs <- sequence
-    [ check "arbitrary precision" (expect (2^100) (F.addInt (2^100-1) 1))
+    [ check "Int64 addition wraps" (expect minBound (F.addInt maxBound 1))
+    , check "Int64 multiplication wraps" (expect 0 (F.mulInt 4294967296 4294967296))
+    , check "explicit Integer remains unbounded" (expect (2^100::Integer) (F.addInteger (2^100-1) 1))
     , check "comparison right-first <=" (fails "right" ((F.<=) (B.failure "left") (B.failure "right")))
     , check "comparison right-first >" (fails "right" ((F.>) (B.failure "left") (B.failure "right")))
     , check "comparison left-first >=" (fails "left" ((F.>=) (B.failure "left") (B.failure "right")))
@@ -165,26 +167,26 @@ main = do
         F.lengthByteArray bytes >>= expect 5
         mapM (F.readByteArray bytes) [0..4] >>= expect [240,159,152,128,0]
     , check "file lock narrowing is checked" $ do
-        r <- try (F.releaseFileLock (2^100))
+        r <- try (F.releaseFileLock 9223372036854775807)
         case r of { Left (B.HostError s) -> expect "invalid file lock" s; Right _ -> error "huge handle truncated" }
     , check "huge array length is checked" $ do
-        r <- try (F.newIntArray (2^100) 0)
+        r <- try (F.newIntArray 9223372036854775807 0)
         case r of { Left (B.HostError s) -> expect "invalid array length" s; Right _ -> error "huge size truncated" }
     , check "huge index is checked" $ do
         a <- F.newIntArray 1 0
-        r <- try (F.readIntArray a (2^100))
+        r <- try (F.readIntArray a 9223372036854775807)
         case r of { Left (B.HostError s) -> expect "array index out of bounds" s; Right _ -> error "huge index truncated" }
     , check "huge async delay is checked" $ do
         scope <- F.asyncScopeNew 0 0
-        r <- try (F.asyncDelay scope (2^100) (pure F.Unit))
+        r <- try (F.asyncDelay scope 9223372036854775807 (pure ()))
         F.asyncScopeClose scope
         case r of { Left (B.HostError s) -> expect "invalid async delay" s; Right _ -> error "huge delay truncated" }
     , check "huge async wait is checked" $ do
         scope <- F.asyncScopeNew 0 0
-        r <- try (F.asyncWait scope (2^100))
+        r <- try (F.asyncWait scope 9223372036854775807)
         F.asyncScopeClose scope
         case r of { Left (B.HostError s) -> expect "invalid async wait" s; Right _ -> error "huge wait truncated" }
-    , check "Double bits outside Word64 rejected" (fails "Double bit pattern out of bounds" (F.doubleFromBits (2^64)))
+    , check "Double bit input wraps as Int64" (expect 0 (F.doubleToBits (F.doubleFromBits (2^64))))
     , check "Double negative zero bits" (expect (2^63) (F.doubleToBits (F.doubleFromBits (2^63))))
     , check "String scalar maximum" (expect 0x10ffff (F.stringCodeAt (F.stringFromCode 0x10ffff) 0))
     , check "String surrogate rejected" (fails "invalid Unicode scalar" (F.stringFromCode 0xdfff))
@@ -192,8 +194,8 @@ main = do
         scope <- F.asyncScopeNew 1 3
         order <- newIORef ([]::[Integer])
         F.asyncNewCompletion scope (\cell -> do
-          _ <- F.asyncSubscribeCompletion cell (\_ -> modifyIORef' order (++[1]) >> pure F.Unit)
-          _ <- F.asyncSubscribeCompletion cell (\_ -> modifyIORef' order (++[2]) >> pure F.Unit)
+          _ <- F.asyncSubscribeCompletion cell (\_ -> modifyIORef' order (++[1]) >> pure ())
+          _ <- F.asyncSubscribeCompletion cell (\_ -> modifyIORef' order (++[2]) >> pure ())
           F.asyncResolveCompletion cell poison >>= expect 0
           F.asyncResolveCompletion cell poison >>= expect 2
           readIORef order >>= expect []
@@ -203,7 +205,7 @@ main = do
           F.asyncScopeClose scope
           F.asyncResolveCompletion cell poison >>= expect 3
           F.asyncReadCompletion cell poison (pure 77) >>= expect (77::Integer)
-          pure F.Unit) (error "cell allocation rejected")
+          pure ()) (error "cell allocation rejected")
         pure ()
     ]
   putStrLn ("TOTAL "++show (length (cs++rs))++" FAILED "++show (length (filter not (cs++rs))))

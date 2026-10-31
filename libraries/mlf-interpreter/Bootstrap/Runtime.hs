@@ -7,6 +7,7 @@ module Bootstrap.Runtime where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Primitive as P;
   import qualified Bootstrap.ProcessHost as ProcessHost;
@@ -20,6 +21,7 @@ module Bootstrap.Runtime where {
     RRecursive (Map XName (Either String RValue)) REnv;
   data RValue =
     RInteger Int |
+    RBigInteger Integer |
     RDouble Double |
     RBoolean Bool |
     RString String |
@@ -56,6 +58,7 @@ module Bootstrap.Runtime where {
   forceValue value =
     case value of {
       RInteger n -> seq n value;
+      RBigInteger n -> seq n value;
       RDouble n -> seq n value;
       RBoolean b -> seq b value;
       RString text -> seq text value;
@@ -285,6 +288,11 @@ module Bootstrap.Runtime where {
            RInteger n -> Right n;
            _ -> Left "runtime primitive expected Int"
          });
+  bigInteger :: Either String RValue -> Either String Integer;
+  bigInteger thunk = bindEither thunk (\value -> case value of {
+    RBigInteger n -> Right n;
+    _ -> Left "runtime primitive expected Integer"
+  });
   floating :: Either String RValue -> Either String Double;
   floating thunk =
     bindEither thunk
@@ -365,6 +373,24 @@ module Bootstrap.Runtime where {
   runtimeCharsText :: Either String RValue -> Either String String;
   runtimeCharsText thunk =
     bindEither (runtimeCharsChunks False thunk) (\chunks -> Right (concatStrings chunks));
+  runtimeStringChunks :: Either String RValue -> [] String -> Either String ([] String);
+  runtimeStringChunks thunk chunks =
+    bindEither thunk
+      (\value -> case value of {
+         RConstructor name fields -> case fields of {
+           [] -> if eqString name "[]" then Right (reverse chunks)
+                  else Left "runtime primitive expected [String]";
+           (:) first ((:) rest []) ->
+             if eqString name ":" then do {
+               piece <- string first;
+               -- RString's wrapper is not its primitive WHNF: demand the
+               -- payload before the next list cell, just like source seq.
+               seq piece (runtimeStringChunks rest ((:) piece chunks))
+             } else Left "runtime primitive expected [String]";
+           _ -> Left "runtime primitive expected [String]"
+         };
+         _ -> Left "runtime primitive expected [String]"
+       });
   runtimeCharsChunks :: Bool -> Either String RValue -> Either String ([] String);
   runtimeCharsChunks diagnostic thunk =
     bindEither thunk
@@ -512,13 +538,32 @@ module Bootstrap.Runtime where {
       y <- floating b;
       Right (RBoolean (f x y))
     };
-  divide f a b =
+  divide overflow f a b =
     do {
       x <- integer a;
       y <- integer b;
       ensure (y /= 0) "integer division by zero";
+      ensure (not overflow || x /= (-9223372036854775808) || y /= (-1)) "integer division overflow";
       Right (RInteger (f x y))
     };
+  integerShift f a b = do {
+    x <- integer a; y <- integer b;
+    ensure (y >= 0) "integer shift overflow";
+    Right (RInteger (f x y))
+  };
+  bigInteger2 f a b = do {
+    x <- bigInteger a; y <- bigInteger b;
+    Right (RBigInteger (f x y))
+  };
+  bigIntegerCompare f a b = do {
+    x <- bigInteger a; y <- bigInteger b;
+    Right (RBoolean (f x y))
+  };
+  bigIntegerDivide f a b = do {
+    x <- bigInteger a; y <- bigInteger b;
+    ensure (not (eqInteger y (intToInteger 0))) "integer division by zero";
+    Right (RBigInteger (f x y))
+  };
   isAction primitive =
     let {
       n = P.primitiveCode primitive
@@ -585,19 +630,43 @@ module Bootstrap.Runtime where {
           y <- string b;
           Right (RString (x ++ y))
         };
+      PConcatStringList ->
+        bindEither (runtimeStringChunks a []) (\chunks -> Right (RString (concatStringList chunks)));
       PShowInt -> mapEither (\n -> RString (showInt n)) (integer a);
       PAddInt -> integer2 addInt a b;
       PSubInt -> integer2 subInt a b;
       PMulInt -> integer2 mulInt a b;
       PAndInt -> integer2 andInt a b;
-      PQuotInt -> divide quotInt a b;
-      PRemInt -> divide remInt a b;
+      POrInt -> integer2 orInt a b;
+      PXorInt -> integer2 xorInt a b;
+      PShiftLInt -> integerShift shiftLInt a b;
+      PShiftRInt -> integerShift shiftRInt a b;
+      PUnsignedShiftRInt -> integerShift unsignedShiftRInt a b;
+      PCountLeadingZerosInt -> mapEither (\n -> RInteger (countLeadingZerosInt n)) (integer a);
+      PCountTrailingZerosInt -> mapEither (\n -> RInteger (countTrailingZerosInt n)) (integer a);
+      PPopCountInt -> mapEither (\n -> RInteger (popCountInt n)) (integer a);
+      PIntToInteger -> mapEither (\n -> RBigInteger (intToInteger n)) (integer a);
+      PIntegerToInt -> mapEither (\n -> RInteger (integerToInt n)) (bigInteger a);
+      PAddInteger -> bigInteger2 addInteger a b;
+      PSubInteger -> bigInteger2 subInteger a b;
+      PMulInteger -> bigInteger2 mulInteger a b;
+      PQuotInteger -> bigIntegerDivide quotInteger a b;
+      PRemInteger -> bigIntegerDivide remInteger a b;
+      PEqInteger -> bigIntegerCompare eqInteger a b;
+      PLtInteger -> bigIntegerCompare ltInteger a b;
+      PShowInteger -> mapEither (\n -> RString (showInteger n)) (bigInteger a);
+      PReadInteger -> bindEither (string a) (\s ->
+        if validInteger s then Right (RBigInteger (readInteger s)) else Left "invalid integer input");
+      PIntegerToDouble -> mapEither (\n -> RDouble (integerToDouble n)) (bigInteger a);
+      PQuotInt -> divide True quotInt a b;
+      PRemInt -> divide False remInt a b;
       PReadInt ->
         bindEither (string a)
           (\s ->
              if validInteger s then Right (RInteger (readInt s)) else Left "invalid integer input");
       PEqInt -> intCompare eqInt a b;
       PLtInt -> intCompare ltInt a b;
+      PUnsignedLtInt -> intCompare unsignedLtInt a b;
       PAddDouble -> double2 addDouble a b;
       PSubDouble -> double2 subDouble a b;
       PMulDouble -> double2 mulDouble a b;
@@ -660,7 +729,6 @@ module Bootstrap.Runtime where {
       PDoubleFromBits ->
         do {
           n <- integer a;
-          ensure ((n >= 0) && (n <= 18446744073709551615)) "Double bit pattern out of bounds";
           Right (RDouble (doubleFromBits n))
         };
       PSeq -> bindEither a (\value -> seq (forceValue value) b);
@@ -708,8 +776,8 @@ module Bootstrap.Runtime where {
   -- Each runST starts a fresh persistent store. The checked region type keeps
   -- handles local to this store; no host mutation or IO operation is involved.
   -- Keeping the default cell separate avoids allocating or forcing every slot.
-  data RSTArrayState = RSTArrayState Int (Either String RValue) (Map Int (Either String RValue));
-  data RSTStore = RSTStore Int (Map Int RSTArrayState);
+  data RSTArrayState = RSTArrayState Int (Either String RValue) (IntMap (Either String RValue));
+  data RSTStore = RSTStore Int (IntMap RSTArrayState);
   stateArray n initial cells = seq n (seq cells (RSTArrayState n initial cells));
   stateStore next arrays = seq next (seq arrays (RSTStore next arrays));
   stateArrayHandle :: Either String RValue -> Either String Int;
@@ -720,15 +788,15 @@ module Bootstrap.Runtime where {
            RSTArrayHandle handle -> Right handle;
            _ -> Left "runtime primitive expected STArray"
          });
-  stateArrayLookup :: Int -> Map Int RSTArrayState -> Either String RSTArrayState;
+  stateArrayLookup :: Int -> IntMap RSTArrayState -> Either String RSTArrayState;
   stateArrayLookup handle arrays =
-    case M.lookup compareInt handle arrays of {
+    case IM.lookup handle arrays of {
       Nothing -> Left "STArray does not belong to this region";
       Just array -> Right array
     };
   runStateRegion :: DataEnv -> Either String RValue -> Either String RValue;
   runStateRegion ds action =
-    bindEither (runStateAction ds (stateStore 0 M.empty) action [])
+    bindEither (runStateAction ds (stateStore 0 IM.empty) action [])
       (\result ->
          case result of {
            (,) finalStore value ->
@@ -786,10 +854,10 @@ module Bootstrap.Runtime where {
           case store of {
             RSTStore next arrays ->
               let {
-                array = stateArray n b M.empty
+                array = stateArray n b IM.empty
               } in
               let {
-                updated = stateStore (next + 1) (M.insert compareInt next array arrays)
+                updated = stateStore (next + 1) (IM.insert next array arrays)
               } in
               resumeState ds updated (Right (RSTArrayHandle next)) continuations
           }
@@ -805,7 +873,7 @@ module Bootstrap.Runtime where {
                   RSTArrayState n initial cells ->
                     do {
                       index <- arrayIndex n b;
-                      resumeState ds store (M.findWithDefault compareInt initial index cells)
+                      resumeState ds store (IM.findWithDefault initial index cells)
                         continuations
                     }
                 }
@@ -824,10 +892,10 @@ module Bootstrap.Runtime where {
                     do {
                       index <- arrayIndex n b;
                       let {
-                        updatedArray = stateArray n initial (M.insert compareInt index c cells)
+                        updatedArray = stateArray n initial (IM.insert index c cells)
                       };
                       let {
-                        updated = stateStore next (M.insert compareInt handle updatedArray arrays)
+                        updated = stateStore next (IM.insert handle updatedArray arrays)
                       };
                       seq updatedArray (resumeState ds updated unit continuations)
                     }
@@ -1149,17 +1217,17 @@ module Bootstrap.Runtime where {
   data RAsyncSubscriptionState =
     RAsyncSubscriptionState Int (Maybe Int) (Either String RValue) (Maybe (Either String RValue));
   data RAsyncStore =
-    RAsyncStore Int Int Int (Map Int RAsyncScopeState) (Map Int RAsyncCellState) (Map Int
+    RAsyncStore Int Int Int (IntMap RAsyncScopeState) (IntMap RAsyncCellState) (IntMap
                                                                                   RAsyncSubscriptionState);
   rAsyncStore ns nc nt scopes cells tickets =
     seq ns
       (seq nc
          (seq nt
             (seq scopes (seq cells (seq tickets (RAsyncStore ns nc nt scopes cells tickets))))));
-  rAsyncEmpty = rAsyncStore 0 0 0 M.empty M.empty M.empty;
+  rAsyncEmpty = rAsyncStore 0 0 0 IM.empty IM.empty IM.empty;
   rAsyncLookupScope :: RAsyncStore -> Int -> Either String RAsyncScopeState;
   rAsyncLookupScope (RAsyncStore ns _ _ scopes _ _) identity =
-    case M.lookup compareInt identity scopes of {
+    case IM.lookup identity scopes of {
       Nothing ->
         if ((identity >= 0) && (identity < ns))
         then Right (RAsyncScopeState True False 0 0 [] [] [] [])
@@ -1168,18 +1236,18 @@ module Bootstrap.Runtime where {
     };
   rAsyncLookupCell :: RAsyncStore -> Int -> Either String RAsyncCellState;
   rAsyncLookupCell (RAsyncStore _ _ _ _ cells _) identity =
-    case M.lookup compareInt identity cells of {
+    case IM.lookup identity cells of {
       Nothing -> Left "unknown completion cell";
       Just cell -> Right cell
     };
   rAsyncLookupTicket (RAsyncStore _ _ _ _ _ tickets) identity =
-    M.lookup compareInt identity tickets;
+    IM.lookup identity tickets;
   rAsyncSetScope (RAsyncStore ns nc nt scopes cells tickets) identity scope =
-    rAsyncStore ns nc nt (M.insert compareInt identity scope scopes) cells tickets;
+    rAsyncStore ns nc nt (IM.insert identity scope scopes) cells tickets;
   rAsyncSetCell (RAsyncStore ns nc nt scopes cells tickets) identity cell =
-    rAsyncStore ns nc nt scopes (M.insert compareInt identity cell cells) tickets;
+    rAsyncStore ns nc nt scopes (IM.insert identity cell cells) tickets;
   rAsyncSetTicket (RAsyncStore ns nc nt scopes cells tickets) identity ticket =
-    rAsyncStore ns nc nt scopes cells (M.insert compareInt identity ticket tickets);
+    rAsyncStore ns nc nt scopes cells (IM.insert identity ticket tickets);
   rAsyncRemoveIdentity identity values = filter (\value -> (value /= identity)) values;
   rAsyncClosed (RAsyncScopeState closed _ _ _ _ _ _ _) = closed;
   rAsyncBusy (RAsyncScopeState _ busy _ _ _ _ _ _) = busy;
@@ -1228,7 +1296,7 @@ module Bootstrap.Runtime where {
     let {
       scope = RAsyncScopeState False False cellLimit callbackLimit [] [] [] []
     } in
-    (,) (rAsyncStore (ns + 1) nc nt (M.insert compareInt ns scope scopes) cells tickets)
+    (,) (rAsyncStore (ns + 1) nc nt (IM.insert ns scope scopes) cells tickets)
       (RAsyncScopeHandle ns);
   rAsyncClose :: RAsyncStore -> Int -> Either String RAsyncStore;
   rAsyncClose store identity =
@@ -1243,15 +1311,15 @@ module Bootstrap.Runtime where {
                    RAsyncStore ns nc nt scopes cells tickets ->
                      let {
                        remainingCells =
-                         foldlStrict (\table key -> M.delete compareInt key table) cells ownedCells
+                         foldlStrict (\table key -> IM.delete key table) cells ownedCells
                      } in
                      let {
                        remainingTickets =
-                         foldlStrict (\table key -> M.delete compareInt key table) tickets
+                         foldlStrict (\table key -> IM.delete key table) tickets
                            ownedTickets
                      } in
                      Right
-                       (rAsyncStore ns nc nt (M.delete compareInt identity scopes) remainingCells
+                       (rAsyncStore ns nc nt (IM.delete identity scopes) remainingCells
                           remainingTickets)
                  }
           }
@@ -1277,8 +1345,8 @@ module Bootstrap.Runtime where {
                      } in
                      let {
                        updated =
-                         rAsyncStore ns (nc + 1) nt (M.insert compareInt owner scope scopes)
-                           (M.insert compareInt nc (RAsyncCellState owner Nothing []) cells)
+                         rAsyncStore ns (nc + 1) nt (IM.insert owner scope scopes)
+                           (IM.insert nc (RAsyncCellState owner Nothing []) cells)
                            tickets
                      } in
                      Right ((,) updated (Just (RCompletionHandle owner nc)))
@@ -1425,9 +1493,9 @@ module Bootstrap.Runtime where {
                             } in
                             let {
                               updated =
-                                rAsyncStore ns nc (nt + 1) (M.insert compareInt owner scope scopes)
+                                rAsyncStore ns nc (nt + 1) (IM.insert owner scope scopes)
                                   cells
-                                  (M.insert compareInt nt
+                                  (IM.insert nt
                                      (RAsyncSubscriptionState owner cellId callback payload)
                                      tickets)
                             } in
@@ -1512,8 +1580,8 @@ module Bootstrap.Runtime where {
                             (filter (\((,) _ entry) -> (entry /= identity)) timers)
                       } in
                       Right
-                        (rAsyncStore ns nc nt (M.insert compareInt owner scope scopes) cells
-                           (M.delete compareInt identity tickets))
+                        (rAsyncStore ns nc nt (IM.insert owner scope scopes) cells
+                           (IM.delete identity tickets))
                   }
                 }
             }

@@ -40,7 +40,7 @@ module Bootstrap.X.Type where {
     };
   freshNegative :: Set XTyVar -> Int -> XTyVar;
   freshNegative used i =
-    if S.member compareTyVar (XTyVar i) used then freshNegative used (i - 1) else XTyVar i;
+    if S.member compareTyVar (XTyVar i) used then freshNegative used (L.advanceIdentity i (-1)) else XTyVar i;
   substitute :: XTyVar -> XType -> XType -> XType;
   substitute a replacement ty =
     case ty of {

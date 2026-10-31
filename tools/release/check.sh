@@ -21,8 +21,21 @@ tools/release/test-qualification-gate.sh
 node tools/release/test-benchmark-gate.mjs
 node tools/release/test-ci-policy.mjs
 python3 tools/shared/test_provenance.py
+python3 -B tools/shared/test_generated_string_pool.py
+python3 -B tools/shared/test_prepared_verification.py
+python3 tools/performance/a1-private-index/test_platform.py
+python3 -B tools/performance/a1-private-index/test_current.py
+python3 -B tools/performance/c4-local-transaction/test_controls.py
+python3 -B tools/performance/patricia/test_historical_metadata.py
+python3 tools/performance/fingerprint-fusion/test_controls.py
+python3 tools/shared/test_perf_inference.py
+python3 tools/shared/test_io_action_sharing_controls.py
+python3 tools/shared/test_framework_controls.py
 python3 tools/shared/test_framework_policy.py
+python3 tools/shared/test_source_field_layout_controls.py
+python3 tools/shared/test_parameter_field_graph.py --self-test
 python3 tools/shared/test_resource_watchdog.py
+python3 tools/shared/test_resource_watchdog_output.py
 python3 tools/shared/test_guest_framework_controls.py
 python3 tools/shared/test_guest_state_laws_controls.py
 node tools/release/test-release-tag.mjs

@@ -8,28 +8,28 @@ evalA i j =
     sum = addDouble x y
   in divDouble 1.0 (addDouble (addDouble (divDouble (mulDouble sum (addDouble sum 1.0)) 2.0) x) 1.0)
 
-rowA : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO Unit
+rowA : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO ()
 rowA n u out i j sum =
   if j < n then do
     x <- readDoubleArray u j
     rowA n u out i (j + 1) (addDouble sum (mulDouble (evalA i j) x))
   else writeDoubleArray out i sum
 
-rowAt : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO Unit
+rowAt : Int -> DoubleArray -> DoubleArray -> Int -> Int -> Double -> IO ()
 rowAt n u out i j sum =
   if j < n then do
     x <- readDoubleArray u j
     rowAt n u out i (j + 1) (addDouble sum (mulDouble (evalA j i) x))
   else writeDoubleArray out i sum
 
-evalAv : Int -> DoubleArray -> DoubleArray -> Int -> IO Unit
+evalAv : Int -> DoubleArray -> DoubleArray -> Int -> IO ()
 evalAv n u out i =
   if i < n then do
     rowA n u out i 0 0.0
     evalAv n u out (i + 1)
   else return ()
 
-evalAtv : Int -> DoubleArray -> DoubleArray -> Int -> IO Unit
+evalAtv : Int -> DoubleArray -> DoubleArray -> Int -> IO ()
 evalAtv n u out i =
   if i < n then do
     rowAt n u out i 0 0.0
@@ -40,7 +40,7 @@ evalAtAv n u out tmp = do
   evalAv n u tmp 0
   evalAtv n tmp out 0
 
-power : Int -> DoubleArray -> DoubleArray -> DoubleArray -> Int -> IO Unit
+power : Int -> DoubleArray -> DoubleArray -> DoubleArray -> Int -> IO ()
 power n u v tmp remaining =
   if remaining == 0 then return ()
   else do
@@ -48,7 +48,7 @@ power n u v tmp remaining =
     evalAtAv n v u tmp
     power n u v tmp (remaining - 1)
 
-dot : Int -> DoubleArray -> DoubleArray -> DoubleArray -> Int -> IO Unit
+dot : Int -> DoubleArray -> DoubleArray -> DoubleArray -> Int -> IO ()
 dot n u v sums i =
   if i < n then do
     x <- readDoubleArray u i

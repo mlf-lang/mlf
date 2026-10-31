@@ -53,15 +53,24 @@ jobs:
           "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
   native:
     # Preserve the required-check job ID, but label the producer honestly.
-    name: Shared compiler source smoke (GHC O${{ matrix.optimization }})
+    name: Shared compiler source smoke (GHC O${{ matrix.optimization }}, ${{ matrix.suite }})
     if: github.event_name != 'workflow_dispatch' || !inputs.windows_runtime_only
     runs-on: ubuntu-24.04
-    # O0: three 30-minute frontend modes, two 100-minute suites, build/misc margin.
-    timeout-minutes: ${{ matrix.optimization == '0' && 330 || 120 }}
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        optimization: ['0', '2']
+        # Keep the same O0 assertions, but bound the direct/default/framework
+        # work independently. O2 retains the original complete sequence.
+        include:
+          - optimization: '2'
+            suite: all
+          - optimization: '0'
+            suite: direct
+          - optimization: '0'
+            suite: default
+          - optimization: '0'
+            suite: framework
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -70,7 +79,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y build-essential clang libgmp-dev libnuma-dev libncurses-dev xz-utils
+          sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils
           archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
           curl -fsSL https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$archive"
           printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" | sha256sum -c -
@@ -78,28 +87,140 @@ jobs:
           (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
           test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
           echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
+      # Each shard intentionally pays for its own toolchain and producer build.
+      # Authentication binds absolute toolchain, host, object, and command-log
+      # paths; copying/rebasing receipts would weaken that provenance contract.
       - name: Build exact committed shared sources and direct test runners
         run: |
-          python3 tools/shared/build.py --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
+          python3 tools/shared/build.py --bootstrap-only --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
+      # Low-cost coverage for the compiler shape benchmark, placed directly after
+      # the producer so it runs before the long suites: the contract test proves
+      # the analyzer refuses bad data, and the smoke matrix performs real
+      # same-source GHC/MLF compilations with a fresh target on every leg. The
+      # complete 10 x 3 matrix stays a manual, dedicated workflow run.
+      - name: Check compiler shape benchmark contract
+        if: matrix.suite == 'all' && matrix.optimization == '2'
+        run: python3 -B tools/performance/compiler-shapes/test_contract.py
+      - name: Compiler shape smoke (GHC vs MLF, 18 timed compilations)
+        if: matrix.suite == 'all' && matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/performance/compiler-shapes/bench.py all \
+            --workdir .mlf-build/compiler-shapes-smoke --cohort smoke --matrix smoke \
+            --producer .mlf-build/shared-ghc --build-builtin
+      - name: Check Int64 arithmetic and Patricia boundaries
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/performance/patricia/test_adapters.py
+          python3 -O -B tools/performance/patricia/test_adapters.py
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard python3 -B tools/performance/patricia/run_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-focused
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-design-guard python3 -B tools/performance/patricia/run_design_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-design
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-native-guard python3 -B tools/performance/patricia/run_native.py --producer .mlf-build/shared-ghc --output .mlf-build/patricia-native --mode standalone
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/llp64-guard python3 -B tools/performance/int64/run_llp64.py --producer .mlf-build/shared-ghc --output .mlf-build/llp64-controls
+          for suite in host native legacy; do
+            python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 ".mlf-build/int64-$suite-guard" python3 -B tools/performance/int64/run_controls.py --suite "$suite" --producer .mlf-build/shared-ghc --output ".mlf-build/int64-$suite" --gc-prefix /usr --gmp-prefix /usr --gc-library "$(pkg-config --variable=libdir bdw-gc)/libgc.a"
+          done
+      - name: Check finite P1-P3, A1 and F1 correctness
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/patricia/run_integrated.py --suite p123 --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/patricia/run_integrated.py --suite graph --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/f1-integrated-guard python3 -B tools/performance/patricia/run_fingerprint.py --producer .mlf-build/shared-ghc --output .mlf-build/f1-integrated-controls
+      - name: Check Map balance tree and demand semantics
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/map-balance-guard python3 -B tools/performance/patricia/run_integrated.py --suite map-balance --producer .mlf-build/shared-ghc --output .mlf-build/map-balance-controls
+      - name: Check generated graph validation boundary
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B -m unittest discover -s tools/performance/validation-reuse -p 'test_*.py'
+          python3 -B -O -m unittest discover -s tools/performance/validation-reuse -p 'test_*.py'
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/validation-reuse-guard python3 -B tools/performance/patricia/run_integrated.py --suite validation --producer .mlf-build/shared-ghc --output .mlf-build/validation-reuse-controls
+      - name: Check canonical builtin and retained file cases
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-builtin-guard python3 -B tools/performance/patricia/run_integrated.py --suite builtin --producer .mlf-build/shared-ghc --output .mlf-build/patricia-builtin-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-files-guard python3 -B tools/performance/patricia/run_file_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --producer .mlf-build/shared-ghc --builtin-prefix .mlf-build/patricia-builtin-controls/builtin --output .mlf-build/patricia-file-controls
       - name: Execute the actual shared suite-receipt helpers
+        if: matrix.suite == 'all' || matrix.suite == 'direct'
         run: |
           python3 tools/release/test-suite-build-receipts.py --executable .mlf-build/shared-ghc/bin/build-receipts --output .mlf-build/suite-receipt-regression
       - name: Execute source-bound shared smoke runner
+        if: matrix.suite == 'all' || matrix.suite == 'direct'
         env:
           MLF_SOURCE_SMOKE_RUNNER: .mlf-build/shared-ghc/bin/source-smoke
           MLF_SOURCE_SMOKE_RECEIPT: .mlf-build/shared-ghc/receipt.json
         run: tools/release/source-smoke.sh
       - name: Qualify authenticated direct async and frontend execution
+        if: matrix.suite == 'all' || matrix.suite == 'direct'
         run: |
           set -euo pipefail
           python3 tools/shared/test_direct.py --bin-dir .mlf-build/shared-ghc/bin \
             --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/direct-host-tests
-      # The authenticated framework runner executes both 305 legacy and 105 registry cases once.
-      - name: Qualify framework semantics and exact maintained Figure12 fixtures
+          # The default/all framework gate executes this same no-argument
+          # TupleList binary with its exact 305-observation completion oracle.
+      - name: Qualify authenticated TupleList default and framework semantics
+        if: matrix.suite != 'direct'
         run: |
-          python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct
+          # CI164 framework used 4455.57s; CI167 default reached 302/305 at4500s.
+          # Both O0 suites use the existing bounded override; O2 stays unchanged.
+          suite_args=()
+          if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then
+            suite_args=(--suite-timeout 5400)
+          fi
+          python3 tools/shared/test_framework_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/framework-direct --suite '${{ matrix.suite }}' ${suite_args[@]+"${suite_args[@]}"}
+      - name: Qualify exact maintained Figure12 fixtures
+        if: matrix.suite == 'all' || matrix.suite == 'direct'
+        run: |
           python3 tools/shared/test_figure12_direct.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/figure12-direct
+      - name: Check recursive managed evidence and source-group contracts
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_recursive_managed.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/recursive-managed
+      - name: Check known parameter-field projection graph invariants
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_parameter_field_graph.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/parameter-field-graph
+      - name: Check source field normalization and exact imported layouts
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_source_field_layouts.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-field-layouts
+      - name: Check shared-value specialization admission and lazy semantics
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_common_calls.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/common-calls
+      - name: Check callback code sharing and capture identity boundaries
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_callback_sharing.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/callback-sharing
+      - name: Check lazy IO action specialization with native execution
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y libgc-dev
+          prefix="$PWD/.mlf-build/io-action-gc"
+          mkdir -p "$prefix/include" "$prefix/lib"
+          cp /usr/include/gc.h "$prefix/include/gc.h"
+          cp -R /usr/include/gc "$prefix/include/gc"
+          archive="$(cc -print-file-name=libgc.a)"
+          test -f "$archive"
+          cp "$archive" "$prefix/lib/libgc.a"
+          dpkg-query -W libgc-dev > "$prefix/dependency-version.txt"
+          python3 tools/shared/test_io_action_sharing.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/io-action-sharing --clang clang --gc-prefix "$prefix"
+      - name: Check fixed native library boundaries and lazy exports
+        if: matrix.optimization == '2'
+        run: python3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc
+      - name: Build and check the default installed standard library
+        if: matrix.optimization == '2' && matrix.suite == 'all'
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y pkg-config
+          PYTHONDONTWRITEBYTECODE=1 python3 -B tools/shared/build.py --optimization 2 --build-dir .mlf-build/stdlib-default
+          PYTHONDONTWRITEBYTECODE=1 python3 -B .mlf-build/stdlib-default/sources/tools/shared/test_native_library.py \
+            --build-receipt .mlf-build/stdlib-default/receipt.json \
+            --output .mlf-build/stdlib-default-controls --clang clang --gc-prefix .mlf-build/io-action-gc \
+            --frontend-source-root .mlf-build/stdlib-default/sources/libraries/mlf-foundation
       - name: Check actual MLF mixed-framework source acceptance
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_guest_framework.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-framework-source
@@ -109,13 +230,66 @@ jobs:
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: source-smoke-evidence-ghc-O${{ matrix.optimization }}
+          name: source-smoke-evidence-ghc-O${{ matrix.optimization }}-${{ matrix.suite }}
           include-hidden-files: true
           retention-days: 14
           path: |
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt
+            .mlf-build/compiler-shapes-smoke/setup/setup.json
+            .mlf-build/compiler-shapes-smoke/setup/*.json
+            .mlf-build/compiler-shapes-smoke/cohorts/**/*.json
+            .mlf-build/compiler-shapes-smoke/cohorts/**/*.csv
+            .mlf-build/compiler-shapes-smoke/cohorts/**/*.md
+            .mlf-build/compiler-shapes-smoke/cohorts/**/stdout
+            .mlf-build/compiler-shapes-smoke/cohorts/**/stderr
+            .mlf-build/compiler-shapes-smoke/results/
+            .mlf-build/crate-optimization-guard/
+            .mlf-build/crate-optimization-controls/**/*.json
+            .mlf-build/crate-optimization-controls/**/*.stdout
+            .mlf-build/crate-optimization-controls/**/*.stderr
+            .mlf-build/a1-integrated-guard/
+            .mlf-build/a1-integrated-controls/**/*.json
+            .mlf-build/a1-integrated-controls/**/*.stdout
+            .mlf-build/a1-integrated-controls/**/*.stderr
+            .mlf-build/f1-integrated-guard/
+            .mlf-build/validation-reuse-guard/
+            .mlf-build/validation-reuse-controls/**/*.json
+            .mlf-build/validation-reuse-controls/**/stdout
+            .mlf-build/validation-reuse-controls/**/stderr
+            .mlf-build/validation-reuse-controls/**/*.hs
+            .mlf-build/crate-optimization-controls/**/stdout
+            .mlf-build/crate-optimization-controls/**/stderr
+            .mlf-build/crate-optimization-controls/**/*.hs
+            .mlf-build/a1-integrated-controls/**/stdout
+            .mlf-build/a1-integrated-controls/**/stderr
+            .mlf-build/a1-integrated-controls/**/*.hs
+            .mlf-build/f1-integrated-controls/**/stdout
+            .mlf-build/f1-integrated-controls/**/stderr
+            .mlf-build/f1-integrated-controls/**/*.hs
+            .mlf-build/map-balance-controls/**/stdout
+            .mlf-build/map-balance-controls/**/stderr
+            .mlf-build/map-balance-controls/**/*.hs
+            .mlf-build/map-balance-guard/
+            .mlf-build/map-balance-controls/**/*.json
+            .mlf-build/patricia-*/**/*.json
+            .mlf-build/patricia-*/**/stdout
+            .mlf-build/patricia-*/**/stderr
+            .mlf-build/patricia-*/**/*.hs
+            .mlf-build/int64-*/**/*.json
+            .mlf-build/int64-*/**/stdout
+            .mlf-build/int64-*/**/stderr
+            .mlf-build/int64-*/**/*.hs
+            .mlf-build/llp64-*/**/*.json
+            .mlf-build/llp64-*/**/stdout
+            .mlf-build/llp64-*/**/stderr
+            .mlf-build/llp64-*/**/*.hs
+            .mlf-build/f1-integrated-controls/**/*.json
+            .mlf-build/f1-integrated-controls/**/*.stdout
+            .mlf-build/f1-integrated-controls/**/*.stderr
+            .mlf-build/f1-integrated-controls/**/source/Probe.dump-*
+            .mlf-build/f1-integrated-controls/actual-source/Separate.dump-*
             .mlf-build/source-smoke/*.log*
             .mlf-build/source-smoke/*.json
             .mlf-build/source-smoke/*.xmlf
@@ -130,6 +304,24 @@ jobs:
             .mlf-build/figure12-direct/*.json
             .mlf-build/figure12-direct/*.stdout
             .mlf-build/figure12-direct/*.stderr
+            .mlf-build/recursive-managed/*.json
+            .mlf-build/recursive-managed/*.stdout
+            .mlf-build/recursive-managed/*.stderr
+            .mlf-build/source-field-layouts/*.json
+            .mlf-build/source-field-layouts/*.stdout
+            .mlf-build/source-field-layouts/*.stderr
+            .mlf-build/parameter-field-graph/*.json
+            .mlf-build/parameter-field-graph/*.stdout
+            .mlf-build/parameter-field-graph/*.stderr
+            .mlf-build/common-calls/**/*.json
+            .mlf-build/common-calls/**/*.stdout
+            .mlf-build/common-calls/**/*.stderr
+            .mlf-build/io-action-gc/dependency-version.txt
+            .mlf-build/io-action-sharing/**/*.json
+            .mlf-build/io-action-sharing/**/*.stdout
+            .mlf-build/io-action-sharing/**/*.stderr
+            .mlf-build/io-action-sharing/**/*.ll
+            .mlf-build/io-action-sharing/**/*.xmlf
             .mlf-build/guest-framework-source/**/*.json
             .mlf-build/guest-framework-source/**/*.log
             .mlf-build/guest-framework-source/**/*.stdout
@@ -398,6 +590,7 @@ jobs:
     # A skipped manual job must not satisfy the required check on the same SHA.
     name: ${{ github.event_name == 'workflow_dispatch' && 'Manual CI summary' || 'PR gate' }}
     if: always() && github.event_name != 'workflow_dispatch'
+    # The native dependency covers every matrix leg, including all three O0 shards.
     needs: [metadata, native, windows-runtime, build-runner, async-runtime, async-language]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

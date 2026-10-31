@@ -1,8 +1,8 @@
 {
   "format": 1,
   "source_syntax": "shared-haskell-v1",
-  "frontend_semantics": "mlf-frontend/shared-haskell-v1/7",
-  "primitive_abi": "mlf-primitive-107-v4",
+  "frontend_semantics": "mlf-frontend/shared-haskell-v1/8",
+  "primitive_abi": "mlf-primitive-129-v6",
   "source_roots": [
     "libraries/mlf-async",
     "libraries/mlf-crates",
@@ -49,6 +49,21 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.BuiltinPreludeContext",
+      "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.BuiltinPreludeLiteral",
+      "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ClassDemand",
+      "path": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Classes",
       "path": "libraries/mlf-inference/Bootstrap/Classes.hs",
       "role": "implementation"
@@ -86,6 +101,11 @@
     {
       "module": "Bootstrap.CrateQuery",
       "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.CrateSession",
+      "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
       "role": "implementation"
     },
     {
@@ -129,6 +149,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.Graph.IndexStore",
+      "path": "libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Graph.Solver",
       "path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
       "role": "implementation"
@@ -136,6 +161,16 @@
     {
       "module": "Bootstrap.Host",
       "path": "libraries/mlf-foundation/Bootstrap/Host.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ImportParameters",
+      "path": "libraries/mlf-crates/Bootstrap/ImportParameters.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ImportedRoot",
+      "path": "libraries/mlf-crates/Bootstrap/ImportedRoot.hs",
       "role": "implementation"
     },
     {
@@ -149,8 +184,18 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.IntRank",
+      "path": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.IntSet",
       "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.IntTree",
+      "path": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
       "role": "implementation"
     },
     {
@@ -174,6 +219,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.LLVM.Argument",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Argument.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.LLVM.Build",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
       "role": "implementation"
@@ -189,6 +239,16 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.LLVM.LazyProducer",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/LazyProducer.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Library",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Library.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.LLVM.Native",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
       "role": "implementation"
@@ -196,6 +256,11 @@
     {
       "module": "Bootstrap.LLVM.Optimize",
       "path": "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.LLVM.Result",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM/Result.hs",
       "role": "implementation"
     },
     {
@@ -241,6 +306,16 @@
     {
       "module": "Bootstrap.Prelude",
       "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.PreparedLibraries",
+      "path": "libraries/mlf-crates/Bootstrap/PreparedLibraries.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.PreparedLibraryLiteral",
+      "path": "libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs",
       "role": "implementation"
     },
     {
@@ -349,6 +424,16 @@
       "role": "implementation"
     },
     {
+      "module": "MLF.BuiltinPreludeData",
+      "path": "bootstrap/MLF/BuiltinPreludeData.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.Entry.BuiltinPrelude",
+      "path": "bootstrap/MLF/Entry/BuiltinPrelude.hs",
+      "role": "implementation"
+    },
+    {
       "module": "MLF.Entry.CompilerTests",
       "path": "tests/MLF/Entry/CompilerTests.hs",
       "role": "implementation"
@@ -366,6 +451,26 @@
     {
       "module": "MLF.Entry.TupleList",
       "path": "tests/MLF/Entry/TupleList.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.NativeBuild",
+      "path": "bootstrap/MLF/NativeBuild.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.PreparedCompiler",
+      "path": "bootstrap/MLF/PreparedCompiler.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.PreparedLibraryData",
+      "path": "bootstrap/MLF/PreparedLibraryData.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.PreparedNativeData",
+      "path": "bootstrap/MLF/PreparedNativeData.hs",
       "role": "implementation"
     },
     {
@@ -396,6 +501,11 @@
     {
       "module": "MLF.Tests.BuildReceipts",
       "path": "tests/shared/MLF/Tests/BuildReceipts.hs",
+      "role": "direct-test"
+    },
+    {
+      "module": "MLF.Tests.ClassDemand",
+      "path": "tests/shared/MLF/Tests/ClassDemand.hs",
       "role": "direct-test"
     },
     {
@@ -622,6 +732,11 @@
       "module": "MLF.Tests.PRQuickMain",
       "wrapper": "host/ghc/app/source-smoke/Main.hs",
       "role": "direct-test"
+    },
+    {
+      "name": "builtin-prelude",
+      "module": "MLF.Entry.BuiltinPrelude",
+      "wrapper": "host/ghc/app/builtin-prelude/Main.hs"
     }
   ],
   "host_only": [
@@ -642,7 +757,8 @@
     "host/ghc/app/async-process/Main.hs",
     "host/ghc/app/async-process-panic/Main.hs",
     "host/ghc/app/build-receipts/Main.hs",
-    "host/ghc/app/source-smoke/Main.hs"
+    "host/ghc/app/source-smoke/Main.hs",
+    "host/ghc/app/builtin-prelude/Main.hs"
   ],
-  "builtin_interface": "mlf-primitive/shared-haskell-v1/8"
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/10"
 }

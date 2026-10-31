@@ -3,7 +3,7 @@
 
 Tracks descendant identities as well as process groups. It does not modify
 producer receipts; resource failure is never a successful negative control."""
-import argparse,json,os,resource,shutil,signal,stat,subprocess,time
+import argparse,errno,json,os,resource,shutil,signal,stat,subprocess,time
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--seconds',type=int,default=600);p.add_argument('--address-space-mib',type=int,default=1024);p.add_argument('--rss-mib',type=int,default=1024);p.add_argument('--max-output-mib',type=int,default=0);p.add_argument('--disk-free-mib',type=int,default=768);p.add_argument('out',type=Path);p.add_argument('command',nargs=argparse.REMAINDER);a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
 if not a.command or min(a.seconds,a.address_space_mib,a.rss_mib,a.disk_free_mib)<=0 or a.max_output_mib<0:p.error('positive limits and a command are required')
@@ -56,16 +56,27 @@ def stop():
   except ProcessLookupError:pass
  if proc.poll() is None:proc.wait()
 def output_bytes(root):
- # A vanished sampled child is normal during atomic query publication.  Root
- # and directory traversal errors remain fatal, as do all other file errors.
- if not stat.S_ISDIR(root.stat().st_mode):raise NotADirectoryError(str(root))
- def traversal_error(error):raise error
+ # Atomic cache publication may remove a descendant between walk steps.
+ # Only that missing-child race is tolerated; the monitored root and all
+ # other traversal failures remain fatal, including a root lost mid-scan.
+ def validate_root():
+  if not stat.S_ISDIR(root.stat().st_mode):raise NotADirectoryError(str(root))
+ validate_root()
+ root_absolute=Path(os.path.abspath(root))
+ enumerated_children=set()
+ def traversal_error(error):
+  if isinstance(error,FileNotFoundError) and error.errno==errno.ENOENT and error.filename is not None:
+   missing=Path(os.path.abspath(error.filename))
+   if missing in enumerated_children and missing!=root_absolute and root_absolute in missing.parents:return
+  raise error
  total=0
- for directory, _, files in os.walk(root,followlinks=False,onerror=traversal_error):
+ for directory, dirs, files in os.walk(root,followlinks=False,onerror=traversal_error):
+  enumerated_children.update(Path(os.path.abspath(Path(directory)/name)) for name in dirs)
   for name in files:
    try:info=(Path(directory)/name).lstat()
    except FileNotFoundError:continue
    if stat.S_ISREG(info.st_mode):total+=info.st_size
+ validate_root()
  return total
 def sample_and_check():
  sample={'seconds':time.monotonic()-start,'group_rss':rss(proc.pid),'host_available':available(),'disk_free':shutil.disk_usage(a.out).free}

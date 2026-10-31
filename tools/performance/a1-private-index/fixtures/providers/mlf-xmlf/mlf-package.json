@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "name": "mlf-xmlf",
+  "version": "0.3.0",
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    },
+    "mlf-frontend": {
+      "path": "../mlf-frontend"
+    },
+    "mlf-language-core": {
+      "path": "../mlf-language-core"
+    }
+  },
+  "library": {
+    "modules": {
+      "Bootstrap.X.Check": "Bootstrap/X/Check.hs",
+      "Bootstrap.X.Checked": "Bootstrap/X/Checked.hs",
+      "Bootstrap.X.Parser": "Bootstrap/X/Parser.hs",
+      "Bootstrap.X.Pretty": "Bootstrap/X/Pretty.hs",
+      "Bootstrap.X.Syntax": "Bootstrap/X/Syntax.hs",
+      "Bootstrap.X.Type": "Bootstrap/X/Type.hs"
+    }
+  },
+  "source-syntax": "shared-haskell-v1"
+}

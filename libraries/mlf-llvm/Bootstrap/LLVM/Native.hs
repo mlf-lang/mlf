@@ -1300,12 +1300,24 @@ module Bootstrap.LLVM.Native where {
                slow
            }
     };
+  -- Analysis uses exact intermediates: wrapping endpoint products must never
+  -- justify an LLVM nsw instruction or an unchecked immediate representation.
+  integerRange :: Integer -> Integer -> (,) Int Int;
+  integerRange lo hi =
+    if ltInteger lo (intToInteger (-9223372036854775808)) ||
+       ltInteger (intToInteger 9223372036854775807) hi
+    then (,) (-9223372036854775808) 9223372036854775807
+    else (,) (integerToInt lo) (integerToInt hi);
+  minInteger a b = if ltInteger a b then a else b;
+  maxInteger a b = if ltInteger a b then b else a;
   productBounds :: (,) Int Int -> (,) Int Int -> (,) Int Int;
   productBounds ((,) lo hi) ((,) lo2 hi2) =
     let {
-      products = args4 (lo * lo2) (lo * hi2) (hi * lo2) (hi * hi2)
+      product a b = mulInteger (intToInteger a) (intToInteger b);
+      first = product lo lo2;
+      products = args4 first (product lo hi2) (product hi lo2) (product hi hi2)
     } in
-    (,) (L.foldl L.min (lo * lo2) products) (L.foldl L.max (lo * lo2) products);
+    integerRange (L.foldl minInteger first products) (L.foldl maxInteger first products);
   smallBounds :: (,) Int Int -> Bool;
   smallBounds ((,) lo hi) = ((lo >= (0 - 4611686018427387904)) && (hi < 4611686018427387904));
   numericProduct :: Primitive -> String -> String -> Build String;
@@ -1350,7 +1362,11 @@ module Bootstrap.LLVM.Native where {
     };
   integerBounds :: Primitive -> (,) Int Int -> (,) Int Int -> (,) Int Int;
   integerBounds p ((,) lo hi) ((,) lo2 hi2) =
-    if (P.primitiveCode p == 8) then (,) (lo + lo2) (hi + hi2) else (,) (lo - hi2) (hi - lo2);
+    if (P.primitiveCode p == 8)
+    then integerRange (addInteger (intToInteger lo) (intToInteger lo2))
+                      (addInteger (intToInteger hi) (intToInteger hi2))
+    else integerRange (subInteger (intToInteger lo) (intToInteger hi2))
+                      (subInteger (intToInteger hi) (intToInteger lo2));
   numericInteger :: Primitive -> String -> String -> Build String;
   numericInteger p a b =
     do {

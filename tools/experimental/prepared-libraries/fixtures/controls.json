@@ -1,0 +1,196 @@
+{
+  "format": "MLF-PREPARED-LIBRARY-FIXTURES-1",
+  "library_roots": ["Fixed.API"],
+  "cases": [
+    {
+      "name": "independent-polymorphic-uses",
+      "source": "module Root where\nimport Fixed.API\nmain = do { printInt (identity 7); printInt (if identity true then 1 else 0) }\n",
+      "accepted": true, "reused": true, "stdout": "7\n1\n"
+    },
+    {
+      "name": "higher-rank-argument",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt (if higher identity then 1 else 0)\n",
+      "accepted": true, "reused": true, "stdout": "1\n"
+    },
+    {
+      "name": "bounded-contract-application",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt ((bounded identity) 17)\n",
+      "accepted": true, "reused": true, "stdout": "17\n"
+    },
+    {
+      "name": "higher-kinded-contract",
+      "source": "module Root where\nimport Fixed.API\nmain = case higherKind (Box 19) of { Box n -> printInt n }\n",
+      "accepted": true, "reused": true, "stdout": "19\n"
+    },
+    {
+      "name": "returned-polymorphic-import",
+      "source": "module Root where\nimport Fixed.API\nmain = identity\n",
+      "accepted": true, "reused": true, "execute": []
+    },
+    {
+      "name": "returned-bounded-import",
+      "source": "module Root where\nimport Fixed.API\nmain = bounded\n",
+      "accepted": true, "reused": true, "execute": []
+    },
+    {
+      "name": "nested-polymorphic-contract",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt (choose 23 true)\n",
+      "accepted": true, "reused": true, "stdout": "23\n"
+    },
+    {
+      "name": "private-class-and-helper",
+      "source": "module Root where\nimport Fixed.API\nmain = do { putStrLn (exposePrivate 7); putStrLn (render 41) }\n",
+      "accepted": true, "reused": true, "stdout": "private:7\nrender:42\n"
+    },
+    {
+      "name": "dictionary-only-import",
+      "source": "module Root where\nimport Fixed.Class (Render(..))\nimport Fixed.API ()\nmain = putStrLn (render 9)\n",
+      "accepted": true, "reused": true, "stdout": "render:10\n"
+    },
+    {
+      "name": "private-helper-not-exported",
+      "source": "module Root where\nimport Fixed.API\nimport Fixed.Instances (privateRender)\nmain = putStrLn \"unused\"\n",
+      "accepted": false, "reused": false, "error_phase": "ModuleResolution"
+    },
+    {
+      "name": "private-class-not-exported",
+      "source": "module Root where\nimport Fixed.API\nimport Fixed.Class (Private)\nmain = putStrLn \"unused\"\n",
+      "accepted": false, "reused": false, "error_phase": "ModuleResolution"
+    },
+    {
+      "name": "unused-invalid-user-binding",
+      "source": "module Root where\nimport Fixed.API\nbad = putStrLn 1\nmain = putStrLn \"unreachable\"\n",
+      "accepted": false, "reused": false, "error_phase": "Inference"
+    },
+    {
+      "name": "unused-invalid-user-instance",
+      "source": "module Root where\nimport Fixed.API\nclass Broken a where { broken : a -> Bool }\ninstance Broken Int where { broken x = 7 }\nmain = putStrLn \"unreachable\"\n",
+      "accepted": false, "reused": false
+    },
+    {
+      "name": "inferred-qualified-module-binding",
+      "source": "module Root where\nimport Fixed.API\nimport qualified Scope.User as U\nmain = putStrLn U.value\n",
+      "extra_modules": {
+        "Scope.User": "module Scope.User (value) where\nimport Fixed.Class (Render(..))\nvalue = render 7\n"
+      },
+      "rationale": "An unsigned declaration abstracts its wanted dictionary. Root may supply its visible Render Int instance at the use of U.value.",
+      "accepted": true, "reused": true, "stdout": "render:8\n"
+    },
+    {
+      "name": "defining-module-instance-scope",
+      "source": "module Root where\nimport Fixed.API\nimport qualified Scope.User as U\nmain = putStrLn U.value\n",
+      "extra_modules": {
+        "Scope.User": "module Scope.User (value) where\nimport Fixed.Class (Render(..))\nvalue : String\nvalue = render 7\n"
+      },
+      "rationale": "The explicit unqualified String contract closes wanted evidence within Scope.User, which does not import Fixed.Instances. Root's extra instance visibility must not leak into this signed definition.",
+      "accepted": false, "reused": false, "error_phase": "Resolution"
+    },
+    {
+      "name": "local-shadowing",
+      "source": "module Root where\nimport Fixed.API\nmain = let identity = \\x -> x + 1 in printInt (identity 7)\n",
+      "accepted": true, "reused": true, "stdout": "8\n"
+    },
+    {
+      "name": "ordinary-returned-user-lambda",
+      "source": "module Root where\nimport Fixed.API\nmain = let ignored = identity 7 in \\x y -> x\n",
+      "accepted": true, "reused": true, "execute": []
+    },
+    {
+      "name": "ordered-library-and-user-layouts",
+      "source": "module Root where\nimport Fixed.API\ndata UserZ = UserSecond Alpha | UserFirst Zebra\ndata UserA = UserOnly Poly\nmain = case UserFirst (ZFirst 31) of { UserFirst (ZFirst n) -> printInt n; UserFirst ZLast -> printInt 0; UserSecond _ -> printInt 1 }\n",
+      "accepted": true, "reused": true, "stdout": "31\n",
+      "layout_entities": [
+        ["Fixed.Types", "Zebra", ["ZLast", "ZFirst"]],
+        ["Fixed.Types", "Alpha", ["AFirst", "ALast"]],
+        ["Fixed.Types", "Box", ["Box"]],
+        ["Fixed.Types", "Poly", ["Poly"]],
+        ["Root", "UserZ", ["UserSecond", "UserFirst"]],
+        ["Root", "UserA", ["UserOnly"]]
+      ]
+    },
+    {
+      "name": "quantified-data-field",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt (runPoly (Poly identity))\n",
+      "accepted": true, "reused": true, "stdout": "7\n"
+    },
+    {
+      "name": "nested-source-qualified-method",
+      "source": "module Root where\nimport Fixed.API\nsame : forall a. Render a => a -> String\nsame x = render x\nmain = putStrLn (same 3)\n",
+      "accepted": true, "reused": true, "stdout": "render:4\n"
+    },
+    {
+      "name": "user-instance-after-library",
+      "source": "module Root where\nimport Fixed.API\ninstance Render Bool where { render x = if x then \"yes\" else \"no\" }\nmain = do { putStrLn (render true); putStrLn (render 4) }\n",
+      "accepted": true, "reused": true, "stdout": "yes\nrender:5\n"
+    },
+    {
+      "name": "exact-managed-library-stack",
+      "source": "module Root where\nimport Fixed.API\nmain = putStrLn (stackText 0)\n",
+      "accepted": true, "reused": true,
+      "stdout": "CallStack (from HasCallStack):\n  leaf, called at {{Fixed.Stack}}:10:15 in main:Fixed.Stack\n  forward, called at {{Fixed.Stack}}:12:49 in main:Fixed.Stack\n  stackText, called at {{root}}:3:18 in main:Root\n"
+    },
+    {
+      "name": "unsigned-library-stack-boundary",
+      "source": "module Root where\nimport Fixed.API\nmain = putStrLn (unsignedText 0)\n",
+      "accepted": true, "reused": true,
+      "stdout": "CallStack (from HasCallStack):\n  leaf, called at {{Fixed.Stack}}:13:52 in main:Fixed.Stack\n"
+    },
+    {
+      "name": "changed-source-byte-fallback",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt (identity 7)\n",
+      "mutations": [{"module": "Fixed.Functions", "append": "-- exact source-byte mutation\n"}],
+      "accepted": true, "reused": false, "stdout": "7\n"
+    },
+    {
+      "name": "changed-dependency-body-fallback",
+      "source": "module Root where\nimport Fixed.API\nmain = putStrLn (render 41)\n",
+      "mutations": [{"module": "Fixed.Instances", "replace": ["(n + 1)", "(n + 2)"]}],
+      "accepted": true, "reused": false, "stdout": "render:43\n"
+    },
+    {
+      "name": "changed-source-path-fallback",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt (identity 7)\n",
+      "mutations": [{"module": "Fixed.Functions", "relocate": true}],
+      "accepted": true, "reused": false, "stdout": "7\n"
+    },
+    {
+      "name": "changed-prelude-mode-fallback",
+      "source": "module Root where\nimport Prelude\nimport Fixed.API\nmain = printInt (identity 7)\n",
+      "no_prelude": true,
+      "accepted": true, "reused": false, "stdout": "7\n"
+    },
+    {
+      "name": "incomplete-fixed-closure-fallback",
+      "source": "module Root where\nimport Fixed.Functions\nmain = printInt (identity 7)\n",
+      "accepted": true, "reused": false, "stdout": "7\n"
+    },
+    {
+      "name": "stale-builtin-body-witness",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt (identity 7)\n",
+      "registry_variant": "stale-builtin-witness",
+      "accepted": true, "reused": false, "stdout": "7\n"
+    },
+    {
+      "name": "stale-registry-schema",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt (identity 7)\n",
+      "registry_variant": "stale-schema",
+      "accepted": true, "reused": false, "stdout": "7\n"
+    },
+    {
+      "name": "invalid-source-hash",
+      "source": "module Root where\nimport Fixed.API\nmain = printInt (identity 7)\n",
+      "registry_variant": "invalid-source-hash",
+      "accepted": true, "reused": false, "stdout": "7\n"
+    },
+    {
+      "name": "canonical-value-name-collision",
+      "source": "module Root where\nimport Fixed.API\n{{protected_value}} x = x\nmain = printInt ({{protected_value}} 7)\n",
+      "accepted": true, "reused": false, "stdout": "7\n"
+    },
+    {
+      "name": "canonical-dictionary-name-collision",
+      "source": "module Root where\nimport Fixed.API\ndata {{protected_dictionary}} = CollisionOnly\nmain = case CollisionOnly of { CollisionOnly -> printInt 7 }\n",
+      "accepted": true, "reused": false, "stdout": "7\n"
+    }
+  ]
+}

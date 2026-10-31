@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build the committed shared implementation directly with the installed GHC.
+"""Build an owned compiler with its fixed native standard library by default.
 
-No source emission, preprocessing, copying or header overlays occur here.
-The static manifest and Cabal package describe the same closed source set.
+--bootstrap-only retains the explicit low-level shared-source GHC producer used
+by installation workers and direct-source qualification.
 """
 from __future__ import annotations
 import argparse
@@ -16,6 +16,7 @@ import shlex
 import subprocess
 import sys
 import time
+import types
 
 ROOT = Path(__file__).resolve().parents[2]
 GHC_VERSION = '9.14.1'
@@ -28,6 +29,24 @@ PACKAGES = ['base', 'array', 'bytestring', 'text', 'containers', 'directory']
 # Audited closed-corpus exceptions: datatype declarations and a pure re-export.
 # All other owned modules must produce actual value-scheme dump evidence.
 SIGNATURELESS_MODULES = {'Bootstrap.Types', 'Async.Task.Internal'}
+BUILTIN_VERIFICATION_HELPERS = ('tools/shared/builtin_prelude_identity.py',
+                                'tools/shared/verify_builtin_prelude.py')
+
+
+def prepared_verifier():
+    path = Path(__file__).resolve().with_name('verify_prepared_libraries.py')
+    module = types.ModuleType('verify_prepared_libraries')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
+
+
+def builtin_verifier():
+    path = Path(__file__).resolve().with_name('verify_builtin_prelude.py')
+    module = types.ModuleType('verify_builtin_prelude')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
 
 
 def sha(path):
@@ -274,7 +293,7 @@ def toolchain_inputs(ghc, libdir, ghc_info, cc):
     paths.update(p.resolve() for p in private_bin.iterdir() if p.is_file())
     for key, command in re.findall(r'\("([^"\n]*command)","([^"\n]*)"\)', ghc_info):
         # This driver uses GHC's native code generator, never the optional LLVM/JS tools.
-        if key.startswith(('LLVM ', 'JavaScript ')):
+        if key.startswith(('LLVM ', 'JavaScript ')) or (sys.platform == 'darwin' and key == 'windres command'):
             continue
         words = shlex.split(command)
         if words and not words[0].startswith('$'):
@@ -286,6 +305,8 @@ def toolchain_inputs(ghc, libdir, ghc_info, cc):
             paths.add(Path(value).resolve())
         elif value and shutil.which(value):
             paths.add(executable(value))
+    if sys.platform == 'darwin':
+        return darwin_toolchain_inputs(paths, actual_ghc, libdir)
     if sys.platform != 'linux':
         raise RuntimeError('this qualified direct build driver currently records Linux toolchains only')
     for path in list(paths):
@@ -302,6 +323,69 @@ def toolchain_inputs(ghc, libdir, ghc_info, cc):
         for match in re.findall(r'(?:=>\s+|^\s*)(/[^\s]+)', result.stdout, re.M):
             paths.add(Path(match).resolve(strict=True))
     return {'actual_ghc': identified(actual_ghc), 'files': {str(path): sha(path) for path in sorted(paths)}}
+
+
+
+def darwin_toolchain_inputs(initial_paths, actual_ghc, libdir):
+    """Record the real Mach-O dependency closure and dyld shared-cache bytes."""
+    sdk = Path(subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()).resolve(strict=True)
+    cache_dir = Path('/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld')
+    cache_map = cache_dir / 'dyld_shared_cache_arm64e.map'
+    if not cache_map.is_file():
+        raise RuntimeError('cannot identify Darwin shared-cache map')
+    cache_text = cache_map.read_text()
+    caches = sorted(p for p in cache_dir.glob('dyld_shared_cache_arm64e*') if p.is_file())
+    if not caches:
+        raise RuntimeError('missing dyld shared-cache files')
+    paths = set(initial_paths)
+    for name in ['clang', 'ld', 'as', 'ar', 'ranlib', 'otool', 'install_name_tool']:
+        value = subprocess.check_output(['xcrun', '--find', name], text=True).strip()
+        paths.add(Path(value).resolve(strict=True))
+    paths.add((sdk / 'SDKSettings.json').resolve(strict=True))
+    paths.update(p.resolve() for p in caches)
+    ghc_libraries = {}
+    for root in [libdir, Path('/Library/Developer/CommandLineTools/usr/lib')]:
+        for path in root.rglob('*.dylib'):
+            ghc_libraries.setdefault(path.name, set()).add(path.resolve())
+    pending = list(paths - set(caches)); visited = set(); system_names = set()
+    while pending:
+        path = pending.pop()
+        if path in visited:
+            continue
+        visited.add(path)
+        kind = subprocess.check_output(['/usr/bin/file', '-b', str(path)], text=True)
+        if 'Mach-O' not in kind:
+            continue
+        result = subprocess.run(['/usr/bin/otool', '-L', str(path)], capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError('otool failed: ' + str(path))
+        for line in result.stdout.splitlines():
+            match = re.match(r'^\s+(\S+) \(compatibility version ', line)
+            if not match:
+                continue
+            name = match.group(1)
+            if name.startswith('/usr/lib/') or name.startswith('/System/Library/'):
+                if name not in cache_text:
+                    raise RuntimeError('system dylib absent from dyld cache map: ' + name)
+                system_names.add(name)
+                continue
+            if name.startswith('@rpath/'):
+                candidates = ghc_libraries.get(Path(name).name, set())
+                if len(candidates) != 1:
+                    raise RuntimeError('cannot uniquely resolve Mach-O dependency: ' + name)
+                dependency = next(iter(candidates))
+            elif name.startswith('@loader_path/'):
+                dependency = (path.parent / name[len('@loader_path/'):]).resolve(strict=True)
+            elif name.startswith('/'):
+                dependency = Path(name).resolve(strict=True)
+            else:
+                raise RuntimeError('unsupported Mach-O dependency: ' + name)
+            if dependency not in paths:
+                paths.add(dependency)
+                pending.append(dependency)
+    return {'actual_ghc': identified(actual_ghc), 'files': {str(path): sha(path) for path in sorted(paths)},
+            'platform_qualification': 'Darwin Mach-O and dyld cache; experimental',
+            'sdk': str(sdk), 'system_dylibs': sorted(system_names)}
 
 
 def audit_inferred_interfaces(log, inputs):
@@ -336,19 +420,41 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ghc', default='ghc')
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
-    parser.add_argument('--optimization', choices=['0', '2'], default='0')
+    parser.add_argument('--optimization', choices=['0', '2'], default=None)
     parser.add_argument('--build-dir', type=Path, default=ROOT / '.mlf-build/shared-ghc')
     parser.add_argument('--typecheck-only', action='store_true')
+    parser.add_argument('--bootstrap-only', action='store_true', help='low-level shared producer without recursive standard-library installation')
+    parser.add_argument('--native-config', type=Path, help='explicit fixed native toolchain configuration')
+    parser.add_argument('--clang', default='clang', help='Clang used by default fixed native installation')
     options = parser.parse_args()
+    if options.optimization is None:
+        options.optimization = '0' if options.bootstrap_only or options.typecheck_only else '2'
+    if not options.bootstrap_only and not options.typecheck_only:
+        path = ROOT / 'tools/shared/default_stdlib.py'
+        module = types.ModuleType('default_stdlib')
+        module.__file__ = str(path)
+        exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+        module.build(ROOT, options)
+        return
     output = options.build_dir.resolve()
+    prepared = None
     if output == ROOT or ROOT.is_relative_to(output):
-        raise RuntimeError('build directory must not contain the source checkout')
+        # The public installer owns exactly OUTPUT/sources and authenticates it
+        # before allowing sibling compiler outputs. Arbitrary ancestors remain
+        # forbidden, and an ordinary empty registry cannot claim this layout.
+        if ROOT != output / 'sources':
+            raise RuntimeError('build directory must not contain the source checkout')
+        prepared = prepared_verifier().verify(ROOT)
+        if prepared.get('kind') != 'prepared':
+            raise RuntimeError('compiler-at-root requires an authenticated owned source snapshot')
     output.mkdir(parents=True, exist_ok=True)
     # A new attempt invalidates an earlier success before manifest/tool discovery.
     # Failure during any preflight must never leave a complete stale receipt.
     receipt_path = output / 'receipt.json'
     receipt_path.write_text(json.dumps({'format': 1, 'complete': False,
         'phase': 'preflight', 'started': time.time()}, indent=2) + '\n')
+    if prepared is None:
+        prepared = prepared_verifier().verify(ROOT)
     manifest = load_manifest()
     (output / 'objects').mkdir(exist_ok=True)
     (output / 'bin').mkdir(exist_ok=True)
@@ -390,6 +496,10 @@ def main():
                'shared_inputs': inputs,
                'configuration_inputs': {str(p.relative_to(ROOT)): identified(p) for p in configuration_paths},
                'host_inputs': {str(p.relative_to(ROOT)): identified(p) for p in host_paths},
+               'builtin_verification_helpers': {path: identified(ROOT / path) for path in BUILTIN_VERIFICATION_HELPERS},
+               'builtin_verification': None,
+               'prepared_verification': prepared,
+               'prepared_verification_helper': identified(ROOT / 'tools/shared/verify_prepared_libraries.py'),
                'commands': [], 'resolved_modules': {}, 'outputs': {}, 'typecheck_only': options.typecheck_only}
 
     def save():
@@ -471,6 +581,16 @@ def main():
         if identity != 'MLF/shared-haskell-v1 GHC':
             raise RuntimeError('unexpected implementation identity: ' + identity)
         receipt['implementation_identity'] = identity
+        for item in receipt['builtin_verification_helpers'].values():
+            if sha(item['path']) != item['sha256']:
+                raise RuntimeError('builtin verification helper changed during build: ' + item['path'])
+        # This gate only compares fresh generator stdout with the committed
+        # literal. It never updates/recompiles source or trusts a previous run.
+        verifier = builtin_verifier()
+        verification = verifier.verify(ROOT, output / 'bin/emlf',
+            output / 'bin/builtin-prelude', output / 'builtin-verification')
+        receipt['builtin_verification'] = identified(verification)
+        save()
     if sha(ROOT / 'shared-sources.json') != receipt['manifest_sha256']:
         raise RuntimeError('shared manifest changed during build')
     for item in inputs.values():
@@ -482,6 +602,12 @@ def main():
     for item in receipt['host_inputs'].values():
         if sha(item['path']) != item['sha256']:
             raise RuntimeError('host source changed during build: ' + item['path'])
+    for item in receipt['builtin_verification_helpers'].values():
+        if sha(item['path']) != item['sha256']:
+            raise RuntimeError('builtin verification helper changed during build: ' + item['path'])
+    for item in receipt['outputs'].values():
+        if sha(item['path']) != item['sha256']:
+            raise RuntimeError('executable changed during build: ' + item['path'])
     for key in ['build_driver', 'cabal_manifest', 'orchestrator']:
         if sha(receipt[key]['path']) != receipt[key]['sha256']:
             raise RuntimeError(key + ' changed during build')
@@ -495,6 +621,13 @@ def main():
         raise RuntimeError('GHC settings changed during build')
     receipt['object_inputs'] = {str(p.relative_to(output)): sha(p)
                               for p in sorted((output / 'objects').rglob('*')) if p.is_file()}
+    if not options.typecheck_only:
+        verifier.authenticate(receipt['builtin_verification'], ROOT,
+            output / 'bin/emlf', output / 'bin/builtin-prelude')
+    helper = receipt['prepared_verification_helper']
+    if sha(helper['path']) != helper['sha256']:
+        raise RuntimeError('prepared verification helper changed during build')
+    prepared_verifier().authenticate(receipt['prepared_verification'], ROOT)
     receipt['complete'] = True
     save()
     print(receipt_path)

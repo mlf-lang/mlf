@@ -99,7 +99,9 @@ static void mlf_ps_kill_scope(pid_t pid) {
     if(pid>0) { (void)kill(-pid,SIGKILL); (void)kill(pid,SIGKILL); }
 }
 static void mlf_ps_child_fail(int fd,int error) {
-    (void)write(fd,&error,sizeof(error));
+    /* Best-effort notification: retain the original single-write/exit path. */
+    ssize_t written=write(fd,&error,sizeof(error));
+    (void)written;
     _exit(error==ENOENT ? 127 : 126);
 }
 /* execve plus explicit PATH search avoids execvp's implicit shell fallback
@@ -225,7 +227,9 @@ static void mlf_ps_guard_task(const mlf_process_spec *spec,int control,int resul
 #else
     record.rss=(uint64_t)usage.ru_maxrss*1024;
 #endif
-    (void)write(result,&record,sizeof(record)); close(result); close(control); _exit(0);
+    /* The receiver detects a missing/short record; do not retry at exit. */
+    ssize_t written=write(result,&record,sizeof(record));
+    (void)written; close(result); close(control); _exit(0);
 }
 static int mlf_ps_platform_launch(const mlf_process_spec *spec,struct mlf_ps_process *t,int legacy) {
     int control[2],result[2];

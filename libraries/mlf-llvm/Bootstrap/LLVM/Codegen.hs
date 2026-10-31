@@ -15,13 +15,31 @@ module Bootstrap.LLVM.Codegen where {
   import qualified Bootstrap.LLVM.Kernel as K;
   import qualified Bootstrap.LLVM.Optimize as O;
   import qualified Bootstrap.LLVM.Native as N;
+  import qualified Bootstrap.LLVM.Result as R;
+  import qualified Bootstrap.LLVM.LazyProducer as V;
   generate :: Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
-  generate cs term =
+  generate = generateWithClosedConstructors True;
+  -- Separately compiled units can receive constructor fields allocated by
+  -- other units. Local construction sites cannot prove those fields are WHNF.
+  generateOpen :: Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
+  generateOpen = generateWithClosedConstructors False;
+  generateWithClosedConstructors :: Bool -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
+  generateWithClosedConstructors closed = generateWithConstructorPolicy closed S.empty;
+  -- Callers may close only constructors that cannot be created independently
+  -- outside this unit. Bare/partial constructor escapes still invalidate the
+  -- usual all-site field proof; this set does not itself prove field strictness.
+  generateWithPrivate :: Set String -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
+  generateWithPrivate names = generateWithConstructorPolicy False names;
+  generateWithConstructorPolicy :: Bool -> Set String -> Map String ((,) Int Int) -> XErased -> Either String ((,) String ([] String));
+  generateWithConstructorPolicy closed names cs term =
     let {
       fs = A.analyze term
     } in
     let {
       ks = K.kernels fs
+    } in
+    let {
+      rs = R.plan cs fs ks
     } in
     let {
       output =
@@ -31,8 +49,12 @@ module Bootstrap.LLVM.Codegen where {
           M.empty
           M.empty
           M.empty
-          (F.infer (M.map L.snd cs) fs term)
+          (if closed then F.infer (M.map L.snd cs) fs term else if S.null names then M.empty
+           else M.filterWithKey (\name _ -> S.member compareString name names)
+             (F.infer (M.map L.snd cs) fs term))
           S.empty
+          rs
+          (V.plan cs fs (S.union O.compareName ks (M.keysSet rs)) term) M.empty
     } in
     case runBuild (callback [] Nothing term) output of {
       Left error -> Left error;
@@ -51,6 +73,7 @@ module Bootstrap.LLVM.Codegen where {
   lookupName :: Map XName CGBinding -> XName -> Build CGBinding;
   lookupName scope name =
     case M.lookup O.compareName name scope of {
+      Just (CGSlot slot forced) -> do { value <- result ("load volatile ptr, ptr " ++ slot ++ ", align 8"); cgPure (CGBinding value forced) };
       Just value -> cgPure value;
       Nothing ->
         do {
@@ -108,7 +131,115 @@ module Bootstrap.LLVM.Codegen where {
   -- Drop those slots after loading them, before entering its possibly long body.
   -- Reusable function and IO environments must keep their captures intact.
   callbackWithClear :: Bool -> [] XName -> Maybe XName -> XErased -> Build String;
-  callbackWithClear private captures argument body =
+  callbackWithClear private captures argument body = do {
+    state <- get;
+    let { key = callbackKey state private captures argument body };
+    case key of {
+      Just fields -> case M.lookup (L.compareList compareString) fields (callbacks state) of {
+        Just name -> cgPure name;
+        Nothing -> do {
+          name <- callbackFresh private captures argument body;
+          modify (\current -> withCallbacks
+            (M.insert (L.compareList compareString) fields name (callbacks current)) current);
+          cgPure name
+        }
+      };
+      Nothing -> callbackFresh private captures argument body
+    }
+  };
+  -- Code alone is shared; every use still allocates its own closure/environment.
+  -- Keys are exact token lists, never hashes. Local identities denote capture
+  -- slots or lexical binders, while static workers retain their identity AND
+  -- the slot mapping of their implicit captures. Definition entry resets all
+  -- flow facts; primitive inlining is the remaining variable emission mode.
+  -- Bound workers/producer recipes and recursive groups are deliberately
+  -- ineligible: their global analyses are indexed by original binder identity.
+  callbackKey :: Output -> Bool -> [] XName -> Maybe XName -> XErased -> Maybe ([] String);
+  callbackKey state private captured argument body =
+    if O.remainingSize 128 body < 0 ||
+       L.any (\name -> M.member O.compareName name (functions state)) captured
+    then Nothing
+    else do {
+      let { scope = M.fromList O.compareName
+              (L.zip captured (L.range 0 (L.length captured - 1))) };
+      local <- case argument of {
+        Nothing -> Just scope;
+        Just name -> callbackBind state scope name
+      };
+      fields <- callbackTerm state local body;
+      Just (L.append [if private then "clear" else "keep",
+        if inlinePrimitives state then "inline" else "calls",
+        showInt (L.length captured), case argument of { Nothing -> "thunk"; Just _ -> "function" }]
+        fields)
+    };
+  callbackBind :: Output -> Map XName Int -> XName -> Maybe (Map XName Int);
+  callbackBind state scope name =
+    if M.member O.compareName name (functions state) ||
+       M.member O.compareName name (producerPlans state)
+    then Nothing
+    else Just (M.insert O.compareName name (M.size scope) scope);
+  callbackVariable :: Map XName Int -> XName -> [] String;
+  callbackVariable scope name = case M.lookup O.compareName name scope of {
+    Just slot -> ["local", showInt slot];
+    Nothing -> ["global", showInt (O.nameId name)]
+  };
+  callbackTerm :: Output -> Map XName Int -> XErased -> Maybe ([] String);
+  callbackTerm state scope expression = case expression of {
+    XEVar name -> case M.lookup O.compareName name (functions state) of {
+      Nothing -> Just (callbackVariable scope name);
+      Just worker -> Just (L.append ["worker", showInt (O.nameId name), showInt (L.length (A.captures worker))]
+        (L.concatMap (callbackVariable scope) (A.captures worker)))
+    };
+    XEAbs name body -> do {
+      local <- callbackBind state scope name;
+      fields <- callbackTerm state local body;
+      Just ((:) "lambda" fields)
+    };
+    XEApp function argument -> do {
+      first <- callbackTerm state scope function;
+      second <- callbackTerm state scope argument;
+      Just ((:) "apply" (L.append first second))
+    };
+    XELet name value body -> do {
+      local <- callbackBind state scope name;
+      first <- callbackTerm state scope value;
+      second <- callbackTerm state local body;
+      Just ((:) "let" (L.append first second))
+    };
+    XELetRec _ _ -> Nothing;
+    XEInt value -> Just ["integer", showInt value];
+    XEDouble value -> Just ["double", showInt (doubleToBits value)];
+    XEBool value -> Just ["boolean", if value then "true" else "false"];
+    XEString value -> Just ["string", value];
+    XEPrimitive primitive -> Just ["primitive", showInt (P.primitiveCode primitive)];
+    XEConstructor name -> Just ["constructor", name];
+    XEEvidenceHole _ -> Nothing;
+    XECase subject alternatives -> do {
+      first <- callbackTerm state scope subject;
+      rest <- L.mapM (callbackAlternative state scope) alternatives;
+      Just (L.append ["case", showInt (L.length alternatives)] (L.append first (L.concat rest)))
+    }
+  };
+  callbackAlternative :: Output -> Map XName Int -> XErasedAlternative -> Maybe ([] String);
+  callbackAlternative state scope (XErasedAlternative pattern body) = do {
+    let { names = case pattern of {
+      XConstructorPattern _ fields -> fields;
+      XDefaultPattern name -> [name]
+    } };
+    local <- L.foldM (\current optional -> case optional of {
+      Nothing -> Just current;
+      Just name -> callbackBind state current name
+    }) scope names;
+    fields <- callbackTerm state local body;
+    let { header = case pattern of {
+      XConstructorPattern name _ -> ["constructor-pattern", name, showInt (L.length names)];
+      XDefaultPattern _ -> ["default-pattern"]
+    } };
+    Just (L.append header (L.append
+      (L.map (\optional -> case optional of { Nothing -> "ignored"; Just _ -> "bound" }) names) fields))
+  };
+  callbackFresh :: Bool -> [] XName -> Maybe XName -> XErased -> Build String;
+  callbackFresh private captures argument body =
     do {
       name <- fresh "@mlf.code.";
       definition name (args2 "ptr %env" "ptr %arg")
@@ -129,6 +260,144 @@ module Bootstrap.LLVM.Codegen where {
          });
       cgPure name
     };
+  -- Internal aggregate domain: never a CGBinding or a value passed to force.
+  resultType :: String;
+  resultType = "{ i64, ptr }";
+  resultSymbol :: XName -> String;
+  resultSymbol name = "@mlf.result." ++ showInt (O.nameId name);
+  resultWorker :: XName -> A.WorkerFunction -> Build String;
+  resultWorker name f = do {
+    let { symbol = resultSymbol name };
+    seen <- gets (\state -> S.member compareString symbol (workers state));
+    if seen then cgPure () else do {
+      -- Mark before emitting the body, so recursive result calls use this ABI.
+      modify (\state -> withWorkers (S.insert compareString symbol (workers state)) state);
+      let { names = L.append (A.captures f) (A.parameters f) };
+      let { registers = L.map (\i -> "%a" ++ showInt i) (L.range 0 (L.length names - 1)) };
+      let { scope = M.fromList O.compareName
+              (L.zipWith (\n register -> (,) n (CGBinding register (S.member O.compareName n (A.strict f)))) names registers) };
+      definitionTyped resultType symbol (L.map pointer registers) (evaluateResult scope (A.functionBody f))
+    };
+    cgPure symbol
+  };
+  invokeResult :: Map XName CGBinding -> XName -> A.WorkerFunction -> [] XErased -> Build String;
+  invokeResult scope name f args = do {
+    symbol <- resultWorker name f;
+    -- Exact original ordinary call schedule; no new input demand or wrappers.
+    preparedArguments <- workerArguments scope f args;
+    let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
+    callTyped resultType symbol (L.map pointer (L.append captured values))
+  };
+  packResult :: Int -> String -> Build String;
+  packResult tag payload = do {
+    first <- result ("insertvalue " ++ (resultType ++ (" zeroinitializer, i64 " ++ (showInt tag ++ ", 0"))));
+    result ("insertvalue " ++ (resultType ++ (" " ++ (first ++ (", ptr " ++ (payload ++ ", 1"))))))
+  };
+  evaluateResult :: Map XName CGBinding -> XErased -> Build String;
+  evaluateResult scope expression = case expression of {
+    XELet n rhs body -> do {
+      fs <- gets functions;
+      if M.member O.compareName n fs then evaluateResult scope body else do {
+        strict <- letDemanded scope n body;
+        value <- if strict then evaluate scope rhs else thunk scope rhs;
+        evaluateResult (M.insert O.compareName n (CGBinding value strict) scope) body
+      }
+    };
+    XECase subject alternatives -> evaluateCaseTyped resultType evaluateResult scope subject alternatives;
+    _ -> case O.applications expression of {
+      (,) (XEConstructor c) args -> do {
+        constructor <- lookupConstructor c;
+        case constructor of {
+          (,) tag arity ->
+            if arity == 0 then
+              if L.null args then packResult tag "null" else failure "LLVM invalid admitted nullary result"
+            else if arity == 1 then case args of {
+              (:) field [] -> do { payload <- thunk scope field; packResult tag payload };
+              _ -> failure "LLVM invalid admitted unary result"
+            } else failure "LLVM unsupported admitted result constructor"
+        }
+      };
+      (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) -> do {
+        value <- evaluate scope condition;
+        test <- result ("icmp eq ptr " ++ (value ++ (", " ++ immediate 6)));
+        choose resultType test (evaluateResult scope yes) (evaluateResult scope no)
+      };
+      (,) (XEVar name) args -> do {
+        fs <- gets functions;
+        case M.lookup O.compareName name fs of {
+          Just f -> if L.length args == L.length (A.parameters f)
+                    then invokeResult scope name f args
+                    else failure "LLVM unsaturated admitted result call";
+          Nothing -> failure "LLVM unknown admitted result call"
+        }
+      };
+      _ -> failure "LLVM unsupported admitted result expression"
+    }
+  };
+  resultAlternatives :: R.ResultInfo -> [] XErasedAlternative -> Bool;
+  resultAlternatives info alternatives = case alternatives of {
+    (:) (XErasedAlternative (XConstructorPattern first firstFields) a)
+      ((:) (XErasedAlternative (XConstructorPattern second secondFields) b) []) ->
+      L.not (eqString first second) &&
+      resultPattern info first firstFields && resultPattern info second secondFields;
+    _ -> False
+  };
+  resultPattern :: R.ResultInfo -> String -> [] (Maybe XName) -> Bool;
+  resultPattern info constructor fields = case R.descriptor info constructor of {
+    Just ((,) tag arity) -> L.length fields == arity;
+    Nothing -> False
+  };
+  evaluateResultCase :: (Map XName CGBinding -> XErased -> Build String) ->
+                        Map XName CGBinding -> XName -> A.WorkerFunction -> [] XErased ->
+                        [] XErasedAlternative -> Build String;
+  evaluateResultCase finish scope name f args alternatives = do {
+    aggregate <- invokeResult scope name f args;
+    tag <- result ("extractvalue " ++ (resultType ++ (" " ++ (aggregate ++ ", 0"))));
+    -- Extract to an ordinary ptr SSA before any subsequent allocation. Null is
+    -- legal here: the explicit tag distinguishes unary null from nullary.
+    payload <- result ("extractvalue " ++ (resultType ++ (" " ++ (aggregate ++ ", 1"))));
+    labelled <- L.mapM (\alternative -> do { label <- fresh "result.case."; cgPure ((,) label alternative) }) alternatives;
+    missing <- fresh "result.missing.";
+    join <- fresh "result.join.";
+    entries <- L.mapM caseSwitchEntry labelled;
+    emit ("  switch i64 " ++ (tag ++ (", label %" ++ (missing ++ " ["))));
+    L.mapM_ emit (L.concat entries);
+    emit "  ]";
+    forcedBefore <- gets forcedValues;
+    incoming <- L.mapM (\entry -> case entry of {
+      (,) target (XErasedAlternative pattern body) -> do {
+        modify (withForcedValues forcedBefore);
+        label target;
+        local <- resultCaseScope scope payload pattern body;
+        value <- finish local body;
+        from <- gets block;
+        emit ("  br label %" ++ join);
+        cgPure ((,) value from)
+      }
+    }) labelled;
+    label missing;
+    emit "  call void @mlf_match_failure()";
+    emit "  unreachable";
+    label join;
+    modify (withForcedValues forcedBefore);
+    phi "ptr" incoming
+  };
+  resultCaseScope :: Map XName CGBinding -> String -> XPattern -> XErased -> Build (Map XName CGBinding);
+  resultCaseScope scope payload pattern body = case pattern of {
+    XConstructorPattern constructor [] -> cgPure scope;
+    XConstructorPattern constructor ((:) optional []) -> case optional of {
+      Nothing -> cgPure scope;
+      Just name -> do {
+        fs <- gets functions;
+        if S.member O.compareName name (A.needed fs body) then do {
+          facts <- gets constructorFacts;
+          let { flags = M.findWithDefault compareString [] constructor facts };
+          cgPure (M.insert O.compareName name (CGBinding payload (L.fromMaybe False (L.at 0 flags))) scope)
+        } else cgPure scope
+      }
+    };
+    _ -> failure "LLVM invalid admitted result pattern"
+  };
   worker :: XName -> A.WorkerFunction -> Build String;
   worker name f =
     do {
@@ -141,11 +410,11 @@ module Bootstrap.LLVM.Codegen where {
       let {
         registers = L.map (\i -> ("%a" ++ showInt i)) (L.range 0 (L.length names - 1))
       };
-      seen <- gets (\state -> S.member O.compareName name (workers state));
+      seen <- gets (\state -> S.member compareString symbol (workers state));
       if seen
       then cgPure ()
       else do {
-             modify (\state -> withWorkers (S.insert O.compareName name (workers state)) state);
+             modify (\state -> withWorkers (S.insert compareString symbol (workers state)) state);
              inline <- gets inlinePrimitives;
              native <- gets (\state -> S.member O.compareName name (numericKernels state));
              if native then modify (withInlinePrimitives False) else cgPure ();
@@ -206,38 +475,183 @@ module Bootstrap.LLVM.Codegen where {
       native <- gets (\state -> S.member O.compareName name (numericKernels state));
       if native then kernelAction scope name f args else invokeOrdinary scope name f args
     };
-  capturedArguments :: Map XName CGBinding -> A.WorkerFunction -> Build ([] String);
-  capturedArguments scope f =
-    L.mapM
-      (\name ->
-         do {
-           binding <- lookupName scope name;
-           if S.member O.compareName name (A.strict f)
-           then forceBinding binding
-           else bindingOperand binding
-         })
-      (A.captures f);
-  ordinaryArguments :: Map XName CGBinding ->
-                       A.WorkerFunction -> [] XErased -> Build ([] String);
-  ordinaryArguments scope f args =
-    L.mapM
-      (\entry ->
-         case entry of {
-           (,) name arg ->
-             if S.member O.compareName name (A.strict f)
-             then evaluate scope arg
-             else thunk scope arg
-         })
-      (L.zip (A.parameters f) args);
+  skippedWorkerParameter :: Maybe XName -> XName -> Bool;
+  skippedWorkerParameter skipped name = case skipped of {
+    Nothing -> False;
+    Just selected -> O.eqName name selected
+  };
+  workerArguments :: Map XName CGBinding -> A.WorkerFunction -> [] XErased ->
+                     Build ((,) ([] String) ([] String));
+  workerArguments scope f args = workerArgumentsWith scope f args Nothing;
+  -- All worker entry paths use this schedule. Force the combined capture and
+  -- formal prefix in semantic order before assembling normal ABI positions.
+  -- The optional slot is a certified non-strict producer recipe, represented
+  -- by its private fields rather than by an ordinary language value.
+  workerArgumentsWith :: Map XName CGBinding -> A.WorkerFunction -> [] XErased -> Maybe XName ->
+                         Build ((,) ([] String) ([] String));
+  workerArgumentsWith scope f args skipped = do {
+    let { parameters = M.fromList O.compareName (L.zip (A.parameters f) args) };
+    prepared <- L.foldM (\known name -> do {
+      value <- if skippedWorkerParameter skipped name
+        then failure "LLVM strict producer recipe slot"
+        else case M.lookup O.compareName name parameters of {
+          Just argument -> evaluate scope argument;
+          Nothing -> if L.elem O.eqName name (A.captures f) then do {
+            binding <- lookupName scope name;
+            forceBinding binding
+          } else failure "LLVM invalid worker demand prefix"
+        };
+      cgPure (M.insert O.compareName name value known)
+    }) M.empty (A.entryOrder f);
+    captured <- L.mapM (\name -> case M.lookup O.compareName name prepared of {
+      Just value -> cgPure value;
+      Nothing -> do { binding <- lookupName scope name; bindingOperand binding }
+    }) (A.captures f);
+    values <- L.mapM (\binding -> case binding of {
+      (,) name argument -> case M.lookup O.compareName name prepared of {
+        Just value -> cgPure value;
+        Nothing -> if skippedWorkerParameter skipped name then cgPure "null"
+                   else thunk scope argument
+      }
+    }) (L.zip (A.parameters f) args);
+    cgPure ((,) captured values)
+  };
   invokeOrdinary :: Map XName CGBinding ->
                     XName -> A.WorkerFunction -> [] XErased -> Build String;
   invokeOrdinary scope name f args =
     do {
-      symbol <- worker name f;
-      captured <- capturedArguments scope f;
-      values <- ordinaryArguments scope f args;
-      call symbol (L.map pointer (L.append captured values))
+      plans <- gets producerPlans;
+      case M.lookup O.compareName name plans of {
+        Just info -> invokeProducerBoxed scope name f info args;
+        Nothing -> do {
+          symbol <- worker name f;
+          preparedArguments <- workerArguments scope f args;
+          let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
+          call symbol (L.map pointer (L.append captured values))
+        }
+      }
     };
+  -- A private canonical entry carries one unshared deferred recipe, never a
+  -- fictitious language pointer. Original workers and demand masks are kept.
+  producerRegister :: Int -> Int -> String;
+  producerRegister selected index = "%a" ++ showInt (if index > selected then index + 2 else index);
+  producerScope :: V.ProducerPlan -> [] String -> Map XName CGBinding;
+  producerScope info values = M.fromList O.compareName
+    (L.zipWith (\name value -> (,) name (CGBinding value False)) (V.recipeCaptures info) values);
+  producerCaptureValues :: Map XName CGBinding -> V.ProducerPlan -> Build ([] String);
+  producerCaptureValues scope info = L.mapM
+    (\name -> do { binding <- lookupName scope name; bindingOperand binding }) (V.recipeCaptures info);
+  materializeProducer :: Map XName CGBinding -> V.ProducerPlan -> Build String;
+  materializeProducer scope info = do {
+    values <- producerCaptureValues scope info;
+    suspended (producerScope info values) (V.recipe info)
+  };
+  producerWorker :: XName -> A.WorkerFunction -> V.ProducerPlan -> Build String;
+  producerWorker name f info = do {
+    let { symbol = "@mlf.producer." ++ showInt (O.nameId name) };
+    seen <- gets (\state -> S.member compareString symbol (workers state));
+    if seen then cgPure () else do {
+      modify (\state -> withWorkers (S.insert compareString symbol (workers state)) state);
+      worker name f;
+      let { names = L.append (A.captures f) (A.parameters f) };
+      let { selected = L.length (A.captures f) + V.parameterIndex info };
+      let { entries = L.zip (L.range 0 (L.length names - 1)) names };
+      let { mode = "%a" ++ showInt selected };
+      let { first = "%a" ++ showInt (selected + 1) };
+      let { second = "%a" ++ showInt (selected + 2) };
+      let { parameters = L.concatMap
+        (\((,) index ignored) -> if index == selected
+          then args3 ("i64 " ++ mode) (pointer first) (pointer second)
+          else (:) (pointer (producerRegister selected index)) []) entries };
+      let { scope = M.fromList O.compareName (L.map
+        (\((,) index parameter) -> (,) parameter
+          (CGBinding (producerRegister selected index) (S.member O.compareName parameter (A.strict f))))
+        (L.filter (\((,) index ignored) -> index /= selected) entries)) };
+      definition symbol parameters
+        (evaluateProducerPrefix info mode first second scope (V.prefixExpression name (V.prefix info)))
+    };
+    cgPure symbol
+  };
+  invokeProducerBoxed :: Map XName CGBinding -> XName -> A.WorkerFunction -> V.ProducerPlan -> [] XErased -> Build String;
+  invokeProducerBoxed scope name f info args = do {
+    symbol <- producerWorker name f info;
+    preparedArguments <- workerArguments scope f args;
+    let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
+    let { prepared = L.concatMap (\((,) index value) ->
+      if index == V.parameterIndex info then args3 (number 0) (pointer value) (pointer "null")
+      else (:) (pointer value) []) (L.zip (L.range 0 (L.length values - 1)) values) };
+    call symbol (L.append (L.map pointer captured) prepared)
+  };
+  invokeProducerRecipe :: Map XName CGBinding -> A.WorkerFunction -> V.ProducerPlan -> [] XErased -> Build String;
+  invokeProducerRecipe scope f info args = do {
+    symbol <- producerWorker (V.worker info) f info;
+    preparedArguments <- workerArgumentsWith scope f args (Just (V.parameter info));
+    let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
+    fields <- L.mapM
+      (\((,) index value) ->
+        if index == V.parameterIndex info then do {
+          recipeValues <- producerCaptureValues scope info;
+          cgPure ((:) (number 1) (L.map pointer recipeValues))
+        } else cgPure ((:) (pointer value) []))
+      (L.zip (L.range 0 (L.length values - 1)) values);
+    call symbol (L.append (L.map pointer captured) (L.concat fields))
+  };
+  producerEscape :: Map XName CGBinding -> XName -> Build String -> XErased -> Build String;
+  producerEscape scope virtual materialize expression = case O.applications expression of {
+    (,) (XEConstructor name) arguments -> do {
+      constructor <- lookupConstructor name;
+      if L.length arguments /= L.snd constructor then failure "LLVM invalid producer escape arity"
+      else do {
+        fields <- L.mapM (\argument -> case argument of {
+          XEVar name -> if O.eqName name virtual then materialize else thunk scope argument;
+          _ -> thunk scope argument
+        }) arguments;
+        constructorValue (L.fst constructor) fields
+      }
+    };
+    _ -> failure "LLVM invalid certified producer escape"
+  };
+  evaluateProducerPrefix :: V.ProducerPlan -> String -> String -> String ->
+                            Map XName CGBinding -> XErased -> Build String;
+  evaluateProducerPrefix info mode first second scope expression = case expression of {
+    XECase subject alternatives ->
+      evaluateCase (evaluateProducerPrefix info mode first second) scope subject alternatives;
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) -> do {
+        boxed <- result ("icmp eq i64 " ++ mode ++ ", 0");
+        value <- choose "ptr" boxed
+          (forceBinding (CGBinding first False))
+          (evaluate (producerScope info (args2 first second)) (V.recipe info));
+        evaluate (M.insert O.compareName (V.parameter info) (CGBinding value True) scope) expression
+      };
+      _ -> producerEscape scope (V.parameter info)
+        (do {
+          boxed <- result ("icmp eq i64 " ++ mode ++ ", 0");
+          choose "ptr" boxed (cgPure first)
+            (suspended (producerScope info (args2 first second)) (V.recipe info))
+        }) expression
+    }
+  };
+  evaluateProducerTerminal :: V.ProducerPlan -> Map XName CGBinding -> XErased -> Build String;
+  evaluateProducerTerminal info scope expression = case O.applications expression of {
+    (,) (XEVar name) args ->
+      if L.not (O.eqName name (V.worker info)) then failure "LLVM invalid producer terminal target"
+      else do {
+        fs <- gets functions;
+        case M.lookup O.compareName name fs of {
+          Nothing -> failure "LLVM missing producer terminal worker";
+          Just f -> invokeProducerRecipe scope f info args
+        }
+      };
+    _ -> producerEscape scope (V.recipeBinder info) (materializeProducer scope info) expression
+  };
+  evaluateDeferredProducer :: V.ProducerPlan -> Map XName CGBinding -> Build String;
+  evaluateDeferredProducer info scope = case V.deferredExpression (V.worker info) (V.deferred info) of {
+    XECase subject alternatives -> evaluateCase (evaluateProducerTerminal info) scope subject alternatives;
+    _ -> failure "LLVM invalid certified deferred producer case"
+  };
+  recipePlan :: XName -> Map XName V.ProducerPlan -> Maybe V.ProducerPlan;
+  recipePlan name plans = L.find (\info -> O.eqName name (V.recipeBinder info)) (L.map L.snd (M.toList plans));
   kernelAction :: Map XName CGBinding -> XName -> A.WorkerFunction -> [] XErased -> Build String;
   kernelAction scope name f args =
     do {
@@ -279,8 +693,8 @@ module Bootstrap.LLVM.Codegen where {
               cgPure symbol
             }
         };
-      captured <- capturedArguments scope f;
-      values <- ordinaryArguments scope f args;
+      preparedArguments <- workerArguments scope f args;
+      let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
       let {
         all = L.append captured values
       };
@@ -294,7 +708,24 @@ module Bootstrap.LLVM.Codegen where {
       call "@mlf_native_io" (args2 (pointer entry) (pointer env))
     };
   suspended :: Map XName CGBinding -> XErased -> Build String;
+  -- An application cell already suspends and memoizes its evaluation. For
+  -- an unknown local function applied to a variable, both operands can be
+  -- captured without demand; an extra thunk and callback add no laziness.
+  -- Known workers retain their direct-call and specialization path.
   suspended scope expression =
+    case expression of {
+      XEApp (XEVar function) (XEVar argument) -> do {
+        fs <- gets functions;
+        if M.notMember O.compareName function fs then do {
+          f <- thunk scope (XEVar function);
+          a <- thunk scope (XEVar argument);
+          call "@mlf_application" (args2 (pointer f) (pointer a))
+        } else suspendedGeneral scope expression
+      };
+      _ -> suspendedGeneral scope expression
+    };
+  suspendedGeneral :: Map XName CGBinding -> XErased -> Build String;
+  suspendedGeneral scope expression =
     do {
       fs <- gets functions;
       let {
@@ -325,6 +756,58 @@ module Bootstrap.LLVM.Codegen where {
              cgPure value
            }
     };
+  -- Computing these operations cannot fail on checked, already evaluated
+  -- operands. In particular, neither indexing nor division is admitted here.
+  -- Leave multiplication lazy because large products may be expensive even
+  -- when their operands have already been evaluated.
+  -- This is not a demand analysis: unknown operands still need a suspension.
+  totalReadyPrimitive :: Primitive -> Bool;
+  totalReadyPrimitive primitive = case primitive of {
+    PAddInt -> True;
+    PSubInt -> True;
+    PAndInt -> True;
+    PEqInt -> True;
+    PLtInt -> True;
+    -- The readiness check requires the condition and both branches to be
+    -- total; evaluation still enters only the selected branch.
+    PIfThenElse -> True;
+    _ -> False
+  };
+  readyTotal :: Map XName CGBinding -> Map String String -> XErased -> Bool;
+  readyTotal scope known expression = case expression of {
+    XEVar name -> readyName scope known name;
+    XEInt _ -> True;
+    XEBool _ -> True;
+    _ -> case O.applications expression of {
+      (,) (XEPrimitive primitive) args ->
+        totalReadyPrimitive primitive && L.length args == P.primitiveArity primitive &&
+        L.all (readyTotal scope known) args;
+      _ -> False
+    }
+  };
+  readyName :: Map XName CGBinding -> Map String String -> XName -> Bool;
+  readyName scope known name = case M.lookup O.compareName name scope of {
+    Nothing -> False;
+    Just (CGSlot _ forced) -> forced;
+    Just (CGBinding value forced) -> forced || M.member compareString value known
+  };
+  nextDemandIs :: Map XName CGBinding -> Map String String -> XName -> [] XName -> Bool;
+  nextDemandIs scope known binder names = case names of {
+    [] -> False;
+    (:) first rest ->
+      if O.eqName binder first then True
+      else if readyName scope known first then nextDemandIs scope known binder rest
+      else False
+  };
+  letDemanded :: Map XName CGBinding -> XName -> XErased -> Build Bool;
+  letDemanded scope binder body = do {
+    fs <- gets functions;
+    known <- gets forcedValues;
+    -- Entry prefixes already stop at semantic barriers. Skip only earlier
+    -- forces that have succeeded on this dominating path; missing bindings
+    -- and facts from sibling branches cannot justify advancing the demand.
+    cgPure (nextDemandIs scope known binder (A.demandNames (A.entryDemand fs M.empty body)))
+  };
   thunk :: Map XName CGBinding -> XErased -> Build String;
   thunk scope expression =
     case expression of {
@@ -350,14 +833,38 @@ module Bootstrap.LLVM.Codegen where {
               then evaluate scope expression
               else suspended scope expression
             };
-          _ -> suspended scope expression
+          _ -> do {
+            known <- gets forcedValues;
+            -- Facts are scoped to dominated uses by Build's branch/definition
+            -- boundaries. Reuse only those facts; never force another leaf.
+            if readyTotal scope known expression
+            then evaluate scope expression
+            else suspended scope expression
+          }
         }
     };
   evaluate :: Map XName CGBinding -> XErased -> Build String;
-  -- Compact strings have immutable bytes and a lazily initialized Unicode
-  -- index. A writable global value is itself a BDWGC root for that index;
-  -- repeated evaluation needs no allocation or byte copying.
-  evaluate scope expression =
+  -- Large compiler-owned literals must not become one enormous machine
+  -- function. Outline only at an existing evaluation point, immediately call
+  -- the helper, and capture values so demand order and escaping closures stay
+  -- unchanged. Both the expression and instruction scans are bounded.
+  evaluate scope expression = do {
+    prior <- gets instructions;
+    if O.remainingSize 128 expression < 0 && workerBodyLimit 4097 prior then do {
+      fs <- gets functions;
+      let { names = S.toList (A.needed fs expression) };
+      -- Loading an oversized environment could itself cross the instruction
+      -- budget and re-outline the same expression indefinitely. Descend in the
+      -- current function until the required capture set is small enough.
+      if L.length names > 1024 then evaluateBody scope expression else do {
+        code <- callback names Nothing expression;
+        env <- environment scope names;
+        call code (args2 (pointer env) "ptr null")
+      }
+    } else evaluateBody scope expression
+  };
+  evaluateBody :: Map XName CGBinding -> XErased -> Build String;
+  evaluateBody scope expression =
     case expression of {
       XEVar n ->
         do {
@@ -410,61 +917,76 @@ module Bootstrap.LLVM.Codegen where {
           if M.member O.compareName n fs
           then evaluate scope body
           else do {
-                 let {
-                   strict = S.member O.compareName n (A.demanded fs body)
-                 };
-                 value <- if strict then evaluate scope rhs else thunk scope rhs;
-                 evaluate (M.insert O.compareName n (CGBinding value strict) scope) body
-               }
+            plans <- gets producerPlans;
+            case recipePlan n plans of {
+              Just info -> evaluateDeferredProducer info scope;
+              Nothing -> do {
+                strict <- letDemanded scope n body;
+                value <- if strict then evaluate scope rhs else thunk scope rhs;
+                evaluate (M.insert O.compareName n (CGBinding value strict) scope) body
+              }
+            }
+          }
         };
       XELetRec bindings body ->
         do {
-          fs <- gets functions;
-          let {
-            values =
-              L.filter
-                (\entry ->
-                   case entry of {
-                     (,) n a -> L.not (M.member O.compareName n fs)
-                   })
-                bindings
-          };
-          holes <-
-            L.mapM
-              (\entry ->
-                 case entry of {
-                   (,) n ignored ->
-                     do {
-                       hole <- call "@mlf_hole" [];
-                       cgPure ((,) n (CGBinding hole False))
-                     }
-                 })
-              values;
-          let {
-            recursive = M.union O.compareName (M.fromList O.compareName holes) scope
-          };
-          L.mapM_
-            (\entry ->
-               case entry of {
-                 (,) n rhs ->
-                   do {
-                     value <- thunk recursive rhs;
-                     hole <- lookupName recursive n;
-                     emit
-                       ("  call void @mlf_fill(ptr " ++
-                        (operand hole ++ (", ptr " ++ (value ++ ")"))))
-                   }
-               })
-            values;
+          recursive <- recursiveBindings scope bindings body;
           evaluate recursive body
         };
       XECase scrutinee alternatives -> evaluateCase evaluate scope scrutinee alternatives;
       XEApp f a -> application scope expression;
       XEEvidenceHole hole -> failure "LLVM unresolved dictionary evidence"
     };
+  -- In a large recursive scope retain function values once, rather than
+  -- rebuilding their environments at every lookup. Stack slots shorten the
+  -- SSA lifetimes of recursive roots; only entry-block slots are allowed.
+  -- Environments load their values and never capture addresses of these slots.
+  recursiveBindings :: Map XName CGBinding -> [] ((,) XName XErased) -> XErased -> Build (Map XName CGBinding);
+  recursiveBindings scope bindings body = do {
+    fs <- gets functions;
+    let {
+      large = M.size scope + L.length bindings > 128 || O.remainingSize 16384 body < 0;
+      values = L.filter (\((,) name _) -> large || L.not (M.member O.compareName name fs)) bindings
+    };
+    current <- gets block;
+    holes <- L.mapM (\((,) name _) -> do {
+      hole <- call "@mlf_hole" [];
+      binding <- if large && eqString current "entry" then do {
+        slot <- result "alloca ptr, align 8";
+        emit ("  store volatile ptr " ++ hole ++ ", ptr " ++ slot ++ ", align 8");
+        cgPure (CGSlot slot False)
+      } else cgPure (CGBinding hole False);
+      cgPure ((,) name binding)
+    }) values;
+    let { recursive = M.union O.compareName (M.fromList O.compareName holes) scope };
+    L.mapM_ (\((,) name rhs) -> do {
+      value <- thunk recursive rhs;
+      hole <- lookupName recursive name;
+      emit ("  call void @mlf_fill(ptr " ++ operand hole ++ ", ptr " ++ value ++ ")")
+    }) values;
+    cgPure recursive
+  };
   evaluateCase :: (Map XName CGBinding -> XErased -> Build String) ->
                   Map XName CGBinding -> XErased -> [] XErasedAlternative -> Build String;
-  evaluateCase finish scope scrutinee alternatives =
+  evaluateCase finish scope scrutinee alternatives = do {
+    fs <- gets functions;
+    plans <- gets resultPlans;
+    case O.applications scrutinee of {
+      (,) (XEVar name) args -> case M.lookup O.compareName name plans of {
+        Just info -> case M.lookup O.compareName name fs of {
+          Just f -> if (L.length args == L.length (A.parameters f)) && resultAlternatives info alternatives
+                    then evaluateResultCase finish scope name f args alternatives
+                    else evaluateCaseTyped "ptr" finish scope scrutinee alternatives;
+          Nothing -> evaluateCaseTyped "ptr" finish scope scrutinee alternatives
+        };
+        Nothing -> evaluateCaseTyped "ptr" finish scope scrutinee alternatives
+      };
+      _ -> evaluateCaseTyped "ptr" finish scope scrutinee alternatives
+    }
+  };
+  evaluateCaseTyped :: String -> (Map XName CGBinding -> XErased -> Build String) ->
+                       Map XName CGBinding -> XErased -> [] XErasedAlternative -> Build String;
+  evaluateCaseTyped ty finish scope scrutinee alternatives =
     case alternatives of {
       (:) (XErasedAlternative (XDefaultPattern optional) body) [] ->
         do {
@@ -510,7 +1032,7 @@ module Bootstrap.LLVM.Codegen where {
           else cgPure ();
           label join;
           modify (withForcedValues forcedBefore);
-          phi "ptr" incoming
+          phi ty incoming
         }
     };
   bindOptional :: Maybe XName -> CGBinding -> Map XName CGBinding -> Map XName CGBinding;
@@ -621,43 +1143,7 @@ module Bootstrap.LLVM.Codegen where {
         };
       XELetRec bindings body ->
         do {
-          fs <- gets functions;
-          let {
-            values =
-              L.filter
-                (\entry ->
-                   case entry of {
-                     (,) n a -> L.not (M.member O.compareName n fs)
-                   })
-                bindings
-          };
-          holes <-
-            L.mapM
-              (\entry ->
-                 case entry of {
-                   (,) n ignored ->
-                     do {
-                       hole <- call "@mlf_hole" [];
-                       cgPure ((,) n (CGBinding hole False))
-                     }
-                 })
-              values;
-          let {
-            recursive = M.union O.compareName (M.fromList O.compareName holes) scope
-          };
-          L.mapM_
-            (\entry ->
-               case entry of {
-                 (,) n rhs ->
-                   do {
-                     value <- thunk recursive rhs;
-                     hole <- lookupName recursive n;
-                     emit
-                       ("  call void @mlf_fill(ptr " ++
-                        (operand hole ++ (", ptr " ++ (value ++ ")"))))
-                   }
-               })
-            values;
+          recursive <- recursiveBindings scope bindings body;
           executeST fuel recursive body
         };
       XECase scrutinee alternatives -> evaluateCase (executeST fuel) scope scrutinee alternatives;
@@ -698,8 +1184,8 @@ module Bootstrap.LLVM.Codegen where {
                   if (L.length args == L.length (A.parameters f))
                   then do {
                          symbol <- stateWorker n f;
-                         captured <- capturedArguments scope f;
-                         values <- ordinaryArguments scope f args;
+                         preparedArguments <- workerArguments scope f args;
+                         let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
                          call symbol
                            ((:) ("i64 " ++ fuel) (L.map pointer (L.append captured values)))
                        }
@@ -831,9 +1317,7 @@ module Bootstrap.LLVM.Codegen where {
       if M.member O.compareName n fs
       then executeST fuel scope body
       else do {
-             let {
-               strict = S.member O.compareName n (A.demanded fs body)
-             };
+             strict <- letDemanded scope n body;
              value <- if strict then evaluate scope rhs else thunk scope rhs;
              executeST fuel (M.insert O.compareName n (CGBinding value strict) scope) body
            }
@@ -858,43 +1342,7 @@ module Bootstrap.LLVM.Codegen where {
         };
       XELetRec bindings body ->
         do {
-          fs <- gets functions;
-          let {
-            values =
-              L.filter
-                (\entry ->
-                   case entry of {
-                     (,) n a -> L.not (M.member O.compareName n fs)
-                   })
-                bindings
-          };
-          holes <-
-            L.mapM
-              (\entry ->
-                 case entry of {
-                   (,) n ignored ->
-                     do {
-                       hole <- call "@mlf_hole" [];
-                       cgPure ((,) n (CGBinding hole False))
-                     }
-                 })
-              values;
-          let {
-            recursive = M.union O.compareName (M.fromList O.compareName holes) scope
-          };
-          L.mapM_
-            (\entry ->
-               case entry of {
-                 (,) n rhs ->
-                   do {
-                     value <- thunk recursive rhs;
-                     hole <- lookupName recursive n;
-                     emit
-                       ("  call void @mlf_fill(ptr " ++
-                        (operand hole ++ (", ptr " ++ (value ++ ")"))))
-                   }
-               })
-            values;
+          recursive <- recursiveBindings scope bindings body;
           executeSTTail arity tailFuel fuel recursive body
         };
       XECase scrutinee alternatives ->
@@ -929,8 +1377,8 @@ module Bootstrap.LLVM.Codegen where {
                       ((L.length (A.captures f) + L.length args) == arity))
                   then do {
                          symbol <- stateWorker n f;
-                         captured <- capturedArguments scope f;
-                         values <- ordinaryArguments scope f args;
+                         preparedArguments <- workerArguments scope f args;
+                         let { captured = L.fst preparedArguments; values = L.snd preparedArguments };
                          value <-
                            result
                              ("musttail call ptr " ++
@@ -958,9 +1406,7 @@ module Bootstrap.LLVM.Codegen where {
       if M.member O.compareName n fs
       then executeSTTail arity tailFuel fuel scope body
       else do {
-             let {
-               strict = S.member O.compareName n (A.demanded fs body)
-             };
+             strict <- letDemanded scope n body;
              value <- if strict then evaluate scope rhs else thunk scope rhs;
              executeSTTail arity tailFuel fuel
                (M.insert O.compareName n (CGBinding value strict) scope)
@@ -1147,23 +1593,32 @@ module Bootstrap.LLVM.Codegen where {
       else case values of {
              (:) a ((:) b []) ->
                case p of {
-                 PAddInt -> integerOperation p a b;
-                 PSubInt -> integerOperation p a b;
+                 PAddInt -> N.numericInteger p a b;
+                 PSubInt -> N.numericInteger p a b;
                  PMulInt -> N.numericProduct p a b;
                  PQuotInt -> N.numericProduct p a b;
                  PRemInt -> N.numericProduct p a b;
-                 PEqInt -> integerOperation p a b;
-                 PLtInt -> integerOperation p a b;
+                 PEqInt -> N.numericInteger p a b;
+                 PLtInt -> N.numericInteger p a b;
                  PAddDouble -> doubleOperation p a b;
                  PSubDouble -> doubleOperation p a b;
                  PMulDouble -> doubleOperation p a b;
                  PDivDouble -> doubleOperation p a b;
                  PEqDouble -> doubleOperation p a b;
                  PLtDouble -> doubleOperation p a b;
+                 PStringCodeAt -> do {
+                   value <- stringCodeAtValue a b;
+                   -- The checked Unicode helper can fail; every successful
+                   -- return is a scalar value representable as a compact Int.
+                   recordRange value ((,) 0 1114111);
+                   cgPure value
+                 };
                  _ -> primitiveCall p values
                };
              (:) a [] ->
                case p of {
+                 PConcatStringList -> call "@mlf_concat_string_list" (args1 (pointer a));
+                 PStringLength -> call "@mlf_string_length" (args1 (pointer a));
                  PSqrtDouble ->
                    do {
                      x <- loadAt "double" a 8;
@@ -1175,6 +1630,35 @@ module Bootstrap.LLVM.Codegen where {
              _ -> primitiveCall p values
            }
     };
+  -- Operands have already been evaluated in primitiveApplication's original
+  -- order. This is a value-position optimization, not permission to demand a
+  -- lazy let or an unexecuted IO action. The checked helper retains every
+  -- Unicode, large-integer, uninitialized-cache and bounds-error path.
+  stringCodeAtValue :: String -> String -> Build String;
+  stringCodeAtValue text index = do {
+    indices <- loadAt "ptr" text 24;
+    ascii <- result ("icmp eq ptr " ++ indices ++ ", @mlf_ascii_string_indices");
+    bits <- result ("ptrtoint ptr " ++ index ++ " to i64");
+    low <- result ("and i64 " ++ bits ++ ", 1");
+    small <- result ("icmp ne i64 " ++ low ++ ", 0");
+    fast <- result ("and i1 " ++ ascii ++ ", " ++ small);
+    choose "ptr" fast (do {
+      offset <- result ("ashr i64 " ++ bits ++ ", 1");
+      length <- loadAt "i64" text 8;
+      nonnegative <- result ("icmp sge i64 " ++ offset ++ ", 0");
+      below <- result ("icmp ult i64 " ++ offset ++ ", " ++ length);
+      inside <- result ("and i1 " ++ nonnegative ++ ", " ++ below);
+      choose "ptr" inside (do {
+        bytes <- loadAt "ptr" text 16;
+        address <- result ("getelementptr i8, ptr " ++ bytes ++ ", i64 " ++ offset);
+        byte <- result ("load i8, ptr " ++ address ++ ", align 1");
+        code <- result ("zext i8 " ++ byte ++ " to i64");
+        shifted <- result ("shl i64 " ++ code ++ ", 1");
+        tagged <- result ("or i64 " ++ shifted ++ ", 1");
+        result ("inttoptr i64 " ++ tagged ++ " to ptr")
+      }) (call "@mlf_string_code_at" (args2 (pointer text) (pointer index)))
+    }) (call "@mlf_string_code_at" (args2 (pointer text) (pointer index)))
+  };
   primitiveCall :: Primitive -> [] String -> Build String;
   primitiveCall p values =
     if L.null values
@@ -1197,98 +1681,70 @@ module Bootstrap.LLVM.Codegen where {
   -- A single thunk can use its own update root directly. Mark it busy before
   -- calling, clear captures through its callback, then force and memoize its
   -- result. Runtime fallback preserves null/cycle errors and longer spines.
+  -- Keep the immediate, WHNF and one-forwarding tests inline. Thunk entry
+  -- performs the same busy marking, callback, forcing and memoization once
+  -- out of line, instead of duplicating that sequence at every force site.
   forceDefinition :: [] String;
   forceDefinition =
-    (:) "define private ptr @mlf.force(ptr %value) alwaysinline {"
-      ((:) "entry:"
-         ((:) "  %null = icmp eq ptr %value, null"
-            ((:) "  br i1 %null, label %slow, label %test"
-               ((:) "test:"
-                  ((:) "  %bits = ptrtoint ptr %value to i64"
-                     ((:) "  %kind = and i64 %bits, 7"
-                        ((:) "  %immediate = icmp ne i64 %kind, 0"
-                           ((:) "  br i1 %immediate, label %done, label %tagged"
-                              ((:) "tagged:"
-                                 ((:) "  %tag = load i32, ptr %value, align 4"
-                                    ((:) "  %ready = icmp uge i32 %tag, 5"
-                                       ((:) "  br i1 %ready, label %done, label %deferred"
-                                          ((:) "deferred:"
-                                             ((:) "  %isthunk = icmp eq i32 %tag, 3"
-                                                ((:)
-                                                   "  br i1 %isthunk, label %enter, label %indirect"
-                                                   ((:) "indirect:"
-                                                      ((:) "  %forwarded = icmp eq i32 %tag, 2"
-                                                         ((:)
-                                                            "  br i1 %forwarded, label %next, label %slow"
-                                                            ((:) "next:"
-                                                               ((:)
-                                                                  "  %slot = getelementptr i8, ptr %value, i64 8"
-                                                                  ((:)
-                                                                     "  %p = load ptr, ptr %slot, align 8"
-                                                                     ((:)
-                                                                        "  %missing = icmp eq ptr %p, null"
-                                                                        ((:)
-                                                                           "  br i1 %missing, label %slow, label %nexttest"
-                                                                           ((:) "nexttest:"
-                                                                              ((:)
-                                                                                 "  %pbits = ptrtoint ptr %p to i64"
-                                                                                 ((:)
-                                                                                    "  %pkind = and i64 %pbits, 7"
-                                                                                    ((:)
-                                                                                       "  %pimm = icmp ne i64 %pkind, 0"
-                                                                                       ((:)
-                                                                                          "  br i1 %pimm, label %forward, label %ptagged"
-                                                                                          ((:)
-                                                                                             "ptagged:"
-                                                                                             ((:)
-                                                                                                "  %ptag = load i32, ptr %p, align 4"
-                                                                                                ((:)
-                                                                                                   "  %pready = icmp uge i32 %ptag, 5"
-                                                                                                   ((:)
-                                                                                                      "  br i1 %pready, label %forward, label %slow"
-                                                                                                      ((:)
-                                                                                                         "forward:"
-                                                                                                         ((:)
-                                                                                                            "  ret ptr %p"
-                                                                                                            ((:)
-                                                                                                               "done:"
-                                                                                                               ((:)
-                                                                                                                  "  ret ptr %value"
-                                                                                                                  ((:)
-                                                                                                                     "enter:"
-                                                                                                                     ((:)
-                                                                                                                        "  %code.slot = getelementptr i8, ptr %value, i64 8"
-                                                                                                                        ((:)
-                                                                                                                           "  %env.slot = getelementptr i8, ptr %value, i64 16"
-                                                                                                                           ((:)
-                                                                                                                              "  %code = load ptr, ptr %code.slot, align 8"
-                                                                                                                              ((:)
-                                                                                                                                 "  %env = load ptr, ptr %env.slot, align 8"
-                                                                                                                                 ((:)
-                                                                                                                                    "  store i32 1, ptr %value, align 4"
-                                                                                                                                    ((:)
-                                                                                                                                       "  store ptr null, ptr %code.slot, align 8"
-                                                                                                                                       ((:)
-                                                                                                                                          "  store ptr null, ptr %env.slot, align 8"
-                                                                                                                                          ((:)
-                                                                                                                                             "  %returned = call ptr %code(ptr %env, ptr null)"
-                                                                                                                                             ((:)
-                                                                                                                                                "  %canonical = call ptr @mlf_force(ptr %returned)"
-                                                                                                                                                ((:)
-                                                                                                                                                   "  store i32 2, ptr %value, align 4"
-                                                                                                                                                   ((:)
-                                                                                                                                                      "  store ptr %canonical, ptr %code.slot, align 8"
-                                                                                                                                                      ((:)
-                                                                                                                                                         "  ret ptr %canonical"
-                                                                                                                                                         ((:)
-                                                                                                                                                            "slow:"
-                                                                                                                                                            ((:)
-                                                                                                                                                               "  %result = tail call ptr @mlf_force(ptr %value)"
-                                                                                                                                                               ((:)
-                                                                                                                                                                  "  ret ptr %result"
-                                                                                                                                                                  ((:)
-                                                                                                                                                                     "}"
-                                                                                                                                                                     [])))))))))))))))))))))))))))))))))))))))))))))))))))));
+    ["define private ptr @mlf.force(ptr %value) alwaysinline {",
+     "entry:",
+     "  %null = icmp eq ptr %value, null",
+     "  br i1 %null, label %slow, label %test",
+     "test:",
+     "  %bits = ptrtoint ptr %value to i64",
+     "  %kind = and i64 %bits, 7",
+     "  %immediate = icmp ne i64 %kind, 0",
+     "  br i1 %immediate, label %done, label %tagged",
+     "tagged:",
+     "  %tag = load i32, ptr %value, align 4",
+     "  %ready = icmp uge i32 %tag, 5",
+     "  br i1 %ready, label %done, label %deferred",
+     "deferred:",
+     "  %isthunk = icmp eq i32 %tag, 3",
+     "  br i1 %isthunk, label %enter, label %indirect",
+     "indirect:",
+     "  %forwarded = icmp eq i32 %tag, 2",
+     "  br i1 %forwarded, label %next, label %slow",
+     "next:",
+     "  %slot = getelementptr i8, ptr %value, i64 8",
+     "  %p = load ptr, ptr %slot, align 8",
+     "  %missing = icmp eq ptr %p, null",
+     "  br i1 %missing, label %slow, label %nexttest",
+     "nexttest:",
+     "  %pbits = ptrtoint ptr %p to i64",
+     "  %pkind = and i64 %pbits, 7",
+     "  %pimm = icmp ne i64 %pkind, 0",
+     "  br i1 %pimm, label %forward, label %ptagged",
+     "ptagged:",
+     "  %ptag = load i32, ptr %p, align 4",
+     "  %pready = icmp uge i32 %ptag, 5",
+     "  br i1 %pready, label %forward, label %slow",
+     "forward:",
+     "  ret ptr %p",
+     "done:",
+     "  ret ptr %value",
+     "enter:",
+     "  %entered = tail call ptr @mlf.force.enter(ptr %value)",
+     "  ret ptr %entered",
+     "slow:",
+     "  %result = tail call ptr @mlf_force(ptr %value)",
+     "  ret ptr %result",
+     "}",
+     "define private ptr @mlf.force.enter(ptr %value) noinline {",
+     "entry:",
+     "  %code.slot = getelementptr i8, ptr %value, i64 8",
+     "  %env.slot = getelementptr i8, ptr %value, i64 16",
+     "  %code = load ptr, ptr %code.slot, align 8",
+     "  %env = load ptr, ptr %env.slot, align 8",
+     "  store i32 1, ptr %value, align 4",
+     "  store ptr null, ptr %code.slot, align 8",
+     "  store ptr null, ptr %env.slot, align 8",
+     "  %returned = call ptr %code(ptr %env, ptr null)",
+     "  %canonical = call ptr @mlf_force(ptr %returned)",
+     "  store i32 2, ptr %value, align 4",
+     "  store ptr %canonical, ptr %code.slot, align 8",
+     "  ret ptr %canonical",
+     "}"];
   aliasMetadata :: [] String;
   aliasMetadata =
     (:) "!0 = !{!\"MLF storage\"}"
@@ -1297,6 +1753,12 @@ module Bootstrap.LLVM.Codegen where {
             ((:) "!3 = !{!1, !1, i64 0}" ((:) "!4 = !{!2, !2, i64 0}" []))));
   runtimeDeclarations :: [] String;
   runtimeDeclarations =
+    L.append ["@mlf_ascii_string_indices = external global i64",
+      "declare ptr @mlf_string_length(ptr)", "declare ptr @mlf_string_code_at(ptr, ptr)",
+      "declare ptr @mlf_concat_string_list(ptr)"]
+      runtimeBaseDeclarations;
+  runtimeBaseDeclarations :: [] String;
+  runtimeBaseDeclarations =
     (:) "declare ptr @mlf_execute_st_lazy(ptr)"
       ((:) "declare ptr @mlf_st_new_array(ptr, ptr)"
          ((:) "declare ptr @mlf_st_read_array(ptr, ptr)"
@@ -1394,13 +1856,15 @@ module Bootstrap.LLVM.Codegen where {
                                                                                                                                                                            ((:)
                                                                                                                                                                               ""
                                                                                                                                                                               []))))))))))))))))))))))))))))))))))))))))))))))))))))))));
-  -- Shared helpers keep emitted modules small; LLVM inlines their fast paths.
+  -- Share allocation and constructor initialization instead of duplicating
+  -- them at each construction site. Managed field parameters remain live
+  -- across allocation until the initialized object contains those fields.
   allocationDefinition :: [] String;
   allocationDefinition =
     (:) "@mlf_constructor_pending = external global [33 x ptr]"
       ((:) "declare ptr @mlf_constructor_allocate(i64, i64)"
          ((:)
-            "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) alwaysinline {"
+            "define private ptr @mlf.allocate.constructor(i64 %identity, i64 %count, i64 %size) noinline {"
             ((:) "entry:"
                ((:) "  %small = icmp ule i64 %size, 256"
                   ((:) "  br i1 %small, label %batch, label %slow"
@@ -1422,7 +1886,7 @@ module Bootstrap.LLVM.Codegen where {
                                                             ((:) "  ret ptr %allocated"
                                                                ((:) "}"
                                                                   ((:)
-                                                                     "define private ptr @mlf.construct.1(i64 %identity, ptr %a) alwaysinline {"
+                                                                     "define private ptr @mlf.construct.1(i64 %identity, ptr %a) noinline {"
                                                                      ((:) "entry:"
                                                                         ((:)
                                                                            "  %value = call ptr @mlf.allocate.constructor(i64 %identity, i64 1, i64 24)"
@@ -1441,7 +1905,7 @@ module Bootstrap.LLVM.Codegen where {
                                                                                              ((:)
                                                                                                 "}"
                                                                                                 ((:)
-                                                                                                   "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) alwaysinline {"
+                                                                                                   "define private ptr @mlf.construct.2(i64 %identity, ptr %a, ptr %b) noinline {"
                                                                                                    ((:)
                                                                                                       "entry:"
                                                                                                       ((:)
@@ -1465,7 +1929,7 @@ module Bootstrap.LLVM.Codegen where {
                                                                                                                                  ((:)
                                                                                                                                     "}"
                                                                                                                                     ((:)
-                                                                                                                                       "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) alwaysinline {"
+                                                                                                                                       "define private ptr @mlf.construct.wide(i64 %identity, i64 %count) noinline {"
                                                                                                                                        ((:)
                                                                                                                                           "entry:"
                                                                                                                                           ((:)
@@ -1495,7 +1959,7 @@ module Bootstrap.LLVM.Codegen where {
   thunkAllocationDefinition :: [] String;
   thunkAllocationDefinition =
     (:) "@mlf_compact_pending = external global [17 x ptr]"
-      ((:) "define private ptr @mlf.allocate.thunk(ptr %code, i64 %count) alwaysinline {"
+      ((:) "define private ptr @mlf.allocate.thunk(ptr %code, i64 %count) noinline {"
          ((:) "entry:"
             ((:) "  %words = add i64 %count, 4"
                ((:) "  %index = lshr i64 %words, 1"

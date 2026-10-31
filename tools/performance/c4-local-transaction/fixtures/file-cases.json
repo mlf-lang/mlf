@@ -1,0 +1,105 @@
+{
+  "format": 1,
+  "source_only": true,
+  "case_count": 9,
+  "old_entry": "Bootstrap.Crate.compileSpecFile",
+  "new_entry": "Bootstrap.CrateSession.compileSpecFile",
+  "oracle_policy": "Handwritten status/type/error constraints plus byte-exact old P3 diagnostic/artifact comparison; no candidate-derived expected outputs.",
+  "prelude_mode": "NoImplicitPrelude",
+  "entry_module": "Main",
+  "cases": [
+    {
+      "name": "polymorphic-two-uses",
+      "modules": {
+        "Main": "module Main where\nidentity x = x\nnumber = identity 42\nmain = identity true\n"
+      },
+      "expected_type": "Bool",
+      "oracle": "Handwritten identity at two ground types; source-language form also prescribed in Tests.SurfaceSyntax declarations generalize."
+    },
+    {
+      "name": "higher-rank-argument",
+      "modules": {
+        "Main": "module Main where\napply (f : forall a. a -> a) = f f\nidentity x = x\nmain = apply identity 42\n"
+      },
+      "expected_type": "Int",
+      "oracle": "Tests.SurfaceSyntax annotated function parameter has exact Int oracle; wrapped as one parsed module."
+    },
+    {
+      "name": "project-polymorphic-field",
+      "modules": {
+        "Main": "module Main where\ndata Box a = Box a\nmain = case ((Box (\\x -> x)) : Box (forall a. a -> a)) of { Box f -> let n = f 42 in f true }\n"
+      },
+      "expected_type": "Bool",
+      "oracle": "Tests.GraphUnification projectionPrograms first positive source; final f true is Bool, not a candidate-produced oracle."
+    },
+    {
+      "name": "recursive-import-cycle",
+      "modules": {
+        "A": "module A where\nimport qualified B\nf x = B.g x\n",
+        "B": "module B where\nimport qualified A\ng x = A.f x\n",
+        "Main": "module Main where\nimport A\nmain = f 0\n"
+      },
+      "expected_type": "Bottom",
+      "oracle": "Exact original Tests.Modules cross-module recursion infers unsigned cycle source and XBot oracle; no evaluation of divergent term."
+    },
+    {
+      "name": "field-not-generalisable",
+      "modules": {
+        "Main": "module Main where\ndata Box a = Box a\nmain box = case box of { Box f -> let n = f 42 in f true }\n"
+      },
+      "expected_type": "reject",
+      "required_error_fragments": [],
+      "oracle": "Tests.GraphUnification projectionPrograms second source explicitly rejected. Exact full diagnostic compared to unchanged P3, not guessed."
+    },
+    {
+      "name": "annotation-mismatch",
+      "modules": {
+        "Main": "module Main where\nf : Int -> Bool\nf x = x + 1\nmain = f 42\n"
+      },
+      "expected_type": "reject",
+      "required_error_fragments": [
+        "type constructor mismatch"
+      ],
+      "oracle": "Tests.SurfaceSyntax whole function signature is checked: prescribed Inference rejection."
+    },
+    {
+      "name": "missing-else",
+      "modules": {
+        "Main": "module Main where\nmain = if true then 42\n"
+      },
+      "expected_type": "reject",
+      "required_error_fragments": [
+        "else"
+      ],
+      "oracle": "Tests.SurfaceSyntax missing else: prescribed Parsing rejection."
+    },
+    {
+      "name": "empty-crate-identity",
+      "modules": {
+        "Main": "module Main where\nmain = 42\n"
+      },
+      "identity": "",
+      "expected_type": "reject",
+      "required_error_fragments": [
+        "crate identity is empty"
+      ],
+      "exact_error": "crate identity is empty",
+      "oracle": "Literal first Crate.decodeSpec identity check; parser/solver must not run."
+    },
+    {
+      "name": "missing-source-file",
+      "modules": {
+        "Main": "module Main where\nmain = 42\n"
+      },
+      "missing_modules": [
+        "Main"
+      ],
+      "expected_type": "reject",
+      "required_error_fragments": [
+        "crate source does not exist: "
+      ],
+      "exact_error_template": "crate source does not exist: {source:Main}",
+      "oracle": "Literal Crate.loadSourcesInPackage fileExists guard; identical missing source pathname on both routes."
+    }
+  ]
+}

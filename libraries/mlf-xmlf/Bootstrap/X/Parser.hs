@@ -86,11 +86,11 @@ module Bootstrap.X.Parser where {
     if ((stringLength s == 0) || L.not (allDigits s 0))
     then Left "expected decimal identity"
     else let {
-           n = readInt s
+           n = readInteger s
          } in
-         if (n > 9223372036854775807)
+         if (ltInteger (intToInteger 9223372036854775807) n)
          then Left "identity is outside the supported integer range"
-         else Right n;
+         else Right (integerToInt n);
   allDigits :: String -> Int -> Bool;
   allDigits s i =
     if (i >= stringLength s) then True else (isDigit (stringCodeAt s i) && allDigits s (i + 1));
@@ -338,7 +338,7 @@ module Bootstrap.X.Parser where {
          bits <-
            pChoice (pMap (\_ -> 9221120237041090560) (pToken "NaN"))
              (pMap (\_ -> 9218868437227405312) (pToken "Infinity"));
-         pPure (doubleFromBits (bits + (if negative then 9223372036854775808 else 0)))
+         pPure (doubleFromBits (if negative then xorInt bits (-9223372036854775808) else bits))
        });
   finiteDoubleLiteral :: Parser Double;
   finiteDoubleLiteral =
@@ -352,7 +352,7 @@ module Bootstrap.X.Parser where {
          let {
            n = readDouble (sign ++ s)
          };
-         if (remInt (quotInt (doubleToBits n) 4503599627370496) 2048 == 2047)
+         if (andInt (doubleToBits n) 9218868437227405312 == 9218868437227405312)
          then pFail "non-finite Double literal"
          else pPure n
        });

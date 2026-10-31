@@ -157,10 +157,11 @@ bindings =
   (:) ((,) "xMLF does not identify inert or alias bounds" "core/binding-hygiene/xmlf-does-not-identify-inert-or-alias-bounds") (
   []))))))) (
  (:) ((,) "core/graph-expansion" (
+  (:) ((,) "recursive exports preserve scoped identities and independent copies" "core/graph-expansion/recursive-exports-preserve-scoped-identities-and-independent-copies") (
   (:) ((,) "expansion resets scheme flag and binding" "core/graph-expansion/expansion-resets-scheme-flag-and-binding") (
   (:) ((,) "all inert nodes normalized" "core/graph-expansion/all-inert-nodes-normalized") (
   (:) ((,) "well-domination enforced" "core/graph-expansion/well-domination-enforced") (
-  []))))) (
+  [])))))) (
  (:) ((,) "core/graph-validation" (
   (:) ((,) "graph validation agrees with uncached reference" "core/graph-validation/graph-validation-agrees-with-uncached-reference") (
   (:) ((,) "graph validation checks deeply nested binding scopes" "core/graph-validation/graph-validation-checks-deeply-nested-binding-scopes") (
@@ -363,7 +364,7 @@ bindings =
   (:) ((,) "do: optional trailing semicolon" "core/do-notation/do-optional-trailing-semicolon") (
   (:) ((,) "do: nested blocks" "core/do-notation/do-nested-blocks") (
   (:) ((,) "do: bind statement sees the outer binding" "core/do-notation/do-bind-statement-sees-the-outer-binding") (
-  (:) ((,) "do: local let sees the outer binding" "core/do-notation/do-local-let-sees-the-outer-binding") (
+  (:) ((,) "do: distinct do-let binder sees the outer binding" "core/do-notation/do-distinct-do-let-binder-sees-the-outer-binding") (
   (:) ((,) "do: local let is generalized" "core/do-notation/do-local-let-is-generalized") (
   (:) ((,) "do: local let annotation" "core/do-notation/do-local-let-annotation") (
   (:) ((,) "do: let-in expression is an action" "core/do-notation/do-let-in-expression-is-an-action") (
@@ -373,7 +374,10 @@ bindings =
   (:) ((,) "do: constructor wildcard field" "core/do-notation/do-constructor-wildcard-field") (
   (:) ((,) "do: discarded action cannot capture an outer name" "core/do-notation/do-discarded-action-cannot-capture-an-outer-name") (
   (:) ((,) "do: pattern temporary cannot capture an outer name" "core/do-notation/do-pattern-temporary-cannot-capture-an-outer-name") (
-  (:) ((,) "do: uses the lexical bind function" "core/do-notation/do-uses-the-lexical-bind-function") (
+  (:) ((,) "do: explicit bind remains lexical" "core/do-notation/do-explicit-bind-remains-lexical") (
+  (:) ((,) "do rejection: lexical bind cannot intercept do" "core/do-notation/do-rejection-lexical-bind-cannot-intercept-do") (
+  (:) ((,) "do rejection: same-name do-let is recursive, not an outer reference" "core/do-notation/do-rejection-same-name-do-let-is-recursive-not-an-outer-reference") (
+  (:) ((,) "do: annotated recursive do-let keeps its own binding" "core/do-notation/do-annotated-recursive-do-let-keeps-its-own-binding") (
   (:) ((,) "do rejection: empty block" "core/do-notation/do-rejection-empty-block") (
   (:) ((,) "do rejection: final statement must be an expression" "core/do-notation/do-rejection-final-statement-must-be-an-expression") (
   (:) ((,) "do rejection: cannot end with a local declaration" "core/do-notation/do-rejection-cannot-end-with-a-local-declaration") (
@@ -384,12 +388,12 @@ bindings =
   (:) ((,) "do rejection: later binding is unavailable" "core/do-notation/do-rejection-later-binding-is-unavailable") (
   (:) ((,) "do rejection: action type mismatch" "core/do-notation/do-rejection-action-type-mismatch") (
   (:) ((,) "do rejection: final action has the right monadic type" "core/do-notation/do-rejection-final-action-has-the-right-monadic-type") (
-  (:) ((,) "do rejection: refutable pattern requires an explicit case" "core/do-notation/do-rejection-refutable-pattern-requires-an-explicit-case") (
+  (:) ((,) "do rejection: refutable pattern requires canonical MonadFail" "core/do-notation/do-rejection-refutable-pattern-requires-canonical-monadfail") (
   (:) ((,) "do rejection: pattern binder duplicates" "core/do-notation/do-rejection-pattern-binder-duplicates") (
   (:) ((,) "do: parser preserves statement forms" "core/do-notation/do-parser-preserves-statement-forms") (
   (:) ((,) "do: lowering preserves binding order and the final action" "core/do-notation/do-lowering-preserves-binding-order-and-the-final-action") (
   (:) ((,) "do: multiparameter MonadState example" "core/do-notation/do-multiparameter-monadstate-example") (
-  [])))))))))))))))))))))))))))))))))))) (
+  []))))))))))))))))))))))))))))))))))))))) (
  (:) ((,) "core/surface-syntax" (
   (:) ((,) "surface parser: multiplication binds above addition" "core/surface-syntax/surface-parser-multiplication-binds-above-addition") (
   (:) ((,) "surface parser: application binds above arithmetic" "core/surface-syntax/surface-parser-application-binds-above-arithmetic") (
@@ -420,21 +424,22 @@ bindings =
   (:) ((,) "surface checking: inline whole-function signature" "core/surface-syntax/surface-checking-inline-whole-function-signature") (
   (:) ((,) "surface checking: annotated local function" "core/surface-syntax/surface-checking-annotated-local-function") (
   (:) ((,) "surface checking: do-local function generalizes" "core/surface-syntax/surface-checking-do-local-function-generalizes") (
-  (:) ((,) "surface checking: do-local function sees outer binding" "core/surface-syntax/surface-checking-do-local-function-sees-outer-binding") (
+  (:) ((,) "surface checking: distinct do-local function sees outer binding" "core/surface-syntax/surface-checking-distinct-do-local-function-sees-outer-binding") (
   (:) ((,) "surface checking: conditional returns polymorphic function" "core/surface-syntax/surface-checking-conditional-returns-polymorphic-function") (
   (:) ((,) "surface checking: conditional works in a case scrutinee" "core/surface-syntax/surface-checking-conditional-works-in-a-case-scrutinee") (
   (:) ((,) "surface checking: keyword prefixes remain identifiers" "core/surface-syntax/surface-checking-keyword-prefixes-remain-identifiers") (
   (:) ((,) "surface checking: instance method parameters" "core/surface-syntax/surface-checking-instance-method-parameters") (
   (:) ((,) "surface checking: qualified function declaration" "core/surface-syntax/surface-checking-qualified-function-declaration") (
   (:) ((,) "surface checking: syntax needs no implicit prelude" "core/surface-syntax/surface-checking-syntax-needs-no-implicit-prelude") (
-  (:) ((,) "surface rejection: recursion needs a signature" "core/surface-syntax/surface-rejection-recursion-needs-a-signature") (
+  (:) ((,) "surface checking: same-name do-local function is recursive" "core/surface-syntax/surface-checking-same-name-do-local-function-is-recursive") (
+  (:) ((,) "surface checking: unsigned recursion infers bottom" "core/surface-syntax/surface-checking-unsigned-recursion-infers-bottom") (
   (:) ((,) "surface checking: forward value references" "core/surface-syntax/surface-checking-forward-value-references") (
   (:) ((,) "surface rejection: branch types must agree" "core/surface-syntax/surface-rejection-branch-types-must-agree") (
   (:) ((,) "surface rejection: condition must be Bool" "core/surface-syntax/surface-rejection-condition-must-be-bool") (
   (:) ((,) "surface rejection: arithmetic does not overload Double" "core/surface-syntax/surface-rejection-arithmetic-does-not-overload-double") (
   (:) ((,) "surface rejection: unary plus requires a number" "core/surface-syntax/surface-rejection-unary-plus-requires-a-number") (
   (:) ((,) "surface rejection: unary minus requires a number" "core/surface-syntax/surface-rejection-unary-minus-requires-a-number") (
-  (:) ((,) "surface rejection: comparisons do not overload String" "core/surface-syntax/surface-rejection-comparisons-do-not-overload-string") (
+  (:) ((,) "surface checking: equality supports annotated strings" "core/surface-syntax/surface-checking-equality-supports-annotated-strings") (
   (:) ((,) "surface rejection: whole function signature is checked" "core/surface-syntax/surface-rejection-whole-function-signature-is-checked") (
   (:) ((,) "surface rejection: chained comparisons" "core/surface-syntax/surface-rejection-chained-comparisons") (
   (:) ((,) "surface rejection: mixed chained comparisons" "core/surface-syntax/surface-rejection-mixed-chained-comparisons") (
@@ -449,7 +454,7 @@ bindings =
   (:) ((,) "surface rejection: signature without equation" "core/surface-syntax/surface-rejection-signature-without-equation") (
   (:) ((,) "surface rejection: reserved conditional word" "core/surface-syntax/surface-rejection-reserved-conditional-word") (
   (:) ((,) "surface rejection: reserved word in datatype parameter" "core/surface-syntax/surface-rejection-reserved-word-in-datatype-parameter") (
-  [])))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+  []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
  (:) ((,) "core/readability" (
   (:) ((,) "layout: top-level data, signatures and equations" "core/readability/layout-top-level-data-signatures-and-equations") (
   (:) ((,) "layout: nested do with a trailing semicolon" "core/readability/layout-nested-do-with-a-trailing-semicolon") (
@@ -476,8 +481,8 @@ bindings =
   (:) ((,) "recursion: unused explicit quantified variables are discharged" "core/readability/recursion-unused-explicit-quantified-variables-are-discharged") (
   (:) ((,) "equations: parameter can shadow the function name" "core/readability/equations-parameter-can-shadow-the-function-name") (
   (:) ((,) "readability rejection: recursive forall cannot specialize to Int" "core/readability/readability-rejection-recursive-forall-cannot-specialize-to-int") (
-  (:) ((,) "readability rejection: mutual recursion needs every signature" "core/readability/readability-rejection-mutual-recursion-needs-every-signature") (
-  (:) ((,) "readability rejection: local recursion needs a signature" "core/readability/readability-rejection-local-recursion-needs-a-signature") (
+  (:) ((,) "recursion: mixed signed and inferred group" "core/readability/recursion-mixed-signed-and-inferred-group") (
+  (:) ((,) "recursion: unsigned local group" "core/readability/recursion-unsigned-local-group") (
   (:) ((,) "readability rejection: recursive existentials are not closed signatures" "core/readability/readability-rejection-recursive-existentials-are-not-closed-signatures") (
   (:) ((,) "readability rejection: recursive signature free variable" "core/readability/readability-rejection-recursive-signature-free-variable") (
   (:) ((,) "readability rejection: equation arity" "core/readability/readability-rejection-equation-arity") (
@@ -572,7 +577,7 @@ bindings =
   (:) ((,) "modules rejection: explicit empty Prelude removes value names" "core/modules/modules-rejection-explicit-empty-prelude-removes-value-names") (
   (:) ((,) "modules rejection: qualified Prelude suppresses implicit Prelude" "core/modules/modules-rejection-qualified-prelude-suppresses-implicit-prelude") (
   (:) ((,) "modules rejection: Prelude cannot be redefined" "core/modules/modules-rejection-prelude-cannot-be-redefined") (
-  (:) ((,) "modules rejection: primitive constructor cannot be redefined" "core/modules/modules-rejection-primitive-constructor-cannot-be-redefined") (
+  (:) ((,) "modules rejection: ordinary Unit constructor is not builtin unit" "core/modules/modules-rejection-ordinary-unit-constructor-is-not-builtin-unit") (
   (:) ((,) "modules rejection: primitive type cannot be redefined" "core/modules/modules-rejection-primitive-type-cannot-be-redefined") (
   (:) ((,) "modules rejection: unused private definitions still checked" "core/modules/modules-rejection-unused-private-definitions-still-checked") (
   (:) ((,) "modules rejection: export list cannot name missing value" "core/modules/modules-rejection-export-list-cannot-name-missing-value") (
@@ -581,7 +586,6 @@ bindings =
   (:) ((,) "modules rejection: instance not visible in another instance" "core/modules/modules-rejection-instance-not-visible-in-another-instance") (
   (:) ((,) "modules rejection: cyclic private constructor remains hidden" "core/modules/modules-rejection-cyclic-private-constructor-remains-hidden") (
   (:) ((,) "modules rejection: cyclic reexports cannot invent a missing identity" "core/modules/modules-rejection-cyclic-reexports-cannot-invent-a-missing-identity") (
-  (:) ((,) "modules rejection: cross-module recursion retains existing signature requirement" "core/modules/modules-rejection-cross-module-recursion-retains-existing-signature-requirement") (
   (:) ((,) "modules rejection: downstream orphan cannot leak into an import cycle" "core/modules/modules-rejection-downstream-orphan-cannot-leak-into-an-import-cycle") (
   (:) ((,) "modules: original source type names" "core/modules/modules-original-source-type-names") (
   (:) ((,) "modules: unit syntax is intrinsic" "core/modules/modules-unit-syntax-is-intrinsic") (
@@ -591,10 +595,12 @@ bindings =
   (:) ((,) "modules: unused imports do not cause value ambiguity" "core/modules/modules-unused-imports-do-not-cause-value-ambiguity") (
   (:) ((,) "modules: legacy compile path preserves checked output" "core/modules/modules-legacy-compile-path-preserves-checked-output") (
   (:) ((,) "modules: file loader, includes, hierarchy and errors" "core/modules/modules-file-loader-includes-hierarchy-and-errors") (
+  (:) ((,) "modules typing: cross-module recursion infers unsigned cycle" "core/modules/modules-typing-cross-module-recursion-infers-unsigned-cycle") (
+  (:) ((,) "modules typing: cross-module qualified recursion generalizes shared exports" "core/modules/modules-typing-cross-module-qualified-recursion-generalizes-shared-exports") (
   (:) ((,) "crate namespaces resolve recursive declarations before inference" "core/modules/crate-namespaces-resolve-recursive-declarations-before-inference") (
   (:) ((,) "crate namespace resolution preserves external ownership and mangling" "core/modules/crate-namespace-resolution-preserves-external-ownership-and-mangling") (
   (:) ((,) "cyclic export fixed point is invariant under source order" "core/modules/cyclic-export-fixed-point-is-invariant-under-source-order") (
-  [])))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+  []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
  (:) ((,) "core/separate-compilation" (
   (:) ((,) "crate checking: selective and qualified imports" "core/separate-compilation/crate-checking-selective-and-qualified-imports") (
   (:) ((,) "crate checking: unnamed entry expression imports" "core/separate-compilation/crate-checking-unnamed-entry-expression-imports") (
@@ -665,7 +671,7 @@ bindings =
   (:) ((,) "crate rejects: explicit empty Prelude removes value names" "core/separate-compilation/crate-rejects-explicit-empty-prelude-removes-value-names") (
   (:) ((,) "crate rejects: qualified Prelude suppresses implicit Prelude" "core/separate-compilation/crate-rejects-qualified-prelude-suppresses-implicit-prelude") (
   (:) ((,) "crate rejects: Prelude cannot be redefined" "core/separate-compilation/crate-rejects-prelude-cannot-be-redefined") (
-  (:) ((,) "crate rejects: primitive constructor cannot be redefined" "core/separate-compilation/crate-rejects-primitive-constructor-cannot-be-redefined") (
+  (:) ((,) "crate rejects: ordinary Unit constructor is not builtin unit" "core/separate-compilation/crate-rejects-ordinary-unit-constructor-is-not-builtin-unit") (
   (:) ((,) "crate rejects: primitive type cannot be redefined" "core/separate-compilation/crate-rejects-primitive-type-cannot-be-redefined") (
   (:) ((,) "crate rejects: unused private definitions still checked" "core/separate-compilation/crate-rejects-unused-private-definitions-still-checked") (
   (:) ((,) "crate rejects: export list cannot name missing value" "core/separate-compilation/crate-rejects-export-list-cannot-name-missing-value") (
@@ -674,14 +680,15 @@ bindings =
   (:) ((,) "crate rejects: instance not visible in another instance" "core/separate-compilation/crate-rejects-instance-not-visible-in-another-instance") (
   (:) ((,) "crate rejects: cyclic private constructor remains hidden" "core/separate-compilation/crate-rejects-cyclic-private-constructor-remains-hidden") (
   (:) ((,) "crate rejects: cyclic reexports cannot invent a missing identity" "core/separate-compilation/crate-rejects-cyclic-reexports-cannot-invent-a-missing-identity") (
-  (:) ((,) "crate rejects: cross-module recursion retains existing signature requirement" "core/separate-compilation/crate-rejects-cross-module-recursion-retains-existing-signature-requirement") (
   (:) ((,) "crate rejects: downstream orphan cannot leak into an import cycle" "core/separate-compilation/crate-rejects-downstream-orphan-cannot-leak-into-an-import-cycle") (
+  (:) ((,) "crate typing: cross-module recursion infers unsigned cycle" "core/separate-compilation/crate-typing-cross-module-recursion-infers-unsigned-cycle") (
+  (:) ((,) "crate typing: cross-module qualified recursion generalizes shared exports" "core/separate-compilation/crate-typing-cross-module-qualified-recursion-generalizes-shared-exports") (
   (:) ((,) "crate paths and native cache commands" "core/separate-compilation/crate-paths-and-native-cache-commands") (
   (:) ((,) "crate metadata version rejection" "core/separate-compilation/crate-metadata-version-rejection") (
   (:) ((,) "crate object binding schemes are independently checked" "core/separate-compilation/crate-object-binding-schemes-are-independently-checked") (
   (:) ((,) "crate datatype metadata is independently reconstructed" "core/separate-compilation/crate-datatype-metadata-is-independently-reconstructed") (
   (:) ((,) "crate unused import parameters retain checked schemes" "core/separate-compilation/crate-unused-import-parameters-retain-checked-schemes") (
-  []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
+  [])))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))) (
  (:) ((,) "core/state-types" (
   (:) ((,) "ST source type: return" "core/state-types/st-source-type-return") (
   (:) ((,) "ST source type: bind" "core/state-types/st-source-type-bind") (

@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables, ImplicitParams #-}
+{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables, ImplicitParams, CPP #-}
 module MLF.Host.IO where
 
 import Prelude hiding (Int, String)
@@ -6,7 +6,12 @@ import qualified Prelude as P
 import MLF.Host.Base
 import qualified Data.ByteString as B
 import qualified Data.Array.IO as A
-import qualified Data.Map.Strict as M
+#include "MachDeps.h"
+#if WORD_SIZE_IN_BITS >= 64 && !defined(MLF_TEST_NARROW_INT_TABLE)
+import qualified Data.IntMap.Lazy as M
+#else
+import qualified Data.Map.Lazy as M
+#endif
 import Data.IORef
 import Data.Int (Int64)
 import Foreign (Ptr, alloca, peek, peekElemOff, nullPtr, free)
@@ -38,13 +43,13 @@ host operation a b n = withMVar hostLock $ \_ -> mask_ $
   B.useAsCStringLen (utf8 a) $ \(pa,na) ->
   B.useAsCStringLen (utf8 b) $ \(pb,nb) ->
   alloca $ \out -> alloca $ \len -> alloca $ \number -> do
-    status <- c_host operation pa (fromIntegral na) pb (fromIntegral nb) (fromInteger n) out len number
+    status <- c_host operation pa (fromIntegral na) pb (fromIntegral nb) (fromIntegral n) out len number
     bytes <- peek out
     size <- peek len
     text <- if bytes==nullPtr then pure B.empty else bracket (pure bytes) free (\p -> B.packCStringLen (p,fromIntegral size))
     result <- peek number
     decoded <- evaluate (fromUtf8 text)
-    if status/=0 then throwIO (HostError (unpack decoded)) else pure (decoded,toInteger result)
+    if status/=0 then throwIO (HostError (unpack decoded)) else pure (decoded,fromIntegral result)
 empty :: String
 empty = literal ""
 hostText :: CInt -> String -> IO String
@@ -115,7 +120,7 @@ withRawArgs action = alloca $ \count -> alloca $ \arguments -> do
   c_args count arguments
   n <- peek count
   argv <- peek arguments
-  action (max 0 (toInteger n-1)) argv
+  action (max 0 (fromIntegral n-1)) argv
 v_getArgCount :: IO Int
 v_getArgCount = withRawArgs (\count _ -> pure count)
 v_getArg :: Int -> IO String
@@ -163,7 +168,7 @@ newArray n initial = do
 index :: A.IOArray P.Int a -> Int -> IO P.Int
 index array n = do
   (_,hi) <- A.getBounds array
-  evaluate (bounded "array index out of bounds" (toInteger hi) n)
+  evaluate (bounded "array index out of bounds" (fromIntegral hi) n)
 readArray :: A.IOArray P.Int a -> Int -> IO a
 readArray array n = index array n >>= A.readArray array
 writeArray :: A.IOArray P.Int a -> Int -> a -> IO ()
@@ -173,13 +178,13 @@ writeArray array n value = do
   A.writeArray array i x
   pure ()
 lengthArray :: A.IOArray P.Int a -> IO Int
-lengthArray array = do { (_,hi) <- A.getBounds array; pure (toInteger hi+1) }
+lengthArray array = do { (_,hi) <- A.getBounds array; pure (fromIntegral hi+1) }
 v_newIntArray :: Int -> Int -> IO IntArray
 v_newIntArray n x = IntArray <$> newArray n x
 v_newDoubleArray :: Int -> Double -> IO DoubleArray
 v_newDoubleArray n x = DoubleArray <$> newArray n x
 v_newByteArray :: Int -> Int -> IO ByteArray
-v_newByteArray n x = ByteArray <$> newArray n (toInteger (bounded "byte value must be between 0 and 255" 255 x))
+v_newByteArray n x = ByteArray <$> newArray n (fromIntegral (bounded "byte value must be between 0 and 255" 255 x))
 v_readIntArray :: IntArray -> Int -> IO Int
 v_readIntArray (IntArray a) = readArray a
 v_readDoubleArray :: DoubleArray -> Int -> IO Double
@@ -191,7 +196,7 @@ v_writeIntArray (IntArray a) = writeArray a
 v_writeDoubleArray :: DoubleArray -> Int -> Double -> IO ()
 v_writeDoubleArray (DoubleArray a) = writeArray a
 v_writeByteArray :: ByteArray -> Int -> Int -> IO ()
-v_writeByteArray (ByteArray a) n x = writeArray a n (toInteger (bounded "byte value must be between 0 and 255" 255 x))
+v_writeByteArray (ByteArray a) n x = writeArray a n (fromIntegral (bounded "byte value must be between 0 and 255" 255 x))
 v_lengthIntArray :: IntArray -> IO Int
 v_lengthIntArray (IntArray a) = lengthArray a
 v_lengthDoubleArray :: DoubleArray -> IO Int
@@ -199,7 +204,7 @@ v_lengthDoubleArray (DoubleArray a) = lengthArray a
 v_lengthByteArray :: ByteArray -> IO Int
 v_lengthByteArray (ByteArray a) = lengthArray a
 bytesArray :: B.ByteString -> IO ByteArray
-bytesArray bytes = ByteArray <$> A.newListArray (0,B.length bytes-1) (map toInteger (B.unpack bytes))
+bytesArray bytes = ByteArray <$> A.newListArray (0,B.length bytes-1) (map fromIntegral (B.unpack bytes))
 v_byteArrayFromString :: String -> IO ByteArray
 v_byteArrayFromString = bytesArray . utf8
 v_getByteLine :: IO ByteArray
@@ -216,22 +221,32 @@ v_putBytes (ByteArray a) start count = do
   i <- evaluate (bounded "byte slice out of bounds" size start)
   n <- evaluate (bounded "byte slice out of bounds" (size-start) count)
   bytes <- mapM (A.readArray a) [i..i+n-1]
-  ioErrorAs "IO error: output failed" (B.hPut H.stdout (B.pack (map fromInteger bytes)) >> H.hFlush H.stdout)
+  ioErrorAs "IO error: output failed" (B.hPut H.stdout (B.pack (map fromIntegral bytes)) >> H.hFlush H.stdout)
   pure ()
+-- The primitive owns evaluated Int64 keys/values. Machine IntMap is lossless
+-- on 64-bit hosts; retain full keys on narrower hosts instead of truncating.
+#if WORD_SIZE_IN_BITS >= 64 && !defined(MLF_TEST_NARROW_INT_TABLE)
+type IntTable = IORef (M.IntMap Int)
+intTableKey :: Int -> P.Int
+intTableKey = fromIntegral
+#else
 type IntTable = IORef (M.Map Int Int)
+intTableKey :: Int -> Int
+intTableKey = id
+#endif
 v_newIntTable :: IO IntTable
 v_newIntTable = newIORef M.empty
 v_readIntTable :: IntTable -> Int -> IO Int
 v_readIntTable table key = do
   values <- readIORef table
   k <- evaluate key
-  pure (M.findWithDefault 0 k values)
+  pure (M.findWithDefault 0 (intTableKey k) values)
 v_writeIntTable :: IntTable -> Int -> Int -> IO ()
 v_writeIntTable table key value = do
   values <- readIORef table
   k <- evaluate key
   x <- evaluate value
-  writeIORef table (M.insert k x values)
+  writeIORef table (M.insert (intTableKey k) x values)
   pure ()
 
 runEntry :: IO () -> IO ()

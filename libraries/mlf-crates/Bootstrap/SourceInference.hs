@@ -9,6 +9,7 @@ module Bootstrap.SourceInference where {
   import Bootstrap.Fresh;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.EvidenceBoundary as Boundary;
   import qualified Bootstrap.InferenceUnit as Inference;
@@ -206,7 +207,7 @@ module Bootstrap.SourceInference where {
     XTerm -> [] ((,,) EvidenceRole String XType) -> Either String ([] Boundary.Candidate);
   candidateParameters parameters term candidates =
     let {
-      first = 1 + foldl max 0 (Set.toList (Separate.termIdentities term Set.empty))
+      first = 1 + foldl max 0 (IS.toList (Separate.termIdentities term IS.empty))
     } in
     traverseEither
       (\((,) ordinal ((,,) role name ty)) -> do {
@@ -287,6 +288,7 @@ module Bootstrap.SourceInference where {
   isCopied (SSourceDefinition _) = True;
   isCopied (SCallSite _ _ body) = isCopied body;
   isCopied (SAnn body _) = isCopied body;
+  isCopied (SSignature body _) = isCopied body;
   isCopied (SChecked _ body) = isCopied body;
   isCopied _ = False;
   prepareSourcePlan :: Map String SType -> [] DataDecl -> [] SClassDecl ->
@@ -385,7 +387,8 @@ module Bootstrap.SourceInference where {
   eligibleSource :: [] ((,,) String (Maybe SAnnotation) SExpr) -> Bool;
   eligibleSource members = case members of {
     (:) ((,,) name Nothing rhs) [] ->
-      not (isCopied rhs) && not (elem eqString name (Surface.freeNames rhs));
+      not (isCopied rhs) && not (elem eqString name (Surface.freeNames rhs)) &&
+      null (Classes.sourceDeclaredClasses Nothing rhs);
     _ -> False
   };
   prepareGroup :: SourcePlan -> Map String SourceContract -> [] String -> Either String PreparedGroup;

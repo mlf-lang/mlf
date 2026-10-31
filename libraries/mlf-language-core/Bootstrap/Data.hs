@@ -7,6 +7,7 @@ module Bootstrap.Data where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Kind as K;
   import qualified Bootstrap.Unicode as U;
   datatypeName :: DataDecl -> String;
@@ -21,8 +22,64 @@ module Bootstrap.Data where {
   datatypeConstructors (DataDeclK _ _ cs) = cs;
   constructorName (ConstructorDecl n _) = n;
   constructorFields (ConstructorDecl _ fs) = fs;
+  -- Source graphs cannot represent unused quantifiers. Normalize only freshly
+  -- declared source layouts, before they become checked nominal contracts.
+  -- In particular, imported target layouts must never pass through this map.
+  fieldUsesParameter :: String -> Field -> Bool;
+  fieldUsesParameter name field =
+    case field of {
+      Parameter variable -> eqString name variable;
+      Function a b -> fieldUsesParameter name a || fieldUsesParameter name b;
+      Applied _ arguments -> any (fieldUsesParameter name) arguments;
+      Application f a -> fieldUsesParameter name f || fieldUsesParameter name a;
+      Quantified variable _ body ->
+        not (eqString name variable) && fieldUsesParameter name body
+    };
+  canonicalSourceField :: Field -> Field;
+  canonicalSourceField field =
+    case field of {
+      Parameter _ -> field;
+      Function a b -> Function (canonicalSourceField a) (canonicalSourceField b);
+      Applied name arguments -> Applied name (map canonicalSourceField arguments);
+      Application f a -> Application (canonicalSourceField f) (canonicalSourceField a);
+      Quantified variable kind body ->
+        let { normalized = canonicalSourceField body } in
+        if fieldUsesParameter variable normalized
+        then Quantified variable kind normalized
+        else normalized
+    };
+  canonicalSourceDeclaration :: DataDecl -> DataDecl;
+  canonicalSourceDeclaration declaration =
+    let {
+      constructors = map (\(ConstructorDecl name fields) ->
+        ConstructorDecl name (map canonicalSourceField fields)) (datatypeConstructors declaration)
+    } in
+    case declaration of {
+      DataDecl name parameters _ -> DataDecl name parameters constructors;
+      DataDeclK name parameters _ -> DataDeclK name parameters constructors
+    };
+  canonicalSourceDeclarations :: [] DataDecl -> [] DataDecl -> Either String ([] DataDecl);
+  canonicalSourceDeclarations checkedContext declarations = do {
+    -- Validate the original syntax: deleting an unused binder must not conceal
+    -- an ill-kinded or ill-scoped field. The context participates in validation
+    -- but is returned nowhere and remains byte-for-byte owned by its importer.
+    validateDeclarations (append checkedContext declarations);
+    Right (map canonicalSourceDeclaration declarations)
+  };
+  canonicalSourceProgram :: SProgram -> Either String SProgram;
+  canonicalSourceProgram program =
+    case program of {
+      SProgram declarations body -> do {
+        normalized <- canonicalSourceDeclarations [] declarations;
+        Right (SProgram normalized body)
+      };
+      SClassProgram declarations classes instances body -> do {
+        normalized <- canonicalSourceDeclarations [] declarations;
+        Right (SClassProgram normalized classes instances body)
+      }
+    };
   scalarPrimitiveKinds :: Map String Kind;
-  scalarPrimitiveKinds =
+  scalarPrimitiveKinds = M.insert compareString "Integer" Star (
     M.fromList compareString
       ((:) ((,) "AsyncScope" Star)
          ((:) ((,) "Completion" (KArrow Star Star))
@@ -39,7 +96,7 @@ module Bootstrap.Data where {
                                           ((:) ((,) "ByteArray" Star)
                                              ((:) ((,) "IntTable" Star)
                                                 ((:) ((,) "IO" (KArrow Star Star))
-                                                   [])))))))))))))));
+                                                   []))))))))))))))));
   -- Wired source identities are independent of Bootstrap.Types' temporary
   -- List/Pair/Unit implementation ADTs. Never normalize a user ADT to these.
   sourceUnitDeclaration :: DataDecl;
@@ -171,7 +228,10 @@ module Bootstrap.Data where {
   memberString name names = any (eqString name) names;
   distinct :: String -> [] String -> Either String ();
   distinct what xs =
-    if (length xs == length (nubBy eqString xs)) then Right () else Left ("duplicate " ++ what);
+    -- Complete the spine before demanding names. Int64 worker arguments can
+    -- otherwise evaluate the Set side before the ordered comparison is entered.
+    let { count = length xs } in
+    seq count (if (count == Set.size (Set.fromList compareString xs)) then Right () else Left ("duplicate " ++ what));
   fieldKind :: [] DataDecl -> DataEnv -> Map String Kind -> Field -> Either String Kind;
   fieldKind declarations env ps field =
     case field of {

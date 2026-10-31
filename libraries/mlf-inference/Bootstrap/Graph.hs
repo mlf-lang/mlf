@@ -6,8 +6,8 @@ module Bootstrap.Graph where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
-  import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntTree as IT;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.ST as ST;
   -- Persistent graph operations. Identities are retained through aliases, while
@@ -77,49 +77,24 @@ module Bootstrap.Graph where {
   -- the generic lazy map builder, every graph node retains strictNode's demand.
   nodesFromDistinctAscList :: [] ((,) Int Node) -> IntMap Node;
   nodesFromDistinctAscList entries =
-    case buildNodeTree (L.length entries) entries of {
-      (,) tree remaining -> seq tree (IntMap tree)
-    };
-  buildNodeTree :: Int -> [] ((,) Int Node) -> (,) (Map Int Node) ([] ((,) Int Node));
-  -- Keep each completed subtree strict while consuming the list.
-  -- A lazy Pair field otherwise retains a second construction
-  -- spine until the final root demands all its child maps.
-  buildNodeTree count entries =
-    if (count <= 0)
-    then (,) MapEmpty entries
-    else case buildNodeTree (quotInt count 2) entries of {
-           (,) left rest ->
-             case rest of {
-               [] -> panic "invalid sorted graph entries";
-               (:) ((,) key value) following ->
-                 let {
-                   node = strictNode value
-                 } in
-                 seq node
-                   (case buildNodeTree ((count - quotInt count 2) - 1) following of {
-                      (,) right after ->
-                        let {
-                          tree = M.node count key node left right
-                        } in
-                        seq tree ((,) tree after)
-                    })
-             }
-         };
-  mapNodeTree :: (Int -> Node -> Node) -> Map Int Node -> Map Int Node;
+    seq (L.length entries)
+      (case L.foldlStrict
+        (\state -> \entry -> case entry of {
+          (,) key value -> seq (strictNode value) (IM.ascInsert state entry)
+        }) IM.NoState entries of {
+        IM.NoState -> IM.empty;
+        IM.State key value stack -> IM.wrap (IM.ascLinkStack stack key (IM.tip key value))
+      });
+  mapNodeTree :: (Int -> Node -> Node) -> IntMapTree Node -> IntMapTree Node;
   mapNodeTree action tree =
     case tree of {
-      MapEmpty -> MapEmpty;
-      MapNode count key value left right ->
-        let {
-          result = strictNode (action key value)
-        } in
-        let {
-          leftTree = mapNodeTree action left
-        } in
-        let {
-          rightTree = mapNodeTree action right
-        } in
-        seq result (M.node count key result leftTree rightTree)
+      IntMapNil -> IntMapNil;
+      IntMapTip key value ->
+        let { result = strictNode (action key value) } in
+        seq result (IM.tip key result);
+      IntMapBin count prefix left right ->
+        let { leftTree = mapNodeTree action left; rightTree = mapNodeTree action right } in
+        seq leftTree (seq rightTree (IntMapBin count prefix leftTree rightTree))
     };
   mapNodesWithKey :: (Int -> Node -> Node) -> IntMap Node -> IntMap Node;
   mapNodesWithKey action (IntMap tree) =
@@ -327,7 +302,7 @@ module Bootstrap.Graph where {
       Just n -> Just (f n)
     };
   freshId :: Graph -> (,) Int Graph;
-  freshId (Graph ns ls fresh) = (,) fresh (mkGraph ns ls (fresh + 1));
+  freshId (Graph ns ls fresh) = (,) fresh (mkGraph ns ls (L.advanceIdentity fresh 1));
   resolve :: Graph -> Int -> Int;
   resolve graph identity =
     case IM.lookup identity (links graph) of {
@@ -759,7 +734,7 @@ module Bootstrap.Graph where {
     else bindE (mapE_ (validateChild graph intervals identity) (children (tag node)))
            (\ignored -> Right ());
   -- A bounded span keeps local scratch storage proportional to the graph even
-  -- when public graph identities are sparse or arbitrary-precision integers.
+  -- when public graph identities span the full signed 64-bit domain.
   denseDisjoint :: forall a b. IntMap a -> IntMap b -> Bool;
   denseDisjoint left right =
     case left of {
@@ -771,12 +746,12 @@ module Bootstrap.Graph where {
             else denseNoKeys rightTree leftTree
         }
     };
-  denseNoKeys :: forall a b. Map Int a -> Map Int b -> Bool;
+  denseNoKeys :: forall a b. IntMapTree a -> IntMapTree b -> Bool;
   denseNoKeys smaller larger =
     case smaller of {
-      MapEmpty -> True;
-      MapNode count key value left right ->
-        (L.not (IM.memberTree key larger) && (denseNoKeys left larger && denseNoKeys right larger))
+      IntMapNil -> True;
+      IntMapTip key value -> L.not (IM.memberTree key larger);
+      IntMapBin count prefix left right -> denseNoKeys left larger && denseNoKeys right larger
     };
   denseBounds :: Graph -> Maybe ((,) Int Int);
   denseBounds graph =
@@ -786,7 +761,9 @@ module Bootstrap.Graph where {
         case IM.lookupMax (nodes graph) of {
           Nothing -> Nothing;
           Just ((,) high last) ->
-            if (((high - low) <= (8 * IM.size (nodes graph))) &&
+            -- A mathematical span of at least 2^63 wraps negative. It cannot
+            -- qualify for bounded scratch storage, even when the keys fit.
+            if (((high - low) >= 0) && ((high - low) <= (8 * IM.size (nodes graph))) &&
                 denseDisjoint (nodes graph) (links graph))
             then Just ((,) low high)
             else Nothing
@@ -1206,6 +1183,22 @@ module Bootstrap.Graph where {
       (:) ((,) next node) rest ->
         ((previous < next) && (simpleKindTag node && orderedSimpleKindsAfter next rest))
     };
+  -- Signed-order payload traversal plus a linear proof of every routing edge.
+  -- This replaces the temporary ascending-entry list and also rejects forged
+  -- prefixes whose sorted leaves would otherwise hide a missing-child error.
+  simpleKindTree :: IntMapTree Node -> Bool;
+  simpleKindTree tree = case tree of {
+    IntMapNil -> True;
+    IntMapTip key node -> simpleKindTag node;
+    IntMapBin count prefix left right ->
+      let { reversed = IT.signBranch prefix;
+            first = if reversed then right else left;
+            second = if reversed then left else right } in
+      prefix /= 0 && IM.childRouting (L.not reversed) prefix first && simpleKindTree first &&
+      IM.childRouting reversed prefix second && simpleKindTree second
+  };
+  simpleKinds :: IntMap Node -> Bool;
+  simpleKinds (IntMap tree) = simpleKindTree tree;
   firstOrderValidated :: Graph -> Graph -> (,) Int Int -> Either String Graph;
   firstOrderValidated original graph ((,) left right) =
     let {
@@ -1252,7 +1245,7 @@ module Bootstrap.Graph where {
   -- any merge. Preserve that error priority even when an earlier pair would
   -- fail constructor/kind equality. All structural premises were validated.
   checkedFirstOrder equations before =
-    if (IM.null (links before) && orderedSimpleKinds (IM.toList (nodes before)))
+    if (IM.null (links before) && simpleKinds (nodes before))
     then bindE
            (mapE_ (\n -> bindE (require before n) (\ignored -> Right ()))
               (L.concatMap equationNodes equations))
@@ -2170,7 +2163,7 @@ module Bootstrap.Graph where {
     case originals of {
       [] -> [];
       (:) original rest ->
-        seq first ((:) ((,) original first) (freshCopyEntries (first + 1) rest))
+        seq first ((:) ((,) original first) (freshCopyEntries (L.advanceIdentity first 1) rest))
     };
   allocateCopies :: Graph -> [] Int -> (,) (IntMap Int) Graph;
   allocateCopies graph originals =
@@ -2189,7 +2182,7 @@ module Bootstrap.Graph where {
                copied = IM.fromDistinctAscList entries
              } in
              let {
-               next = mkGraph (nodes graph) (links graph) (first + L.length originals)
+               next = mkGraph (nodes graph) (links graph) (L.advanceIdentity first (L.length originals))
              } in
              seq first (strictPair copied (strictGraph next))
     };
@@ -2271,6 +2264,222 @@ module Bootstrap.Graph where {
                       result)
              })
     };
+  -- Freeze one solved recursive member without instantiating its environment.
+  -- Unlike expansion, the traversal's outer frontier retains its identities:
+  -- copying it to fresh bottoms would let later uses generalize captured types.
+  -- The destination identity has been reserved with freshId, but has no node
+  -- yet. Install its GGen atomically with the completed root, so intermediate
+  -- solver flushes never have to validate an unfinished export scheme.
+  materializeExport :: Int ->
+                       Int ->
+                       Int ->
+                       Int ->
+                       Graph -> Either String ((,) ((,) Int (IntMap Int)) Graph);
+  materializeExport generalization selected destination parent graph =
+    bindE (validateGraph graph)
+      (\valid ->
+         bindE (require graph generalization)
+           (\groupNode ->
+              bindE (require graph parent)
+                (\parentNode ->
+                   bindE (require graph selected)
+                     (\sourceNode ->
+                        let {
+                          group = resolve graph generalization;
+                          source = resolve graph selected;
+                          outer = resolve graph parent
+                        } in
+                        bindE
+                          (check
+                             (isGen (tag groupNode) && isGen (tag parentNode) &&
+                              equalMaybeInt (mapMaybeInt (resolve graph) (binder groupNode)) (Just outer))
+                             "recursive export requires a group under its parent gen")
+                          (\scopeChecked ->
+                             bindE
+                               (check
+                                  (IM.notMember destination (nodes graph) &&
+                                   IM.notMember destination (links graph) &&
+                                   (destination < nextId graph) &&
+                                   L.all (\n -> (n < nextId graph))
+                                     (L.append (IM.keys (nodes graph)) (IM.keys (links graph))))
+                                  "recursive export requires a reserved destination and valid fresh counter")
+                               (\destinationChecked ->
+                                  bindE
+                                    (check (L.not (isGen (tag sourceNode)))
+                                       "recursive export root must be a type node")
+                                    (\sourceChecked ->
+                                       materializeExportIn graph group source destination outer)))))));
+  materializeExportIn :: Graph ->
+                         Int ->
+                         Int ->
+                         Int ->
+                         Int -> Either String ((,) ((,) Int (IntMap Int)) Graph);
+  materializeExportIn graph generalization source destination parent =
+    case expansionVisitCached graph generalization IM.empty ((,) IS.empty IM.empty)
+           ((:) source []) of {
+      (,) visited scopes ->
+        let {
+          originals = L.filter (\n -> IM.findWithDefault False n scopes) (IS.toList visited)
+        } in
+        -- Shared member roots start directly group-bound; solving can only
+        -- raise their binder. A nested root is not a completed member interface.
+        bindE
+          (check
+             (L.not (IM.findWithDefault False source scopes) ||
+              equalMaybeInt (mapMaybeInt (resolve graph) (binder (nodeAt graph source)))
+                (Just generalization))
+             "recursive export root must be group-bound or external")
+          (\rootChecked ->
+             case allocateCopies graph originals of {
+               (,) copies allocated ->
+                 bindE (mapE_ (validateExportCopy graph generalization source copies) originals)
+                   (\copiesChecked ->
+                      let {
+                        copy = copyIdentity graph copies;
+                        result =
+                          L.foldlStrict
+                            (\current ->
+                               \n ->
+                                 setNode (copy n)
+                                   (exportNode graph generalization destination source copies n)
+                                   current)
+                            allocated
+                            originals;
+                        exported =
+                          setNode destination (mkNode (GGen (copy source)) (Just parent) Flexible)
+                            result
+                      } in
+                      bindE (validateGraph exported)
+                        (\verified -> Right ((,) ((,) (copy source) copies) exported)))
+             })
+    };
+  validateExportCopy :: Graph -> Int -> Int -> IntMap Int -> Int -> Either String ();
+  validateExportCopy graph generalization source copies identity =
+    let {
+      copy = IM.get identity copies
+    } in
+    bindE
+      (check (IM.notMember copy (nodes graph) && IM.notMember copy (links graph))
+         "recursive export fresh identities overlap the source graph")
+      (\freshChecked ->
+         if (identity == source)
+         then Right ()
+         else case binder (nodeAt graph identity) of {
+                Nothing -> Left "recursive export lost a local binder";
+                Just owner ->
+                  let {
+                    canonical = resolve graph owner
+                  } in
+                  check ((canonical == generalization) || IM.member canonical copies)
+                    "recursive export is not closed under local binders"
+              });
+  exportNode :: Graph -> Int -> Int -> Int -> IntMap Int -> Int -> Node;
+  exportNode graph generalization destination source copies identity =
+    let {
+      node = nodeAt graph identity;
+      copy = copyIdentity graph copies;
+      owner =
+        if (identity == source)
+        then Just destination
+        else mapMaybeInt
+               (\p -> if (resolve graph p == generalization) then copy source else copy p)
+               (binder node)
+    } in
+    mkNode (mapTag copy (tag node)) owner (flag node);
+  -- Inspect the exact raw interface, never a normalized unfinished graph or
+  -- the structural lower bound of a flexible/abstract parameter.
+  knownFieldInterface :: Graph -> Int -> Either String Bool;
+  knownFieldInterface graph original =
+    bindE (require graph original)
+      (\node -> bindE (kindAt graph original)
+        (\kind -> bindE (check (equalKind kind Star) "pattern field must have kind *")
+          (\checked ->
+            if L.not (equalFlag (flag node) Rigid) then Right False
+            else case tag node of {
+              GSkolem _ _ -> Right False;
+              GGen _ -> Left "pattern field must be a type node";
+              GBot -> Right True;
+              GBotK _ -> Right True;
+              _ -> Right (L.any (fieldQuantifier graph (resolve graph original))
+                (orderedBelow graph original))
+            })));
+  fieldQuantifier :: Graph -> Int -> Int -> Bool;
+  fieldQuantifier graph root identity =
+    let { node = nodeAt graph identity } in
+    equalFlag (flag node) Flexible &&
+    equalMaybeInt (mapMaybeInt (resolve graph) (binder node)) (Just root) &&
+    (case tag node of { GGen _ -> False; GSkolem _ _ -> False; _ -> True }) &&
+    L.not (inert graph identity);
+  -- A field proxy already exists in the scope tree. Only its structural root
+  -- is replaced; the original parameter and every external frontier identity
+  -- are untouched. The returned map is the complete fresh-copy receipt.
+  materializeField :: Int -> Int -> Graph -> Either String ((,) (IntMap Int) Graph);
+  materializeField original destination graph =
+    bindE (validateGraph graph)
+      (\valid -> bindE
+        (check
+          (L.all (\n -> n < nextId graph && IM.notMember n (links graph)) (IM.keys (nodes graph)) &&
+           L.all (\n -> n < nextId graph) (IM.keys (links graph)))
+          "pattern projection requires a valid fresh identity counter")
+        (\freshChecked -> materializeFieldIn original destination graph));
+  -- Trusted solver entry: prepare has checked graph/counter invariants, and
+  -- each prior solver operation preserves them. The case audits its output.
+  materializeFieldIn :: Int -> Int -> Graph -> Either String ((,) (IntMap Int) Graph);
+  materializeFieldIn original destination graph =
+    bindE (knownFieldInterface graph original)
+      (\eligible -> bindE (check eligible "pattern field has no known polymorphic interface")
+        (\checked -> bindE (require graph destination)
+          (\proxy ->
+            let { source = resolve graph original; target = resolve graph destination } in
+            bindE
+              (check
+                (case tag proxy of {
+                  GGen root -> resolve graph root == source &&
+                    L.not (underBinder graph source target);
+                  _ -> False
+                }) "pattern projection requires its original external-root proxy")
+              (\proxyChecked ->
+                case expansionVisitCached graph source IM.empty
+                  ((,) (IS.singleton source) (IM.singleton source True))
+                  (children (tag (nodeAt graph source))) of {
+                  (,) visited scopes ->
+                    let { originals = L.filter (\n -> IM.findWithDefault False n scopes)
+                      (IS.toList visited) } in
+                    case allocateCopies graph originals of {
+                      (,) copies allocated ->
+                        bindE (mapE_ (validateFieldCopy graph source copies) originals)
+                          (\copiesChecked ->
+                            let { copy = copyIdentity graph copies } in
+                            let { copied = L.foldlStrict
+                              (\current n -> setNode (copy n)
+                                (fieldCopyNode graph source target copies n) current)
+                              allocated originals } in
+                            Right ((,) copies (setNode target
+                              (mkNode (GGen (copy source)) (binder proxy) (flag proxy)) copied)))
+                    }
+                }))));
+  validateFieldCopy :: Graph -> Int -> IntMap Int -> Int -> Either String ();
+  validateFieldCopy graph source copies identity =
+    let { node = nodeAt graph identity; copy = IM.get identity copies } in
+    bindE
+      (check (IM.notMember copy (nodes graph) && IM.notMember copy (links graph))
+        "pattern projection fresh identities overlap the source graph")
+      (\freshChecked -> bindE
+        (check (case tag node of { GGen _ -> False; GSkolem _ _ -> False; _ -> True })
+          "pattern projection cannot copy scope or abstract identities")
+        (\tagChecked ->
+          if identity == source then Right ()
+          else case binder node of {
+            Nothing -> Left "pattern projection lost a local binder";
+            Just owner -> check (IM.member (resolve graph owner) copies)
+              "pattern projection is not closed under local binders"
+          }));
+  fieldCopyNode :: Graph -> Int -> Int -> IntMap Int -> Int -> Node;
+  fieldCopyNode graph source destination copies identity =
+    let { node = nodeAt graph identity; copy = copyIdentity graph copies } in
+    if identity == source
+    then mkNode (mapTag copy (tag node)) (Just destination) Flexible
+    else mkNode (mapTag copy (tag node)) (mapMaybeInt copy (binder node)) (flag node);
   schemeOrExistential :: Graph -> Int -> Node -> Bool;
   schemeOrExistential graph identity node =
     case binder node of {

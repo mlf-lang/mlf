@@ -26,11 +26,12 @@ main = do
   let changeIdentity name modules (A.CrateInterface _ deps _ es reach ds cs instances lowered bindings entry objectHash protection) = A.CrateInterface name deps modules es reach ds cs instances lowered bindings entry objectHash protection
       rejects label diagnostic mutated = check label (case A.decodeInterface (A.encodeInterface mutated) of { T.Left message -> P.eqString message diagnostic; T.Right _ -> False })
   rejects "stale builtin7 rejected on metadata decode" "stale or forged builtin crate identity" (changeIdentity "mlf:builtin-shared-haskell-v1:7" (A.crateModules iface) iface)
+  rejects "stale builtin8 rejected on metadata decode" "stale or forged builtin crate identity" (changeIdentity "mlf:builtin-shared-haskell-v1:8" (A.crateModules iface) iface)
   rejects "user crate cannot own builtin modules" "stale or forged builtin crate identity" (changeIdentity "user-forgery" (A.crateModules iface) iface)
   rejects "builtin missing owner rejected" "builtin crate must own exactly Prelude and MLF.Primitive" (changeIdentity A.builtinCrateIdentity ["Prelude"] iface)
   rejects "builtin extra owner rejected" "builtin crate must own exactly Prelude and MLF.Primitive" (changeIdentity A.builtinCrateIdentity ["Prelude", "MLF.Primitive", "User"] iface)
   source <- expect "parse decoded facade dependency consumer" (Parser.parseModule "Consumer.emlf" "module Consumer where\nimport Prelude\nmain = 42\n")
-  let stale = changeIdentity "mlf:builtin-shared-haskell-v1:7" (A.crateModules iface) iface
+  let stale = changeIdentity "mlf:builtin-shared-haskell-v1:8" (A.crateModules iface) iface
       spec = C.CrateSpec "consumer" "Consumer" T.NoImplicitPrelude [] ["not-opened.mlfci"] "not-used" "not-used"
   staleSelection <- C.withPrelude spec [source] [("not-opened.mlfci", stale)]
   check "stale builtin dependency rejected before shortcut file access" (case staleSelection of { T.Left message -> P.eqString message "stale or forged builtin crate identity"; T.Right _ -> False })

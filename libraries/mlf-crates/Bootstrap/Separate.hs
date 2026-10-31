@@ -10,6 +10,8 @@ module Bootstrap.Separate where {
   import Bootstrap.Fresh;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Parser as Parser;
@@ -17,6 +19,7 @@ module Bootstrap.Separate where {
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.Kind as K;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Syntax as X;
@@ -160,15 +163,20 @@ module Bootstrap.Separate where {
           x <- hygieneIn env a;
           freshPure (SAnn x t)
         };
+      SSignature a t ->
+        do {
+          x <- hygieneIn env a;
+          freshPure (SSignature x t)
+        };
       SLetRec ds b ->
         do {
           scope <- hygieneBind env (map (\((,,) n _ _) -> n) ds);
           definitions <-
             mapM
-              (\((,,) n t a) ->
+              (\((,,) n mode a) ->
                  do {
                    x <- hygieneIn scope a;
-                   freshPure ((,,) (hygieneName scope n) t x)
+                   freshPure ((,,) (hygieneName scope n) mode x)
                  })
               ds;
           body <- hygieneIn scope b;
@@ -439,6 +447,16 @@ module Bootstrap.Separate where {
   fingerprintFrom text i a b =
     if (i >= stringLength text)
     then (showInt a ++ ("-" ++ showInt b))
+    else if (i == 0)
+         then fingerprintChars (textToChars text) a b
+         else fingerprintIndexedFrom text i a b;
+  -- Complete traversals use the existing scalar-character stream. Keep the
+  -- indexed path for every nonzero start: negative indices retain their exact
+  -- error/demand behavior and positive offsets do not require a prefix scan.
+  fingerprintIndexedFrom :: String -> Int -> Int -> Int -> String;
+  fingerprintIndexedFrom text i a b =
+    if (i >= stringLength text)
+    then (showInt a ++ ("-" ++ showInt b))
     else let {
            code = stringCodeAt text i
          } in
@@ -448,13 +466,30 @@ module Bootstrap.Separate where {
          let {
            nextB = (((b * 131) + code) % 2147483629)
          } in
-         seq nextA (seq nextB (fingerprintFrom text (i + 1) nextA nextB));
+         seq nextA (seq nextB (fingerprintIndexedFrom text (i + 1) nextA nextB));
+  fingerprintChars :: [] Char -> Int -> Int -> String;
+  fingerprintChars chars a b =
+    case chars of {
+      [] -> (showInt a ++ ("-" ++ showInt b));
+      (:) c rest ->
+        let { code = charCode c } in
+        let { nextA = (((a * 65599) + code) % 2147483647) } in
+        let { nextB = (((b * 131) + code) % 2147483629) } in
+        seq nextA (seq nextB (fingerprintChars rest nextA nextB))
+    };
   fingerprint text = fingerprintFrom text 0 0 1;
   -- Exact summaries of the two existing rolling checksums. A summary composes
-  -- with any initial state, so shared datatype prefixes need not be rescanned
+  -- with a canonical nonnegative rolling state, so datatype prefixes need not be rescanned
   -- for every independently checked fragment. The serialized digest is unchanged.
   fingerprintStateFrom :: String -> Int -> Int -> Int -> (,) Int Int;
   fingerprintStateFrom text i a b =
+    if (i >= stringLength text)
+    then (,) a b
+    else if (i == 0)
+         then fingerprintStateChars (textToChars text) a b
+         else fingerprintIndexedStateFrom text i a b;
+  fingerprintIndexedStateFrom :: String -> Int -> Int -> Int -> (,) Int Int;
+  fingerprintIndexedStateFrom text i a b =
     if (i >= stringLength text)
     then (,) a b
     else let {
@@ -466,7 +501,17 @@ module Bootstrap.Separate where {
          let {
            nextB = (((b * 131) + code) % 2147483629)
          } in
-         seq nextA (seq nextB (fingerprintStateFrom text (i + 1) nextA nextB));
+         seq nextA (seq nextB (fingerprintIndexedStateFrom text (i + 1) nextA nextB));
+  fingerprintStateChars :: [] Char -> Int -> Int -> (,) Int Int;
+  fingerprintStateChars chars a b =
+    case chars of {
+      [] -> (,) a b;
+      (:) c rest ->
+        let { code = charCode c } in
+        let { nextA = (((a * 65599) + code) % 2147483647) } in
+        let { nextB = (((b * 131) + code) % 2147483629) } in
+        seq nextA (seq nextB (fingerprintStateChars rest nextA nextB))
+    };
   fingerprintPower :: Int -> Int -> Int -> Int;
   fingerprintPower base count modulus =
     if (count == 0)
@@ -498,6 +543,142 @@ module Bootstrap.Separate where {
     seq nextA (seq nextB ((,) nextA nextB));
   fingerprintAfter :: (,) Int Int -> String -> String;
   fingerprintAfter ((,) a b) text = fingerprintFrom text 0 a b;
+  -- Exact compositional summaries of actual serialized scalar text.
+  data FingerprintEncoding = FingerprintEncoding Int Int Int Int Int;
+  encodingLength (FingerprintEncoding count _ _ _ _) = count;
+  encodingText text = case fingerprintPart text of {
+    (,,,) pa pb a b -> FingerprintEncoding (stringLength text) pa pb a b
+  };
+  encodingEmpty = FingerprintEncoding 0 1 1 0 0;
+  encodingAppend (FingerprintEncoding n pa pb a b) (FingerprintEncoding m qa qb c d) =
+    case fingerprintAppend ((,) a b) ((,,,) qa qb c d) of {
+      (,) x y -> FingerprintEncoding (n + m) ((pa * qa) % 2147483647)
+        ((pb * qb) % 2147483629) x y
+    };
+  encodingConcat values = foldlStrict encodingAppend encodingEmpty values;
+  encodingPack values = encodingConcat (concatMap (\value ->
+    [encodingText (showInt (encodingLength value) ++ ":"), value]) values);
+  -- Composition requires canonical nonnegative residues, as produced above.
+  encodingState state (FingerprintEncoding _ pa pb a b) =
+    fingerprintAppend state ((,,,) pa pb a b);
+  encodingAfter state value = case encodingState state value of {
+    (,) a b -> showInt a ++ "-" ++ showInt b
+  };
+  encodingFingerprint value = encodingAfter ((,) 0 1) value;
+  -- The pool lasts for one admitted object and keys exact scalar text, never
+  -- names, inferred types or caller-provided digests. Punctuation is reusable too.
+  -- Advance the two residues per chunk. Aggregate powers depend only on the
+  -- total scalar length, so compute them once rather than once per token.
+  encodingChunks pool chunks (FingerprintEncoding count pa pb a b) =
+    case encodingChunkState pool chunks 0 ((,) a b) of {
+      (,,) next added ((,) x y) -> let {
+        powerA = (pa * fingerprintPower 65599 added 2147483647) % 2147483647;
+        powerB = (pb * fingerprintPower 131 added 2147483629) % 2147483629;
+        total = count + added
+      } in seq total (seq powerA (seq powerB
+        ((,) next (FingerprintEncoding total powerA powerB x y))))
+    };
+  encodingChunkState pool chunks count state = case chunks of {
+    [] -> (,,) pool count state;
+    (:) text rest -> let {
+      selected = case M.lookup compareString text pool of {
+        Just encoded -> (,) pool encoded;
+        Nothing -> let { encoded = encodingText text }
+          in (,) (M.insert compareString text encoded pool) encoded
+      };
+      next = count + encodingLength (snd selected)
+    } in case encodingState state (snd selected) of {
+      (,) x y -> seq next (seq x (seq y (encodingChunkState (fst selected) rest next ((,) x y))))
+    }
+  };
+  -- A per-compilation pool contains only pure encodings, never inferred results.
+  -- Entries remain lazy. A name lookup is not an identity proof: lowering may
+  -- change a layout, so reuse requires equality of the actual full declaration.
+  data DatatypeEncoding =
+    DatatypeEncoding DataDecl String Int ((,,,) Int Int Int Int);
+  data DatatypeEncodings = DatatypeEncodings (Map String ([] DatatypeEncoding));
+  datatypeEncoding :: DataDecl -> DatatypeEncoding;
+  datatypeEncoding declaration =
+    let { text = D.prettyDeclaration declaration ++ "\n" } in
+    DatatypeEncoding declaration text (stringLength text) (fingerprintPart text);
+  prepareDatatypeEncodings :: [] DataDecl -> DatatypeEncodings;
+  prepareDatatypeEncodings declarations =
+    DatatypeEncodings (M.fromListWith compareString append
+      (map (\d -> (,) (D.datatypeName d) ((:) (datatypeEncoding d) [])) declarations));
+  findDatatypeEncoding :: DataDecl -> [] DatatypeEncoding -> DatatypeEncoding;
+  findDatatypeEncoding declaration entries = case entries of {
+    [] -> datatypeEncoding declaration;
+    (:) entry rest -> case entry of {
+      DatatypeEncoding original _ _ _ ->
+        if SourceEquality.eqDataDecl declaration original then entry
+        else findDatatypeEncoding declaration rest
+    }
+  };
+  lookupDatatypeEncoding :: DatatypeEncodings -> DataDecl -> DatatypeEncoding;
+  lookupDatatypeEncoding (DatatypeEncodings entries) declaration =
+    findDatatypeEncoding declaration
+      (M.findWithDefault compareString [] (D.datatypeName declaration) entries);
+  datatypeEncodingText :: DatatypeEncoding -> String;
+  datatypeEncodingText (DatatypeEncoding _ text _ _) = text;
+  datatypeEncodingLength :: DatatypeEncoding -> Int;
+  datatypeEncodingLength (DatatypeEncoding _ _ count _) = count;
+  appendDatatypeEncoding :: (,) Int Int -> DatatypeEncoding -> (,) Int Int;
+  -- Internal callers reach canonical residues. Other signed Int64 seeds need
+  -- the original recurrence: a negative seed can cross zero, and a large
+  -- positive seed can wrap before the first remainder. Composing the summary
+  -- is exact only when both seeds are already within their residue ranges.
+  appendDatatypeEncoding state (DatatypeEncoding _ text _ part) = case state of {
+    (,) a b -> if (a < 0 || a >= 2147483647 || b < 0 || b >= 2147483629)
+      then fingerprintStateFrom text 0 a b
+      else fingerprintAppend state part
+  };
+  prettyTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
+  prettyTermWithDatatypes pool term = case term of {
+    XWithData declarations body ->
+      concatMapString (\d -> datatypeEncodingText (lookupDatatypeEncoding pool d)) declarations
+        ++ Pretty.prettyTerm body;
+    _ -> Pretty.prettyTerm term
+  };
+  fingerprintTermWithDatatypes :: DatatypeEncodings -> XTerm -> String;
+  fingerprintTermWithDatatypes pool term = case term of {
+    XWithData declarations body ->
+      fingerprintAfter
+        (foldlStrict appendDatatypeEncoding ((,) 0 1)
+          (map (lookupDatatypeEncoding pool) declarations))
+        (Pretty.prettyTerm body);
+    _ -> fingerprint (Pretty.prettyTerm term)
+  };
+  -- The interface checksum is NOT the payload checksum. Compose the exact
+  -- scalar-length-framed seven fields, sharing only actual datatype text parts.
+  -- Header and payload declarations are looked up separately by encodeUnit.
+  encodeInterfaceWithDatatypes :: DatatypeEncodings -> UnitInterface -> (,) String String;
+  encodeInterfaceWithDatatypes pool iface =
+    let { encodings = map (lookupDatatypeEncoding pool) (unitData iface) } in
+    let { suffix = unlines (append (map prettyClass (unitClasses iface))
+          (map (\p -> prettyInstance (snd p)) (unitInstances iface))) } in
+    let { metadata = concatMapString datatypeEncodingText encodings ++ suffix } in
+    let { metadataLength = foldlStrict (\n entry -> n + datatypeEncodingLength entry)
+          (stringLength suffix) encodings } in
+    let { before = (:) "MLFI-4" ((:) (unitName iface)
+          ((:) (pack (map pairEncoding (unitDependencies iface)))
+            ((:) (pack (map entityEncoding (unitExports iface))) []))) } in
+    let { after = (:) (pack (map fst (unitInstances iface)))
+          ((:) (pack (map (\((,) n t) -> pairEncoding ((,) n (Pretty.prettyType (normalType t))))
+            (unitBindings iface))) []) } in
+    let { fields = append before ((:) metadata after) } in
+    let { state = foldlStrict appendDatatypeEncoding
+          (fingerprintStateFrom (pack before ++ showInt metadataLength ++ ":") 0 0 1)
+          encodings } in
+    (,) (pack (snoc fields (unitObjectFingerprint iface)))
+      (fingerprintAfter state (suffix ++ pack after));
+  encodeUnitWithDatatypes :: DatatypeEncodings -> UnitObject -> (,) String String;
+  encodeUnitWithDatatypes pool object =
+    let { iface = objectInterface object } in
+    let { interfaceEncoding = encodeInterfaceWithDatatypes pool iface } in
+    (,) (fst interfaceEncoding)
+      (pack ((:) "MLFO-1" ((:) (unitName iface)
+        ((:) (snd interfaceEncoding)
+          ((:) (prettyTermWithDatatypes pool (objectTerm object)) [])))));
   entityEncoding (Modules.Entity owner name role) =
     let {
       result :: (String, String);
@@ -638,6 +819,21 @@ module Bootstrap.Separate where {
                ((:) metadata ((:) (pack (map fst (unitInstances i))) ((:) bindings []))))));
   interfaceFingerprint i = fingerprint (pack (interfaceFields i));
   encodeInterface i = pack (snoc (interfaceFields i) (unitObjectFingerprint i));
+  -- Preserve encodeInterface's exact eight framed fields, reusing only the
+  -- rendered name/type text summaries from this object's local pool.
+  encodingBindings pool bindings = case bindings of {
+    [] -> (,) pool [];
+    (:) ((,) name ty) rest -> let {
+      named = encodingChunks pool [name] encodingEmpty;
+      typed = encodingChunks (fst named) (Pretty.typeChunks 0 (normalType ty) []) encodingEmpty;
+      remaining = encodingBindings (fst typed) rest
+    } in (,) (fst remaining) ((:) (encodingPack [snd named, snd typed]) (snd remaining))
+  };
+  encodingInterface pool iface = let {
+    bindings = encodingBindings pool (unitBindings iface);
+    prefix = map encodingText (take 6 (interfaceFields iface));
+    fields = append prefix [encodingPack (snd bindings), encodingText (unitObjectFingerprint iface)]
+  } in (,) (fst bindings) (encodingPack fields);
   decodePair text =
     do {
       fields <- unpack text;
@@ -1001,44 +1197,44 @@ module Bootstrap.Separate where {
     };
   -- Dense renumbering also handles valid object IDs near the parser's Int64
   -- limit. Adding an offset to original IDs would overflow that wire format.
-  typeIdentities :: XType -> Set Int -> Set Int;
+  typeIdentities :: XType -> IntSet -> IntSet;
   typeIdentities ty seen =
     case ty of {
-      XVar (XTyVar a) -> Set.insert compareInt a seen;
+      XVar (XTyVar a) -> IS.insert a seen;
       XArrow a b -> typeIdentities b (typeIdentities a seen);
       XCon _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
       XApply a b -> typeIdentities b (typeIdentities a seen);
       XForall (XTyVar a) bound b ->
-        typeIdentities b (typeIdentities bound (Set.insert compareInt a seen));
+        typeIdentities b (typeIdentities bound (IS.insert a seen));
       _ -> seen
     };
-  computationIdentities :: XComputation -> Set Int -> Set Int;
+  computationIdentities :: XComputation -> IntSet -> IntSet;
   computationIdentities p seen =
     case p of {
       XBottom t -> typeIdentities t seen;
-      XHyp (XTyVar a) -> Set.insert compareInt a seen;
+      XHyp (XTyVar a) -> IS.insert a seen;
       XInner q -> computationIdentities q seen;
-      XOuter (XTyVar a) q -> computationIdentities q (Set.insert compareInt a seen);
-      XIntro (XTyVar a) -> Set.insert compareInt a seen;
-      XIntroKind (XTyVar a) _ -> Set.insert compareInt a seen;
+      XOuter (XTyVar a) q -> computationIdentities q (IS.insert a seen);
+      XIntro (XTyVar a) -> IS.insert a seen;
+      XIntroKind (XTyVar a) _ -> IS.insert a seen;
       XThen a b -> computationIdentities b (computationIdentities a seen);
       _ -> seen
     };
-  termIdentities :: XTerm -> Set Int -> Set Int;
+  termIdentities :: XTerm -> IntSet -> IntSet;
   termIdentities term seen =
     case term of {
-      XVarTerm n -> Set.insert compareInt (X.nameId n) seen;
-      XAbs n ty b -> termIdentities b (typeIdentities ty (Set.insert compareInt (X.nameId n) seen));
+      XVarTerm n -> IS.insert (X.nameId n) seen;
+      XAbs n ty b -> termIdentities b (typeIdentities ty (IS.insert (X.nameId n) seen));
       XApp a b -> termIdentities b (termIdentities a seen);
       XTypeAbs (XTyVar a) bound b ->
-        termIdentities b (typeIdentities bound (Set.insert compareInt a seen));
+        termIdentities b (typeIdentities bound (IS.insert a seen));
       XTypeApp a p -> computationIdentities p (termIdentities a seen);
-      XLet n a b -> termIdentities b (termIdentities a (Set.insert compareInt (X.nameId n) seen));
+      XLet n a b -> termIdentities b (termIdentities a (IS.insert (X.nameId n) seen));
       XLetRec bs b ->
         termIdentities b
           (foldl
              (\acc ((,,) n t a) ->
-                termIdentities a (typeIdentities t (Set.insert compareInt (X.nameId n) acc)))
+                termIdentities a (typeIdentities t (IS.insert (X.nameId n) acc)))
              seen
              bs);
       XPrimitive _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
@@ -1047,7 +1243,7 @@ module Bootstrap.Separate where {
         foldl
           (\acc (XAlternative p b) ->
              termIdentities b
-               (foldl (\ids n -> Set.insert compareInt (X.nameId n) ids) acc (X.patternNames p)))
+               (foldl (\ids n -> IS.insert (X.nameId n) ids) acc (X.patternNames p)))
           (typeIdentities t (termIdentities a seen))
           bs;
       XWithData _ b -> termIdentities b seen;
@@ -1055,16 +1251,36 @@ module Bootstrap.Separate where {
     };
   freshObject serial term =
     let {
-      ids = Set.toList (termIdentities term Set.empty)
+      ids = IS.toList (termIdentities term IS.empty)
     } in
     let {
-      replacements = M.fromList compareInt (zip ids (range serial ((serial + length ids) - 1)))
+      replacements = IM.fromList (zip ids (range serial ((advanceIdentity serial (length ids)) - 1)))
     } in
     let {
-      rename = \n -> M.findWithDefault compareInt (panic "missing object identity") n replacements
+      rename = \n -> IM.findWithDefault (panic "missing object identity") n replacements
     } in
-    (,) (serial + length ids)
+    (,) (advanceIdentity serial (length ids))
       (mapTerm (\(XName n hint) -> XName (rename n) hint) (\(XTyVar n) -> XTyVar (rename n)) term);
+  -- The same injective renaming applies to the term and its exported names.
+  -- Inferred types may contain fresh quantified identities from datatype
+  -- fields that are absent from the term. Closed export types can instead be
+  -- alpha-normalized without capture. No caller-provided signature enters.
+  -- Keep the inventory's fragment-specific error deferred until linking asks
+  -- for it, after the existing metadata, layout and import-boundary checks.
+  freshCheckedObject :: Int -> Checked.CheckedTerm ->
+    (,,) Int XTerm (Either String ([] ((,) XName XType)));
+  freshCheckedObject serial checked =
+    let {
+      term = Checked.term checked;
+      ids = IS.toList (termIdentities term IS.empty);
+      replacements = IM.fromList (zip ids (range serial ((advanceIdentity serial (length ids)) - 1)));
+      rename = \n -> IM.findWithDefault (panic "missing object identity") n replacements;
+      name = \(XName n hint) -> XName (rename n) hint;
+      variable = \(XTyVar n) -> XTyVar (rename n)
+    } in
+    (,,) (advanceIdentity serial (length ids)) (mapTerm name variable term)
+      (mapEither (map (\((,) n ty) -> (,) (name n) (normalType ty)))
+        (Checked.declarationBindings checked));
   splitParameters :: XTerm -> (,) ([] ((,) XName XType)) XTerm;
   splitParameters term =
     case term of {

@@ -2,16 +2,17 @@
 #define MLF_RUNTIME_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 /* Compact 64-bit BDWGC ABI. Low bits encode immediate integers, booleans
  * and nullary constructors. Heap value tags start at byte 0; payloads at
  * byte 8, packed fields at byte 16, wide fields at byte 24 and environment
  * slots at byte 8. The runtime requires GMP and BDWGC. Old standard-layout
  * LLVM/object files must be regenerated; their ABI guard is not exported. */
-/* Boundary v3: true unit is constructor tag1, tuple arities2..64, source
- * stack frames7/evidence8. No earlier ABI guard is exported: old generated
+/* Boundary v4: signed Int64 payloads, explicit GMP Integer, true unit tag1,
+ * tuple arities2..64, and source stack frames7/evidence8. No earlier ABI guard is exported: old generated
  * objects must use their frozen old runtime, not silently cross this boundary. */
-void mlf_require_haskell_boundary_v3_abi(void);
+void mlf_require_haskell_boundary_v4_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;
@@ -52,6 +53,17 @@ double mlf_int_to_double(MlfValue *value);
 uint8_t mlf_byte(MlfValue *value);
 MlfValue *mlf_boolean(int64_t boolean);
 MlfValue *mlf_string(const char *bytes, uint64_t length);
+/* Join a canonical [String], forcing each head before its following tail.
+ * Empty input yields an empty String; singleton input preserves the forced
+ * String value. Multi-fragment output uses one checked final byte buffer. */
+MlfValue *mlf_concat_string_list(MlfValue *pieces);
+/* Checked Unicode-scalar operations. Compact generated code may use the ASCII
+ * sentinel only after evaluating operands, checking a tagged small index and
+ * checking its unsigned bounds against the string's byte length. All other
+ * cases, including an uninitialized index cache, use these checked helpers. */
+MlfValue *mlf_string_length(MlfValue *text);
+MlfValue *mlf_string_code_at(MlfValue *text, MlfValue *index);
+extern size_t mlf_ascii_string_indices;
 MlfValue *mlf_primitive(int64_t primitive);
 MlfValue *mlf_constructor(int64_t tag, int64_t arity);
 MlfValue *mlf_constructor1(int64_t tag, MlfValue *a);

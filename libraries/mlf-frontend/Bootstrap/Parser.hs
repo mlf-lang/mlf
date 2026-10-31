@@ -479,11 +479,12 @@ module Bootstrap.Parser where {
     if recursive
     then pMap (\ds -> SLetRec ds body) (pEither (Surface.recursiveValues values))
     else pPure (foldr (\((,,) n a e) b -> SLet n (annotateMaybe e a) b) body values);
+  -- Declaration and instance-method signatures must not become expression coercions.
   annotateMaybe :: SExpr -> Maybe SAnnotation -> SExpr;
   annotateMaybe expression ty =
     case ty of {
       Nothing -> expression;
-      Just a -> SAnn expression a
+      Just a -> SSignature expression a
     };
   parameter :: Parser ((,) String Kind);
   parameter =
@@ -1153,7 +1154,7 @@ module Bootstrap.Parser where {
          let {
            value = readDouble spelling
          };
-         if (((doubleToBits value / 4503599627370496) % 2048) == 2047)
+         if ((andInt (doubleToBits value) 9218868437227405312) == 9218868437227405312)
          then pFail "non-finite Double literal"
          else pPure value
        });
@@ -1563,6 +1564,12 @@ module Bootstrap.Parser where {
           validateSharedScheme ty;
           validateSharedExpression e
         };
+      SSignature e (SAnnotation variables ty) ->
+        do {
+          unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
+          validateSharedScheme ty;
+          validateSharedExpression e
+        };
       SCase value branches ->
         do {
           validateSharedExpression value;
@@ -1585,12 +1592,10 @@ module Bootstrap.Parser where {
       SLetRec definitions body ->
         do {
           mapM_
-            (\((,,) name (SAnnotation variables ty) value) ->
+            (\((,,) name mode value) ->
                do {
                  validateSharedBinding name;
-                 unless (null variables)
-                   (Left "existential annotations are outside shared-haskell-v1");
-                 validateSharedScheme ty;
+                 validateSharedRecursiveMode mode;
                  validateSharedExpression value
                })
             definitions;
@@ -1598,6 +1603,16 @@ module Bootstrap.Parser where {
         };
       SDo _ _ -> Left "internal error: shared do was not normalized";
       _ -> Right ()
+    };
+  validateSharedRecursiveMode :: RecursiveMode -> Either String ();
+  validateSharedRecursiveMode mode =
+    case mode of {
+      InferRecursive -> Right ();
+      CheckRecursive (SAnnotation variables ty) ->
+        do {
+          unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
+          validateSharedScheme ty
+        }
     };
   sharedDoExpr :: Parser SExpr;
   sharedDoExpr =

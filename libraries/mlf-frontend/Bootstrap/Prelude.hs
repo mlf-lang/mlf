@@ -100,6 +100,7 @@ module Bootstrap.Prelude where {
       SLet name value body ->
         Set.union compareString (freeNames value) (Set.delete compareString name (freeNames body));
       SAnn value annotation -> freeNames value;
+      SSignature value annotation -> freeNames value;
       SCase value branches ->
         Set.union compareString (freeNames value)
           (Set.unions compareString (L.map alternativeNames branches));
@@ -115,10 +116,10 @@ module Bootstrap.Prelude where {
   alternativeNames :: SAlternative -> Set String;
   alternativeNames (SAlternative pattern body) =
     Set.difference compareString (freeNames body) (patternNames pattern);
-  recursiveNames :: (,,) String SAnnotation SExpr -> Set String;
-  recursiveNames ((,,) name annotation body) = freeNames body;
-  recursiveName :: (,,) String SAnnotation SExpr -> String;
-  recursiveName ((,,) name annotation body) = name;
+  recursiveNames :: (,,) String RecursiveMode SExpr -> Set String;
+  recursiveNames ((,,) name mode body) = freeNames body;
+  recursiveName :: (,,) String RecursiveMode SExpr -> String;
+  recursiveName ((,,) name mode body) = name;
   statementNames :: SStatement -> Set String -> Set String;
   statementNames statement rest =
     case statement of {
@@ -170,6 +171,7 @@ module Bootstrap.Prelude where {
       SApp f a -> (exprMentionsMonad f || exprMentionsMonad a);
       SLet name value body -> (exprMentionsMonad value || exprMentionsMonad body);
       SAnn value annotation -> (exprMentionsMonad value || annotationMentionsMonad annotation);
+      SSignature value annotation -> (exprMentionsMonad value || annotationMentionsMonad annotation);
       SCase value branches -> (exprMentionsMonad value || L.any alternativeMentionsMonad branches);
       SDo statements result ->
         (L.any statementMentionsMonad statements || exprMentionsMonad result);
@@ -187,9 +189,15 @@ module Bootstrap.Prelude where {
   equationMentionsMonad :: (,) ([] SPattern) SExpr -> Bool;
   equationMentionsMonad ((,) patterns body) =
     (L.any patternMentionsMonad patterns || exprMentionsMonad body);
-  recursiveMentionsMonad :: (,,) String SAnnotation SExpr -> Bool;
-  recursiveMentionsMonad ((,,) name annotation body) =
-    (annotationMentionsMonad annotation || exprMentionsMonad body);
+  recursiveModeMentionsMonad :: RecursiveMode -> Bool;
+  recursiveModeMentionsMonad mode =
+    case mode of {
+      InferRecursive -> False;
+      CheckRecursive annotation -> annotationMentionsMonad annotation
+    };
+  recursiveMentionsMonad :: (,,) String RecursiveMode SExpr -> Bool;
+  recursiveMentionsMonad ((,,) name mode body) =
+    (recursiveModeMentionsMonad mode || exprMentionsMonad body);
   statementMentionsMonad :: SStatement -> Bool;
   statementMentionsMonad statement =
     case statement of {
@@ -281,7 +289,8 @@ module Bootstrap.Prelude where {
                          collectionUnitEquality)
                   ((:) (simpleInstance "IsString" (SCon "String" []) "fromString" (SPrimitive PTextFromChars))
                     ((:) (simpleInstance "IsString" charListType "fromString" (SLam "$chars" Nothing (SVar "$chars"))) []))))))))
-      (L.append canonicalCollectionInstances ((:) ioFailInstance hierarchyInstances));
+      ((:) (simpleInstance "Eq" (SCon "Integer" []) "==" (SPrimitive PEqInteger))
+        (L.append canonicalCollectionInstances ((:) ioFailInstance hierarchyInstances)));
   standardMethodClass :: String -> String;
   standardMethodClass name =
     if L.elem eqString name ((:) "==" ((:) "/=" [])) then "Eq"
@@ -332,11 +341,11 @@ module Bootstrap.Prelude where {
   -- Canonical base list/tuple instances. Recursion has closed signatures;
   -- element Eq is passed explicitly, avoiding a recursive qualified binding.
   collectionListMap :: SExpr;
-  collectionListMap = (SLetRec ((:) ((,,) "$collectionMap" (SAnnotation [] (forallType "a" (forallType "b" (SArrow (SArrow (STVar "a") (STVar "b")) (SArrow (SCon "[]" ((:) (STVar "a") [])) (SCon "[]" ((:) (STVar "b") []))))))) (SLam "$f" Nothing (SLam "$xs" Nothing (SCase (SVar "$xs") ((:) (SAlternative (SConstructorPattern "[]" []) (SConstructor "[]")) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$x") ((:) (Just "$xt") []))) (SApp (SApp (SConstructor ":") (SApp (SVar "$f") (SVar "$x"))) (SApp (SApp (SVar "$collectionMap") (SVar "$f")) (SVar "$xt")))) [])))))) []) (SVar "$collectionMap"));
+  collectionListMap = (SLetRec ((:) ((,,) "$collectionMap" (CheckRecursive (SAnnotation [] (forallType "a" (forallType "b" (SArrow (SArrow (STVar "a") (STVar "b")) (SArrow (SCon "[]" ((:) (STVar "a") [])) (SCon "[]" ((:) (STVar "b") [])))))))) (SLam "$f" Nothing (SLam "$xs" Nothing (SCase (SVar "$xs") ((:) (SAlternative (SConstructorPattern "[]" []) (SConstructor "[]")) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$x") ((:) (Just "$xt") []))) (SApp (SApp (SConstructor ":") (SApp (SVar "$f") (SVar "$x"))) (SApp (SApp (SVar "$collectionMap") (SVar "$f")) (SVar "$xt")))) [])))))) []) (SVar "$collectionMap"));
   collectionListBind :: SExpr;
-  collectionListBind = (SLetRec ((:) ((,,) "$collectionAppend" (SAnnotation [] (forallType "a" (SArrow (SCon "[]" ((:) (STVar "a") [])) (SArrow (SCon "[]" ((:) (STVar "a") [])) (SCon "[]" ((:) (STVar "a") [])))))) (SLam "$xs" Nothing (SLam "$ys" Nothing (SCase (SVar "$xs") ((:) (SAlternative (SConstructorPattern "[]" []) (SVar "$ys")) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$x") ((:) (Just "$xt") []))) (SApp (SApp (SConstructor ":") (SVar "$x")) (SApp (SApp (SVar "$collectionAppend") (SVar "$xt")) (SVar "$ys")))) [])))))) ((:) ((,,) "$collectionBind" (SAnnotation [] (forallType "a" (forallType "b" (SArrow (SCon "[]" ((:) (STVar "a") [])) (SArrow (SArrow (STVar "a") (SCon "[]" ((:) (STVar "b") []))) (SCon "[]" ((:) (STVar "b") []))))))) (SLam "$xs" Nothing (SLam "$f" Nothing (SCase (SVar "$xs") ((:) (SAlternative (SConstructorPattern "[]" []) (SConstructor "[]")) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$x") ((:) (Just "$xt") []))) (SApp (SApp (SVar "$collectionAppend") (SApp (SVar "$f") (SVar "$x"))) (SApp (SApp (SVar "$collectionBind") (SVar "$xt")) (SVar "$f")))) [])))))) [])) (SVar "$collectionBind"));
+  collectionListBind = (SLetRec ((:) ((,,) "$collectionAppend" (CheckRecursive (SAnnotation [] (forallType "a" (SArrow (SCon "[]" ((:) (STVar "a") [])) (SArrow (SCon "[]" ((:) (STVar "a") [])) (SCon "[]" ((:) (STVar "a") []))))))) (SLam "$xs" Nothing (SLam "$ys" Nothing (SCase (SVar "$xs") ((:) (SAlternative (SConstructorPattern "[]" []) (SVar "$ys")) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$x") ((:) (Just "$xt") []))) (SApp (SApp (SConstructor ":") (SVar "$x")) (SApp (SApp (SVar "$collectionAppend") (SVar "$xt")) (SVar "$ys")))) [])))))) ((:) ((,,) "$collectionBind" (CheckRecursive (SAnnotation [] (forallType "a" (forallType "b" (SArrow (SCon "[]" ((:) (STVar "a") [])) (SArrow (SArrow (STVar "a") (SCon "[]" ((:) (STVar "b") []))) (SCon "[]" ((:) (STVar "b") [])))))))) (SLam "$xs" Nothing (SLam "$f" Nothing (SCase (SVar "$xs") ((:) (SAlternative (SConstructorPattern "[]" []) (SConstructor "[]")) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$x") ((:) (Just "$xt") []))) (SApp (SApp (SVar "$collectionAppend") (SApp (SVar "$f") (SVar "$x"))) (SApp (SApp (SVar "$collectionBind") (SVar "$xt")) (SVar "$f")))) [])))))) [])) (SVar "$collectionBind"));
   collectionListEquality :: SExpr;
-  collectionListEquality = (SApp (SLetRec ((:) ((,,) "$collectionEq" (SAnnotation [] (forallType "a" (SArrow (SArrow (STVar "a") (SArrow (STVar "a") (SCon "Bool" []))) (SArrow (SCon "[]" ((:) (STVar "a") [])) (SArrow (SCon "[]" ((:) (STVar "a") [])) (SCon "Bool" [])))))) (SLam "$eq" Nothing (SLam "$xs" Nothing (SLam "$ys" Nothing (SCase (SVar "$xs") ((:) (SAlternative (SConstructorPattern "[]" []) (SCase (SVar "$ys") ((:) (SAlternative (SConstructorPattern "[]" []) (SBoolLit True)) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$y") ((:) (Just "$yt") []))) (SBoolLit False)) [])))) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$x") ((:) (Just "$xt") []))) (SCase (SVar "$ys") ((:) (SAlternative (SConstructorPattern "[]" []) (SBoolLit False)) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$y") ((:) (Just "$yt") []))) (SApp (SApp (SApp (SPrimitive PIfThenElse) (SApp (SApp (SVar "$eq") (SVar "$x")) (SVar "$y"))) (SApp (SApp (SApp (SVar "$collectionEq") (SVar "$eq")) (SVar "$xt")) (SVar "$yt"))) (SBoolLit False))) [])))) []))))))) []) (SVar "$collectionEq")) (SVar "$MLF.Primitive.=="));
+  collectionListEquality = (SApp (SLetRec ((:) ((,,) "$collectionEq" (CheckRecursive (SAnnotation [] (forallType "a" (SArrow (SArrow (STVar "a") (SArrow (STVar "a") (SCon "Bool" []))) (SArrow (SCon "[]" ((:) (STVar "a") [])) (SArrow (SCon "[]" ((:) (STVar "a") [])) (SCon "Bool" []))))))) (SLam "$eq" Nothing (SLam "$xs" Nothing (SLam "$ys" Nothing (SCase (SVar "$xs") ((:) (SAlternative (SConstructorPattern "[]" []) (SCase (SVar "$ys") ((:) (SAlternative (SConstructorPattern "[]" []) (SBoolLit True)) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$y") ((:) (Just "$yt") []))) (SBoolLit False)) [])))) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$x") ((:) (Just "$xt") []))) (SCase (SVar "$ys") ((:) (SAlternative (SConstructorPattern "[]" []) (SBoolLit False)) ((:) (SAlternative (SConstructorPattern ":" ((:) (Just "$y") ((:) (Just "$yt") []))) (SApp (SApp (SApp (SPrimitive PIfThenElse) (SApp (SApp (SVar "$eq") (SVar "$x")) (SVar "$y"))) (SApp (SApp (SApp (SVar "$collectionEq") (SVar "$eq")) (SVar "$xt")) (SVar "$yt"))) (SBoolLit False))) [])))) []))))))) []) (SVar "$collectionEq")) (SVar "$MLF.Primitive.=="));
   collectionUnitEquality :: SExpr;
   collectionUnitEquality = (SLam "$a" Nothing (SLam "$b" Nothing (SCase (SVar "$a") ((:) (SAlternative (SConstructorPattern "()" []) (SCase (SVar "$b") ((:) (SAlternative (SConstructorPattern "()" []) (SBoolLit True)) []))) []))));
   collectionTupleInstance :: String -> [] String -> SInstanceDecl;

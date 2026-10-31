@@ -326,12 +326,18 @@ module Bootstrap.Crate where {
       let {
         resolved = Modules.resolvedCrateModules resolution
       };
-      let {
-        ownData = concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) resolved
-      };
-      let {
-        ownClasses = concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) resolved
-      };
+      -- Canonicalize only this crate's freshly resolved source declarations.
+      -- Imported checked layouts are validation context, never rewrite input.
+      -- Do this before SourcePlan, dictionary inventory and cache-key creation.
+      ownData <- D.canonicalSourceDeclarations
+        (concatMap (\p -> Artifact.crateData (snd p)) interfaces)
+        (concatMap (\r -> Modules.renamedDatatypes (Modules.resolvedContents r)) resolved);
+      -- Checked class headers are ABI context. Canonicalize only this crate's
+      -- fresh headers, before selectors, dictionary inventory and saved metadata.
+      ownClasses <- Classes.canonicalSourceClasses Set.empty
+        (append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData)
+        (concatMap (\p -> Artifact.crateClasses (snd p)) interfaces)
+        (concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) resolved);
       let {
         ownValues = concatMap (\r -> Modules.renamedValues (Modules.resolvedContents r)) resolved
       };
@@ -450,6 +456,22 @@ module Bootstrap.Crate where {
   -- Query compilation consumes only metadata-derived schemes. Upstream checked
   -- bodies are opened later by the linker and never enter an inference key.
   compilePrepared spec interfaces prepared =
+    compilePreparedWith (\object _ report -> (,) object report) spec interfaces prepared;
+  -- Preserve compilePrepared's public result while allowing the file producer
+  -- to carry the exact finalized pooled payload through its result builder.
+  -- The builder runs only after the same interface validation as before.
+  compilePreparedWith :: forall a. (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
+    CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
+    IO (Either String a);
+  compilePreparedWith complete spec interfaces prepared =
+    compilePreparedWithEncoding False complete spec interfaces prepared;
+  -- Only compileSpecFile enables this internal parsed-source encoding path.
+  -- Generic prepared/source APIs retain their original no-pool demand behavior.
+  compilePreparedWithEncoding :: forall a. Bool ->
+    (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
+    CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
+    IO (Either String a);
+  compilePreparedWithEncoding shareEncoding complete spec interfaces prepared =
     do {
       let {
         lowered = preparedLowered prepared
@@ -470,8 +492,11 @@ module Bootstrap.Crate where {
           M.empty (concatMap (\p -> Artifact.crateProtection (snd p)) interfaces)
       };
       compiled <- case preparedSourcePlan prepared of {
-        Just plan -> Query.compileSourceGroups (specIdentity spec) (specCache spec)
-          imported protected plan;
+        Just plan -> if shareEncoding
+          then Query.compileParsedSourceGroups (specIdentity spec) (specCache spec)
+            imported protected plan
+          else Query.compileSourceGroups (specIdentity spec) (specCache spec)
+            imported protected plan;
         Nothing -> do {
           result <- Query.compileGroups (specIdentity spec) (specCache spec) imported
             (Inference.loweredData lowered) (Inference.loweredValues lowered);
@@ -556,11 +581,12 @@ module Bootstrap.Crate where {
                      "pending"
                      protection
                };
-               let {
-                 object = Artifact.makeObject iface fragments
-               };
-               Artifact.validateInterface (Artifact.objectInterface object);
-               Right ((,) object report)
+               case Artifact.makeObjectWithPayload iface fragments of {
+                 (,) object payload -> do {
+                   Artifact.validateInterface (Artifact.objectInterface object);
+                   Right (complete object payload report)
+                 }
+               }
              })
       }
     };
@@ -644,6 +670,10 @@ module Bootstrap.Crate where {
          }
     else ioReturn (Right ((,) spec interfaces));
   compileSources spec sources interfaces prefix =
+    compileSourcesWithEncoding False spec sources interfaces prefix;
+  compileSourcesWithEncoding :: Bool -> CrateSpec -> [] SourceModule ->
+    [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
+  compileSourcesWithEncoding shareEncoding spec sources interfaces prefix =
     do {
       dependencies <- withPrelude spec sources interfaces;
       case do {
@@ -659,7 +689,8 @@ module Bootstrap.Crate where {
         Left message -> ioReturn (Left message);
         Right ((,,) updated loaded prepared) ->
           do {
-            result <- compilePrepared updated loaded prepared;
+            result <- compilePreparedWithEncoding shareEncoding
+              (\object payload report -> (,,) object payload report) updated loaded prepared;
             case result of {
               Left message ->
                 let {
@@ -673,9 +704,9 @@ module Bootstrap.Crate where {
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));
-              Right ((,) object report) ->
+              Right ((,,) object payload report) ->
                 do {
-                  Artifact.writeObject prefix object;
+                  Artifact.writeObjectWithPayload prefix object payload;
                   writeFile (prefix ++ ".queries")
                     (Query.reportJSON (specIdentity spec)
                        (Artifact.semanticFingerprint (Artifact.objectInterface object))
@@ -710,7 +741,9 @@ module Bootstrap.Crate where {
                         } of {
                      Left message -> ioReturn (Left message);
                      Right ((,) sources interfaces) ->
-                       compileSources normalized sources interfaces prefix
+                       -- Both source and dependency values originate in the
+                       -- parsers/decoders above, not caller-supplied lazy ASTs.
+                       compileSourcesWithEncoding True normalized sources interfaces prefix
                    }
                  }
              }

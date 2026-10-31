@@ -194,9 +194,31 @@ passes. Failed correctness or performance checks remain failures.
 The Haskell compiler, Cabal project, and old Haskell/Python test and build
 harnesses have been removed. Native MLF is the supported build and test path.
 Pinned C/Rust/Haskell benchmark sources, the independent Snake baseline,
-golden oracle data, and archived measurements remain available.
+golden oracle data, and archived measurements remain available. Compiler-level
+classification measurements, which compile identical generated sources with GHC
+and MLF instead of pinned applications, live in the
+[compiler shape benchmark](tools/performance/compiler-shapes/README.md).
 
 ## Native compilation with LLVM
+
+An installed compiler builds an executable directly and automatically reuses
+its fixed standard library and runtime:
+
+```sh
+"$EMLF_BIN" examples/snake.emlf -o .mlf-build/snake
+.mlf-build/snake
+```
+
+Each invocation freshly checks and compiles the user program, runs one ordinary
+Clang `-O2` job, and links the installed objects. `--compile SOURCE -o OUTPUT`
+is an equivalent spelling. By default, a fresh hidden `.emlf-<output>-N`
+directory beside the output retains the IR, object, process logs and
+`receipt.json`, including selected standard-library exports and any fallback
+reason. `--build-dir FRESH_DIRECTORY` selects an explicit fresh location instead. Explicit module search roots take precedence
+over installed standard-library roots. Changed library sources use the ordinary
+checked compilation path. See [standard compiler installation](tools/shared/prepared-build.md).
+
+The standalone LLVM commands remain available for explicit linking:
 
 Compile a saved xMLF program to LLVM IR, then link it with the runtime:
 
@@ -241,7 +263,8 @@ Known saturated functions use native workers, with conservative demand
 analysis to avoid unnecessary thunks. Partial applications and lazy fields
 retain their call-by-need behavior. Small integers and nullary constructors
 use tagged immediate values; unary/binary data has inline fields.
-GMP preserves the language's unbounded `Int`; strings use length-delimited
+`Int` uses signed 64-bit arithmetic; GMP supports the separate unbounded
+`Integer` type. Strings use length-delimited
 UTF-8, including embedded NULs. Invalid Unicode scalar literals are rejected.
 
 The runtime memoizes pure thunks and executes shared IO actions afresh on
@@ -464,8 +487,11 @@ or layouts invalidate the affected queries; unrelated declarations remain reusab
 The shared built-in Prelude is a generated compiler artifact with one identity.
 
 Import cycles do not make all declarations recursive. Only actual value SCCs
-require the existing closed recursive signatures. Acyclic values retain their
-ordinary generalization and first-class polymorphism. User-defined operator
+share recursive inference assumptions. Unsigned ordinary recursion is inferred
+across modules within one crate; signed members remain fixed polymorphic
+interfaces. Acyclic values retain ordinary generalization and first-class
+polymorphism. Cyclic dependencies between separately compiled crates remain
+unsupported. User-defined operator
 imports remain unsupported.
 
 ### Function declarations and expressions
@@ -489,9 +515,14 @@ it annotates the whole function. Parameters may have annotations, for example
 bindings (`let inc x = x + 1 in inc 41`), `do` declarations
 (`do { let inc x = x + 1; printInt (inc 41) }`), and instance methods.
 
+Declaration signatures retain their own checking mode independently of class
+declarations, so a known higher-rank argument interface can guide the function
+body. An annotation on an expression, such as `(value : Type)`, remains an
+expression coercion rather than silently becoming a declaration signature.
+
 Top-level values can refer forward to other values. The compiler orders
 dependencies and generalizes acyclic definitions as ordinary `let` bindings;
-recursive groups require signatures as described below. In module-free scripts,
+ordinary recursive groups are inferred as described below. In module-free scripts,
 class and instance declarations retain their separate scope. A final expression can select a
 result instead of `main`: `inc x = x + 1; inc 41`.
 
@@ -542,12 +573,12 @@ while an implicit block opened inside parentheses still follows indentation.
 
 ### Recursive bindings
 
-Every member of a recursive top-level dependency group needs an explicit,
-closed signature. This supports self recursion, mutual recursion, cyclic
-lazy data, and polymorphic recursion without guessing recursive MLF schemes:
+Ordinary self-recursive and mutually recursive top-level definitions do not
+need whole-binding signatures. Unsigned uses share one unsolved type within
+their inference component; the solved exports are generalized afterward,
+without generalizing captured environmental types:
 
 ```haskell
-factorial : Int -> Int
 factorial 0 = 1
 factorial n = n * factorial (n - 1)
 
@@ -560,7 +591,6 @@ local recursion, including inside `do`:
 ```haskell
 main = do
   let rec
-    countdown : Int -> IO Unit
     countdown 0 = putStrLn "done"
     countdown n = do
       printInt n
@@ -568,12 +598,19 @@ main = do
   countdown 3
 ```
 
-Local recursive groups require signatures on every binding. Quantified and
-qualified signatures, such as `forall (m : * -> *) a. Monad m => Int -> m a -> m a`,
-are supported; free annotation variables and existential signatures are not
-closed recursive interfaces. Bodies are checked against their declared schemes,
-and recursive uses instantiate those schemes. The generated xMLF `letrec` is
-verified by the existing independent checker.
+Local groups also infer unsigned ordinary recursion, including qualified
+(class-constrained) interfaces. Signed and unsigned members can coexist. A
+signature such as `forall (m : * -> *) a. Monad m => Int -> m a -> m a` supplies
+a fixed interface: its body is checked against that scheme, and recursive
+uses can instantiate it independently. Free annotation variables and
+existential signatures are not closed recursive interfaces.
+
+Recursive polymorphic instantiation still needs an appropriate declared
+interface; this is not unrestricted polymorphic-recursion inference. A local
+higher-rank parameter annotation can suffice without annotating the whole
+recursive binding. The compiler emits checked xMLF evidence while preserving
+the recursive value knot. See the [design and validation record](docs/inference/Unsigned-Recursion-Final-Validation.md)
+for exact inference limits and focused host-versus-native validation scope.
 
 ### Conditionals and operators
 
@@ -650,7 +687,7 @@ binds below the operators, so `x + 1 : Int` annotates the sum.
 The annotation/cons distinction for `:` is described below; `::` always
 introduces an annotation.
 
-Arithmetic and comparisons use the existing arbitrary-precision `Int`
+Arithmetic and comparisons use signed 64-bit `Int`
 primitives. `/` truncates toward zero and `%` has the dividend's sign.
 They are not overloaded: use `addDouble`, `ltDouble`, or `eqString` for other
 types. Signed `Double` literals such as `-2.5e-2` remain supported; negating a
@@ -745,13 +782,26 @@ MLF can instantiate datatype parameters with polymorphic types:
 data Box a = Box a;
 let boxed = Box (\x -> x) : Box (forall a. a -> a) in
 case boxed of {
-  Box f -> let id = f : forall a. a -> a in
-           let number = id 42 in id true
+  Box f -> let number = f 42 in f true
 }
 ```
 
-Pattern fields are not implicitly generalized. An explicit annotation can
-expose a field's polymorphic type for independent uses, as above.
+Ordinary unknown pattern fields are not implicitly generalized. When the
+scrutinee already supplies an exact polymorphic parameter interface, as above,
+each field use can instantiate that interface. Captured outer type variables
+remain shared. A field whose declaration itself begins with `forall` also
+supplies an interface and is instantiated automatically at each use:
+
+```haskell
+data Poly = Poly (forall a. a -> a);
+case Poly (\x -> x) of { Poly f -> let number = f 42 in f true }
+```
+
+Fresh source datatypes and class signatures are validated before unused
+quantifiers are removed consistently from their inference and emitted layouts.
+Checked imported layouts are not rewritten. See
+[source field normalization](docs/inference/Source-Field-Normalization.md)
+for the exact known-interface boundary, validation and remaining cases.
 See [`maybe.emlf`](examples/maybe.emlf),
 [`recursive-data.emlf`](examples/recursive-data.emlf), and
 [`polymorphic-data.emlf`](examples/polymorphic-data.emlf).
@@ -1045,14 +1095,24 @@ and cause a nonzero exit. Console output is flushed before the next action.
 | `eqString` | `String -> String -> Bool` |
 | `ifThenElse` | `forall a. Bool -> a -> a -> a` |
 
-Integer arithmetic uses arbitrary-precision signed integers. `ltInt` is strict
+`Int` follows Haskell `Int64`: literals, decimal `readInt`, addition,
+subtraction, multiplication and negation wrap modulo 2^64, interpreted as
+signed two's complement. Its range is -9223372036854775808 through
+9223372036854775807. `ltInt` is strict
 less-than. `quotInt` truncates toward zero, `remInt` has the dividend's sign,
-and division by zero fails at runtime. `andInt` is strict bitwise AND with
-unbounded two's-complement semantics. `readInt` accepts an optional sign and
+and division by zero fails at runtime. The minimum value divided by -1 raises
+`integer division overflow`; its remainder with -1 is zero. `andInt`, `orInt` and
+`xorInt` operate on 64 bits. `readInt` accepts an optional sign and
 one or more ASCII decimal digits, with no whitespace or trailing characters.
 String equality is case-sensitive. `ifThenElse condition yes no`
 evaluates only the selected branch; it also works with functions, datatypes,
 and IO actions. Selecting an IO action does not execute it until it is sequenced.
+
+For unbounded arithmetic, use the separate `Integer` type and explicit
+`intToInteger`, `integerToInt`, `addInteger`, `subInteger`, `mulInteger`,
+`quotInteger`, `remInteger`, `eqInteger`, `ltInteger`, `showInteger`,
+`readInteger` and `integerToDouble` primitives. Conversion back to `Int`
+wraps. Ordinary numeric operators remain specific to `Int`.
 
 `Double` is IEEE binary64, distinct from `Int`: use `1.0`, `-2.5`, or `3e2`
 and convert integers explicitly with `intToDouble`. Literals must be finite;
@@ -1077,7 +1137,7 @@ do {
 
 Both backends implement these operations. The LLVM backend emits floating
 arithmetic directly and stores Double array elements unboxed; Int array cells
-retain arbitrary precision. See [numeric semantics](docs/numeric-arrays.txt).
+store signed 64-bit values. See [numeric semantics](docs/numeric-arrays.txt).
 
 `ByteArray` stores unsigned bytes. Reads return `Int`; writes and initial
 values must be between 0 and 255. `byteArrayFromString` allocates a fresh
@@ -1088,7 +1148,7 @@ buffers and binary formats such as Mandelbrot's PBM bitmap on both backends.
 
 `getByteLine` reads raw bytes through LF, preserving the newline and invalid
 UTF-8; EOF returns an empty fresh array. A blank line contains one LF byte.
-`IntTable` is a mutable library hash table with arbitrary integer keys and
+`IntTable` is a mutable library hash table with signed 64-bit integer keys and
 values. Missing keys read as zero; writes insert or replace. Reads return
 snapshots, and each execution of `newIntTable` creates a fresh table.
 These operations are available in both backends.
@@ -1227,7 +1287,7 @@ Movement and food placement are pure functions; only the interface uses IO.
 
 [`examples/SnakeBaseline.hs`](examples/SnakeBaseline.hs) implements the same
 game with Haskell ADTs, standard lists and `Maybe`, ordinary recursion, and
-the standard `IO` monad with `do`. It uses `Integer` to match eMLF's unbounded
+the standard `IO` monad with `do`. It uses `Int64` to match eMLF's fixed-width
 `Int`, and preserves the rules, deterministic food search, prompts, board
 format, and flushing after each write. Only the `base` package is needed.
 
@@ -1254,6 +1314,15 @@ LLVM native code. It also checks eleven pure-rule outcomes, including the
 departing tail and full-board win.
 
 ## Compiler performance
+
+See [Int64 and Patricia collection qualification](docs/int64-patricia-qualification.md)
+for this numeric/collection migration, its retained correctness controls, and
+the measured compilation and runtime results, including unmet performance targets.
+
+See [C4 prepared-transaction integration and validation](docs/performance/c4-local-transaction.md)
+and [performance-optimization research workflow and literature](docs/performance/optimization-workflow-research.md).
+The latter is a set of future recommendations, not an activated measurement
+protocol or a claim of new performance results.
 
 Graph validation uses indexed scratch tables for densely numbered graphs,
 numbers the binding tree once, and checks kinds, scope, and structural cycles
@@ -1289,9 +1358,9 @@ permissions, target typing, and source erasure.
 The native backend lowers eligible first-order numeric IO functions to direct,
 bounds-checked array loops with unboxed Double intermediates and recursive
 arguments. Specialized workers preserve proven integer ranges, while checked
-machine multiplication/division retain GMP fallback. A non-forcing argument
+machine multiplication/division retain the full Int64 runtime fallback. A non-forcing argument
 guard preserves the lazy fallback; actions remain repeatable. GMP
-arithmetic reads immutable operands directly and collection also accounts for
+arithmetic for explicit `Integer` values reads immutable operands directly and collection also accounts for
 large-integer limb storage. Allocating byte/array/table IO uses explicitly
 rooted native calls. Adjacent table count updates fuse, and guarded copy loops
 use LLVM memory intrinsics. See [backend design](docs/llvm-backend.txt).
@@ -1331,6 +1400,37 @@ directory must be new. Run measured jobs alone. The
 [results](benchmarks/RESULTS.md) retain raw samples, medians, variation, source
 and toolchain hashes; [self-compilation profiling](tools/profile/README.md)
 reports the separate frozen-source comparison and diagnostic timing boundaries.
+
+### Compiler shape classification benchmark
+
+The [compiler shape benchmark](tools/performance/compiler-shapes/README.md)
+answers a different question from the C/MLF Benchmark Game above. It compiles the
+same generated shared-Haskell program with GHC and with MLF for ten program shapes
+at sizes 8, 32 and 128, and reports where compile time goes per shape instead of
+gating pinned application workloads. One entry point drives the whole benchmark:
+
+```sh
+python3 -B tools/performance/compiler-shapes/bench.py list
+python3 -B tools/performance/compiler-shapes/bench.py all \
+  --workdir .mlf-build/compiler-shapes --cohort default-20261031 \
+  --producer .mlf-build/shared-ghc --build-builtin
+```
+
+`--family` and `--size` filter the matrix, `--matrix smoke` is the 18-compilation
+check that ordinary pull requests run, and `analyze.py` writes `summary.json`,
+`summary.csv`, `samples.csv` and a human `summary.md`. The measured endpoint is the
+bootstrap crate route (`--compile-crate`, then `--crate-to-llvm-gc`, then Clang
+`-O2`), not the installed `emlf SOURCE -o` driver; the setup, plan and report state
+that endpoint, and the analyzer refuses cohorts that differ in endpoint, toolchain,
+host or repeat count. The runner contract in [tools/bench](tools/bench/README.md)
+is unchanged.
+
+The current cohort (2026-10-31, `b81f9b0a`) completed the full 31-cell, 186-compilation
+matrix with no failures: MLF was slower in all 30 shaped cells, with ratios from
+2.28 to 5.03 and a mean that rises from 2.57 at n=8 to 3.19 at n=128. The minimal
+program alone costs 1.133 s versus 0.445 s for GHC, and the group-heavy families
+grow with their fresh target-group count. Three repetitions describe spread on one
+host; they are not a confidence interval, and no universal speed claim follows.
 
 ### Preserved benchmark baselines
 

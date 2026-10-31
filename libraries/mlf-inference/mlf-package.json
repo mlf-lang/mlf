@@ -18,6 +18,7 @@
   },
   "library": {
     "modules": {
+      "Bootstrap.ClassDemand": "Bootstrap/ClassDemand.hs",
       "Bootstrap.Classes": "Bootstrap/Classes.hs",
       "Bootstrap.Compiler": "Bootstrap/Compiler.hs",
       "Bootstrap.CompilerCore": "Bootstrap/CompilerCore.hs",
@@ -26,6 +27,7 @@
       "Bootstrap.Evidence": "Bootstrap/Evidence.hs",
       "Bootstrap.EvidenceBoundary": "Bootstrap/EvidenceBoundary.hs",
       "Bootstrap.Graph": "Bootstrap/Graph.hs",
+      "Bootstrap.Graph.IndexStore": "Bootstrap/Graph/IndexStore.hs",
       "Bootstrap.Graph.Solver": "Bootstrap/Graph/Solver.hs"
     }
   },

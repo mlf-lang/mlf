@@ -19,10 +19,12 @@ module Bootstrap.Constraint where {
   import qualified Bootstrap.Unicode as Unicode;
   import qualified Bootstrap.Lexer as Lexer;
   import qualified Bootstrap.Desugar as Desugar;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.X.Syntax as X;
-  -- The writer keeps edges in reverse creation order. They are reversed once at
-  -- the boundary; this preserves dependency-first instantiation exactly.
-  data Generation = Generation Graph ([] ((,) Int Int)) ([] Edge);
+  import qualified Bootstrap.X.Type as T;
+  -- The writer keeps solver work in reverse dependency order. A case barrier
+  -- carries a sealed descriptor list before any alternative body is generated.
+  data Generation = Generation Graph ([] ((,) Int Int)) ([] SolveStep);
   data Generate a = Generate (Generation -> Either String ((,) a Generation));
   runGenerate (Generate f) state = f state;
   generatePure :: forall a. a -> Generate a;
@@ -115,6 +117,30 @@ module Bootstrap.Constraint where {
           }
       }
     };
+  reserveIdentity =
+    do {
+      graph <- getGraph;
+      case G.freshId graph of {
+        (,) identity next -> do { setGraph next; return identity }
+      }
+    };
+  -- All pending instance sources are completed children, closed declarations,
+  -- or frozen exports. Recursive assumptions contribute equalities only.
+  -- Keep the surrounding unfinished graph unnormalized across this boundary.
+  flushGeneration :: Generate ();
+  flushGeneration =
+    Generate
+      (\state ->
+         case state of {
+           Generation graph eqs es ->
+             do {
+               prepared <- Solver.prepare graph;
+               initial <- Solver.solverUnify (reverse eqs) prepared;
+               solved <- evaluatePreparedSteps initial (reverse es);
+               finished <- Solver.finish solved;
+               Right ((,) () (Generation finished [] []))
+             }
+         });
   equality a b =
     Generate
       (\state ->
@@ -129,8 +155,33 @@ module Bootstrap.Constraint where {
              let {
                e = Edge gen target
              } in
-             Right ((,) e (Generation graph eqs ((:) e es)))
+             Right ((,) e (Generation graph eqs ((:) (Instantiate e) es)))
          });
+  projectCase fields =
+    Generate
+      (\state ->
+         case state of {
+           Generation graph eqs steps ->
+             Right ((,) () (Generation graph eqs ((:) (ProjectCase fields) steps)))
+         });
+  evaluateStep :: Solver -> SolveStep -> Either String Solver;
+  evaluateStep solver step =
+    case step of {
+      Instantiate e -> Solver.instantiateClosed (fromGen e) (toNode e) solver;
+      ProjectCase fields -> Solver.projectCaseFields fields solver
+    };
+  evaluateSteps :: Solver -> [] SolveStep -> Either String Solver;
+  evaluateSteps initial steps = foldM evaluateStep initial steps;
+  -- Internal fold: both callers have completed prepare and solverUnify.
+  -- Existing public evaluateStep/evaluateSteps retain the original route.
+  evaluatePreparedStep :: Solver -> SolveStep -> Either String Solver;
+  evaluatePreparedStep solver step =
+    case step of {
+      Instantiate e -> Solver.instantiateClosedPrepared (fromGen e) (toNode e) solver;
+      ProjectCase fields -> Solver.projectCaseFields fields solver
+    };
+  evaluatePreparedSteps :: Solver -> [] SolveStep -> Either String Solver;
+  evaluatePreparedSteps initial steps = foldM evaluatePreparedStep initial steps;
   generalization (Typed gen _) = gen;
   form (Typed _ f) = f;
   fromGen (Edge gen _) = gen;
@@ -138,7 +189,12 @@ module Bootstrap.Constraint where {
   initialGraph (Constraints graph _ _ _) = graph;
   skeleton (Constraints _ typed _ _) = typed;
   equalities (Constraints _ _ eqs _) = eqs;
-  instances (Constraints _ _ _ es) = es;
+  solveSteps (Constraints _ _ _ steps) = steps;
+  -- Edge-only inspection/evidence view. Solver drivers must use solveSteps.
+  instances constraints = concatMap (\step -> case step of {
+    Instantiate e -> (:) e [];
+    ProjectCase _ -> []
+  }) (solveSteps constraints);
   sameFlag :: Flag -> Flag -> Bool;
   sameFlag Flexible Flexible = True;
   sameFlag Rigid Rigid = True;
@@ -163,10 +219,10 @@ module Bootstrap.Constraint where {
   samePredicates ((:) (SPredicate n xs) ps) ((:) (SPredicate m ys) qs) =
     (eqString n m && (sameTypes xs ys && samePredicates ps qs));
   samePredicates _ _ = False;
-  recursiveRHS :: SAnnotation -> SExpr -> Core;
-  recursiveRHS annotation expression =
-    case annotation of {
-      SAnnotation [] ty ->
+  recursiveRHS :: RecursiveMode -> SExpr -> Core;
+  recursiveRHS mode expression =
+    case mode of {
+      CheckRecursive (SAnnotation [] ty) ->
         case expression of {
           SChecked other _ ->
             if sameType ty other then desugar expression else CChecked ty expression;
@@ -185,6 +241,11 @@ module Bootstrap.Constraint where {
       SApp a b -> CApp (desugar a) (desugar b);
       SLet x a b -> CLet x (desugar a) (desugar b);
       SAnn a annotation -> CApp (CCoerce annotation) (desugar a);
+      SSignature a annotation ->
+        case annotation of {
+          SAnnotation [] _ -> recursiveRHS (CheckRecursive annotation) a;
+          _ -> CApp (CCoerce annotation) (desugar a)
+        };
       SIntLit n -> CInt n;
       SDoubleLit n -> CDouble n;
       SBoolLit b -> CBool b;
@@ -285,6 +346,17 @@ module Bootstrap.Constraint where {
             do {
               e <- edge source root;
               return (FVariable name (Just e))
+            };
+          Just (DeclaredPoly name source declared) ->
+            do {
+              e <- edge source root;
+              return (FDeclaredVariable name declared e)
+            };
+          Just (RecursiveMono name shared export) ->
+            do {
+              equality root shared;
+              -- This edge is evidence metadata, never solver work.
+              return (FVariable name (Just (Edge export root)))
             }
         };
       CLam x body ->
@@ -316,36 +388,7 @@ module Bootstrap.Constraint where {
           return (FBinding name a' b' e)
         };
       CRec definitions body ->
-        do {
-          declarations <- mapM (declareRecursive datatypes gen) definitions;
-          let {
-            bindings =
-              map
-                (\declaration ->
-                   case declaration of {
-                     (,,,) x name source _ -> (,) x (Poly name source)
-                   })
-                declarations
-          };
-          let {
-            scope = M.union compareString (M.fromList compareString bindings) env
-          };
-          definitions' <-
-            mapM
-              (\pair ->
-                 case pair of {
-                   (,) ((,,,) _ name source target) ((,,) _ _ rhs) ->
-                     do {
-                       rhs' <- child scope rhs;
-                       e <- edge (generalization rhs') target;
-                       return ((,,,) name source rhs' e)
-                     }
-                 })
-              (zip declarations definitions);
-          body' <- child scope body;
-          e <- edge (generalization body') root;
-          return (FRecursive definitions' body' e)
-        };
+        buildRecursive datatypes typeScope env gen root definitions body;
       CWanted dictionary candidates ->
         do {
           declaration <- liftResult (D.lookupDatatype datatypes dictionary);
@@ -372,6 +415,10 @@ module Bootstrap.Constraint where {
                        Just (Mono name identity) ->
                          return (EvidenceBinding role name identity False);
                        Just (Poly name source) -> return (EvidenceBinding role name source True);
+                       Just (DeclaredPoly name _ declared) ->
+                         return (DeclaredEvidenceBinding role name declared);
+                       Just (RecursiveMono _ _ _) ->
+                         failGenerate "recursive dictionary interfaces require an explicit signature";
                        Nothing -> failGenerate ("dictionary candidate is out of scope: " ++ x)
                      }
                  })
@@ -544,16 +591,168 @@ module Bootstrap.Constraint where {
             };
           a <- child env scrutinee;
           ea <- edge (generalization a) domain;
-          branches <-
-            mapM (buildBranch datatypes typeScope env gen root domain parameters) alternatives;
+          -- An unsigned recursive group can flush while generating the first
+          -- branch. Allocate and seal EVERY alternative before any body work.
+          prepared <- mapM (prepareBranch datatypes gen domain parameters) alternatives;
+          let { projections = concatMap preparedProjections prepared };
+          unless (null projections) (projectCase projections);
+          branches <- mapM (buildPreparedBranch datatypes typeScope env gen root) prepared;
           return (FMatch a ea branches)
         }
     };
+  checkedRecursive :: (,,) String RecursiveMode Core -> Bool;
+  checkedRecursive ((,,) _ mode _) =
+    case mode of { CheckRecursive _ -> True; InferRecursive -> False };
+  recursiveCoreNames :: Core -> [] String;
+  recursiveCoreNames core =
+    case core of {
+      CVar n -> (:) n [];
+      CLam n body -> filter (\x -> not (eqString n x)) (recursiveCoreNames body);
+      CApp a b -> append (recursiveCoreNames a) (recursiveCoreNames b);
+      CLet n a b ->
+        append (recursiveCoreNames a)
+          (filter (\x -> not (eqString n x)) (recursiveCoreNames b));
+      CCase a branches ->
+        append (recursiveCoreNames a)
+          (concatMap
+             (\((,) pattern body) ->
+                filter (\x -> not (elem eqString x (Desugar.patternVariables pattern)))
+                  (recursiveCoreNames body)) branches);
+      CRec definitions body ->
+        let { names = map (\((,,) n _ _) -> n) definitions } in
+        filter (\x -> not (elem eqString x names))
+          (append (recursiveCoreNames body)
+             (concatMap (\((,,) _ _ rhs) -> recursiveCoreNames rhs) definitions));
+      CWanted _ candidates -> map snd candidates;
+      CChecked _ expression -> Dependency.valueNames (Dependency.observeExpression expression);
+      _ -> []
+    };
+  -- The spine is only a multi-root reachability anchor. It has no fresh leaf,
+  -- and none of these arrows is used by an instance/equality constraint.
+  recursiveAnchor :: Int -> [] Int -> Generate Int;
+  recursiveAnchor group roots =
+    case roots of {
+      [] -> failGenerate "empty recursive inference component";
+      (:) root [] -> newNode (GArr root root) (Just group) Flexible;
+      (:) first ((:) second []) -> newNode (GArr first second) (Just group) Flexible;
+      (:) first rest ->
+        do {
+          tail <- recursiveAnchor group rest;
+          newNode (GArr first tail) (Just group) Flexible
+        }
+    };
+  buildRecursive :: DataEnv -> Map String Int -> Map String Binding -> Int -> Int ->
+                    [] ((,,) String RecursiveMode Core) -> Core -> Generate Form;
+  buildRecursive datatypes typeScope env gen root definitions body =
+    do {
+      let { signed = filter checkedRecursive definitions };
+      declarations <- mapM (declareRecursive datatypes gen) signed;
+      let {
+        signedScope =
+          M.union compareString
+            (M.fromList compareString
+               (map (\((,,,) n name source _) -> (,) n (Poly name source)) declarations)) env
+      };
+      let {
+        unsigned = filter (\definition -> not (checkedRecursive definition)) definitions
+      };
+      let {
+        members = M.fromList compareString (map (\d -> case d of { (,,) n _ _ -> (,) n d }) unsigned)
+      };
+      let {
+        groups = Dependency.components
+          (map (\((,,) n _ rhs) -> (,) n (recursiveCoreNames rhs)) unsigned)
+      };
+      inferred <-
+        foldM
+          (\state names ->
+             case state of {
+               (,) scope done ->
+                 do {
+                   result <- buildRecursiveGroup datatypes typeScope scope gen
+                     (map (\n -> M.findWithDefault compareString
+                         ((,,) n InferRecursive (CVar n)) n members) names);
+                   case result of {
+                     (,) scope2 values -> return ((,) scope2 (append done values))
+                   }
+                 }
+             })
+          ((,) signedScope []) groups;
+      case inferred of {
+        (,) scope inferredDefinitions ->
+          do {
+            checkedDefinitions <-
+              mapM
+                (\((,) ((,,,) n name source target) ((,,) _ _ rhs)) ->
+                   do {
+                     value <- build datatypes typeScope (Just gen) scope rhs;
+                     proof <- edge (generalization value) target;
+                     return ((,) n (RecursiveDefinition name source value proof Nothing))
+                   })
+                (zip declarations signed);
+            let { values = M.fromList compareString (append inferredDefinitions checkedDefinitions) };
+            ordered <- mapM
+              (\((,,) n _ _) -> case M.lookup compareString n values of {
+                 Nothing -> failGenerate "recursive component lost a declaration";
+                 Just value -> return value
+               }) definitions;
+            continuation <- build datatypes typeScope (Just gen) scope body;
+            proof <- edge (generalization continuation) root;
+            return (FRecursive ordered continuation proof)
+          }
+      }
+    };
+  buildRecursiveGroup :: DataEnv -> Map String Int -> Map String Binding -> Int ->
+                         [] ((,,) String RecursiveMode Core) ->
+                         Generate ((,) (Map String Binding) ([] ((,) String RecursiveDefinition)));
+  buildRecursiveGroup datatypes typeScope env parent definitions =
+    do {
+      group <- newNode (GGen (-1)) (Just parent) Flexible;
+      declarations <- mapM
+        (\((,,) n _ _) -> do {
+           name <- freshName n;
+           shared <- newNode GBot (Just group) Flexible;
+           export <- reserveIdentity;
+           return ((,,,) n name shared export)
+         }) definitions;
+      anchor <- recursiveAnchor group (map (\((,,,) _ _ shared _) -> shared) declarations);
+      setNode group (Node (GGen anchor) (Just parent) Flexible);
+      let {
+        scope = M.union compareString
+          (M.fromList compareString
+             (map (\((,,,) n name shared export) -> (,) n (RecursiveMono name shared export)) declarations)) env
+      };
+      bodies <- mapM
+        (\((,) ((,,,) _ _ shared _) ((,,) _ _ rhs)) -> do {
+           value <- build datatypes typeScope (Just group) scope rhs;
+           proof <- edge (generalization value) shared;
+           return ((,) value proof)
+         }) (zip declarations definitions);
+      flushGeneration;
+      exports <- mapM
+        (\((,) ((,,,) n name shared export) ((,) value proof)) -> do {
+           graph <- getGraph;
+           materialized <- liftResult (G.materializeExport group shared export parent graph);
+           case materialized of {
+             (,) ((,) _ copies) next -> do {
+               setGraph next;
+               return ((,) n (RecursiveDefinition name export value proof
+                 (Just (RecursiveClosure group copies))))
+             }
+           }
+         }) (zip declarations bodies);
+      let {
+        exportedScope = M.union compareString
+          (M.fromList compareString
+             (map (\((,,,) n name _ export) -> (,) n (Poly name export)) declarations)) env
+      };
+      return ((,) exportedScope exports)
+    };
   declareRecursive :: DataEnv ->
-                      Int -> (,,) String SAnnotation Core -> Generate ((,,,) String XName Int Int);
+                      Int -> (,,) String RecursiveMode Core -> Generate ((,,,) String XName Int Int);
   declareRecursive datatypes gen definition =
     case definition of {
-      (,,) x (SAnnotation [] ty) _ ->
+      (,,) x (CheckRecursive (SAnnotation [] ty)) _ ->
         do {
           name <- freshName x;
           declarationGen <- newNode (GGen (-1)) (Just gen) Flexible;
@@ -562,6 +761,7 @@ module Bootstrap.Constraint where {
           setNode declarationGen (Node (GGen root) (Just gen) Flexible);
           return ((,,,) x name declarationGen root)
         };
+      (,,) _ InferRecursive _ -> failGenerate "unsigned recursive inference is not implemented";
       _ -> failGenerate "recursive definitions require a closed signature"
     };
   outermost :: Graph -> Int -> Int;
@@ -588,6 +788,9 @@ module Bootstrap.Constraint where {
   directed :: SType -> SExpr -> SExpr;
   directed (SArrow domain result) (SLam x annotation body) =
     SLam x (Just (fromMaybe (SAnnotation [] domain) annotation)) (directed result body);
+  -- Ordinary let infers/generalizes its RHS as before. Only its continuation
+  -- is checked under the same expected type, including scoped skolems.
+  directed expected (SLet name rhs body) = SLet name rhs (directed expected body);
   directed _ expression = expression;
   freshOptional :: Maybe String -> Generate (Maybe XName);
   freshOptional Nothing = return Nothing;
@@ -597,70 +800,148 @@ module Bootstrap.Constraint where {
       return (Just name)
     };
   patternBindings :: [] (Maybe String) ->
-                     [] (Maybe XName) -> [] Int -> [] ((,) String Binding);
-  patternBindings ((:) (Just original) originals) ((:) (Just resolved) names) ((:) identity identities) =
-    (:) ((,) original (Mono resolved identity)) (patternBindings originals names identities);
+                     [] (Maybe XName) -> [] ((,) Int (Maybe XType)) -> [] ((,) String Binding);
+  patternBindings ((:) (Just original) originals) ((:) (Just resolved) names) ((:) ((,) identity declared) identities) =
+    (:) ((,) original (case declared of {
+      Nothing -> Mono resolved identity;
+      Just ty -> DeclaredPoly resolved identity ty
+    })) (patternBindings originals names identities);
   patternBindings ((:) _ originals) ((:) _ names) ((:) _ identities) =
     patternBindings originals names identities;
   patternBindings _ _ _ = [];
-  buildBranch :: DataEnv ->
-                 Map String Int ->
-                 Map String Binding ->
-                 Int -> Int -> Int -> Map String Int -> (,) SPattern Core -> Generate Branch;
-  buildBranch datatypes typeScope env gen root domain parameters alternative =
+  data PreparedBranch = PreparedBranch XPattern ([] ((,) String Binding)) Core ([] ((,) Int Int));
+  preparedProjections (PreparedBranch _ _ _ fields) = fields;
+  prepareBranch :: DataEnv -> Int -> Int -> Map String Int ->
+                   (,) SPattern Core -> Generate PreparedBranch;
+  prepareBranch datatypes gen domain parameters alternative =
     case alternative of {
       (,) pattern body ->
-        do {
-          resolved <-
-            case pattern of {
-              SConstructorPattern constructor names ->
-                do {
-                  declaration <- liftResult (D.lookupConstructor datatypes constructor);
-                  fields <-
-                    mapM
-                      (\field ->
-                         do {
-                           ty <- liftResult (sourceField field);
-                           identity <- embed datatypes parameters ty;
-                           attach gen Rigid identity;
-                           return identity
-                         })
-                      (D.constructorFields (snd declaration));
-                  let {
-                    used = catMaybes names
-                  };
-                  unless (length used == length (nubBy eqString used))
-                    (failGenerate "duplicate pattern variable");
-                  names' <- mapM freshOptional names;
-                  return
-                    ((,) (XConstructorPattern constructor names')
-                       (patternBindings names names' fields))
-                };
-              SDefaultPattern name ->
-                do {
-                  resolvedName <- freshOptional name;
-                  let {
-                    bindings =
-                      case name of {
-                        Nothing -> [];
-                        Just original ->
-                          case resolvedName of {
-                            Nothing -> [];
-                            Just resolved -> (:) ((,) original (Mono resolved domain)) []
-                          }
-                      }
-                  };
-                  return ((,) (XDefaultPattern resolvedName) bindings)
-                };
-              _ -> failGenerate "surface pattern escaped lowering"
+        case pattern of {
+          SConstructorPattern constructor names -> do {
+            declaration <- liftResult (D.lookupConstructor datatypes constructor);
+            let { declared = D.constructorFields (snd declaration) };
+            fields <- mapM (patternField datatypes parameters gen) declared;
+            let { used = catMaybes names };
+            unless (length used == length (nubBy eqString used))
+              (failGenerate "duplicate pattern variable");
+            names' <- mapM freshOptional names;
+            projections <- liftResult (mapM patternProjection (zip declared fields));
+            return (PreparedBranch (XConstructorPattern constructor names')
+              (patternBindings names names' fields) body (catMaybes projections))
+          };
+          SDefaultPattern name -> do {
+            resolvedName <- freshOptional name;
+            let {
+              bindings = case name of {
+                Nothing -> [];
+                Just original -> case resolvedName of {
+                  Nothing -> [];
+                  Just resolved -> (:) ((,) original (Mono resolved domain)) []
+                }
+              }
             };
-          body' <-
-            build datatypes typeScope (Just gen)
-              (M.union compareString (M.fromList compareString (snd resolved)) env)
-              body;
-          e <- edge (generalization body') root;
-          return (Branch (fst resolved) body' e)
+            return (PreparedBranch (XDefaultPattern resolvedName) bindings body [])
+          };
+          _ -> failGenerate "surface pattern escaped lowering"
         }
+    };
+  patternProjection :: (,) Field ((,) Int (Maybe XType)) ->
+                       Either String (Maybe ((,) Int Int));
+  patternProjection ((,) field prepared) =
+    case field of {
+      Parameter _ -> case snd prepared of {
+        Just (XVar (XTyVar original)) -> Right (Just ((,) original (fst prepared)));
+        _ -> Left "pattern parameter lost its exact projection identity"
+      };
+      _ -> Right Nothing
+    };
+  buildPreparedBranch :: DataEnv -> Map String Int -> Map String Binding ->
+                         Int -> Int -> PreparedBranch -> Generate Branch;
+  buildPreparedBranch datatypes typeScope env gen root prepared =
+    case prepared of {
+      PreparedBranch pattern bindings body _ -> do {
+        body' <- build datatypes typeScope (Just gen)
+          (M.union compareString (M.fromList compareString bindings) env) body;
+        e <- edge (generalization body') root;
+        return (Branch pattern body' e)
+      }
+    };
+  -- Declared foralls keep their existing evidence path. Bare parameters use
+  -- external-root proxies until the case's one-shot barrier either copies a
+  -- known polymorphic interface or permanently leaves the field shared.
+  patternField :: DataEnv -> Map String Int -> Int -> Field -> Generate ((,) Int (Maybe XType));
+  patternField datatypes parameters parent field =
+    case field of {
+      Parameter name -> do {
+        embedded <- embedDeclaredField datatypes parameters field;
+        gen <- newNode (GGen (fst embedded)) (Just parent) Flexible;
+        return ((,) gen (Just (snd embedded)))
+      };
+      Quantified _ _ _ -> do {
+        gen <- newNode (GGen (-1)) (Just parent) Flexible;
+        before <- getGraph;
+        embedded <- embedDeclaredField datatypes parameters field;
+        after <- getGraph;
+        setGraph (pruneEmbedding (G.nextId before) (fst embedded) after);
+        -- An external parameter can itself be the entire field root. attach
+        -- deliberately leaves its original owner unchanged in that case.
+        attach gen Flexible (fst embedded);
+        setNode gen (Node (GGen (fst embedded)) (Just parent) Flexible);
+        return ((,) gen (Just (snd embedded)))
+      };
+      _ -> do {
+        ty <- liftResult (sourceField field);
+        identity <- embed datatypes parameters ty;
+        attach parent Rigid identity;
+        return ((,) identity Nothing)
+      }
+    };
+  -- Keep the exact declaration alongside its graph view. Its bound IDs are
+  -- distinct from free datatype-parameter IDs, including under shadowing;
+  -- unused binders survive in the evidence type even when graph pruning drops
+  -- them. This metadata never introduces an inferred/generalized field type.
+  embedDeclaredField :: DataEnv -> Map String Int -> Field -> Generate ((,) Int XType);
+  embedDeclaredField datatypes scope field =
+    case field of {
+      Parameter name ->
+        case M.lookup compareString name scope of {
+          Nothing -> failGenerate ("unbound data type parameter: " ++ name);
+          Just identity -> return ((,) identity (XVar (XTyVar identity)))
+        };
+      Function a b -> do {
+        root <- newNode GBot Nothing Rigid;
+        x <- embedDeclaredField datatypes scope a;
+        y <- embedDeclaredField datatypes scope b;
+        attachUnscoped root scope (fst x);
+        attachUnscoped root scope (fst y);
+        setNode root (Node (GArr (fst x) (fst y)) Nothing Rigid);
+        return ((,) root (XArrow (snd x) (snd y)))
+      };
+      Applied constructor arguments -> do {
+        let { kind = D.constructorKind datatypes constructor (length arguments) };
+        head <- newNode
+          (if Kind.eqKind kind Star then GCon constructor [] else GTyCon constructor kind)
+          Nothing Rigid;
+        foldM (\f argument -> do {
+          a <- embedDeclaredField datatypes scope argument;
+          root <- embedApplication scope (fst f) (fst a);
+          return ((,) root (T.apply (snd f) (snd a)))
+        }) ((,) head (XCon constructor [])) arguments
+      };
+      Application f a -> do {
+        x <- embedDeclaredField datatypes scope f;
+        y <- embedDeclaredField datatypes scope a;
+        root <- embedApplication scope (fst x) (fst y);
+        return ((,) root (T.apply (snd x) (snd y)))
+      };
+      Quantified name kind body -> do {
+        bound <- newNode (G.bottomTag kind) Nothing Flexible;
+        result <- embedDeclaredField datatypes (M.insert compareString name bound scope) body;
+        graph <- getGraph;
+        when ((bound /= fst result) && IS.member bound (G.reachable graph (fst result)))
+          (setNode bound (Node (G.tag (G.nodeAt graph bound)) (Just (fst result)) Flexible));
+        return ((,) (fst result) (XForall (XTyVar bound) (T.bottomKind kind) (snd result)))
+      }
     };
   sourceField :: Field -> Either String SType;
   sourceField field =
@@ -742,6 +1023,11 @@ module Bootstrap.Constraint where {
           validateIn datatypes scope a;
           validateAnnotation datatypes scope annotation
         };
+      SSignature a annotation ->
+        case annotation of {
+          SAnnotation [] ty -> validateIn datatypes scope (SChecked ty a);
+          _ -> validateIn datatypes scope (SAnn a annotation)
+        };
       SIntLit _ -> Right ();
       SDoubleLit n ->
         unless (andInt (doubleToBits n) 9218868437227405312 /= 9218868437227405312)
@@ -771,8 +1057,12 @@ module Bootstrap.Constraint where {
                case definition of {
                  (,,) _ annotation value ->
                    do {
-                     validateAnnotation datatypes scope annotation;
-                     validateIn datatypes scope value
+                     validateRecursiveMode datatypes scope annotation;
+                     case annotation of {
+                       InferRecursive -> validateIn datatypes scope value;
+                       CheckRecursive signature ->
+                         validateIn datatypes scope (SSignature value signature)
+                     }
                    }
                })
             definitions;
@@ -785,6 +1075,12 @@ module Bootstrap.Constraint where {
           local <- validateBinders datatypes scope ty;
           validateIn datatypes local body
         }
+    };
+  validateRecursiveMode :: DataEnv -> Map String Kind -> RecursiveMode -> Either String ();
+  validateRecursiveMode datatypes scope mode =
+    case mode of {
+      InferRecursive -> Right ();
+      CheckRecursive annotation -> validateAnnotation datatypes scope annotation
     };
   attach parent flag identity =
     do {
@@ -911,9 +1207,7 @@ module Bootstrap.Constraint where {
     do {
       prepared <- Solver.prepare (initialGraph constraints);
       initial <- Solver.solverUnify (equalities constraints) prepared;
-      solved <-
-        foldM (\solver e -> Solver.instantiateClosed (fromGen e) (toNode e) solver) initial
-          (instances constraints);
+      solved <- evaluatePreparedSteps initial (solveSteps constraints);
       Solver.finishNormalized solved
     };
   eraseSource typed = eraseSourceWith IM.empty typed;
@@ -921,6 +1215,7 @@ module Bootstrap.Constraint where {
   eraseSourceWith evidence typed =
     case form typed of {
       FVariable name _ -> XEVar name;
+      FDeclaredVariable name _ _ -> XEVar name;
       FLambda name _ body _ -> XEAbs name (eraseSourceWith evidence body);
       FApply a b _ _ -> XEApp (eraseSourceWith evidence a) (eraseSourceWith evidence b);
       FBinding name a b _ -> XELet name (eraseSourceWith evidence a) (eraseSourceWith evidence b);
@@ -945,7 +1240,7 @@ module Bootstrap.Constraint where {
           (map
              (\definition ->
                 case definition of {
-                  (,,,) name _ rhs _ -> (,) name (eraseSourceWith evidence rhs)
+                  RecursiveDefinition name _ rhs _ _ -> (,) name (eraseSourceWith evidence rhs)
                 })
              definitions)
           (eraseSourceWith evidence body);

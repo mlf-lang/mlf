@@ -42,8 +42,14 @@
         "mlf-inference",
         "mlf-interpreter",
         "mlf-xmlf",
-        "mlf-crates"
-      ]
+        "mlf-crates",
+        "mlf-language-core"
+      ],
+      "modules": {
+        "MLF.Tests.ClassDemand": "MLF/Tests/ClassDemand.hs",
+        "Tests.IndependentCheck": "Tests/IndependentCheck.hs",
+        "Tests.IndependentType": "Tests/IndependentType.hs"
+      }
     },
     "async-task": {
       "main": "MLF/Tests/Async/TaskMain.hs",

@@ -125,6 +125,20 @@ module Bootstrap.SourceEquality where {
           SAnnotation y0 y1 -> (L.eqList eqString x0 y0 && eqSType x1 y1)
         }
     };
+  eqRecursiveMode :: RecursiveMode -> RecursiveMode -> Bool;
+  eqRecursiveMode a b =
+    case a of {
+      InferRecursive ->
+        case b of {
+          InferRecursive -> True;
+          _ -> False
+        };
+      CheckRecursive annotation ->
+        case b of {
+          CheckRecursive other -> eqSAnnotation annotation other;
+          _ -> False
+        }
+    };
   eqSExpr :: SExpr -> SExpr -> Bool;
   eqSExpr a b =
     case a of {
@@ -156,6 +170,11 @@ module Bootstrap.SourceEquality where {
       SAnn x0 x1 ->
         case b of {
           SAnn y0 y1 -> (eqSExpr x0 y0 && eqSAnnotation x1 y1);
+          _ -> False
+        };
+      SSignature x0 x1 ->
+        case b of {
+          SSignature y0 y1 -> (eqSExpr x0 y0 && eqSAnnotation x1 y1);
           _ -> False
         };
       SIntLit x0 ->
@@ -220,7 +239,7 @@ module Bootstrap.SourceEquality where {
       SLetRec x0 x1 ->
         case b of {
           SLetRec y0 y1 ->
-            (L.eqList (eqTriple eqString eqSAnnotation eqSExpr) x0 y0 && eqSExpr x1 y1);
+            (L.eqList (eqTriple eqString eqRecursiveMode eqSExpr) x0 y0 && eqSExpr x1 y1);
           _ -> False
         };
       SWanted x0 x1 ->
@@ -314,7 +333,7 @@ module Bootstrap.SourceEquality where {
         };
       SDoLetRec x0 ->
         case b of {
-          SDoLetRec y0 -> L.eqList (eqTriple eqString eqSAnnotation eqSExpr) x0 y0;
+          SDoLetRec y0 -> L.eqList (eqTriple eqString eqRecursiveMode eqSExpr) x0 y0;
           _ -> False
         }
     };

@@ -55,8 +55,21 @@ module Bootstrap.Module where {
                                                     SourceModule ->
                                                     m (Either String ([] SourceModule));
   loadGraph fetch root =
+    loadGraphBy (\source -> source) fetch root;
+  -- Payloads travel with the exact parser read. Consumers that authenticate
+  -- fixed implementations must not reopen a path and mistake a later read for
+  -- the bytes whose syntax and namespace were checked here.
+  data LoadedModule = LoadedModule SourceModule String;
+  data LoadedModules = LoadedModules ([] LoadedModule);
+  loadedSource (LoadedModule source _) = source;
+  loadedText (LoadedModule _ text) = text;
+  loadedEntries (LoadedModules entries) = entries;
+  loadedSources (LoadedModules entries) = map loadedSource entries;
+  loadGraphBy :: forall (m :: (* -> *)) a. (Monad m) =>
+    (a -> SourceModule) -> (String -> m (Either String a)) -> a -> m (Either String ([] a));
+  loadGraphBy sourceOf fetch root =
     do {
-      result <- visit fetch root Set.empty [];
+      result <- visitBy sourceOf fetch root Set.empty [];
       return (mapEither (\state -> reverse (snd state)) result)
     };
   visit :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
@@ -69,7 +82,13 @@ module Bootstrap.Module where {
   -- Discovery and namespace dependencies are not a compilation order. Mark
   -- before descending so a reference back into this crate needs no boot file.
   visit fetch source done order =
+    visitBy (\value -> value) fetch source done order;
+  visitBy :: forall (m :: (* -> *)) a. (Monad m) =>
+    (a -> SourceModule) -> (String -> m (Either String a)) -> a ->
+    Set String -> [] a -> m (Either String ((,) (Set String) ([] a)));
+  visitBy sourceOf fetch payload done order =
     let {
+      source = sourceOf payload;
       name = moduleIdentity source
     } in
     if Set.member compareString name done
@@ -79,8 +98,8 @@ module Bootstrap.Module where {
              dependencies = nubBy eqString (map importedModule (sourceImports source))
            };
            result <-
-             visitDependencies fetch dependencies (Set.insert compareString name done) order;
-           return (mapEither (\state -> (,) (fst state) ((:) source (snd state))) result)
+             visitDependenciesBy sourceOf fetch dependencies (Set.insert compareString name done) order;
+           return (mapEither (\state -> (,) (fst state) ((:) payload (snd state))) result)
          };
   visitDependencies :: forall (m :: (* -> *)). (Monad m) => (String ->
                                                              m (Either String SourceModule)) ->
@@ -92,18 +111,23 @@ module Bootstrap.Module where {
                                                              ((,) (Set String)
                                                               ([] SourceModule)));
   visitDependencies fetch dependencies done order =
+    visitDependenciesBy (\source -> source) fetch dependencies done order;
+  visitDependenciesBy :: forall (m :: (* -> *)) a. (Monad m) =>
+    (a -> SourceModule) -> (String -> m (Either String a)) -> [] String ->
+    Set String -> [] a -> m (Either String ((,) (Set String) ([] a)));
+  visitDependenciesBy sourceOf fetch dependencies done order =
     case dependencies of {
       [] -> return (Right ((,) done order));
       (:) dependency rest ->
         if isBuiltinModule dependency
-        then visitDependencies fetch rest done order
+        then visitDependenciesBy sourceOf fetch rest done order
         else if Set.member compareString dependency done
-             then visitDependencies fetch rest done order
+             then visitDependenciesBy sourceOf fetch rest done order
              else do {
                     loaded <- fetch dependency;
                     case loaded of {
                       Left message -> return (Left message);
-                      Right child ->
+                      Right payload -> let { child = sourceOf payload } in
                         if not (eqMaybe eqString (sourceModuleName child) (Just dependency))
                         then return
                                (Left
@@ -118,11 +142,11 @@ module Bootstrap.Module where {
                                        (sourcePath child ++
                                         ": imported modules must contain declarations only"))
                              else do {
-                                    result <- visit fetch child done order;
+                                    result <- visitBy sourceOf fetch payload done order;
                                     case result of {
                                       Left message -> return (Left message);
                                       Right state ->
-                                        visitDependencies fetch rest (fst state) (snd state)
+                                        visitDependenciesBy sourceOf fetch rest (fst state) (snd state)
                                     }
                                   }
                     }
@@ -201,6 +225,14 @@ module Bootstrap.Module where {
     };
   fetchFile paths name =
     do {
+      result <- fetchFileWithEvidence paths name;
+      ioReturn (mapEither loadedSource result)
+    };
+  fetchFileWithEvidence paths name = fetchFileWithEvidenceUsing Parser.parseModule paths name;
+  -- The callback returns raw syntax, not authenticated evidence. Graph and
+  -- compiler checks remain mandatory, including for caller-supplied parsers.
+  fetchFileWithEvidenceUsing parseSource paths name =
+    do {
       let {
         stem = intercalate "/" (components name)
       };
@@ -233,7 +265,7 @@ module Bootstrap.Module where {
              (:) file _ ->
                do {
                  source <- readFile file;
-                 ioReturn (Parser.parseModule file source)
+                 ioReturn (mapEither (\parsed -> LoadedModule parsed source) (parseSource file source))
                }
            }
     };
@@ -242,18 +274,37 @@ module Bootstrap.Module where {
   -- fileExists/readFile resolve relative paths, dot segments and symlinks
   -- through the filesystem; no canonicalPath precondition is needed here.
   loadModuleFiles includes root =
-    do {
-      let {
-        directory = takeDirectory (sourcePath root)
-      };
-      let {
-        hierarchy = parentDirectory (length (components (moduleIdentity root)) - 1) directory
-      };
-      let {
-        paths = nubBy eqString ((:) directory (append includes ((:) hierarchy ((:) "." []))))
-      };
-      loadGraph (fetchFile paths) root
-    };
+    loadGraph (fetchFile (moduleSearchPaths includes root)) root;
+  moduleSearchPaths includes root = let {
+    directory = takeDirectory (sourcePath root);
+    hierarchy = parentDirectory (length (components (moduleIdentity root)) - 1) directory
+  } in nubBy eqString ((:) directory (append includes ((:) hierarchy ((:) "." []))));
+  loadModuleFilesWithEvidence :: [] String -> SourceModule -> String ->
+    IO (Either String LoadedModules);
+  loadModuleFilesWithEvidence includes root input =
+    loadModuleFilesWithEvidenceUsing Parser.parseModule includes root input;
+  loadModuleFilesWithEvidenceUsing parseSource includes root input = do {
+    result <- loadGraphBy loadedSource (fetchFileWithEvidenceUsing parseSource (moduleSearchPaths includes root))
+      (LoadedModule root input);
+    ioReturn (mapEither LoadedModules result)
+  };
+  -- Installed defaults have lower precedence than actual user search roots.
+  -- Presence is decided before parsing, so an explicit malformed or ambiguous
+  -- source never silently falls through to a different installed definition.
+  fetchFileWithEvidenceUsingFallback parseSource paths defaults name = do {
+    let { stem = intercalate "/" (components name);
+          files = concatMap (\path ->
+            [joinPath path (stem ++ ".emlf"), joinPath path (stem ++ ".hs")]) paths };
+    found <- findFiles files;
+    if null found then fetchFileWithEvidenceUsing parseSource defaults name
+      else fetchFileWithEvidenceUsing parseSource paths name
+  };
+  loadModuleFilesWithEvidenceUsingFallback parseSource includes defaults root input = do {
+    result <- loadGraphBy loadedSource
+      (fetchFileWithEvidenceUsingFallback parseSource (moduleSearchPaths includes root) defaults)
+      (LoadedModule root input);
+    ioReturn (mapEither LoadedModules result)
+  };
   -- Interfaces retain original entity identity across diamonds and re-exports.
   data ModuleSpace = Terms | Types;
   data Role =
@@ -379,6 +430,12 @@ module Bootstrap.Module where {
   lookupEntities namespace name (Interface entries) =
     M.findWithDefault compareKey Set.empty ((,) namespace name) entries;
   visible (Interface entries) = Set.unions compareEntity (M.elems entries);
+  -- Selector predicates depend only on entity identity. Filtering each alias
+  -- set first preserves the ordered, deduplicated result without rebuilding a
+  -- global set containing every unrelated visible entity for each parent.
+  visibleMatching :: (Entity -> Bool) -> Interface -> Set Entity;
+  visibleMatching predicate (Interface entries) =
+    Set.unions compareEntity (map (Set.filter predicate) (M.elems entries));
   -- Compiler-only intrinsic reach supplies generated evidence, not source method visibility.
   -- Ordinary qualified imports remain visible for instance method declarations.
   sourceMethodVisible (Interface entries) =
@@ -401,7 +458,7 @@ module Bootstrap.Module where {
   legacyPrimitiveTypeNames :: [] String;
   legacyPrimitiveTypeNames =
     ["AsyncScope", "Completion", "AsyncSubscription", "ST", "STArray",
-     "Int", "Double", "Bool", "String", "IO", "IntArray", "DoubleArray",
+     "Int", "Integer", "Double", "Bool", "String", "IO", "IntArray", "DoubleArray",
      "ByteArray", "IntTable"];
   primitiveEntities =
     append (map (\p -> Entity "Prelude" (P.primitiveName p) (Primitive p)) P.allPrimitives)
@@ -598,11 +655,12 @@ module Bootstrap.Module where {
       ty <- lookupEntity Types name env;
       let {
         children =
-          filter
-            (\entity ->
-               eqMaybe (eqPair eqString eqString) (parent entity)
-                 (Just ((,) (owner ty) (spelling ty))))
-            (Set.toList (visible env))
+          Set.toList
+            (visibleMatching
+               (\entity ->
+                  eqMaybe (eqPair eqString eqString) (parent entity)
+                    (Just ((,) (owner ty) (spelling ty))))
+               env)
       };
       chosen <-
         case members of {
@@ -735,13 +793,14 @@ module Bootstrap.Module where {
         } in
         let {
           children =
-            filter
-              (\entity ->
-                 case parent entity of {
-                   Nothing -> False;
-                   Just identity -> elem (eqPair eqString eqString) identity parents
-                 })
-              (Set.toList (visible env))
+            Set.toList
+              (visibleMatching
+                 (\entity ->
+                    case parent entity of {
+                      Nothing -> False;
+                      Just identity -> elem (eqPair eqString eqString) identity parents
+                    })
+                 env)
         } in
         let {
           chosen =
@@ -1040,6 +1099,13 @@ module Bootstrap.Module where {
           Right (Just value')
         }
     };
+  resolveRecursiveMode :: Names -> Interface -> RecursiveMode -> Either String RecursiveMode;
+  resolveRecursiveMode names env mode =
+    case mode of {
+      InferRecursive -> Right InferRecursive;
+      CheckRecursive annotation ->
+        mapEither CheckRecursive (resolveAnnotation names env annotation)
+    };
   resolveVariable names entity =
     case role entity of {
       Primitive p -> Right (SPrimitive p);
@@ -1229,6 +1295,12 @@ module Bootstrap.Module where {
           b' <- resolveBound names env (Set.insert compareString variable bound) b;
           Right (SLet variable a' b')
         };
+      SSignature a annotation ->
+        do {
+          a' <- resolveBound names env bound a;
+          annotation' <- resolveAnnotation names env annotation;
+          Right (SSignature a' annotation')
+        };
       SAnn matchValueShared19 matchValueShared20 ->
         let {
           a = matchValueShared19
@@ -1264,11 +1336,11 @@ module Bootstrap.Module where {
             mapM
               (\definition ->
                  case definition of {
-                   (,,) variable annotation value ->
+                   (,,) variable mode value ->
                      do {
-                       annotation' <- resolveAnnotation names env annotation;
+                       mode' <- resolveRecursiveMode names env mode;
                        value' <- resolveBound names env local value;
-                       Right ((,,) variable annotation' value')
+                       Right ((,,) variable mode' value')
                      }
                  })
               definitions;
@@ -1542,13 +1614,19 @@ module Bootstrap.Module where {
            (M.fromList compareEntity
               (map (\entity -> (,) entity (mangle entity)) (Set.toList entities))))
       supplied;
+  data CrateResolution = CrateResolution PreludeMode ([] SourceModule)
+    (Map String Interface) (Map String Interface) (Set Entity);
   resolveCrateWithAllocator :: PreludeMode ->
                                Map String Interface ->
                                ([] SourceModule -> Set Entity -> Names) ->
                                [] SourceModule -> Either String ResolvedCrate;
   -- An instance implements its class's methods even when those method names
   -- are intentionally omitted from the class's imported source namespace.
-  resolveCrateWithAllocator mode external allocate supplied =
+  resolveCrateWithAllocator mode external allocate supplied = do {
+    plan <- prepareCrateResolution mode external supplied;
+    resolveCratePlan allocate plan
+  };
+  prepareCrateResolution mode external supplied =
     if null supplied
     then Left "no entry module"
     else do {
@@ -1657,6 +1735,9 @@ module Bootstrap.Module where {
                        (append (map visible (M.elems external))
                           ((:) (Set.fromList compareEntity (concat methodEntities)) []))))
            };
+           Right (CrateResolution mode modules localMap exports allEntities)
+         };
+  resolveCratePlan allocate (CrateResolution mode modules localMap exports allEntities) = do {
            let {
              names = allocate modules allEntities
            };

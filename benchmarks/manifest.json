@@ -94,7 +94,25 @@
     "benchmarks/regex-redux/rust/adaptation.patch": "54c84b02c1849f9e8253fa02f8da083996c412a5c17725a7ddbd43c77a6a020f",
     "benchmarks/regex-redux/rust/main.rs": "57c4c99caa58a20008c7ce35d42497edd881e80ba7e51b523c14bc46db34393d",
     "benchmarks/regex-redux/rust/upstream.rs": "4c6b9ac11ef0f5044532388ae18c97e2ba70e19f904405d2fd974bfa5055c6a5",
-    "benchmarks/regex-redux/haskell/cabal.project.freeze": "086a4595bc0130b4f19d49d25b686f94cfb7166365ba2ce233506ef4fdaad345"
+    "benchmarks/regex-redux/haskell/cabal.project.freeze": "086a4595bc0130b4f19d49d25b686f94cfb7166365ba2ce233506ef4fdaad345",
+    "benchmarks/binary-trees/mlf/main.emlf": "0ece600365aec9c44657a73a8258d516d7511d597c1ef1b798c1195850ff0aea",
+    "benchmarks/pidigits/mlf/main.emlf": "a5b90141e811ddf5f8e4e7075896a0d5b261b9b96bc24cb2111571cf4887ed7d",
+    "benchmarks/n-body/mlf/main.emlf": "2d4bc4be2c05de6fddd632c0cbfc22d02347a76a4cdba0c5514da7c102e7e8e4",
+    "benchmarks/fannkuch-redux/mlf/main.emlf": "e5250786bbdf5ed50d1f150cc4a68bdc4871d8ecbe90d319673b528e1d796125",
+    "benchmarks/spectral-norm/mlf/main.emlf": "de85acb0607bd2f52211cec4470a7e8ce0c13710e8cd2083509ad7fb99c2c64b",
+    "benchmarks/fasta/mlf/main.emlf": "9cf4e25c4e6de080306c4a565474e5f49097f09996eabcfd2672c6f3ee9babe2",
+    "benchmarks/mandelbrot/mlf/main.emlf": "d4324f9f77c9842afe2d0cb524d994a7fb9c3ee949c6cddbe3afabb1f07cf690",
+    "benchmarks/reverse-complement/mlf/main.emlf": "c62fd62e285b1f634a6d229738342974e32e5cb09bead96400ea9f691aafd843",
+    "benchmarks/k-nucleotide/mlf/main.emlf": "f5be5957e29a02603b9b632d5169111a035002364e1464c79a055456055d4884",
+    "benchmarks/regex-redux/mlf/main.emlf": "f8ade352362ffce016e22e9df99834777eaf2f731996d39e73ae7e89cfedefc4",
+    "libraries/mlf-foundation/Bootstrap/Regex.hs": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d",
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "9eb67b3a3e7f3591f051a8627bb466209a3be39436d58f48db8efc89f936fbac",
+    "libraries/mlf-foundation/Bootstrap/Std.hs": "d8ac87643ba3c81b1a87a46f59386f4a8f27eaad3515100b5374737f9747ca17",
+    "libraries/mlf-foundation/Bootstrap/IntMap.hs": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+    "libraries/mlf-foundation/Bootstrap/IntSet.hs": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+    "libraries/mlf-foundation/Bootstrap/Map.hs": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+    "libraries/mlf-foundation/Bootstrap/IntTree.hs": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
+    "libraries/mlf-foundation/Bootstrap/IntRank.hs": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
   },
   "workloads": [
     {
@@ -848,12 +866,14 @@
         "libraries/mlf-foundation"
       ],
       "mlf_dependencies": [
-        "libraries/mlf-foundation/Bootstrap/Regex.emlf",
-        "libraries/mlf-foundation/Bootstrap/Types.emlf",
-        "libraries/mlf-foundation/Bootstrap/Std.emlf",
-        "libraries/mlf-foundation/Bootstrap/IntMap.emlf",
-        "libraries/mlf-foundation/Bootstrap/IntSet.emlf",
-        "libraries/mlf-foundation/Bootstrap/Map.emlf"
+        "libraries/mlf-foundation/Bootstrap/Regex.hs",
+        "libraries/mlf-foundation/Bootstrap/Types.hs",
+        "libraries/mlf-foundation/Bootstrap/Std.hs",
+        "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+        "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+        "libraries/mlf-foundation/Bootstrap/Map.hs",
+        "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+        "libraries/mlf-foundation/Bootstrap/IntRank.hs"
       ],
       "output_comparison": "Exact bytes: nine ordered pattern/count lines, separator, and all three lengths against independent MLF scanner oracle and pinned upstream fixture",
       "haskell_lockfile": "benchmarks/regex-redux/haskell/cabal.project.freeze"

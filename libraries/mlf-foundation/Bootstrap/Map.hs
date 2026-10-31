@@ -41,6 +41,8 @@ module Bootstrap.Map where {
     } in
     if (total <= 1)
     then node (1 + total) k v l r
+    -- Keep the original ordered tests for all cached sizes. The larger-side
+    -- shortcut assumed unbounded arithmetic, which Int64 no longer provides.
     else if (rightSize > (3 * leftSize))
          then rotateL k v l r
          else if (leftSize > (3 * rightSize)) then rotateR k v l r else node (1 + total) k v l r;
@@ -348,7 +350,30 @@ module Bootstrap.Map where {
   union :: forall k v. (k -> k -> Int) -> Map k v -> Map k v -> Map k v;
   union cmp a b = unionWith cmp (\left right -> left) a b;
   unionWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> Map k v -> Map k v -> Map k v;
-  unionWith cmp combine a b = foldlWithKeyStrict (\tree k v -> insertWith cmp combine k v tree) b a;
+  -- Insert only the smaller input. In particular, accumulating singleton sets
+  -- must not rebuild the growing left map at every union. The right-input
+  -- worker retains the left key representative and combine argument order.
+  unionWith cmp combine a b =
+    case a of {
+      MapEmpty -> b;
+      MapNode _ _ _ _ _ -> case b of {
+        MapEmpty -> a;
+        MapNode _ _ _ _ _ ->
+          if size a <= size b
+          then foldlWithKeyStrict (\tree k v -> insertWith cmp combine k v tree) b a
+          else foldlWithKeyStrict (\tree k v -> insertRightWith cmp combine k v tree) a b
+      }
+    };
+  insertRightWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> k -> v -> Map k v -> Map k v;
+  insertRightWith cmp combine key value tree =
+    case tree of {
+      MapEmpty -> singleton key value;
+      MapNode n k v l r ->
+        let { c = cmp key k } in
+        if c < 0 then balance k v (insertRightWith cmp combine key value l) r
+        else if c > 0 then balance k v l (insertRightWith cmp combine key value r)
+        else node n k (combine v value) l r
+    };
   unions :: forall k v. (k -> k -> Int) -> [] (Map k v) -> Map k v;
   unions cmp trees = S.foldlStrict (union cmp) empty trees;
   unionsWith :: forall k v. (k -> k -> Int) -> (v -> v -> v) -> [] (Map k v) -> Map k v;

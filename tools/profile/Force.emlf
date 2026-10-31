@@ -193,6 +193,11 @@ forceSAnnotation : SAnnotation -> Unit
 forceSAnnotation value = case value of
   SAnnotation x0 x1 -> seq ((forceList scalar) x0) (seq ((forceSType) x1) (Unit))
 
+forceRecursiveMode : RecursiveMode -> Unit
+forceRecursiveMode value = case value of
+  InferRecursive -> Unit
+  CheckRecursive annotation -> forceSAnnotation annotation
+
 forceSExpr : SExpr -> Unit
 forceSExpr value = case value of
   SVar x0 -> seq (scalar x0) (Unit)
@@ -201,6 +206,7 @@ forceSExpr value = case value of
   SApp x0 x1 -> seq ((forceSExpr) x0) (seq ((forceSExpr) x1) (Unit))
   SLet x0 x1 x2 -> seq (scalar x0) (seq ((forceSExpr) x1) (seq ((forceSExpr) x2) (Unit)))
   SAnn x0 x1 -> seq ((forceSExpr) x0) (seq ((forceSAnnotation) x1) (Unit))
+  SSignature x0 x1 -> seq ((forceSExpr) x0) (seq ((forceSAnnotation) x1) (Unit))
   SIntLit x0 -> seq (scalar x0) (Unit)
   SDoubleLit x0 -> seq (scalar x0) (Unit)
   SBoolLit x0 -> seq (scalar x0) (Unit)
@@ -209,7 +215,7 @@ forceSExpr value = case value of
   SCase x0 x1 -> seq ((forceSExpr) x0) (seq ((forceList (forceSAlternative)) x1) (Unit))
   SDo x0 x1 -> seq ((forceList (forceSStatement)) x0) (seq ((forceSExpr) x1) (Unit))
   SEquations x0 -> seq ((forceList (forcePair (forceList (forceSPattern)) (forceSExpr))) x0) (Unit)
-  SLetRec x0 x1 -> seq ((forceList (forceTriple scalar (forceSAnnotation) (forceSExpr))) x0) (seq ((forceSExpr) x1) (Unit))
+  SLetRec x0 x1 -> seq ((forceList (forceTriple scalar (forceRecursiveMode) (forceSExpr))) x0) (seq ((forceSExpr) x1) (Unit))
   SWanted x0 x1 -> seq (scalar x0) (seq ((forceList (forcePair (forceEvidenceRole) scalar)) x1) (Unit))
   SChecked x0 x1 -> seq ((forceSType) x0) (seq ((forceSExpr) x1) (Unit))
 
@@ -232,7 +238,7 @@ forceSStatement value = case value of
   SDoBind x0 x1 -> seq ((forceSPattern) x0) (seq ((forceSExpr) x1) (Unit))
   SDoThen x0 -> seq ((forceSExpr) x0) (Unit)
   SDoLet x0 x1 x2 -> seq (scalar x0) (seq ((forceMaybe (forceSAnnotation)) x1) (seq ((forceSExpr) x2) (Unit)))
-  SDoLetRec x0 -> seq ((forceList (forceTriple scalar (forceSAnnotation) (forceSExpr))) x0) (Unit)
+  SDoLetRec x0 -> seq ((forceList (forceTriple scalar (forceRecursiveMode) (forceSExpr))) x0) (Unit)
 
 forceSPredicate : SPredicate -> Unit
 forceSPredicate value = case value of
@@ -418,6 +424,7 @@ forceTyped value = case value of
 forceForm : Form -> Unit
 forceForm value = case value of
   FVariable x0 x1 -> seq ((forceXName) x0) (seq ((forceMaybe (forceEdge)) x1) (Unit))
+  FDeclaredVariable x0 x1 x2 -> seq (forceXName x0) (seq (forceXType x1) (seq (forceEdge x2) Unit))
   FLambda x0 x1 x2 x3 -> seq ((forceXName) x0) (seq (scalar x1) (seq ((forceTyped) x2) (seq ((forceEdge) x3) (Unit))))
   FApply x0 x1 x2 x3 -> seq ((forceTyped) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (seq ((forceEdge) x3) (Unit))))
   FBinding x0 x1 x2 x3 -> seq ((forceXName) x0) (seq ((forceTyped) x1) (seq ((forceTyped) x2) (seq ((forceEdge) x3) (Unit))))
@@ -429,9 +436,15 @@ forceForm value = case value of
   FPrimitive x0 x1 -> seq ((forcePrimitive) x0) (seq ((forceList scalar) x1) (Unit))
   FConstructor x0 x1 -> seq (scalar x0) (seq ((forceList scalar) x1) (Unit))
   FMatch x0 x1 x2 -> seq ((forceTyped) x0) (seq ((forceEdge) x1) (seq ((forceList (forceBranch)) x2) (Unit)))
-  FRecursive x0 x1 x2 -> seq ((forceList (forceQuad (forceXName) scalar (forceTyped) (forceEdge))) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
+  FRecursive x0 x1 x2 -> seq ((forceList forceRecursiveDefinition) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
   FEvidence x0 -> seq ((forceList (forceEvidenceBinding)) x0) (Unit)
   FChecked x0 x1 x2 -> seq ((forceList (forcePair (forceXTyVar) (forceKind))) x0) (seq ((forceTyped) x1) (seq ((forceEdge) x2) (Unit)))
+
+forceRecursiveClosure : RecursiveClosure -> Unit
+forceRecursiveClosure (RecursiveClosure group copies) = seq group ((forceIntMap scalar) copies)
+
+forceRecursiveDefinition : RecursiveDefinition -> Unit
+forceRecursiveDefinition (RecursiveDefinition name declaration rhs edge closure) = seq (forceXName name) (seq declaration (seq (forceTyped rhs) (seq (forceEdge edge) ((forceMaybe forceRecursiveClosure) closure))))
 
 forceBranch : Branch -> Unit
 forceBranch value = case value of
@@ -440,10 +453,16 @@ forceBranch value = case value of
 forceEvidenceBinding : EvidenceBinding -> Unit
 forceEvidenceBinding value = case value of
   EvidenceBinding x0 x1 x2 x3 -> seq ((forceEvidenceRole) x0) (seq ((forceXName) x1) (seq (scalar x2) (seq (scalar x3) (Unit))))
+  DeclaredEvidenceBinding x0 x1 x2 -> seq (forceEvidenceRole x0) (seq (forceXName x1) (seq (forceXType x2) Unit))
+
+forceSolveStep : SolveStep -> Unit
+forceSolveStep value = case value of
+  Instantiate edge -> forceEdge edge
+  ProjectCase fields -> (forceList (forcePair scalar scalar)) fields
 
 forceConstraints : Constraints -> Unit
 forceConstraints value = case value of
-  Constraints x0 x1 x2 x3 -> seq ((forceGraph) x0) (seq ((forceTyped) x1) (seq ((forceList (forcePair scalar scalar)) x2) (seq ((forceList (forceEdge)) x3) (Unit))))
+  Constraints x0 x1 x2 x3 -> seq ((forceGraph) x0) (seq ((forceTyped) x1) (seq ((forceList (forcePair scalar scalar)) x2) (seq ((forceList forceSolveStep) x3) (Unit))))
 
 forceCore : Core -> Unit
 forceCore value = case value of
@@ -459,7 +478,7 @@ forceCore value = case value of
   CPrimitive x0 -> seq ((forcePrimitive) x0) (Unit)
   CConstructor x0 -> seq (scalar x0) (Unit)
   CCase x0 x1 -> seq ((forceCore) x0) (seq ((forceList (forcePair (forceSPattern) (forceCore))) x1) (Unit))
-  CRec x0 x1 -> seq ((forceList (forceTriple scalar (forceSAnnotation) (forceCore))) x0) (seq ((forceCore) x1) (Unit))
+  CRec x0 x1 -> seq ((forceList (forceTriple scalar (forceRecursiveMode) (forceCore))) x0) (seq ((forceCore) x1) (Unit))
   CWanted x0 x1 -> seq (scalar x0) (seq ((forceList (forcePair (forceEvidenceRole) scalar)) x1) (Unit))
   CChecked x0 x1 -> seq ((forceSType) x0) (seq ((forceSExpr) x1) (Unit))
 
@@ -467,6 +486,8 @@ forceBinding : Binding -> Unit
 forceBinding value = case value of
   Mono x0 x1 -> seq ((forceXName) x0) (seq (scalar x1) (Unit))
   Poly x0 x1 -> seq ((forceXName) x0) (seq (scalar x1) (Unit))
+  DeclaredPoly x0 x1 x2 -> seq (forceXName x0) (seq x1 (seq (forceXType x2) Unit))
+  RecursiveMono x0 x1 x2 -> seq (forceXName x0) (seq x1 (seq x2 Unit))
 
 forcePhase : Phase -> Unit
 forcePhase value = case value of

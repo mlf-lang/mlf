@@ -27,9 +27,9 @@ check count offset mode = do
   let changed = case S.projectionChanges first second of (,,) removed added deleted -> S.patchIndexedNodes initial removed added
   L.mapM_ (\result -> if same (S.structuralParents result) (reference true second) && same (S.bindingChildren result) (reference false second) then return () else panic "incremental edge patches disagree with independent reverse-edge enumeration") ((:) full ((:) changed [])) }) ((:) ((,) before after) ((:) ((,) after before) []))
 transitions = do
- L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (check count offset) (L.range 0 7)) ((:) (-1000000000000000000000000000000) ((:) (-7) ((:) 0 ((:) 1000000000000000000000000000000 []))))) ((:) 0 ((:) 1 ((:) 2 ((:) 5 []))))
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (check count offset) (L.range 0 7)) ((:) (-1152921504606846976) ((:) (-7) ((:) 0 ((:) 1152921504606846976 []))))) ((:) 0 ((:) 1 ((:) 2 ((:) 5 []))))
  L.mapM_ (\count -> L.mapM_ (check count 0) (L.range 0 7)) ((:) 17 ((:) 33 []))
- L.mapM_ (\offset -> L.mapM_ (check 33 offset) (L.range 0 7)) ((:) (-1000000000000000000000000000000) ((:) 1000000000000000000000000000000 []))
+ L.mapM_ (\offset -> L.mapM_ (check 33 offset) (L.range 0 7)) ((:) (-1152921504606846976) ((:) 1152921504606846976 []))
  return ()
 
 
@@ -57,7 +57,7 @@ editWitnesses offset = do
   return ((,) nextEntries next)) ((,) [] IM.empty) edits
  H.assert (L.null entries && IM.null index) "final edge removal retained an empty bucket"
 directUpdates = do
- let offsets = (:) (-1000000000000000000000000000000) ((:) (-7) ((:) 0 ((:) 1000000000000000000000000000000 [])))
+ let offsets = (:) (-1152921504606846976) ((:) (-7) ((:) 0 ((:) 1152921504606846976 [])))
  L.mapM_ editWitnesses offsets
  L.mapM_ (\offset -> L.mapM_ (\seed -> indexSteps 24 offset seed 0 [] IM.empty) (L.filter (\seed -> offset /= 0 || (seed /= 0 && seed /= 7)) (L.range 0 7))) offsets
  L.mapM_ (\seed -> indexSteps 96 0 seed 0 [] IM.empty) ((:) 0 ((:) 7 []))

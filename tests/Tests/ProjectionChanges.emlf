@@ -25,9 +25,9 @@ check ((,) before after) =
  if same (S.projectionChanges before after) (oracle before after) then ioReturn () else do { putErr "projection patch disagrees with independent maps\n"; exitWith 1 }
 patches : IO ()
 patches = do
- let fullInputs = L.concatMap (\count -> L.concatMap (\offset -> L.concatMap (\stride -> L.concatMap (\a -> L.map (\b -> (,) (entries count offset stride a) (entries (count + b) offset stride b)) (L.range 0 3)) (L.range 0 3)) ((:) 1 ((:) 17 []))) ((:) (-10000) ((:) 0 ((:) 1000000000000000000000000000000000000000000000001 [])))) ((:) 0 ((:) 1 ((:) 2 ((:) 5 ((:) 17 [])))))
+ let fullInputs = L.concatMap (\count -> L.concatMap (\offset -> L.concatMap (\stride -> L.concatMap (\a -> L.map (\b -> (,) (entries count offset stride a) (entries (count + b) offset stride b)) (L.range 0 3)) (L.range 0 3)) ((:) 1 ((:) 17 []))) ((:) (-10000) ((:) 0 ((:) 1152921504606846976 [])))) ((:) 0 ((:) 1 ((:) 2 ((:) 5 ((:) 17 [])))))
  -- Keep every mode at both former large sizes, and one large-identity scale.
- let scaleInputs = L.concatMap (\((,,) count offset stride) -> L.concatMap (\a -> L.map (\b -> (,) (entries count offset stride a) (entries (count + b) offset stride b)) (L.range 0 3)) (L.range 0 3)) ((:) ((,,) 65 0 1) ((:) ((,,) 257 0 1) ((:) ((,,) 257 1000000000000000000000000000000000000000000000001 17) [])))
+ let scaleInputs = L.concatMap (\((,,) count offset stride) -> L.concatMap (\a -> L.map (\b -> (,) (entries count offset stride a) (entries (count + b) offset stride b)) (L.range 0 3)) (L.range 0 3)) ((:) ((,,) 65 0 1) ((:) ((,,) 257 0 1) ((:) ((,,) 257 1152921504606846976 17) [])))
  let inputs = L.append fullInputs scaleInputs
  let unique = H.distinctListPairs sameInputEntry inputs
  H.assert (L.length inputs == 528 && L.length unique == 427) "projection stimulus coverage changed"

@@ -1,0 +1,40 @@
+{
+  "added_shared_inputs": {},
+  "changed_shared_inputs": {
+    "Bootstrap.BuiltinPreludeLiteral": {
+      "new": "a47225c2a798e8c0f6d70fdd640005f267cfb996316c147a96e9a4f4bb38d9d3",
+      "old": "e70f9137be94c940548a99d8a4e9fa5eb2954da6e93397405657b37e2abfdb1f"
+    },
+    "Bootstrap.LLVM.Build": {
+      "new": "09f70e8a52101b0d0005c1e6c83810598b8989281e0fdcbe23c94182436ac984",
+      "old": "a2ce7074f82495ae72256c392e42f2649c312d823021b285d2c906d7423fd8a9"
+    },
+    "Bootstrap.LLVM.Codegen": {
+      "new": "fcf55233cad799e26570bdf8790582168757d8592be0aad415f636b4567dadce",
+      "old": "8d01370b45427075823f502de249a994e98ddd5b1baf901fec3da33cb4193654"
+    },
+    "Bootstrap.PreparedLibraryLiteral": {
+      "new": "7e681c7c2a85b25bf29b3807222341de581c2c1d4dbcecf6998407e0d84c5d64",
+      "old": "f69507ec31c555af9bcd0fcc14f30770ad381a4bae6eee4fdb9073becd7a297d"
+    },
+    "MLF.BuiltinPreludeData": {
+      "new": "05ac8bf4886df3cc55780dc923449a40e9976619b04dace76f9ad60eafdb0410",
+      "old": "6e28bdd5400fd2281246b0b5c8f19ca21f1840f2dbfda9bc52eaf0a8749f3a6d"
+    },
+    "MLF.Entry.BuiltinPrelude": {
+      "new": "0bbc1bd3d42303d37f2e7e8ce9123780e55795f4bd1a7de5d0145ff399e6ea49",
+      "old": "0130e6af538c4bcfd27aa3b4a223b63eb147e5b1eb30017288bceb1074a1abb1"
+    }
+  },
+  "format": "a1-current-source-migration-v1",
+  "from_ref": "c4b0132aa9daeb068d6628e2668accb17078958d",
+  "from_tree": "ac3108587a5b2406efcf8d5586d9950c39eebe13",
+  "historical_added_count": 3,
+  "historical_changed_count": 18,
+  "module_count": 126,
+  "prior_compatibility_sha256": "44ce8da0daba21192d997b0167d89a07f0ebcedd057a044175b2ca6681b31bd2",
+  "removed_shared_inputs": [],
+  "to_ref": "cf39c68ecb3bf861a7c910356684e01f014af1f0",
+  "to_tree": "f0bee12bb2bb457144ed7952b15162170b764ae7",
+  "unchanged_shared_input_count": 120
+}

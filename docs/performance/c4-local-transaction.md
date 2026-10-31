@@ -1,0 +1,211 @@
+# C4: operation-local prepared fallback transaction
+
+## Integration scope
+
+This ports the two algorithm files from research commit
+`6be0c51f93ae8f31e4048aebe4c9a9bba3ce0a88` (parent P3
+`875e483de49655030c4ffba1995b60610a50273a`) onto PR #25's
+`d96f67726599fa4e21f236462886106434c8e417`, subsequently preserving upstream
+`823f3060ea379ddb7d865764ae2b097e8fcf29bc` by a non-lossy merge. It preserves the
+intervening query-v6 source-key compaction and its independent P2/P3/A1 controls.
+The executed full qualification below remains on d96; the later Darwin-only
+runtime change has separate, explicitly limited Linux object-equivalence evidence.
+It does not merge the divergent
+research branch history, stack C1/C2/C3, modify the sealed A1 implementation,
+change fingerprint/serialization algorithms, or cache target inference.
+
+The integration-before Graph, Solver and Constraint originals equal P3 byte-for-byte.
+Current host/library integration is nevertheless different. In particular,
+generic Map.unionWith and the generated builtin representation changed. C4's
+Solver alias/node unions use the unchanged IntMap.union implementation, not
+that generic unionWith. The prepared differential is checked under the same
+current collections/runtime on both sides. The separate complete historical
+P3 algorithm/collection oracle remains untouched in the A1 controls.
+
+## Current user goal (not a retrospective protocol change)
+
+The final goal is approximately **1x**: a GHC-built MLF compiler compiling the
+**complete compiler** should take roughly the time that GHC takes to compile
+that compiler workload. Three times GHC is only an intermediate milestone;
+the fixed 14-module slice is a quick screen, not final acceptance.
+
+The next research phase must first define the complete source/module and fresh
+work inventory, same-machine configuration, reusable dependencies, output
+artifacts and start/end boundaries of both compilation chains. In particular,
+checked MLF/xMLF crates versus GHC `--make -no-link` objects are different
+endpoints. Do not silently omit checks, code generation or linking from one
+side or claim parity from that asymmetric slice. Map the screen's cost coverage
+to the full task and confirm outcomes on the full compiler with new evidence.
+No single optimization is promised to reach parity. This clarification does not
+change the completed historical C4 protocol or add a benchmark to this integration.
+
+## One mechanism and its lifetime
+
+C4 retains the full expanded persistent Graph. For a narrowly admitted
+prepared-instantiation fallback it avoids first building the expanded reverse
+indexes and subsequently rediscovering the same fresh portion of the local
+component. It discovers the old closure from the old equations and all external
+old endpoints of fresh child/binder edges, appends the known contiguous fresh
+range, and builds the same compact local graph.
+
+Full local unification and both validators, hidden stubs, scope/rigid checks,
+canonical equation/error order, and complete projectionChanges remain. Graph
+restoration uses the same physical starting tree and update sequence. The
+transaction publishes old-node changes and **all** surviving fresh nodes,
+including fresh survivors whose payload did not change during local unification.
+There is no persistent plan reused after graph/index/alias/counter changes.
+Unknown shapes and payload-demand barriers take the complete old fallback.
+
+The new entry is used only after the actual preparation barrier in
+`Constraint.flushGeneration` and `Constraint.solvePrepared`. Existing public
+single-step APIs retain their old path. The sealed A1 `CrateSession` has its own
+solver loop and is not rerouted here. Thus this is not a claim that every
+instantiation in the current compiler executes C4.
+
+## Exact comparison contract
+
+The original C4 contract already permitted only the two reverse-index trees and
+their bucket trees to rebalance. Graph node trees and payloads, alias trees,
+nextId and scope-index trees remain physically identical. Complete ordered
+reverse-edge sets are equal and independently enumerated from graph nodes;
+BST order, cached sizes, balance, nonempty buckets, full Frozen finish and both
+graph validators must also pass. Errors retain exact first-diagnostic bytes.
+
+The relevant legal index readers use ordered enumeration, membership/null,
+edge difference and complete audits, not tree shape to choose Graph updates.
+The source-level domain is a state reached through actual prepare and the
+prepared drivers. This does **not** promise arbitrary raw Solver constructor
+observations, forged-state equivalence or unrestricted partial-input semantics.
+Finite demand/error/retry/rollback/continuation controls supplement, rather than
+replace, that boundary argument.
+
+The A1 current runner's single public `C.solvePrepared` assertion is adapted in
+a test-only generated copy to this same already-reviewed C4 comparator.
+Inverse byte transformation must recover the original SessionTests exactly.
+All other public and private comparisons, original fixture/oracle bytes and
+privacy controls remain unchanged. Thirteen extra comparator rejection cases
+include malformed self-comparisons; they are not a replacement for the full
+existing A1 gate. See its current-source README for the exact adaptation.
+
+## Reviewable controls and reproduction
+
+[The repository control package](../../tools/performance/c4-local-transaction/README.md)
+contains the complete pre-C4 core algorithms and independently authored
+expectations, rather than pointing to an unavailable external test bundle.
+It provides:
+
+- Complete old finite controls: 12,000 validation cases, 5,616 unification
+  cases, 400 ID renamings, 28 traces, eight parsed expressions, permission,
+  exact-error and rollback boundaries.
+- 28 C4-specific fixtures (19 successes, nine expected rejections), physical
+  compact graph/equation/scope/stub comparisons and both real prepared drivers.
+- 216 fixed nonmonotone ID-layout executions, including sparse and huge-negative
+  coordinates. These are executions, not independent random topologies;
+  rank-normalized inputs include at least 36 cross-label duplicates.
+- Nine two-producer parsed-file controls with independent checking, fresh
+  inference, exact outcomes and complete raw checked-byte comparison.
+- A separate fixed historical 14-module qualification: unchanged 81-file
+  fixture contract and ordered 544-query projection, common independently
+  admitted current builtin/dependencies, 544 fresh / zero reused on each side,
+  complete raw checked-byte equality and a plain-GHC 14-fresh/56-reused control.
+  This finite qualification produces no speedup estimate.
+
+Use fresh output directories, retain failures, and follow the exact parameterized
+commands in that README. Ordinary producers must be newly authenticated GHC
+9.14.1 `--bootstrap-only --optimization 2` builds. A source-identity token change
+alone is not builtin validation: the maintained builder freshly regenerates the
+entire split literal byte-for-byte and performs the complete independent builtin
+checks. The integration preserves all 74 split term declarations and every
+non-identity byte of the target's generated file.
+
+CI adds the explicitly **focused** one-producer graph gate at ordinary O2 and
+retains all existing CI jobs, old finite gates and resource bounds. That gate
+runs the complete finite graph controls, 28 C4 fixtures and 216 layouts; it does
+not claim the local two-producer nine-file or fixed-14 qualification. Its receipts
+encode that distinction. Full local verification results are recorded separately
+below, rather than relabelling a focused receipt as a full pass.
+
+## Performance evidence boundary
+
+Historical P3/C4 research used six fixed blocks, 12 adjacent pairs and six GHC
+controls. Its block-log estimate was 2.9963% faster, with nominal 95% improvement
+interval [0.7480%, 5.1937%], nine of 12 faster and both orientations positive.
+Order effects and shared-cloud noise remained; the nominal interval is not
+familywise coverage over the candidate search. C4 remained about 10.59 times
+the slice's GHC endpoint, short of the historical study's three-times milestone. A separate diagnostic
+observed 2.8068% fewer allocated bytes; that is not a wall-clock speedup claim.
+
+Those numbers describe only the historical exact-P3 inputs and cohort. Current
+PR25 additionally contains A1/F1 and other changes and uses different driver
+routes. This integration does not claim a measured current-head 3% improvement,
+add acceleration percentages, or repeat the historical timing campaign.
+
+## Integration validation record
+
+On 2026-10-30, a new same-cloud-machine ordinary GHC 9.14.1 O2 pair qualified
+this C4 port against exact `d96f67726599fa4e21f236462886106434c8e417`, preserving
+query-v6 and its current independent oracles. The previous d390-machine results
+were not reused or spliced into this qualification.
+
+- Both canonical 126-module / 13-output producers passed full source/object
+  authentication, fresh exact builtin literal generation and independent checks.
+- Full C4 gate: 30 native commands, all original public controls, all 28 C4
+  fixtures, all 216 nonmonotone executions and nine before/candidate source-file
+  outcomes with exact diagnostics and complete raw checked-artifact comparison.
+- Fixed historical slice: six common provider crates and independent object
+  reload/malformed rejection; **544 fresh / 0 reused on each target side**;
+  exact ordered group projection and whole `.mlfci`/`.mlfco` byte equality.
+  The GHC control compiled exactly 14 fresh targets using 56 unchanged reusable
+  dependency modules. These are correctness checks, not a timing cohort.
+- Current A1 composition (CF39 → query-v6 → C4), including the 13 comparator
+  rejection cases, passed its 32 native commands and 30 cheap methods. P1/P2/P3,
+  F1, all 12 maintained direct async/frontend/native-semantics commands, release
+  metadata and 22 cheap C4 methods also passed. Original guards remain unchanged.
+
+One preparation attempt was rejected normally because an authored builtin-seed
+module lacked the approved shared-Haskell LANGUAGE header. It was preserved;
+a corrected seed used a wholly fresh output. The full C4 gate subsequently
+independently admitted the actual common builtin pair on both producers. No
+parser, guard, oracle or algorithm was adjusted to make that seed pass.
+
+An earlier host also exposed a harness mistake: 544 query objects plus the
+required `query-key.new` and `.lock` files were incorrectly counted as more than
+544 queries. The recovered, independently reviewed helper now requires exact
+report-named objects plus precisely those two regular sidecars, an empty lock
+and the last ordered scratch digest. The old failure summary survives in the
+recovery checkpoint; later old-host raw logs did not survive the platform reset.
+Neither the old failure nor old reported success is counted as this new pass.
+
+[The compact evidence record](c4-pr25-integration-evidence.json) binds actual
+algorithm/script/producer identities, counts, checked artifact hashes and
+original receipt hashes. Bulk checked/cache bytes are not copied into the repo.
+Hosted checks of the eventual published commit are tracked separately in PR #25;
+this local record does not pre-claim CI, complete-compiler/native-bootstrap
+qualification or any current-head performance gain.
+
+## Subsequent upstream Darwin runtime preservation
+
+After the full d96 qualification, PR #25 advanced to
+`823f3060ea379ddb7d865764ae2b097e8fcf29bc`. Its ten changed paths are preserved
+verbatim. The only changed production input among the 179 authenticated inputs
+is `runtime/mlf_system.h`, adding three Darwin conditional branches; all C4,
+query-v6, collection, host Haskell and generated builtin inputs are unchanged.
+
+A bounded Linux-only check reauthenticated both original ordinary producers
+before and after. Removing precisely the three additive Darwin arms recovers
+the old header byte-for-byte. Actual GCC 14 preprocessing of the complete host
+and supervisor translation units (`-O2 -std=c11 -E -P`, with no token filtering)
+is byte-identical between the old and merged trees. Recompiling both with the
+original ordinary C flags yields `.o` files byte-identical to each other and to
+the already-qualified candidate producer's objects. Eight actual C commands
+completed with empty stderr. This supports retaining the earlier Linux evidence
+without another fixed-14 campaign; it does **not** create a new ordinary producer
+receipt, claim a new 544-group run, or test the new Darwin branches on macOS.
+
+The future/current-source C4 manifest moves only that header hash and the exact
+before reference to 823. A separately pinned migration reverses to the entire
+previous manifest byte-for-byte before applying the unchanged query-v6 source
+proof. Twelve additional stale/unrelated-source and migration mutations reject.
+The production authentication and native runners are unchanged: an old receipt
+still cannot authenticate the changed source tree. A fresh current-source CI
+producer remains required; hosted CI results are not implied by this local note.

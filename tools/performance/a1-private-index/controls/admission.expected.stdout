@@ -1,0 +1,4 @@
+PASS admission handwritten topology aliases scopes paging and identities
+PASS admission literal rejection and first-error ordering
+PASS admission finite fresh-counter demand probes
+PASS admission test-only children-before-binder demand

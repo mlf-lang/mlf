@@ -4,6 +4,8 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 root=$PWD
 scratch=$(mktemp -d)
+# Match pwd -P in the mocked keg check, including macOS /var -> /private/var.
+scratch=$(cd -- "$scratch" && pwd -P)
 trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/template/tools/release" "$scratch/template/.github" "$scratch/bin"
 cp tools/release/setup-macos.sh "$scratch/template/tools/release/"

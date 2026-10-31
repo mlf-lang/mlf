@@ -43,7 +43,7 @@ main = do
   integer "source helper shadows facade value" (header ++ "pure x = 42;\ninstance C Int where { c = pure };\nc (0 :: Int)") 42
   integer "instance lambda shadow does not capture source helper" (header ++ "helper x = 42;\ninstance C Int where { c helper = helper };\nc (7 :: Int)") 7
   integer "signed recursive source SCC remains supported" (header ++ "helper :: Int -> Int;\nhelper x = if eqInt x 0 then 42 else helper (subInt x 1);\ninstance C Int where { c = helper };\nc (2 :: Int)") 42
-  reject "unsigned recursive source SCC remains rejected" (header ++ "helper x = if eqInt x 0 then 42 else helper (subInt x 1);\ninstance C Int where { c = helper };\nc (2 :: Int)")
+  integer "unsigned recursive source SCC infers and evaluates" (header ++ "helper x = if eqInt x 0 then 42 else helper (subInt x 1);\ninstance C Int where { c = helper };\nc (2 :: Int)") 42
   reject "final-expression let is not instance source scope" (header ++ "instance C Int where { c = hidden };\nlet hidden x = 42 in c (0 :: Int)")
 
   let rawClass = T.SClassDecl "RawC" [("a",T.Star)] [] [("rawC",T.SArrow (T.STVar "a") (T.SCon "Int" []))]

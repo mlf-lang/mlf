@@ -1,0 +1,7 @@
+module Fixed.Instances () where
+import Prelude
+import Fixed.Class (Render)
+privateRender : Int -> String
+privateRender n = "render:" ++ showInt (n + 1)
+instance Render Int where
+  render = privateRender

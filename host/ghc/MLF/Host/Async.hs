@@ -29,7 +29,9 @@ data Resume = Resume AsyncScope (IORef Bool) (IORef (Maybe (IO ()))) (IO ())
 data AsyncSubscription = Rejected Int | Accepted Resume
 
 clock :: IO Int
-clock = (`quot` 1000000) . toInteger <$> getMonotonicTimeNSec
+-- Divide the unsigned nanosecond clock before narrowing. The entire Word64
+-- millisecond range, plus the checked 32-bit delay, fits signed Int64.
+clock = fromIntegral . (`quot` 1000000) <$> getMonotonicTimeNSec
 v_asyncScopeNew :: Int -> Int -> IO AsyncScope
 v_asyncScopeNew cells slots = do
   _ <- evaluate (bounded "invalid async cell limit" (9223372036854775807 `quot` 8) cells)
@@ -194,5 +196,5 @@ v_asyncWait scope limit = do
               [] -> pure 1
               (deadline,_):_ -> if limit/=(-1) && now-start>=limit then pure 1 else do
                 let pause=min 1000 (min (deadline-now) (if limit==(-1) then deadline-now else limit-(now-start)))
-                threadDelay (fromInteger (max 0 pause)*1000)
+                threadDelay (fromIntegral (max 0 pause)*1000)
                 loop start

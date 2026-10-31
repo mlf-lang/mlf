@@ -16,6 +16,7 @@ module Bootstrap.CrateQuery where {
   import qualified Bootstrap.Primitive as Primitive;
   import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Check as Check;
@@ -111,6 +112,8 @@ module Bootstrap.CrateQuery where {
       SLet n a b -> node "let" ((:) n ((:) (encodeExpression a) ((:) (encodeExpression b) [])));
       SAnn a annotation ->
         node "annotate" ((:) (encodeExpression a) ((:) (encodeAnnotation annotation) []));
+      SSignature a annotation ->
+        node "signature" ((:) (encodeExpression a) ((:) (encodeAnnotation annotation) []));
       SIntLit n -> node "integer" ((:) (showInt n) []);
       SDoubleLit n -> node "double-bits" ((:) (showInt (doubleToBits n)) []);
       SBoolLit b -> node "boolean" ((:) (boolean b) []);
@@ -141,10 +144,15 @@ module Bootstrap.CrateQuery where {
   encodeEquation :: (,) ([] SPattern) SExpr -> String;
   encodeEquation ((,) patterns body) =
     node "equation" ((:) (list encodePattern patterns) ((:) (encodeExpression body) []));
-  encodeRecursive :: (,,) String SAnnotation SExpr -> String;
-  encodeRecursive ((,,) n annotation body) =
-    node "recursive"
-      ((:) n ((:) (encodeAnnotation annotation) ((:) (encodeExpression body) [])));
+  encodeRecursive :: (,,) String RecursiveMode SExpr -> String;
+  encodeRecursive ((,,) n mode body) =
+    case mode of {
+      InferRecursive -> node "recursive-infer" ((:) n ((:) (encodeExpression body) []));
+      -- Preserve the signed representation used by existing query keys.
+      CheckRecursive annotation ->
+        node "recursive"
+          ((:) n ((:) (encodeAnnotation annotation) ((:) (encodeExpression body) [])))
+    };
   encodeStatement :: SStatement -> String;
   encodeStatement statement =
     case statement of {
@@ -159,6 +167,122 @@ module Bootstrap.CrateQuery where {
   encodeMember ((,,) n annotation body) =
     node "member"
       ((:) n ((:) (optional encodeAnnotation annotation) ((:) (encodeExpression body) [])));
+  -- Query keys are finite parser-owned syntax. Retain field lengths in a tree
+  -- and flatten once, instead of copying every enclosing expression at each
+  -- node. The ordinary encoders above remain independent format oracles.
+  data SourceKey = KeyText String | KeyFields ([] SourceKey)
+    | KeyScope ([] ((,) EvidenceRole String));
+  data FramedKey = FramedText String | FramedFields Int ([] FramedKey);
+  keyNode :: String -> [] SourceKey -> SourceKey;
+  keyNode tag fields = KeyFields ((:) (KeyText tag) fields);
+  keyList :: forall a. (a -> SourceKey) -> [] a -> SourceKey;
+  keyList encode values = KeyFields (map encode values);
+  inlineScopeKey :: [] ((,) EvidenceRole String) -> SourceKey;
+  inlineScopeKey candidates = keyList (\candidate -> KeyText (encodeCandidate candidate)) candidates;
+  expressionKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SExpr -> SourceKey;
+  expressionKey scope expression = let { child = expressionKey scope } in case expression of {
+    SVar n -> keyNode "variable" [KeyText n];
+    SConstructor n -> keyNode "constructor" [KeyText n];
+    SLam n annotation body -> keyNode "lambda"
+      [KeyText n, KeyText (optional encodeAnnotation annotation), child body];
+    SApp a b -> keyNode "apply" [child a, child b];
+    SLet n a b -> keyNode "let" [KeyText n, child a, child b];
+    SAnn a annotation -> keyNode "annotate" [child a, KeyText (encodeAnnotation annotation)];
+    SSignature a annotation -> keyNode "signature" [child a, KeyText (encodeAnnotation annotation)];
+    SIntLit n -> keyNode "integer" [KeyText (showInt n)];
+    SDoubleLit n -> keyNode "double-bits" [KeyText (showInt (doubleToBits n))];
+    SBoolLit b -> keyNode "boolean" [KeyText (boolean b)];
+    SStringLit s -> keyNode "string" [KeyText s];
+    SPrimitive p -> keyNode "primitive" [KeyText (Primitive.primitiveName p)];
+    SCase a branches -> keyNode "case" [child a, keyList (alternativeKey scope) branches];
+    SSourceDefinition body -> keyNode "source-definition" [child body];
+    SCallSite label span body -> keyNode "call-site" [KeyText label, KeyText (encodeSourceSpan span), child body];
+    SSharedBind pattern action continuation bindMethod failure -> keyNode "shared-bind"
+      [KeyText (encodePattern pattern), child action, child continuation, child bindMethod, child failure];
+    SDo statements body -> keyNode "do" [keyList (statementKey scope) statements, child body];
+    SEquations rows -> keyNode "equations" [keyList (equationKey scope) rows];
+    SLetRec definitions body -> keyNode "letrec" [keyList (recursiveKey scope) definitions, child body];
+    SWanted dictionary candidates -> keyNode "wanted" [KeyText dictionary, scope candidates];
+    SChecked ty body -> keyNode "checked" [KeyText (encodeType ty), child body]
+  };
+  alternativeKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SAlternative -> SourceKey;
+  alternativeKey scope (SAlternative pattern body) =
+    keyNode "alternative" [KeyText (encodePattern pattern), expressionKey scope body];
+  equationKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> (,) ([] SPattern) SExpr -> SourceKey;
+  equationKey scope ((,) patterns body) =
+    keyNode "equation" [KeyText (list encodePattern patterns), expressionKey scope body];
+  recursiveKey :: ([] ((,) EvidenceRole String) -> SourceKey) ->
+    (,,) String RecursiveMode SExpr -> SourceKey;
+  recursiveKey scope ((,,) name mode body) = case mode of {
+    InferRecursive -> keyNode "recursive-infer" [KeyText name, expressionKey scope body];
+    CheckRecursive annotation -> keyNode "recursive"
+      [KeyText name, KeyText (encodeAnnotation annotation), expressionKey scope body]
+  };
+  statementKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SStatement -> SourceKey;
+  statementKey scope statement = case statement of {
+    SDoBind pattern body -> keyNode "do-bind" [KeyText (encodePattern pattern), expressionKey scope body];
+    SDoThen body -> keyNode "do-then" [expressionKey scope body];
+    SDoLet name annotation body -> keyNode "do-let"
+      [KeyText name, KeyText (optional encodeAnnotation annotation), expressionKey scope body];
+    SDoLetRec definitions -> keyNode "do-letrec" [keyList (recursiveKey scope) definitions]
+  };
+  memberKey :: ([] ((,) EvidenceRole String) -> SourceKey) ->
+    (,,) String (Maybe SAnnotation) SExpr -> SourceKey;
+  memberKey scope ((,,) name annotation body) = keyNode "member"
+    [KeyText name, KeyText (optional encodeAnnotation annotation), expressionKey scope body];
+  compareCandidateScopes :: [] ((,) EvidenceRole String) -> [] ((,) EvidenceRole String) -> Int;
+  compareCandidateScopes left right = case left of {
+    [] -> if null right then 0 else 0 - 1;
+    (:) ((,) role name) rest -> case right of {
+      [] -> 1;
+      (:) ((,) otherRole otherName) following -> let {
+        roleOrder = compareString (encodeRole role) (encodeRole otherRole);
+        nameOrder = compareString name otherName
+      } in if roleOrder /= 0 then roleOrder else if nameOrder /= 0 then nameOrder
+        else compareCandidateScopes rest following
+    }
+  };
+  keyScopes :: SourceKey -> Set ([] ((,) EvidenceRole String)) -> Set ([] ((,) EvidenceRole String));
+  keyScopes key known = case key of {
+    KeyText _ -> known;
+    KeyScope candidates -> S.insert compareCandidateScopes candidates known;
+    KeyFields fields -> foldlStrict (\found field -> keyScopes field found) known fields
+  };
+  framedLength :: FramedKey -> Int;
+  framedLength key = case key of {
+    FramedText text -> stringLength text;
+    FramedFields size _ -> size
+  };
+  frameKey :: Map ([] ((,) EvidenceRole String)) Int -> SourceKey -> FramedKey;
+  frameKey scopes key = case key of {
+    KeyText text -> FramedText text;
+    KeyScope candidates -> case M.lookup compareCandidateScopes candidates scopes of {
+      Nothing -> panic "query key scope missing from its own inventory";
+      Just index -> FramedText (showInt index)
+    };
+    KeyFields children -> let { fields = map (frameKey scopes) children } in let {
+      size = foldlStrict (\total field -> let { count = framedLength field }
+        in total + stringLength (showInt count) + 1 + count) 0 fields
+    } in seq size (FramedFields size fields)
+  };
+  framedChunks :: FramedKey -> [] String -> [] String;
+  framedChunks key rest = case key of {
+    FramedText text -> (:) text rest;
+    FramedFields _ fields -> foldr (\field tail ->
+      (:) (showInt (framedLength field) ++ ":") (framedChunks field tail)) rest fields
+  };
+  renderKey :: Map ([] ((,) EvidenceRole String)) Int -> SourceKey -> String;
+  renderKey scopes key = concatStringList (framedChunks (frameKey scopes key) []);
+  -- Pool exact ordered (role, canonical binding) lists, not just class names
+  -- or hashes. The table is itself part of the authenticated query key. No
+  -- candidate is removed, reordered, or selected here, and no inference or
+  -- checked-object admission path consumes these references as authority.
+  pooledSourceKey :: [] SourceKey -> String;
+  pooledSourceKey fields = let {
+    candidates = S.toList (keyScopes (KeyFields fields) S.empty);
+    scopes = M.fromList compareCandidateScopes (zip candidates (range 0 (length candidates - 1)));
+    table = keyList inlineScopeKey candidates
+  } in renderKey scopes (KeyFields (snoc fields table));
   encodeField :: Field -> String;
   encodeField field =
     case field of {
@@ -215,6 +339,27 @@ module Bootstrap.CrateQuery where {
                   node "parameter" ((:) (canonicalReference scope n) ((:) (encodeKind k) [])))
                parameters)
             ((:) (list encodeConstructor constructors) [])));
+  data QueryDatatypeEncoding = QueryDatatypeEncoding DataDecl String;
+  data SourceEncodings = SourceEncodings Separate.DatatypeEncodings
+    (Map String ([] QueryDatatypeEncoding));
+  prepareSourceEncodings :: [] DataDecl -> SourceEncodings;
+  prepareSourceEncodings declarations =
+    SourceEncodings (Separate.prepareDatatypeEncodings declarations)
+      (M.fromListWith compareString append
+        (map (\d -> (,) (D.datatypeName d) ((:) (QueryDatatypeEncoding d (encodeDatatype d)) []))
+          (append D.builtinDeclarations declarations)));
+  findQueryDatatypeEncoding :: DataDecl -> [] QueryDatatypeEncoding -> String;
+  findQueryDatatypeEncoding declaration entries = case entries of {
+    [] -> encodeDatatype declaration;
+    (:) (QueryDatatypeEncoding original text) rest ->
+      if SourceEquality.eqDataDecl declaration original then text
+      else findQueryDatatypeEncoding declaration rest
+  };
+  encodeDatatypeContextWithPool :: SourceEncodings -> [] DataDecl -> String;
+  encodeDatatypeContextWithPool (SourceEncodings _ entries) declarations =
+    list (\d -> findQueryDatatypeEncoding d
+      (M.findWithDefault compareString [] (D.datatypeName d) entries))
+      (append D.builtinDeclarations declarations);
   encodeXType :: XType -> String;
   encodeXType ty =
     case ty of {
@@ -328,6 +473,17 @@ module Bootstrap.CrateQuery where {
              typeDepth
              b);
       SAnn a annotation -> SAnn (child a) (canonicalAnnotation types typeDepth annotation);
+      SSignature a annotation ->
+        let {
+          names = case annotation of {
+            SAnnotation [] ty -> leadingTypes ty;
+            _ -> []
+          }
+        } in
+        SSignature
+          (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
+             (typeDepth + length names) a)
+          (canonicalAnnotation types typeDepth annotation);
       SCase a branches ->
         SCase (child a)
           (map
@@ -391,22 +547,35 @@ module Bootstrap.CrateQuery where {
   canonicalRecursive :: Map String String ->
                         Int ->
                         Map String String ->
-                        Int -> (,,) String SAnnotation SExpr -> (,,) String SAnnotation SExpr;
-  canonicalRecursive env depth types typeDepth ((,,) n annotation body) =
-    let {
-      names =
-        case annotation of {
-          SAnnotation [] ty -> leadingTypes ty;
-          _ -> []
-        }
-    } in
-    (,,) (canonicalReference env n) (canonicalAnnotation types typeDepth annotation)
-      (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
-         (typeDepth + length names)
-         body);
+                        Int -> (,,) String RecursiveMode SExpr -> (,,) String RecursiveMode SExpr;
+  canonicalRecursive env depth types typeDepth ((,,) n mode body) =
+    case mode of {
+      InferRecursive ->
+        (,,) (canonicalReference env n) InferRecursive
+          (canonicalExpression env depth types typeDepth body);
+      CheckRecursive annotation ->
+        let {
+          names =
+            case annotation of {
+              SAnnotation [] ty -> leadingTypes ty;
+              _ -> []
+            }
+        } in
+        (,,) (canonicalReference env n)
+          (CheckRecursive (canonicalAnnotation types typeDepth annotation))
+          (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
+             (typeDepth + length names)
+             body)
+    };
   canonicalMember ((,,) n annotation body) =
+    let {
+      names = case annotation of {
+        Just (SAnnotation [] ty) -> leadingTypes ty;
+        _ -> []
+      }
+    } in
     (,,) n (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
-      (canonicalExpression M.empty 0 M.empty 0 body);
+      (canonicalExpression M.empty 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
   data TypeInventory =
     TypeInventory (Map String DataDecl) (Map String String) (Map String ([] String));
   prepareData datatypes =
@@ -757,6 +926,14 @@ module Bootstrap.CrateQuery where {
               ((:) key
                  ((:) (Separate.encodeInterface (Separate.objectInterface object))
                     ((:) (Separate.encodeObject object) []))));
+  encodeCachedWithDatatypes :: Separate.DatatypeEncodings -> String -> Separate.UnitObject -> String;
+  encodeCachedWithDatatypes pool key object =
+    if contextualCache key object
+    then Separate.pack
+      ((:) "MLF-QUERY-CACHE-2" ((:) key ((:) (Separate.encodeContextualObject object) [])))
+    else let { encoded = Separate.encodeUnitWithDatatypes pool object } in
+      Separate.pack ((:) "MLF-QUERY-CACHE-1"
+        ((:) key ((:) (fst encoded) ((:) (snd encoded) []))));
   -- Commands receive NUL-separated argv directly; paths never enter a shell.
   cacheCommand arguments =
     do {
@@ -919,6 +1096,9 @@ module Bootstrap.CrateQuery where {
         ((:) (boolean (Source.contractProtected contract)) [])));
   encodeSourceGroup prepared = node "prepared-source-group"
     ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupOriginal prepared))
+      (sourceGroupMetadata prepared));
+  sourceGroupMetadata :: Source.PreparedGroup -> [] String;
+  sourceGroupMetadata prepared =
       ((:) (list (\((,) name dictionary) -> node "class-dictionary" ((:) name ((:) dictionary [])))
         (M.toList (Source.groupRegistry prepared)))
       ((:) (list (\((,,) name classes protected) -> node "result-contract"
@@ -934,21 +1114,27 @@ module Bootstrap.CrateQuery where {
               ((:) (encodeRole role) ((:) (encodeBinding ((,) candidate ty))
                 ((:) (boolean (elem eqString candidate protectedCandidates)) [])))) candidates) []))))
       }) ((:) (list (\((,) name flag) -> node "raw-parameter-protection"
-        ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) [])))));
+        ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) []))));
+  sourceGroupKey :: Source.PreparedGroup -> SourceKey;
+  sourceGroupKey prepared = keyNode "prepared-source-group"
+    ((:) (keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupOriginal prepared))
+      (map KeyText (sourceGroupMetadata prepared)));
   sourceQueryKey crateId compilerHash prepared contracts datatypes =
+    sourceQueryKeyWithContext crateId compilerHash prepared contracts (encodeDatatypeContext datatypes);
+  sourceQueryKeyWithContext :: String -> String -> Source.PreparedGroup ->
+    Map String Source.SourceContract -> String -> String;
+  sourceQueryKeyWithContext crateId compilerHash prepared contracts datatypeContext =
     let { observed = S.fromList compareString
       (append (map fst (Source.groupBindings prepared))
         (append (map fst (Source.groupCandidateBindings prepared))
           (concatMap (\member -> Dependency.valueNames (Dependency.observeDeclaration member))
             (Source.groupOriginal prepared)))) } in
     let { relevant = M.filterWithKey (\name _ -> S.member compareString name observed) contracts } in
-    node "MLF-SOURCE-CRATE-QUERY-5"
-      ((:) crateId ((:) compilerHash
-        ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupMembers prepared))
-        ((:) (list encodeBinding (Source.groupBindings prepared))
-        ((:) (encodeDatatypeContext datatypes)
-        ((:) (encodeSourceGroup prepared)
-        ((:) (list encodeSourceContract (M.toList relevant)) [])))))));
+    pooledSourceKey
+      [KeyText "MLF-SOURCE-CRATE-QUERY-6", KeyText crateId, KeyText compilerHash,
+       keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupMembers prepared),
+       KeyText (list encodeBinding (Source.groupBindings prepared)), KeyText datatypeContext,
+       sourceGroupKey prepared, KeyText (list encodeSourceContract (M.toList relevant))];
   -- Raw checked inference payloads retain their established validator. A new
   -- source key deliberately uses self-contained cache format1: the old compact
   -- key parser must not be tricked into supplying a different context.
@@ -957,6 +1143,14 @@ module Bootstrap.CrateQuery where {
     Int -> Int -> [] GroupResult ->
     IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
   runSourceGroups crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsWithEncodings Nothing crateId compilerHash cacheDir inventory plan groups contracts
+      objects inferred reused results;
+  runSourceGroupsWithEncodings :: Maybe SourceEncodings -> String -> String -> String ->
+    TypeInventory -> Source.SourcePlan -> [] ([] String) -> Map String Source.SourceContract ->
+    [] Separate.UnitObject -> Int -> Int -> [] GroupResult ->
+    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (QueryReport inferred reused (reverse results)) contracts));
@@ -968,7 +1162,11 @@ module Bootstrap.CrateQuery where {
         let { datatypes = requiredDataIn inventory members
           (append bindings (Source.groupCandidateBindings prepared)) };
         let { name = groupName crateId names };
-        let { key = sourceQueryKey crateId compilerHash prepared contracts datatypes };
+        let { key = case encodings of {
+          Nothing -> sourceQueryKey crateId compilerHash prepared contracts datatypes;
+          Just pool -> sourceQueryKeyWithContext crateId compilerHash prepared contracts
+            (encodeDatatypeContextWithPool pool datatypes)
+        } };
         writeFile (cacheDir ++ "/query-key.new") key;
         digest <- fileDigest (cacheDir ++ "/query-key.new");
         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
@@ -982,9 +1180,12 @@ module Bootstrap.CrateQuery where {
         } else ioReturn (Left "cache miss");
         let { raw = case cached of {
           Right object -> Right ((,) True object);
-          Left _ -> mapEither ((,) False)
-            (Inference.compileLoweredGroup name
-              ((:) (dependencyInterface bindings) []) datatypes members)
+          Left _ -> mapEither ((,) False) (case encodings of {
+            Nothing -> Inference.compileLoweredGroup name
+              ((:) (dependencyInterface bindings) []) datatypes members;
+            Just (SourceEncodings pool _) -> Inference.compileLoweredGroupWithDatatypes pool name
+              ((:) (dependencyInterface bindings) []) datatypes members
+          })
         } };
         case raw of {
           Left error -> ioReturn (Left error);
@@ -992,7 +1193,10 @@ module Bootstrap.CrateQuery where {
             Left error -> ioReturn (Left error);
             Right finalized -> do {
               saved <- if hit then ioReturn (Right ())
-                else writeCache destination (encodeCached key object);
+                else writeCache destination (case encodings of {
+                  Nothing -> encodeCached key object;
+                  Just (SourceEncodings pool _) -> encodeCachedWithDatatypes pool key object
+                });
               case saved of {
                 Left error -> ioReturn (Left error);
                 Right _ -> do {
@@ -1000,7 +1204,7 @@ module Bootstrap.CrateQuery where {
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (list encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroups crateId compilerHash cacheDir inventory plan rest
+                  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan rest
                     (M.union compareString finalContracts contracts)
                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))
                     (reused + (if hit then 1 else 0))
@@ -1017,6 +1221,18 @@ module Bootstrap.CrateQuery where {
     Map String Bool -> Source.SourcePlan ->
     IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
   compileSourceGroups crateId directory imports protected originalPlan =
+    compileSourceGroupsWithEncoding False crateId directory imports protected originalPlan;
+  -- Internal file-producer entry: the plan was built from finite parsed source
+  -- and decoded dependencies. Keep the original API independent of any pool.
+  compileParsedSourceGroups :: String -> String -> [] Separate.UnitInterface ->
+    Map String Bool -> Source.SourcePlan ->
+    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+  compileParsedSourceGroups crateId directory imports protected originalPlan =
+    compileSourceGroupsWithEncoding True crateId directory imports protected originalPlan;
+  compileSourceGroupsWithEncoding :: Bool -> String -> String -> [] Separate.UnitInterface ->
+    Map String Bool -> Source.SourcePlan ->
+    IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
+  compileSourceGroupsWithEncoding shareEncoding crateId directory imports protected originalPlan =
     case Source.initializeProtection originalPlan protected of {
       Left error -> ioReturn (Left error);
       Right plan -> case prepareData (Source.planData plan) of {
@@ -1035,8 +1251,10 @@ module Bootstrap.CrateQuery where {
                 lock <- acquireFileLock (cacheDir ++ "/.lock");
                 executable <- getExecutablePath;
                 compilerHash <- fileDigest executable;
-                result <- runSourceGroups crateId compilerHash cacheDir inventory plan
-                  (Source.planGroups plan) contracts [] 0 0 [];
+                let { encodings = if shareEncoding
+                      then Just (prepareSourceEncodings (Source.planData plan)) else Nothing };
+                result <- runSourceGroupsWithEncodings encodings
+                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
                 releaseFileLock lock;
                 ioReturn result
               }

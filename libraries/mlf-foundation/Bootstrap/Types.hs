@@ -13,8 +13,11 @@ module Bootstrap.Types where {
   data Either e a = Left e | Right a;
   data Map k v = MapEmpty | MapNode Int k v (Map k v) (Map k v);
   data Set a = Set (Map a ());
-  data IntMap a = IntMap (Map Int a);
-  data IntSet = IntSet (Map Int ());
+  data IntMapTree a = IntMapNil | IntMapTip Int a | IntMapBin Int Int (IntMapTree a) (IntMapTree a);
+  data IntMap a = IntMap (IntMapTree a);
+  data IntSetTree = IntSetNil | IntSetTip Int Int Int | IntSetBin Int Int IntSetTree IntSetTree;
+  data IntSet = IntSet IntSetTree;
+  data IntTreeRelation = IntTreeABL | IntTreeABR | IntTreeBAL | IntTreeBAR | IntTreeEQL | IntTreeNOM;
   data Kind = Star | KArrow Kind Kind;
   data Flag = Flexible | Rigid;
   data Field =
@@ -136,7 +139,29 @@ module Bootstrap.Types where {
     PEmptyCallStack |
     PPushCallStack |
     PPrettyCallStack |
-    PIOErrorWithStack;
+    PIOErrorWithStack |
+    PConcatStringList |
+    POrInt |
+    PXorInt |
+    PShiftLInt |
+    PShiftRInt |
+    PUnsignedShiftRInt |
+    PCountLeadingZerosInt |
+    PCountTrailingZerosInt |
+    PPopCountInt |
+    PIntToInteger |
+    PIntegerToInt |
+    PAddInteger |
+    PSubInteger |
+    PMulInteger |
+    PQuotInteger |
+    PRemInteger |
+    PEqInteger |
+    PLtInteger |
+    PShowInteger |
+    PReadInteger |
+    PIntegerToDouble |
+    PUnsignedLtInt;
   data SType =
     STVar String |
     SBottom |
@@ -147,6 +172,7 @@ module Bootstrap.Types where {
     SForall Flag String SType SType |
     SQualified ([] SPredicate) SType;
   data SAnnotation = SAnnotation ([] String) SType;
+  data RecursiveMode = InferRecursive | CheckRecursive SAnnotation;
   data SourceSpan = SourceSpan String String String Int Int Int Int;
   data SExpr =
     SVar String |
@@ -155,6 +181,8 @@ module Bootstrap.Types where {
     SApp SExpr SExpr |
     SLet String SExpr SExpr |
     SAnn SExpr SAnnotation |
+    -- Declaration provenance is distinct from expression annotation/coercion.
+    SSignature SExpr SAnnotation |
     SIntLit Int |
     SDoubleLit Double |
     SBoolLit Bool |
@@ -163,7 +191,7 @@ module Bootstrap.Types where {
     SCase SExpr ([] SAlternative) |
     SDo ([] SStatement) SExpr |
     SEquations ([] ((,) ([] SPattern) SExpr)) |
-    SLetRec ([] ((,,) String SAnnotation SExpr)) SExpr |
+    SLetRec ([] ((,,) String RecursiveMode SExpr)) SExpr |
     SWanted String ([] ((,) EvidenceRole String)) |
     SChecked SType SExpr |
     SSourceDefinition SExpr |
@@ -186,7 +214,7 @@ module Bootstrap.Types where {
     SDoBind SPattern SExpr |
     SDoThen SExpr |
     SDoLet String (Maybe SAnnotation) SExpr |
-    SDoLetRec ([] ((,,) String SAnnotation SExpr));
+    SDoLetRec ([] ((,,) String RecursiveMode SExpr));
   data SPredicate = SPredicate String ([] SType);
   data SClassDecl =
     SClassDecl String ([] ((,) String Kind)) ([] SPredicate) ([] ((,) String SType));
@@ -284,9 +312,12 @@ module Bootstrap.Types where {
   data ScopeIndex = ScopeIndex (IntMap ((,) Int Int)) ([] (IntMap Int));
   data Solver = Solver Graph (IntMap IntSet) (IntMap IntSet) ScopeIndex;
   data Edge = Edge Int Int;
+  -- Case projection barriers precede every use of their sealed field schemes.
+  data SolveStep = Instantiate Edge | ProjectCase ([] ((,) Int Int));
   data Typed = Typed Int Form;
   data Form =
     FVariable XName (Maybe Edge) |
+    FDeclaredVariable XName XType Edge |
     FLambda XName Int Typed Edge |
     FApply Typed Typed Edge Edge |
     FBinding XName Typed Typed Edge |
@@ -298,12 +329,14 @@ module Bootstrap.Types where {
     FPrimitive Primitive ([] Int) |
     FConstructor String ([] Int) |
     FMatch Typed Edge ([] Branch) |
-    FRecursive ([] ((,,,) XName Int Typed Edge)) Typed Edge |
+    FRecursive ([] RecursiveDefinition) Typed Edge |
     FEvidence ([] EvidenceBinding) |
     FChecked ([] ((,) XTyVar Kind)) Typed Edge;
+  data RecursiveClosure = RecursiveClosure Int (IntMap Int);
+  data RecursiveDefinition = RecursiveDefinition XName Int Typed Edge (Maybe RecursiveClosure);
   data Branch = Branch XPattern Typed Edge;
-  data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool;
-  data Constraints = Constraints Graph Typed ([] ((,) Int Int)) ([] Edge);
+  data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool | DeclaredEvidenceBinding EvidenceRole XName XType;
+  data Constraints = Constraints Graph Typed ([] ((,) Int Int)) ([] SolveStep);
   data Core =
     CVar String |
     CLam String Core |
@@ -317,10 +350,10 @@ module Bootstrap.Types where {
     CPrimitive Primitive |
     CConstructor String |
     CCase Core ([] ((,) SPattern Core)) |
-    CRec ([] ((,,) String SAnnotation Core)) Core |
+    CRec ([] ((,,) String RecursiveMode Core)) Core |
     CWanted String ([] ((,) EvidenceRole String)) |
     CChecked SType SExpr;
-  data Binding = Mono XName Int | Poly XName Int;
+  data Binding = Mono XName Int | Poly XName Int | DeclaredPoly XName Int XType | RecursiveMono XName Int Int;
   data Phase = Parsing | ModuleResolution | Inference | Resolution | Elaboration | Verification;
   data CompileError = CompileError Phase String
 }

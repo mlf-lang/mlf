@@ -57,7 +57,7 @@ sumTrees depth remaining total =
       sumTrees depth (remaining - 1) forced
     else return 0
 
-depths : Int -> Int -> IO Unit
+depths : Int -> Int -> IO ()
 depths maximum depth =
   if maximum < depth then return ()
   else

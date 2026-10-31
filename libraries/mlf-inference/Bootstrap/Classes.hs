@@ -10,6 +10,9 @@ module Bootstrap.Classes where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.IntSet as I;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.ClassDemand as Q;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Kinding as K;
   import qualified Bootstrap.Desugar as Desugar;
@@ -67,9 +70,12 @@ module Bootstrap.Classes where {
     SApp a b -> managedExpression a || managedExpression b;
     SLet _ a b -> managedExpression a || managedExpression b;
     SAnn body (SAnnotation _ ty) -> managedType ty || managedExpression body;
+    SSignature body (SAnnotation _ ty) -> managedType ty || managedExpression body;
     SCase body branches -> managedExpression body || any (\(SAlternative _ rhs) -> managedExpression rhs) branches;
     SLetRec definitions body -> managedExpression body ||
-      any (\((,,) _ (SAnnotation _ ty) rhs) -> managedType ty || managedExpression rhs) definitions;
+      any (\((,,) _ mode rhs) -> (case mode of {
+        InferRecursive -> False; CheckRecursive (SAnnotation _ ty) -> managedType ty
+      }) || managedExpression rhs) definitions;
     SChecked ty body -> managedType ty || managedExpression body;
     SDo _ _ -> managedExpression (Desugar.desugarDo expression);
     SEquations rows -> any (\((,) _ body) -> managedExpression body) rows;
@@ -85,6 +91,7 @@ module Bootstrap.Classes where {
     SApp a b -> SApp (eraseCallSites a) (eraseCallSites b);
     SLet name a b -> SLet name (eraseCallSites a) (eraseCallSites b);
     SAnn body annotation -> SAnn (eraseCallSites body) annotation;
+    SSignature body annotation -> SSignature (eraseCallSites body) annotation;
     SCase body branches -> SCase (eraseCallSites body)
       (map (\(SAlternative pattern rhs) -> SAlternative pattern (eraseCallSites rhs)) branches);
     SLetRec definitions body -> SLetRec
@@ -170,6 +177,70 @@ module Bootstrap.Classes where {
           (concatMap (\(SPredicate _ args) -> concatMap freeTypeRaw args) predicates);
       _ -> []
     };
+  -- Source-owned class headers share the same canonical Field view as source
+  -- datatypes. This is not a type equality rule: checked imported headers and
+  -- dictionary reconstruction keep their original contracts byte-for-byte.
+  canonicalSourceType :: SType -> SType;
+  canonicalSourceType ty =
+    case ty of {
+      SArrow a b -> SArrow (canonicalSourceType a) (canonicalSourceType b);
+      STypeApp a b -> STypeApp (canonicalSourceType a) (canonicalSourceType b);
+      SCon name arguments -> SCon name (map canonicalSourceType arguments);
+      SQualified predicates body ->
+        SQualified (map canonicalSourcePredicate predicates) (canonicalSourceType body);
+      SForall flag name bound body ->
+        let { a = canonicalSourceType bound; b = canonicalSourceType body } in
+        if (case (,) flag a of {
+              (,) Flexible SBottom -> True;
+              (,) Flexible (SBottomKind _) -> True;
+              _ -> False
+            }) && not (elem eqString name (freeTypeRaw b))
+        then b
+        else SForall flag name a b;
+      _ -> ty
+    };
+  canonicalSourcePredicate :: SPredicate -> SPredicate;
+  canonicalSourcePredicate (SPredicate name arguments) =
+    SPredicate name (map canonicalSourceType arguments);
+  canonicalSourceClass :: SClassDecl -> SClassDecl;
+  canonicalSourceClass (SClassDecl name parameters supers methods) =
+    SClassDecl name parameters (map canonicalSourcePredicate supers)
+      (map (\((,) method ty) -> (,) method (canonicalSourceType ty)) methods);
+  canonicalSourceClasses :: Set String -> [] DataDecl -> [] SClassDecl ->
+                            [] SClassDecl -> Either String ([] SClassDecl);
+  canonicalSourceClasses importedNames datatypes checkedHeaders ownHeaders =
+    withValidatedClasses Nothing importedNames M.empty Nothing datatypes
+      (append checkedHeaders ownHeaders) [] (SConstructor "()")
+      (\base declarations -> do {
+        -- Validation needs only class identities/parameters, not generated
+        -- selector names. The temporary dictionary names are never exported.
+        let {
+          infos = M.fromList compareString
+            (map (\declaration ->
+              (,) (className declaration)
+                (Info declaration ("Dict_" ++ className declaration)
+                   ("Make_" ++ className declaration) [] [])) declarations)
+        };
+        freshLift (validateClasses base infos);
+        -- Superclass argument kinds are checked above, while this additional
+        -- conversion retains the original generated-Field admissibility check.
+        freshLift (traverseEither
+          (\declaration -> traverseEither
+            (\predicate -> do { ty <- dictionary infos predicate; field ty; Right () })
+            (superclasses declaration)) declarations);
+        freshPure (map canonicalSourceClass ownHeaders)
+      });
+  canonicalSourceProgram :: Set String -> SProgram -> Either String SProgram;
+  canonicalSourceProgram importedNames original = do {
+    program <- D.canonicalSourceProgram original;
+    case program of {
+      SProgram _ _ -> Right program;
+      SClassProgram datatypes declarations instances body -> do {
+        normalized <- canonicalSourceClasses importedNames datatypes [] declarations;
+        Right (SClassProgram datatypes normalized instances body)
+      }
+    }
+  };
   unique :: String -> [] String -> Either String ();
   unique label names =
     ensure (length names == length (nubBy eqString names)) ("duplicate " ++ label);
@@ -222,6 +293,12 @@ module Bootstrap.Classes where {
           Right result
         }
     };
+  -- Unqualified local types need no dictionary translation. Their variables
+  -- may be scoped by an enclosing checked declaration, so retain that scope
+  -- for Constraint.validateIn rather than checking them here in an empty one.
+  translateLocalScheme :: DataEnv -> Map String Info -> SType -> Either String SType;
+  translateLocalScheme ds infos ty =
+    if qualified ty then translateScheme ds infos ty else Right ty;
   checkPredicate :: DataEnv ->
                     Map String Info -> Map String Kind -> SPredicate -> Either String ();
   checkPredicate ds infos scope (SPredicate name arguments) =
@@ -310,7 +387,7 @@ module Bootstrap.Classes where {
             parameters =
               map
                 (\((,) n ty) ->
-                   (,,) n (SAnnotation [] ty)
+                   (,,) n (CheckRecursive (SAnnotation [] ty))
                      (SChecked ty
                         (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter"))))
                 (M.toList externals)
@@ -347,7 +424,7 @@ module Bootstrap.Classes where {
             parameters =
               map
                 (\((,) n ty) ->
-                   (,,) n (SAnnotation [] ty)
+                   (,,) n (CheckRecursive (SAnnotation [] ty))
                      (SChecked ty
                         (SApp (SPrimitive PPanic) (SStringLit "unlinked crate parameter"))))
                 (M.toList externals)
@@ -654,7 +731,8 @@ module Bootstrap.Classes where {
               result = closeWants infos globalCandidates wants expression
             };
             let {
-              inner = if null localBindings then result else SLetRec localBindings result
+              inner = if null localBindings then result else SLetRec
+                (map (\((,,) name annotation rhs) -> (,,) name (CheckRecursive annotation) rhs) localBindings) result
             };
             externalBindings <-
               mapM
@@ -662,7 +740,7 @@ module Bootstrap.Classes where {
                    do {
                      translated <- freshLift (translateScheme ds infos ty);
                      freshPure
-                       ((,,) n (SAnnotation [] translated)
+                       ((,,) n (CheckRecursive (SAnnotation [] translated))
                           (SChecked translated
                              (SApp (SPrimitive PPanic) (SStringLit "unlinked module parameter"))))
                    })
@@ -723,88 +801,81 @@ module Bootstrap.Classes where {
         }
       }
     };
-  -- Fallback retains original signed/SCC contracts without reinserting support
-  -- definitions. Unsigned protected singletons keep their issued slot order.
+  -- Every fallback keeps the real lexical value-SCC structure. Source contract
+  -- slots come from this exact solved planner, not dictionary-arrow inspection.
   lowerSourceGroupUnchanged :: ClassInventory -> Map String ((,) String ([] String)) ->
     Map String Bool -> [] ((,,) String (Maybe SAnnotation) SExpr) ->
     Fresh ((,) SExpr ([] ((,,) String ([] String) Bool)));
   lowerSourceGroupUnchanged inventory overloads protected members =
     case inventory of {
       ClassInventory _ ds infos valueScopes candidates methods _ _ _ -> do {
-      original <- freshLift (Surface.bindValues members (SConstructor "()"));
-      freshLift (traverseEither
-        (\((,,) name _ _) -> ensure (M.member compareString name valueScopes)
-          "source group member has no authenticated definition scope") members);
-      case members of {
-        (:) ((,,) name Nothing rhs) [] -> do {
-          root <- lowerUnsignedSourceRootProtected inventory overloads protected name rhs;
-          case root of {
-            SourceRootLowering body labels _ managed ->
-              freshPure ((,) (SLet name body (SConstructor "()"))
-                ((:) ((,,) name (map (\((,,) _ c _) -> c) labels) managed) []))
-          }
-        };
-        (:) ((,,) name (Just (SAnnotation ((:) variable variables) ty)) rhs) [] -> do {
-          root <- lowerUnsignedSourceRootProtected inventory overloads protected name
-            (SAnn rhs (SAnnotation ((:) variable variables) ty));
-          case root of {
-            SourceRootLowering body labels _ managed ->
-              freshPure ((,) (SLet name body (SConstructor "()"))
-                ((:) ((,,) name (map (\((,,) _ c _) -> c) labels) managed) []))
-          }
-        };
-        _ -> do {
-          freshLift (traverseEither
-            (\((,,) _ annotation _) -> case annotation of {
-              Nothing -> Left "non-singleton fallback requires original signed declarations";
-              Just _ -> Right ()
-            }) members);
-          surface <- freshLift (Surface.lowerExpressionWithData ds original);
-          let {
-            declaredOverloads = M.fromList compareString
-              (map (\((,,) name annotation _) ->
-                (,) name ((,) name (case annotation of {
-                  Just (SAnnotation _ ty) -> case scheme ty of {
-                    (,,) _ ps _ -> map (\(SPredicate c _) -> c) ps
-                  };
-                  Nothing -> []
-                }))) members)
-          };
-          let { environment = M.union compareString declaredOverloads
-            (M.union compareString overloads methods) };
-          protection <- freshLift (traverseEither
-            (\((,,) _ annotation rhs) -> do {
-              normalized <- Surface.lowerExpressionWithData ds rhs;
-              Right ((case annotation of {
-                Just (SAnnotation _ ty) -> managedType ty;
-                Nothing -> False
-              }) || protectedSourceBody environment protected normalized)
-            }) members);
-          let { groupProtected = any (\flag -> flag) protection };
-          reserveSourceNames (append (Desugar.allNames surface)
-            (append (M.keys environment) (append (map fst (M.elems environment)) (map snd candidates))));
-          lowered <- lowerExpr valueScopes ds infos environment candidates surface;
-          case lowered of {
-            (,) body wants -> do {
-              freshLift (ensure (null wants) "signed source group leaked ordinary obligations");
-              let {
-                contracts = map
-                  (\((,,) name annotation rhs) -> case annotation of {
-                    Just (SAnnotation _ ty) ->
-                      case scheme ty of {
-                        (,,) _ ps _ -> (,,) name (map (\(SPredicate c _) -> c) ps)
-                          groupProtected
-                      };
-                    Nothing -> (,,) name [] True
-                  }) members
-              };
-              freshPure ((,) body contracts)
-            }
-          }
-        }
-      }
+        original <- freshLift (Surface.bindValues members (SConstructor "()"));
+        freshLift (traverseEither
+          (\((,,) name _ _) -> ensure (M.member compareString name valueScopes)
+            "source group member has no authenticated definition scope") members);
+        surface <- freshLift (Surface.lowerExpressionWithData ds original);
+        let { environment = M.union compareString overloads methods };
+        let { declared = M.fromList compareString (map (\((,,) name annotation rhs) ->
+          (,) name ((,) name (sourceDeclaredClasses annotation rhs))) members) };
+        protection <- freshLift (traverseEither
+          (\((,,) _ annotation rhs) -> do {
+            normalized <- Surface.lowerExpressionWithData ds rhs;
+            Right ((case annotation of {
+              Just (SAnnotation _ ty) -> managedType ty;
+              Nothing -> False
+            }) || protectedSourceBody (M.union compareString declared environment) protected normalized)
+          }) members);
+        let { groupProtected = any (\flag -> flag) protection };
+        reserveSourceNames (append (Desugar.allNames surface)
+          (append (M.keys environment) (append (map fst (M.elems environment)) (map snd candidates))));
+        planned <- prepareQualified Nothing valueScopes ds infos environment candidates surface;
+        case planned of { (,) expression plan -> do {
+          wants <- freshLift (Q.slotsAt plan (qualifiedNode expression));
+          freshLift (ensure (null wants) "source group leaked ordinary obligations");
+          let { bindings = qualifiedTopBindings expression };
+          contracts <- mapM (\((,,) name annotation rhs) -> do {
+            value <- freshLift (case M.lookup compareString name bindings of {
+              Nothing -> Left ("source planner lost top-level binding: " ++ name);
+              Just result -> Right result
+            });
+            let { explicit = sourceDeclaredClasses annotation rhs };
+            classes <- if null explicit then do {
+              slots <- freshLift (Q.slotsAt plan (qualifiedNode value));
+              freshLift (traverseEither (Q.slotClass plan) slots)
+            } else freshPure explicit;
+            freshPure ((,,) name classes groupProtected)
+          }) members;
+          body <- renderQualified plan infos IM.empty expression;
+          freshPure ((,) body contracts)
+        } }
       }
     };
+  -- Declaration and qualified expression interfaces are source-issued facts.
+  -- Only provenance/location wrappers are peeled; no target type is inspected.
+  sourceDeclaredClasses :: Maybe SAnnotation -> SExpr -> [] String;
+  sourceDeclaredClasses annotation rhs = case annotation of {
+    Just (SAnnotation [] ty) -> qualifiedClasses ty;
+    Just _ -> [];
+    Nothing -> case rhs of {
+      SSourceDefinition body -> sourceDeclaredClasses Nothing body;
+      SCallSite name _ body ->
+        -- A managed expression signature is a use: planQualifiedFunction
+        -- supplies its managed argument here and propagates ordinary demands.
+        if eqString name "an expression type signature" && managedAnnotation body
+        then [] else sourceDeclaredClasses Nothing body;
+      SAnn _ (SAnnotation [] ty) -> qualifiedClasses ty;
+      SSignature _ (SAnnotation [] ty) -> qualifiedClasses ty;
+      _ -> []
+    }
+  };
+  qualifiedTopBindings :: QualifiedExpr -> Map String QualifiedExpr;
+  qualifiedTopBindings (QualifiedExpr _ form) = case form of {
+    QualifiedLet name rhs body -> M.insert compareString name rhs (qualifiedTopBindings body);
+    QualifiedRec definitions body -> M.union compareString
+      (M.fromList compareString (map (\((,,) name _ rhs) -> (,) name rhs) definitions))
+      (qualifiedTopBindings body);
+    _ -> M.empty
+  };
   reserveSourceNames :: [] String -> Fresh ();
   reserveSourceNames names = Fresh (\count used ->
     Right ((,,) () count (foldlStrict (\acc name -> S.insert compareString name acc) used names)));
@@ -1312,254 +1383,496 @@ module Bootstrap.Classes where {
       SArrow x y -> (occurrences a x + occurrences a y);
       _ -> 0
     };
-  lowerExpr :: Map String ([] ((,) EvidenceRole String)) ->
-               DataEnv ->
-               Map String Info ->
-               Map String ((,) String ([] String)) ->
-               [] ((,) EvidenceRole String) ->
-               SExpr -> Fresh ((,) SExpr ([] ((,) String String)));
-  lowerExpr valueScopes ds infos env candidates expression =
-    lowerExprAt Nothing valueScopes ds infos env candidates expression;
-  lowerExprAt :: Maybe ((,) String SourceSpan) ->
-                 Map String ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info ->
-                 Map String ((,) String ([] String)) -> [] ((,) EvidenceRole String) ->
-                 SExpr -> Fresh ((,) SExpr ([] ((,) String String)));
-  lowerExprAt site valueScopes ds infos env candidates expression =
+  -- Planning fixes dictionary arity/provenance, never predicate argument types.
+  -- Those remain ordinary dictionary-arrow constraints in the existing solver.
+  data QualifiedBinding = QualifiedKnown String ([] String)
+                        | QualifiedTemplate String Int Int
+                        | QualifiedRecursive String Int;
+  -- Managed evidence is synthesized at each use, never a demand seed.
+  data QualifiedArgument = OrdinaryArgument Int | ManagedArgument SExpr;
+  data QualifiedExpr = QualifiedExpr Int QualifiedForm;
+  data QualifiedForm = QualifiedPlain SExpr
+                     | QualifiedVariable String (Maybe ((,) Int Int))
+                     | QualifiedApply QualifiedExpr QualifiedExpr
+                     | QualifiedContext QualifiedExpr ([] QualifiedArgument)
+                     | QualifiedLambda String (Maybe SAnnotation) QualifiedExpr
+                     | QualifiedLet String QualifiedExpr QualifiedExpr
+                     | QualifiedAnnotation QualifiedExpr SAnnotation
+                     | QualifiedSignature QualifiedExpr SAnnotation
+                     | QualifiedCase QualifiedExpr ([] ((,) SPattern QualifiedExpr))
+                     | QualifiedChecked SType ([] String) ([] ((,) EvidenceRole String)) QualifiedExpr
+                     | QualifiedRec ([] ((,,) String RecursiveMode QualifiedExpr)) QualifiedExpr;
+  data QualifiedBuild = QualifiedBuild ([] Q.Frame) ([] Q.Seed) ([] Q.Use)
+                                      ([] ((,) Int Q.Demand));
+  data QualifiedResult = QualifiedResult QualifiedExpr QualifiedBuild;
+  qualifiedEmpty :: QualifiedBuild;
+  qualifiedEmpty = QualifiedBuild [] [] [] [];
+  qualifiedMerge :: QualifiedBuild -> QualifiedBuild -> QualifiedBuild;
+  qualifiedMerge (QualifiedBuild a b c d) (QualifiedBuild w x y z) =
+    QualifiedBuild (append a w) (append b x) (append c y) (append d z);
+  qualifiedBuilds :: [] QualifiedBuild -> QualifiedBuild;
+  qualifiedBuilds = foldlStrict qualifiedMerge qualifiedEmpty;
+  qualifiedNode :: QualifiedExpr -> Int;
+  qualifiedNode (QualifiedExpr n _) = n;
+  qualifiedExpression :: QualifiedResult -> QualifiedExpr;
+  qualifiedExpression (QualifiedResult expression _) = expression;
+  qualifiedBuild :: QualifiedResult -> QualifiedBuild;
+  qualifiedBuild (QualifiedResult _ build) = build;
+  qualifiedId :: Fresh Int;
+  qualifiedId = Fresh (\count used -> Right ((,,) count (count + 1) used));
+  qualifiedFinish :: Int -> Maybe Int -> QualifiedBuild -> Fresh QualifiedBuild;
+  qualifiedFinish owner parent (QualifiedBuild frames seeds uses nodes) =
+    do {
+      rank <- qualifiedId;
+      freshPure (QualifiedBuild ((:) (Q.Frame owner parent rank) frames) seeds uses nodes)
+    };
+  qualifiedMake :: QualifiedForm -> Q.Demand -> QualifiedBuild -> Fresh QualifiedResult;
+  qualifiedMake form demand build =
+    do {
+      node <- qualifiedId;
+      case build of {
+        QualifiedBuild frames seeds uses nodes ->
+          freshPure (QualifiedResult (QualifiedExpr node form)
+            (QualifiedBuild frames seeds uses ((:) ((,) node demand) nodes)))
+      }
+    };
+  qualifiedJoin :: QualifiedForm -> [] QualifiedResult -> Fresh QualifiedResult;
+  qualifiedJoin form results =
+    qualifiedMake form (Q.UnionNodes (map (\result -> qualifiedNode (qualifiedExpression result)) results))
+      (qualifiedBuilds (map qualifiedBuild results));
+  qualifiedClasses :: SType -> [] String;
+  qualifiedClasses ty =
+    case scheme ty of { (,,) _ ps _ -> map (\(SPredicate c _) -> c) ps };
+  qualifiedSeeds :: Int -> [] String -> Fresh QualifiedBuild;
+  qualifiedSeeds owner classes =
+    do {
+      seeds <- mapM (\c -> do { n <- qualifiedId; freshPure (Q.Seed n c owner) }) classes;
+      nodes <- mapM (\seed -> case seed of {
+        Q.Seed n _ _ -> do { node <- qualifiedId; freshPure ((,) node (Q.SeedNode n)) }
+      }) seeds;
+      freshPure (QualifiedBuild [] seeds [] nodes)
+    };
+  qualifiedManagedScope :: Map String QualifiedBinding -> Map String ((,) String ([] String));
+  qualifiedManagedScope env = case M.lookup compareString callStackScopeKey env of {
+    Just (QualifiedKnown name _) -> M.singleton callStackScopeKey ((,) name []);
+    _ -> M.empty
+  };
+  qualifiedEvidence :: Maybe ((,) String SourceSpan) -> Int -> Map String QualifiedBinding ->
+                       String -> QualifiedResult -> [] String -> Fresh QualifiedResult;
+  qualifiedEvidence site owner env hint source classes = do {
+    arguments <- mapM (\classId ->
+      if eqString classId callStackPredicate then do {
+        evidence <- callSiteEvidence site hint (qualifiedManagedScope env);
+        freshPure ((,) (ManagedArgument evidence) qualifiedEmpty)
+      } else do {
+        seed <- qualifiedId;
+        node <- qualifiedId;
+        freshPure ((,) (OrdinaryArgument seed)
+          (QualifiedBuild [] ((:) (Q.Seed seed classId owner) []) []
+            ((:) ((,) node (Q.SeedNode seed)) [])))
+      }) classes;
+    let { build = qualifiedBuilds (map snd arguments) };
+    case build of { QualifiedBuild _ _ _ nodes ->
+      qualifiedMake (QualifiedContext (qualifiedExpression source) (map fst arguments))
+        (Q.UnionNodes (map fst nodes)) (qualifiedMerge (qualifiedBuild source) build)
+    }
+  };
+  qualifiedKnown :: Maybe ((,) String SourceSpan) -> Int -> Map String QualifiedBinding ->
+                    String -> String -> [] String -> Fresh QualifiedResult;
+  qualifiedKnown site owner env hint name classes = do {
+    source <- qualifiedMake (QualifiedPlain (SVar name)) Q.Empty qualifiedEmpty;
+    qualifiedEvidence site owner env hint source classes
+  };
+  planQualifiedFunction :: Maybe ((,) String SourceSpan) ->
+    Map String ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
+    Map String QualifiedBinding -> [] ((,) EvidenceRole String) -> SExpr -> Fresh QualifiedResult;
+  planQualifiedFunction site valueScopes ds infos owner env candidates expression =
     case expression of {
-      SSourceDefinition body ->
-        lowerExprAt site valueScopes ds infos (M.delete compareString callStackScopeKey env) candidates body;
+      SSourceDefinition body -> planQualifiedFunction site valueScopes ds infos owner
+        (M.delete compareString callStackScopeKey env) candidates body;
+      SCallSite name location body -> planQualifiedFunction (Just ((,) name location))
+        valueScopes ds infos owner env candidates body;
+      SAnn rhs (SAnnotation [] ty) ->
+        if null (qualifiedClasses ty)
+        then planQualified site valueScopes ds infos owner env candidates expression
+        else do {
+          source <- planQualifiedSigned site valueScopes ds infos owner env candidates rhs ty;
+          qualifiedEvidence site owner env "an expression type signature" source (qualifiedClasses ty)
+        };
+      _ -> planQualified site valueScopes ds infos owner env candidates expression
+    };
+  planQualified :: Maybe ((,) String SourceSpan) -> Map String ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
+                   Map String QualifiedBinding -> [] ((,) EvidenceRole String) ->
+                   SExpr -> Fresh QualifiedResult;
+  planQualified site valueScopes ds infos owner env candidates expression =
+    case expression of {
+      SSourceDefinition body -> planQualified site valueScopes ds infos owner
+        (M.delete compareString callStackScopeKey env) candidates body;
       SCallSite name location value ->
         if eqString name "an expression type signature" && managedAnnotation value
-        then lowerFunctionAt (Just ((,) name location)) valueScopes ds infos env candidates value
-        else lowerExprAt (Just ((,) name location)) valueScopes ds infos env candidates value;
+        then planQualifiedFunction (Just ((,) name location)) valueScopes ds infos owner env candidates value
+        else planQualified (Just ((,) name location)) valueScopes ds infos owner env candidates value;
       SVar x ->
         if eqString x "$MLF.Stack.callStack"
-        then do { stack <- currentCallStack env; freshPure ((,) stack []) }
-        else case M.lookup compareString x env of {
-          Nothing -> freshPure ((,) expression []);
-          Just ((,) name classes) -> applyEvidence site x env (SVar name) classes
+        then do {
+          stack <- currentCallStack (qualifiedManagedScope env);
+          qualifiedMake (QualifiedPlain stack) Q.Empty qualifiedEmpty
+        }
+        else
+        case M.lookup compareString x env of {
+          Nothing -> qualifiedMake (QualifiedPlain expression) Q.Empty qualifiedEmpty;
+          Just (QualifiedKnown name classes) -> qualifiedKnown site owner env x name classes;
+          Just (QualifiedRecursive name source) ->
+            qualifiedMake (QualifiedVariable name Nothing) (Q.RefNode source) qualifiedEmpty;
+          Just (QualifiedTemplate name frame source) ->
+            do {
+              use <- qualifiedId;
+              qualifiedMake (QualifiedVariable name (Just ((,) use source))) (Q.InstantiateNode use source)
+                (QualifiedBuild [] [] ((:) (Q.Use use frame owner) []) [])
+            }
         };
-      SConstructor _ -> freshPure ((,) expression []);
-      SIntLit _ -> freshPure ((,) expression []);
-      SDoubleLit _ -> freshPure ((,) expression []);
-      SBoolLit _ -> freshPure ((,) expression []);
-      SStringLit _ -> freshPure ((,) expression []);
-      SPrimitive _ -> freshPure ((,) expression []);
       SApp a b ->
         do {
-          boundValueShared10 <- lowerFunctionAt site valueScopes ds infos env candidates a;
-          case boundValueShared10 of {
-            (,) f as ->
-              do {
-                boundValueShared9 <- lowerExprAt site valueScopes ds infos env candidates b;
-                case boundValueShared9 of {
-                  (,) x bs ->
-                    do {
-                      freshPure ((,) (SApp f x) (append as bs))
-                    }
-                }
-              }
-          }
+          left <- planQualifiedFunction site valueScopes ds infos owner env candidates a;
+          right <- planQualified site valueScopes ds infos owner env candidates b;
+          qualifiedJoin (QualifiedApply (qualifiedExpression left) (qualifiedExpression right))
+            ((:) left ((:) right []))
         };
       SLam x annotation body ->
         do {
-          boundValueShared12 <-
-            case annotation of {
-              Nothing -> freshPure ((,) Nothing []);
-              Just (SAnnotation existential ty) ->
-                do {
-                  translated <-
-                    if null existential
-                    then freshLift (translateScheme ds infos ty)
-                    else freshPure ty;
-                  let {
-                    predicates =
-                      case scheme ty of {
-                        (,,) _ ps _ -> ps
-                      }
-                  };
-                  freshPure
-                    ((,) (Just (SAnnotation existential translated))
-                       (map (\(SPredicate c _) -> c) predicates))
-                }
-            };
-          case boundValueShared12 of {
-            (,) annotation2 classes ->
+          translated <- case annotation of {
+            Nothing -> freshPure Nothing;
+            Just (SAnnotation existential ty) ->
               do {
-                boundValueShared11 <-
-                  lowerExprAt site valueScopes ds infos (M.insert compareString x ((,) x classes) env)
-                    candidates
-                    body;
-                case boundValueShared11 of {
-                  (,) body2 wants ->
-                    do {
-                      freshPure ((,) (SLam x annotation2 body2) wants)
-                    }
-                }
-              }
-          }
-        };
-      SLet x (SAnn rhs (SAnnotation [] ty)) body ->
-        do {
-          rhs2 <-
-            signedIn valueScopes ds infos (M.findWithDefault compareString candidates x valueScopes)
-              env
-              rhs
-              ty;
-          let {
-            predicates =
-              case scheme ty of {
-                (,,) _ ps _ -> ps
+                ty2 <- if null existential then freshLift (translateLocalScheme ds infos ty)
+                       else freshPure ty;
+                freshPure (Just (SAnnotation existential ty2))
               }
           };
-          boundValueShared13 <-
-            lowerExprAt site valueScopes ds infos
-              (M.insert compareString x ((,) x (map (\(SPredicate c _) -> c) predicates)) env)
-              candidates
-              body;
-          case boundValueShared13 of {
-            (,) body2 wants ->
-              do {
-                freshPure ((,) (SLet x rhs2 body2) wants)
-              }
-          }
+          let { classes = case annotation of {
+            Nothing -> []; Just (SAnnotation _ ty) -> qualifiedClasses ty
+          } };
+          result <- planQualified site valueScopes ds infos owner
+            (M.insert compareString x (QualifiedKnown x classes) env) candidates body;
+          qualifiedJoin (QualifiedLambda x translated (qualifiedExpression result)) ((:) result [])
+        };
+      SLet x (SSignature rhs (SAnnotation [] ty)) body ->
+        do {
+          left <- planQualified site valueScopes ds infos owner env
+            (M.findWithDefault compareString candidates x valueScopes)
+            (SSignature rhs (SAnnotation [] ty));
+          right <- planQualified site valueScopes ds infos owner
+            (M.insert compareString x (QualifiedKnown x (qualifiedClasses ty)) env) candidates body;
+          qualifiedMake (QualifiedLet x (qualifiedExpression left) (qualifiedExpression right))
+            (Q.RefNode (qualifiedNode (qualifiedExpression right)))
+            (qualifiedMerge (qualifiedBuild left) (qualifiedBuild right))
         };
       SLet x rhs body ->
         do {
-          boundValueShared15 <-
-            lowerExprAt site valueScopes ds infos env
-              (M.findWithDefault compareString candidates x valueScopes)
-              rhs;
-          case boundValueShared15 of {
-            (,) rhs2 wanted ->
-              do {
-                boundValueShared14 <-
-                  lowerExprAt site valueScopes ds infos
-                    (M.insert compareString x ((,) x (map snd wanted)) env)
-                    candidates
-                    body;
-                case boundValueShared14 of {
-                  (,) body2 wants ->
-                    do {
-                      freshPure
-                        ((,) (SLet x (foldr (\((,) n _) b -> SLam n Nothing b) rhs2 wanted) body2)
-                           wants)
-                    }
-                }
-              }
-          }
+          frame <- qualifiedId;
+          left <- planQualified site valueScopes ds infos frame env
+            (M.findWithDefault compareString candidates x valueScopes) rhs;
+          build <- qualifiedFinish frame (Just owner) (qualifiedBuild left);
+          let {
+            inferred = QualifiedTemplate x frame (qualifiedNode (qualifiedExpression left));
+            explicit = sourceDeclaredClasses Nothing rhs;
+            -- Match source-export interface provenance, including copied and
+            -- located wrappers, without interpreting a target dictionary arrow.
+            binding = if null explicit then inferred else QualifiedKnown x explicit
+          };
+          right <- planQualified site valueScopes ds infos owner
+            (M.insert compareString x binding env) candidates body;
+          qualifiedMake (QualifiedLet x (qualifiedExpression left) (qualifiedExpression right))
+            (Q.RefNode (qualifiedNode (qualifiedExpression right)))
+            (qualifiedMerge build (qualifiedBuild right))
         };
-      SAnn a (SAnnotation existential ty) ->
-        let {
-          predicates =
-            case scheme ty of {
-              (,,) _ ps _ -> ps
-            }
-        } in
-        if not (null predicates)
+      SSignature rhs (SAnnotation existential ty) ->
+        if null existential
         then do {
-               freshLift
-                 (ensure (null existential) "qualified annotations cannot bind existentials");
-               result <- signedIn valueScopes ds infos candidates env a ty;
-               freshPure ((,) result [])
-             }
+          translated <- freshLift (translateLocalScheme ds infos ty);
+          result <- planQualifiedSigned site valueScopes ds infos owner env candidates rhs ty;
+          qualifiedJoin (QualifiedSignature (qualifiedExpression result) (SAnnotation [] translated))
+            ((:) result [])
+        }
         else do {
-               boundValueShared16 <- lowerExprAt site valueScopes ds infos env candidates a;
-               case boundValueShared16 of {
-                 (,) a2 wants ->
-                   do {
-                     translated <-
-                       if null existential
-                       then freshLift (translateScheme ds infos ty)
-                       else freshPure ty;
-                     freshPure ((,) (SAnn a2 (SAnnotation existential translated)) wants)
-                   }
-               }
-             };
-      SCase a branches ->
-        do {
-          boundValueShared18 <- lowerExprAt site valueScopes ds infos env candidates a;
-          case boundValueShared18 of {
-            (,) a2 as ->
-              do {
-                bs <-
-                  mapM
-                    (\(SAlternative pattern body) ->
-                       do {
-                         let {
-                           names = Surface.patternVariables pattern
-                         };
-                         let {
-                           scope = foldr (\n -> M.insert compareString n ((,) n [])) env names
-                         };
-                         boundValueShared17 <- lowerExprAt site valueScopes ds infos scope candidates body;
-                         case boundValueShared17 of {
-                           (,) body2 wants ->
-                             do {
-                               freshPure ((,) (SAlternative pattern body2) wants)
-                             }
-                         }
-                       })
-                    branches;
-                freshPure ((,) (SCase a2 (map fst bs)) (append as (concatMap snd bs)))
-              }
-          }
+          freshLift (ensure (null (qualifiedClasses ty)) "qualified annotations cannot bind existentials");
+          result <- planQualified site valueScopes ds infos owner env candidates rhs;
+          qualifiedJoin (QualifiedSignature (qualifiedExpression result) (SAnnotation existential ty))
+            ((:) result [])
         };
-      SDo _ _ -> lowerExprAt site valueScopes ds infos env candidates (Desugar.desugarDo expression);
+      SAnn rhs (SAnnotation existential ty) ->
+        if not (null (qualifiedClasses ty))
+        then do {
+          freshLift (ensure (null existential) "qualified annotations cannot bind existentials");
+          planQualifiedSigned site valueScopes ds infos owner env candidates rhs ty
+        }
+        else do {
+          result <- planQualified site valueScopes ds infos owner env candidates rhs;
+          ty2 <- if null existential then freshLift (translateLocalScheme ds infos ty) else freshPure ty;
+          qualifiedJoin (QualifiedAnnotation (qualifiedExpression result) (SAnnotation existential ty2))
+            ((:) result [])
+        };
+      SCase rhs branches ->
+        do {
+          result <- planQualified site valueScopes ds infos owner env candidates rhs;
+          planned <- mapM (\(SAlternative pattern body) -> do {
+            let { scope = foldr (\n -> M.insert compareString n (QualifiedKnown n []))
+                          env (Surface.patternVariables pattern) };
+            branch <- planQualified site valueScopes ds infos owner scope candidates body;
+            freshPure ((,) pattern branch)
+          }) branches;
+          qualifiedJoin (QualifiedCase (qualifiedExpression result)
+            (map (\((,) p r) -> (,) p (qualifiedExpression r)) planned))
+            ((:) result (map snd planned))
+        };
+      SDo _ _ -> planQualified site valueScopes ds infos owner env candidates (Desugar.desugarDo expression);
       SLetRec definitions body ->
-        do {
-          signatures <-
-            freshLift
-              (traverseEither
-                 (\((,,) n annotation rhs) ->
-                    case annotation of {
-                      SAnnotation [] ty -> Right ((,,) n ty rhs);
-                      _ ->
-                        Left
-                          ("recursive definition " ++
-                           (n ++ " requires an explicit closed signature"))
-                    })
-                 definitions);
-          let {
-            entries =
-              map
-                (\((,,) n ty _) ->
-                   case scheme ty of {
-                     (,,) _ predicates _ ->
-                       (,) n ((,) n (map (\(SPredicate c _) -> c) predicates))
-                   })
-                signatures
-          };
-          let {
-            scope = M.union compareString (M.fromList compareString entries) env
-          };
-          definitions2 <-
-            mapM
-              (\((,,) n ty rhs) ->
-                 do {
-                   translated <- freshLift (translateScheme ds infos ty);
-                   rhs2 <-
-                     signedIn valueScopes ds infos
-                       (M.findWithDefault compareString candidates n valueScopes)
-                       scope
-                       rhs
-                       ty;
-                   freshPure ((,,) n (SAnnotation [] translated) rhs2)
-                 })
-              signatures;
-          boundValueShared19 <- lowerExprAt site valueScopes ds infos scope candidates body;
-          case boundValueShared19 of {
-            (,) body2 wants ->
-              do {
-                freshPure ((,) (SLetRec definitions2 body2) wants)
-              }
-          }
-        };
+        planQualifiedRecursive site valueScopes ds infos owner env candidates definitions body;
       SSharedBind _ _ _ _ _ -> freshFail "shared do bind escaped surface lowering";
       SEquations _ -> freshFail "surface equations escaped lowering";
       SWanted _ _ -> freshFail "dictionary holes are reserved for dictionary translation";
-      SChecked _ _ -> freshFail "checked source forms are reserved for dictionary translation"
+      SChecked _ _ -> freshFail "checked source forms are reserved for dictionary translation";
+      _ -> qualifiedMake (QualifiedPlain expression) Q.Empty qualifiedEmpty
     };
+  planQualifiedSigned :: Maybe ((,) String SourceSpan) -> Map String ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
+                         Map String QualifiedBinding -> [] ((,) EvidenceRole String) ->
+                         SExpr -> SType -> Fresh QualifiedResult;
+  planQualifiedSigned site valueScopes ds infos owner env available expression ty =
+    case expression of {
+      -- Reset copied definition scope before installing its own explicit givens.
+      SSourceDefinition body -> planQualifiedSigned site valueScopes ds infos owner
+        (M.delete compareString callStackScopeKey env) available body ty;
+      SCallSite name location body -> planQualifiedSigned (Just ((,) name location))
+        valueScopes ds infos owner env available body ty;
+      _ -> do {
+        translated <- freshLift (translateLocalScheme ds infos ty);
+        let { classes = qualifiedClasses ty };
+        names <- mapM (\_ -> freshName "givenDictionary") classes;
+        let {
+          ordinary = filter (\((,) classId _) -> not (eqString classId callStackPredicate))
+            (zip classes names);
+          local = append (map (\((,) _ name) -> (,) GivenEvidence name) ordinary) available;
+          scope = foldl (\current ((,) classId name) ->
+            if eqString classId callStackPredicate
+            then M.insert compareString callStackScopeKey (QualifiedKnown name []) current
+            else current) env (zip classes names)
+        };
+        frame <- qualifiedId;
+        result <- planQualified site valueScopes ds infos frame scope local expression;
+        build <- qualifiedFinish frame (Just owner) (qualifiedBuild result);
+        qualifiedMake (QualifiedChecked translated names local (qualifiedExpression result)) Q.Empty build
+      }
+    };
+  planQualifiedRecursive :: Maybe ((,) String SourceSpan) -> Map String ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
+                            Map String QualifiedBinding -> [] ((,) EvidenceRole String) ->
+                            [] ((,,) String RecursiveMode SExpr) -> SExpr -> Fresh QualifiedResult;
+  planQualifiedRecursive site valueScopes ds infos owner env candidates definitions body =
+    do {
+      freshLift (traverseEither (\((,,) n mode _) -> case mode of {
+        InferRecursive -> Right ();
+        CheckRecursive (SAnnotation [] _) -> Right ();
+        _ -> Left ("recursive definition " ++ n ++ " requires an explicit closed signature")
+      }) definitions);
+      let {
+        unsigned = filter (\((,,) _ mode _) -> case mode of {
+          InferRecursive -> True; _ -> False
+        }) definitions;
+        signed = filter (\((,,) _ mode _) -> case mode of {
+          InferRecursive -> False; _ -> True
+        }) definitions;
+        fixed = foldr (\((,,) n mode _) scope -> case mode of {
+          CheckRecursive (SAnnotation [] ty) ->
+            M.insert compareString n (QualifiedKnown n (qualifiedClasses ty)) scope;
+          _ -> scope
+        }) env signed;
+        groups = Dependency.components (map (\((,,) n _ rhs) ->
+          (,) n (Dependency.valueNames (Dependency.observeExpression rhs))) unsigned)
+      };
+      accumulated <- foldM (\((,,) scope previous build) group -> do {
+        frame <- qualifiedId;
+        entries <- mapM (\n -> do { node <- qualifiedId; freshPure ((,) n node) }) group;
+        let {
+          shared = foldr (\((,) n node) -> M.insert compareString n (QualifiedRecursive n node))
+                    scope entries
+        };
+        planned <- mapM (\((,) n node) -> do {
+          rhs <- freshLift (case find (\((,,) name _ _) -> eqString name n) unsigned of {
+            Nothing -> Left "qualified recursive declaration disappeared";
+            Just ((,,) _ _ rhs) -> Right rhs
+          });
+          result <- planQualified site valueScopes ds infos frame shared
+            (M.findWithDefault compareString candidates n valueScopes) rhs;
+          let {
+            link = QualifiedBuild [] [] []
+              ((:) ((,) node (Q.RefNode (qualifiedNode (qualifiedExpression result)))) [])
+          };
+          freshPure ((,) ((,,) n InferRecursive (qualifiedExpression result))
+            (qualifiedMerge (qualifiedBuild result) link))
+        }) entries;
+        completed <- qualifiedFinish frame (Just owner) (qualifiedBuilds (map snd planned));
+        let {
+          exported = foldr (\((,) n node) -> M.insert compareString n (QualifiedTemplate n frame node))
+                       scope entries
+        };
+        freshPure ((,,) exported (append previous (map fst planned)) (qualifiedMerge build completed))
+      }) ((,,) fixed [] qualifiedEmpty) groups;
+      case accumulated of {
+        (,,) scope inferred build -> do {
+          checked <- mapM (\((,,) n mode rhs) -> case mode of {
+            CheckRecursive (SAnnotation [] ty) -> do {
+              translated <- freshLift (translateLocalScheme ds infos ty);
+              result <- planQualifiedSigned site valueScopes ds infos owner scope
+                (M.findWithDefault compareString candidates n valueScopes) rhs ty;
+              freshPure ((,) ((,,) n (CheckRecursive (SAnnotation [] translated))
+                (qualifiedExpression result)) (qualifiedBuild result))
+            };
+            _ -> freshFail "invalid signed recursive plan"
+          }) signed;
+          let { allDefinitions = append inferred (map fst checked) };
+          ordered <- freshLift (traverseEither (\((,,) n _ _) ->
+            case find (\((,,) name _ _) -> eqString name n) allDefinitions of {
+              Nothing -> Left "qualified recursive plan lost a declaration";
+              Just definition -> Right definition
+            }) definitions);
+          continuation <- planQualified site valueScopes ds infos owner scope candidates body;
+          qualifiedMake (QualifiedRec ordered (qualifiedExpression continuation))
+            (Q.RefNode (qualifiedNode (qualifiedExpression continuation)))
+            (qualifiedBuilds ((:) build ((:) (qualifiedBuild continuation) (map snd checked))))
+        }
+      }
+    };
+  qualifiedParameters :: Q.Plan -> QualifiedExpr -> Fresh ([] ((,,) Int String String));
+  qualifiedParameters plan expression =
+    do {
+      slots <- freshLift (Q.slotsAt plan (qualifiedNode expression));
+      mapM (\slot -> do {
+        name <- freshName "wantedDictionary";
+        classId <- freshLift (Q.slotClass plan slot);
+        freshPure ((,,) slot name classId)
+      }) slots
+    };
+  qualifiedParameterMap :: [] ((,,) Int String String) -> IntMap String;
+  qualifiedParameterMap parameters = IM.fromList (map (\((,,) slot name _) -> (,) slot name) parameters);
+  qualifiedWants :: [] ((,,) Int String String) -> [] ((,) String String);
+  qualifiedWants parameters = map (\((,,) _ name classId) -> (,) name classId) parameters;
+  renderQualified :: Q.Plan -> Map String Info -> IntMap String -> QualifiedExpr -> Fresh SExpr;
+  renderQualified plan infos bindings expression =
+    case expression of {
+      QualifiedExpr node form ->
+        case form of {
+          QualifiedPlain source -> freshPure source;
+          QualifiedVariable name mapping -> renderQualifiedArguments plan bindings node mapping (SVar name);
+          QualifiedApply a b -> do {
+            left <- renderQualified plan infos bindings a;
+            right <- renderQualified plan infos bindings b;
+            freshPure (SApp left right)
+          };
+          QualifiedContext source arguments -> do {
+            result <- renderQualified plan infos bindings source;
+            values <- mapM (\argument -> case argument of {
+              ManagedArgument value -> freshPure value;
+              OrdinaryArgument seed -> do {
+                slot <- freshLift (Q.seedSlot plan seed);
+                name <- freshLift (case IM.lookup slot bindings of {
+                  Nothing -> Left "ordinary evidence escaped its lexical abstraction";
+                  Just value -> Right value
+                });
+                freshPure (SVar name)
+              }
+            }) arguments;
+            freshPure (foldl SApp result values)
+          };
+          QualifiedLambda name annotation body -> do {
+            result <- renderQualified plan infos bindings body;
+            freshPure (SLam name annotation result)
+          };
+          QualifiedLet name rhs body -> do {
+            parameters <- qualifiedParameters plan rhs;
+            left <- renderQualified plan infos (qualifiedParameterMap parameters) rhs;
+            right <- renderQualified plan infos bindings body;
+            freshPure (SLet name (foldr (\((,,) _ n _) b -> SLam n Nothing b) left parameters) right)
+          };
+          QualifiedAnnotation source annotation -> do {
+            result <- renderQualified plan infos bindings source;
+            freshPure (SAnn result annotation)
+          };
+          QualifiedSignature source annotation -> do {
+            result <- renderQualified plan infos bindings source;
+            freshPure (SSignature result annotation)
+          };
+          QualifiedCase source branches -> do {
+            result <- renderQualified plan infos bindings source;
+            alternatives <- mapM (\((,) pattern body) -> do {
+              branch <- renderQualified plan infos bindings body;
+              freshPure (SAlternative pattern branch)
+            }) branches;
+            freshPure (SCase result alternatives)
+          };
+          QualifiedChecked ty names candidates source -> do {
+            parameters <- qualifiedParameters plan source;
+            result <- renderQualified plan infos (qualifiedParameterMap parameters) source;
+            freshPure (SChecked ty (foldr (\n b -> SLam n Nothing b)
+              (closeWants infos candidates (qualifiedWants parameters) result) names))
+          };
+          QualifiedRec definitions body -> do {
+            lowered <- mapM (\((,,) name mode rhs) -> do {
+              parameters <- qualifiedParameters plan rhs;
+              result <- renderQualified plan infos (qualifiedParameterMap parameters) rhs;
+              freshPure ((,,) name mode
+                (foldr (\((,,) _ n _) b -> SLam n Nothing b) result parameters))
+            }) definitions;
+            result <- renderQualified plan infos bindings body;
+            freshPure (SLetRec lowered result)
+          }
+        }
+    };
+  renderQualifiedArguments :: Q.Plan -> IntMap String -> Int -> Maybe ((,) Int Int) -> SExpr -> Fresh SExpr;
+  renderQualifiedArguments plan bindings node mapping source =
+    do {
+      -- Preserve formal order and multiplicity. Two callee slots can map to
+      -- one inherited caller slot; the call still passes both arguments.
+      slots <- freshLift (case mapping of {
+        Nothing -> Q.slotsAt plan node;
+        Just ((,) use input) -> do {
+          original <- Q.slotsAt plan input;
+          traverseEither (Q.instantiateSlot plan use) original
+        }
+      });
+      names <- freshLift (traverseEither (\slot -> case IM.lookup slot bindings of {
+        Nothing -> Left "qualified dictionary slot escaped its lexical abstraction";
+        Just name -> Right name
+      }) slots);
+      freshPure (foldl SApp source (map SVar names))
+    };
+  lowerExpr :: Map String ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info ->
+               Map String ((,) String ([] String)) -> [] ((,) EvidenceRole String) ->
+               SExpr -> Fresh ((,) SExpr ([] ((,) String String)));
+  lowerExpr valueScopes ds infos env candidates expression =
+    lowerExprAt Nothing valueScopes ds infos env candidates expression;
+  lowerExprAt :: Maybe ((,) String SourceSpan) -> Map String ([] ((,) EvidenceRole String)) ->
+    DataEnv -> Map String Info -> Map String ((,) String ([] String)) ->
+    [] ((,) EvidenceRole String) -> SExpr -> Fresh ((,) SExpr ([] ((,) String String)));
+  lowerExprAt site valueScopes ds infos env candidates expression = do {
+    result <- prepareQualified site valueScopes ds infos env candidates expression;
+    case result of { (,) planned plan -> do {
+      parameters <- qualifiedParameters plan planned;
+      lowered <- renderQualified plan infos (qualifiedParameterMap parameters) planned;
+      freshPure ((,) lowered (qualifiedWants parameters))
+    } }
+  };
+  prepareQualified :: Maybe ((,) String SourceSpan) -> Map String ([] ((,) EvidenceRole String)) ->
+    DataEnv -> Map String Info -> Map String ((,) String ([] String)) ->
+    [] ((,) EvidenceRole String) -> SExpr -> Fresh ((,) QualifiedExpr Q.Plan);
+  prepareQualified site valueScopes ds infos env candidates expression = do {
+    owner <- qualifiedId;
+    result <- planQualified site valueScopes ds infos owner
+      (M.map (\((,) name classes) -> QualifiedKnown name classes) env) candidates expression;
+    build <- qualifiedFinish owner Nothing (qualifiedBuild result);
+    plan <- freshLift (case build of {
+      QualifiedBuild frames seeds uses nodes -> Q.solve frames seeds uses (IM.fromList nodes)
+    });
+    freshPure ((,) (qualifiedExpression result) plan)
+  };
   managedAnnotation :: SExpr -> Bool;
   managedAnnotation expression = case expression of {
     SAnn _ (SAnnotation _ ty) -> managedType ty;
@@ -1737,6 +2050,7 @@ module Bootstrap.Classes where {
       SLet n a b ->
         SLet n (closeWanted replacements candidates a) (closeWanted replacements candidates b);
       SAnn a ty -> SAnn (closeWanted replacements candidates a) ty;
+      SSignature a ty -> SSignature (closeWanted replacements candidates a) ty;
       SCase a branches ->
         SCase (closeWanted replacements candidates a)
           (map (\(SAlternative p b) -> SAlternative p (closeWanted replacements candidates b))
