@@ -122,6 +122,14 @@ jobs:
           for suite in host native legacy; do
             python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 ".mlf-build/int64-$suite-guard" python3 -B tools/performance/int64/run_controls.py --suite "$suite" --producer .mlf-build/shared-ghc --output ".mlf-build/int64-$suite" --gc-prefix /usr --gmp-prefix /usr --gc-library "$(pkg-config --variable=libdir bdw-gc)/libgc.a"
           done
+      - name: Check complete datatype context reuse against frozen encoder
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/datatype-context-guard python3 -B tools/performance/datatype-context/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/datatype-context
+      - name: Check contract encoding reuse against frozen encoder
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/contract-context-guard python3 -B tools/performance/contract-context/run_controls.py --producer .mlf-build/shared-ghc --output .mlf-build/contract-context
       - name: Check finite P1-P3, A1 and F1 correctness
         if: matrix.optimization == '2'
         run: |

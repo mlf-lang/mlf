@@ -360,6 +360,18 @@ module Bootstrap.CrateQuery where {
     list (\d -> findQueryDatatypeEncoding d
       (M.findWithDefault compareString [] (D.datatypeName d) entries))
       (append D.builtinDeclarations declarations);
+  -- File-owned, finite declarations only. Keep one complete context; a miss
+  -- uses the original encoder, including its duplicate-name/layout fallback.
+  data DatatypeContextEncoding = DatatypeContextEncoding ([] DataDecl) String;
+  emptyDatatypeContextEncoding :: SourceEncodings -> DatatypeContextEncoding;
+  emptyDatatypeContextEncoding pool = DatatypeContextEncoding []
+    (encodeDatatypeContextWithPool pool []);
+  reuseDatatypeContext :: SourceEncodings -> DatatypeContextEncoding -> [] DataDecl ->
+    (,) String DatatypeContextEncoding;
+  reuseDatatypeContext pool (DatatypeContextEncoding original encoded) declarations =
+    let { text = if eqList SourceEquality.eqDataDecl original declarations then encoded
+          else encodeDatatypeContextWithPool pool declarations }
+    in (,) text (DatatypeContextEncoding declarations text);
   encodeXType :: XType -> String;
   encodeXType ty =
     case ty of {
@@ -1098,7 +1110,46 @@ module Bootstrap.CrateQuery where {
     ((:) (list (\member -> encodeMember (canonicalMember member)) (Source.groupOriginal prepared))
       (sourceGroupMetadata prepared));
   sourceGroupMetadata :: Source.PreparedGroup -> [] String;
-  sourceGroupMetadata prepared =
+  sourceGroupMetadata = sourceGroupMetadataUsing encodeTypedCandidate;
+  encodeTypedCandidate protectedCandidates ((,,) role candidate ty) =
+    encodeTypedCandidateBinding role candidate protectedCandidates (encodeBinding ((,) candidate ty));
+  encodeTypedCandidateBinding role candidate protectedCandidates binding = node "typed-definition-candidate"
+    ((:) (encodeRole role) ((:) binding
+      ((:) (boolean (elem eqString candidate protectedCandidates)) [])));
+  -- This pool belongs to one parsed-source driver and its current contract map.
+  -- prepareGroup obtains candidate types and selected group bindings from that
+  -- exact map. Apply every
+  -- finalized delta to both maps with the same left bias before the next group;
+  -- this ownership permits name lookup without repeating structural type checks.
+  -- Map values and both encoded fields remain lazy, including unused contracts.
+  data SourceContractEncoding = SourceContractEncoding String String;
+  data SourceContractEncodings = SourceContractEncodings (Map String SourceContractEncoding);
+  prepareSourceContractEncoding name contract =
+    let { binding = encodeBinding ((,) name (Source.contractType contract)) } in
+    SourceContractEncoding binding (node "source-contract"
+      ((:) binding ((:) (list (\x -> x) (Source.contractClasses contract))
+        ((:) (boolean (Source.contractProtected contract)) []))));
+  prepareSourceContractEncodings contracts =
+    SourceContractEncodings (M.mapWithKey prepareSourceContractEncoding contracts);
+  extendSourceContractEncodings contracts (SourceContractEncodings entries) =
+    SourceContractEncodings (M.union compareString
+      (M.mapWithKey prepareSourceContractEncoding contracts) entries);
+  cachedSourceContract (SourceContractEncodings entries) pair@((,) name _) =
+    case M.lookup compareString name entries of {
+      Just (SourceContractEncoding _ text) -> text;
+      Nothing -> encodeSourceContract pair
+    };
+  cachedBinding (SourceContractEncodings entries) pair@((,) name _) =
+    case M.lookup compareString name entries of {
+      Just (SourceContractEncoding binding _) -> binding;
+      -- Keep the structural fallback for absent entries. A present entry is
+      -- valid only under the driver-owned, synchronized environment invariant.
+      Nothing -> encodeBinding pair
+    };
+  cachedTypedCandidate encodings protectedCandidates ((,,) role name ty) =
+    encodeTypedCandidateBinding role name protectedCandidates
+      (cachedBinding encodings ((,) name ty));
+  sourceGroupMetadataUsing candidateEncoding prepared =
       ((:) (list (\((,) name dictionary) -> node "class-dictionary" ((:) name ((:) dictionary [])))
         (M.toList (Source.groupRegistry prepared)))
       ((:) (list (\((,,) name classes protected) -> node "result-contract"
@@ -1109,21 +1160,20 @@ module Bootstrap.CrateQuery where {
         Just (Source.RootAuthority name labels protected candidates protectedCandidates) -> node "unsigned-source-root"
           ((:) name ((:) (list (\((,,) binder cls dictionary) -> node "exact-slot"
             ((:) binder ((:) cls ((:) dictionary [])))) labels)
-          ((:) (boolean protected) ((:) (list
-            (\((,,) role candidate ty) -> node "typed-definition-candidate"
-              ((:) (encodeRole role) ((:) (encodeBinding ((,) candidate ty))
-                ((:) (boolean (elem eqString candidate protectedCandidates)) [])))) candidates) []))))
+          ((:) (boolean protected) ((:) (list (candidateEncoding protectedCandidates) candidates) []))))
       }) ((:) (list (\((,) name flag) -> node "raw-parameter-protection"
         ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) []))));
   sourceGroupKey :: Source.PreparedGroup -> SourceKey;
-  sourceGroupKey prepared = keyNode "prepared-source-group"
+  sourceGroupKey = sourceGroupKeyUsing encodeTypedCandidate;
+  sourceGroupKeyUsing candidateEncoding prepared = keyNode "prepared-source-group"
     ((:) (keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupOriginal prepared))
-      (map KeyText (sourceGroupMetadata prepared)));
+      (map KeyText (sourceGroupMetadataUsing candidateEncoding prepared)));
   sourceQueryKey crateId compilerHash prepared contracts datatypes =
     sourceQueryKeyWithContext crateId compilerHash prepared contracts (encodeDatatypeContext datatypes);
   sourceQueryKeyWithContext :: String -> String -> Source.PreparedGroup ->
     Map String Source.SourceContract -> String -> String;
-  sourceQueryKeyWithContext crateId compilerHash prepared contracts datatypeContext =
+  sourceQueryKeyWithContext = sourceQueryKeyUsing encodeBinding encodeTypedCandidate encodeSourceContract;
+  sourceQueryKeyUsing bindingEncoding candidateEncoding contractEncoding crateId compilerHash prepared contracts datatypeContext =
     let { observed = S.fromList compareString
       (append (map fst (Source.groupBindings prepared))
         (append (map fst (Source.groupCandidateBindings prepared))
@@ -1133,8 +1183,10 @@ module Bootstrap.CrateQuery where {
     pooledSourceKey
       [KeyText "MLF-SOURCE-CRATE-QUERY-6", KeyText crateId, KeyText compilerHash,
        keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupMembers prepared),
-       KeyText (list encodeBinding (Source.groupBindings prepared)), KeyText datatypeContext,
-       sourceGroupKey prepared, KeyText (list encodeSourceContract (M.toList relevant))];
+       KeyText (list bindingEncoding (Source.groupBindings prepared)), KeyText datatypeContext,
+       sourceGroupKeyUsing candidateEncoding prepared, KeyText (list contractEncoding (M.toList relevant))];
+  sourceQueryKeyWithContractEncodings encodings =
+    sourceQueryKeyUsing (cachedBinding encodings) (cachedTypedCandidate encodings) (cachedSourceContract encodings);
   -- Raw checked inference payloads retain their established validator. A new
   -- source key deliberately uses self-contained cache format1: the old compact
   -- key parser must not be tricked into supplying a different context.
@@ -1151,6 +1203,14 @@ module Bootstrap.CrateQuery where {
     [] Separate.UnitObject -> Int -> Int -> [] GroupResult ->
     IO (Either String ((,,) ([] Separate.UnitObject) QueryReport (Map String Source.SourceContract)));
   runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsWithContext encodings Nothing crateId compilerHash cacheDir inventory plan groups contracts
+      objects inferred reused results;
+  runSourceGroupsWithContext encodings datatypeContext crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsWithOwnedContracts encodings datatypeContext Nothing crateId compilerHash cacheDir inventory plan
+      groups contracts objects inferred reused results;
+  runSourceGroupsWithOwnedContracts encodings datatypeContext contractEncodings crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (QueryReport inferred reused (reverse results)) contracts));
@@ -1162,10 +1222,17 @@ module Bootstrap.CrateQuery where {
         let { datatypes = requiredDataIn inventory members
           (append bindings (Source.groupCandidateBindings prepared)) };
         let { name = groupName crateId names };
-        let { key = case encodings of {
-          Nothing -> sourceQueryKey crateId compilerHash prepared contracts datatypes;
-          Just pool -> sourceQueryKeyWithContext crateId compilerHash prepared contracts
-            (encodeDatatypeContextWithPool pool datatypes)
+        let { context = case encodings of {
+          Nothing -> (,) (encodeDatatypeContext datatypes) Nothing;
+          Just pool -> case datatypeContext of {
+            Nothing -> (,) (encodeDatatypeContextWithPool pool datatypes) Nothing;
+            Just previous -> case reuseDatatypeContext pool previous datatypes of {
+              (,) text next -> (,) text (Just next)
+            }
+          }
+        }; key = case contractEncodings of {
+          Nothing -> sourceQueryKeyWithContext crateId compilerHash prepared contracts (fst context);
+          Just pool -> sourceQueryKeyWithContractEncodings pool crateId compilerHash prepared contracts (fst context)
         } };
         writeFile (cacheDir ++ "/query-key.new") key;
         digest <- fileDigest (cacheDir ++ "/query-key.new");
@@ -1204,7 +1271,10 @@ module Bootstrap.CrateQuery where {
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (list encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan rest
+                  runSourceGroupsWithOwnedContracts encodings (snd context) (case contractEncodings of {
+                    Nothing -> Nothing;
+                    Just pool -> Just (extendSourceContractEncodings finalContracts pool)
+                  }) crateId compilerHash cacheDir inventory plan rest
                     (M.union compareString finalContracts contracts)
                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))
                     (reused + (if hit then 1 else 0))
@@ -1253,7 +1323,10 @@ module Bootstrap.CrateQuery where {
                 compilerHash <- fileDigest executable;
                 let { encodings = if shareEncoding
                       then Just (prepareSourceEncodings (Source.planData plan)) else Nothing };
-                result <- runSourceGroupsWithEncodings encodings
+                result <- runSourceGroupsWithOwnedContracts encodings (case encodings of {
+                  Nothing -> Nothing;
+                  Just pool -> Just (emptyDatatypeContextEncoding pool)
+                }) (if shareEncoding then Just (prepareSourceContractEncodings contracts) else Nothing)
                   crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
                 releaseFileLock lock;
                 ioReturn result

@@ -49,8 +49,22 @@ def main():
                 if a.suite=='validation':
                     V=H.module(ROOT/'tools/performance/validation-reuse/source_contract.py','validation_contract')
                     raw=(source/V.OWNER).read_bytes()
+                    collection_source=raw
+                    if b'runSourceGroupsWithOwnedContracts' in collection_source:
+                        contract_path=ROOT/'tools/performance/contract-context/source_contract.py'
+                        for path in [contract_path,contract_path.with_name('session-delta.json')]:
+                            record['driver_inputs'][str(path)]=H.sha(path)
+                        Q=H.module(contract_path,'contract_context_contract')
+                        collection_source=Q.restore_previous_owner(collection_source)
+                    if b'runSourceGroupsWithContext' in collection_source:
+                        datatype_contract=ROOT/'tools/performance/datatype-context/source_contract.py'
+                        for path in [datatype_contract,datatype_contract.with_name('session-delta.json')]:
+                            record['driver_inputs'][str(path)]=H.sha(path)
+                        Q=H.module(datatype_contract,'datatype_context_contract')
+                        collection_source=Q.restore_previous_owner(collection_source)
+                        record['datatype_context_driver_projection']='Exact four reviewed driver edits inverted for the retained source proof; runtime candidate remains unprojected.'
                     rank_view=b'Rank.MapIndex Node' in raw
-                    collection_source=A.without_rank_view(raw) if rank_view else raw
+                    collection_source=A.without_rank_view(collection_source) if rank_view else collection_source
                     H.require(collection_source.count(b'IntMapTree Node')==3,'three collection representation type signatures')
                     historical=collection_source.replace(b'IntMapTree Node',b'Map Int Node')
                     previous=V.restore_previous_owner(historical).replace(b'Map Int Node',b'IntMapTree Node')

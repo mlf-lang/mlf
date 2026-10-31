@@ -3,6 +3,7 @@ from pathlib import Path
 import difflib
 import hashlib
 import json
+import importlib.util
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -13,6 +14,14 @@ import run_fingerprint as fingerprint
 import source_migration as migration
 
 ROOT = Path(__file__).resolve().parents[3]
+datatype_spec=importlib.util.spec_from_file_location('datatype_context_contract',
+    ROOT/'tools/performance/datatype-context/source_contract.py')
+datatype=importlib.util.module_from_spec(datatype_spec)
+datatype_spec.loader.exec_module(datatype)
+contract_spec=importlib.util.spec_from_file_location('contract_context_contract',
+    ROOT/'tools/performance/contract-context/source_contract.py')
+contract=importlib.util.module_from_spec(contract_spec)
+contract_spec.loader.exec_module(contract)
 
 
 class AdapterTests(unittest.TestCase):
@@ -110,6 +119,74 @@ class AdapterTests(unittest.TestCase):
                     migration.migrate(base)
                 else:
                     migration.host_sources({})
+
+    def test_datatype_layer_preserves_the_exact_design_parent(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.datatype_delta()
+        result=migration.apply_changes(migration.migrate(base), {})
+        result=migration.apply_changes(result, {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'} for name,row in migration.contract_delta()['changed_sources'].items()})
+        self.assertEqual(len(result),128)
+        for name,row in delta['changed_sources'].items():
+            prior=migration.design_delta()['changed_sources'].get(name)
+            if prior is None:
+                numeric=json.loads((migration.HERE/'source-migration.json').read_bytes())
+                prior=numeric['changed_sources'].get(name,{'new':numeric['old_sources'][name]})
+            self.assertEqual(row['old'],prior['new'])
+            self.assertEqual(result[name],row['new'])
+        bad=json.loads(json.dumps(delta))
+        bad['changed_sources']['Bootstrap.CrateQuery']['old']='0'*64
+        with patch.object(migration,'datatype_delta',return_value=bad),self.assertRaises(ValueError):
+            migration.migrate(base)
+
+    def test_datatype_session_projection_preserves_previous_complete_owner(self):
+        source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        previous=datatype.restore_previous_owner(contract.restore_previous_owner(source))
+        expected=migration.design_delta()['changed_sources']['Bootstrap.CrateSession']['new']
+        self.assertEqual(hashlib.sha256(previous).hexdigest(),expected)
+        source=contract.restore_previous_owner(source)
+        edits=datatype.manifest()['edits']
+        for bad in [source+b'\n',source.replace(edits[0]['new'].encode(),b'',1),
+                    source+edits[0]['new'].encode()]:
+            with self.assertRaises(ValueError):datatype.restore_previous_owner(bad)
+        corrupted=json.loads(json.dumps(datatype.manifest()))
+        corrupted['edits'][0]['old']+='\n'
+        with patch.object(datatype,'manifest',return_value=corrupted),self.assertRaises(ValueError):
+            datatype.restore_previous_owner(source)
+
+    def test_contract_migration_and_session_projection_fail_closed(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.contract_delta()
+        for name,row in delta['changed_sources'].items():
+            self.assertEqual(row['old'],migration.datatype_delta()['changed_sources'][name]['new'])
+            self.assertEqual(migration.migrate(base)[name],row['new'])
+        bad=json.loads(json.dumps(delta))
+        bad['changed_sources']['Bootstrap.CrateQuery']['old']='0'*64
+        with patch.object(migration,'contract_delta',return_value=bad),self.assertRaises(ValueError):
+            migration.migrate(base)
+        source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        previous=contract.restore_previous_owner(source)
+        self.assertEqual(hashlib.sha256(previous).hexdigest(),delta['changed_sources']['Bootstrap.CrateSession']['old'])
+        edits=contract.manifest()['edits']
+        for value in [source+b'\n',source.replace(edits[0]['new'].encode(),b'',1),source+edits[0]['new'].encode()]:
+            with self.assertRaises(ValueError):contract.restore_previous_owner(value)
+        bad=json.loads(json.dumps(contract.manifest()))
+        bad['edits'][0]['old']+='\n'
+        with patch.object(contract,'manifest',return_value=bad),self.assertRaises(ValueError):
+            contract.restore_previous_owner(source)
+        original=(contract.HERE/'session-delta.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for value in [original+b' ',b'{}']:
+                (root/'session-delta.json').write_bytes(value)
+                with patch.object(contract,'HERE',root),self.assertRaises(ValueError):contract.manifest()
+
+    def test_datatype_session_manifest_is_fixed(self):
+        original=(datatype.HERE/'session-delta.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for bad in [original+b' ',b'{}']:
+                (root/'session-delta.json').write_bytes(bad)
+                with patch.object(datatype,'HERE',root),self.assertRaises(ValueError):datatype.manifest()
 
 
 class CoreProofTests(unittest.TestCase):

@@ -477,6 +477,18 @@ class CurrentCompatibilityTests(unittest.TestCase):
                           if current.SHARED_HASHES[n] != current.BALANCE_SHARED_HASHES[n]},
                          {'Bootstrap.CrateSession'})
         owner = (ROOT / contract.OWNER).read_bytes()
+        if b'runSourceGroupsWithOwnedContracts' in owner:
+            path = ROOT / 'tools/performance/contract-context/source_contract.py'
+            spec = importlib.util.spec_from_file_location('contract_context_adapter', path)
+            adapter = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(adapter)
+            owner = adapter.restore_previous_owner(owner)
+        if b'runSourceGroupsWithContext' in owner:
+            path = ROOT / 'tools/performance/datatype-context/source_contract.py'
+            spec = importlib.util.spec_from_file_location('datatype_context_adapter', path)
+            adapter = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(adapter)
+            owner = adapter.restore_previous_owner(owner)
         if b'Rank.MapIndex Node' in owner:
             path = ROOT / 'tools/performance/patricia/adapt_oracles.py'
             spec = importlib.util.spec_from_file_location('rank_view_adapter', path)

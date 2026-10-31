@@ -5,6 +5,35 @@ HERE=Path(__file__).resolve().parent
 # Finalized once after canonical builtin regeneration, before confirmation.
 MANIFEST_SHA='35feca71afa2d2c392df2d920b890f61a5dce84fd85c8c61909f5da32d31fea6'
 DESIGN_MANIFEST_SHA='31e8f91c4de11d92e8d02f739df9ee9b96557ba4fc12f8a08bedd20e17f96d2a'
+CONTRACT_MANIFEST_SHA='762b056350c72a204a5edfb4e5a65af7a0d1b4da603226a90f8ebb2b79294071'
+DATATYPE_MANIFEST_SHA='6b819d779d924972f8123f258abbf0f97c410485bc97995ef0f8d9aee49bb9c2'
+
+def datatype_delta():
+    raw=(HERE.parent/'datatype-context/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=DATATYPE_MANIFEST_SHA:
+        raise ValueError('fixed reviewed datatype-context source migration required')
+    value=json.loads(raw)
+    if (value['format']!='datatype-context-source-migration-v1'
+        or value['parent_manifest_sha256']!=DESIGN_MANIFEST_SHA
+        or value['parent_ref']!='c1b802bd505d20d3f52653b27bd3db506f1ff617'
+        or set(value['changed_sources'])!={'Bootstrap.CrateQuery','Bootstrap.CrateSession'}
+        or value['module_count']!=128 or value['unchanged_sources']!=126
+        or value['added_sources'] or value['removed_sources'] or value['host_sources']):
+        raise ValueError('exact two-owner datatype-context source migration')
+    return value
+
+def contract_delta():
+    raw=(HERE.parent/'contract-context/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=CONTRACT_MANIFEST_SHA:
+        raise ValueError('fixed reviewed contract-context source migration required')
+    value=json.loads(raw)
+    if (value['format']!='contract-context-source-migration-v1'
+        or value['parent_manifest_sha256']!=DATATYPE_MANIFEST_SHA
+        or set(value['changed_sources'])!={'Bootstrap.CrateQuery','Bootstrap.CrateSession'}
+        or value['module_count']!=128 or value['unchanged_sources']!=126
+        or value['added_sources'] or value['removed_sources'] or value['host_sources']):
+        raise ValueError('exact two-owner contract-context source migration')
+    return value
 
 def design_delta():
     raw=(HERE/'index-design-migration.json').read_bytes()
@@ -46,7 +75,8 @@ def migrate(base):
         raise ValueError('one explicit rank-view module')
     result.update(design['added_sources'])
     if len(result)!=128:raise ValueError('128-module index-design source registry')
-    return result
+    result=apply_changes(result,datatype_delta()['changed_sources'])
+    return apply_changes(result,contract_delta()['changed_sources'])
 
 
 def host_sources(base):

@@ -249,6 +249,14 @@ module Bootstrap.CrateSession (compileSpecFile) where {
     [] Separate.UnitObject -> Int -> Int -> [] Query.GroupResult ->
     IO (Either String ((,,) ([] Separate.UnitObject) Query.QueryReport (Map String Source.SourceContract)));
   runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsWithContext encodings Nothing crateId compilerHash cacheDir inventory plan groups contracts
+      objects inferred reused results;
+  runSourceGroupsWithContext encodings datatypeContext crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsWithOwnedContracts encodings datatypeContext Nothing crateId compilerHash cacheDir inventory plan
+      groups contracts objects inferred reused results;
+  runSourceGroupsWithOwnedContracts encodings datatypeContext contractEncodings crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (Query.QueryReport inferred reused (reverse results)) contracts));
@@ -260,10 +268,17 @@ module Bootstrap.CrateSession (compileSpecFile) where {
         let { datatypes = Query.requiredDataIn inventory members
           (append bindings (Source.groupCandidateBindings prepared)) };
         let { name = Query.groupName crateId names };
-        let { key = case encodings of {
-          Nothing -> Query.sourceQueryKey crateId compilerHash prepared contracts datatypes;
-          Just pool -> Query.sourceQueryKeyWithContext crateId compilerHash prepared contracts
-            (Query.encodeDatatypeContextWithPool pool datatypes)
+        let { context = case encodings of {
+          Nothing -> (,) (Query.encodeDatatypeContext datatypes) Nothing;
+          Just pool -> case datatypeContext of {
+            Nothing -> (,) (Query.encodeDatatypeContextWithPool pool datatypes) Nothing;
+            Just previous -> case Query.reuseDatatypeContext pool previous datatypes of {
+              (,) text next -> (,) text (Just next)
+            }
+          }
+        }; key = case contractEncodings of {
+          Nothing -> Query.sourceQueryKeyWithContext crateId compilerHash prepared contracts (fst context);
+          Just pool -> Query.sourceQueryKeyWithContractEncodings pool crateId compilerHash prepared contracts (fst context)
         } };
         writeFile (cacheDir ++ "/query-key.new") key;
         digest <- fileDigest (cacheDir ++ "/query-key.new");
@@ -302,7 +317,10 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (Query.list Query.encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan rest
+                  runSourceGroupsWithOwnedContracts encodings (snd context) (case contractEncodings of {
+                    Nothing -> Nothing;
+                    Just pool -> Just (Query.extendSourceContractEncodings finalContracts pool)
+                  }) crateId compilerHash cacheDir inventory plan rest
                     (M.union compareString finalContracts contracts)
                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))
                     (reused + (if hit then 1 else 0))
@@ -345,7 +363,10 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                 compilerHash <- fileDigest executable;
                 let { encodings = if shareEncoding
                       then Just (Query.prepareSourceEncodings (Source.planData plan)) else Nothing };
-                result <- runSourceGroupsWithEncodings encodings
+                result <- runSourceGroupsWithOwnedContracts encodings (case encodings of {
+                  Nothing -> Nothing;
+                  Just pool -> Just (Query.emptyDatatypeContextEncoding pool)
+                }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)
                   crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
                 releaseFileLock lock;
                 ioReturn result

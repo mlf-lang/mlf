@@ -1,0 +1,22 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.CrateQuery": {
+      "new": "322ee23d20fc88edb382df53da7366208c36910d18cb94af72e2e69a84a1049d",
+      "old": "61201909b9874944a650153af3492a3a7b5ae953b678b22113d8278c222e9712",
+      "reviewed_change": "One complete datatype context memo on finite parsed-file routes. Exact ordered declarations admit reuse; misses and all other encoders retain the original implementation."
+    },
+    "Bootstrap.CrateSession": {
+      "new": "1d837ed6dfb21a54d78e491dc90b24c42e11e702bec53dd72d85f2f291d305b6",
+      "old": "da9727970cf184031b547c5c877a083a31d43bbaf03d4a1e647f7f49be38d88b",
+      "reviewed_change": "One complete datatype context memo on finite parsed-file routes. Exact ordered declarations admit reuse; misses and all other encoders retain the original implementation."
+    }
+  },
+  "format": "datatype-context-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "31e8f91c4de11d92e8d02f739df9ee9b96557ba4fc12f8a08bedd20e17f96d2a",
+  "parent_ref": "c1b802bd505d20d3f52653b27bd3db506f1ff617",
+  "removed_sources": [],
+  "unchanged_sources": 126
+}
