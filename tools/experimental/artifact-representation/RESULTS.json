@@ -1,0 +1,134 @@
+{
+  "format": "historical-offline-artifact-representation-measurement-v1",
+  "not_a_production_migration": true,
+  "sample_population_commit": "14e031730cd01999ce39260227757a73efac5f4d",
+  "schema_bridge_commit": "7bf7ac6db5e3db2daff2e0a1c249e68ae0db2d0c",
+  "reference_codec_sha256": "5676ef360ec21a4c5ace9185fc23a907a0995f50c54fac7934f171f656c8c783",
+  "reference_experiment_result_sha256": "e0eb059ddc660dfda5e727d428baa50e95c9402a9a96bf795ebfc920875d76ab",
+  "sample_count": 12,
+  "input_bytes": 5167282,
+  "codec_controls_passed": 41,
+  "portable_cli_controls_are_separate": true,
+  "inputs": [
+    {
+      "name": "c0416719307bc555e450f3c3be5c7bc09473b0d8e8146355dcb6b8ddf1c695a6.mlfq",
+      "bytes": 1032237,
+      "sha256": "f6cb6cb21c3b6dc518e2901e33e4d881eba191ef8ad168d05baaa1ea902a00a9",
+      "selection": "query_whole_median_by_worker"
+    },
+    {
+      "name": "5ecda6bf4c3cbfa09f9a1d7a96c7fa6adc03d4eef1527dbb9d5bce721e6a533b.mlfq",
+      "bytes": 146829,
+      "sha256": "84e343ee59285f6752bc0a4b359645ef199c1bd2a08cc05fa7eada8500b9e926",
+      "selection": "query_whole_median_by_worker"
+    },
+    {
+      "name": "0ba11d9d15c99f6a0bdebb0dac2d47dd83e473fa0ee4a225508d301356f72f75.mlfq",
+      "bytes": 550653,
+      "sha256": "75308a3c3bf87a94918c1b2182624a186db646a5f8016978306b4d7569a5400d",
+      "selection": "query_whole_median_by_worker"
+    },
+    {
+      "name": "63c1c2e0965d808ef124fedfa70041644ddb1d1a2f021326364fa87119d2d6d6.mlfq",
+      "bytes": 386194,
+      "sha256": "0e69bff1c57f4d13ec2715d0239c78f4b9d6c4b12e961fe6ab07ed71adac3b60",
+      "selection": "query_whole_median_by_worker"
+    },
+    {
+      "name": "5fc94f2f3e62bf044a5526ddb90d7d2d5a354dae7e03f8952207aa483c274229.mlfq",
+      "bytes": 423825,
+      "sha256": "3ae2a627e7fb5da3da8cef1d77f009a8eba41819e76ed3f568f292782f81e11b",
+      "selection": "query_whole_median_by_worker"
+    },
+    {
+      "name": "18c0ca84599084e61dc1ec077c1bdefa35761d9d0b1c7ae47feb8469375c8efe.mlfq",
+      "bytes": 418225,
+      "sha256": "a8ec4171966e48a4bfd6458c37e72b33ec48790543828c92355d59d2d9324eaf",
+      "selection": "query_whole_median_by_worker"
+    },
+    {
+      "name": "c2495cd10262c52cfd68b3b93248184bb99b03b926feeb7400018add1d634812.mlfq",
+      "bytes": 373106,
+      "sha256": "80e47f3a2c2e686e97e0a66475a62ac294745334ba28cd5ce7d1b02ca48b6a93",
+      "selection": "query_whole_nonascii"
+    },
+    {
+      "name": "70b664ddceff307828a40226d5962518b93ffe8d77e9a8336371ed29c2ac06ec.mlfq",
+      "bytes": 370998,
+      "sha256": "8ff20695e336c99d2693b2f9bd8b1d90e6c968581a263cce17079921bd9b1c94",
+      "selection": "query_whole_nonascii"
+    },
+    {
+      "name": "d6595c38cb6e3e5204df3f9a0bf4361acff0b616e5433c84c92fd5216efe6f57.mlfq",
+      "bytes": 367706,
+      "sha256": "0b4ed5674d502f198e0fa57247f10f63f2c353c57d01e063f15f1ef29d925596",
+      "selection": "query_whole_nonascii"
+    },
+    {
+      "name": "4d5d33ba3144e617d5210d685db1e73a4a53c7e35b048b1dd47565d2ace5445f.mlfq",
+      "bytes": 372725,
+      "sha256": "f8b7a9b1cec72b3cac3969f9b801a66a419d50c4953190c897814b70e8c337e0",
+      "selection": "query_whole_nonascii"
+    },
+    {
+      "name": "2b53c7d3d2ca19cf67027cd5960467e5f002177e062277a4fa30b91ab3feaa08.mlfq",
+      "bytes": 357198,
+      "sha256": "692189ed2702dfc0edf4b34fcfe258e005fecfe016d6aca2d1862815c09de716",
+      "selection": "query_whole_nonascii"
+    },
+    {
+      "name": "8be7c36899ad1dd8c63548d78345cf5cedde1d62744c85d9d2e0cdcb44ea5b51.mlfq",
+      "bytes": 367586,
+      "sha256": "db34d4bc64da826e62949273f3e5eda19092f2d1071847179e505a09cc18a9a2",
+      "selection": "query_whole_nonascii"
+    }
+  ],
+  "strategies": [
+    {
+      "strategy": "whole-fields",
+      "accounting": {
+        "files": {
+          "objects.pack": 3516527,
+          "objects.index": 12167,
+          "manifest.json": 3454
+        },
+        "complete_reachable_bytes": 3532148,
+        "reachable_nodes": 187,
+        "orphan_nodes": 0,
+        "padding_bytes": 0,
+        "external_dependencies": 0,
+        "allocated_file_bytes": 3534848,
+        "allocated_directory_bytes": 4096,
+        "note": "All payloads, reference hashes, index entries and manifest counted; no compression or external dictionary."
+      },
+      "roundtrips": 12,
+      "all_exact_bytes": true
+    },
+    {
+      "strategy": "component-lists",
+      "accounting": {
+        "files": {
+          "objects.pack": 2146709,
+          "objects.index": 31862,
+          "manifest.json": 3457
+        },
+        "complete_reachable_bytes": 2182028,
+        "reachable_nodes": 490,
+        "orphan_nodes": 0,
+        "padding_bytes": 0,
+        "external_dependencies": 0,
+        "allocated_file_bytes": 2187264,
+        "allocated_directory_bytes": 4096,
+        "note": "All payloads, reference hashes, index entries and manifest counted; no compression or external dictionary."
+      },
+      "roundtrips": 12,
+      "all_exact_bytes": true
+    }
+  ],
+  "limitations": [
+    "Historical fixed sample, not current-head compiler execution.",
+    "No compression, external dictionary, or omitted reachable storage.",
+    "Exact byte roundtrip is not independent MLF semantic-checker execution.",
+    "No corpus-wide savings, production incremental update, or compiler performance conclusion."
+  ]
+}
