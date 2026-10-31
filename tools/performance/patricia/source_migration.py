@@ -6,6 +6,7 @@ HERE=Path(__file__).resolve().parent
 MANIFEST_SHA='35feca71afa2d2c392df2d920b890f61a5dce84fd85c8c61909f5da32d31fea6'
 DESIGN_MANIFEST_SHA='31e8f91c4de11d92e8d02f739df9ee9b96557ba4fc12f8a08bedd20e17f96d2a'
 CONTRACT_MANIFEST_SHA='762b056350c72a204a5edfb4e5a65af7a0d1b4da603226a90f8ebb2b79294071'
+SPARSE_MANIFEST_SHA='f925cbc17365a534db21e66ec806820ed7957fc2942dd9b1eb5d789f12b1b4cf'
 DATATYPE_MANIFEST_SHA='6b819d779d924972f8123f258abbf0f97c410485bc97995ef0f8d9aee49bb9c2'
 
 def datatype_delta():
@@ -33,6 +34,21 @@ def contract_delta():
         or value['module_count']!=128 or value['unchanged_sources']!=126
         or value['added_sources'] or value['removed_sources'] or value['host_sources']):
         raise ValueError('exact two-owner contract-context source migration')
+    return value
+
+def sparse_delta():
+    raw=(HERE.parent/'sparse-contracts/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=SPARSE_MANIFEST_SHA:
+        raise ValueError('fixed reviewed sparse-contracts source migration required')
+    value=json.loads(raw)
+    if (value['format']!='sparse-contracts-source-migration-v1'
+        or value['parent_manifest_sha256']!=CONTRACT_MANIFEST_SHA
+        or value['parent_ref']!='48275901cd7b760cc8dd000ed54898a23a494a87'
+        or set(value['changed_sources'])!={'Bootstrap.Classes','Bootstrap.CrateQuery','Bootstrap.CrateSession',
+            'Bootstrap.SourceInference','MLF.BuiltinPreludeData'}
+        or value['module_count']!=128 or value['unchanged_sources']!=123
+        or value['added_sources'] or value['removed_sources'] or value['host_sources']):
+        raise ValueError('exact five-owner sparse-contracts source migration')
     return value
 
 def design_delta():
@@ -76,7 +92,8 @@ def migrate(base):
     result.update(design['added_sources'])
     if len(result)!=128:raise ValueError('128-module index-design source registry')
     result=apply_changes(result,datatype_delta()['changed_sources'])
-    return apply_changes(result,contract_delta()['changed_sources'])
+    result=apply_changes(result,contract_delta()['changed_sources'])
+    return apply_changes(result,sparse_delta()['changed_sources'])
 
 
 def host_sources(base):

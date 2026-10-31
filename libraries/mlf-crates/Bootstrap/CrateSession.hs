@@ -257,10 +257,20 @@ module Bootstrap.CrateSession (compileSpecFile) where {
     runSourceGroupsWithOwnedContracts encodings datatypeContext Nothing crateId compilerHash cacheDir inventory plan
       groups contracts objects inferred reused results;
   runSourceGroupsWithOwnedContracts encodings datatypeContext contractEncodings crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsWithOwnedContext encodings datatypeContext contractEncodings Nothing crateId compilerHash cacheDir inventory plan
+      groups contracts objects inferred reused results;
+  runSourceGroupsWithOwnedContext encodings datatypeContext contractEncodings ownedContext crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (Query.QueryReport inferred reused (reverse results)) contracts));
-    (:) names rest -> case Source.prepareGroup plan contracts names of {
+    (:) names rest -> case (case ownedContext of {
+      Just owned -> Source.prepareGroupOwned owned plan contracts names;
+      Nothing -> case contractEncodings of {
+        Nothing -> Source.prepareGroup plan contracts names;
+        Just _ -> Source.prepareGroupSparse plan contracts names
+      }
+    }) of {
       Left error -> ioReturn (Left error);
       Right prepared -> do {
         let { bindings = Source.groupBindings prepared };
@@ -317,9 +327,12 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (Query.list Query.encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsWithOwnedContracts encodings (snd context) (case contractEncodings of {
+                  runSourceGroupsWithOwnedContext encodings (snd context) (case contractEncodings of {
                     Nothing -> Nothing;
                     Just pool -> Just (Query.extendSourceContractEncodings finalContracts pool)
+                  }) (case ownedContext of {
+                    Nothing -> Nothing;
+                    Just owned -> Just (Source.extendOwnedSourceContext finalContracts owned)
                   }) crateId compilerHash cacheDir inventory plan rest
                     (M.union compareString finalContracts contracts)
                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))
@@ -363,10 +376,11 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                 compilerHash <- fileDigest executable;
                 let { encodings = if shareEncoding
                       then Just (Query.prepareSourceEncodings (Source.planData plan)) else Nothing };
-                result <- runSourceGroupsWithOwnedContracts encodings (case encodings of {
+                result <- runSourceGroupsWithOwnedContext encodings (case encodings of {
                   Nothing -> Nothing;
                   Just pool -> Just (Query.emptyDatatypeContextEncoding pool)
                 }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)
+                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing)
                   crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
                 releaseFileLock lock;
                 ioReturn result

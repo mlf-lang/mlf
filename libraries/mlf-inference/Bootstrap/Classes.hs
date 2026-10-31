@@ -771,7 +771,15 @@ module Bootstrap.Classes where {
   lowerUnsignedSourceRootProtected :: ClassInventory ->
     Map String ((,) String ([] String)) -> Map String Bool -> String -> SExpr ->
     Fresh SourceRootLowering;
-  lowerUnsignedSourceRootProtected
+  lowerUnsignedSourceRootProtected = lowerUnsignedSourceRootUsingNames
+    (\_ _ environment suffix -> sourceEnvironmentNames environment suffix);
+  -- File-owned callers start Fresh with the original plan reservation plus
+  -- every current contract key. Their overload targets are exactly those keys.
+  lowerUnsignedSourceRootProtectedOwned :: ClassInventory ->
+    Map String ((,) String ([] String)) -> Map String Bool -> String -> SExpr ->
+    Fresh SourceRootLowering;
+  lowerUnsignedSourceRootProtectedOwned = lowerUnsignedSourceRootUsingNames sourceOwnedEnvironmentNames;
+  lowerUnsignedSourceRootUsingNames environmentNames
     (ClassInventory _ ds infos valueScopes _ baseMethodEnv _ _ _) overloads protected name original =
     do {
       body <- freshLift (Surface.lowerExpressionWithData ds original);
@@ -782,7 +790,7 @@ module Bootstrap.Classes where {
         });
       let { environment = M.union compareString overloads baseMethodEnv };
       reserveSourceNames ((:) name (append (Desugar.allNames body)
-        (append (M.keys environment) (append (map fst (M.elems environment)) (map snd candidates)))));
+        (environmentNames overloads baseMethodEnv environment (map snd candidates))));
       let { usesManaged = protectedSourceBody environment protected body };
       lowered <- lowerExpr valueScopes ds infos environment candidates body;
       case lowered of {
@@ -806,7 +814,13 @@ module Bootstrap.Classes where {
   lowerSourceGroupUnchanged :: ClassInventory -> Map String ((,) String ([] String)) ->
     Map String Bool -> [] ((,,) String (Maybe SAnnotation) SExpr) ->
     Fresh ((,) SExpr ([] ((,,) String ([] String) Bool)));
-  lowerSourceGroupUnchanged inventory overloads protected members =
+  lowerSourceGroupUnchanged = lowerSourceGroupUsingNames
+    (\_ _ environment suffix -> sourceEnvironmentNames environment suffix);
+  lowerSourceGroupUnchangedOwned :: ClassInventory -> Map String ((,) String ([] String)) ->
+    Map String Bool -> [] ((,,) String (Maybe SAnnotation) SExpr) ->
+    Fresh ((,) SExpr ([] ((,,) String ([] String) Bool)));
+  lowerSourceGroupUnchangedOwned = lowerSourceGroupUsingNames sourceOwnedEnvironmentNames;
+  lowerSourceGroupUsingNames environmentNames inventory overloads protected members =
     case inventory of {
       ClassInventory _ ds infos valueScopes candidates methods _ _ _ -> do {
         original <- freshLift (Surface.bindValues members (SConstructor "()"));
@@ -827,7 +841,7 @@ module Bootstrap.Classes where {
           }) members);
         let { groupProtected = any (\flag -> flag) protection };
         reserveSourceNames (append (Desugar.allNames surface)
-          (append (M.keys environment) (append (map fst (M.elems environment)) (map snd candidates))));
+          (environmentNames overloads methods environment (map snd candidates)));
         planned <- prepareQualified Nothing valueScopes ds infos environment candidates surface;
         case planned of { (,) expression plan -> do {
           wants <- freshLift (Q.slotsAt plan (qualifiedNode expression));
@@ -876,6 +890,16 @@ module Bootstrap.Classes where {
       (qualifiedTopBindings body);
     _ -> M.empty
   };
+  sourceEnvironmentNames environment suffix =
+    append (M.keys environment) (append (map fst (M.elems environment)) suffix);
+  -- Method keys are always in the union. Only unshadowed method targets occur
+  -- there: retaining a target after a contract shadows it could change Fresh.
+  -- Scan the fixed method table, never the growing predecessor environment.
+  sourceOwnedEnvironmentNames overloads methods _ suffix =
+    append (M.keys methods)
+      (append (concatMap (\((,) name entry) ->
+        if M.member compareString name overloads then [] else [fst entry])
+        (M.toList methods)) suffix);
   reserveSourceNames :: [] String -> Fresh ();
   reserveSourceNames names = Fresh (\count used ->
     Right ((,,) () count (foldlStrict (\acc name -> S.insert compareString name acc) used names)));

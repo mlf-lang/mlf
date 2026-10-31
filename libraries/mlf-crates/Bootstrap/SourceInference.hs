@@ -380,8 +380,19 @@ module Bootstrap.SourceInference where {
     Just (RootAuthority _ _ _ candidates _) ->
       map (\((,,) _ name ty) -> (,) name ty) candidates
   };
-  makePrepared original lowered registry specs authority contracts =
-    let { bindings = selectedBindings lowered (contractTypes contracts) } in
+  -- The sparse selector is reserved for finite parsed-file groups. The public
+  -- selector retains its full-map traversal and partial-value demand behavior.
+  selectedContractBindings members contracts =
+    let { used = Set.fromList compareString
+      (concatMap (\member -> Dependency.valueNames (Dependency.observeDeclaration member)) members) }
+    in concatMap (\name -> case M.lookup compareString name contracts of {
+      Nothing -> [];
+      Just contract -> [(,) name (contractType contract)]
+    }) (Set.toList used);
+  structuralContractBindings members contracts = selectedBindings members (contractTypes contracts);
+  makePrepared = makePreparedUsing structuralContractBindings;
+  makePreparedUsing selectBindings original lowered registry specs authority contracts =
+    let { bindings = selectBindings lowered contracts } in
     PreparedGroup original lowered bindings registry specs authority
       (parameterProtection contracts bindings);
   eligibleSource :: [] ((,,) String (Maybe SAnnotation) SExpr) -> Bool;
@@ -392,9 +403,61 @@ module Bootstrap.SourceInference where {
     _ -> False
   };
   prepareGroup :: SourcePlan -> Map String SourceContract -> [] String -> Either String PreparedGroup;
-  prepareGroup plan@(SourcePlan inventory sources supports _ count used _ _ _ supportProtection) contracts names = do {
-    let { original = filter (\member -> elem eqString (sourceName member) names) sources };
-    let { support = filter (\member -> elem eqString (sourceName member) names) supports };
+  prepareGroup = prepareGroupUsing structuralContractBindings;
+  -- Only the file-owned query drivers select this route, with finite parsed
+  -- declarations and their current checked predecessor contracts.
+  prepareGroupSparse :: SourcePlan -> Map String SourceContract -> [] String -> Either String PreparedGroup;
+  prepareGroupSparse = prepareGroupUsing selectedContractBindings;
+  -- This context belongs to one finite parsed file and its checked predecessor
+  -- map. Ordinals retain declaration order independently of SCC name order.
+  -- Index values and projected contract fields remain lazy. Finalized deltas
+  -- replace all views with the same left bias as the owned contract map.
+  -- The reserved set is only plan.used plus current contract keys. Per-group
+  -- generated names and method targets never enter this persistent seed.
+  data OwnedSourceContext = OwnedSourceContext
+    (Map String ((,) Int ((,,) String (Maybe SAnnotation) SExpr)))
+    (Map String ((,) Int ((,,) String (Maybe SAnnotation) SExpr)))
+    (Map String ((,) String ([] String))) (Map String Bool) (Set String);
+  ownedSourceUsed (OwnedSourceContext _ _ _ _ used) = used;
+  reserveContractKeys contracts used = M.foldlWithKeyStrict
+    (\reserved name _ -> Set.insert compareString name reserved) used contracts;
+  indexSourceDeclarations members = M.fromList compareString (numberSourceDeclarations 0 members);
+  numberSourceDeclarations ordinal members = case members of {
+    [] -> [];
+    (:) member rest -> (:) ((,) (sourceName member) ((,) ordinal member))
+      (numberSourceDeclarations (ordinal + 1) rest)
+  };
+  prepareOwnedSourceContext :: SourcePlan -> Map String SourceContract -> OwnedSourceContext;
+  prepareOwnedSourceContext plan@(SourcePlan _ _ _ _ _ used _ _ _ _) contracts = OwnedSourceContext
+    (indexSourceDeclarations (planSources plan)) (indexSourceDeclarations (planSupports plan))
+    (contractOverloads contracts) (M.map contractProtected contracts)
+    (reserveContractKeys contracts used);
+  extendOwnedSourceContext :: Map String SourceContract -> OwnedSourceContext -> OwnedSourceContext;
+  extendOwnedSourceContext contracts (OwnedSourceContext sources supports overloads protected used) =
+    OwnedSourceContext sources supports
+      (M.union compareString (contractOverloads contracts) overloads)
+      (M.union compareString (M.map contractProtected contracts) protected)
+      (reserveContractKeys contracts used);
+  indexedSourceDeclarations index names =
+    let { selected = concatMap (\name -> case M.lookup compareString name index of {
+      Nothing -> [];
+      Just entry -> [entry]
+    }) (Set.toList (Set.fromList compareString names)) }
+    in map snd (sortBy (\left right -> compareInt (fst left) (fst right)) selected);
+  prepareGroupOwned :: OwnedSourceContext -> SourcePlan -> Map String SourceContract ->
+    [] String -> Either String PreparedGroup;
+  prepareGroupOwned (OwnedSourceContext sources supports overloads protected used) plan contracts names =
+    prepareGroupWithReservation selectedContractBindings (Just used) plan contracts names
+      (indexedSourceDeclarations sources names) (indexedSourceDeclarations supports names)
+      overloads protected;
+  prepareGroupUsing selectBindings plan contracts names =
+    prepareGroupWithViews selectBindings plan contracts names
+      (filter (\member -> elem eqString (sourceName member) names) (planSources plan))
+      (filter (\member -> elem eqString (sourceName member) names) (planSupports plan))
+      (contractOverloads contracts) (M.map contractProtected contracts);
+  prepareGroupWithViews selectBindings = prepareGroupWithReservation selectBindings Nothing;
+  prepareGroupWithReservation selectBindings reserved (SourcePlan inventory _ _ _ count used _ _ _ supportProtection)
+    contracts names original support overloads protected = do {
     ensure (length original + length support == length names) "source SCC ownership mismatch";
     traverseEither (\name -> ensure (not (M.member compareString name contracts))
       "source SCC imports its own checked predecessor") names;
@@ -406,13 +469,15 @@ module Bootstrap.SourceInference where {
         Just protected -> Right ((,,) name []
           (protected || any (\peer -> M.findWithDefault compareString True peer supportProtection) names))
       }) names;
-      Right (makePrepared support support registry specs Nothing contracts)
+      Right (makePreparedUsing selectBindings support support registry specs Nothing contracts)
     } else do {
       outcome <- runFreshState
         (if eligibleSource original then case original of {
           (:) ((,,) name Nothing rhs) [] -> do {
-            lowered <- Classes.lowerUnsignedSourceRootProtected inventory
-              (contractOverloads contracts) (M.map contractProtected contracts) name rhs;
+            lowered <- (case reserved of {
+              Nothing -> Classes.lowerUnsignedSourceRootProtected;
+              Just _ -> Classes.lowerUnsignedSourceRootProtectedOwned
+            }) inventory overloads protected name rhs;
             case lowered of { Classes.SourceRootLowering body labels candidates protected -> do {
               typed <- freshLift (traverseEither
                 (\((,) role candidate) -> case M.lookup compareString candidate contracts of {
@@ -421,7 +486,7 @@ module Bootstrap.SourceInference where {
                 }) candidates);
               let { loweredMembers = (:) ((,,) name Nothing body) [] };
               let { protectedNow = protected };
-              freshPure (makePrepared original loweredMembers registry
+              freshPure (makePreparedUsing selectBindings original loweredMembers registry
                 ((:) ((,,) name (map (\((,,) _ cls _) -> cls) labels) protectedNow) [])
                 (Just (RootAuthority name labels protectedNow typed
                   (protectedCandidateNames contracts (map snd candidates)))) contracts)
@@ -429,13 +494,15 @@ module Bootstrap.SourceInference where {
           };
           _ -> freshFail "invalid eligible source group"
         } else do {
-          lowered <- Classes.lowerSourceGroupUnchanged inventory (contractOverloads contracts)
-            (M.map contractProtected contracts) original;
+          lowered <- (case reserved of {
+            Nothing -> Classes.lowerSourceGroupUnchanged;
+            Just _ -> Classes.lowerSourceGroupUnchangedOwned
+          }) inventory overloads protected original;
           case lowered of { (,) body specs -> do {
             values <- freshLift (Inference.extractLoweredDeclarations body);
-            freshPure (makePrepared original values registry specs Nothing contracts)
+            freshPure (makePreparedUsing selectBindings original values registry specs Nothing contracts)
           } }
-        }) count used;
+        }) count (case reserved of { Nothing -> used; Just cached -> cached });
       case outcome of { (,,) prepared _ _ -> Right prepared }
     }
   };

@@ -1,0 +1,631 @@
+{
+  "complete": true,
+  "baseline_ref": "48275901cd7b760cc8dd000ed54898a23a494a87",
+  "scope": "Fixed exploratory growth curve; one ABBA/BAAB block per cell; 2 samples per implementation; same-session separate GHC reference pass; no CI or asymptotic order claim.",
+  "endpoint": "crate-bootstrap-v1; fresh source to native executable, GHC 9.14.1 O2 hosted MLF; serial ordinary Clang O2; fixed primitive/runtime/builtin dependencies reused",
+  "raw_directory": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101",
+  "receipts": {
+    "curve/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/curve/plan.json",
+      "sha256": "cc450c1b0deb1c5fcf910b8bb7dad25670b69f81ec80a3c0249b5603227fa1f2"
+    },
+    "curve/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/curve/receipt.json",
+      "sha256": "fac46df3b85198e0838c9a692fdd90a3226d6a62dc3ce392eaf8c35b3f7426af"
+    },
+    "ghc-reference/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/ghc-reference/receipt.json",
+      "sha256": "10e79600651ce8a42755b238946167ec2ba84e576e27b49f6de20c5db8da4815"
+    },
+    "controls-final/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/controls-final/receipt.json",
+      "sha256": "9bcb4264205c273d75a48f8c8b084f45edefbf91f59594295aec23621aa25328"
+    },
+    "candidate-bootstrap-v2/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/candidate-bootstrap-v2/receipt.json",
+      "sha256": "4960bef37f0f0a60a55146c2e194ea36a363fb40617c3e7f7c26d7b86637165f"
+    },
+    "builtin-refresh/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/builtin-refresh/receipt.json",
+      "sha256": "b0f54c3a29f0fae9d18f298edcab07f242b118560c957e36896687b17efc2be3"
+    }
+  },
+  "rows": [
+    {
+      "case": "dependency_chain-8",
+      "family": "dependency_chain",
+      "size": 8,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            0.897620958,
+            0.841314833
+          ],
+          "whole_median": 0.8694678954999999,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.168335709,
+              0.156981916
+            ],
+            "checked-to-llvm": [
+              0.461659709,
+              0.437649417
+            ],
+            "llvm-to-executable": [
+              0.179873042,
+              0.1709195
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.1626588125,
+            "checked-to-llvm": 0.44965456299999995,
+            "llvm-to-executable": 0.175396271
+          },
+          "fresh": 11
+        },
+        "B": {
+          "whole_seconds": [
+            0.838539208,
+            0.853803959
+          ],
+          "whole_median": 0.8461715835,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.156950666,
+              0.164547291
+            ],
+            "checked-to-llvm": [
+              0.431974416,
+              0.446163167
+            ],
+            "llvm-to-executable": [
+              0.173594375,
+              0.165645333
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.1607489785,
+            "checked-to-llvm": 0.4390687915,
+            "llvm-to-executable": 0.16961985400000001
+          },
+          "fresh": 11
+        }
+      },
+      "ghc_seconds": [
+        0.614908042,
+        0.625184791
+      ],
+      "ghc_median": 0.6200464165,
+      "descriptive_geometric_time_reduction": 0.02632279200041021,
+      "candidate_over_ghc": 1.3646907086027809
+    },
+    {
+      "case": "dependency_chain-32",
+      "family": "dependency_chain",
+      "size": 32,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            1.000023917,
+            1.0050365
+          ],
+          "whole_median": 1.0025302085,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.273738666,
+              0.274892291
+            ],
+            "checked-to-llvm": [
+              0.464799625,
+              0.479334875
+            ],
+            "llvm-to-executable": [
+              0.1830625,
+              0.177250917
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.27431547850000004,
+            "checked-to-llvm": 0.47206725,
+            "llvm-to-executable": 0.18015670849999998
+          },
+          "fresh": 35
+        },
+        "B": {
+          "whole_seconds": [
+            0.9908025,
+            0.968584
+          ],
+          "whole_median": 0.97969325,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.280497875,
+              0.268064917
+            ],
+            "checked-to-llvm": [
+              0.4581095,
+              0.442593458
+            ],
+            "llvm-to-executable": [
+              0.174686416,
+              0.181836666
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.274281396,
+            "checked-to-llvm": 0.450351479,
+            "llvm-to-executable": 0.17826154100000002
+          },
+          "fresh": 35
+        }
+      },
+      "ghc_seconds": [
+        0.641729083,
+        0.639796542
+      ],
+      "ghc_median": 0.6407628125,
+      "descriptive_geometric_time_reduction": 0.02283909834281228,
+      "candidate_over_ghc": 1.5289483579386092
+    },
+    {
+      "case": "dependency_chain-128",
+      "family": "dependency_chain",
+      "size": 128,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            1.839611083,
+            1.500315375
+          ],
+          "whole_median": 1.669963229,
+          "stages_seconds": {
+            "source-to-checked": [
+              1.005472334,
+              0.710022375
+            ],
+            "checked-to-llvm": [
+              0.515547083,
+              0.508205416
+            ],
+            "llvm-to-executable": [
+              0.222957292,
+              0.206386042
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.8577473545000001,
+            "checked-to-llvm": 0.5118762495,
+            "llvm-to-executable": 0.214671667
+          },
+          "fresh": 131
+        },
+        "B": {
+          "whole_seconds": [
+            1.360186875,
+            1.571623375
+          ],
+          "whole_median": 1.465905125,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.616428667,
+              0.7869115
+            ],
+            "checked-to-llvm": [
+              0.481336708,
+              0.50823375
+            ],
+            "llvm-to-executable": [
+              0.191436625,
+              0.200604834
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.7016700835,
+            "checked-to-llvm": 0.494785229,
+            "llvm-to-executable": 0.1960207295
+          },
+          "fresh": 131
+        }
+      },
+      "ghc_seconds": [
+        0.680321,
+        0.692955083
+      ],
+      "ghc_median": 0.6866380415,
+      "descriptive_geometric_time_reduction": 0.11992589822623045,
+      "candidate_over_ghc": 2.134902286796762
+    },
+    {
+      "case": "dependency_chain-512",
+      "family": "dependency_chain",
+      "size": 512,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            4.018776208,
+            4.197212416
+          ],
+          "whole_median": 4.107994312000001,
+          "stages_seconds": {
+            "source-to-checked": [
+              2.679396334,
+              2.826622
+            ],
+            "checked-to-llvm": [
+              0.964764375,
+              0.994627417
+            ],
+            "llvm-to-executable": [
+              0.295778208,
+              0.294162625
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 2.753009167,
+            "checked-to-llvm": 0.979695896,
+            "llvm-to-executable": 0.2949704165
+          },
+          "fresh": 515
+        },
+        "B": {
+          "whole_seconds": [
+            4.03862875,
+            4.03013825
+          ],
+          "whole_median": 4.034383500000001,
+          "stages_seconds": {
+            "source-to-checked": [
+              2.682874917,
+              2.70073275
+            ],
+            "checked-to-llvm": [
+              0.989388125,
+              0.961828959
+            ],
+            "llvm-to-executable": [
+              0.289040041,
+              0.287112875
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 2.6918038335,
+            "checked-to-llvm": 0.975608542,
+            "llvm-to-executable": 0.28807645800000004
+          },
+          "fresh": 515
+        }
+      },
+      "ghc_seconds": [
+        1.026314208,
+        0.986561291
+      ],
+      "ghc_median": 1.0064377495,
+      "descriptive_geometric_time_reduction": 0.017687766187044485,
+      "candidate_over_ghc": 4.008577283596813
+    },
+    {
+      "case": "inferred_chain-8",
+      "family": "inferred_chain",
+      "size": 8,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            0.859994458,
+            0.885705
+          ],
+          "whole_median": 0.8728497289999999,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.167936208,
+              0.170562666
+            ],
+            "checked-to-llvm": [
+              0.440007,
+              0.455451917
+            ],
+            "llvm-to-executable": [
+              0.173792625,
+              0.184069625
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.169249437,
+            "checked-to-llvm": 0.4477294585,
+            "llvm-to-executable": 0.178931125
+          },
+          "fresh": 11
+        },
+        "B": {
+          "whole_seconds": [
+            0.863399042,
+            0.88163125
+          ],
+          "whole_median": 0.872515146,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.166122125,
+              0.167383292
+            ],
+            "checked-to-llvm": [
+              0.442064208,
+              0.446459416
+            ],
+            "llvm-to-executable": [
+              0.17065525,
+              0.188644208
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.1667527085,
+            "checked-to-llvm": 0.44426181200000003,
+            "llvm-to-executable": 0.179649729
+          },
+          "fresh": 11
+        }
+      },
+      "ghc_seconds": [
+        0.617261667,
+        0.640167791
+      ],
+      "ghc_median": 0.6287147289999999,
+      "descriptive_geometric_time_reduction": 0.0003294581435590027,
+      "candidate_over_ghc": 1.3877758954172683
+    },
+    {
+      "case": "inferred_chain-32",
+      "family": "inferred_chain",
+      "size": 32,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            0.937804125,
+            0.94521125
+          ],
+          "whole_median": 0.9415076874999999,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.266855542,
+              0.273835875
+            ],
+            "checked-to-llvm": [
+              0.430777791,
+              0.437551709
+            ],
+            "llvm-to-executable": [
+              0.163429084,
+              0.160223
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.2703457085,
+            "checked-to-llvm": 0.43416475,
+            "llvm-to-executable": 0.161826042
+          },
+          "fresh": 35
+        },
+        "B": {
+          "whole_seconds": [
+            0.93545125,
+            0.947248583
+          ],
+          "whole_median": 0.9413499165,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.269694666,
+              0.277354125
+            ],
+            "checked-to-llvm": [
+              0.429423583,
+              0.431801209
+            ],
+            "llvm-to-executable": [
+              0.16618725,
+              0.167445334
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.2735243955,
+            "checked-to-llvm": 0.430612396,
+            "llvm-to-executable": 0.166816292
+          },
+          "fresh": 35
+        }
+      },
+      "ghc_seconds": [
+        0.717700042,
+        0.657203667
+      ],
+      "ghc_median": 0.6874518545,
+      "descriptive_geometric_time_reduction": 0.0001794666683815338,
+      "candidate_over_ghc": 1.3693321362623512
+    },
+    {
+      "case": "inferred_chain-128",
+      "family": "inferred_chain",
+      "size": 128,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            1.501786292,
+            1.465504459
+          ],
+          "whole_median": 1.4836453755,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.753119291,
+              0.726884416
+            ],
+            "checked-to-llvm": [
+              0.48967275,
+              0.479481833
+            ],
+            "llvm-to-executable": [
+              0.184108625,
+              0.190346125
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.7400018534999999,
+            "checked-to-llvm": 0.4845772915,
+            "llvm-to-executable": 0.187227375
+          },
+          "fresh": 131
+        },
+        "B": {
+          "whole_seconds": [
+            1.489330667,
+            1.479931042
+          ],
+          "whole_median": 1.4846308545,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.729457209,
+              0.733950625
+            ],
+            "checked-to-llvm": [
+              0.494989625,
+              0.489122916
+            ],
+            "llvm-to-executable": [
+              0.191335083,
+              0.187549167
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.7317039169999999,
+            "checked-to-llvm": 0.4920562705,
+            "llvm-to-executable": 0.189442125
+          },
+          "fresh": 131
+        }
+      },
+      "ghc_seconds": [
+        0.65296625,
+        0.665314375
+      ],
+      "ghc_median": 0.6591403124999999,
+      "descriptive_geometric_time_reduction": -0.0007340247432665592,
+      "candidate_over_ghc": 2.252374534443302
+    },
+    {
+      "case": "inferred_chain-512",
+      "family": "inferred_chain",
+      "size": 512,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            4.289628541,
+            4.081672625
+          ],
+          "whole_median": 4.185650583,
+          "stages_seconds": {
+            "source-to-checked": [
+              2.9434805,
+              2.760079542
+            ],
+            "checked-to-llvm": [
+              0.949541792,
+              0.978245667
+            ],
+            "llvm-to-executable": [
+              0.3072035,
+              0.271032708
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 2.851780021,
+            "checked-to-llvm": 0.9638937295000001,
+            "llvm-to-executable": 0.28911810400000004
+          },
+          "fresh": 515
+        },
+        "B": {
+          "whole_seconds": [
+            4.035510375,
+            4.071217584
+          ],
+          "whole_median": 4.0533639795,
+          "stages_seconds": {
+            "source-to-checked": [
+              2.757591417,
+              2.773911084
+            ],
+            "checked-to-llvm": [
+              0.939660125,
+              0.943618042
+            ],
+            "llvm-to-executable": [
+              0.267459,
+              0.275382208
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 2.7657512505,
+            "checked-to-llvm": 0.9416390834999999,
+            "llvm-to-executable": 0.271420604
+          },
+          "fresh": 515
+        }
+      },
+      "ghc_seconds": [
+        1.144387,
+        0.969826042
+      ],
+      "ghc_median": 1.0571065210000001,
+      "descriptive_geometric_time_reduction": 0.031315248337625,
+      "candidate_over_ghc": 3.834395019780603
+    }
+  ],
+  "growth": {
+    "dependency_chain": {
+      "interval": [
+        128,
+        512
+      ],
+      "whole_increment_seconds_per_function": {
+        "A": 0.0063490392786458355,
+        "B": 0.006688745768229168
+      },
+      "whole_increment_reduction": -0.05350518002399052,
+      "frontend_increment_seconds_per_function": {
+        "A": 0.00493557763671875,
+        "B": 0.0051826399739583326
+      },
+      "frontend_increment_reduction": -0.0500574310495161
+    },
+    "inferred_chain": {
+      "interval": [
+        128,
+        512
+      ],
+      "whole_increment_seconds_per_function": {
+        "A": 0.00703647189453125,
+        "B": 0.006689409179687501
+      },
+      "whole_increment_reduction": 0.049323399573795834,
+      "frontend_increment_seconds_per_function": {
+        "A": 0.005499422311197918,
+        "B": 0.0052969982643229175
+      },
+      "frontend_increment_reduction": 0.03680823828765145
+    }
+  },
+  "decision": "Inconclusive growth improvement; retain uncommitted discovery candidate; no additional samples or PR25 push.",
+  "additional_qualification": {
+    "validation/receipt.json": {
+      "complete": true,
+      "sha256": "966ddccf4c00111c2ed89e8e4417217c5d43d6c5f1902a89a470c3a1c14c1b95",
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/validation/receipt.json"
+    },
+    "builtin/receipt.json": {
+      "complete": true,
+      "sha256": "6f3a4ef19ba271364fa94ed70acf6b33c0282c03c8842726b1a7b39c1fad3c20",
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/builtin/receipt.json"
+    },
+    "lock-validation.json": {
+      "complete": true,
+      "sha256": "5fc3d34fb16f5e4491bf1bed24dee6e0f43a556a54a3b6e608a9fe2dcf8a6d1b",
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/sparse-contracts-20261101/lock-validation.json"
+    }
+  }
+}

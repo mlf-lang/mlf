@@ -1,6 +1,6 @@
 """Explicit test-only Int64/Patricia adaptation; never edits historical inputs."""
 from pathlib import Path
-import difflib,hashlib,json,re
+import difflib,hashlib,json,re,importlib.util
 
 def require(value,message):
     if not value:raise ValueError(message)
@@ -10,6 +10,14 @@ def sha(raw):return hashlib.sha256(raw).hexdigest()
 RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
 OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
 NEW_INDEX = b'Rank.indexMap selected'
+
+def without_sparse_contracts(raw):
+    # Exact hash-gated source-proof projection only; runtime copies stay current.
+    path=Path(__file__).resolve().parent.parent/'sparse-contracts/source_contract.py'
+    spec=importlib.util.spec_from_file_location('sparse_contracts_projection',path)
+    adapter=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    return adapter.restore_previous_owner(raw)
 
 def without_rank_view(raw):
     require(raw.count(RANK_IMPORT)==1 and raw.count(b'Rank.MapIndex Node')==3

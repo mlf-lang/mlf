@@ -22,6 +22,15 @@ contract_spec=importlib.util.spec_from_file_location('contract_context_contract'
     ROOT/'tools/performance/contract-context/source_contract.py')
 contract=importlib.util.module_from_spec(contract_spec)
 contract_spec.loader.exec_module(contract)
+sparse_spec=importlib.util.spec_from_file_location('sparse_contracts_contract',
+    ROOT/'tools/performance/sparse-contracts/source_contract.py')
+sparse=importlib.util.module_from_spec(sparse_spec)
+sparse_spec.loader.exec_module(sparse)
+
+def before_sparse_registry(base):
+    return migration.apply_changes(migration.migrate(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.sparse_delta()['changed_sources'].items()})
 
 
 class AdapterTests(unittest.TestCase):
@@ -123,7 +132,7 @@ class AdapterTests(unittest.TestCase):
     def test_datatype_layer_preserves_the_exact_design_parent(self):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
         delta=migration.datatype_delta()
-        result=migration.apply_changes(migration.migrate(base), {})
+        result=before_sparse_registry(base)
         result=migration.apply_changes(result, {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'} for name,row in migration.contract_delta()['changed_sources'].items()})
         self.assertEqual(len(result),128)
         for name,row in delta['changed_sources'].items():
@@ -140,6 +149,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_datatype_session_projection_preserves_previous_complete_owner(self):
         source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=sparse.restore_previous_owner(source)
         previous=datatype.restore_previous_owner(contract.restore_previous_owner(source))
         expected=migration.design_delta()['changed_sources']['Bootstrap.CrateSession']['new']
         self.assertEqual(hashlib.sha256(previous).hexdigest(),expected)
@@ -158,12 +168,13 @@ class AdapterTests(unittest.TestCase):
         delta=migration.contract_delta()
         for name,row in delta['changed_sources'].items():
             self.assertEqual(row['old'],migration.datatype_delta()['changed_sources'][name]['new'])
-            self.assertEqual(migration.migrate(base)[name],row['new'])
+            self.assertEqual(before_sparse_registry(base)[name],row['new'])
         bad=json.loads(json.dumps(delta))
         bad['changed_sources']['Bootstrap.CrateQuery']['old']='0'*64
         with patch.object(migration,'contract_delta',return_value=bad),self.assertRaises(ValueError):
             migration.migrate(base)
         source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=sparse.restore_previous_owner(source)
         previous=contract.restore_previous_owner(source)
         self.assertEqual(hashlib.sha256(previous).hexdigest(),delta['changed_sources']['Bootstrap.CrateSession']['old'])
         edits=contract.manifest()['edits']
@@ -179,6 +190,56 @@ class AdapterTests(unittest.TestCase):
             for value in [original+b' ',b'{}']:
                 (root/'session-delta.json').write_bytes(value)
                 with patch.object(contract,'HERE',root),self.assertRaises(ValueError):contract.manifest()
+
+    def test_sparse_layer_has_exact_parent_and_current_five_owners(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.sparse_delta()
+        previous=before_sparse_registry(base)
+        paths={'Bootstrap.Classes':'libraries/mlf-inference/Bootstrap/Classes.hs',
+               'Bootstrap.CrateQuery':'libraries/mlf-crates/Bootstrap/CrateQuery.hs',
+               'Bootstrap.CrateSession':'libraries/mlf-crates/Bootstrap/CrateSession.hs',
+               'Bootstrap.SourceInference':'libraries/mlf-crates/Bootstrap/SourceInference.hs',
+               'MLF.BuiltinPreludeData':'bootstrap/MLF/BuiltinPreludeData.hs'}
+        self.assertEqual(set(delta['changed_sources']),set(paths))
+        for name,row in delta['changed_sources'].items():
+            self.assertEqual(previous[name],row['old'])
+            self.assertEqual(migration.migrate(base)[name],row['new'])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),row['new'])
+        bad=json.loads(json.dumps(delta))
+        bad['changed_sources']['Bootstrap.SourceInference']['old']='0'*64
+        with patch.object(migration,'sparse_delta',return_value=bad),self.assertRaises(ValueError):
+            migration.migrate(base)
+        original=(migration.HERE.parent/'sparse-contracts/source-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'sparse-contracts').mkdir()
+            for value in [original+b' ',b'{}']:
+                (root/'sparse-contracts/source-migration.json').write_bytes(value)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
+                    migration.sparse_delta()
+
+    def test_sparse_projection_rejects_owner_or_edit_corruption(self):
+        source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        previous=sparse.restore_previous_owner(source)
+        self.assertEqual(graph.without_sparse_contracts(source),previous)
+        self.assertEqual(hashlib.sha256(previous).hexdigest(),
+            migration.contract_delta()['changed_sources']['Bootstrap.CrateSession']['new'])
+        self.assertEqual(hashlib.sha256(datatype.restore_previous_owner(
+            contract.restore_previous_owner(previous))).hexdigest(),
+            migration.design_delta()['changed_sources']['Bootstrap.CrateSession']['new'])
+        with self.assertRaises(ValueError):sparse.restore_previous_owner(source+b'\n')
+        for index,edit in enumerate(sparse.manifest()['edits']):
+            for value in [source.replace(edit['new'].encode(),b'',1),source+edit['new'].encode()]:
+                with self.assertRaises(ValueError):sparse.restore_previous_owner(value)
+            bad=json.loads(json.dumps(sparse.manifest()))
+            bad['edits'][index]['old']+='\n'
+            with patch.object(sparse,'manifest',return_value=bad),self.assertRaises(ValueError):
+                sparse.restore_previous_owner(source)
+        original=(sparse.HERE/'session-delta.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for value in [original+b' ',b'{}']:
+                (root/'session-delta.json').write_bytes(value)
+                with patch.object(sparse,'HERE',root),self.assertRaises(ValueError):sparse.manifest()
 
     def test_datatype_session_manifest_is_fixed(self):
         original=(datatype.HERE/'session-delta.json').read_bytes()

@@ -50,6 +50,12 @@ def main():
                     V=H.module(ROOT/'tools/performance/validation-reuse/source_contract.py','validation_contract')
                     raw=(source/V.OWNER).read_bytes()
                     collection_source=raw
+                    if b'Source.prepareGroupOwned' in collection_source:
+                        sparse_path=ROOT/'tools/performance/sparse-contracts/source_contract.py'
+                        for path in [sparse_path,sparse_path.with_name('session-delta.json')]:
+                            record['driver_inputs'][str(path)]=H.sha(path)
+                        collection_source=A.without_sparse_contracts(collection_source)
+                        record['sparse_contracts_driver_projection']='Exact combined sparse and owned session delta inverted for source proof; runtime candidate remains unprojected.'
                     if b'runSourceGroupsWithOwnedContracts' in collection_source:
                         contract_path=ROOT/'tools/performance/contract-context/source_contract.py'
                         for path in [contract_path,contract_path.with_name('session-delta.json')]:
