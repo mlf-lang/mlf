@@ -1,0 +1,101 @@
+name: Compiler shape benchmark
+# Manual, full-matrix measurement of the GHC / MLF compiler shape benchmark.
+# There is deliberately no schedule: repeated timings on a shared runner are not
+# stable enough to be a gate, and machine contention would corrupt them.
+on:
+  workflow_dispatch:
+    inputs:
+      families:
+        description: Comma-separated families (blank = the default ten)
+        type: string
+        default: ''
+      sizes:
+        description: Comma-separated sizes (blank = 8,32,128)
+        type: string
+        default: ''
+      repeats:
+        description: Repetitions per compiler per cell (minimum 3)
+        type: string
+        default: '3'
+      cohort:
+        description: Cohort label recorded in the plan and report
+        type: string
+        default: ci-default
+permissions:
+  contents: read
+concurrency:
+  group: compiler-shapes-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  measure:
+    name: Full shape matrix (GHC O2 vs MLF crate route)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+      - name: Install pinned direct-host GHC 9.14.1
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          curl -fsSL https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$archive"
+          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" | sha256sum -c -
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
+          test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
+          echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
+      - name: Build the authenticated bootstrap producer
+        run: |
+          set -euo pipefail
+          python3 tools/shared/build.py --bootstrap-only --optimization 2 --build-dir .mlf-build/shared-ghc
+          python3 -c "import json;r=json.load(open('.mlf-build/shared-ghc/receipt.json'));assert r['complete'] and r['optimization']=='2',r"
+      - name: Check benchmark contract
+        run: python3 -B tools/performance/compiler-shapes/test_contract.py
+      - name: Measure the requested matrix
+        env:
+          FAMILIES: ${{ inputs.families }}
+          SIZES: ${{ inputs.sizes }}
+          REPEATS: ${{ inputs.repeats }}
+          COHORT: ${{ inputs.cohort }}
+        run: |
+          set -euo pipefail
+          args=(--workdir ".mlf-build/compiler-shapes-$COHORT" --cohort "$COHORT" --matrix default
+                --producer .mlf-build/shared-ghc --build-builtin)
+          if [ -n "${FAMILIES//[[:space:]]/}" ]; then
+            IFS=',' read -ra names <<< "$FAMILIES"
+            for name in "${names[@]}"; do args+=(--family "${name//[[:space:]]/}"); done
+          fi
+          if [ -n "${SIZES//[[:space:]]/}" ]; then
+            IFS=',' read -ra values <<< "$SIZES"
+            for value in "${values[@]}"; do args+=(--size "${value//[[:space:]]/}"); done
+          fi
+          args+=(--repeats "$REPEATS")
+          python3 -B tools/performance/compiler-shapes/bench.py all "${args[@]}"
+      - name: Show the human summary
+        if: always()
+        run: |
+          summary=".mlf-build/compiler-shapes-${{ inputs.cohort }}/results/${{ inputs.cohort }}/summary.md"
+          if [ -f "$summary" ]; then cat "$summary"; else echo "no summary was produced"; fi
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: compiler-shapes-${{ inputs.cohort }}-${{ github.run_id }}
+          include-hidden-files: true
+          retention-days: 30
+          path: |
+            .mlf-build/shared-ghc/receipt.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/setup/setup.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/setup/preparation.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/plan.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/receipt.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/source-patch.diff
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/sources/**/Main.hs
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/command.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/stages.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/query-cache-inventory.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/stdout
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/stderr
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/results/**

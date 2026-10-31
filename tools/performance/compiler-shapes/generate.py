@@ -99,8 +99,24 @@ def expected(family, n, x):
 def generate(out, sizes=(8,32,128), families=None):
     out = Path(out); out.mkdir(parents=True, exist_ok=False)
     cases = []
-    selected = families if families is not None else tuple(f for f in FAMILIES if f != 'local_functions')
-    for family,n in ([('baseline',0)] if families is None else []) + [(f,n) for f in selected for n in sizes]:
+    if families is None:
+        # The default matrix keeps the ten shape families and one minimal baseline.
+        selected = [f for f in FAMILIES if f != 'local_functions']
+        pairs = [('baseline', 0)]
+        for family in selected:
+            pairs.extend((family, n) for n in sizes)
+    else:
+        selected = list(families)
+        unknown = [f for f in selected if f != 'baseline' and f not in FAMILIES]
+        if unknown:
+            raise ValueError('unknown families: ' + ', '.join(unknown))
+        pairs = []
+        for family in selected:
+            if family == 'baseline':
+                pairs.append((family, 0))
+            else:
+                pairs.extend((family, n) for n in sizes)
+    for family, n in pairs:
         identity = f'{family}-{n}'
         directory = out/identity; directory.mkdir()
         source = directory/'Main.hs'; source.write_text(program(family,n))

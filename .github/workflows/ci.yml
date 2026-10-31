@@ -211,6 +211,20 @@ jobs:
       - name: Check actual-import guest Graph and Oracle laws
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_guest_state_laws.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-state-laws
+      # Low-cost coverage for the compiler shape benchmark: the contract test
+      # proves the analyzer refuses bad data, and the smoke matrix performs real
+      # same-source GHC/MLF compilations with a fresh target on every leg. The
+      # complete 10 x 3 matrix stays a manual, dedicated workflow run.
+      - name: Check compiler shape benchmark contract
+        if: matrix.optimization == '2'
+        run: python3 -B tools/performance/compiler-shapes/test_contract.py
+      - name: Compiler shape smoke (GHC vs MLF, 18 timed compilations)
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/performance/compiler-shapes/bench.py all \
+            --workdir .mlf-build/compiler-shapes-smoke --cohort smoke --matrix smoke \
+            --producer .mlf-build/shared-ghc --build-builtin
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -221,6 +235,14 @@ jobs:
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt
+            .mlf-build/compiler-shapes-smoke/setup/setup.json
+            .mlf-build/compiler-shapes-smoke/setup/*.json
+            .mlf-build/compiler-shapes-smoke/cohorts/**/*.json
+            .mlf-build/compiler-shapes-smoke/cohorts/**/*.csv
+            .mlf-build/compiler-shapes-smoke/cohorts/**/*.md
+            .mlf-build/compiler-shapes-smoke/cohorts/**/stdout
+            .mlf-build/compiler-shapes-smoke/cohorts/**/stderr
+            .mlf-build/compiler-shapes-smoke/results/
             .mlf-build/crate-optimization-guard/
             .mlf-build/crate-optimization-controls/**/*.json
             .mlf-build/crate-optimization-controls/**/*.stdout
