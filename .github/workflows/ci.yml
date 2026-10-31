@@ -116,6 +116,7 @@ jobs:
           python3 -B tools/performance/patricia/test_adapters.py
           python3 -O -B tools/performance/patricia/test_adapters.py
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-focused-guard python3 -B tools/performance/patricia/run_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-focused
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-design-guard python3 -B tools/performance/patricia/run_design_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --output .mlf-build/patricia-design
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-native-guard python3 -B tools/performance/patricia/run_native.py --producer .mlf-build/shared-ghc --output .mlf-build/patricia-native --mode standalone
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/llp64-guard python3 -B tools/performance/int64/run_llp64.py --producer .mlf-build/shared-ghc --output .mlf-build/llp64-controls
           for suite in host native legacy; do

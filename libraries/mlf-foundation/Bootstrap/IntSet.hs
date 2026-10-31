@@ -41,6 +41,7 @@ module Bootstrap.IntSet where {
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.IntTree as P;
+  import qualified Bootstrap.IntRank as Rank;
   data AscStack = NoStack | Push Int IntSetTree AscStack;
   data AscState = NoState | State Int Int AscStack;
   sizeTree :: IntSetTree -> Int;
@@ -332,39 +333,15 @@ module Bootstrap.IntSet where {
   maxView :: IntSet -> Maybe ((,) Int IntSet);
   maxView (IntSet tree) = L.mapOptional (\((,) key rest) -> (,) key (wrap rest)) (viewTree True tree);
   lookupIndexTree :: Int -> Int -> IntSetTree -> Maybe Int;
-  lookupIndexTree key offset tree = case tree of {
-    IntSetNil -> Nothing;
-    IntSetTip count prefix bits ->
-      if P.prefixOf key == prefix && andInt bits (P.bitmapOf key) /= 0
-      then Just (offset + popCountInt (andInt bits (P.bitmapOf key - 1))) else Nothing;
-    IntSetBin count prefix left right ->
-      if P.left key prefix
-      then lookupIndexTree key (offset + (if P.signBranch prefix then sizeTree right else 0)) left
-      else lookupIndexTree key (offset + (if P.signBranch prefix then 0 else sizeTree left)) right
-  };
+  lookupIndexTree = Rank.setRankTree;
   lookupIndex :: Int -> IntSet -> Maybe Int;
-  lookupIndex key (IntSet tree) = lookupIndexTree key 0 tree;
+  lookupIndex key values = Rank.setRank key (Rank.indexSet values);
   selectBitmap :: Int -> Int -> Int -> Int -> Int;
-  selectBitmap position bits width offset =
-    if position == 0 then offset + countTrailingZerosInt bits
-    else let { lower = andInt bits (shiftLInt 1 width - 1); count = popCountInt lower } in
-      if position < count then selectBitmap position lower (quotInt width 2) offset
-      else selectBitmap (position - count) (unsignedShiftRInt bits width) (quotInt width 2) (offset + width);
+  selectBitmap = Rank.selectBitmap;
   elemAtTree :: Int -> IntSetTree -> Maybe Int;
-  elemAtTree position tree =
-    if position < 0 || position >= sizeTree tree then Nothing
-    else case tree of {
-      IntSetNil -> Nothing;
-      IntSetTip count prefix bits -> Just (prefix + selectBitmap position bits 32 0);
-      IntSetBin count prefix left right ->
-        if P.signBranch prefix
-        then if position < sizeTree right then elemAtTree position right
-             else elemAtTree (position - sizeTree right) left
-        else if position < sizeTree left then elemAtTree position left
-             else elemAtTree (position - sizeTree left) right
-    };
+  elemAtTree = Rank.setSelectTree;
   elemAt :: Int -> IntSet -> Maybe Int;
-  elemAt position (IntSet tree) = elemAtTree position tree;
+  elemAt position values = Rank.setSelect position (Rank.indexSet values);
   eqIntSet :: IntSet -> IntSet -> Bool;
   eqIntSet a b = size a == size b && L.eqList eqInt (toList a) (toList b);
   validTree :: IntSetTree -> Bool;

@@ -35,6 +35,23 @@ def fixture():
     sa=set(a);sb=set(b)
     for row in [('set-A','sa',sa),('set-B','sb',sb),('set-union','S.union sa sb',sa|sb),('set-intersection','S.intersection sa sb',sa&sb),('set-difference','S.difference sa sb',sa-sb),('set-sorted','S.fromDistinctAscList '+numbers(sorted(sa)),sa),('set-delete','S.delete '+integer(minimum)+' (S.delete '+integer(maximum)+' sa)',sa-{minimum,maximum})]:set_case(*row)
     for k in queries:actions.append('printInt (if S.member '+integer(k)+' sa then 1 else 0)');expected.append('1' if k in sa else '0')
+    # Exercise the new view constructors and operations through both backends,
+    # independently of the legacy collection entry points above.
+    view_start=len(actions)
+    for k in queries:
+        actions.append('dumpMaybe (Rank.mapRank '+integer(k)+' 17 (Rank.indexMap a))')
+        expected.append(str(sorted(a).index(k)+17) if k in a else 'none')
+        actions.append('dumpMaybe (Rank.setRank '+integer(k)+' (Rank.indexSet sa))')
+        expected.append(str(sorted(sa).index(k)) if k in sa else 'none')
+    for n in [-1,0,1,len(a)//2,len(a)-1,len(a),len(a)+1]:
+        for expr in ['Rank.mapSelect '+integer(n)+' (Rank.indexMap a)',
+                     'Rank.setSelect '+integer(n)+' (Rank.indexSet sa)']:
+            actions.append('dumpMaybe ('+expr+')')
+            expected.append(str(sorted(a)[n]) if 0<=n<len(a) else 'none')
+    actions.append('printInt (Rank.mapSize (Rank.indexMap lazyMap))');expected.append('2')
+    actions.append('dumpMaybe (Rank.mapSelect 0 (Rank.indexMap lazyMap))');expected.append(str(minimum))
+    actions.append('dumpMaybe (Rank.mapRank '+integer(minimum)+' 0 (Rank.indexMap lazyMap))');expected.append('0')
+    view_checks=len(actions)-view_start
     definitions+=['lazyMap :: IntMap Int; lazyMap = M.fromList [((,) '+integer(minimum)+' (panic "unselected-payload")),((,) '+integer(maximum)+' 17)];', 'leftMap = M.singleton '+integer(minimum)+' 5;', 'rightMap :: IntMap Int; rightMap = M.singleton '+integer(minimum)+' (panic "unselected-right");']
     for expr,value in [('M.size lazyMap',2),('M.findWithDefault 0 '+integer(maximum)+' lazyMap',17),('M.findWithDefault 0 '+integer(minimum)+' (M.union leftMap rightMap)',5),('M.findWithDefault 0 '+integer(minimum)+' (M.intersection leftMap rightMap)',5),('M.size (M.difference leftMap rightMap)',0),('M.size (M.map (\\x -> panic "unselected-map") a)',len(a))]:actions.append('printInt ('+expr+')');expected.append(str(value))
     header='''-- mlf:syntax shared-haskell-v1
@@ -44,6 +61,7 @@ import MLF.Primitive;
 import Bootstrap.Types;
 import qualified Bootstrap.IntMap as M;
 import qualified Bootstrap.IntSet as S;
+import qualified Bootstrap.IntRank as Rank;
 runActions :: [] (IO ()) -> IO ();
 runActions xs = case xs of { [] -> ioReturn (); (:) x rest -> ioBind x (\\_ -> runActions rest) };
 printNumbers :: [] Int -> IO ();
@@ -57,7 +75,7 @@ dumpPairMaybe value = case value of { Nothing -> putStrLn "none"; Just ((,) k v)
 '''
     good=header+'\n'.join(definitions)+'\nmain :: IO ();\nmain = runActions ['+','.join(actions)+'];\n}\n'
     bad=header+'main :: IO (); main = ioBind (putStrLn "before") (\\_ -> printInt (M.findWithDefault 0 '+integer(minimum)+' (M.singleton '+integer(minimum)+' (panic "selected-payload"))));\n}\n'
-    return good,('\n'.join(expected)+'\n').encode(),bad,{'signed_keys':len(a),'output_lines':len(expected),'map_cases':9,'set_cases':7,'lazy_payload_checks':6,'selected_payload_error_checks':1}
+    return good,('\n'.join(expected)+'\n').encode(),bad,{'signed_keys':len(a),'output_lines':len(expected),'map_cases':9,'set_cases':7,'index_view_checks':view_checks,'lazy_payload_checks':9,'selected_payload_error_checks':1}
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)

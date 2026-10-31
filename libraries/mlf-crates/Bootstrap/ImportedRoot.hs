@@ -11,6 +11,7 @@ module Bootstrap.ImportedRoot
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.Constraint as C;
@@ -228,7 +229,7 @@ module Bootstrap.ImportedRoot
     _ -> Left "direct import elaboration lost its empty scope wrapper"
   };
   bindsImport parameters term = let {
-    member = \name -> S.member compareInt (X.nameId name) parameters;
+    member = \name -> IS.member (X.nameId name) parameters;
     child = bindsImport parameters
   } in case term of {
     XAbs name _ body -> member name || child body;
@@ -250,7 +251,7 @@ module Bootstrap.ImportedRoot
     split <- takeParameters (M.toList signatures) term;
     let { parameters = fst split;
           parameterNames = map (\((,,) _ name _) -> name) parameters;
-          identities = Separate.termIdentities expression S.empty };
+          identities = Separate.termIdentities expression IS.empty };
     ensure (length parameterNames == length (nubBy X.equalName parameterNames))
       "direct import wrapper reused a binder identity";
     replacements <- traverseEither (\((,,) key name actual) ->
@@ -258,13 +259,13 @@ module Bootstrap.ImportedRoot
         Nothing -> Left ("missing direct import symbol: " ++ key);
         Just ((,) exported expected) -> do {
           ensure (T.alphaEq actual expected) ("direct import symbol type mismatch: " ++ key);
-          ensure (not (S.member compareInt (X.nameId exported) identities))
+          ensure (not (IS.member (X.nameId exported) identities))
             ("direct import substitution would capture an identity: " ++ key);
           Right ((,) name exported)
         }
       }) parameters;
     body <- if M.null signatures then Right (snd split) else removeEmptyGroup (snd split);
-    ensure (not (bindsImport (S.fromList compareInt (map X.nameId parameterNames)) body))
+    ensure (not (bindsImport (IS.fromList (map X.nameId parameterNames)) body))
       "direct import body rebinds a parameter identity";
     let { substitution = M.fromList X.compareName replacements };
     Right (Separate.mapTerm (\name -> M.findWithDefault X.compareName name name substitution) (\a -> a) body)

@@ -41,6 +41,7 @@ module Bootstrap.IntMap where {
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.IntTree as P;
+  import qualified Bootstrap.IntRank as Rank;
   import qualified Bootstrap.IntSet as IS;
   data AscStack a = NoStack | Push Int (IntMapTree a) (AscStack a);
   data AscState a = NoState | State Int a (AscStack a);
@@ -355,25 +356,11 @@ module Bootstrap.IntMap where {
   minViewWithKey :: forall a. IntMap a -> Maybe ((,) ((,) Int a) (IntMap a));
   minViewWithKey (IntMap tree) = L.mapOptional (\((,) item rest) -> (,) item (wrap rest)) (minViewTree tree);
   lookupIndexTree :: forall a. Int -> Int -> IntMapTree a -> Maybe Int;
-  lookupIndexTree key offset tree = case tree of {
-    IntMapNil -> Nothing;
-    IntMapTip previous value -> if key == previous then Just offset else Nothing;
-    IntMapBin count prefix left right ->
-      if P.left key prefix then lookupIndexTree key (offset + (if P.signBranch prefix then sizeTree right else 0)) left
-      else lookupIndexTree key (offset + (if P.signBranch prefix then 0 else sizeTree left)) right
-  };
+  lookupIndexTree = Rank.mapRankTree;
   lookupIndex :: forall a. Int -> IntMap a -> Maybe Int;
-  lookupIndex key (IntMap tree) = lookupIndexTree key 0 tree;
+  lookupIndex key values = Rank.mapRank key 0 (Rank.indexMap values);
   elemAtTree :: forall a. Int -> IntMapTree a -> Maybe ((,) Int a);
-  elemAtTree position tree =
-    if position < 0 || position >= sizeTree tree then Nothing else case tree of {
-      IntMapNil -> Nothing;
-      IntMapTip key value -> Just ((,) key value);
-      IntMapBin count prefix left right ->
-        if P.signBranch prefix then
-          if position < sizeTree right then elemAtTree position right else elemAtTree (position - sizeTree right) left
-        else if position < sizeTree left then elemAtTree position left else elemAtTree (position - sizeTree left) right
-    };
+  elemAtTree = Rank.mapEntryTree;
   elemAt :: forall a. Int -> IntMap a -> Maybe ((,) Int a);
   elemAt position (IntMap tree) = elemAtTree position tree;
   eqIntMap :: forall a. (a -> a -> Bool) -> IntMap a -> IntMap a -> Bool;

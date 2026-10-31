@@ -11,6 +11,7 @@ module Bootstrap.BuiltinPreludeContext
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Data as D;
@@ -80,7 +81,7 @@ module Bootstrap.BuiltinPreludeContext
         ensure (T.alphaEq declared expected && T.alphaEq declared target)
           ("prepared Prelude export contract mismatch: " ++ key)
       }) (M.toList available);
-      let { identities = S.toList (Separate.termIdentities term S.empty) };
+      let { identities = IS.toList (Separate.termIdentities term IS.empty) };
       ensure (serial >= 0 && all (\identity -> identity < serial) identities)
         "prepared Prelude fresh serial overlaps its checked term";
       case term of {

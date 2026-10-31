@@ -10,6 +10,8 @@ module Bootstrap.Separate where {
   import Bootstrap.Fresh;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Parser as Parser;
@@ -1195,44 +1197,44 @@ module Bootstrap.Separate where {
     };
   -- Dense renumbering also handles valid object IDs near the parser's Int64
   -- limit. Adding an offset to original IDs would overflow that wire format.
-  typeIdentities :: XType -> Set Int -> Set Int;
+  typeIdentities :: XType -> IntSet -> IntSet;
   typeIdentities ty seen =
     case ty of {
-      XVar (XTyVar a) -> Set.insert compareInt a seen;
+      XVar (XTyVar a) -> IS.insert a seen;
       XArrow a b -> typeIdentities b (typeIdentities a seen);
       XCon _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
       XApply a b -> typeIdentities b (typeIdentities a seen);
       XForall (XTyVar a) bound b ->
-        typeIdentities b (typeIdentities bound (Set.insert compareInt a seen));
+        typeIdentities b (typeIdentities bound (IS.insert a seen));
       _ -> seen
     };
-  computationIdentities :: XComputation -> Set Int -> Set Int;
+  computationIdentities :: XComputation -> IntSet -> IntSet;
   computationIdentities p seen =
     case p of {
       XBottom t -> typeIdentities t seen;
-      XHyp (XTyVar a) -> Set.insert compareInt a seen;
+      XHyp (XTyVar a) -> IS.insert a seen;
       XInner q -> computationIdentities q seen;
-      XOuter (XTyVar a) q -> computationIdentities q (Set.insert compareInt a seen);
-      XIntro (XTyVar a) -> Set.insert compareInt a seen;
-      XIntroKind (XTyVar a) _ -> Set.insert compareInt a seen;
+      XOuter (XTyVar a) q -> computationIdentities q (IS.insert a seen);
+      XIntro (XTyVar a) -> IS.insert a seen;
+      XIntroKind (XTyVar a) _ -> IS.insert a seen;
       XThen a b -> computationIdentities b (computationIdentities a seen);
       _ -> seen
     };
-  termIdentities :: XTerm -> Set Int -> Set Int;
+  termIdentities :: XTerm -> IntSet -> IntSet;
   termIdentities term seen =
     case term of {
-      XVarTerm n -> Set.insert compareInt (X.nameId n) seen;
-      XAbs n ty b -> termIdentities b (typeIdentities ty (Set.insert compareInt (X.nameId n) seen));
+      XVarTerm n -> IS.insert (X.nameId n) seen;
+      XAbs n ty b -> termIdentities b (typeIdentities ty (IS.insert (X.nameId n) seen));
       XApp a b -> termIdentities b (termIdentities a seen);
       XTypeAbs (XTyVar a) bound b ->
-        termIdentities b (typeIdentities bound (Set.insert compareInt a seen));
+        termIdentities b (typeIdentities bound (IS.insert a seen));
       XTypeApp a p -> computationIdentities p (termIdentities a seen);
-      XLet n a b -> termIdentities b (termIdentities a (Set.insert compareInt (X.nameId n) seen));
+      XLet n a b -> termIdentities b (termIdentities a (IS.insert (X.nameId n) seen));
       XLetRec bs b ->
         termIdentities b
           (foldl
              (\acc ((,,) n t a) ->
-                termIdentities a (typeIdentities t (Set.insert compareInt (X.nameId n) acc)))
+                termIdentities a (typeIdentities t (IS.insert (X.nameId n) acc)))
              seen
              bs);
       XPrimitive _ ts -> foldl (\acc t -> typeIdentities t acc) seen ts;
@@ -1241,7 +1243,7 @@ module Bootstrap.Separate where {
         foldl
           (\acc (XAlternative p b) ->
              termIdentities b
-               (foldl (\ids n -> Set.insert compareInt (X.nameId n) ids) acc (X.patternNames p)))
+               (foldl (\ids n -> IS.insert (X.nameId n) ids) acc (X.patternNames p)))
           (typeIdentities t (termIdentities a seen))
           bs;
       XWithData _ b -> termIdentities b seen;
@@ -1249,13 +1251,13 @@ module Bootstrap.Separate where {
     };
   freshObject serial term =
     let {
-      ids = Set.toList (termIdentities term Set.empty)
+      ids = IS.toList (termIdentities term IS.empty)
     } in
     let {
-      replacements = M.fromList compareInt (zip ids (range serial ((advanceIdentity serial (length ids)) - 1)))
+      replacements = IM.fromList (zip ids (range serial ((advanceIdentity serial (length ids)) - 1)))
     } in
     let {
-      rename = \n -> M.findWithDefault compareInt (panic "missing object identity") n replacements
+      rename = \n -> IM.findWithDefault (panic "missing object identity") n replacements
     } in
     (,) (advanceIdentity serial (length ids))
       (mapTerm (\(XName n hint) -> XName (rename n) hint) (\(XTyVar n) -> XTyVar (rename n)) term);
@@ -1270,9 +1272,9 @@ module Bootstrap.Separate where {
   freshCheckedObject serial checked =
     let {
       term = Checked.term checked;
-      ids = Set.toList (termIdentities term Set.empty);
-      replacements = M.fromList compareInt (zip ids (range serial ((advanceIdentity serial (length ids)) - 1)));
-      rename = \n -> M.findWithDefault compareInt (panic "missing object identity") n replacements;
+      ids = IS.toList (termIdentities term IS.empty);
+      replacements = IM.fromList (zip ids (range serial ((advanceIdentity serial (length ids)) - 1)));
+      rename = \n -> IM.findWithDefault (panic "missing object identity") n replacements;
       name = \(XName n hint) -> XName (rename n) hint;
       variable = \(XTyVar n) -> XTyVar (rename n)
     } in

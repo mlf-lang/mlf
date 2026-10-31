@@ -5,6 +5,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import adapt_oracles as graph
 import legacy_controls as legacy
@@ -55,6 +56,9 @@ class AdapterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root/'tools').symlink_to(ROOT/'tools', target_is_directory=True)
+            solver = root/'libraries/mlf-inference/Bootstrap/Graph/Solver.hs'
+            solver.parent.mkdir(parents=True)
+            solver.write_bytes((ROOT/solver.relative_to(root)).read_bytes())
             path = root/'libraries/mlf-crates/Bootstrap/CrateSession.hs'
             path.parent.mkdir(parents=True)
             for index,source in enumerate(['', 'module Bootstrap.CrateSession (compileSpecFile) where {\n'*2]):
@@ -70,6 +74,42 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(migration.host_sources({key: row[field]}), {key: row['new']})
         with self.assertRaisesRegex(ValueError, 'exact frozen host parent'):
             migration.host_sources({key: '0'*64})
+
+    def test_rank_view_adapter_is_exactly_reversible(self):
+        source = (ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        restored = graph.without_rank_view(source)
+        self.assertEqual(graph.with_rank_view(restored), source)
+        for bad in [source.replace(graph.RANK_IMPORT, b''),
+                    source.replace(b'Rank.MapIndex Node', b'IntMapTree Node', 1)]:
+            with self.assertRaises(ValueError):
+                graph.without_rank_view(bad)
+
+    def test_design_layer_keeps_old_manifest_and_rejects_corruption(self):
+        old = (migration.HERE/'source-migration.json').read_bytes()
+        self.assertEqual(hashlib.sha256(old).hexdigest(), migration.MANIFEST_SHA)
+        base = json.loads(old)['old_sources']
+        self.assertEqual(len(migration.migrate(base)), 128)
+        design = (migration.HERE/'index-design-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/'source-migration.json').write_bytes(old)
+            for bad in [design+b' ', b'{}']:
+                (root/'index-design-migration.json').write_bytes(bad)
+                with patch.object(migration, 'HERE', root), self.assertRaises(ValueError):
+                    migration.migrate(base)
+
+    def test_rehashed_design_still_requires_exact_previous_sources(self):
+        base = json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        design = migration.design_delta()
+        for section in ['changed_sources', 'host_sources']:
+            bad = json.loads(json.dumps(design))
+            name = next(iter(bad[section]))
+            bad[section][name]['old'] = '0'*64
+            with patch.object(migration, 'design_delta', return_value=bad), self.assertRaises(ValueError):
+                if section == 'changed_sources':
+                    migration.migrate(base)
+                else:
+                    migration.host_sources({})
 
 
 class CoreProofTests(unittest.TestCase):

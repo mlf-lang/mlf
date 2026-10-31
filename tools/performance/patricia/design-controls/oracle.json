@@ -1,0 +1,18 @@
+{
+  "baseline": "a047e81f716256ecfa99ce851d248f1b74bddc3d",
+  "source": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+  "source_sha256": "160ccb4889adcb562adf7d99263197d2436b21f5a110c76df6e6ab3b47ead957",
+  "frozen_sha256": "d36788066eae3e859d26310abc178bdedd3432eebaef84f85e4c61af5ba32655",
+  "adaptation": "module header only; all algorithm bodies unchanged",
+  "identity_inventory": {
+    "source": "libraries/mlf-crates/Bootstrap/Separate.hs",
+    "source_sha256": "cd856547fabe3a320681795662fd5a4fd8435128a3d16f6b5c0dfeb474bdb34b",
+    "body_sha256": "3a113dafaf3aa1251b2c6ebe59067d03ff08721b028b2db55e8b887054f74edd",
+    "frozen_sha256": "e124701116aba2826e4f34fdd1fce4809bb488ecbc41d99f5f2d3d07a8ba4035",
+    "adaptation": "exact three collector bodies; generic Set dependency retained",
+    "dependencies": {
+      "libraries/mlf-foundation/Bootstrap/Map.hs": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+      "libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+    }
+  }
+}

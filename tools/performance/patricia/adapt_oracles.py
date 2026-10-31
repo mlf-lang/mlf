@@ -6,6 +6,24 @@ def require(value,message):
     if not value:raise ValueError(message)
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()
+
+RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
+OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
+NEW_INDEX = b'Rank.indexMap selected'
+
+def without_rank_view(raw):
+    require(raw.count(RANK_IMPORT)==1 and raw.count(b'Rank.MapIndex Node')==3
+            and raw.count(NEW_INDEX)==1, 'exact session rank-view interface')
+    restored=raw.replace(RANK_IMPORT,b'').replace(b'Rank.MapIndex Node',b'IntMapTree Node').replace(NEW_INDEX,OLD_INDEX)
+    require(with_rank_view(restored)==raw, 'session rank-view inverse')
+    return restored
+
+def with_rank_view(raw):
+    marker=b'  import qualified Bootstrap.IntSet as IS;\n'
+    require(raw.count(marker)==1 and raw.count(b'IntMapTree Node')==3
+            and raw.count(OLD_INDEX)==1 and RANK_IMPORT not in raw, 'exact previous session rank interface')
+    return raw.replace(marker,marker+RANK_IMPORT).replace(b'IntMapTree Node',b'Rank.MapIndex Node').replace(OLD_INDEX,NEW_INDEX)
+
 def prepare(root,out):
     out.mkdir(parents=True,exist_ok=False)
     a=root/'tools/performance/a1-private-index/controls';c=root/'tools/performance/c4-local-transaction/controls'
@@ -52,6 +70,14 @@ def prepare(root,out):
         if name=='C4TransactionControls.hs':
             s=s.replace('import C4TransactionOracle\n','import C4TransactionOracle\nimport qualified Bootstrap.Types as R\nimport qualified PatriciaOracleControls\n')
             s=s.replace('(O.validTree selected)','(T.validMap (R.IntMap selected))').replace('(O.entries selected)','(T.mapEntries (R.IntMap selected))')
+            if 'Rank.MapIndex' in (root/'libraries/mlf-inference/Bootstrap/Graph/Solver.hs').read_text():
+                # Observe the same raw tree through the new immutable view;
+                # validation and enumeration remain independent oracle code.
+                s=s.replace('import qualified Bootstrap.Types as R\n',
+                    'import qualified Bootstrap.Types as R\nimport qualified Bootstrap.IntRank as Rank\n')
+                require(s.count('(R.IntMap selected)')==2,'two rank-view observations')
+                s=s.replace('(R.IntMap selected)',
+                    '(case selected of Rank.MapIndex tree -> R.IntMap tree)')
             start=s.index('oracleBoundaryControls :: IO ()');end=s.index('prefixDemandControls :: IO ()',start)
             s=s[:start]+'oracleBoundaryControls :: IO ()\noracleBoundaryControls=PatriciaOracleControls.boundary\n\n'+s[end:]
         s=s.replace('\\"old_public_physical_oracle_weakened\\":false','\\"old_BST_representation_preserved\\":false,\\"Patricia_representation_independently_checked\\":true')

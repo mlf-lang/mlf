@@ -7,6 +7,7 @@
       "Bootstrap.Fresh": "Bootstrap/Fresh.hs",
       "Bootstrap.Host": "Bootstrap/Host.hs",
       "Bootstrap.IntMap": "Bootstrap/IntMap.hs",
+      "Bootstrap.IntRank": "Bootstrap/IntRank.hs",
       "Bootstrap.IntSet": "Bootstrap/IntSet.hs",
       "Bootstrap.IntTree": "Bootstrap/IntTree.hs",
       "Bootstrap.Map": "Bootstrap/Map.hs",

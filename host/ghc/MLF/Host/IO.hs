@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables, ImplicitParams #-}
+{-# LANGUAGE ForeignFunctionInterface, ScopedTypeVariables, ImplicitParams, CPP #-}
 module MLF.Host.IO where
 
 import Prelude hiding (Int, String)
@@ -6,7 +6,12 @@ import qualified Prelude as P
 import MLF.Host.Base
 import qualified Data.ByteString as B
 import qualified Data.Array.IO as A
-import qualified Data.Map.Strict as M
+#include "MachDeps.h"
+#if WORD_SIZE_IN_BITS >= 64 && !defined(MLF_TEST_NARROW_INT_TABLE)
+import qualified Data.IntMap.Lazy as M
+#else
+import qualified Data.Map.Lazy as M
+#endif
 import Data.IORef
 import Data.Int (Int64)
 import Foreign (Ptr, alloca, peek, peekElemOff, nullPtr, free)
@@ -218,20 +223,30 @@ v_putBytes (ByteArray a) start count = do
   bytes <- mapM (A.readArray a) [i..i+n-1]
   ioErrorAs "IO error: output failed" (B.hPut H.stdout (B.pack (map fromIntegral bytes)) >> H.hFlush H.stdout)
   pure ()
+-- The primitive owns evaluated Int64 keys/values. Machine IntMap is lossless
+-- on 64-bit hosts; retain full keys on narrower hosts instead of truncating.
+#if WORD_SIZE_IN_BITS >= 64 && !defined(MLF_TEST_NARROW_INT_TABLE)
+type IntTable = IORef (M.IntMap Int)
+intTableKey :: Int -> P.Int
+intTableKey = fromIntegral
+#else
 type IntTable = IORef (M.Map Int Int)
+intTableKey :: Int -> Int
+intTableKey = id
+#endif
 v_newIntTable :: IO IntTable
 v_newIntTable = newIORef M.empty
 v_readIntTable :: IntTable -> Int -> IO Int
 v_readIntTable table key = do
   values <- readIORef table
   k <- evaluate key
-  pure (M.findWithDefault 0 k values)
+  pure (M.findWithDefault 0 (intTableKey k) values)
 v_writeIntTable :: IntTable -> Int -> Int -> IO ()
 v_writeIntTable table key value = do
   values <- readIORef table
   k <- evaluate key
   x <- evaluate value
-  writeIORef table (M.insert k x values)
+  writeIORef table (M.insert (intTableKey k) x values)
   pure ()
 
 runEntry :: IO () -> IO ()

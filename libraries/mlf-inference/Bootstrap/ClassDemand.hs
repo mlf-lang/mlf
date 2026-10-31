@@ -21,7 +21,8 @@ module Bootstrap.ClassDemand where {
   -- inside j remain distinct when both requirements are instantiated at k.
   data Origin = SeedOrigin Int | InstantiatedOrigin Int Int;
   data Slot = Slot Int String Int Origin;
-  data Universe = Universe (IntMap Slot) (IntMap Int) (IntMap (IntMap Int));
+  -- Allocation owns its supply; container cardinality is not an identity.
+  data Universe = Universe Int (IntMap Slot) (IntMap Int) (IntMap (IntMap Int));
   data Plan = Plan Universe (IntMap IntSet) Int;
   data Discovery = Discovery Universe (IntMap IntSet) ([] ((,) Int Int));
 
@@ -52,11 +53,18 @@ module Bootstrap.ClassDemand where {
   originOf :: Slot -> Origin;
   originOf (Slot _ _ _ origin) = origin;
   universeSlots :: Universe -> IntMap Slot;
-  universeSlots (Universe slots _ _) = slots;
+  universeSlots (Universe _ slots _ _) = slots;
   universeSeeds :: Universe -> IntMap Int;
-  universeSeeds (Universe _ seeds _) = seeds;
+  universeSeeds (Universe _ _ seeds _) = seeds;
   universeTransitions :: Universe -> IntMap (IntMap Int);
-  universeTransitions (Universe _ _ transitions) = transitions;
+  universeTransitions (Universe _ _ _ transitions) = transitions;
+  nextSlot :: Universe -> Int;
+  nextSlot (Universe next _ _ _) = next;
+  emptyUniverse :: Universe;
+  emptyUniverse = Universe 0 IM.empty IM.empty IM.empty;
+  advanceSlot :: Int -> Int;
+  advanceSlot next =
+    if next < 0 then panic "identity supply exhausted" else advanceIdentity next 1;
   planUniverse :: Plan -> Universe;
   planUniverse (Plan universe _ _) = universe;
   nodeSets :: Plan -> IntMap IntSet;
@@ -178,14 +186,14 @@ module Bootstrap.ClassDemand where {
     IM.foldl
       (\universe seed ->
          case universe of {
-           Universe slots origins transitions ->
-             let { identity = IM.size slots } in
-             Universe
+           Universe identity slots origins transitions ->
+             let { next = advanceSlot identity } in
+             seq next (Universe next
                (IM.insert identity
                  (Slot identity (seedClass seed) (seedOwner seed) (SeedOrigin (seedId seed))) slots)
-               (IM.insert (seedId seed) identity origins) transitions
+               (IM.insert (seedId seed) identity origins) transitions)
          })
-      (Universe IM.empty IM.empty IM.empty) seeds;
+      emptyUniverse seeds;
   -- Discovery follows actual seed/node paths. It does not form the unrelated
   -- seed-by-use Cartesian product, which would explode for unused local lets.
   -- A copied token's owner rank strictly increases. Identity transports never
@@ -205,7 +213,7 @@ module Bootstrap.ClassDemand where {
   allocateAt :: IntMap Frame -> Use -> Int -> Universe -> Either String ((,) Int Universe);
   allocateAt frames use input universe =
     case universe of {
-      Universe slots seeds transitions ->
+      Universe next slots seeds transitions ->
         let { previous = IM.findWithDefault IM.empty (useId use) transitions } in
         case IM.lookup input previous of {
           Just output -> Right ((,) output universe);
@@ -221,17 +229,17 @@ module Bootstrap.ClassDemand where {
                 let { receiver = IM.get (useReceiver use) frames };
                 ensure (frameFinish receiver > frameFinish owner)
                   "class demand: origin copy did not increase its owner finish rank";
-                let { output = IM.size slots };
+                let { output = next; following = advanceSlot next };
                 let {
                   fresh = Slot output (classOf slot) (useReceiver use)
                     (InstantiatedOrigin (useId use) input)
                 };
-                Right ((,) output
-                  (Universe (IM.insert output fresh slots) seeds
-                    (IM.insert (useId use) (IM.insert input output previous) transitions)))
+                seq following (Right ((,) output
+                  (Universe following (IM.insert output fresh slots) seeds
+                    (IM.insert (useId use) (IM.insert input output previous) transitions))))
               }
               else Right ((,) input
-                (Universe slots seeds
+                (Universe next slots seeds
                   (IM.insert (useId use) (IM.insert input input previous) transitions)))
             }
         }
@@ -349,7 +357,7 @@ module Bootstrap.ClassDemand where {
       -- avoid constructing reverse edges and replaying the empty fixed point.
       -- Retain every demand-node key, even for disconnected empty components.
       if IM.null seeds
-      then Right (Plan (Universe IM.empty IM.empty IM.empty)
+      then Right (Plan emptyUniverse
         (IM.map (\_ -> IS.empty) nodes) 0)
       else do {
         let { dependents = dependentNodes nodes };

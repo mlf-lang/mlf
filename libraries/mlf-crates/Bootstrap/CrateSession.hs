@@ -13,6 +13,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntRank as Rank;
   import Bootstrap.Crate (CrateSpec, PreparedCrate, withPrelude, prepareCrate,
     withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
     specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
@@ -664,7 +665,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
   };
 
   unifyProjection :: [] ((,) Int Int) -> Graph -> ScopeIndex -> IntMap Node -> IntSet ->
-    Either String ((,,,) ([] ((,) Int Node)) (IntMapTree Node) Int Graph);
+    Either String ((,,,) ([] ((,) Int Node)) (Rank.MapIndex Node) Int Graph);
   unifyProjection equations current scopeValue connected boundaries =
          let {
            old = current
@@ -688,9 +689,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
          } in
          let {
            forward =
-             case selected of {
-               IntMap tree -> tree
-             }
+             Rank.indexMap selected
          } in
          let {
            backward = forward
@@ -767,7 +766,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                      (\checkedScopes ->
                         Right ((,,,) originals backward count solved))));
 
-  restoreProjectionPlan :: Graph -> [] ((,) Int Node) -> IntMapTree Node -> Int -> Graph ->
+  restoreProjectionPlan :: Graph -> [] ((,) Int Node) -> Rank.MapIndex Node -> Int -> Graph ->
     Either String ((,,) Graph ([] ((,) Int Node)) ([] ((,) Int Node)));
   restoreProjectionPlan current originals backward count solved =
     G.bindE (G.mapE (S.restoreAliases backward) (IM.toList (G.links solved)))
@@ -813,7 +812,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                   Right ((,,) patched removedNodes changedNodes)
               }));
 
-  restoreProjection :: forall s. Session s -> [] ((,) Int Node) -> IntMapTree Node -> Int -> Graph ->
+  restoreProjection :: forall s. Session s -> [] ((,) Int Node) -> Rank.MapIndex Node -> Int -> Graph ->
     ST s (Either String (Session s));
   restoreProjection state originals backward count solved =
     ST.bindE (stReturn (restoreProjectionPlan (graph state) originals backward count solved))

@@ -3,8 +3,8 @@
 The compiler now uses a lazy IntMap Patricia tree and a bitmap-leaf IntSet,
 ported from `containers-0.8.1`. `provenance.json` pins the downloaded archive and
 upstream sources; the complete BSD attribution is in
-`tools/release/licenses/containers-0.8.1.txt`. Cached cardinalities retain the
-previous constant-time `size` and rank/select operations. Signed enumeration,
+`tools/release/licenses/containers-0.8.1.txt`. Cached cardinalities retain
+constant-time `size` and support rank/select without a second tree. Signed enumeration,
 left/right union bias, and lazy map payloads are part of the contract.
 
 This is also an explicit public representation migration. The former balanced
@@ -79,3 +79,49 @@ uses the existing `process-spawn/compare.py`, a fixed fresh workload, raw-byte
 reference checks, and a schedule frozen before sampling. Successful finite
 controls alone do not imply a speedup. Sparse lookup and sorted construction
 can regress even when a compiler task improves; retain those observations.
+
+## Allocation and index interfaces
+
+`ClassDemand.Universe` now owns a checked `nextSlot` counter. Slot allocation
+does not derive identities from container cardinality, and repeated transitions
+do not consume identities. The added constructor field is an explicit internal
+API change; dense plans retain their previous identities and observations.
+
+`Bootstrap.IntRank` owns rank/select and exposes immutable map/set index views.
+Solver and CrateSession share these views without enumerating or copying trees.
+The collection entry points delegate for compatibility. Per-node cardinalities
+remain because the public constant-time `size` contract also needs them; this
+refactor does not claim a smaller ordinary-tree representation.
+
+Interpreter ST/async stores, datatype pool indexes, identity inventories and
+renaming tables use the shared Patricia collections. Name-keyed collections
+retain their comparison and payload-demand semantics. The GHC IntTable primitive
+uses containers IntMap when machine Int can represent every Int64 key, and a
+lossless generic fallback on narrower hosts. Writes preserve key-before-value
+demand and failed-write behavior.
+
+Run `run_design_controls.py --reference-producer PRODUCER --reference-source SOURCE
+--output FRESH_DIRECTORY` before the ordinary installation build. It checks all
+shared modules, O0/O2, the narrower-host fallback, 150 frozen planner cases and
+529 frozen identity-inventory cases, plus signed rank/select and demand probes.
+The original oracle bodies and their source hashes are in `design-controls`.
+The runner rejects a stale canonical builtin source identity before compiling;
+the normal installation subsequently verifies exact fresh regeneration. These
+controls also run in the existing bounded Int64/Patricia CI step.
+The fallback test selects that code path; it does not emulate a 32-bit ABI.
+Full retained graph/P1/P2/P3/file/native controls and fresh compiler-task raw-byte
+checks remain required. Small ordinary A/B screens qualify this design change;
+they do not establish an isolated data-structure speedup.
+
+The [2026-10-31 design qualification](index-design-results.json) passed the
+retained controls, twelve installed direct commands, and the fresh 711/0
+compiler task with independent raw-byte equality. The three compiled paths
+also exercise 35 explicit rank-view checks, including lazy payloads. The
+unchanged Int64 source-admission manifest is followed by a separately pinned
+`index-design-migration.json`; it is not rewritten to admit this refactor.
+
+The fixed ABBA/BAAB screen has eight ordinary legs. Geometric wall times were
+47.598 seconds for the previous installed compiler and 47.641 seconds for this
+candidate (B/A 1.000897, descriptively 0.090% slower). This supports retaining
+the design change under its screening rule, but supplies no speedup or
+statistical noninferiority claim. No extra samples were added.

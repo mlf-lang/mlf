@@ -477,6 +477,12 @@ class CurrentCompatibilityTests(unittest.TestCase):
                           if current.SHARED_HASHES[n] != current.BALANCE_SHARED_HASHES[n]},
                          {'Bootstrap.CrateSession'})
         owner = (ROOT / contract.OWNER).read_bytes()
+        if b'Rank.MapIndex Node' in owner:
+            path = ROOT / 'tools/performance/patricia/adapt_oracles.py'
+            spec = importlib.util.spec_from_file_location('rank_view_adapter', path)
+            adapter = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(adapter)
+            owner = adapter.without_rank_view(owner)
         if b'IntMapTree Node' in owner:
             self.assertEqual(owner.count(b'IntMapTree Node'), 3)
             owner = owner.replace(b'IntMapTree Node', b'Map Int Node')

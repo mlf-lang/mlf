@@ -40,8 +40,8 @@ module MLF.Tests.ClassDemand where {
         "a seedless cycle invented a dictionary"
     };
   assertEmptyPlan :: IntSet -> Q.Plan -> Either String ();
-  assertEmptyPlan expected (Q.Plan (Q.Universe slots seeds transitions) values updates) =
-    ensure (IM.null slots && IM.null seeds && IM.null transitions &&
+  assertEmptyPlan expected (Q.Plan (Q.Universe next slots seeds transitions) values updates) =
+    ensure (next == 0 && IM.null slots && IM.null seeds && IM.null transitions &&
       IS.eqIntSet expected (IM.keysSet values) &&
       IM.foldl (\empty value -> empty && IS.null value) True values && updates == 0)
       "seedless plan changed its exact universe, node sets, or update count";
@@ -197,8 +197,9 @@ module MLF.Tests.ClassDemand where {
     };
   checks :: [] ((,) String (Either String ()));
   checks = append
-    ((:) ((,) "seedless exact plan across all demand forms" emptyDemandKinds)
-      ((:) ((,) "seedless exact validation and error order" emptyValidation) []))
+    ((:) ((,) "slot supply independent of cardinality" independentSupply)
+      ((:) ((,) "seedless exact plan across all demand forms" emptyDemandKinds)
+        ((:) ((,) "seedless exact validation and error order" emptyValidation) [])))
     ((:) ((,) "empty recursive demand cycle" emptyCycle)
     ((:) ((,) "same-class origin distinction" sameClassOrigins)
       ((:) ((,) "nested owner reentry and actual multiplicity" nestedReentry)
@@ -207,6 +208,26 @@ module MLF.Tests.ClassDemand where {
             ((:) ((,) "captured ancestor origin" capturedOrigin)
               ((:) ((,) "no unreachable Cartesian expansion" unreachableUses)
                 ((:) ((,) "invalid rank and reference rejection" validation) []))))))));
+  independentSupply :: Either String ();
+  independentSupply = do {
+    let { frameMap = IM.fromList (map (\frame -> (,) (Q.frameId frame) frame) frames) };
+    let { seed = Q.Slot 0 "Inspect" 2 (Q.SeedOrigin 10) };
+    -- A removed/reserved range must not cause a slot identity to be reused.
+    let { initial = Q.Universe 10 (IM.singleton 0 seed) (IM.singleton 10 0) IM.empty };
+    allocated <- Q.allocateAt frameMap (Q.Use 100 2 1) 0 initial;
+    case allocated of {
+      (,) output universe -> do {
+        ensure (output == 10 && Q.nextSlot universe == 11 &&
+          eqList eqInt (IM.keys (Q.universeSlots universe)) ((:) 0 ((:) 10 [])))
+          "slot allocation reused a removed identity";
+        repeated <- Q.allocateAt frameMap (Q.Use 100 2 1) 0 universe;
+        case repeated of {
+          (,) again unchanged -> ensure (again == 10 && Q.nextSlot unchanged == 11)
+            "cached transition consumed another slot"
+        }
+      }
+    }
+  };
   checkAll :: Either String ();
   checkAll =
     foldM

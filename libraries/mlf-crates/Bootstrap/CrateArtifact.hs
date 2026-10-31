@@ -7,6 +7,7 @@ module Bootstrap.CrateArtifact where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Host as Host;
@@ -973,7 +974,7 @@ module Bootstrap.CrateArtifact where {
                }
            }
          };
-  decodeTypePool :: String -> Either String (Map Int DataDecl);
+  decodeTypePool :: String -> Either String (IntMap DataDecl);
   decodeTypePool input =
     do {
       texts <- canonicalFields input;
@@ -992,9 +993,9 @@ module Bootstrap.CrateArtifact where {
       ensure (eqList eqString texts (map D.prettyDeclaration declarations))
         "noncanonical crate datatype pool declaration";
       uniqueNames "pooled datatype" (map D.datatypeName declarations);
-      Right (M.fromList compareInt (zip (range 0 (length declarations - 1)) declarations))
+      Right (IM.fromList (zip (range 0 (length declarations - 1)) declarations))
     };
-  decodeTypeReferences :: Map Int DataDecl -> String -> Either String ([] DataDecl);
+  decodeTypeReferences :: IntMap DataDecl -> String -> Either String ([] DataDecl);
   decodeTypeReferences pool input =
     do {
       references <- canonicalFields input;
@@ -1011,7 +1012,7 @@ module Bootstrap.CrateArtifact where {
              };
              ensure (eqString reference (showInt index))
                "noncanonical crate datatype pool reference";
-             case M.lookup compareInt index pool of {
+             case IM.lookup index pool of {
                Nothing -> Left "crate datatype pool reference is out of bounds";
                Just declaration -> Right declaration
              }
@@ -1032,7 +1033,7 @@ module Bootstrap.CrateArtifact where {
            (snd (M.get compareString (D.datatypeName declaration) parts)))
       ((,) 0 1)
       declarations;
-  decodePooledFragments :: Map Int DataDecl ->
+  decodePooledFragments :: IntMap DataDecl ->
                            Map String ((,) String ((,,,) Int Int Int Int)) ->
                            String ->
                            Int ->
@@ -1076,7 +1077,7 @@ module Bootstrap.CrateArtifact where {
                 M.fromList compareString
                   (map
                      (\declaration -> (,) (D.datatypeName declaration) (datatypePart declaration))
-                     (M.elems pool))
+                     (IM.elems pool))
             };
             fragments <- decodePooledFragments pool parts bodies 0 [];
             ensure (eqString payload (encodePooledPayload fragments))

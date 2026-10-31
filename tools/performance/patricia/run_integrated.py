@@ -49,9 +49,12 @@ def main():
                 if a.suite=='validation':
                     V=H.module(ROOT/'tools/performance/validation-reuse/source_contract.py','validation_contract')
                     raw=(source/V.OWNER).read_bytes()
-                    H.require(raw.count(b'IntMapTree Node')==3,'three collection representation type signatures')
-                    historical=raw.replace(b'IntMapTree Node',b'Map Int Node')
+                    rank_view=b'Rank.MapIndex Node' in raw
+                    collection_source=A.without_rank_view(raw) if rank_view else raw
+                    H.require(collection_source.count(b'IntMapTree Node')==3,'three collection representation type signatures')
+                    historical=collection_source.replace(b'IntMapTree Node',b'Map Int Node')
                     previous=V.restore_previous_owner(historical).replace(b'Map Int Node',b'IntMapTree Node')
+                    if rank_view:previous=A.with_rank_view(previous)
                     H.require(H.sha(source/V.CONSTRAINT)==V.CONSTRAINT_SHA,'unchanged generated constraint owner')
                     for name,data in [('V1FrozenSession',previous),('V1SessionUnderTest',raw)]:
                         old_header=b'module Bootstrap.CrateSession (compileSpecFile) where {'
