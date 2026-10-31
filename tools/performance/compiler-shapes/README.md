@@ -155,6 +155,12 @@ sources changed, and reports whose cohorts differ in endpoint, suite version,
 repeat count, GHC/Clang identity, producer receipt, builtin pair or host. Cells
 that appear in more than one cohort are listed and never combined.
 
+Ledger paths are absolute because they pin the authenticated producer, toolchain
+and per-leg commands, so re-analysis needs the same path mapping the cohort was
+measured with — for example the same `-v "$PWD:/work" -w /work` container. Against
+the recorded cohort, re-running `bench.py analyze` reproduced a byte-identical
+`summary.md`.
+
 Large build products stay in the evidence directory and in CI artifacts. The
 repository does not contain them: `.mlf-build/` is ignored.
 
