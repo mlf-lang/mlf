@@ -94,6 +94,21 @@ jobs:
         run: |
           python3 tools/shared/build.py --bootstrap-only --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
+      # Low-cost coverage for the compiler shape benchmark, placed directly after
+      # the producer so it runs before the long suites: the contract test proves
+      # the analyzer refuses bad data, and the smoke matrix performs real
+      # same-source GHC/MLF compilations with a fresh target on every leg. The
+      # complete 10 x 3 matrix stays a manual, dedicated workflow run.
+      - name: Check compiler shape benchmark contract
+        if: matrix.suite == 'all' && matrix.optimization == '2'
+        run: python3 -B tools/performance/compiler-shapes/test_contract.py
+      - name: Compiler shape smoke (GHC vs MLF, 18 timed compilations)
+        if: matrix.suite == 'all' && matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/performance/compiler-shapes/bench.py all \
+            --workdir .mlf-build/compiler-shapes-smoke --cohort smoke --matrix smoke \
+            --producer .mlf-build/shared-ghc --build-builtin
       - name: Check Int64 arithmetic and Patricia boundaries
         if: matrix.optimization == '2'
         run: |
@@ -211,20 +226,6 @@ jobs:
       - name: Check actual-import guest Graph and Oracle laws
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_guest_state_laws.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/guest-state-laws
-      # Low-cost coverage for the compiler shape benchmark: the contract test
-      # proves the analyzer refuses bad data, and the smoke matrix performs real
-      # same-source GHC/MLF compilations with a fresh target on every leg. The
-      # complete 10 x 3 matrix stays a manual, dedicated workflow run.
-      - name: Check compiler shape benchmark contract
-        if: matrix.optimization == '2'
-        run: python3 -B tools/performance/compiler-shapes/test_contract.py
-      - name: Compiler shape smoke (GHC vs MLF, 18 timed compilations)
-        if: matrix.optimization == '2'
-        run: |
-          set -euo pipefail
-          python3 -B tools/performance/compiler-shapes/bench.py all \
-            --workdir .mlf-build/compiler-shapes-smoke --cohort smoke --matrix smoke \
-            --producer .mlf-build/shared-ghc --build-builtin
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
