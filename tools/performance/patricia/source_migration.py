@@ -11,6 +11,22 @@ DATATYPE_MANIFEST_SHA='6b819d779d924972f8123f258abbf0f97c410485bc97995ef0f8d9aee
 
 BATCH_MANIFEST_SHA='10f2da2458cbda85d61787be112fcb09e28d93cf97ebbd7b974eaccac5466f6b'
 
+PERMISSION_MANIFEST_SHA='da5f482bb5c89e0e88d812eaacaafc4788bafef2cfbe709c924fed0e6179746e'
+
+def permission_delta():
+    raw=(HERE.parent/'permission-view/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=PERMISSION_MANIFEST_SHA:
+        raise ValueError('fixed reviewed permission-view source migration required')
+    value=json.loads(raw)
+    if (value['format']!='permission-view-source-migration-v1'
+        or value['parent_manifest_sha256']!=BATCH_MANIFEST_SHA
+        or value['parent_ref']!='01ef8e70741c9f9ac4f27e489d059c96a4b33df5'
+        or set(value['changed_sources'])!={'Bootstrap.Graph','MLF.BuiltinPreludeData'}
+        or value['module_count']!=128 or value['unchanged_sources']!=126
+        or value['added_sources'] or value['removed_sources'] or value['host_sources']):
+        raise ValueError('exact Graph and regenerated-builtin source migration')
+    return value
+
 def batch_delta():
     raw=(HERE.parent/'batch-replacement/source-migration.json').read_bytes()
     if hashlib.sha256(raw).hexdigest()!=BATCH_MANIFEST_SHA:
@@ -110,7 +126,8 @@ def migrate(base):
     result=apply_changes(result,datatype_delta()['changed_sources'])
     result=apply_changes(result,contract_delta()['changed_sources'])
     result=apply_changes(result,sparse_delta()['changed_sources'])
-    return apply_changes(result,batch_delta()['changed_sources'])
+    result=apply_changes(result,batch_delta()['changed_sources'])
+    return apply_changes(result,permission_delta()['changed_sources'])
 
 
 def host_sources(base):
