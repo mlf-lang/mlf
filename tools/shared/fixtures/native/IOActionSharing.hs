@@ -21,6 +21,7 @@ import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as Type
 import qualified MLF.Host.Base as B
+import qualified MLF.Primitive as P
 import qualified Tests.IndependentCheck as Frozen
 import qualified Tests.IndependentType as FrozenType
 
@@ -30,15 +31,15 @@ right :: T.Either B.String a -> IO a
 right (T.Left message) = fail (B.unpack message)
 right (T.Right value) = pure value
 
-name :: Integer -> T.XName
+name :: P.Int -> T.XName
 name n = T.XName n "same"
-v :: Integer -> T.XErased
+v :: P.Int -> T.XErased
 v = T.XEVar . name
 p :: T.Primitive -> [T.XErased] -> T.XErased
 p primitive = foldl T.XEApp (T.XEPrimitive primitive)
 ret :: T.XErased -> T.XErased
 ret a = p T.PIOReturn [a]
-bind :: T.XErased -> Integer -> T.XErased -> T.XErased
+bind :: T.XErased -> P.Int -> T.XErased -> T.XErased
 bind action n body = p T.PIOBind [action, T.XEAbs (name n) body]
 zero :: T.XErased
 zero = T.XEInt 0
