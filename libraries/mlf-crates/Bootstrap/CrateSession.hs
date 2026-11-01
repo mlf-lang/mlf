@@ -719,7 +719,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
            originals = IM.toList selected
          } in
          let {
-           count = L.length originals
+           count = IM.size selected
          } in
          let {
            forward =
@@ -800,6 +800,13 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                      (\checkedScopes ->
                         Right ((,,,) originals backward count solved))));
 
+  -- This is the same ascending filtered view as toList followed by filter, but
+  -- constructs its list spine once and leaves unselected Node payloads lazy.
+  projectedOriginalNodes :: Int -> IntMap Node -> [] ((,) Int Node);
+  projectedOriginalNodes count nodes =
+    IM.foldrWithKey
+      (\n node rest -> if n < count then (:) ((,) n node) rest else rest)
+      [] nodes;
   restoreProjectionPlan :: Graph -> [] ((,) Int Node) -> Rank.MapIndex Node -> Int -> Graph ->
     Either String ((,,) Graph ([] ((,) Int Node)) ([] ((,) Int Node)));
   restoreProjectionPlan current originals backward count solved =
@@ -816,12 +823,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
          } in
          G.bindE
            (S.restoreProjectedNodes withAliases backward 0 originals
-              (L.filter
-                 (\entry ->
-                    case entry of {
-                      (,) n v -> (n < count)
-                    })
-                 (IM.toList (G.nodes solved))))
+              (projectedOriginalNodes count (G.nodes solved)))
            (\restored ->
               case S.projectionChanges originals restored of {
                 (,,) removedNodes changedNodes deleted ->

@@ -477,6 +477,12 @@ class CurrentCompatibilityTests(unittest.TestCase):
                           if current.SHARED_HASHES[n] != current.BALANCE_SHARED_HASHES[n]},
                          {'Bootstrap.CrateSession'})
         owner = (ROOT / contract.OWNER).read_bytes()
+        path = ROOT / 'tools/performance/source-context-projection-merge/source_contract.py'
+        spec = importlib.util.spec_from_file_location('source_diamond', path)
+        diamond = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(diamond)
+        diamond.verify_diamond(owner)
+        owner = diamond.to_left(owner)
         path = ROOT / 'tools/performance/query-key-scratch/source_contract.py'
         spec = importlib.util.spec_from_file_location('query_key_scratch_adapter', path)
         adapter = importlib.util.module_from_spec(spec)

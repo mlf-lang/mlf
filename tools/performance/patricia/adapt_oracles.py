@@ -11,12 +11,18 @@ RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
 OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
 NEW_INDEX = b'Rank.indexMap selected'
 
+def diamond_contract():
+    path=Path(__file__).resolve().parent.parent/'source-context-projection-merge/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_diamond_adapter',path)
+    adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
+    return adapter
+
 def without_query_key_scratch(raw):
     path=Path(__file__).resolve().parent.parent/'query-key-scratch/source_contract.py'
     spec=importlib.util.spec_from_file_location('query_key_scratch_projection',path)
     adapter=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    return adapter.current_or_parent(raw)
+    return adapter.current_or_parent(diamond_contract().storage_history(raw))
 
 def without_source_query_context(raw):
     path=Path(__file__).resolve().parent.parent/'source-query-context/source_contract.py'
@@ -25,12 +31,19 @@ def without_source_query_context(raw):
     spec.loader.exec_module(adapter)
     return adapter.current_or_parent(without_query_key_scratch(raw))
 
+def without_projection_patch(raw):
+    path=Path(__file__).resolve().parent.parent/'full-compiler/source_contract.py'
+    spec=importlib.util.spec_from_file_location('owned_projection_inverse',path)
+    adapter=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    return adapter.current_or_parent(diamond_contract().upstream_history(raw))
+
 def without_survivor_merge(raw):
     path=Path(__file__).resolve().parent.parent/'c3-survivors/source_contract.py'
     spec=importlib.util.spec_from_file_location('c3_survivor_projection',path)
     adapter=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    return adapter.current_or_parent(without_source_query_context(raw))
+    return adapter.current_or_parent(without_projection_patch(without_source_query_context(raw)))
 
 def without_delayed_indexes(raw):
     path=Path(__file__).resolve().parent.parent/'c3-delayed-index/source_contract.py'

@@ -18,6 +18,9 @@ def load_projection(path):
 
 def retained_owner(raw=None):
     source = (ROOT / C.OWNER).read_bytes() if raw is None else raw
+    diamond = load_projection(ROOT / 'tools/performance/source-context-projection-merge/source_contract.py')
+    diamond.verify_diamond(source)
+    source = diamond.to_left(source)
     scratch = load_projection(ROOT / 'tools/performance/query-key-scratch/source_contract.py')
     source = scratch.restore_previous_owner(source)
     context = load_projection(ROOT / 'tools/performance/source-query-context/source_contract.py')
@@ -79,6 +82,13 @@ class SourceContractTests(unittest.TestCase):
 
     def test_reviewed_projection_chain_and_order_are_pinned(self):
         source = (ROOT / C.OWNER).read_bytes()
+        diamond = load_projection(ROOT / 'tools/performance/source-context-projection-merge/source_contract.py')
+        common = diamond.verify_diamond(source)
+        projection = load_projection(ROOT / 'tools/performance/full-compiler/source_contract.py')
+        incoming = diamond.to_right(source)
+        self.assertEqual(C.sha(incoming), projection.NEW_SHA)
+        self.assertEqual(projection.restore_previous_owner(incoming), common)
+        source = diamond.to_left(source)
         scratch = load_projection(ROOT / 'tools/performance/query-key-scratch/source_contract.py')
         self.assertEqual(C.sha(source), scratch.NEW_SHA)
         source = scratch.restore_previous_owner(source)
