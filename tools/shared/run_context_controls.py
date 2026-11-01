@@ -557,16 +557,172 @@ def main():
         verify_sentinels(cache, sentinels)
         lifecycle["concurrent"] = {"reports": reports, "final_sha256": finals, "cache": physical_inventory(cache),
                                      "original_sentinels": sentinels, "scope": "two cooperative POSIX lockf processes; READY is before query preparation, not proof of kernel lock wait; not adversarial TOCTOU/crash proof"}
+
+        # Additive invocation-local context memo controls. Original 31 commands,
+        # owner-alive probes, concurrent pair and all their oracles remain above.
+        memo_results = {}
+        record["context_read_memo"] = memo_results
+        def context_identity(path):
+            before = path.lstat()
+            require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1 and before.st_size <= 2 * 1024**2,
+                    "small regular private context, never a lock path")
+            raw = path.read_bytes()
+            after = path.lstat()
+            require(all(getattr(before, key) == getattr(after, key) for key in
+                        ["st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns"]),
+                    "context identity changed during sampling (read atime excluded)")
+            return {"device": before.st_dev, "inode": before.st_ino, "mode": before.st_mode,
+                    "links": before.st_nlink, "bytes": len(raw), "sha256": digest(raw),
+                    "mtime_ns": before.st_mtime_ns, "ctime_ns": before.st_ctime_ns}
+        def run_memo_helper():
+            name, cache = "memo-helper", out / "memo-helper-cache"
+            row = {"name": name, "argv": [str(fixture), name, str(cache)], "kind": "fixture",
+                   "state": "running", "timeout_seconds": 60,
+                   "scope": "private held-lock counterfactual; not noncooperative mutation safety"}
+            record["commands"].append(row)
+            save()
+            captures = {label: out / (name + "." + label) for label in ("stdout", "stderr")}
+            started, owner, failure = time.monotonic(), None, None
+            reference = None
+            def wait_marker(prefix, pattern):
+                deadline = min(started + 60, time.monotonic() + 10)
+                while True:
+                    require(owner.poll() is None, "memo owner exited before context identity ACK")
+                    require(captures["stdout"].stat().st_size <= 65536 and captures["stderr"].stat().st_size == 0,
+                            "bounded memo marker and empty stderr")
+                    raw = captures["stdout"].read_bytes()
+                    require(len(raw) <= 65536, "bounded memo marker read")
+                    match = re.fullmatch(pattern, raw)
+                    if match:
+                        return match, raw
+                    # Prefix includes complete prior markers; a partial next
+                    # line may be in flight, but arbitrary earlier lines may not.
+                    require(raw.startswith(prefix) or prefix.startswith(raw), "memo handshake prefix changed")
+                    require(time.monotonic() < deadline, "memo marker 10-second deadline within total 60")
+                    time.sleep(.01)
+            try:
+                with captures["stdout"].open("xb") as stdout, captures["stderr"].open("xb") as stderr:
+                    owner = subprocess.Popen(row["argv"], cwd=out, env=os.environ.copy(), stdin=subprocess.PIPE,
+                                             stdout=stdout, stderr=stderr)
+                    row["owner_pid"] = owner.pid
+                    match, raw_before = wait_marker(b"MEMO-CONTEXT-BEFORE ", rb"MEMO-CONTEXT-BEFORE ([0-9a-f]{64})\n")
+                    reference = match.group(1).decode("ascii")
+                    path = cache / ("context-" + reference + ".mlfqc")
+                    before = context_identity(path)
+                    require(before["sha256"] == reference, "before identity matches actual context digest")
+                    require(owner.poll() is None, "memo owner alive before first ACK")
+                    row["context_before"] = before
+                    save()
+                    owner.stdin.write(b"MEMO-BEFORE-ACK\n"); owner.stdin.flush()
+                    prefix = raw_before + b"PASS empty memo needs context file\nMEMO-CONTEXT-AFTER "
+                    _, raw_after = wait_marker(prefix, re.escape(prefix + reference.encode() + b"\n"))
+                    after = context_identity(path)
+                    stable = ["device", "inode", "mode", "links", "bytes", "sha256", "mtime_ns"]
+                    require(all(before[k] == after[k] for k in stable), "bracket restores original context identity and full bytes")
+                    require(not Path(str(path) + ".memo-test-backup").exists(), "backup consumed by restoration")
+                    require(owner.poll() is None, "memo owner alive after restoration sampling")
+                    row.update(context_after=after, restored_fields=stable,
+                               ctime_scope="recorded before/after; rename legitimately changes ctime")
+                    save()
+                    owner.stdin.write(b"MEMO-AFTER-ACK\n"); owner.stdin.flush(); owner.stdin.close()
+                    owner.wait(timeout=max(.001, 60 - (time.monotonic() - started)))
+            except BaseException as error:
+                failure = error
+                row.update(error=type(error).__name__ + ": " + str(error), timed_out=isinstance(error, subprocess.TimeoutExpired))
+            finally:
+                if owner is not None:
+                    try:
+                        if owner.poll() is None:
+                            owner.kill()
+                        owner.wait(timeout=5)
+                        if owner.stdin is not None and not owner.stdin.closed:
+                            owner.stdin.close()
+                    except BaseException as error:
+                        row["cleanup_error"] = type(error).__name__ + ": " + str(error)
+                        if failure is None:
+                            failure = error
+                    row["exit_code"] = owner.returncode
+                row.update(seconds=time.monotonic() - started, state="failed")
+                for label, path in captures.items():
+                    if path.exists():
+                        hasher = hashlib.sha256()
+                        with path.open("rb") as stream:
+                            for block in iter(lambda: stream.read(65536), b""):
+                                hasher.update(block)
+                        row[label] = {"path": str(path), "bytes": path.stat().st_size, "sha256": hasher.hexdigest()}
+                save()  # Full captures survive wrong marker, EOF, status, timeout, and assertion failure.
+            if failure is not None:
+                raise failure
+            require(row["exit_code"] == 0 and row["stderr"]["bytes"] == 0 and row["stdout"]["bytes"] <= 65536,
+                    "memo helper status and bounded captures")
+            tail = ["memo rejects bad payload", "memo rejects full scope key change", "memo rejects owner change",
+                    "memo rejects parameter change", "memo rejects declaration change", "memo rejects context field change",
+                    "memo rejects different digest", "memo rejects unsafe reference", "memo does not cross cache directory",
+                    "legacy readers clear memo without changing raw", "memo rejects datatype kind change",
+                    "memo rejects datatype constructor change", "memo rejects datatype field change",
+                    "datatype switch and structural guards", "prepared authority rejects memo-decoded final payload",
+                    "memo helper complete"]
+            expected = raw_after + b"".join(("PASS " + label + "\n").encode() for label in tail)
+            require(captures["stdout"].read_bytes() == expected, "complete ordered memo assertion inventory")
+            no_query_scratch(cache)
+            no_query_scratch(cache / "prepared-counterexample")
+            row["state"] = "passed"
+            memo_results["helper"] = {"context_before": row["context_before"], "context_after": row["context_after"],
+                                      "assertion_markers": tail, "cache": physical_inventory(cache),
+                                      "proof": "real verified state survives private context rename; empty state fails; finally restores original inode/bytes",
+                                      "limits": "returned Bool is context branch only; PreparedRaw rejection is checked separately, not a reader-owned invalidation"}
+            save()
+        run_memo_helper()
+        phases = ["cold", "warm", "mixed", "restored-warm", "corrupt-repair", "missing-repair"]
+        expected_counts = [(2, 0), (0, 2), (0, 2), (0, 2), (1, 1), (1, 1)]
+        for kind in ["query", "session"]:
+            root = out / ("memo-" + kind)
+            cache = root / "cache"
+            raw = run("memo-" + kind, ["memo-" + kind, cache, root], timeout=60)
+            require(raw == b"PASS six public invocations preserve complete final artifacts and repair context\n",
+                    "fixed six-invocation completion marker")
+            rows, baseline_artifact, keys = [], None, None
+            for phase, counts in zip(phases, expected_counts):
+                report_path, artifact_path = root / (phase + ".queries"), root / (phase + ".artifact")
+                require(report_path.stat().st_size <= 65536 and artifact_path.stat().st_size <= 2 * 1024**2,
+                        "small fixed public memo evidence")
+                report = json.loads(report_path.read_bytes())
+                require(report["format"] == 1 and len(report["groups"]) == 2, "exact two-group memo population")
+                require((report["inferred_groups"], report["reused_groups"]) == counts,
+                        "exact cold/warm/mixed/restored/invalidation infer-hit oracle: " + kind + "/" + phase)
+                current_keys = sorted(group["query_key"] for group in report["groups"])
+                require(len(set(current_keys)) == 2, "distinct memo query keys")
+                if keys is None:
+                    keys = current_keys
+                require(current_keys == keys, "same public keys across all six invocations")
+                artifact_sha = digest(artifact_path.read_bytes())
+                if baseline_artifact is None:
+                    baseline_artifact = artifact_sha
+                require(artifact_sha == baseline_artifact, "complete final artifact bytes equal cold in every phase")
+                rows.append({"phase": phase, "query_report": report, "artifact_sha256": artifact_sha,
+                             "report_sha256": digest(report_path.read_bytes())})
+            no_query_scratch(cache)
+            final_snapshot = snapshot(cache, keys)
+            require(set(final_snapshot["active_records"].values()) == {"MLF-QUERY-CACHE-3"}, "all records restored to source CACHE3")
+            require(len(final_snapshot["reachable_contexts"]) == 1, "one shared context after both repairs")
+            context = cache / final_snapshot["reachable_contexts"][0]
+            require(context.read_bytes() == (root / "context.original").read_bytes(), "final context exact original bytes")
+            memo_results[kind] = {"phases": rows, "final_cache": final_snapshot,
+                                  "mixed_legacy_scope": "Haskell checked full bytes and mtime during mixed hit only; explicit C3 restoration is test setup; no added ctime/devino claim",
+                                  "cross_invocation_scope": "all-C3 warm ends verified; next corrupt/missing invocations must each infer one and hit one, not reuse global state"}
+            save()
+
         cache_roots = [out / "helper-cache", out / "raw-final-cache", out / "query/cache", out / "session/cache",
                        *[out / ("left-" + mode) / "cache" for mode in ["legacy", "source", "session"]],
                        *[out / name / "cache" for name in ["empty-success", "empty-directory-failure", "cleanup-dual-failure", "concurrent"]]]
+        cache_roots += [out / "memo-helper-cache", out / "memo-query/cache", out / "memo-session/cache"]
         record["all_cache_inventory"] = {str(root.relative_to(out)): physical_inventory(root) for root in cache_roots}
         allocated = sum(value["all_pathname_conservative_allocated_bytes"] for value in record["all_cache_inventory"].values())
         logical = sum(value["all_file_logical_bytes"] for value in record["all_cache_inventory"].values())
         record["all_cache_totals"] = {"logical": logical, "allocated": allocated, "cache_roots": len(cache_roots),
-                                      "scope": "all eleven private cache trees, including helper, legacy, orphan, staging, lock and rejected directory nodes; build/capture evidence is separately in outer root accounting"}
+                                      "scope": "all fourteen private cache trees, including helper, legacy, orphan, staging, lock and rejected directory nodes; build/capture evidence is separately in outer root accounting"}
         require(logical <= 16 * 1024**2 and allocated <= 16 * 1024**2, "16 MiB complete cache budget")
-        require(len(record["commands"]) == 31, "fixed original 18 plus 13 command inventory")
+        require(len(record["commands"]) == 34, "fixed original 31 plus 3 memo command inventory")
         record["complete"] = True
         save()
         print(json.dumps({"complete": True, "commands": len(record["commands"]), "drivers": ["query", "session"]}))

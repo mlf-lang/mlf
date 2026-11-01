@@ -11,6 +11,21 @@ RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
 OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
 NEW_INDEX = b'Rank.indexMap selected'
 
+def memo_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-read-reuse/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_read_reuse_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def without_context_read_reuse(raw):
+    memo=memo_contract();memo.manifest()
+    if sha(raw)==memo.OWNERS['Bootstrap.CrateSession']['new']:
+        return memo.restore_previous_owner(raw)
+    # Historical admission remains entirely in the frozen diamond contract.
+    diamond_contract().storage_history(raw)
+    return raw
+
 def diamond_contract():
     path=Path(__file__).resolve().parent.parent/'source-context-projection-merge/source_contract.py'
     spec=importlib.util.spec_from_file_location('source_diamond_adapter',path)
@@ -22,7 +37,7 @@ def without_query_key_scratch(raw):
     spec=importlib.util.spec_from_file_location('query_key_scratch_projection',path)
     adapter=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    return adapter.current_or_parent(diamond_contract().storage_history(raw))
+    return adapter.current_or_parent(diamond_contract().storage_history(without_context_read_reuse(raw)))
 
 def without_source_query_context(raw):
     path=Path(__file__).resolve().parent.parent/'source-query-context/source_contract.py'
@@ -36,7 +51,7 @@ def without_projection_patch(raw):
     spec=importlib.util.spec_from_file_location('owned_projection_inverse',path)
     adapter=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    return adapter.current_or_parent(diamond_contract().upstream_history(raw))
+    return adapter.current_or_parent(diamond_contract().upstream_history(without_context_read_reuse(raw)))
 
 def without_survivor_merge(raw):
     path=Path(__file__).resolve().parent.parent/'c3-survivors/source_contract.py'

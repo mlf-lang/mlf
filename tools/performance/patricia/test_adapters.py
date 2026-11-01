@@ -53,11 +53,27 @@ full_spec=importlib.util.spec_from_file_location('projection_patch_contract',
     ROOT/'tools/performance/full-compiler/source_contract.py')
 full=importlib.util.module_from_spec(full_spec);full_spec.loader.exec_module(full)
 
+memo=migration.memo_contract()
+def before_memo_registry(base):
+    return memo.registry_to_parent(migration.migrate(base))
+def prior_owner(path):
+    module='Bootstrap.'+path.stem
+    return memo.restore_previous_owner(path.read_bytes(),module)
+def prior_lock():
+    lock=json.loads((ROOT/'mlf.lock').read_bytes())
+    crates=[c for c in lock['packages'] if c['name']=='mlf-crates']
+    if len(crates)!=1:raise ValueError('one exact crate')
+    for module,o in memo.OWNERS.items():
+        key='Bootstrap/'+module.split('.')[-1]+'.hs'
+        if crates[0]['sources'][key]!=o['new']:raise ValueError('current read-reuse lock owner')
+        crates[0]['sources'][key]=o['old']
+    return lock
+
 def before_diamond_registry(base):
-    return diamond.registry_to_parent(migration.migrate(base),'left')
+    return diamond.registry_to_parent(before_memo_registry(base),'left')
 
 def full_only_registry(base):
-    return diamond.registry_to_parent(migration.migrate(base),'right')
+    return diamond.registry_to_parent(before_memo_registry(base),'right')
 
 def before_full_registry(base):
     return migration.apply_changes(full_only_registry(base),
@@ -165,7 +181,7 @@ class AdapterTests(unittest.TestCase):
             migration.host_sources({key: '0'*64})
 
     def test_rank_view_adapter_is_exactly_reversible(self):
-        source = (ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source = prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs')
         restored = graph.without_rank_view(source)
         self.assertEqual(graph.with_rank_view(restored), source)
         for bad in [source.replace(graph.RANK_IMPORT, b''),
@@ -219,7 +235,7 @@ class AdapterTests(unittest.TestCase):
             migration.migrate(base)
 
     def test_datatype_session_projection_preserves_previous_complete_owner(self):
-        source=diamond.to_left((ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes())
+        source=diamond.to_left(prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs'))
         source=graph.without_delayed_indexes(source)
         source=sparse.restore_previous_owner(source)
         previous=datatype.restore_previous_owner(contract.restore_previous_owner(source))
@@ -245,7 +261,7 @@ class AdapterTests(unittest.TestCase):
         bad['changed_sources']['Bootstrap.CrateQuery']['old']='0'*64
         with patch.object(migration,'contract_delta',return_value=bad),self.assertRaises(ValueError):
             migration.migrate(base)
-        source=diamond.to_left((ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes())
+        source=diamond.to_left(prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs'))
         source=graph.without_delayed_indexes(source)
         source=sparse.restore_previous_owner(source)
         previous=contract.restore_previous_owner(source)
@@ -396,7 +412,7 @@ class AdapterTests(unittest.TestCase):
                     migration.batch_delta()
 
     def test_sparse_projection_rejects_owner_or_edit_corruption(self):
-        source=diamond.to_left((ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes())
+        source=diamond.to_left(prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs'))
         source=graph.without_delayed_indexes(source)
         previous=sparse.restore_previous_owner(source)
         self.assertEqual(graph.without_sparse_contracts(source),previous)
@@ -473,7 +489,7 @@ class AdapterTests(unittest.TestCase):
                     migration.c3_delta()
 
     def test_c3_projection_requires_complete_owner_and_exact_inverse(self):
-        source=diamond.to_left((ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes())
+        source=diamond.to_left(prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs'))
         source=graph.without_survivor_merge(source)
         previous=c3.restore_previous_owner(source)
         self.assertEqual(hashlib.sha256(previous).hexdigest(),
@@ -514,7 +530,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(row['old'],previous['Bootstrap.CrateSession'])
 
     def test_survivors_inverse_recovers_complete_previous_owner(self):
-        source=diamond.to_left((ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes())
+        source=diamond.to_left(prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs'))
         source=source_context.restore_previous_owner(scratch.restore_previous_owner(source))
         previous=survivors.restore_previous_owner(source)
         self.assertEqual(hashlib.sha256(previous).hexdigest(),
@@ -578,7 +594,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual({n for n in current if current[n]!=previous[n]},owners)
         self.assertEqual({n:current[n] for n in current if n not in owners},
                          {n:previous[n] for n in previous if n not in owners})
-        lock=json.loads((ROOT/'mlf.lock').read_bytes())
+        lock=prior_lock()
         crates=[p for p in lock['packages'] if p['name']=='mlf-crates']
         self.assertEqual(len(crates),1)
         self.assertEqual(crates[0]['sources']['Bootstrap/CrateSession.hs'],diamond.EXPECTED['session_edges']['left']['new_sha256'])
@@ -594,12 +610,12 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(row['new'],current[module])
             self.assertEqual(row['old'],owner['old'])
             self.assertEqual(row['new'],owner['new'])
-            self.assertEqual(hashlib.sha256(scratch.restore_previous_owner(diamond.storage_current_owner((ROOT/owner['path']).read_bytes(),module),module)).hexdigest(),row['new'])
+            self.assertEqual(hashlib.sha256(scratch.restore_previous_owner(diamond.storage_current_owner(prior_owner(ROOT/owner['path']),module),module)).hexdigest(),row['new'])
             self.assertEqual(crates[0]['sources'][owner['path'].split('libraries/mlf-crates/',1)[1]],row['new'])
 
     def test_source_context_complete_inverse_and_explicit_parent_replay(self):
         for module,owner in source_context.OWNERS.items():
-            source=scratch.restore_previous_owner(diamond.storage_current_owner((ROOT/owner['path']).read_bytes(),module),module)
+            source=scratch.restore_previous_owner(diamond.storage_current_owner(prior_owner(ROOT/owner['path']),module),module)
             previous=source_context.restore_previous_owner(source,module)
             self.assertEqual(hashlib.sha256(previous).hexdigest(),owner['old'])
             forward=previous
@@ -611,7 +627,7 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(source_context.current_or_parent(previous,module),previous)
             with self.assertRaises(ValueError):
                 source_context.restore_previous_owner(previous,module)
-        session=scratch.restore_previous_owner(diamond.to_left((ROOT/source_context.OWNERS['Bootstrap.CrateSession']['path']).read_bytes()))
+        session=scratch.restore_previous_owner(diamond.to_left(prior_owner(ROOT/source_context.OWNERS['Bootstrap.CrateSession']['path'])))
         self.assertEqual(graph.without_source_query_context(session),
                          source_context.restore_previous_owner(session))
         prior=source_context.restore_previous_owner(session)
@@ -624,7 +640,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_source_context_partial_unknown_or_reordered_owner_rejected(self):
         for module,owner in source_context.OWNERS.items():
-            source=scratch.restore_previous_owner(diamond.storage_current_owner((ROOT/owner['path']).read_bytes(),module),module)
+            source=scratch.restore_previous_owner(diamond.storage_current_owner(prior_owner(ROOT/owner['path']),module),module)
             for edit in source_context.manifest(module)['edits']:
                 for changed in (source+b' ',source[:-1],
                                 source.replace(edit['new'].encode(),edit['old'].encode(),1),
@@ -633,7 +649,7 @@ class AdapterTests(unittest.TestCase):
                         source_context.restore_previous_owner(changed,module)
                     with self.subTest(module=module,replay=True),self.assertRaises(ValueError):
                         source_context.current_or_parent(changed,module)
-        session=scratch.restore_previous_owner(diamond.to_left((ROOT/source_context.OWNERS['Bootstrap.CrateSession']['path']).read_bytes()))
+        session=scratch.restore_previous_owner(diamond.to_left(prior_owner(ROOT/source_context.OWNERS['Bootstrap.CrateSession']['path'])))
         for adapter in (survivors,c3,sparse,contract,datatype):
             with self.subTest(out_of_order=adapter.__name__),self.assertRaises(ValueError):
                 adapter.restore_previous_owner(session)
@@ -641,7 +657,7 @@ class AdapterTests(unittest.TestCase):
     def test_source_context_delta_manifests_are_fixed_and_inverse_is_independent(self):
         for module,owner in source_context.OWNERS.items():
             original=(source_context.HERE/owner['file']).read_bytes()
-            source=scratch.restore_previous_owner(diamond.storage_current_owner((ROOT/owner['path']).read_bytes(),module),module)
+            source=scratch.restore_previous_owner(diamond.storage_current_owner(prior_owner(ROOT/owner['path']),module),module)
             with tempfile.TemporaryDirectory() as directory:
                 root=Path(directory);path=root/owner['file']
                 for raw in (original+b' ',b'{}'):
@@ -707,7 +723,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual({n for n in current if current[n]!=previous[n]},owners)
         self.assertEqual({n:current[n] for n in current if n not in owners},
                          {n:previous[n] for n in previous if n not in owners})
-        lock=json.loads((ROOT/'mlf.lock').read_bytes())
+        lock=prior_lock()
         crates=[p for p in lock['packages'] if p['name']=='mlf-crates']
         self.assertEqual(len(crates),1)
         self.assertEqual(crates[0]['sources']['Bootstrap/CrateSession.hs'],diamond.EXPECTED['session_edges']['left']['new_sha256'])
@@ -719,12 +735,12 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(row['new'],current[module])
             self.assertEqual(row['old'],owner['old'])
             self.assertEqual(row['new'],owner['new'])
-            self.assertEqual(hashlib.sha256(diamond.storage_current_owner((ROOT/owner['path']).read_bytes(),module)).hexdigest(),row['new'])
+            self.assertEqual(hashlib.sha256(diamond.storage_current_owner(prior_owner(ROOT/owner['path']),module)).hexdigest(),row['new'])
             self.assertEqual(crates[0]['sources'][owner['path'].split('libraries/mlf-crates/',1)[1]],row['new'])
 
     def test_scratch_complete_inverse_and_explicit_parent_replay(self):
         for module,owner in scratch.OWNERS.items():
-            source=diamond.storage_current_owner((ROOT/owner['path']).read_bytes(),module)
+            source=diamond.storage_current_owner(prior_owner(ROOT/owner['path']),module)
             previous=scratch.restore_previous_owner(source,module)
             self.assertEqual(hashlib.sha256(previous).hexdigest(),owner['old'])
             forward=previous
@@ -736,7 +752,7 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(scratch.current_or_parent(previous,module),previous)
             with self.assertRaises(ValueError):
                 scratch.restore_previous_owner(previous,module)
-        session=diamond.to_left((ROOT/scratch.OWNERS['Bootstrap.CrateSession']['path']).read_bytes())
+        session=diamond.to_left(prior_owner(ROOT/scratch.OWNERS['Bootstrap.CrateSession']['path']))
         prior=scratch.restore_previous_owner(session)
         self.assertEqual(graph.without_query_key_scratch(session),prior)
         self.assertEqual(graph.without_source_query_context(session),
@@ -751,7 +767,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_scratch_partial_unknown_or_reordered_owner_rejected(self):
         for module,owner in scratch.OWNERS.items():
-            source=diamond.storage_current_owner((ROOT/owner['path']).read_bytes(),module)
+            source=diamond.storage_current_owner(prior_owner(ROOT/owner['path']),module)
             for edit in scratch.manifest(module)['edits']:
                 for changed in (source+b' ',source[:-1],
                                 source.replace(edit['new'].encode(),edit['old'].encode(),1),
@@ -765,7 +781,7 @@ class AdapterTests(unittest.TestCase):
                     else:
                         with self.subTest(module=module,replay=True),self.assertRaises(ValueError):
                             scratch.current_or_parent(changed,module)
-        session=diamond.to_left((ROOT/scratch.OWNERS['Bootstrap.CrateSession']['path']).read_bytes())
+        session=diamond.to_left(prior_owner(ROOT/scratch.OWNERS['Bootstrap.CrateSession']['path']))
         for adapter in (source_context,survivors,c3,sparse,contract,datatype):
             with self.subTest(out_of_order=adapter.__name__),self.assertRaises(ValueError):
                 adapter.restore_previous_owner(session)
@@ -773,7 +789,7 @@ class AdapterTests(unittest.TestCase):
     def test_scratch_delta_manifests_are_fixed_and_inverse_is_independent(self):
         for module,owner in scratch.OWNERS.items():
             original=(scratch.HERE/owner['file']).read_bytes()
-            source=diamond.storage_current_owner((ROOT/owner['path']).read_bytes(),module)
+            source=diamond.storage_current_owner(prior_owner(ROOT/owner['path']),module)
             with tempfile.TemporaryDirectory() as directory:
                 root=Path(directory);path=root/owner['file']
                 for raw in (original+b' ',b'{}'):
@@ -854,7 +870,7 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(result['Bootstrap.CrateSession'],row['new'])
 
     def test_projection_inverse_recovers_complete_accepted_owner(self):
-        source=diamond.to_right((ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes())
+        source=diamond.to_right(prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs'))
         previous=full.restore_previous_owner(source)
         self.assertEqual(hashlib.sha256(previous).hexdigest(),
             '51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9')
@@ -896,24 +912,24 @@ class AdapterTests(unittest.TestCase):
 
 
     def test_diamond_both_full_source_routes_and_live_registry(self):
-        raw=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        raw=prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs')
         common=diamond.verify_diamond(raw)
         self.assertEqual(hashlib.sha256(common).hexdigest(),full.OLD_SHA)
         self.assertEqual(hashlib.sha256(diamond.to_left(raw)).hexdigest(),scratch.NEW_SHA)
         self.assertEqual(hashlib.sha256(diamond.to_right(raw)).hexdigest(),full.NEW_SHA)
-        query=(ROOT/'libraries/mlf-crates/Bootstrap/CrateQuery.hs').read_bytes()
+        query=prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateQuery.hs')
         self.assertEqual(hashlib.sha256(diamond.query_to_right(query)).hexdigest(),source_context.QUERY_OLD_SHA)
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
-        merged=migration.migrate(base);left=before_diamond_registry(base);right=full_only_registry(base)
+        merged=before_memo_registry(base);left=before_diamond_registry(base);right=full_only_registry(base)
         self.assertEqual(diamond.merge_registry(left,right),merged)
         self.assertEqual({n for n in merged if merged[n]!=left[n]},{'Bootstrap.CrateSession'})
         self.assertEqual({n for n in merged if merged[n]!=right[n]},{'Bootstrap.CrateSession','Bootstrap.CrateQuery'})
         self.assertEqual(before_full_registry(base),before_source_context_registry(base))
         for module,path in [('Bootstrap.CrateSession','CrateSession.hs'),('Bootstrap.CrateQuery','CrateQuery.hs')]:
-            self.assertEqual(hashlib.sha256((ROOT/'libraries/mlf-crates/Bootstrap'/path).read_bytes()).hexdigest(),merged[module])
+            self.assertEqual(hashlib.sha256((ROOT/'libraries/mlf-crates/Bootstrap'/path).read_bytes()).hexdigest(),migration.migrate(base)[module])
 
     def test_diamond_rejects_unknown_partial_old_and_reordered_owner(self):
-        raw=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        raw=prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs')
         for edge in ('left','right'):
             parent=diamond.to_parent(raw,edge)
             for bad in (raw+b' ',raw[:-1],parent):
@@ -929,7 +945,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_diamond_rejects_mixed_or_stale_complete_registries(self):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
-        merged=migration.migrate(base);left=before_diamond_registry(base);right=full_only_registry(base)
+        merged=before_memo_registry(base);left=before_diamond_registry(base);right=full_only_registry(base)
         for name in ('Bootstrap.CrateQuery','Bootstrap.CrateSession'):
             for value in ('0'*64,right[name],merged[name]):
                 bad={**left,name:value}
@@ -954,13 +970,68 @@ class AdapterTests(unittest.TestCase):
             value=json.loads(original);value['module_count']=127
             raw=json.dumps(value).encode();path.write_bytes(raw)
             with patch.object(diamond,'HERE',root),patch.object(diamond,'MANIFEST_SHA',hashlib.sha256(raw).hexdigest()),self.assertRaises(ValueError):diamond.manifest()
-        raw=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        raw=prior_owner(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs')
         for edge in ('left','right'):
             bad=json.loads(json.dumps(diamond.edge_manifest(edge)));bad['edits'][0]['old']+='\n'
             with patch.object(diamond,'edge_manifest',return_value=bad),self.assertRaises(ValueError):diamond.to_parent(raw,edge)
         value=diamond.manifest()
         self.assertEqual(value['left_parent_manifest_sha256'],migration.SCRATCH_MANIFEST_SHA)
         self.assertEqual(value['right_parent_manifest_sha256'],migration.FULL_MANIFEST_SHA)
+
+    def test_read_reuse_complete_owners_registry_and_original_diamond(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        current=migration.migrate(base);previous=before_memo_registry(base)
+        self.assertEqual(memo.advance_registry(previous),current)
+        self.assertEqual({n for n in current if current[n]!=previous[n]},set(memo.OWNERS))
+        for module,o in memo.OWNERS.items():
+            raw=(ROOT/o['path']).read_bytes()
+            self.assertEqual(hashlib.sha256(raw).hexdigest(),current[module])
+            prior=memo.restore_previous_owner(raw,module)
+            self.assertEqual(hashlib.sha256(prior).hexdigest(),previous[module])
+            if module=='Bootstrap.CrateSession':
+                self.assertEqual(graph.without_context_read_reuse(raw),prior)
+                self.assertEqual(hashlib.sha256(diamond.verify_diamond(prior)).hexdigest(),full.OLD_SHA)
+                with self.assertRaises(ValueError):diamond.to_left(raw)
+            else:
+                self.assertEqual(hashlib.sha256(diamond.query_to_right(prior)).hexdigest(),source_context.QUERY_OLD_SHA)
+
+    def test_read_reuse_rejects_stale_partial_unknown_owners_and_order(self):
+        for module,o in memo.OWNERS.items():
+            raw=(ROOT/o['path']).read_bytes();prior=memo.restore_previous_owner(raw,module)
+            for bad in (prior,raw+b' ',raw[:-1]):
+                with self.assertRaises(ValueError):memo.restore_previous_owner(bad,module)
+            for edit in memo.owner_delta(module)['edits']:
+                partial=raw.replace(edit['new'].encode(),edit['old'].encode(),1)
+                with self.assertRaises(ValueError):memo.restore_previous_owner(partial,module)
+            for adapter in (scratch,source_context):
+                with self.assertRaises(ValueError):adapter.restore_previous_owner(raw,module)
+        with self.assertRaises(ValueError):memo.restore_previous_owner(b'', 'Unknown')
+
+    def test_read_reuse_registry_rejects_replayed_mixed_and_polluted(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        current=migration.migrate(base);prior=before_memo_registry(base)
+        with self.assertRaises(ValueError):memo.advance_registry(current)
+        with self.assertRaises(ValueError):memo.registry_to_parent(prior)
+        for n,o in memo.OWNERS.items():
+            with self.assertRaises(ValueError):memo.registry_to_parent({**current,n:o['old']})
+            with self.assertRaises(ValueError):memo.advance_registry({**prior,n:o['new']})
+        for bad in ({**current,'Unknown':'0'*64},dict(list(current.items())[1:])):
+            with self.assertRaises(ValueError):memo.registry_to_parent(bad)
+
+    def test_read_reuse_fixed_manifests_and_complete_inverse_blocks(self):
+        original=(memo.HERE/'source-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for raw in (original+b' ',b'{}'):
+                (root/'source-migration.json').write_bytes(raw)
+                with patch.object(memo,'HERE',root),self.assertRaises(ValueError):memo.manifest()
+            value=json.loads(original);value['module_count']=127
+            raw=json.dumps(value).encode();(root/'source-migration.json').write_bytes(raw)
+            with patch.object(memo,'HERE',root),patch.object(memo,'MANIFEST_SHA',hashlib.sha256(raw).hexdigest()),self.assertRaises(ValueError):memo.manifest()
+        for module,o in memo.OWNERS.items():
+            raw=(ROOT/o['path']).read_bytes();bad=json.loads(json.dumps(memo.owner_delta(module)))
+            bad['edits'][0]['old']+='\n'
+            with patch.object(memo,'owner_delta',return_value=bad),self.assertRaises(ValueError):memo.restore_previous_owner(raw,module)
 
 class CoreProofTests(unittest.TestCase):
     def worker(self, name='unmatchedMultiplier', operations='timesInt64# plusInt64# remInt64#'):

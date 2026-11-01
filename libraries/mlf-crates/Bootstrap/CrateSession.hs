@@ -261,6 +261,10 @@ module Bootstrap.CrateSession (compileSpecFile) where {
     runSourceGroupsWithOwnedContext encodings datatypeContext contractEncodings Nothing crateId compilerHash cacheDir inventory plan
       groups contracts objects inferred reused results;
   runSourceGroupsWithOwnedContext encodings datatypeContext contractEncodings ownedContext crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+      runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext Nothing
+        crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
+  runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext readContext crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (Query.QueryReport inferred reused (reverse results)) contracts));
@@ -294,14 +298,21 @@ module Bootstrap.CrateSession (compileSpecFile) where {
         digest <- fileDigest (cacheDir ++ "/query-key.new");
         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
         present <- fileExists destination;
-        cached <- if present then do {
+        cachedRead <- if present then do {
           input <- readFile destination;
-          decoded <- Query.readSourceCached cacheDir key name bindings datatypes names input;
-          ioReturn (do {
-            object <- decoded;
-            Source.validatePreparedRaw prepared object
+          observed <- Query.readSourceCachedWithContext readContext cacheDir key name
+            bindings datatypes names input;
+          ioReturn (case observed of {
+            (,,) next _ decoded -> case (do {
+              object <- decoded;
+              Source.validatePreparedRaw prepared object
+            }) of {
+              Left error -> (,) Nothing (Left error);
+              Right object -> (,) next (Right object)
+            }
           })
-        } else ioReturn (Left "cache miss");
+        } else ioReturn ((,) Nothing (Left "cache miss"));
+        let { cached = snd cachedRead };
         let { raw = case cached of {
           Right object -> Right ((,) True object);
           Left _ -> mapEither ((,) False) (case encodings of {
@@ -325,13 +336,14 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (Query.list Query.encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsWithOwnedContext encodings (snd context) (case contractEncodings of {
+                  runSourceGroupsWithReadContext encodings (snd context) (case contractEncodings of {
                     Nothing -> Nothing;
                     Just pool -> Just (Query.extendSourceContractEncodings finalContracts pool)
                   }) (case ownedContext of {
                     Nothing -> Nothing;
                     Just owned -> Just (Source.extendOwnedSourceContext finalContracts owned)
-                  }) crateId compilerHash cacheDir inventory plan rest
+                  }) (if hit then fst cachedRead else Nothing)
+                    crateId compilerHash cacheDir inventory plan rest
                     (M.union compareString finalContracts contracts)
                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))
                     (reused + (if hit then 1 else 0))

@@ -32,6 +32,7 @@ EXPECTED_COMMANDS += ["left-legacy", "lock-after-legacy", "left-source", "lock-a
                       "empty-directory-failure", "lock-after-empty-directory", "cleanup-dual-failure",
                       "lock-after-cleanup-dual", "concurrent-a", "concurrent-b"]
 
+EXPECTED_COMMANDS += ["memo-helper", "memo-query", "memo-session"]
 
 def require(ok, message):
     if not ok:
@@ -81,7 +82,7 @@ def verify_control_receipt(path, binary, python, controls):
             'controls did not complete against this fixture')
     rows = receipt.get('commands', [])
     require([r.get('name') for r in rows] == EXPECTED_COMMANDS,
-            'fixed original 18 plus 13 command inventory differs')
+            'fixed original 31 plus 3 memo command inventory differs')
     require(set(receipt.get('drivers', {})) == {'query', 'session'}, 'both actual drivers required')
     for row in rows:
         require(row.get('state') == 'passed' and row.get('exit_code') == 0,
@@ -112,7 +113,7 @@ def main():
     parser.add_argument('--controls', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--controls-timeout', type=int, default=900,
-                        help='One bound for the whole 31-command runner; not a guarantee of each per-command ceiling.')
+                        help='One bound for the whole 34-command runner; not a guarantee of each per-command ceiling.')
     args = parser.parse_args()
     require(1 <= args.controls_timeout <= 1800, 'controls timeout outside 1..1800')
     source = args.source_root.absolute()
@@ -233,7 +234,7 @@ def main():
         inner = output / 'controls'
         result = runner.run('source-context-controls', [python, '-I', '-B', controls,
                             '--fixture', binary, '--output', inner], timeout=args.controls_timeout)
-        require(json.loads(result.stdout) == {'complete': True, 'commands': 31, 'drivers': ['query', 'session']},
+        require(json.loads(result.stdout) == {'complete': True, 'commands': 34, 'drivers': ['query', 'session']},
                 'controls completion summary differs')
         verify_control_receipt(inner / 'receipt.json', binary, python, controls)
         record['controls_receipt'] = {'path': str(inner / 'receipt.json'), 'sha256': sha(inner / 'receipt.json')}

@@ -292,3 +292,82 @@ representation admission and round-trip behavior. Evidence is retained in
 `real-cache-screen/run/receipt.json`; no timing from this one-shot screen is
 presented as a compiler speedup.
 
+
+## Per-invocation verified-context reuse
+
+The next slice avoids repeating the shared-context file read, full digest and
+datatype encoding for every record of one locked source-driver invocation.
+The first CACHE-3 hit still performs the full original checks. A single-entry
+state may be reused only for the same cache directory, context reference,
+expected context, and structurally equal datatype declarations. Structural
+comparison includes constructor order, binders and kinds, and all field
+forms; a conservative miss is permitted.
+
+Every record still checks canonical packing, its full reconstructed key,
+the contextual object and `validateCached`. Both public source drivers
+still independently call `Source.validatePreparedRaw` before accepting a
+hit. A record failure, legacy read, miss, inference, write, or PreparedRaw
+rejection clears the state. Each public invocation starts empty, and the
+existing normal-return cleanup and lock-release sequence is unchanged.
+There is no process-global or cross-invocation memo.
+
+The new state constructor and lower-level decoder are internal trusted-call
+contracts, not unforgeable capabilities: this module's open exports do not
+create a security boundary against arbitrary caller-supplied state. The
+file can be skipped only while the existing cooperative cache lock is held.
+Non-cooperating mid-lock writers, thread-level mutual exclusion, exceptions,
+crashes and Windows runtime remain outside this qualification.
+
+The strict `source-context-read-reuse` source layer sits above the unchanged
+two-parent projection/context composition. It pins both complete owner
+identities, unique forward/inverse edits, the complete 128-module registry
+(126 unchanged), and all frozen predecessor manifests. Historical adapters
+undo this layer first; current live registries must match the new owners.
+No historical expected hash or semantic oracle was relaxed.
+
+### Local memo qualification
+
+This candidate is based on PR29 merge `6a82267e`, which combines cleanup
+`2c3ce0ee` with PR25 projection change `9dfcd662`. It was built from fresh
+sources and objects, not relabelled from the cleanup-only producer:
+
+* All 18 maintained build commands, 128-module shared profile,
+  implementation identity, 13 binaries and builtin regeneration passed.
+* The strict suites passed **200 checks**: Patricia 54, A1 34,
+  validation-reuse 7 and full-compiler 5, each normally and with Python
+  `-O`.
+* The maintained source-context gate passed its five compile/link/control
+  commands and **34 invocations**. All previous 31 controls remain,
+  including five independent release probes with their owners still alive.
+* The added helper control obtained state from a real successful read,
+  temporarily removed its context while holding the real lock, and
+  distinguished verified-state reuse from a stateless miss. It restored
+  the exact file bytes, inode and modification time; rename legitimately
+  changed ctime and that change was recorded.
+* Both public Query and Session paths performed six calls in one process:
+  cold, warm, mixed legacy, restored CACHE-3 warm, corrupted context and
+  missing context. Their exact inference/hit counts were
+  **2/0, 0/2, 0/2, 0/2, 1/1, 1/1**, with identical complete final objects.
+  The restored warm call prevents a legacy-state reset from hiding an
+  accidental cross-call memo.
+* Full-key, raw-object and PreparedRaw counterexamples remain rejected.
+  Changes to datatype kinds, constructors and fields do not reuse the
+  verified context.
+
+All 14 complete test-cache trees, including intentionally retained old and
+orphan data and unrelated sentinels, totaled **1,963,388 content bytes** and
+**2,301,952 pathname-allocated bytes**. Build products and evidence are
+additional storage, not subtracted from that number. This is functional
+qualification, not a complete-corpus or statistical performance result.
+
+PR29's preceding combined head `6a82267e` passed
+[CI #242](https://github.com/mlf-lang/mlf/actions/runs/41327580521).
+That run does **not** qualify the later memo changes; their published exact
+head requires a separate hosted run.
+
+The unchanged 64-group fixture was also repeated with this producer. Its
+complete storage and all semantic oracles matched the earlier run, while
+the earlier large compact warm-read gap was not observed in this single
+ABBA repeat. Both the negative earlier observations and the new raw times,
+identity differences and limitations are documented in
+[the controlled study](../source-context-read-reuse/README.md).

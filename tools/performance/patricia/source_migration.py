@@ -272,6 +272,13 @@ def apply_changes(base, changes):
         result[name]=row['new']
     return result
 
+def memo_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-read-reuse/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_read_reuse_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
 def diamond_contract():
     import importlib.util
     path=HERE.parent/'source-context-projection-merge/source_contract.py'
@@ -313,7 +320,7 @@ def migrate(base):
     upstream=apply_changes(result,full_delta()['changed_sources'])
     result=apply_changes(result,source_context_delta()['changed_sources'])
     result=apply_changes(result,scratch_delta()['changed_sources'])
-    return diamond_contract().merge_registry(result,upstream)
+    return memo_contract().advance_registry(diamond_contract().merge_registry(result,upstream))
 
 
 def host_sources(base):

@@ -481,6 +481,9 @@ class CurrentCompatibilityTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('source_diamond', path)
         diamond = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(diamond)
+        memo_spec = importlib.util.spec_from_file_location('read_reuse_contract', ROOT / 'tools/performance/source-context-read-reuse/source_contract.py')
+        memo = importlib.util.module_from_spec(memo_spec);memo_spec.loader.exec_module(memo)
+        owner = memo.restore_previous_owner(owner)
         diamond.verify_diamond(owner)
         owner = diamond.to_left(owner)
         path = ROOT / 'tools/performance/query-key-scratch/source_contract.py'

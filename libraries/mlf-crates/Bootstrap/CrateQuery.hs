@@ -1010,7 +1010,15 @@ module Bootstrap.CrateQuery where {
   decodeSourceCached :: String -> String -> String ->
     [] ((,) String XType) -> [] DataDecl -> [] String -> String -> String ->
     Either String Separate.UnitObject;
-  decodeSourceCached actualDigest key name bindings datatypes names contextInput input = do {
+  decodeSourceCached actualDigest key name bindings datatypes names contextInput input =
+    decodeSourceCachedWithEncoding (encodeDatatypeContext datatypes) actualDigest key name
+      bindings datatypes names contextInput input;
+  -- Only an encoding verified against structurally identical datatypes may be
+  -- reused here. The public stateless decoder still computes the original encoding.
+  decodeSourceCachedWithEncoding :: String -> String -> String -> String ->
+    [] ((,) String XType) -> [] DataDecl -> [] String -> String -> String ->
+    Either String Separate.UnitObject;
+  decodeSourceCachedWithEncoding verifiedEncoding actualDigest key name bindings datatypes names contextInput input = do {
     fields <- Separate.unpack input;
     case fields of {
       (:) format ((:) digest ((:) compact ((:) payload []))) -> do {
@@ -1020,7 +1028,7 @@ module Bootstrap.CrateQuery where {
         case sourceCacheParts key of {
           Nothing -> Left "unsupported source query key";
           Just ((,) _ expectedContext) -> do {
-            ensure (eqString expectedContext (encodeDatatypeContext datatypes))
+            ensure (eqString expectedContext verifiedEncoding)
               "cached source query datatype context mismatch";
             ensure (eqString contextInput (sourceContextContents expectedContext))
               "cached source query context mismatch";
@@ -1049,6 +1057,59 @@ module Bootstrap.CrateQuery where {
           actualDigest <- fileDigest path;
           ioReturn (decodeSourceCached actualDigest key name bindings datatypes names contextInput input)
         }
+      }
+    };
+  -- Only a successful read under the caller's directory lock constructs this
+  -- finite single-entry snapshot. It is not serialized or shared across calls.
+  -- Cooperative writers use that same lock; hostile writes and same-process
+  -- concurrent callers are outside this existing lock's guarantees.
+  data SourceContextRead = SourceContextRead String String ([] DataDecl) String String;
+  -- The Bool reports this narrow context-snapshot reuse branch, not record reuse.
+  readSourceCachedWithContext :: Maybe SourceContextRead -> String -> String -> String ->
+    [] ((,) String XType) -> [] DataDecl -> [] String -> String ->
+    IO ((,,) (Maybe SourceContextRead) Bool (Either String Separate.UnitObject));
+  readSourceCachedWithContext previous cacheDir key name bindings datatypes names input =
+    case sourceCacheReference input of {
+      Left error -> ioReturn ((,,) Nothing False (Left error));
+      Right Nothing -> ioReturn ((,,) Nothing False
+        (decodeCached key name bindings datatypes names input));
+      Right (Just digest) -> case sourceCacheParts key of {
+        Nothing -> ioReturn ((,,) Nothing False (Left "unsupported source query key"));
+        Just ((,) _ expectedContext) ->
+          let { reusable = case previous of {
+            Just (SourceContextRead directory reference declarations encoded blob) ->
+              if eqString directory cacheDir && eqString reference digest
+                && eqString expectedContext encoded
+                && eqList SourceEquality.eqDataDecl declarations datatypes
+              then Just ((,) encoded blob) else Nothing;
+            Nothing -> Nothing
+          } } in case reusable of {
+            Just ((,) encoded blob) ->
+              let { decoded = decodeSourceCachedWithEncoding encoded digest key name
+                    bindings datatypes names blob input } in
+              ioReturn (case decoded of {
+                Left error -> (,,) Nothing True (Left error);
+                Right object -> (,,) previous True (Right object)
+              });
+            Nothing -> do {
+              let { path = sourceContextPath cacheDir digest };
+              present <- fileExists path;
+              if not present
+              then ioReturn ((,,) Nothing False (Left "source query context cache miss"))
+              else do {
+                blob <- readFile path;
+                actualDigest <- fileDigest path;
+                let { decoded = decodeSourceCached actualDigest key name
+                      bindings datatypes names blob input };
+                ioReturn (case decoded of {
+                  Left error -> (,,) Nothing False (Left error);
+                  Right object -> (,,)
+                    (Just (SourceContextRead cacheDir digest datatypes expectedContext blob))
+                    False (Right object)
+                })
+              }
+            }
+          }
       }
     };
   -- The existing cache-directory lock owns this staging file. Publish the
@@ -1409,6 +1470,10 @@ module Bootstrap.CrateQuery where {
     runSourceGroupsWithOwnedContext encodings datatypeContext contractEncodings Nothing crateId compilerHash cacheDir inventory plan
       groups contracts objects inferred reused results;
   runSourceGroupsWithOwnedContext encodings datatypeContext contractEncodings ownedContext crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+      runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext Nothing
+        crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
+  runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext readContext crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (QueryReport inferred reused (reverse results)) contracts));
@@ -1442,14 +1507,21 @@ module Bootstrap.CrateQuery where {
         digest <- fileDigest (cacheDir ++ "/query-key.new");
         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
         present <- fileExists destination;
-        cached <- if present then do {
+        cachedRead <- if present then do {
           input <- readFile destination;
-          decoded <- readSourceCached cacheDir key name bindings datatypes names input;
-          ioReturn (do {
-            object <- decoded;
-            Source.validatePreparedRaw prepared object
+          observed <- readSourceCachedWithContext readContext cacheDir key name
+            bindings datatypes names input;
+          ioReturn (case observed of {
+            (,,) next _ decoded -> case (do {
+              object <- decoded;
+              Source.validatePreparedRaw prepared object
+            }) of {
+              Left error -> (,) Nothing (Left error);
+              Right object -> (,) next (Right object)
+            }
           })
-        } else ioReturn (Left "cache miss");
+        } else ioReturn ((,) Nothing (Left "cache miss"));
+        let { cached = snd cachedRead };
         let { raw = case cached of {
           Right object -> Right ((,) True object);
           Left _ -> mapEither ((,) False) (case encodings of {
@@ -1473,13 +1545,14 @@ module Bootstrap.CrateQuery where {
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (list encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsWithOwnedContext encodings (snd context) (case contractEncodings of {
+                  runSourceGroupsWithReadContext encodings (snd context) (case contractEncodings of {
                     Nothing -> Nothing;
                     Just pool -> Just (extendSourceContractEncodings finalContracts pool)
                   }) (case ownedContext of {
                     Nothing -> Nothing;
                     Just owned -> Just (Source.extendOwnedSourceContext finalContracts owned)
-                  }) crateId compilerHash cacheDir inventory plan rest
+                  }) (if hit then fst cachedRead else Nothing)
+                    crateId compilerHash cacheDir inventory plan rest
                     (M.union compareString finalContracts contracts)
                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))
                     (reused + (if hit then 1 else 0))

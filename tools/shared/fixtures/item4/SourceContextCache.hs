@@ -7,7 +7,7 @@ import Control.Exception (bracket)
 import Data.List (sort, isInfixOf)
 import System.IO (hFlush, stdout)
 import qualified Data.ByteString as BS
-import System.Directory (createDirectory, doesPathExist, listDirectory, renameFile, getModificationTime)
+import System.Directory (createDirectory, doesPathExist, listDirectory, renameFile, removeFile, getModificationTime)
 import System.Environment (getArgs)
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Map as M
@@ -348,6 +348,9 @@ concurrent directory resultFile = do
 main = do
   args <- getArgs
   case args of
+    ["memo-helper",directory] -> memoHelper directory
+    ["memo-query",directory,root] -> memoQuery directory root
+    ["memo-session",directory,root] -> memoSession directory root
     ["helper",directory] -> helper directory
     ["query",directory,resultFile,value] -> query directory resultFile (read value)
     ["session",directory,root,value] -> session directory root (read value :: Int)
@@ -361,3 +364,230 @@ main = do
     ["cleanup-dual-failure",directory,"await-probe"] -> awaitProbe (cleanupDualFailure directory)
     ["concurrent",directory,resultFile] -> concurrent directory resultFile
     _ -> error "expected helper DIR | query CACHE FINAL VALUE | session CACHE ROOT VALUE | raw-final CACHE"
+
+-- Invocation-local memo controls: returned states are obtained only from real
+-- successful readers. Constructors are not opaque security capabilities.
+withMemoLock directory = bracket (P.acquireFileLock (literal (directory </> ".lock"))) P.releaseFileLock
+memoAbsent state = case state of T.Nothing -> True; T.Just _ -> False
+memoGood label reused prepared raw (next,actual,result) = do
+  need (label ++ " branch/state") (actual == reused && not (memoAbsent next))
+  object <- expect label result
+  checked <- expect (label ++ " prepared raw") (SI.validatePreparedRaw prepared object)
+  need (label ++ " complete raw object") (sameObject raw checked)
+  pure next
+memoBad label reused (next,actual,result) = do
+  need (label ++ " branch/state") (actual == reused && memoAbsent next)
+  reject label result
+memoEntry directory plan (Q.GroupResult groupId memberNames _ _ digest) = do
+  input <- readText (directory </> (B.unpack digest ++ ".mlfq"))
+  (ref,compact,payload) <- recordParts input
+  blob <- readText (B.unpack (Q.sourceContextPath (literal directory) ref))
+  need "helper real empty context" (blob == Q.sourceContextContents (Q.encodeDatatypeContext []))
+  key <- expect "helper complete key" (Q.restoreSourceCacheKey (Q.encodeDatatypeContext []) compact)
+  raw <- expect "helper actual raw" (U.decodeContextualObject [] [] payload)
+  prepared <- expect "helper actual prepared" (SI.prepareGroup plan M.empty memberNames)
+  _ <- expect "helper original prepared validation" (SI.validatePreparedRaw prepared raw)
+  pure (groupId,memberNames,key,input,raw,prepared)
+memoRead previous directory (groupId,memberNames,key,input,_,_) =
+  Q.readSourceCachedWithContext previous (literal directory) key groupId [] [] memberNames input
+memoContextHandshake marker ref acknowledgement = do
+  putStrLn (marker ++ " " ++ B.unpack ref)
+  hFlush stdout
+  answer <- getLine
+  need "exact context identity acknowledgement" (answer == acknowledgement)
+
+memoHelper directory = do
+  fresh directory
+  plan <- makePlan 41
+  (_,cold,_) <- Q.compileParsedSourceGroups "memo-helper" (literal directory) [] M.empty plan >>= expect "memo helper cold"
+  need "memo helper two cold groups" (Q.inferredCount cold == 2 && Q.reusedCount cold == 0)
+  let Q.QueryReport _ _ groups = cold
+  (first,second) <- case groups of [a,b] -> pure (a,b); _ -> error "two independent memo groups required"
+  withMemoLock directory $ \_ -> do
+    firstEntry@(_,_,_,_,rawA,preparedA) <- memoEntry directory plan first
+    secondEntry@(gid,ns,key,input,rawB,preparedB) <- memoEntry directory plan second
+    memo <- memoRead T.Nothing directory firstEntry >>= memoGood "first verified context" False preparedA rawA
+    memoRead memo directory secondEntry >>= memoGood "same context verified reuse" True preparedB rawB >> pure ()
+    (ref,compact,payload) <- recordParts input
+    let contextPath = B.unpack (Q.sourceContextPath (literal directory) ref)
+        backup = contextPath ++ ".memo-test-backup"
+    exists <- doesPathExist backup
+    need "fresh private backup" (not exists)
+    memoContextHandshake "MEMO-CONTEXT-BEFORE" ref "MEMO-BEFORE-ACK"
+    -- Counterfactual only: a private cooperating test holds the actual lock.
+    -- This is NOT a public-driver guarantee for lock-ignoring mutations.
+    bracket (renameFile contextPath backup) (\_ -> renameFile backup contextPath) $ \_ -> do
+      memoRead memo directory secondEntry >>= memoGood "verified memo without context IO" True preparedB rawB >> pure ()
+      memoRead T.Nothing directory secondEntry >>= memoBad "empty memo needs context file" False
+    memoContextHandshake "MEMO-CONTEXT-AFTER" ref "MEMO-AFTER-ACK"
+    let readChanged prev dir k owner bindings ds wanted record =
+          Q.readSourceCachedWithContext prev (literal dir) k owner bindings ds wanted record
+        readSame k owner bindings ds wanted record = readChanged memo directory k owner bindings ds wanted record
+    readSame key gid [] [] ns (newRecord ref compact "") >>= memoBad "memo rejects bad payload" True
+    fs <- fields key
+    let change i = U.pack [if j == i then value P.++ "!" else value | (j,value) <- zip [0..] fs]
+    readSame (change 8) gid [] [] ns input >>= memoBad "memo rejects full scope key change" True
+    readSame key "WrongOwner" [] [] ns input >>= memoBad "memo rejects owner change" True
+    readSame key gid [("external",T.XCon "Int" [])] [] ns input >>= memoBad "memo rejects parameter change" True
+    readSame key gid [] [] ["wrongName"] input >>= memoBad "memo rejects declaration change" True
+    readSame (change 5) gid [] [] ns input >>= memoBad "memo rejects context field change" False
+    let otherRef = literal (replicate 64 '0')
+    need "distinct absent valid digest" (otherRef /= ref)
+    absent <- doesPathExist (B.unpack (Q.sourceContextPath (literal directory) otherRef))
+    need "no zero digest context" (not absent)
+    readSame key gid [] [] ns (newRecord otherRef compact payload) >>= memoBad "memo rejects different digest" False
+    readSame key gid [] [] ns (newRecord "../escape" compact payload) >>= memoBad "memo rejects unsafe reference" False
+    let otherDirectory = directory </> "different-cache"
+    fresh otherDirectory
+    withMemoLock otherDirectory $ \_ ->
+      readChanged memo otherDirectory key gid [] [] ns input >>= memoBad "memo does not cross cache directory" False
+    forM_ [("CACHE1",Q.encodeCached key rawB,key),
+           ("CACHE2",Q.encodeCached (Q.queryKey "legacy-memo" "compiler" (members 41) [] []) rawB,
+                     Q.queryKey "legacy-memo" "compiler" (members 41) [] [])] $ \(label,legacy,legacyKey) -> do
+      (next,reused,result) <- readChanged memo directory legacyKey gid [] [] ns legacy
+      need (label ++ " clears context memo") (memoAbsent next && not reused)
+      obj <- expect (label ++ " read") result
+      checked <- expect (label ++ " prepared") (SI.validatePreparedRaw preparedB obj)
+      need (label ++ " exact raw") (sameObject rawB checked)
+    putStrLn "PASS legacy readers clear memo without changing raw"
+    memoDatatypeControls directory memo
+  memoPreparedControl (directory </> "prepared-counterexample")
+  putStrLn "PASS memo helper complete"
+
+memoDatatypeControls directory previous = do
+  let box = T.DataDecl "Box" ["a"] [T.ConstructorDecl "Box" [T.Parameter "a"]]
+      own = [("value",T.Nothing,T.SApp (T.SConstructor "Box") (T.SIntLit 7))]
+      scopes = M.fromList P.compareString [("value",IS.empty)]
+  maybePlan <- expect "box plan" (SI.prepareSourcePlan M.empty [box] [] [] scopes [] own)
+  plan <- case maybePlan of T.Just p -> pure p; _ -> error "box plan unavailable"
+  prepared <- expect "box prepared" (SI.prepareGroup plan M.empty ["value"])
+  raw <- expect "box raw" (I.compileLoweredGroup "RawGroup" [] [box] own)
+  let key = keyFor (Q.encodeDatatypeContext [box])
+      path = directory </> "box-record.mlfq"
+      readBox state ds input = Q.readSourceCachedWithContext state (literal directory) key "RawGroup" [] ds ["value"] input
+  Q.writeSourceCached T.Nothing (literal directory) (literal path) key raw >>= expect "box write"
+  input <- readText path
+  memo <- readBox previous [box] input >>= memoGood "different valid context refreshes" False prepared raw
+  readBox memo [box] input >>= memoGood "different valid context reuses" True prepared raw >> pure ()
+  forM_ [("kind",T.DataDeclK "Box" [("a",T.KArrow T.Star T.Star)] [T.ConstructorDecl "Box" [T.Parameter "a"]]),
+         ("constructor",T.DataDecl "Box" ["a"] [T.ConstructorDecl "ChangedBox" [T.Parameter "a"]]),
+         ("field",T.DataDecl "Box" ["a"] [T.ConstructorDecl "Box" [T.Parameter "a",T.Parameter "a"]])] $ \(label,changed) ->
+    readBox memo [changed] input >>= memoBad ("memo rejects datatype " ++ label ++ " change") False
+  putStrLn "PASS datatype switch and structural guards"
+
+memoCycle directory root invoke = do
+  fresh root
+  fresh directory
+  let call phase = do
+        (artifact,report) <- invoke phase
+        save (root </> (phase ++ ".artifact")) artifact
+        save (root </> (phase ++ ".queries")) report
+        scratch <- doesPathExist (directory </> "query-key.new")
+        need "memo public call cleans scratch" (not scratch)
+        pure artifact
+  baseline <- call "cold"
+  warm <- call "warm"
+  need "memo warm final complete equality" (warm == baseline)
+  files <- sort <$> listDirectory directory
+  selected <- case filter (\n -> reverse (take 5 (reverse n)) == ".mlfq") files of
+    [a,_] -> pure a
+    _ -> error "memo public program must have exactly two records"
+  let file = directory </> selected
+  original <- readText file
+  (ref,compact,payload) <- recordParts original
+  let contextPath = B.unpack (Q.sourceContextPath (literal directory) ref)
+  contextBlob <- readText contextPath
+  need "memo public empty datatype fixture" (contextBlob == Q.sourceContextContents (Q.encodeDatatypeContext []))
+  key <- expect "memo public full key" (Q.restoreSourceCacheKey (Q.encodeDatatypeContext []) compact)
+  raw <- expect "memo public raw" (U.decodeContextualObject [] [] payload)
+  let legacy = Q.encodeCached key raw
+  withMemoLock directory $ \_ -> save file legacy
+  stamp <- getModificationTime file
+  mixed <- call "mixed"
+  legacyAfter <- readText file
+  stampAfter <- getModificationTime file
+  need "legacy hit bytes/mtime unchanged during mixed call" (legacyAfter == legacy && stampAfter == stamp)
+  need "memo mixed complete final equality" (mixed == baseline)
+  -- Explicit test setup, not a claim that the legacy entry is never rewritten.
+  -- Restore ALL C3 before invalidation so a wrongly global memo cannot hide
+  -- behind a preceding legacy reset in the next invocation.
+  withMemoLock directory $ \_ -> save file original
+  restored <- call "restored-warm"
+  need "restored C3 final equality" (restored == baseline)
+  withMemoLock directory $ \_ -> save contextPath "corrupt-context-for-next-invocation"
+  repaired <- call "corrupt-repair"
+  actual <- readText contextPath
+  need "corrupt context repaired on next invocation" (actual == contextBlob && repaired == baseline)
+  withMemoLock directory $ \_ -> removeFile contextPath
+  missing <- call "missing-repair"
+  after <- readText contextPath
+  need "missing context repaired on next invocation" (after == contextBlob && missing == baseline)
+  save (root </> "context.original") contextBlob
+  putStrLn "PASS six public invocations preserve complete final artifacts and repair context"
+
+memoQuery directory root = do
+  plan <- makePlan 41
+  memoCycle directory root $ \_ -> do
+    (objects,report,_) <- Q.compileParsedSourceGroups "memo-query" (literal directory) [] M.empty plan >>= expect "memo Query public driver"
+    pure (U.pack (map U.encodeObject objects),Q.reportJSON "memo-query" "memo" report)
+
+memoSession directory root = do
+  -- The source/spec bytes remain identical across all six public invocations.
+  let sourcePath = root </> "MemoSession.hs"
+      specPath = root </> "memo.spec"
+      prefix = root </> "memo"
+      source = "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule MemoSession where { import MLF.Primitive; first :: Int; first = 41; second :: Int; second = 99 }\n"
+      spec = U.pack ["MLF-CRATE-1","memo-session","","true",U.pack [U.pack ["MemoSession",literal sourcePath]],U.pack [],literal directory,literal (root </> "builtin")]
+  memoCycle directory root $ \phase -> do
+    if phase == "cold" then writeFile sourcePath source >> save specPath spec else pure ()
+    Session.compileSpecFile (literal specPath) (literal prefix) >>= expect "memo Session public driver"
+    iface <- readText (prefix ++ ".mlfci")
+    objects <- readText (prefix ++ ".mlfco")
+    report <- readText (prefix ++ ".queries")
+    pure (U.pack [iface,objects],report)
+
+memoPreparedControl directory = do
+  fresh directory
+  let int = T.SCon "Int" []
+      cls = T.SClassDecl "Tag" [("a",T.Star)] [] [("tag",T.SArrow (T.STVar "a") int)]
+      instanceInt = T.SInstanceDecl [] [] "Tag" [int] [("tag",T.SLam "x" T.Nothing (T.SVar "x"))]
+      instanceBool = T.SInstanceDecl [] [] "Tag" [T.SCon "Bool" []] [("tag",T.SLam "x" T.Nothing (T.SIntLit 42))]
+      tag n = T.SApp (T.SVar "tag") (T.SIntLit n)
+      add a b = T.SApp (T.SApp (T.SPrimitive T.PAddInt) a) b
+      rhs = T.SLet "known" (T.SSignature (tag 2) (T.SAnnotation [] int)) (add (tag 1) (T.SVar "known"))
+      own = [("sameDeps",T.Nothing,rhs)]
+      scopes = M.fromList P.compareString [("sameDeps",IS.fromList [0])]
+  planMaybe <- expect "raw/final source plan" (SI.prepareSourcePlan M.empty [] [cls] [("tagInt",instanceInt),("tagBool",instanceBool)] scopes [IS.fromList [0,1],IS.fromList [0,1]] own)
+  plan <- case planMaybe of T.Just p -> pure p; _ -> error "raw/final unsupported source"
+  (objects,cold,contracts) <- Q.compileSourceGroups "raw-final" (literal directory) [] M.empty plan >>= expect "raw/final cold"
+  let Q.QueryReport _ _ reports = cold
+  (groupId,digest) <- case [(gid,hash) | Q.GroupResult gid ns _ _ hash <- reports, ns == ["sameDeps"]] of
+    [pair] -> pure pair
+    _ -> error "expected exactly one sameDeps group"
+  finalObject <- case [o | o <- objects, U.unitName (U.objectInterface o) == groupId] of
+    [object] -> pure object
+    _ -> error "expected exactly one sameDeps final object"
+  let file = directory </> (B.unpack digest ++ ".mlfq")
+  input <- readText file
+  (ref,compact,payload) <- recordParts input
+  contextBlob <- readText (B.unpack (Q.sourceContextPath (literal directory) ref)) >>= fields
+  context <- case contextBlob of ["MLF-SOURCE-QUERY-CONTEXT-1",c] -> pure c; _ -> error "context shape"
+  key <- expect "raw/final full key" (Q.restoreSourceCacheKey context compact)
+  let ds = U.unitData (U.objectInterface finalObject)
+  raw <- expect "raw contextual object" (U.decodeContextualObject ds ds payload)
+  let parameters = [(X.nameHint n,t) | (n,t) <- fst (U.splitParameters (strip (U.objectTerm raw)))]
+
+  prepared <- expect "counterexample actual prepared authority"
+    (SI.prepareGroup plan (M.filterWithKey (\name _ -> name /= "sameDeps") contracts) ["sameDeps"])
+  withMemoLock directory $ \_ -> do
+    memo <- Q.readSourceCachedWithContext T.Nothing (literal directory) key groupId parameters ds ["sameDeps"] input
+      >>= memoGood "counterexample verified raw" False prepared raw
+    let poisoned = newRecord ref compact (U.encodeContextualObject finalObject)
+    (next,reused,result) <- Q.readSourceCachedWithContext memo (literal directory) key groupId parameters ds ["sameDeps"] poisoned
+    need "final payload reaches verified reuse branch" (reused && not (memoAbsent next))
+    decoded <- expect "generic memo reader admits final counterexample" result
+    need "counterexample final decoded exactly" (sameObject decoded finalObject && not (sameObject decoded raw))
+    reject "prepared authority rejects memo-decoded final payload" (SI.validatePreparedRaw prepared decoded)
+  -- The reader cannot clear a later PreparedRaw failure it never receives.
+  -- Both public workers clear it; unchanged original raw-final controls cover
+  -- their real reinference, rather than claiming this helper owns that check.

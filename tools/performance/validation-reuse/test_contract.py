@@ -18,6 +18,7 @@ def load_projection(path):
 
 def retained_owner(raw=None):
     source = (ROOT / C.OWNER).read_bytes() if raw is None else raw
+    source = load_projection(ROOT / 'tools/performance/source-context-read-reuse/source_contract.py').restore_previous_owner(source)
     diamond = load_projection(ROOT / 'tools/performance/source-context-projection-merge/source_contract.py')
     diamond.verify_diamond(source)
     source = diamond.to_left(source)
@@ -82,6 +83,7 @@ class SourceContractTests(unittest.TestCase):
 
     def test_reviewed_projection_chain_and_order_are_pinned(self):
         source = (ROOT / C.OWNER).read_bytes()
+        source = load_projection(ROOT / 'tools/performance/source-context-read-reuse/source_contract.py').restore_previous_owner(source)
         diamond = load_projection(ROOT / 'tools/performance/source-context-projection-merge/source_contract.py')
         common = diamond.verify_diamond(source)
         projection = load_projection(ROOT / 'tools/performance/full-compiler/source_contract.py')
