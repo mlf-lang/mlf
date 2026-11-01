@@ -13,6 +13,60 @@ BATCH_MANIFEST_SHA='10f2da2458cbda85d61787be112fcb09e28d93cf97ebbd7b974eaccac546
 
 PERMISSION_MANIFEST_SHA='da5f482bb5c89e0e88d812eaacaafc4788bafef2cfbe709c924fed0e6179746e'
 
+CANONICAL_CARRY_MANIFEST_SHA='bd5061cfcaecd26eb05c4f07628f9125dc0f226d679984ee7ad3fadaeed7451b'
+
+C3_MANIFEST_SHA='ab3b36c9b7429bdc2b0a5e28beaf1afe92330c3279568a4ac34bb26d2a48e6e8'
+
+def c3_delta():
+    raw=(HERE.parent/'c3-delayed-index/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=C3_MANIFEST_SHA:
+        raise ValueError('fixed reviewed C3 source migration required')
+    value=json.loads(raw)
+    metadata={
+        'format':'c3-delayed-index-source-migration-v1',
+        'parent_manifest_sha256':CANONICAL_CARRY_MANIFEST_SHA,
+        'parent_ref':'9b35151dff377a8e0742e9a265f373bc53db98b0',
+        'baseline_ref':'e123603d00f6f64e20e4d771836e49ddd808320f',
+        'module_count':128, 'unchanged_sources':127,
+        'added_sources':{}, 'removed_sources':{}, 'host_sources':{}}
+    if (set(value)!=set(metadata)|{'changed_sources'}
+        or any(value[key]!=wanted for key,wanted in metadata.items())
+        or set(value['changed_sources'])!={'Bootstrap.CrateSession'}):
+        raise ValueError('exact one-owner C3 source migration')
+    for row in value['changed_sources'].values():
+        if (set(row)!={'old','new','reviewed_change'} or not row['reviewed_change']
+            or row['old']==row['new']
+            or any(not isinstance(row[key],str) or len(row[key])!=64
+                   or set(row[key])-set('0123456789abcdef') or row[key]=='0'*64
+                   for key in ('old','new'))):
+            raise ValueError('exact C3 source hash row')
+    return value
+
+def canonical_carry_delta():
+    raw=(HERE.parent/'canonical-carry/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=CANONICAL_CARRY_MANIFEST_SHA:
+        raise ValueError('fixed reviewed canonical-carry source migration required')
+    value=json.loads(raw)
+    metadata={
+        'format':'pooled-canonical-carry-source-migration-v1',
+        'parent_manifest_sha256':PERMISSION_MANIFEST_SHA,
+        'parent_ref':'69580e21d20a742a235b3ea95aa4c68f20783265',
+        'implementation_commit':'e123603d00f6f64e20e4d771836e49ddd808320f',
+        'module_count':128, 'unchanged_sources':125,
+        'added_sources':{}, 'removed_sources':[], 'host_sources':{}}
+    if (set(value)!=set(metadata)|{'changed_sources'}
+        or any(value[key]!=wanted for key,wanted in metadata.items())
+        or set(value['changed_sources'])!={'Bootstrap.Separate','Bootstrap.CrateArtifact','MLF.BuiltinPreludeData'}):
+        raise ValueError('exact three-source canonical-carry migration')
+    for row in value['changed_sources'].values():
+        if (set(row)!={'old','new','reviewed_change'} or not row['reviewed_change']
+            or row['old']==row['new']
+            or any(not isinstance(row[key],str) or len(row[key])!=64
+                   or set(row[key])-set('0123456789abcdef') or row[key]=='0'*64
+                   for key in ('old','new'))):
+            raise ValueError('exact canonical-carry source hash rows')
+    return value
+
 def permission_delta():
     raw=(HERE.parent/'permission-view/source-migration.json').read_bytes()
     if hashlib.sha256(raw).hexdigest()!=PERMISSION_MANIFEST_SHA:
@@ -127,7 +181,9 @@ def migrate(base):
     result=apply_changes(result,contract_delta()['changed_sources'])
     result=apply_changes(result,sparse_delta()['changed_sources'])
     result=apply_changes(result,batch_delta()['changed_sources'])
-    return apply_changes(result,permission_delta()['changed_sources'])
+    result=apply_changes(result,permission_delta()['changed_sources'])
+    result=apply_changes(result,canonical_carry_delta()['changed_sources'])
+    return apply_changes(result,c3_delta()['changed_sources'])
 
 
 def host_sources(base):

@@ -11,13 +11,20 @@ RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
 OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
 NEW_INDEX = b'Rank.indexMap selected'
 
+def without_delayed_indexes(raw):
+    path=Path(__file__).resolve().parent.parent/'c3-delayed-index/source_contract.py'
+    spec=importlib.util.spec_from_file_location('c3_owner_projection',path)
+    adapter=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    return adapter.current_or_parent(raw)
+
 def without_sparse_contracts(raw):
     # Exact hash-gated source-proof projection only; runtime copies stay current.
     path=Path(__file__).resolve().parent.parent/'sparse-contracts/source_contract.py'
     spec=importlib.util.spec_from_file_location('sparse_contracts_projection',path)
     adapter=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    return adapter.restore_previous_owner(raw)
+    return adapter.restore_previous_owner(without_delayed_indexes(raw))
 
 def without_rank_view(raw):
     require(raw.count(RANK_IMPORT)==1 and raw.count(b'Rank.MapIndex Node')==3

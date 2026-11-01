@@ -230,7 +230,7 @@ class AdmissionControls(unittest.TestCase):
         self.assertTrue(receipt['complete'])
         self.assertEqual(receipt['native_cases_passed'], [case[0] for case in PROGRAMS])
         self.assertFalse(receipt['native_toolchain_closure_complete'])
-        self.assertIn(str(self.gc / 'lib/libgc.a'), receipt['external_inputs'])
+        self.assertIn(str((self.gc / 'lib/libgc.a').resolve()), receipt['external_inputs'])
 
     def test_native_wrong_diagnostic_never_passes(self):
         self.mutation = 'native-diagnostic'
