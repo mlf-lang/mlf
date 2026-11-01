@@ -54,7 +54,7 @@ class GateControls(unittest.TestCase):
             self.assertEqual(recorded,original)
     def test_manifest_fail_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); (root/'M.hs').write_text('module M where {}')
+            root=Path(temporary).resolve(); (root/'M.hs').write_text('module M where {}')
             manifest=root/'mlf-package.json'
             value={'format':1,'name':'fixture','version':'1','dependencies':{},'library':{'modules':{'M':'M.hs'}}}
             manifest.write_text(json.dumps(value))
@@ -108,6 +108,7 @@ class GateControls(unittest.TestCase):
                               'dependencies':deps,'library':{'modules':{'M':'M.hs'}}}))
                 with patch.object(gate,'ROOT',root), self.subTest(deps=deps), self.assertRaises(ValueError):
                     gate.manifest_inputs(manifest,'fixture',{'M':'M.hs'},{'dep':'../dep'})
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'requires Linux /proc watchdog')
     def test_watchdog_success_and_error(self):
         for status in [0,1]:
             with self.subTest(status=status), tempfile.TemporaryDirectory() as temporary:
@@ -119,6 +120,7 @@ class GateControls(unittest.TestCase):
                 self.assertEqual(receipt['exit_code'],status)
                 self.assertEqual(receipt['complete'],status==0)
                 self.assertIsNone(receipt['reason'])
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'requires Linux /proc watchdog')
     def test_watchdog_final_output_floor(self):
         with tempfile.TemporaryDirectory() as temporary:
             command=[sys.executable,str(gate.WATCHDOG),'--seconds','5','--address-space-mib','256',

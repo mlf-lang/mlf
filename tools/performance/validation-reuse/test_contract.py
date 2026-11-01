@@ -75,6 +75,9 @@ class SourceContractTests(unittest.TestCase):
 
     def test_reviewed_projection_chain_and_order_are_pinned(self):
         source = (ROOT / C.OWNER).read_bytes()
+        survivors = load_projection(ROOT / 'tools/performance/c3-survivors/source_contract.py')
+        self.assertEqual(C.sha(source), survivors.NEW_SHA)
+        source = survivors.restore_previous_owner(source)
         c3 = load_projection(ROOT / 'tools/performance/c3-delayed-index/source_contract.py')
         self.assertEqual(C.sha(source), c3.NEW_SHA)
         source = c3.restore_previous_owner(source)

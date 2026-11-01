@@ -1376,6 +1376,31 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                   (\((,,,) originals backward count solved) ->
                     restoreProjectionPlan current originals backward count solved)))
         });
+  -- Restoration introduces no new real identities. Its removed list contains
+  -- every changed or deleted node, and changed contains the replacements.
+  -- Reuse the exact original payload for unchanged fresh nodes, including
+  -- descendants absent from changed; never query the patched map again.
+  survivingFreshFromDelta :: [] ((,) Int Node) -> [] ((,) Int Node) ->
+    [] ((,) Int Node) -> [] ((,) Int Node);
+  survivingFreshFromDelta fresh removed changed = case fresh of {
+    [] -> [];
+    (:) entry@((,) n node) rest -> case removed of {
+      [] -> fresh;
+      (:) ((,) m old) following ->
+        if m < n then survivingFreshFromDelta fresh following changed
+        else if n < m then (:) entry (survivingFreshFromDelta rest removed changed)
+        else changedFreshFromDelta n rest following changed
+    }
+  };
+  changedFreshFromDelta :: Int -> [] ((,) Int Node) -> [] ((,) Int Node) ->
+    [] ((,) Int Node) -> [] ((,) Int Node);
+  changedFreshFromDelta identity fresh removed changed = case changed of {
+    [] -> survivingFreshFromDelta fresh removed [];
+    (:) entry@((,) n node) rest ->
+      if n < identity then changedFreshFromDelta identity fresh removed rest
+      else if n == identity then (:) entry (survivingFreshFromDelta fresh removed rest)
+      else survivingFreshFromDelta fresh removed changed
+  };
   unifyExpandedFallback :: forall s. [] ((,) Int Int) -> Session s -> Graph -> Int ->
     [] ((,) Int Node) -> ST s (Either String (Session s));
   unifyExpandedFallback equations state current first fresh =
@@ -1389,10 +1414,12 @@ module Bootstrap.CrateSession (compileSpecFile) where {
           stBind (patchIndexedNodes state
             (L.filter (\((,) n v) -> n < first) removed)
             (L.filter (\((,) n v) -> n < first) changed))
-            (\oldIndexed -> stBind
+            -- The old leading lookup forced mkGraph before any publication,
+            -- even when all fresh identities were deleted. Keep that boundary.
+            (\oldIndexed -> seq patched (stBind
               (ST.fold addNode oldIndexed
-                (S.allocatedNodes first (G.nextId current) (G.nodes patched)))
-              (\indexed -> ST.pureE (withGraph patched indexed)))
+                (survivingFreshFromDelta fresh removed changed))
+              (\indexed -> ST.pureE (withGraph patched indexed))))
       });
   instantiateWithFreshBottom :: forall s. Int -> Int -> Session s -> ST s (Either String (Session s));
   instantiateWithFreshBottom source target state =

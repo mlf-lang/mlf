@@ -50,7 +50,6 @@ strictGraph = G.strictGraph
 insertNodeMap = G.insertNodeMap
 nodesFromList = G.nodesFromList
 nodesFromDistinctAscList = G.nodesFromDistinctAscList
-buildNodeTree = G.buildNodeTree
 mapNodeTree = G.mapNodeTree
 mapNodesWithKey = G.mapNodesWithKey
 mapNodes = G.mapNodes
