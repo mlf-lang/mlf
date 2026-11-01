@@ -100,6 +100,7 @@ const validate = text => {
     ...migrated,
     'python3 -B tools/performance/patricia/test_adapters.py',
     'python3 -O -B tools/performance/patricia/test_adapters.py',
+    'tools/shared/test_source_context_cache.py',
     'tools/shared/test_recursive_managed.py',
     'tools/shared/test_guest_framework.py',
     'tools/shared/test_guest_state_laws.py',
@@ -173,7 +174,13 @@ const controls = [
   ['all framework budgets changed', "if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then", 'if true; then'],
   ['direct budget override', 'python3 tools/shared/test_direct.py --bin-dir', 'python3 tools/shared/test_direct.py --suite-timeout 5400 --bin-dir'],
   ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
-  ['O2 guest omitted', "if: matrix.optimization == '2'", 'if: false'],
+  // Bind selector mutations to the named step, not the first unrelated O2 step.
+  ['O2 guest omitted',
+    "      - name: Check actual MLF mixed-framework source acceptance\n        if: matrix.optimization == '2'\n",
+    "      - name: Check actual MLF mixed-framework source acceptance\n        if: false\n"],
+  ['O2 source context omitted',
+    "      - name: Check shared source-query contexts and legacy cache compatibility\n        if: matrix.optimization == '2'\n",
+    "      - name: Check shared source-query contexts and legacy cache compatibility\n        if: false\n"],
   ['retained P123 omitted', 'run_integrated.py --suite p123', 'run_integrated.py --suite graph'],
   ['retained graph omitted', 'run_integrated.py --suite graph', 'run_integrated.py --suite builtin'],
   ['retained validation omitted', 'run_integrated.py --suite validation', 'run_integrated.py --suite builtin'],
@@ -190,6 +197,11 @@ const controls = [
 ];
 for (const [name, before, after] of controls) {
   assert.ok(workflow.includes(before), `Mutation ${name} must hit the actual workflow`);
-  assert.throws(() => validate(workflow.replace(before, after)), undefined, `Reject ${name}`);
+  if (name === 'O2 guest omitted' || name === 'O2 source context omitted') {
+    assert.equal(workflow.split(before).length, 2, `Mutation ${name} must select exactly one named step`);
+  }
+  const mutated = workflow.replace(before, after);
+  assert.notEqual(mutated, workflow, `Mutation ${name} must change the actual workflow`);
+  assert.throws(() => validate(mutated), undefined, `Reject ${name}`);
 }
 console.log(`Native O0/O2 CI partition and ${controls.length} mutation controls passed.`);
