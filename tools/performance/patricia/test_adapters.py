@@ -131,7 +131,7 @@ class AdapterTests(unittest.TestCase):
         key = 'host/ghc/MLF/Host/Base.hs'
         row = manifest['host_sources'][key]
         for field in ['old', 'retained_F1_parent']:
-            self.assertEqual(migration.host_sources({key: row[field]}), {key: row['new']})
+            self.assertEqual(migration.host_sources({key: row[field]}), {key: '50780c7183d62aa7568c0a799fdf5829b6ea60cbbc67cca7fd1a3f08bc4ba9c5'})
         with self.assertRaisesRegex(ValueError, 'exact frozen host parent'):
             migration.host_sources({key: '0'*64})
 

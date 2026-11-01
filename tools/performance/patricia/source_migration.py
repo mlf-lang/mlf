@@ -1,6 +1,6 @@
 """Reviewed source identities across the numeric/Patricia ABI boundary."""
 from pathlib import Path
-import hashlib, json
+import hashlib, json, importlib.util
 HERE=Path(__file__).resolve().parent
 # Finalized once after canonical builtin regeneration, before confirmation.
 MANIFEST_SHA='35feca71afa2d2c392df2d920b890f61a5dce84fd85c8c61909f5da32d31fea6'
@@ -248,4 +248,9 @@ def host_sources(base):
     if not set(base)<=set(rows) or any(v not in (rows[k]['old'],rows[k].get('retained_F1_parent')) or not rows[k]['reviewed_change'] for k,v in base.items()):
         raise ValueError('exact frozen host parent')
     updated=apply_changes({k:row['new'] for k,row in rows.items()},design_delta()['host_sources'])
+    path=HERE.parent/'llvm-memory/source_contract.py'
+    spec=importlib.util.spec_from_file_location('utf8_host_transition',path)
+    adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
+    delta=adapter.manifest()
+    updated=apply_changes(updated,{delta['path']:{key:delta[key] for key in ['old','new','reviewed_change']}})
     return {k:updated[k] for k in base}

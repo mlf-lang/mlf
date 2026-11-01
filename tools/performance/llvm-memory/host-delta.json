@@ -1,0 +1,29 @@
+{
+  "parent_ref": "9dfcd6625775819568eaaa5065f8dd1431df52f8",
+  "path": "host/ghc/MLF/Host/Base.hs",
+  "old": "2fb2b89dde8e727ca56086a6a85167dded4ae9b993bf2cac48a33233e6a58d92",
+  "new": "50780c7183d62aa7568c0a799fdf5829b6ea60cbbc67cca7fd1a3f08bc4ba9c5",
+  "reviewed_change": "Private UTF-8 scalar index and slice representation only; same primitive signatures, Unicode scalar semantics, bounds and strict argument order. Shared compiler sources and integer operations unchanged.",
+  "edits": [
+    {
+      "old": "import qualified Data.Array as Array\n",
+      "new": "import qualified Data.Array.Unboxed as Array\n"
+    },
+    {
+      "old": "data String = String !T.Text !P.Int (Array.Array P.Int Char)\n",
+      "new": "data String = String !T.Text !P.Int (Array.UArray P.Int P.Int)\n"
+    },
+    {
+      "old": "mkSizedText count text = String text count (Array.listArray (0,count-1) (T.unpack text))\n",
+      "new": "mkSizedText count text = String text count (scalarOffsets count text)\n-- One byte offset per 256 Unicode scalars, rather than a boxed Char per\n-- scalar. Most blocks in compiler objects are ASCII even when the object\n-- contains Unicode literals; those blocks retain constant-time indexing.\nscalarOffsets :: P.Int -> T.Text -> Array.UArray P.Int P.Int\nscalarOffsets count (TI.Text bytes base _) =\n  Array.listArray (0,count `div` 256) (go 0 0)\n  where\n    go scalar offset = offset :\n      if count-scalar < 256 then []\n      else go (scalar+256) (advanceUTF8 bytes base offset 256)\nadvanceUTF8 :: TA.Array -> P.Int -> P.Int -> P.Int -> P.Int\nadvanceUTF8 bytes base = go\n  where\n    go offset remaining\n      | remaining == 0 = offset\n      | otherwise = let first=TA.unsafeIndex bytes (base+offset)\n                        width=if first<0x80 then 1 else if first<0xe0 then 2 else if first<0xf0 then 3 else 4\n                    in go (offset+width) (remaining-1)\nscalarOffset :: T.Text -> P.Int -> Array.UArray P.Int P.Int -> P.Int -> P.Int\nscalarOffset (TI.Text bytes base byteLength) size offsets index =\n  let block=index `div` 256\n      start=offsets Array.! block\n      following=if block<size `div` 256 then offsets Array.! (block+1) else byteLength\n      scalars=min 256 (size-block*256)\n      within=index-block*256\n  in if following-start==scalars then start+within\n     else advanceUTF8 bytes base start within\n"
+    },
+    {
+      "old": "      | otherwise -> fromIntegral (ord (characters Array.! i))\n",
+      "new": "      | otherwise -> let position=scalarOffset t size characters i\n                     in fromIntegral (ord (T.head (TI.text bytes (offset+position) (byteLength-position))))\n"
+    },
+    {
+      "old": "      | otherwise -> literal [characters Array.! j | j <- [i..i+n-1]]\n",
+      "new": "      | otherwise -> let begin=scalarOffset t size characters i\n                         end=scalarOffset t size characters (i+n)\n                     in mkSizedText n (T.copy (TI.text bytes (offset+begin) (end-begin)))\n"
+    }
+  ]
+}
