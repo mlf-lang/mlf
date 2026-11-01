@@ -92,6 +92,45 @@ also remain. Report both:
 Do not report only smaller `.mlfq` files as the total storage saving. Nor do
 micro-codec timings establish compiler or end-to-end loading performance.
 
+## Normal-return query-key scratch cleanup
+
+The follow-up cleanup is limited to the fixed `query-key.new` file owned by
+these three already-locked entry paths: legacy `CrateQuery.compileGroups`,
+`CrateQuery.compileSourceGroupsWithEncoding`, and
+`CrateSession.compileSourceGroupsWithEncoding`. Each calls the shared
+`cleanupQueryKey` helper before releasing its existing directory lock,
+after a normal `Either` return. That includes an ordinary business `Left`
+and a successful empty plan. No record, context blob, lock, or unrelated
+`.new` file is collected.
+
+The helper rejects a directory at the reserved scratch path rather than
+removing it recursively; this also matters for the Windows host's remove
+adapter. Otherwise it uses the existing argv-based host command adapter
+to remove that exact normalized path. A cleanup failure turns an original
+`Right` into `Left`, or appends the cleanup diagnostic to the original
+business `Left`; it is not silently reported as success.
+
+This is not a new exception-safe bracket: host I/O exceptions, panic,
+cancellation, process termination, and crashes may bypass this normal tail.
+It does not clean the separate Codegen scratch lifecycle or implement GC.
+It adds one directory check and at most one remove command per invocation,
+not per group, and does not eliminate the per-group full-key write/hash
+work or measure cumulative I/O.
+
+The lock remains a cooperative POSIX process record lock, not a mutex
+between threads in one process. The directory must be trusted; this change
+does not defend against non-cooperating replacement races. The POSIX tests
+keep the original owner alive while an independent process probes release,
+and check one same-cache two-process cold/warm pair. Their readiness marker
+is a process-start barrier, not proof that both reached a kernel wait.
+They do not establish Windows runtime, crash, hostile-directory, or
+same-process-thread qualification.
+
+The additional `query-key-scratch` frozen migration layer pins the complete
+two-owner identities and unique forward/inverse edits above the unchanged
+`source-query-context` layer. Existing registry, historical projection, and
+negative controls remain strict.
+
 ## Frozen source contracts
 
 The `source-query-context` migration layer records exactly the two changed
@@ -108,9 +147,9 @@ the current registry and lock must contain both new owner hashes, and the
 live inventory is compared in full. Production runtime code is not replaced
 with a projected historical owner.
 
-## Local verification and measured scope
+## Initial production-slice verification and measured scope
 
-The local production candidate now has these completed checks:
+The initial production slice had these completed local checks:
 
 * New authenticated producer: 128 modules, 13 binaries, 18 build commands,
   and builtin generation passed.
@@ -130,13 +169,59 @@ SourceSCC had a stale generic-Set/IntSet fixture interface. These were fixture
 corrections, not silent deletion of failed controls or changed production
 semantic expectations.
 
-The production changes have not yet been pushed for hosted CI at this
-snapshot. These local results are not hosted-CI, native-backend, full-corpus,
-concurrency, crash-injection, permission-failure, or performance qualification.
-The historical real-cache screen below is qualified separately from the
-synthetic source-driver controls.
+That initial production slice, including the one-file CI partition-control
+repair, subsequently passed hosted CI run 41311660916 at exact PR head
+`d6fe38c56fde162506700af40e031534c075e129` (CI 240). This is not hosted
+qualification for a later cleanup commit. None of these observations alone
+establishs native-backend, full-corpus, crash-injection, permission-failure,
+or performance qualification. The historical real-cache screen below is
+qualified separately from the synthetic source-driver controls.
 
-### Small synthetic storage example
+### Local cleanup verification
+
+A fresh revision-1 producer passed all 18 maintained build commands,
+the 128-module shared profile, implementation identity, and builtin
+regeneration. The first cleanup build was retained as a failure because its
+new polymorphic helper omitted an explicit `forall` required by the shared
+source profile; the revision only added that binder and updated exact
+source/lock/migration pins. No qualification check was disabled.
+
+The strict normal/`-O` suites passed **166 checks** (42 Patricia, 34 A1,
+and 7 validation-reuse methods in each mode). The real source-context gate
+then passed all five compile/link/control commands and **31 child
+invocations**: the original 18 plus normal-business-failure, stale empty-plan,
+directory-refusal, combined-error, five live-owner independent-lock probes,
+and a cooperative two-process pair. All five probes succeeded while their
+original owners remained alive waiting for an explicit acknowledgement.
+The two cooperative invocations produced one cold 2/0 and one warm 0/2
+report and identical final-object bytes.
+
+The cold two-group cache snapshots now retain no `query-key.new`:
+
+| Driver | Active query/context content | All retained file content | Full pathname allocation |
+| --- | ---: | ---: | ---: |
+| Query | 120,388 B | 120,474 B | 147,456 B |
+| Session | 130,655 B | 130,741 B | 155,648 B |
+
+The extra 86 content bytes are three deliberately seeded unrelated scratch
+sentinels, preserved unchanged; the zero-byte lock and directory allocation
+are included in the physical accounting. All 11 test-cache trees together
+were also enumerated, including helper records, old records, and deliberately
+rejected directories: 1,347,218 content bytes and 1,613,824 allocated bytes.
+Build products and captures are separate evidence, not hidden cache savings.
+
+On a one-value change each driver still inferred one group and reused one.
+Only the new record was observed as an added/changed retained file: 642 bytes
+for Query and 5,771 bytes for Session. This is **not total I/O**: full-key
+scratch writes still occur during the invocation before cleanup. Old query
+records remain; in the mixed-legacy Query control the retained old record
+alone is 119,777 bytes. No orphan or legacy-record GC is claimed.
+
+These are local Linux/GHC-host qualification results. The cleanup commit
+requires its own hosted CI, and the larger controlled workload and reading
+measurements are separate from these small controls.
+
+### Historical two-group storage example (before scratch cleanup)
 
 `context-controls-r2/controls/receipt.json` records a two-group Query fixture.
 Its self-contained legacy representation was constructed in memory and
@@ -206,3 +291,4 @@ that the historical inputs match present source. Its scope is production
 representation admission and round-trip behavior. Evidence is retained in
 `real-cache-screen/run/receipt.json`; no timing from this one-shot screen is
 presented as a compiler speedup.
+

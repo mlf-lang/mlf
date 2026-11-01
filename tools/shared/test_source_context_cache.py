@@ -27,6 +27,11 @@ for _kind in ("query", "session"):
     EXPECTED_COMMANDS += [_kind + "-" + suffix for suffix in
                           ("missing-context", "corrupt-context", "corrupt-record")]
 
+EXPECTED_COMMANDS += ["left-legacy", "lock-after-legacy", "left-source", "lock-after-source",
+                      "left-session", "lock-after-session", "empty-stale-success",
+                      "empty-directory-failure", "lock-after-empty-directory", "cleanup-dual-failure",
+                      "lock-after-cleanup-dual", "concurrent-a", "concurrent-b"]
+
 
 def require(ok, message):
     if not ok:
@@ -70,18 +75,24 @@ def closed_tree(root):
     return result
 
 
-def verify_control_receipt(path, binary):
+def verify_control_receipt(path, binary, python, controls):
     receipt = json.loads(path.read_text())
     require(receipt.get('complete') is True and receipt.get('fixture_sha256') == sha(binary),
             'controls did not complete against this fixture')
     rows = receipt.get('commands', [])
     require([r.get('name') for r in rows] == EXPECTED_COMMANDS,
-            'fixed 18-command inventory differs')
+            'fixed original 18 plus 13 command inventory differs')
     require(set(receipt.get('drivers', {})) == {'query', 'session'}, 'both actual drivers required')
     for row in rows:
         require(row.get('state') == 'passed' and row.get('exit_code') == 0,
                 'nonpassing inner command: ' + str(row.get('name')))
-        require(row.get('argv', [None])[0] == str(binary), 'inner fixture identity changed')
+        argv = row.get('argv', [])
+        if row['name'].startswith('lock-after-'):
+            require(row.get('kind') == 'lock-probe' and argv[:5] ==
+                    [str(python), '-I', '-B', str(controls), '--lock-probe'],
+                    'independent lock probe interpreter/script identity changed')
+        else:
+            require(argv and argv[0] == str(binary), 'inner fixture identity changed')
         for label in ('stdout', 'stderr'):
             evidence = row[label]
             capture = regular(evidence['path'])
@@ -101,7 +112,7 @@ def main():
     parser.add_argument('--controls', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--controls-timeout', type=int, default=900,
-                        help='One bound for the whole 18-command runner, not 18 times 180 seconds.')
+                        help='One bound for the whole 31-command runner; not a guarantee of each per-command ceiling.')
     args = parser.parse_args()
     require(1 <= args.controls_timeout <= 1800, 'controls timeout outside 1..1800')
     source = args.source_root.absolute()
@@ -142,7 +153,10 @@ def main():
               'producer_receipt_sha256': sha(receipt_path),
               'limits': {'compile_link_seconds_each': 120,
                          'whole_controls_seconds': args.controls_timeout,
-                         'inner_fixture_seconds_each': 180,
+                         'original_fixture_seconds_each': 180,
+                         'added_fixture_seconds_each': 60, 'lock_probe_seconds': 5,
+                         'ready_barrier_seconds': 10, 'pair_whole_seconds': 60,
+                         'complete_cache_logical_and_allocated_cap_bytes': 16 * 1024**2,
                          'outer_resource_guard_required': True},
               'limitations': ['No standalone resource admission; use the original outer guard.',
                   'Per-command ceilings do not guarantee each command its full time under the outer bound.',
@@ -219,9 +233,9 @@ def main():
         inner = output / 'controls'
         result = runner.run('source-context-controls', [python, '-I', '-B', controls,
                             '--fixture', binary, '--output', inner], timeout=args.controls_timeout)
-        require(json.loads(result.stdout) == {'complete': True, 'commands': 18, 'drivers': ['query', 'session']},
+        require(json.loads(result.stdout) == {'complete': True, 'commands': 31, 'drivers': ['query', 'session']},
                 'controls completion summary differs')
-        verify_control_receipt(inner / 'receipt.json', binary)
+        verify_control_receipt(inner / 'receipt.json', binary, python, controls)
         record['controls_receipt'] = {'path': str(inner / 'receipt.json'), 'sha256': sha(inner / 'receipt.json')}
         record['controls_commands'] = EXPECTED_COMMANDS
         postcheck()

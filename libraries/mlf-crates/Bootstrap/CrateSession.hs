@@ -380,8 +380,9 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                 }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)
                   (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing)
                   crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
+                cleaned <- Query.cleanupQueryKey cacheDir result;
                 releaseFileLock lock;
-                ioReturn result
+                ioReturn cleaned
               }
             }
         }

@@ -15,6 +15,39 @@ PERMISSION_MANIFEST_SHA='da5f482bb5c89e0e88d812eaacaafc4788bafef2cfbe709c924fed0
 
 CANONICAL_CARRY_MANIFEST_SHA='bd5061cfcaecd26eb05c4f07628f9125dc0f226d679984ee7ad3fadaeed7451b'
 
+SCRATCH_MANIFEST_SHA='9ecbc912e288495a1ff7f5652e81b429c5cfafd2dcd2da951c395efdc762a95a'
+
+def scratch_delta():
+    raw=(HERE.parent/'query-key-scratch/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=SCRATCH_MANIFEST_SHA:
+        raise ValueError('fixed reviewed query-key scratch migration required')
+    value=json.loads(raw)
+    metadata={
+        'format':'query-key-scratch-source-migration-v1',
+        'parent_manifest_sha256':SOURCE_CONTEXT_MANIFEST_SHA,
+        'parent_ref':'d6fe38c56fde162506700af40e031534c075e129',
+        'baseline_ref':'5172c4ade3b3141da2e64593c383892575b36699',
+        'module_count':128, 'unchanged_sources':126,
+        'added_sources':{}, 'removed_sources':{}, 'host_sources':{}}
+    hashes={
+        'Bootstrap.CrateQuery':(
+            '9d6cda4a88c1891cd52e292691955ab2a34f9e03dd70ad764dbf52eb9de5ccb2',
+            '43af002afc2ddb1d69efef0a2d5c1c75dc3dd0b33c85685d4e83fd3290101a68'),
+        'Bootstrap.CrateSession':(
+            'a5cd0cb1b939c81785c2c8b7fa2499fd63c24cd6730b8a2e3d74ce9559edabbf',
+            '5c888e550760f023278beaeffb137a5e3940980b19be2850186ce35ff117805b')}
+    if (not isinstance(value,dict) or set(value)!=set(metadata)|{'changed_sources'}
+        or any(value[key]!=wanted for key,wanted in metadata.items())
+        or not isinstance(value['changed_sources'],dict)
+        or set(value['changed_sources'])!=set(hashes)):
+        raise ValueError('exact two-owner query-key scratch migration')
+    for name,row in value['changed_sources'].items():
+        if (not isinstance(row,dict) or set(row)!={'old','new','reviewed_change'}
+            or not isinstance(row['reviewed_change'],str) or not row['reviewed_change']
+            or (row['old'],row['new'])!=hashes[name]):
+            raise ValueError('exact query-key scratch owner hashes')
+    return value
+
 SOURCE_CONTEXT_MANIFEST_SHA='5dbb5cbc5fcb047732e1ef48931c88a3dbd73030af4cc853f6a07ed951208a6e'
 
 def source_context_delta():
@@ -244,7 +277,8 @@ def migrate(base):
     result=apply_changes(result,canonical_carry_delta()['changed_sources'])
     result=apply_changes(result,c3_delta()['changed_sources'])
     result=apply_changes(result,survivors_delta()['changed_sources'])
-    return apply_changes(result,source_context_delta()['changed_sources'])
+    result=apply_changes(result,source_context_delta()['changed_sources'])
+    return apply_changes(result,scratch_delta()['changed_sources'])
 
 
 def host_sources(base):

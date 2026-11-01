@@ -4,7 +4,8 @@ module Main where
 import Prelude
 import Control.Monad (unless, forM_)
 import Control.Exception (bracket)
-import Data.List (sort)
+import Data.List (sort, isInfixOf)
+import System.IO (hFlush, stdout)
 import qualified Data.ByteString as BS
 import System.Directory (createDirectory, doesPathExist, listDirectory, renameFile, getModificationTime)
 import System.Environment (getArgs)
@@ -287,6 +288,63 @@ rawFinal directory = do
   need "legacy final artifact exact after repair" (map U.encodeObject repaired == map U.encodeObject objects)
   putStrLn "PASS final payload cannot masquerade as raw source cache"
 
+-- Scratch lifecycle controls are additive to the original 18-call suite.
+cleanupDirectoryError = "cannot remove query key scratch: path is a directory"
+badMembers = [("aGood",T.Nothing,T.SIntLit 1),
+              ("zBad",T.Nothing,T.SApp (T.SVar "aGood") (T.SIntLit 2))]
+checkBusinessLeft directory result = do
+  message <- case result of T.Left e -> pure e; T.Right _ -> error "bad application unexpectedly inferred"
+  need "failure is inference, not prevalidation or cleanup" ("type constructor mismatch:" `isInfixOf` B.unpack message)
+  files <- listDirectory directory
+  need "dependency group was compiled before business Left" (any (\name -> reverse (take 5 (reverse name)) == ".mlfq") files)
+  save (directory ++ ".left-message") message
+  putStrLn "PASS business Left after held-lock group execution"
+leftLegacy directory = Q.compileGroups "scratch-error" (literal directory) [] [] badMembers >>= checkBusinessLeft directory
+leftSource directory = do
+  let scopes = M.fromList P.compareString [(name,IS.empty) | (name,_,_) <- badMembers]
+  maybePlan <- expect "invalid application still forms source plan" (SI.prepareSourcePlan M.empty [] [] [] scopes [] badMembers)
+  plan <- case maybePlan of T.Just p -> pure p; _ -> error "business Left fixture fell back before source runner"
+  Q.compileParsedSourceGroups "scratch-error" (literal directory) [] M.empty plan >>= checkBusinessLeft directory
+leftSession directory root = do
+  let sourcePath = root </> "ScratchFailure.hs"
+      specPath = root </> "failure.spec"
+      prefix = root </> "failure"
+      source = "-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule ScratchFailure where { import MLF.Primitive; aGood :: Int; aGood = 1; zBad = aGood (2 :: Int) }\n"
+      spec = U.pack ["MLF-CRATE-1","scratch-failure","","true",
+             U.pack [U.pack ["ScratchFailure",literal sourcePath]],U.pack [],literal directory,literal (root </> "builtin")]
+  writeFile sourcePath source
+  save specPath spec
+  Session.compileSpecFile (literal specPath) (literal prefix) >>= checkBusinessLeft directory
+emptySuccess directory = do
+  (objects,report) <- Q.compileGroups "scratch-empty" (literal directory) [] [] [] >>= expect "empty plan cleanup"
+  need "empty plan remains empty" (null objects && Q.inferredCount report == 0 && Q.reusedCount report == 0)
+  putStrLn "PASS empty public plan cleans stale scratch"
+emptyDirectoryFailure directory = do
+  result <- Q.compileGroups "scratch-empty" (literal directory) [] [] []
+  case result of
+    T.Left message -> need "directory cleanup failure is explicit" (message == cleanupDirectoryError)
+    T.Right _ -> error "directory cleanup failure incorrectly reported success"
+  putStrLn "PASS directory scratch rejected without recursive deletion"
+cleanupDualFailure directory = do
+  -- cleanupQueryKey does not own the lock. This helper control uses the real
+  -- lock explicitly and does NOT pretend to cover public-entry release itself.
+  bracket (P.acquireFileLock (literal (directory </> ".lock"))) P.releaseFileLock $ \_ -> do
+    result <- Q.cleanupQueryKey (literal directory) (T.Left "original-business-error" :: T.Either P.String ())
+    case result of
+      T.Left message -> need "dual failure retains both errors" (message == "original-business-error; " P.++ cleanupDirectoryError)
+      T.Right _ -> error "dual failure incorrectly reported success"
+  putStrLn "PASS original Left and cleanup Left are both retained"
+awaitProbe action = do
+  action
+  hFlush stdout
+  acknowledgement <- getLine
+  need "fixed independent probe acknowledgement" (acknowledgement == "PROBE-ACK")
+
+concurrent directory resultFile = do
+  putStrLn "READY"
+  hFlush stdout
+  query directory resultFile 41
+
 main = do
   args <- getArgs
   case args of
@@ -295,4 +353,11 @@ main = do
     ["session",directory,root,value] -> session directory root (read value :: Int)
     ["raw-final",directory] -> rawFinal directory
     ["legacy-one",directory] -> legacyOne directory
+    ["left-legacy",directory,"await-probe"] -> awaitProbe (leftLegacy directory)
+    ["left-source",directory,"await-probe"] -> awaitProbe (leftSource directory)
+    ["left-session",directory,root,"await-probe"] -> awaitProbe (leftSession directory root)
+    ["empty-success",directory] -> emptySuccess directory
+    ["empty-directory-failure",directory,"await-probe"] -> awaitProbe (emptyDirectoryFailure directory)
+    ["cleanup-dual-failure",directory,"await-probe"] -> awaitProbe (cleanupDualFailure directory)
+    ["concurrent",directory,resultFile] -> concurrent directory resultFile
     _ -> error "expected helper DIR | query CACHE FINAL VALUE | session CACHE ROOT VALUE | raw-final CACHE"

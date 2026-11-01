@@ -18,6 +18,8 @@ def load_projection(path):
 
 def retained_owner(raw=None):
     source = (ROOT / C.OWNER).read_bytes() if raw is None else raw
+    scratch = load_projection(ROOT / 'tools/performance/query-key-scratch/source_contract.py')
+    source = scratch.restore_previous_owner(source)
     context = load_projection(ROOT / 'tools/performance/source-query-context/source_contract.py')
     source = context.restore_previous_owner(source)
     # Match run_integrated.py's validation source-proof projection. Each
@@ -77,6 +79,9 @@ class SourceContractTests(unittest.TestCase):
 
     def test_reviewed_projection_chain_and_order_are_pinned(self):
         source = (ROOT / C.OWNER).read_bytes()
+        scratch = load_projection(ROOT / 'tools/performance/query-key-scratch/source_contract.py')
+        self.assertEqual(C.sha(source), scratch.NEW_SHA)
+        source = scratch.restore_previous_owner(source)
         context = load_projection(ROOT / 'tools/performance/source-query-context/source_contract.py')
         self.assertEqual(C.sha(source), context.NEW_SHA)
         source = context.restore_previous_owner(source)
@@ -119,7 +124,7 @@ class SourceContractTests(unittest.TestCase):
                 retained_owner(changed)
 
     def test_context_projection_manifests_are_not_new_expectations(self):
-        for family in ('source-query-context', 'sparse-contracts', 'contract-context', 'datatype-context'):
+        for family in ('query-key-scratch', 'source-query-context', 'sparse-contracts', 'contract-context', 'datatype-context'):
             original = ROOT / 'tools/performance' / family
             raw = (original / 'session-delta.json').read_bytes()
             with tempfile.TemporaryDirectory() as directory:

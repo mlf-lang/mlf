@@ -8,7 +8,8 @@ source-context.new staging and query-key.new activity are explicitly not omitted
 from the limitation merely because their files disappear or are overwritten.
 """
 from pathlib import Path
-import argparse, hashlib, json, os, re, stat, subprocess, time
+import argparse, hashlib, json, os, re, stat, subprocess, time, sys
+import fcntl
 
 def require(ok, message):
     if not ok:
@@ -99,6 +100,95 @@ def publication_delta(before, after):
         "temporary_creation_deletion_and_multiple_writes_not_observed": True,
     }
 
+SENTINELS = {"unrelated.new": b"retain unrelated staging\n",
+             "codegen-key.new": b"retain separate codegen scratch\n",
+             "key.new": b"retain non-query key scratch\n"}
+
+
+def no_query_scratch(cache):
+    require(not os.path.lexists(cache / "query-key.new"), "query scratch remains after normal return")
+
+
+def small_identity(path):
+    s = path.lstat()
+    require(stat.S_ISREG(s.st_mode) and s.st_nlink == 1 and s.st_size <= 65536, "small regular sentinel")
+    # A POSIX record lock is dropped if this process closes ANY fd for the
+    # same inode. Never reopen/read/close .lock while the pair holder owns it.
+    # For a regular zero-byte file the empty SHA is exact from metadata.
+    if path.name == ".lock":
+        require(s.st_size == 0, "empty lock sentinel")
+        contents = b""
+    else:
+        contents = path.read_bytes()
+    return {"sha256": digest(contents), "bytes": s.st_size,
+            "mtime_ns": s.st_mtime_ns, "ctime_ns": s.st_ctime_ns,
+            "device": s.st_dev, "inode": s.st_ino, "mode": s.st_mode, "blocks": s.st_blocks}
+
+
+def seed_cache(cache, directory=False):
+    cache.mkdir()
+    for name, value in SENTINELS.items():
+        with (cache / name).open("xb") as stream:
+            stream.write(value)
+    with (cache / ".lock").open("xb"):
+        pass
+    scratch = cache / "query-key.new"
+    if directory:
+        scratch.mkdir()
+        with (scratch / "retained-child").open("xb") as stream:
+            stream.write(b"must not recurse into reserved scratch directory\n")
+    else:
+        with scratch.open("xb") as stream:
+            stream.write(b"stale query key from a prior stopped run\n")
+    result = {name: small_identity(cache / name) for name in SENTINELS}
+    result[".lock"] = small_identity(cache / ".lock")
+    if directory:
+        result["query-key.new/retained-child"] = small_identity(scratch / "retained-child")
+    return result
+
+
+def verify_sentinels(cache, original):
+    for name, expected in original.items():
+        require(small_identity(cache / name) == expected, "sentinel or lock identity changed: " + name)
+
+
+def physical_inventory(cache):
+    # No reference/liveness claim for failed calls without a QueryReport.
+    # Every file/directory is still included, including rejected scratch dirs.
+    rows, logical, allocated = {}, 0, 0
+    for path in [cache, *sorted(cache.rglob("*"))]:
+        s = path.lstat()
+        require(stat.S_ISREG(s.st_mode) or stat.S_ISDIR(s.st_mode), "regular private cache tree")
+        allocated += s.st_blocks * 512
+        row = {"directory": stat.S_ISDIR(s.st_mode), "bytes": s.st_size,
+               "allocated": s.st_blocks * 512, "device": s.st_dev, "inode": s.st_ino}
+        if stat.S_ISREG(s.st_mode):
+            require(s.st_size <= 16 * 1024**2, "individual cache file cap")
+            logical += s.st_size
+            row["sha256"] = digest(path.read_bytes())
+        rows[str(path.relative_to(cache))] = row
+    return {"all_physical_nodes": rows, "all_file_logical_bytes": logical,
+            "all_pathname_conservative_allocated_bytes": allocated,
+            "active_reference_set_not_inferred_from_failure": True}
+
+
+def independent_lock_probe(arguments):
+    require(len(arguments) == 3, "lock probe exact arguments")
+    path, device, inode = Path(arguments[0]), int(arguments[1]), int(arguments[2])
+    require(path.resolve(strict=True) == path, "real lock path")
+    fd = os.open(path, os.O_RDWR | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        before = os.fstat(fd)
+        require(stat.S_ISREG(before.st_mode) and (before.st_dev, before.st_ino) == (device, inode), "same lock inode")
+        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        after = path.lstat()
+        require((after.st_dev, after.st_ino) == (device, inode), "lock path binding changed")
+        fcntl.lockf(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+    print("PASS independent lock acquisition")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", type=Path, required=True)
@@ -110,7 +200,7 @@ def main():
     out.mkdir()
     record = {"complete": False, "fixture_sha256": digest(fixture.read_bytes()), "commands": [], "drivers": {}, "limitations": [
         "Small synthetic source population, not corpus-wide performance or space estimate.",
-        "No concurrency, crash injection, permission failure, or GC qualification.",
+        "One cooperative POSIX same-cache pair; no same-process thread, hostile-directory, crash, permission-failure or GC qualification.",
         "Publication deltas are snapshots, not total IO; deleted staging writes remain unmeasured.",
         "Final objects/contexts checked on actual local compiler identified by outer build receipt.",
     ]}
@@ -118,8 +208,9 @@ def main():
         raw = (json.dumps(record, indent=2) + "\n").encode()
         require(len(raw) <= 1024**2, "small report")
         (out / "receipt.json").write_bytes(raw)
-    def run(name, argv):
-        row = {"name": name, "argv": [str(fixture), *map(str, argv)], "state": "running"}
+    def run(name, argv, executable=None, timeout=180):
+        row = {"name": name, "argv": [str(executable or fixture), *map(str, argv)], "state": "running",
+               "kind": "lock-probe" if executable else "fixture", "timeout_seconds": timeout}
         record["commands"].append(row)
         save()
         started = time.monotonic()
@@ -130,7 +221,7 @@ def main():
         try:
             with captures["stdout"].open("xb") as stdout, captures["stderr"].open("xb") as stderr:
                 result = subprocess.run(row["argv"], cwd=out, env=os.environ.copy(),
-                                        stdout=stdout, stderr=stderr, timeout=180)
+                                        stdout=stdout, stderr=stderr, timeout=timeout)
             row["exit_code"] = result.returncode
         except BaseException as error:
             failure = error
@@ -162,6 +253,7 @@ def main():
         raw = run(name, argv)
         report = json.loads(raw)
         require(report["format"] == 1 and len(report["groups"]) > 0, "actual query report")
+        no_query_scratch(cache)
         hashes = [x["query_key"] for x in report["groups"]]
         require(len(hashes) == len(set(hashes)), "distinct query records")
         result_files = [root / "final.objects"] if kind == "query" else [root / "probe.mlfci", root / "probe.mlfco"]
@@ -196,6 +288,7 @@ def main():
             root = out / kind
             root.mkdir()
             cache = root / "cache"
+            sentinels = seed_cache(cache)
             cold = driver(kind, cache, root, "41", kind + "-cold")
             require(cold["query_report"]["inferred_groups"] > 0 and cold["query_report"]["reused_groups"] == 0, "cold actually infers")
             warm = driver(kind, cache, root, "41", kind + "-warm")
@@ -245,10 +338,235 @@ def main():
                 repaired = driver(kind, cache, root, "42", kind + "-" + mutation)
                 require(repaired["query_report"]["inferred_groups"] >= 1 and repaired["artifact_sha256"] == changed["artifact_sha256"], "corruption miss + exact reconstruction")
                 repairs.append({"mutation": mutation, "result": repaired})
-            record["drivers"][kind] = {"cold": cold, "warm": warm, "mixed_legacy": mixed, "before_one_value_change": before_change,
+            verify_sentinels(cache, sentinels)
+            record["drivers"][kind] = {"sentinels": sentinels, "cold": cold, "warm": warm, "mixed_legacy": mixed, "before_one_value_change": before_change,
                 "changed": changed, "changed_warm": stable,
                 "one_value_publication_delta": publication_delta(before_change["cache"], changed["cache"]), "repairs": repairs}
             save()
+        no_query_scratch(out / "raw-final-cache")
+        lifecycle = {}
+        record["scratch_lifecycle"] = lifecycle
+        canonical_python = str(Path(sys.executable).resolve(strict=True))
+        def probe(name, cache, identity):
+            row = identity[".lock"]
+            raw = run(name, ["-I", "-B", str(Path(__file__).resolve()), "--lock-probe",
+                            cache / ".lock", row["device"], row["inode"]],
+                      executable=canonical_python, timeout=5)
+            require(raw == b"PASS independent lock acquisition\n", "independent lock probe marker")
+        def run_with_live_probe(name, argv, marker, probe_name, cache, sentinels, directory=False):
+            row = {"name": name, "argv": [str(fixture), *map(str, argv), "await-probe"],
+                   "state": "running", "kind": "fixture", "timeout_seconds": 60,
+                   "release_qualification": "independent probe while original owner remains alive"}
+            record["commands"].append(row)
+            save()
+            started, owner, failure = time.monotonic(), None, None
+            captures = {label: out / (name + "." + label) for label in ("stdout", "stderr")}
+            try:
+                with captures["stdout"].open("xb") as stdout, captures["stderr"].open("xb") as stderr:
+                    owner = subprocess.Popen(row["argv"], cwd=out, env=os.environ.copy(),
+                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                    row["owner_pid"] = owner.pid
+                    ready_deadline = started + 10
+                    while True:
+                        require(owner.poll() is None, "owner exited before independent probe")
+                        require(captures["stdout"].stat().st_size <= 65536 and captures["stderr"].stat().st_size == 0,
+                                "live owner bounded marker and empty stderr")
+                        with captures["stdout"].open("rb") as stream:
+                            raw = stream.read(65537)
+                        require(len(raw) <= 65536 and marker.startswith(raw), "unexpected live owner marker")
+                        if raw == marker:
+                            break
+                        require(time.monotonic() < ready_deadline, "owner marker deadline of 10 seconds")
+                        time.sleep(.01)
+                    # Action returned, but the original process is still blocked
+                    # on stdin: exit-time lock release cannot satisfy this probe.
+                    verify_sentinels(cache, sentinels)  # .lock metadata only.
+                    if directory:
+                        require((cache / "query-key.new").is_dir(), "rejected scratch directory remains while owner alive")
+                    else:
+                        no_query_scratch(cache)
+                    require(owner.poll() is None, "owner alive immediately before probe")
+                    row["alive_before_probe"] = True
+                    probe(probe_name, cache, sentinels)
+                    require(owner.poll() is None, "owner exited during independent probe")
+                    row["alive_after_probe"] = True
+                    verify_sentinels(cache, sentinels)
+                    require(time.monotonic() - started < 60, "owner overall 60-second deadline")
+                    owner.stdin.write(b"PROBE-ACK\n")
+                    owner.stdin.flush()
+                    owner.stdin.close()
+                    row["acknowledgement"] = "PROBE-ACK"
+                    owner.wait(timeout=max(.001, 60 - (time.monotonic() - started)))
+            except BaseException as error:
+                failure = error
+                row.update(error=type(error).__name__ + ": " + str(error),
+                           timed_out=isinstance(error, subprocess.TimeoutExpired))
+            finally:
+                if owner is not None:
+                    try:
+                        if owner.poll() is None:
+                            owner.kill()
+                        owner.wait(timeout=5)
+                        if owner.stdin is not None and not owner.stdin.closed:
+                            owner.stdin.close()
+                    except BaseException as cleanup_error:
+                        row["cleanup_error"] = type(cleanup_error).__name__ + ": " + str(cleanup_error)
+                        if failure is None:
+                            failure = cleanup_error
+                    row["exit_code"] = owner.returncode
+                row.update(seconds=time.monotonic()-started, state="failed")
+                for label, path in captures.items():
+                    if path.exists():
+                        hasher = hashlib.sha256()
+                        with path.open("rb") as stream:
+                            for block in iter(lambda: stream.read(65536), b""):
+                                hasher.update(block)
+                        row[label] = {"path": str(path), "bytes": path.stat().st_size, "sha256": hasher.hexdigest()}
+                save()
+            if failure is not None:
+                raise failure
+            require(row["exit_code"] == 0 and row["stderr"]["bytes"] == 0 and row["stdout"]["bytes"] <= 65536,
+                    "live-probed owner status and captures")
+            raw = captures["stdout"].read_bytes()
+            require(raw == marker and row.get("alive_before_probe") and row.get("alive_after_probe"),
+                    "fixed owner marker and live release proof")
+            row["state"] = "passed"
+            save()
+            return raw
+        for mode in ["legacy", "source", "session"]:
+            root = out / ("left-" + mode)
+            root.mkdir()
+            cache = root / "cache"
+            sentinels = seed_cache(cache)
+            argv = ["left-" + mode, cache] + ([root] if mode == "session" else [])
+            raw = run_with_live_probe("left-" + mode, argv,
+                    b"PASS business Left after held-lock group execution\n", "lock-after-" + mode, cache, sentinels)
+            require(raw == b"PASS business Left after held-lock group execution\n", "business Left marker")
+            no_query_scratch(cache)
+            verify_sentinels(cache, sentinels)
+            message_path = Path(str(cache) + ".left-message")
+            message = message_path.read_bytes()
+            require(len(message) <= 65536 and b"type constructor mismatch:" in message,
+                    "actual post-group inference diagnostic required")
+            lifecycle["left-" + mode] = {"cache": physical_inventory(cache), "original_sentinels": sentinels,
+                                          "diagnostic": {"path": str(message_path), "bytes": len(message), "sha256": digest(message)}}
+            save()
+        empty_root = out / "empty-success"
+        empty_root.mkdir()
+        cache = empty_root / "cache"
+        sentinels = seed_cache(cache)
+        raw = run("empty-stale-success", ["empty-success", cache], timeout=60)
+        require(raw == b"PASS empty public plan cleans stale scratch\n", "empty cleanup marker")
+        no_query_scratch(cache)
+        verify_sentinels(cache, sentinels)
+        lifecycle["empty-success"] = {"cache": physical_inventory(cache), "original_sentinels": sentinels}
+        for name, mode, probe_name, marker in [
+                ("empty-directory-failure", "empty-directory-failure", "lock-after-empty-directory",
+                 b"PASS directory scratch rejected without recursive deletion\n"),
+                ("cleanup-dual-failure", "cleanup-dual-failure", "lock-after-cleanup-dual",
+                 b"PASS original Left and cleanup Left are both retained\n")]:
+            root = out / name
+            root.mkdir()
+            cache = root / "cache"
+            sentinels = seed_cache(cache, directory=True)
+            raw = run_with_live_probe(name, [mode, cache], marker, probe_name, cache, sentinels, directory=True)
+            require(raw == marker, "directory rejection marker")
+            verify_sentinels(cache, sentinels)
+            require((cache / "query-key.new").is_dir(), "rejected scratch directory retained")
+            lifecycle[name] = {"cache": physical_inventory(cache), "original_sentinels": sentinels,
+                               "scope": "public empty-plan tail" if mode == "empty-directory-failure" else "helper under explicit acquired/released lock"}
+            save()
+        pair_root = out / "concurrent"
+        pair_root.mkdir()
+        cache = pair_root / "cache"
+        sentinels = seed_cache(cache)
+        stale = small_identity(cache / "query-key.new")
+        lock_path = cache / ".lock"
+        fd = os.open(lock_path, os.O_RDWR | getattr(os, "O_NOFOLLOW", 0))
+        children, handles, pair_rows = [], [], []
+        pair_error = None
+        started = time.monotonic()
+        try:
+            lock_stat = os.fstat(fd)
+            require((lock_stat.st_dev, lock_stat.st_ino) == (sentinels[".lock"]["device"], sentinels[".lock"]["inode"]), "holder exact lock inode")
+            fcntl.lockf(fd, fcntl.LOCK_EX)
+            for name in ["concurrent-a", "concurrent-b"]:
+                result_file = pair_root / (name + ".objects")
+                row = {"name": name, "argv": [str(fixture), "concurrent", str(cache), str(result_file)],
+                       "state": "running", "kind": "fixture", "timeout_seconds": 60}
+                record["commands"].append(row)
+                pair_rows.append(row)
+                stdout = (out / (name + ".stdout")).open("xb")
+                stderr = (out / (name + ".stderr")).open("xb")
+                handles.extend([stdout, stderr])
+                children.append(subprocess.Popen(row["argv"], cwd=out, env=os.environ.copy(), stdout=stdout, stderr=stderr))
+            save()
+            ready_deadline = time.monotonic() + 10
+            while True:
+                require(all(child.poll() is None for child in children), "cooperative child finished while parent holds lock")
+                ready = []
+                for row in pair_rows:
+                    with (out / (row["name"] + ".stdout")).open("rb") as stream:
+                        ready.append(stream.read(6) == b"READY\n")
+                if all(ready):
+                    break
+                require(time.monotonic() < ready_deadline, "both ready barriers within 10 seconds")
+                time.sleep(.01)
+            require(small_identity(cache / "query-key.new") == stale, "scratch modified through held lock")
+            verify_sentinels(cache, sentinels)
+            bound = lock_path.lstat()
+            require((bound.st_dev, bound.st_ino) == (lock_stat.st_dev, lock_stat.st_ino), "holder path still same lock")
+            fcntl.lockf(fd, fcntl.LOCK_UN)
+            for child in children:
+                child.wait(timeout=max(.001, 60 - (time.monotonic() - started)))
+        except BaseException as error:
+            pair_error = error
+        finally:
+            fcntl.lockf(fd, fcntl.LOCK_UN)
+            os.close(fd)
+            for child in children:
+                if child.poll() is None:
+                    child.kill()
+                child.wait(timeout=5)
+            for handle in handles:
+                handle.close()
+            for row, child in zip(pair_rows, children):
+                row.update(exit_code=child.returncode, seconds=time.monotonic()-started, state="failed")
+                for label in ["stdout", "stderr"]:
+                    path = out / (row["name"] + "." + label)
+                    hasher = hashlib.sha256()
+                    with path.open("rb") as stream:
+                        for block in iter(lambda: stream.read(65536), b""):
+                            hasher.update(block)
+                    row[label] = {"path": str(path), "bytes": path.stat().st_size, "sha256": hasher.hexdigest()}
+            save()
+        if pair_error is not None:
+            raise pair_error
+        reports, finals = [], []
+        for row in pair_rows:
+            require(row["exit_code"] == 0 and row["stderr"]["bytes"] == 0 and row["stdout"]["bytes"] <= 65536, "pair status/captures")
+            raw = Path(row["stdout"]["path"]).read_bytes()
+            require(raw.startswith(b"READY\n"), "pair ready marker")
+            reports.append(json.loads(raw[6:]))
+            finals.append(digest((pair_root / (row["name"] + ".objects")).read_bytes()))
+            row["state"] = "passed"
+        require(finals[0] == finals[1], "cooperative final artifacts identical")
+        require(sorted((r["inferred_groups"], r["reused_groups"]) for r in reports) == [(0, 2), (2, 0)],
+                "same-cache pair serializes exactly one cold and one warm")
+        no_query_scratch(cache)
+        verify_sentinels(cache, sentinels)
+        lifecycle["concurrent"] = {"reports": reports, "final_sha256": finals, "cache": physical_inventory(cache),
+                                     "original_sentinels": sentinels, "scope": "two cooperative POSIX lockf processes; READY is before query preparation, not proof of kernel lock wait; not adversarial TOCTOU/crash proof"}
+        cache_roots = [out / "helper-cache", out / "raw-final-cache", out / "query/cache", out / "session/cache",
+                       *[out / ("left-" + mode) / "cache" for mode in ["legacy", "source", "session"]],
+                       *[out / name / "cache" for name in ["empty-success", "empty-directory-failure", "cleanup-dual-failure", "concurrent"]]]
+        record["all_cache_inventory"] = {str(root.relative_to(out)): physical_inventory(root) for root in cache_roots}
+        allocated = sum(value["all_pathname_conservative_allocated_bytes"] for value in record["all_cache_inventory"].values())
+        logical = sum(value["all_file_logical_bytes"] for value in record["all_cache_inventory"].values())
+        record["all_cache_totals"] = {"logical": logical, "allocated": allocated, "cache_roots": len(cache_roots),
+                                      "scope": "all eleven private cache trees, including helper, legacy, orphan, staging, lock and rejected directory nodes; build/capture evidence is separately in outer root accounting"}
+        require(logical <= 16 * 1024**2 and allocated <= 16 * 1024**2, "16 MiB complete cache budget")
+        require(len(record["commands"]) == 31, "fixed original 18 plus 13 command inventory")
         record["complete"] = True
         save()
         print(json.dumps({"complete": True, "commands": len(record["commands"]), "drivers": ["query", "session"]}))
@@ -258,4 +576,7 @@ def main():
         raise
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "--lock-probe":
+        independent_lock_probe(sys.argv[2:])
+    else:
+        main()

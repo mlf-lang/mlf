@@ -1107,6 +1107,32 @@ module Bootstrap.CrateQuery where {
            ((:) "1800" ((:) "" ((:) "" ((:) "" command)))))
     };
   cachePath path = if Host.absolutePath path then path else ("./" ++ path);
+  -- Caller holds the cache-directory lock and has normalized cacheDir with
+  -- cachePath. Clean only this fixed scratch after a normal Either return,
+  -- never records, contexts or other .new files. This costs one subprocess
+  -- per invocation, not per group. Host exceptions/panic are not caught here.
+  -- The directory is trusted: POSIX process locks do not serialize threads
+  -- in one process or protect against uncooperative filesystem replacement.
+  -- Windows mlf-host remove is recursive for directories, so refuse them.
+  cleanupQueryKey :: forall a. String -> Either String a -> IO (Either String a);
+  cleanupQueryKey cacheDir result = do {
+    let { scratch = cacheDir ++ "/query-key.new" };
+    isDirectory <- directoryExists scratch;
+    cleaned <- if isDirectory
+      then ioReturn (Left "cannot remove query key scratch: path is a directory")
+      else do {
+        code <- cacheCommand ["/bin/rm", "-f", scratch];
+        ioReturn (if code == 0 then Right ()
+          else Left "cannot remove query key scratch")
+      };
+    ioReturn (case cleaned of {
+      Right _ -> result;
+      Left cleanupError -> case result of {
+        Left error -> Left (error ++ "; " ++ cleanupError);
+        Right _ -> Left cleanupError
+      }
+    })
+  };
   writeCache :: String -> String -> IO (Either String ());
   writeCache path contents =
     do {
@@ -1247,8 +1273,9 @@ module Bootstrap.CrateQuery where {
                                         members))
                                   groups
                                   (QueryState available [] 0 0 []);
+                              cleaned <- cleanupQueryKey cacheDir result;
                               releaseFileLock lock;
-                              ioReturn result
+                              ioReturn cleaned
                             }
                      }
             }
@@ -1507,8 +1534,9 @@ module Bootstrap.CrateQuery where {
                 }) (if shareEncoding then Just (prepareSourceContractEncodings contracts) else Nothing)
                   (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing)
                   crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
+                cleaned <- cleanupQueryKey cacheDir result;
                 releaseFileLock lock;
-                ioReturn result
+                ioReturn cleaned
               }
             }
         }
