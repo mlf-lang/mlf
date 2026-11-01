@@ -1596,10 +1596,12 @@ module Bootstrap.Graph where {
                                                                                                    originals)
                                                                                                 (\oldPermissions ->
                                                                                                    stBind
-                                                                                                     (newDensePermissions
+                                                                                                     (raisedDensePermissions
+                                                                                                        oldPermissions
                                                                                                         low
                                                                                                         high
                                                                                                         oldNodes
+                                                                                                        oldBinders
                                                                                                         raised
                                                                                                         originals)
                                                                                                      (\raisedPermissions ->
@@ -1881,6 +1883,33 @@ module Bootstrap.Graph where {
                              stReturn
                                (DensePermissions low table binding descendants inertness paths
                                   permissions))))));
+  -- Rigid binding edges are ignored by both permission components: inertness
+  -- follows flexible children, and flexible paths stop at rigid nodes. The old
+  -- view has already loaded every flexible parent. Inspect raised parents in
+  -- the same order as the second constructor, and share the view only when all
+  -- those edges are unchanged. A changed edge retains the original constructor.
+  -- This cache never crosses a rebind transaction or a graph mutation.
+  sameDensePermissionBindings :: forall s. Int ->
+    STArray s (Maybe Int) -> STArray s (Maybe Int) -> [] ((,) Int Node) -> ST s Bool;
+  sameDensePermissionBindings low before after entries = case entries of {
+    [] -> stReturn True;
+    (:) ((,) n v) rest ->
+      if equalFlag (flag v) Rigid
+      then sameDensePermissionBindings low before after rest
+      else stBind (readDense low before n)
+        (\oldParent -> stBind (readDense low after n)
+          (\newParent ->
+            if equalMaybeInt oldParent newParent
+            then sameDensePermissionBindings low before after rest
+            else stReturn False))
+  };
+  raisedDensePermissions :: forall s. DensePermissions s -> Int -> Int ->
+    STArray s (Maybe Node) -> STArray s (Maybe Int) -> STArray s (Maybe Int) ->
+    [] ((,) Int Node) -> ST s (DensePermissions s);
+  raisedDensePermissions previous low high table before after entries =
+    stBind (sameDensePermissionBindings low before after entries)
+      (\unchanged -> if unchanged then stReturn previous
+        else newDensePermissions low high table after entries);
   denseAllInert :: forall s. DensePermissions s -> [] Int -> ST s Bool;
   denseAllInert state pending =
     case pending of {

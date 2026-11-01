@@ -14,6 +14,12 @@ It does not merge the divergent
 research branch history, stack C1/C2/C3, modify the sealed A1 implementation,
 change fingerprint/serialization algorithms, or cache target inference.
 
+The scope above describes the historical C4 integration. The later
+[2026-11-01 permission-view adaptation](../../tools/performance/permission-view/README.md)
+adds a narrow C1-derived reuse guard to dense Graph rebinding, independently
+measured against `01ef8e70`; it does not recover or stack the original C1 patch
+or reuse C1's historical timings. C2/C3 are not added by that change.
+
 The integration-before Graph, Solver and Constraint originals equal P3 byte-for-byte.
 Current host/library integration is nevertheless different. In particular,
 generic Map.unionWith and the generated builtin representation changed. C4's
