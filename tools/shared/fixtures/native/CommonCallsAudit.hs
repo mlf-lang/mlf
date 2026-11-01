@@ -5,15 +5,16 @@ import qualified Bootstrap.Types as T
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.Runtime as R
 import qualified MLF.Host.Base as B
+import qualified MLF.Primitive as P
 import qualified Bootstrap.LLVM.Optimize as O
 import qualified Bootstrap.LLVM.Analysis as A
 import qualified Bootstrap.Set as S
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.X.Syntax as X
 
-n :: Integer -> T.XName
+n :: P.Int -> T.XName
 n i = T.XName i "same-hint"
-v :: Integer -> T.XErased
+v :: P.Int -> T.XErased
 v = T.XEVar . n
 app :: T.XErased -> [T.XErased] -> T.XErased
 app = foldl T.XEApp
@@ -47,7 +48,7 @@ primitive :: T.Primitive -> [T.XErased] -> T.XErased
 primitive p = app (T.XEPrimitive p)
 ret :: T.XErased -> T.XErased
 ret a = primitive T.PIOReturn [a]
-bind :: T.XErased -> Integer -> T.XErased -> T.XErased
+bind :: T.XErased -> P.Int -> T.XErased -> T.XErased
 bind action binder body = primitive T.PIOBind [action,T.XEAbs (n binder) body]
 rawSemantics :: String -> T.XErased -> T.XErased -> T.XErased -> Maybe String -> IO ()
 rawSemantics label initial value body expectedError = do
