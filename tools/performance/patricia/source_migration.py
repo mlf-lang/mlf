@@ -15,6 +15,32 @@ PERMISSION_MANIFEST_SHA='da5f482bb5c89e0e88d812eaacaafc4788bafef2cfbe709c924fed0
 
 CANONICAL_CARRY_MANIFEST_SHA='bd5061cfcaecd26eb05c4f07628f9125dc0f226d679984ee7ad3fadaeed7451b'
 
+FULL_MANIFEST_SHA='8a7118c56442506571541c5c20821086e8ce9aff987de058097a81e224e29bb0'
+
+def full_delta():
+    raw=(HERE.parent/'full-compiler/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=FULL_MANIFEST_SHA:
+        raise ValueError('fixed reviewed owned projection source migration required')
+    value=json.loads(raw)
+    metadata={
+        'format':'owned-projection-view-source-migration-v1',
+        'parent_manifest_sha256':SURVIVORS_MANIFEST_SHA,
+        'parent_ref':'5172c4ade3b3141da2e64593c383892575b36699',
+        'module_count':128, 'unchanged_sources':127,
+        'added_sources':{}, 'removed_sources':{}, 'host_sources':{}}
+    if (set(value)!=set(metadata)|{'changed_sources'}
+        or any(value[key]!=wanted for key,wanted in metadata.items())
+        or set(value['changed_sources'])!={'Bootstrap.CrateSession'}):
+        raise ValueError('exact one-owner owned projection source migration')
+    for row in value['changed_sources'].values():
+        if (set(row)!={'old','new','reviewed_change'} or not row['reviewed_change']
+            or row['old']==row['new']
+            or any(not isinstance(row[key],str) or len(row[key])!=64
+                   or set(row[key])-set('0123456789abcdef') or row[key]=='0'*64
+                   for key in ('old','new'))):
+            raise ValueError('exact owned projection source hash row')
+    return value
+
 SURVIVORS_MANIFEST_SHA='de9192eeaa64cc15ef8039ce2db936db0ed4d23b4578ecd40ac293c066730aff'
 
 def survivors_delta():
@@ -210,7 +236,8 @@ def migrate(base):
     result=apply_changes(result,permission_delta()['changed_sources'])
     result=apply_changes(result,canonical_carry_delta()['changed_sources'])
     result=apply_changes(result,c3_delta()['changed_sources'])
-    return apply_changes(result,survivors_delta()['changed_sources'])
+    result=apply_changes(result,survivors_delta()['changed_sources'])
+    return apply_changes(result,full_delta()['changed_sources'])
 
 
 def host_sources(base):
