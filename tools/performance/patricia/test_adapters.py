@@ -36,8 +36,18 @@ survivors_spec=importlib.util.spec_from_file_location('c3_survivor_contract',
 survivors=importlib.util.module_from_spec(survivors_spec)
 survivors_spec.loader.exec_module(survivors)
 
-def before_survivors_registry(base):
+source_context_spec=importlib.util.spec_from_file_location('source_query_context_contract',
+    ROOT/'tools/performance/source-query-context/source_contract.py')
+source_context=importlib.util.module_from_spec(source_context_spec)
+source_context_spec.loader.exec_module(source_context)
+
+def before_source_context_registry(base):
     return migration.apply_changes(migration.migrate(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.source_context_delta()['changed_sources'].items()})
+
+def before_survivors_registry(base):
+    return migration.apply_changes(before_source_context_registry(base),
         {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
          for name,row in migration.survivors_delta()['changed_sources'].items()})
 
@@ -403,7 +413,8 @@ class AdapterTests(unittest.TestCase):
         delta=migration.c3_delta()
         parent=before_c3_registry(base)
         self.assertEqual(delta['parent_manifest_sha256'],migration.CANONICAL_CARRY_MANIFEST_SHA)
-        self.assertEqual({n for n in result if result[n]!=parent[n]}, {'Bootstrap.CrateSession'})
+        historical=before_source_context_registry(base)
+        self.assertEqual({n for n in historical if historical[n]!=parent[n]}, {'Bootstrap.CrateSession'})
         owner=delta['changed_sources']['Bootstrap.CrateSession']
         self.assertEqual(owner['old'],c3.OLD_SHA)
         self.assertEqual(owner['new'],c3.NEW_SHA)
@@ -462,7 +473,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_survivors_layer_preserves_exact_c3_parent_and_live_owner(self):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
-        delta=migration.survivors_delta();result=migration.migrate(base)
+        delta=migration.survivors_delta();result=before_source_context_registry(base)
         previous=before_survivors_registry(base)
         self.assertEqual(delta['parent_manifest_sha256'],migration.C3_MANIFEST_SHA)
         self.assertEqual({n for n in result if result[n]!=previous[n]}, {'Bootstrap.CrateSession'})
@@ -476,6 +487,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_survivors_inverse_recovers_complete_previous_owner(self):
         source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=source_context.restore_previous_owner(source)
         previous=survivors.restore_previous_owner(source)
         self.assertEqual(hashlib.sha256(previous).hexdigest(),
             '157b4d8d07986b1074cc612b89e2482783b3c80164db5f6dc74b1ece14fa7094')
@@ -521,6 +533,130 @@ class AdapterTests(unittest.TestCase):
                 with patch.object(migration,'HERE',root/'patricia'),patch.object(migration,'SURVIVORS_MANIFEST_SHA',hashlib.sha256(raw).hexdigest()),self.assertRaises(ValueError):
                     migration.survivors_delta()
 
+
+
+    def test_source_context_layer_has_exact_two_owners_and_126_unchanged(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.source_context_delta()
+        previous=before_source_context_registry(base)
+        current=migration.migrate(base)
+        self.assertEqual(delta['parent_manifest_sha256'],migration.SURVIVORS_MANIFEST_SHA)
+        self.assertEqual(delta['module_count'],128)
+        self.assertEqual(delta['unchanged_sources'],126)
+        self.assertEqual(set(current),set(previous))
+        self.assertEqual(len(current),128)
+        owners=set(source_context.OWNERS)
+        self.assertEqual(set(delta['changed_sources']),owners)
+        self.assertEqual({n for n in current if current[n]!=previous[n]},owners)
+        self.assertEqual({n:current[n] for n in current if n not in owners},
+                         {n:previous[n] for n in previous if n not in owners})
+        lock=json.loads((ROOT/'mlf.lock').read_bytes())
+        crates=[p for p in lock['packages'] if p['name']=='mlf-crates']
+        self.assertEqual(len(crates),1)
+        for module,owner in source_context.OWNERS.items():
+            row=delta['changed_sources'][module]
+            self.assertEqual(row['old'],previous[module])
+            self.assertEqual(row['new'],current[module])
+            self.assertEqual(row['old'],owner['old'])
+            self.assertEqual(row['new'],owner['new'])
+            self.assertEqual(hashlib.sha256((ROOT/owner['path']).read_bytes()).hexdigest(),row['new'])
+            self.assertEqual(crates[0]['sources'][owner['path'].split('libraries/mlf-crates/',1)[1]],row['new'])
+
+    def test_source_context_complete_inverse_and_explicit_parent_replay(self):
+        for module,owner in source_context.OWNERS.items():
+            source=(ROOT/owner['path']).read_bytes()
+            previous=source_context.restore_previous_owner(source,module)
+            self.assertEqual(hashlib.sha256(previous).hexdigest(),owner['old'])
+            forward=previous
+            for edit in source_context.manifest(module)['edits']:
+                self.assertEqual(forward.count(edit['old'].encode()),1)
+                forward=forward.replace(edit['old'].encode(),edit['new'].encode())
+            self.assertEqual(forward,source)
+            self.assertEqual(source_context.current_or_parent(source,module),previous)
+            self.assertEqual(source_context.current_or_parent(previous,module),previous)
+            with self.assertRaises(ValueError):
+                source_context.restore_previous_owner(previous,module)
+        session=(ROOT/source_context.OWNERS['Bootstrap.CrateSession']['path']).read_bytes()
+        self.assertEqual(graph.without_source_query_context(session),
+                         source_context.restore_previous_owner(session))
+        prior=source_context.restore_previous_owner(session)
+        c3_owner=survivors.restore_previous_owner(prior)
+        sparse_owner=c3.restore_previous_owner(c3_owner)
+        for old in (prior,c3_owner,sparse_owner):
+            self.assertEqual(source_context.current_or_parent(old),old)
+        with self.assertRaises(ValueError):
+            source_context.manifest('Bootstrap.Graph')
+
+    def test_source_context_partial_unknown_or_reordered_owner_rejected(self):
+        for module,owner in source_context.OWNERS.items():
+            source=(ROOT/owner['path']).read_bytes()
+            for edit in source_context.manifest(module)['edits']:
+                for changed in (source+b' ',source[:-1],
+                                source.replace(edit['new'].encode(),edit['old'].encode(),1),
+                                source+edit['new'].encode()):
+                    with self.subTest(module=module,size=len(changed)),self.assertRaises(ValueError):
+                        source_context.restore_previous_owner(changed,module)
+                    with self.subTest(module=module,replay=True),self.assertRaises(ValueError):
+                        source_context.current_or_parent(changed,module)
+        session=(ROOT/source_context.OWNERS['Bootstrap.CrateSession']['path']).read_bytes()
+        for adapter in (survivors,c3,sparse,contract,datatype):
+            with self.subTest(out_of_order=adapter.__name__),self.assertRaises(ValueError):
+                adapter.restore_previous_owner(session)
+
+    def test_source_context_delta_manifests_are_fixed_and_inverse_is_independent(self):
+        for module,owner in source_context.OWNERS.items():
+            original=(source_context.HERE/owner['file']).read_bytes()
+            source=(ROOT/owner['path']).read_bytes()
+            with tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);path=root/owner['file']
+                for raw in (original+b' ',b'{}'):
+                    path.write_bytes(raw)
+                    with patch.object(source_context,'HERE',root),self.assertRaises(ValueError):
+                        source_context.manifest(module)
+                value=json.loads(original);value['edits'][0]['old']+='\n'
+                raw=json.dumps(value).encode();path.write_bytes(raw)
+                changed=json.loads(json.dumps(source_context.OWNERS))
+                changed[module]['manifest_sha256']=hashlib.sha256(raw).hexdigest()
+                with patch.object(source_context,'HERE',root),patch.object(source_context,'OWNERS',changed),self.assertRaises(ValueError):
+                    source_context.restore_previous_owner(source,module)
+
+    def test_source_context_registry_rejects_tamper_rehashed_scope_and_hashes(self):
+        original=(migration.HERE.parent/'source-query-context/source-migration.json').read_bytes()
+        delta=json.loads(original);bad_values=[]
+        for field,value in [('parent_ref','unknown'),('baseline_ref','unknown'),
+                            ('parent_manifest_sha256','0'*64),('module_count',127),
+                            ('unchanged_sources',127),('added_sources',{'Unknown':'1'*64}),
+                            ('removed_sources',{'Bootstrap.CrateQuery':'1'*64}),
+                            ('host_sources',{'Unknown':'1'*64})]:
+            bad=json.loads(original);bad[field]=value;bad_values.append(bad)
+        for name in delta['changed_sources']:
+            for field,value in [('old','0'*64),('new','1'*64),('reviewed_change','')]:
+                bad=json.loads(original);bad['changed_sources'][name][field]=value;bad_values.append(bad)
+        missing=json.loads(original);missing['changed_sources'].pop('Bootstrap.CrateQuery');bad_values.append(missing)
+        renamed=json.loads(original);renamed['changed_sources']['Unknown']=renamed['changed_sources'].pop('Bootstrap.CrateQuery');bad_values.append(renamed)
+        extra=json.loads(original);extra['unexpected']=True;bad_values.append(extra)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'source-query-context').mkdir();path=root/'source-query-context/source-migration.json'
+            for raw in (original+b' ',b'{}'):
+                path.write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
+                    migration.source_context_delta()
+            for value in bad_values:
+                raw=json.dumps(value).encode();path.write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),patch.object(migration,'SOURCE_CONTEXT_MANIFEST_SHA',hashlib.sha256(raw).hexdigest()),self.assertRaises(ValueError):
+                    migration.source_context_delta()
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        for name in delta['changed_sources']:
+            bad=json.loads(original);bad['changed_sources'][name]['old']='0'*64
+            with patch.object(migration,'source_context_delta',return_value=bad),self.assertRaises(ValueError):
+                migration.migrate(base)
+        previous=before_source_context_registry(base)
+        for name,row in delta['changed_sources'].items():
+            partial={**previous,name:row['new']}
+            with self.subTest(partly_migrated=name),self.assertRaises(ValueError):
+                migration.apply_changes(partial,delta['changed_sources'])
+        with self.assertRaises(ValueError):
+            migration.apply_changes(migration.migrate(base),delta['changed_sources'])
 
 class CoreProofTests(unittest.TestCase):
     def worker(self, name='unmatchedMultiplier', operations='timesInt64# plusInt64# remInt64#'):

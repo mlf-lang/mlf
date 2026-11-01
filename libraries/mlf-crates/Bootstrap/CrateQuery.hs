@@ -946,6 +946,158 @@ module Bootstrap.CrateQuery where {
     else let { encoded = Separate.encodeUnitWithDatatypes pool object } in
       Separate.pack ((:) "MLF-QUERY-CACHE-1"
         ((:) key ((:) (fst encoded) ((:) (snd encoded) []))));
+  -- Source cache format3 shares the exact finite datatype-key context on disk.
+  -- It is deliberately separate from format2's legacy QUERY-4 contract. The
+  -- complete source-query-v6 key is reconstructed before any object admission.
+  sourceCacheParts :: String -> Maybe ((,) String String);
+  sourceCacheParts key = case Separate.unpack key of {
+    Right fields -> case fields of {
+      (:) format ((:) crateId ((:) compilerHash ((:) members ((:) bindings
+        ((:) context ((:) prepared ((:) contracts ((:) scopes [])))))))) ->
+        if eqString format "MLF-SOURCE-CRATE-QUERY-6"
+          && eqString key (Separate.pack fields)
+        then Just ((,) (Separate.pack
+          [format, crateId, compilerHash, members, bindings, prepared, contracts, scopes]) context)
+        else Nothing;
+      _ -> Nothing
+    };
+    Left _ -> Nothing
+  };
+  restoreSourceCacheKey :: String -> String -> Either String String;
+  restoreSourceCacheKey context compact = do {
+    fields <- Separate.unpack compact;
+    case fields of {
+      (:) format ((:) crateId ((:) compilerHash ((:) members ((:) bindings
+        ((:) prepared ((:) contracts ((:) scopes []))))))) -> do {
+        ensure (eqString format "MLF-SOURCE-CRATE-QUERY-6"
+          && eqString compact (Separate.pack fields)) "unsupported source query key";
+        Right (Separate.pack
+          [format, crateId, compilerHash, members, bindings, context, prepared, contracts, scopes])
+      };
+      _ -> Left "unsupported source query key"
+    }
+  };
+  sourceContextDigestFrom :: String -> Int -> Bool;
+  sourceContextDigestFrom digest i =
+    if i >= 64 then True else let { code = stringCodeAt digest i } in
+      ((code >= 48 && code <= 57) || (code >= 97 && code <= 102))
+        && sourceContextDigestFrom digest (i + 1);
+  validSourceContextDigest :: String -> Bool;
+  validSourceContextDigest digest =
+    stringLength digest == 64 && sourceContextDigestFrom digest 0;
+  sourceContextPath :: String -> String -> String;
+  sourceContextPath cacheDir digest = cacheDir ++ "/context-" ++ digest ++ ".mlfqc";
+  sourceContextContents :: String -> String;
+  sourceContextContents context =
+    Separate.pack ["MLF-SOURCE-QUERY-CONTEXT-1", context];
+  sourceCacheReference :: String -> Either String (Maybe String);
+  sourceCacheReference input = do {
+    fields <- Separate.unpack input;
+    case fields of {
+      (:) format rest ->
+        if eqString format "MLF-QUERY-CACHE-3" then case rest of {
+          (:) digest ((:) _ ((:) _ [])) -> do {
+            ensure (validSourceContextDigest digest) "invalid source query context reference";
+            Right (Just digest)
+          };
+          _ -> Left "unsupported source query cache format"
+        } else Right Nothing;
+      _ -> Left "unsupported query cache format"
+    }
+  };
+  -- actualDigest is computed from the bounded-name file by readSourceCached;
+  -- neither the reference nor its hash substitutes for full context/key checks.
+  decodeSourceCached :: String -> String -> String ->
+    [] ((,) String XType) -> [] DataDecl -> [] String -> String -> String ->
+    Either String Separate.UnitObject;
+  decodeSourceCached actualDigest key name bindings datatypes names contextInput input = do {
+    fields <- Separate.unpack input;
+    case fields of {
+      (:) format ((:) digest ((:) compact ((:) payload []))) -> do {
+        ensure (eqString format "MLF-QUERY-CACHE-3" && eqString input (Separate.pack fields)
+          && validSourceContextDigest digest && eqString actualDigest digest)
+          "invalid source query context reference";
+        case sourceCacheParts key of {
+          Nothing -> Left "unsupported source query key";
+          Just ((,) _ expectedContext) -> do {
+            ensure (eqString expectedContext (encodeDatatypeContext datatypes))
+              "cached source query datatype context mismatch";
+            ensure (eqString contextInput (sourceContextContents expectedContext))
+              "cached source query context mismatch";
+            savedKey <- restoreSourceCacheKey expectedContext compact;
+            ensure (eqString key savedKey) "cached query key mismatch";
+            object <- Separate.decodeContextualObject datatypes datatypes payload;
+            validateCached name bindings datatypes names object
+          }
+        }
+      };
+      _ -> Left "unsupported source query cache format"
+    }
+  };
+  readSourceCached :: String -> String -> String ->
+    [] ((,) String XType) -> [] DataDecl -> [] String -> String ->
+    IO (Either String Separate.UnitObject);
+  readSourceCached cacheDir key name bindings datatypes names input =
+    case sourceCacheReference input of {
+      Left error -> ioReturn (Left error);
+      Right Nothing -> ioReturn (decodeCached key name bindings datatypes names input);
+      Right (Just digest) -> do {
+        let { path = sourceContextPath cacheDir digest };
+        present <- fileExists path;
+        if not present then ioReturn (Left "source query context cache miss") else do {
+          contextInput <- readFile path;
+          actualDigest <- fileDigest path;
+          ioReturn (decodeSourceCached actualDigest key name bindings datatypes names contextInput input)
+        }
+      }
+    };
+  -- The existing cache-directory lock owns this staging file. Publish the
+  -- complete context first; a crash can leave an unreachable blob, never a
+  -- record pointing at a partially written context. No garbage collection is
+  -- attempted. Reusing equal bytes preserves the shared blob's modification time.
+  publishSourceContext :: String -> String -> IO (Either String String);
+  publishSourceContext cacheDir context = do {
+    let { staging = cacheDir ++ "/source-context.new";
+          contents = sourceContextContents context };
+    writeFile staging contents;
+    digest <- fileDigest staging;
+    if not (validSourceContextDigest digest)
+    then ioReturn (Left "cannot fingerprint source query context") else do {
+      let { destination = sourceContextPath cacheDir digest };
+      present <- fileExists destination;
+      same <- if present then do {
+        previous <- readFile destination;
+        ioReturn (eqString previous contents)
+      } else ioReturn False;
+      code <- if same
+        then cacheCommand ["/bin/rm", "-f", staging]
+        else cacheCommand ["/bin/mv", "-f", staging, destination];
+      ioReturn (if code == 0 then Right digest else Left "cannot publish source query context")
+    }
+  };
+  writeSourceCached :: Maybe SourceEncodings -> String -> String -> String ->
+    Separate.UnitObject -> IO (Either String ());
+  writeSourceCached encodings cacheDir destination key object =
+    let { legacy = case encodings of {
+      Nothing -> encodeCached key object;
+      Just (SourceEncodings pool _) -> encodeCachedWithDatatypes pool key object
+    }; contextEncoding = case encodings of {
+      Nothing -> encodeDatatypeContext;
+      Just pool -> encodeDatatypeContextWithPool pool
+    } } in case sourceCacheParts key of {
+      Just ((,) compact context) ->
+        if eqString context (contextEncoding (Separate.unitData (Separate.objectInterface object)))
+          && eqString context (contextEncoding (Separate.objectContext object))
+        then do {
+          published <- publishSourceContext cacheDir context;
+          case published of {
+            Left error -> ioReturn (Left error);
+            Right digest -> writeCache destination (Separate.pack
+              ["MLF-QUERY-CACHE-3", digest, compact, Separate.encodeContextualObject object])
+          }
+        } else writeCache destination legacy;
+      Nothing -> writeCache destination legacy
+    };
   -- Commands receive NUL-separated argv directly; paths never enter a shell.
   cacheCommand arguments =
     do {
@@ -1202,9 +1354,9 @@ module Bootstrap.CrateQuery where {
        sourceGroupKeyUsing candidateEncoding prepared, KeyText (observedContractEncoding observed contracts)];
   sourceQueryKeyWithContractEncodings encodings =
     sourceQueryKeyWithSelection (cachedBinding encodings) (cachedTypedCandidate encodings) (cachedObservedContracts encodings);
-  -- Raw checked inference payloads retain their established validator. A new
-  -- source key deliberately uses self-contained cache format1: the old compact
-  -- key parser must not be tricked into supplying a different context.
+  -- Raw checked inference payloads retain their established validator.
+  -- Source keys use their own format3 admission, never the legacy format2
+  -- key parser; unsupported source contexts retain the self-contained format1.
   runSourceGroups :: String -> String -> String -> TypeInventory -> Source.SourcePlan ->
     [] ([] String) -> Map String Source.SourceContract -> [] Separate.UnitObject ->
     Int -> Int -> [] GroupResult ->
@@ -1265,8 +1417,9 @@ module Bootstrap.CrateQuery where {
         present <- fileExists destination;
         cached <- if present then do {
           input <- readFile destination;
+          decoded <- readSourceCached cacheDir key name bindings datatypes names input;
           ioReturn (do {
-            object <- decodeCached key name bindings datatypes names input;
+            object <- decoded;
             Source.validatePreparedRaw prepared object
           })
         } else ioReturn (Left "cache miss");
@@ -1285,10 +1438,7 @@ module Bootstrap.CrateQuery where {
             Left error -> ioReturn (Left error);
             Right finalized -> do {
               saved <- if hit then ioReturn (Right ())
-                else writeCache destination (case encodings of {
-                  Nothing -> encodeCached key object;
-                  Just (SourceEncodings pool _) -> encodeCachedWithDatatypes pool key object
-                });
+                else writeSourceCached encodings cacheDir destination key object;
               case saved of {
                 Left error -> ioReturn (Left error);
                 Right _ -> do {

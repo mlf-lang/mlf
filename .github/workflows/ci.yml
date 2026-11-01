@@ -94,6 +94,10 @@ jobs:
         run: |
           python3 tools/shared/build.py --bootstrap-only --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
+      - name: Check shared source-query contexts and legacy cache compatibility
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-context-cache-guard python3 -B tools/shared/test_source_context_cache.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-context-cache-guard/results
       # Low-cost coverage for the compiler shape benchmark, placed directly after
       # the producer so it runs before the long suites: the contract test proves
       # the analyzer refuses bad data, and the smoke matrix performs real
@@ -267,6 +271,12 @@ jobs:
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt
+            .mlf-build/source-context-cache-guard/bounded-receipt.json
+            .mlf-build/source-context-cache-guard/build.log
+            .mlf-build/source-context-cache-guard/results/**/*.json
+            .mlf-build/source-context-cache-guard/results/**/*.stdout
+            .mlf-build/source-context-cache-guard/results/**/*.stderr
+            .mlf-build/source-context-cache-guard/results/**/*.legacy-bytes
             .mlf-build/owned-source-context-guard/
             .mlf-build/owned-source-context/**/*.json
             .mlf-build/owned-source-context/**/stdout

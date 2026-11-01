@@ -64,11 +64,30 @@ evaluate term=do
  v<-expect"runtime"(R.evaluate env(R.REnv M.empty)(X.erase term))
  case v of R.RInteger n->pure n;_->error"not integer"
 closed ds values parameters rhs=
- let ids=foldl(\acc(n,t)->U.typeIdentities t(Set.insert Std.compareInt(X.nameId n)acc))(U.termIdentities rhs Set.empty)parameters
-     start=1+maximum(0:Set.toList ids)
+ let ids=foldl(\acc(n,t)->U.typeIdentities t(IS.insert(X.nameId n)acc))(U.termIdentities rhs IS.empty)parameters
+     start=1+maximum(0:IS.toList ids)
      step(serial,bindings)(n,_)=let(next,term)=U.freshObject serial(strip(vb(lookupValue values(X.nameHint n))))in(next,bindings++[(n,term)])
      (_,bindings)=foldl step(start,[])parameters
  in T.XWithData ds(foldr(\(n,term)b->T.XLet n term b)rhs bindings)
+-- Representation-only adapter: all original law and raw/final assertions below stay intact.
+decodeRawSourceCache cache datatypes fields=case fields of
+ ["MLF-QUERY-CACHE-1",key,metadata,payload]->do
+   iface<-expect "raw cache interface"(U.decodeInterface metadata)
+   object<-expect "raw cache object"(U.decodeObject iface payload)
+   pure(key,object)
+ ["MLF-QUERY-CACHE-3",reference,compactKey,payload]->do
+   assert "source context reference is a safe SHA"(Q.validSourceContextDigest reference)
+   let contextPath=Q.sourceContextPath(B.literal cache)reference
+       expectedContext=Q.encodeDatatypeContext datatypes
+   contextText<-B.literal <$> readFile(B.unpack contextPath)
+   digest<-Prim.fileDigest contextPath
+   assert "source context retains full expected bytes and identity"
+     (digest==reference&&contextText==Q.sourceContextContents expectedContext)
+   key<-expect "restore complete source key"(Q.restoreSourceCacheKey expectedContext compactKey)
+   object<-expect "raw contextual cache object"(U.decodeContextualObject datatypes datatypes payload)
+   pure(key,object)
+ _->error "unsupported raw source cache representation"
+
 main=do
  hSetBuffering stdout LineBuffering
  [cache]<-getArgs
@@ -94,14 +113,13 @@ main=do
      cacheFile=cache++"/"++B.unpack digest++".mlfq"
  rawText<-B.literal <$> readFile cacheFile
  fields<-expect "read raw cached payload"(U.unpack rawText)
- rawIface<-expect "raw cache interface"(U.decodeInterface(fields!!2))
- rawObject<-expect "raw cache object"(U.decodeObject rawIface(fields!!3))
+ (exactKey,rawObject)<-decodeRawSourceCache cache (U.unitData(U.objectInterface compact)) fields
+ let rawIface=U.objectInterface rawObject
  let rawParameters=map(\(n,t)->(X.nameHint n,t))(fst(U.splitParameters(strip(U.objectTerm rawObject))))
- let exactKey=fields!!1
  _<-expect "counterexample generic validator accepts compact with same dependency context"(Q.decodeCached exactKey groupId rawParameters (U.unitData rawIface) ["sameDeps"] (Q.encodeCached exactKey compact))
  keyFields<-expect "source query framing"(U.unpack exactKey)
  assert "raw cache uses exact new source namespace"(head keyFields=="MLF-SOURCE-CRATE-QUERY-6")
- assert "raw provisional is not compact final object"(Q.encodeCached exactKey compact/=rawText)
+ assert "raw provisional is not compact final object"(Q.encodeCached exactKey compact/=Q.encodeCached exactKey rawObject)
  writeFile cacheFile(B.unpack(Q.encodeCached exactKey compact))
  (repairedObjects,repaired,_)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "reject normalized-as-raw cache"
  assert "normalized final payload fails raw cache validation and reinfers"(Q.inferredCount repaired==1&&Q.reusedCount repaired==fromIntegral(length objects-1))
@@ -198,8 +216,7 @@ supportProtectionChecks cache=do
      [final]=[o|o<-objects,U.unitName(U.objectInterface o)==gid]
  cacheText<-B.literal <$> readFile(cache++"/"++B.unpack digest++".mlfq")
  fs<-expect "managed raw cache"(U.unpack cacheText)
- i<-expect "managed raw interface"(U.decodeInterface(fs!!2))
- raw<-expect "managed raw object"(U.decodeObject i(fs!!3))
+ (_,raw)<-decodeRawSourceCache cache (U.unitData(U.objectInterface final)) fs
  assert "selected managed proof veto preserves exact original object"(U.encodeObject raw==U.encodeObject final)
  values<-foldM collect [] objects
  evaluate(vb(lookupValue values "safeBool"))>>=assert "safe proof runtime".(==42)

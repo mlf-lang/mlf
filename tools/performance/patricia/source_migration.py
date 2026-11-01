@@ -15,6 +15,39 @@ PERMISSION_MANIFEST_SHA='da5f482bb5c89e0e88d812eaacaafc4788bafef2cfbe709c924fed0
 
 CANONICAL_CARRY_MANIFEST_SHA='bd5061cfcaecd26eb05c4f07628f9125dc0f226d679984ee7ad3fadaeed7451b'
 
+SOURCE_CONTEXT_MANIFEST_SHA='5dbb5cbc5fcb047732e1ef48931c88a3dbd73030af4cc853f6a07ed951208a6e'
+
+def source_context_delta():
+    raw=(HERE.parent/'source-query-context/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=SOURCE_CONTEXT_MANIFEST_SHA:
+        raise ValueError('fixed reviewed source-query context migration required')
+    value=json.loads(raw)
+    metadata={
+        'format':'source-query-context-source-migration-v1',
+        'parent_manifest_sha256':SURVIVORS_MANIFEST_SHA,
+        'parent_ref':'941b6c03bed05db0a5b3054d6d789e54204e3cea',
+        'baseline_ref':'5172c4ade3b3141da2e64593c383892575b36699',
+        'module_count':128, 'unchanged_sources':126,
+        'added_sources':{}, 'removed_sources':{}, 'host_sources':{}}
+    hashes={
+        'Bootstrap.CrateQuery':(
+            '06263b9871c593c9f4f7a4f51975b8a38c9f96737f84a632afe5aa7525e50576',
+            '9d6cda4a88c1891cd52e292691955ab2a34f9e03dd70ad764dbf52eb9de5ccb2'),
+        'Bootstrap.CrateSession':(
+            '51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9',
+            'a5cd0cb1b939c81785c2c8b7fa2499fd63c24cd6730b8a2e3d74ce9559edabbf')}
+    if (not isinstance(value,dict) or set(value)!=set(metadata)|{'changed_sources'}
+        or any(value[key]!=wanted for key,wanted in metadata.items())
+        or not isinstance(value['changed_sources'],dict)
+        or set(value['changed_sources'])!=set(hashes)):
+        raise ValueError('exact two-owner source-query context migration')
+    for name,row in value['changed_sources'].items():
+        if (not isinstance(row,dict) or set(row)!={'old','new','reviewed_change'}
+            or not isinstance(row['reviewed_change'],str) or not row['reviewed_change']
+            or (row['old'],row['new'])!=hashes[name]):
+            raise ValueError('exact source-query context owner hashes')
+    return value
+
 SURVIVORS_MANIFEST_SHA='de9192eeaa64cc15ef8039ce2db936db0ed4d23b4578ecd40ac293c066730aff'
 
 def survivors_delta():
@@ -210,7 +243,8 @@ def migrate(base):
     result=apply_changes(result,permission_delta()['changed_sources'])
     result=apply_changes(result,canonical_carry_delta()['changed_sources'])
     result=apply_changes(result,c3_delta()['changed_sources'])
-    return apply_changes(result,survivors_delta()['changed_sources'])
+    result=apply_changes(result,survivors_delta()['changed_sources'])
+    return apply_changes(result,source_context_delta()['changed_sources'])
 
 
 def host_sources(base):

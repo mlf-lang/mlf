@@ -296,8 +296,9 @@ module Bootstrap.CrateSession (compileSpecFile) where {
         present <- fileExists destination;
         cached <- if present then do {
           input <- readFile destination;
+          decoded <- Query.readSourceCached cacheDir key name bindings datatypes names input;
           ioReturn (do {
-            object <- Query.decodeCached key name bindings datatypes names input;
+            object <- decoded;
             Source.validatePreparedRaw prepared object
           })
         } else ioReturn (Left "cache miss");
@@ -316,10 +317,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
             Left error -> ioReturn (Left error);
             Right finalized -> do {
               saved <- if hit then ioReturn (Right ())
-                else Query.writeCache destination (case encodings of {
-                  Nothing -> Query.encodeCached key object;
-                  Just (Query.SourceEncodings pool _) -> Query.encodeCachedWithDatatypes pool key object
-                });
+                else Query.writeSourceCached encodings cacheDir destination key object;
               case saved of {
                 Left error -> ioReturn (Left error);
                 Right _ -> do {

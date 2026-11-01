@@ -18,6 +18,8 @@ def load_projection(path):
 
 def retained_owner(raw=None):
     source = (ROOT / C.OWNER).read_bytes() if raw is None else raw
+    context = load_projection(ROOT / 'tools/performance/source-query-context/source_contract.py')
+    source = context.restore_previous_owner(source)
     # Match run_integrated.py's validation source-proof projection. Each
     # reviewed context layer checks its fixed manifest and complete before/
     # after hashes; runtime candidate sources and frozen V1 expectations stay
@@ -75,6 +77,9 @@ class SourceContractTests(unittest.TestCase):
 
     def test_reviewed_projection_chain_and_order_are_pinned(self):
         source = (ROOT / C.OWNER).read_bytes()
+        context = load_projection(ROOT / 'tools/performance/source-query-context/source_contract.py')
+        self.assertEqual(C.sha(source), context.NEW_SHA)
+        source = context.restore_previous_owner(source)
         survivors = load_projection(ROOT / 'tools/performance/c3-survivors/source_contract.py')
         self.assertEqual(C.sha(source), survivors.NEW_SHA)
         source = survivors.restore_previous_owner(source)
@@ -114,7 +119,7 @@ class SourceContractTests(unittest.TestCase):
                 retained_owner(changed)
 
     def test_context_projection_manifests_are_not_new_expectations(self):
-        for family in ('sparse-contracts', 'contract-context', 'datatype-context'):
+        for family in ('source-query-context', 'sparse-contracts', 'contract-context', 'datatype-context'):
             original = ROOT / 'tools/performance' / family
             raw = (original / 'session-delta.json').read_bytes()
             with tempfile.TemporaryDirectory() as directory:
