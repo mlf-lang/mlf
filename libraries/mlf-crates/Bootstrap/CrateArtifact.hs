@@ -1066,6 +1066,64 @@ module Bootstrap.CrateArtifact where {
          };
   decodePooledPayload :: String -> Either String ([] Separate.UnitObject);
   decodePooledPayload payload =
+    let {
+      decodeCarried pool parts payload start objectsDone recordsDone =
+        if (start == stringLength payload)
+        then Right ((,) (reverse objectsDone) (reverse recordsDone))
+        else do {
+               boundValueShared40 <- canonicalFieldFrom payload start;
+               case boundValueShared40 of {
+                 (,) record next ->
+                   do {
+                     fields <- canonicalFields record;
+                     case fields of {
+                       (:) header ((:) body ((:) contents [])) ->
+                         do {
+                           headerData <- decodeTypeReferences pool header;
+                           bodyData <- decodeTypeReferences pool body;
+                           Separate.decodeContextualObjectAfterWithCanonical
+                             (contextState parts bodyData)
+                             headerData
+                             bodyData
+                             contents
+                             (\fragment canonical ->
+                                decodeCarried pool parts payload next
+                                  ((:) fragment objectsDone)
+                                  ((:) ((,) fragment canonical) recordsDone))
+                         };
+                       _ -> Left "malformed pooled crate inference fragment"
+                     }
+                   }
+               }
+             };
+      poolCarried pool records done =
+        case records of {
+          [] -> (,) pool (reverse done);
+          (:) ((,) fragment canonical) rest ->
+            case rememberTypes pool (Separate.unitData (Separate.objectInterface fragment)) of {
+              (,) afterHeader header ->
+                case rememberTypes afterHeader (Separate.objectContext fragment) of {
+                  (,) afterBody body ->
+                    poolCarried afterBody rest
+                      ((:) (PoolRecord header body canonical) done)
+                }
+            }
+        };
+      encodeCarried carriedRecords =
+        case poolCarried M.empty carriedRecords [] of {
+          (,) inventory records ->
+            let {
+              declarations =
+                Set.toList (Set.fromList compareString (concatMap (map snd) (M.elems inventory)))
+            } in
+            let {
+              numbers = M.fromList compareString (zip declarations (range 0 (length declarations - 1)))
+            } in
+            Separate.pack
+              ((:) (Separate.pack declarations)
+                 ((:) (Separate.pack (map (encodePoolRecord numbers) records)) []))
+        }
+    } in
     do {
       fields <- canonicalFields payload;
       case fields of {
@@ -1079,10 +1137,15 @@ module Bootstrap.CrateArtifact where {
                      (\declaration -> (,) (D.datatypeName declaration) (datatypePart declaration))
                      (IM.elems pool))
             };
-            fragments <- decodePooledFragments pool parts bodies 0 [];
-            ensure (eqString payload (encodePooledPayload fragments))
-              "noncanonical pooled crate object";
-            Right fragments
+            decoded <- decodeCarried pool parts bodies 0 [] [];
+            case decoded of {
+              (,) fragments records ->
+                do {
+                  ensure (eqString payload (encodeCarried records))
+                    "noncanonical pooled crate object";
+                  Right fragments
+                }
+            }
           };
         _ -> Left "malformed pooled crate object payload"
       }
