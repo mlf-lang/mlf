@@ -15,9 +15,7 @@ import qualified Bootstrap.IntSet as IntSet
 import qualified Bootstrap.Map as Map
 import qualified Bootstrap.Runtime as Runtime
 import qualified Bootstrap.Separate as Separate
-import qualified Bootstrap.Set as Set
 import qualified Bootstrap.SourceInference as Source
-import qualified Bootstrap.Std as Std
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.X.Check as Check
 import qualified Bootstrap.X.Parser as Parser
@@ -359,9 +357,9 @@ lookupTerm terms name = case lookup name terms of
 closeFragment datatypes terms parameters body =
   let identities = foldl
         (\seen (name, ty) -> Separate.typeIdentities ty
-          (Set.insert Std.compareInt (X.nameId name) seen))
-        (Separate.termIdentities body Set.empty) parameters
-      first = 1 + maximum (0 : Set.toList identities)
+          (IntSet.insert (X.nameId name) seen))
+        (Separate.termIdentities body IntSet.empty) parameters
+      first = 1 + maximum (0 : IntSet.toList identities)
       bind (serial, bindings) (name, _) =
         let (next, value) = Separate.freshObject serial
               (stripData (lookupTerm terms (X.nameHint name)))
