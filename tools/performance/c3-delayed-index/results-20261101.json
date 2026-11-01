@@ -1,0 +1,424 @@
+{
+  "baseline_ref": "e123603d00f6f64e20e4d771836e49ddd808320f",
+  "complete": true,
+  "decision": "Accepted under the predefined strict-positive structural point-gain rule, retained correctness/fresh/raw-byte/resource checks and both guards. No samples added.",
+  "diagnostic_mechanism": {
+    "counters": {
+      "plannedFresh": [
+        65750,
+        666491
+      ],
+      "publishedFresh": [
+        65750,
+        444691
+      ]
+    },
+    "discarded_fresh_publications_avoided": 221800,
+    "fresh": 711,
+    "raw_bytes_equal": true,
+    "reused": 0
+  },
+  "evidence": {
+    "baseline-auth.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/baseline-auth.json",
+      "sha256": "7f35be938f9f1aa961b73b82533bb76a785f504153f456e76ba9048ee34efa48"
+    },
+    "baseline-build/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/baseline-build/command.json",
+      "sha256": "5ae61bd20072d3da0750b87c8b80158000af1a4acdead1cdca710e701424f8fb"
+    },
+    "baseline-producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/baseline-producer/receipt.json",
+      "sha256": "7f35be938f9f1aa961b73b82533bb76a785f504153f456e76ba9048ee34efa48"
+    },
+    "candidate-build/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/candidate-build/command.json",
+      "sha256": "e6206f02f50b6289e508db9df38984781df08001aa29af8b51baa2c7fa07ccbb"
+    },
+    "candidate-card.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/candidate-card.json",
+      "sha256": "9b301c9ab2cb7d02408816ea75f8bd906f25b1b7d6255c39d69715ebd210df43"
+    },
+    "controls-o0-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/controls-o0-01/receipt.json",
+      "sha256": "073ef38a823dce2a7b8014ab56179858146200d463ee0de0e43c07ce2839454f"
+    },
+    "controls-o0-02/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/controls-o0-02/receipt.json",
+      "sha256": "ebbc50efce1f7360c5860861da2551c38de4aacfc4963925ec86d4e6876cb1f8"
+    },
+    "controls-o0-03/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/controls-o0-03/receipt.json",
+      "sha256": "d7f488150f7919361f608677b6b56929a044837248bf4e9dda333f417de8655e"
+    },
+    "controls-o2-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/controls-o2-01/receipt.json",
+      "sha256": "832c2b3ccb71beb77d42e593664ca56497c6892ff2a80a8eb713a09fa716355f"
+    },
+    "discovery-config.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/discovery-config.json",
+      "sha256": "e9a76abdc7a4a4a4ee925a26b8730bc4644da882bb81410c4765f2fcfd88aa78"
+    },
+    "discovery-summary.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/discovery-summary.json",
+      "sha256": "63f26dbbe3f268cea2659f5f3da3c8228d43247a911440a74505dca98f2f7337"
+    },
+    "discovery/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/discovery/plan.json",
+      "sha256": "5e039b1f9b323c72ba88d45595cf933b4959c230f6061872a9df94f119a6a946"
+    },
+    "discovery/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/discovery/receipt.json",
+      "sha256": "8c4f6ffb8c29ecb6c8c3887875574721e80cc6e4b7948389628bd62d1499ad75"
+    },
+    "gates.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/gates.json",
+      "sha256": "6d67732ee9b82d8c425d4f1b6651587c5d2fac605f34feea2f8f18a3de5a3b94"
+    },
+    "guard-config.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/guard-config.json",
+      "sha256": "a5a2e7895403a97dc0c8600194f8584fa733f8b3ed7383a8479ee568e142d3e8"
+    },
+    "guards/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/guards/plan.json",
+      "sha256": "63ba8bb93901e092344e55bc0c1c928264f199edb4916326ed90dc59d18027bd"
+    },
+    "guards/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/guards/receipt.json",
+      "sha256": "38d9ce9ac16c8acb1b7d4ce84a0e0021454d44ab88c2b0870264e20e5ebd1c87"
+    },
+    "mechanism-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/mechanism-01/receipt.json",
+      "sha256": "569f90c2f19a0f4658c80b86377341e3ac070315ab8931c9db11430f3c5f6e20"
+    },
+    "post-integration-auth.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/post-integration-auth.json",
+      "sha256": "5c2161c8ebbcc8c0fe7921d8eae7c4e07e210663c986f77b82adfd6be1c67768"
+    },
+    "pre-integration-registry.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/pre-integration-registry.json",
+      "sha256": "1e6818481ff7dae97c6853cc198ea24437441bc070483028f33f4752587391dc"
+    },
+    "primary-summary.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/primary-summary.json",
+      "sha256": "2347130fb3c7df23e40821d416e61364da63ca3870cfac48514f2e9fb7d3d329"
+    },
+    "producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/producer/receipt.json",
+      "sha256": "edbf98a5ee65ad85babe0b1c152437d3a90188661001ff92ad32e0ff519d0178"
+    },
+    "qualification.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-delayed-index-20261101/qualification.json",
+      "sha256": "3d7c5fb0d936a22bf0fd32a0cc7cc51b24ff73c0109b7cdb2e17b187e9a17301"
+    }
+  },
+  "evidence_limits": [
+    "New private A1 adaptation; historical C3 code was not recovered and its measurements are excluded.",
+    "Only eight ordinary compiler executions in two balanced blocks; no independent confirmation, interval, significance or portable-gain claim.",
+    "Frozen 711-group checked-crate workload; not a current-source self-bootstrap or a new GHC comparison.",
+    "Private diagnostic source-path counters do not quantify ordinary physical allocation or exclusive CPU.",
+    "Only finite correctness/partial-value coverage; private valid-owned Session invariant, not arbitrary forged Stores.",
+    "Late upstream integration changes metadata/tests only; actual production and build identities unchanged."
+  ],
+  "focused_controls": {
+    "all_complete": true,
+    "fixture_traces": 63,
+    "ordinary_dependencies": "authenticated O2 producer; local control owners compiled separately at O0 and O2",
+    "partial_value_observations": 8
+  },
+  "format": "c3-delayed-index-results-v1",
+  "integrated_parent_ref": "9b35151dff377a8e0742e9a265f373bc53db98b0",
+  "integration_suites": [
+    {
+      "exit_code": 0,
+      "name": "p123"
+    },
+    {
+      "exit_code": 0,
+      "name": "graph"
+    },
+    {
+      "exit_code": 0,
+      "name": "map-balance"
+    },
+    {
+      "exit_code": 0,
+      "name": "validation"
+    },
+    {
+      "exit_code": 0,
+      "name": "builtin"
+    },
+    {
+      "exit_code": 0,
+      "name": "files"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-library"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-containers"
+    },
+    {
+      "exit_code": 0,
+      "name": "fingerprint"
+    },
+    {
+      "exit_code": 0,
+      "name": "direct"
+    },
+    {
+      "exit_code": 0,
+      "name": "batch-optimizer"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-io"
+    },
+    {
+      "exit_code": 0,
+      "name": "locked-plan"
+    },
+    {
+      "exit_code": 0,
+      "name": "manifest"
+    }
+  ],
+  "metadata_controls": {
+    "a1_current": {
+      "normal": 34,
+      "python_O": 34
+    },
+    "ci_io_policy": {
+      "normal": 17,
+      "python_O": 17
+    },
+    "fingerprint_fusion": {
+      "normal": 37,
+      "python_O": 37
+    },
+    "historical_metadata": {
+      "normal": 20
+    },
+    "native_batching": {
+      "normal": 7
+    },
+    "patricia_adapters": {
+      "normal": 27,
+      "python_O": 27
+    },
+    "provenance": {
+      "passed": 82,
+      "platform_skips": 4,
+      "total": 86
+    },
+    "reconciliation": {
+      "normal": 4
+    },
+    "validation_contract": {
+      "normal": 7,
+      "python_O": 7
+    }
+  },
+  "ordinary_samples": [
+    {
+      "block": 0,
+      "case": "compiler",
+      "side": "A",
+      "wall_seconds": 46.864413416,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "side": "B",
+      "wall_seconds": 46.057746667,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "side": "B",
+      "wall_seconds": 46.019893875,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "side": "A",
+      "wall_seconds": 47.24162675,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "side": "B",
+      "wall_seconds": 46.353655875,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "side": "A",
+      "wall_seconds": 46.986826542,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "side": "A",
+      "wall_seconds": 46.799627958,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "side": "B",
+      "wall_seconds": 46.396372584,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "side": "A",
+      "wall_seconds": 4.330668916,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "side": "B",
+      "wall_seconds": 4.160887291,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "side": "B",
+      "wall_seconds": 4.153282084,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "side": "A",
+      "wall_seconds": 4.243212958,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "side": "B",
+      "wall_seconds": 0.977694792,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "side": "A",
+      "wall_seconds": 0.988870125,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "side": "A",
+      "wall_seconds": 0.981899875,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "side": "B",
+      "wall_seconds": 0.960226916,
+      "window": "guards"
+    }
+  ],
+  "post_integration": {
+    "full_source_registry_unchanged": true,
+    "performance_samples_added": 0,
+    "production_and_build_identity_unchanged": true,
+    "upstream": "9b35151dff377a8e0742e9a265f373bc53db98b0"
+  },
+  "production_owner_sha256": "157b4d8d07986b1074cc612b89e2482783b3c80164db5f6dc74b1ece14fa7094",
+  "timing": {
+    "complete": true,
+    "evidence": "Fixed small descriptive window; no confidence interval, significance or portability claim.",
+    "guards": {
+      "flat_functions-512": {
+        "blocks": [
+          {
+            "block": 0,
+            "log_ratio": -0.03070777080738317,
+            "order": "ABBA"
+          }
+        ],
+        "gain": 0.03024107646037011,
+        "geometric_seconds": {
+          "A": 4.286717912480247,
+          "B": 4.157082948324893
+        },
+        "meaningful_regression": false,
+        "median_seconds": {
+          "A": 4.286940937,
+          "B": 4.157084687499999
+        },
+        "ratio": 0.9697589235396299,
+        "runs": 4
+      },
+      "higher_order_chain-128": {
+        "blocks": [
+          {
+            "block": 1,
+            "log_ratio": -0.016842585640903775,
+            "order": "BAAB"
+          }
+        ],
+        "gain": 0.016701542250638357,
+        "geometric_seconds": {
+          "A": 0.985378836858563,
+          "B": 0.9689214905818848
+        },
+        "meaningful_regression": false,
+        "median_seconds": {
+          "A": 0.985385,
+          "B": 0.968960854
+        },
+        "ratio": 0.9832984577493616,
+        "runs": 4
+      }
+    },
+    "guards_complete": true,
+    "positive_primary": true,
+    "primary": {
+      "compiler": {
+        "blocks": [
+          {
+            "block": 0,
+            "log_ratio": -0.021782144102464242,
+            "order": "ABBA"
+          },
+          {
+            "block": 1,
+            "log_ratio": -0.011110542972771014,
+            "order": "BAAB"
+          }
+        ],
+        "gain": 0.016311840798619026,
+        "geometric_seconds": {
+          "A": 46.972820251026256,
+          "B": 46.206607085229365
+        },
+        "median_seconds": {
+          "A": 46.925619979000004,
+          "B": 46.205701271
+        },
+        "ratio": 0.983688159201381,
+        "runs": 8
+      }
+    },
+    "timing_rule_passed": true
+  }
+}

@@ -75,6 +75,9 @@ class SourceContractTests(unittest.TestCase):
 
     def test_reviewed_projection_chain_and_order_are_pinned(self):
         source = (ROOT / C.OWNER).read_bytes()
+        c3 = load_projection(ROOT / 'tools/performance/c3-delayed-index/source_contract.py')
+        self.assertEqual(C.sha(source), c3.NEW_SHA)
+        source = c3.restore_previous_owner(source)
         self.assertEqual(C.sha(source), '18abedc7f96452392ed3401f1ae607233ec13e2a5ba24bd1c0cba344820c382f')
         # These are the already-frozen session-delta before hashes, not new
         # expectations derived from the current owner.
@@ -116,7 +119,7 @@ class SourceContractTests(unittest.TestCase):
                 module = root / 'source_contract.py'
                 module.write_bytes((original / 'source_contract.py').read_bytes())
                 adapter = load_projection(module)
-                self.assertEqual(adapter.HERE, root)
+                self.assertEqual(adapter.HERE, root.resolve())
                 for changed in (raw + b' ', b'{}', raw.replace(b'"new_sha256"', b'"not_the_owner"')):
                     self.assertNotEqual(changed, raw)
                     (root / 'session-delta.json').write_bytes(changed)

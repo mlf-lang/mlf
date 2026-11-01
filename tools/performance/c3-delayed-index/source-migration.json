@@ -1,0 +1,18 @@
+{
+  "added_sources": {},
+  "baseline_ref": "e123603d00f6f64e20e4d771836e49ddd808320f",
+  "changed_sources": {
+    "Bootstrap.CrateSession": {
+      "new": "157b4d8d07986b1074cc612b89e2482783b3c80164db5f6dc74b1ece14fa7094",
+      "old": "18abedc7f96452392ed3401f1ae607233ec13e2a5ba24bd1c0cba344820c382f",
+      "reviewed_change": "Owned negative-prefix fallback skips initial fresh reverse indexes, retains full projection/unify/demand, publishes all surviving fresh nodes, and preserves legacy Left Store epoch."
+    }
+  },
+  "format": "c3-delayed-index-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "bd5061cfcaecd26eb05c4f07628f9125dc0f226d679984ee7ad3fadaeed7451b",
+  "parent_ref": "9b35151dff377a8e0742e9a265f373bc53db98b0",
+  "removed_sources": {},
+  "unchanged_sources": 127
+}
