@@ -1,0 +1,432 @@
+{
+  "baseline_ref": "ffa3d201e4ea9c08109ff00df3f4fd66b56f3ab2",
+  "complete": true,
+  "decision": "Accepted under the predefined strictly-positive structural point-gain rule and retained correctness/fresh/raw/resource/guard checks. The point estimate is sensitive to the slow first baseline run; no stable benefit claim.",
+  "diagnostic_mechanism": {
+    "counters": {
+      "oldDeltaPrefixSteps": [
+        65750,
+        259552
+      ],
+      "plannedFresh": [
+        65750,
+        666491
+      ],
+      "publishedFresh": [
+        65750,
+        444691
+      ],
+      "retainedSourceIntervalSteps": [
+        65750,
+        666491
+      ]
+    },
+    "fresh": 711,
+    "raw_bytes_equal": true,
+    "retained_source_interval_steps_eliminated": 666491,
+    "reused": 0
+  },
+  "evidence": {
+    "baseline-auth.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/baseline-auth.json",
+      "sha256": "952f9e9259fe023c85b674932664d7c4ae0e0fa72ead71bbe69340928516cba0"
+    },
+    "baseline-build/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/baseline-build/command.json",
+      "sha256": "e9aa5748b25c04f98c51cb58b91ae1c3da5b6398e69343c9f7526418d71d8f4d"
+    },
+    "baseline-producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/baseline-producer/receipt.json",
+      "sha256": "952f9e9259fe023c85b674932664d7c4ae0e0fa72ead71bbe69340928516cba0"
+    },
+    "candidate-build/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/candidate-build/command.json",
+      "sha256": "c63004f7f43b5577df9fe73663ab0df0594196ccd5dffde78d95f0c6080fc676"
+    },
+    "candidate-card.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/candidate-card.json",
+      "sha256": "56279ca5214c80601519d03a97cbf073e5e8a4d58e075cad3431f94dbd50501b"
+    },
+    "controls-o0-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/controls-o0-01/receipt.json",
+      "sha256": "7242022513da86f9ed4ac416d07e20ebebf2ac337c49a3c7d71a59a38b0b7b3e"
+    },
+    "controls-o2-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/controls-o2-01/receipt.json",
+      "sha256": "aacba97ffcd2e1d6d4645f903547bf1bf31e5c59d853e1174a7bc9a4089214d4"
+    },
+    "discovery-config.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/discovery-config.json",
+      "sha256": "25167591cf212f3a380e542e17524db7b8ff51a3e1a43f19d8d5708a93221727"
+    },
+    "discovery-summary.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/discovery-summary.json",
+      "sha256": "0453f46fd277a61e2161a1649d5dcfe2caef45d83520f0aac256c295218b6de7"
+    },
+    "discovery/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/discovery/plan.json",
+      "sha256": "650eecf2ba6467687be18a4d0634c4f466e03b8d052c78f775dca01bb8b031a6"
+    },
+    "discovery/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/discovery/receipt.json",
+      "sha256": "bca9ee5360c3a3e7b5a102a2ca6a12fc76010584a9aa41b9413b46d3c94c346e"
+    },
+    "final-auth.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/final-auth.json",
+      "sha256": "9b98b3fe7ed457db27e1a49c7a7dbea34e3dbf2b29a5a71921674b2e1750af4f"
+    },
+    "gates.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/gates.json",
+      "sha256": "2348693d417e02d3d32dd40af2499d63853732989d1a9f99dff47ae697bf501f"
+    },
+    "guard-config.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/guard-config.json",
+      "sha256": "98d24a0fe696e0cad4cad96131c7ef8c59be89530ff023ec660e864447079da0"
+    },
+    "guards/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/guards/plan.json",
+      "sha256": "fb8ac22c28dc7eb96a2044fa6bfbb72d6fab591010a663320d3e8e7c7f0adf4c"
+    },
+    "guards/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/guards/receipt.json",
+      "sha256": "ea035ad30e655f9e96878fe226d18fa9e09df88a300d766afa9dcbdbbc2afe93"
+    },
+    "guest-platform-audit/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/guest-platform-audit/receipt.json",
+      "sha256": "67c9aa381f0cfe75a231f9f65678d086ce70a138dd4101aa19c4b83e64ca656b"
+    },
+    "mechanism-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/mechanism-01/receipt.json",
+      "sha256": "4e1767528b5a578c5d88d4773c333256c48e6f36613b3d844d0ab29d2580c004"
+    },
+    "primary-summary.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/primary-summary.json",
+      "sha256": "6f937b54f5637ce87589855b99e5066c66bc016df200174163b4f1388c07cc68"
+    },
+    "producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/producer/receipt.json",
+      "sha256": "b3b827784d25c52b5d1046599b7b561a93d58406a6f95cc7fdb85c89e9367363"
+    },
+    "qualification.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/qualification.json",
+      "sha256": "c4a5a419d01f2d038026801fd9f01579eed1e6c4a05db61469be6af13b4dfbfb"
+    },
+    "retained-c3-o2/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/retained-c3-o2/receipt.json",
+      "sha256": "fc323b52c50ba2d23fad0dd29acf0fac2a18eb12071d948f666606e2010977a2"
+    },
+    "reuse-attempt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/c3-survivors-20261101/reuse-attempt.json",
+      "sha256": "f05b32391cb22c0d361ef6d78ec75f161bc4091c7410064c0c107a4455c3adc4"
+    }
+  },
+  "evidence_limits": [
+    "Fixed eight compiler executions in two balanced blocks. First baseline 57.525s is unusually slow relative to the other baseline samples; ABBA improves 8.52%, BAAB slows 0.15%. No exclusion/replacement/extension.",
+    "Primary geometric gain 4.29%; descriptive median gain about 0.44% is not the primary statistic. No independent confirmation, confidence interval, significance or stable/portable gain claim.",
+    "higher_order_chain-128 is 2.88% slower, about 0.027s, within the predeclared combined 5% and 0.1s guard.",
+    "Frozen 711-group checked-crate screen, not complete current-source compiler self-bootstrap or a new GHC comparison.",
+    "Diagnostic interval and delta counts are source-level work counts, not ordinary CPU shares or physical allocations.",
+    "Finite valid-owned-delta/partial-value coverage; no forged-state or universal partial-value equivalence claim.",
+    "Two Linux-only watchdog methods cannot execute on macOS and are explicitly skipped there; full local compiler runs retain existing portable resource guards."
+  ],
+  "focused_controls": {
+    "dependencies": "Authenticated ordinary O2; local owners compiled separately at O0 and O2",
+    "exact_node_reuse_and_opaque_payload_checks": true,
+    "independent_model_cases_per_mode": 29160,
+    "retained_earlier_c3_owner_gate_O2_complete": true,
+    "retained_partial_value_observations_per_mode": 8,
+    "retained_physical_traces_per_mode": 63
+  },
+  "format": "c3-survivors-results-v1",
+  "integration_suites": [
+    {
+      "exit_code": 0,
+      "name": "p123"
+    },
+    {
+      "exit_code": 0,
+      "name": "graph"
+    },
+    {
+      "exit_code": 0,
+      "name": "map-balance"
+    },
+    {
+      "exit_code": 0,
+      "name": "validation"
+    },
+    {
+      "exit_code": 0,
+      "name": "builtin"
+    },
+    {
+      "exit_code": 0,
+      "name": "files"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-library"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-containers"
+    },
+    {
+      "exit_code": 0,
+      "name": "fingerprint"
+    },
+    {
+      "exit_code": 0,
+      "name": "direct"
+    },
+    {
+      "exit_code": 0,
+      "name": "batch-optimizer"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-io"
+    },
+    {
+      "exit_code": 0,
+      "name": "locked-plan"
+    },
+    {
+      "exit_code": 0,
+      "name": "manifest"
+    }
+  ],
+  "metadata_controls": {
+    "a1_current": {
+      "normal": 34,
+      "python_O": 34
+    },
+    "ci_execution_budget": {
+      "normal": 5
+    },
+    "ci_io_policy": {
+      "normal": 17
+    },
+    "guest_platform": {
+      "fix": "Canonicalize temporary test root; mark two documented Linux /proc watchdog methods Linux-only. Linux coverage and actual compiler resource protection unchanged.",
+      "normal": {
+        "linux_proc_only_skipped": 2,
+        "passed": 14,
+        "total": 16
+      },
+      "platform_failures_reproduced_on_unmodified_baseline": true,
+      "python_O": {
+        "linux_proc_only_skipped": 2,
+        "passed": 14,
+        "total": 16
+      }
+    },
+    "historical_metadata": {
+      "normal": 20
+    },
+    "native_batching": {
+      "normal": 7
+    },
+    "patricia_adapters": {
+      "normal": 31,
+      "python_O": 31
+    },
+    "validation_contract": {
+      "normal": 7,
+      "python_O": 7
+    }
+  },
+  "ordinary_samples": [
+    {
+      "block": 0,
+      "case": "compiler",
+      "side": "A",
+      "wall_seconds": 57.524916583,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "side": "B",
+      "wall_seconds": 47.710135792,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "side": "B",
+      "wall_seconds": 48.640526875,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "side": "A",
+      "wall_seconds": 48.210297333,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "side": "B",
+      "wall_seconds": 46.329437209,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "side": "A",
+      "wall_seconds": 46.156279333,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "side": "A",
+      "wall_seconds": 46.249147084,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "side": "B",
+      "wall_seconds": 46.211918458,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "side": "A",
+      "wall_seconds": 4.213371042,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "side": "B",
+      "wall_seconds": 4.100871666,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "side": "B",
+      "wall_seconds": 4.103543334,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "side": "A",
+      "wall_seconds": 4.080895292,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "side": "B",
+      "wall_seconds": 0.978631333,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "side": "A",
+      "wall_seconds": 0.947767625,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "side": "A",
+      "wall_seconds": 0.950876958,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "side": "B",
+      "wall_seconds": 0.974723625,
+      "window": "guards"
+    }
+  ],
+  "production_owner_sha256": "51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9",
+  "timing": {
+    "complete": true,
+    "evidence": "Fixed small descriptive window; no confidence interval, significance or portability claim.",
+    "guards": {
+      "flat_functions-512": {
+        "blocks": [
+          {
+            "block": 0,
+            "log_ratio": -0.01076453382371603,
+            "order": "ABBA"
+          }
+        ],
+        "gain": 0.010706803561634115,
+        "geometric_seconds": {
+          "A": 4.14660415867574,
+          "B": 4.1022072825009435
+        },
+        "meaningful_regression": false,
+        "median_seconds": {
+          "A": 4.147133167,
+          "B": 4.1022075000000005
+        },
+        "ratio": 0.9892931964383659,
+        "runs": 4
+      },
+      "higher_order_chain-128": {
+        "blocks": [
+          {
+            "block": 1,
+            "log_ratio": 0.02840747121850963,
+            "order": "BAAB"
+          }
+        ],
+        "gain": -0.028814811449367594,
+        "geometric_seconds": {
+          "A": 0.9493210184921036,
+          "B": 0.9766755246448752
+        },
+        "meaningful_regression": false,
+        "median_seconds": {
+          "A": 0.9493222915,
+          "B": 0.976677479
+        },
+        "ratio": 1.0288148114493676,
+        "runs": 4
+      }
+    },
+    "guards_complete": true,
+    "positive_primary": true,
+    "primary": {
+      "compiler": {
+        "blocks": [
+          {
+            "block": 0,
+            "log_ratio": -0.08909494311039844,
+            "order": "ABBA"
+          },
+          {
+            "block": 1,
+            "log_ratio": 0.0014696272018222339,
+            "order": "BAAB"
+          }
+        ],
+        "gain": 0.04286674802073287,
+        "geometric_seconds": {
+          "A": 49.32675910449112,
+          "B": 47.212281351279515
+        },
+        "median_seconds": {
+          "A": 47.2297222085,
+          "B": 47.019786500500004
+        },
+        "ratio": 0.9571332519792671,
+        "runs": 8
+      }
+    },
+    "timing_rule_passed": true
+  }
+}

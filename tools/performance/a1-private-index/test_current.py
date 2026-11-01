@@ -477,6 +477,12 @@ class CurrentCompatibilityTests(unittest.TestCase):
                           if current.SHARED_HASHES[n] != current.BALANCE_SHARED_HASHES[n]},
                          {'Bootstrap.CrateSession'})
         owner = (ROOT / contract.OWNER).read_bytes()
+        if b'survivingFreshFromDelta' in owner:
+            path = ROOT / 'tools/performance/c3-survivors/source_contract.py'
+            spec = importlib.util.spec_from_file_location('c3_survivor_adapter', path)
+            adapter = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(adapter)
+            owner = adapter.restore_previous_owner(owner)
         if b'unifyExpandedFallback' in owner:
             path = ROOT / 'tools/performance/c3-delayed-index/source_contract.py'
             spec = importlib.util.spec_from_file_location('c3_session_adapter', path)

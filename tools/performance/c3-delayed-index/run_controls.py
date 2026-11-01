@@ -17,6 +17,10 @@ EXPECTED=('PASS 63 physical graph/index/scope traces and legacy failure epochs\n
           'PASS retained expansion descriptors and exact full component selection\n'
           'PASS repeated instances, reflexive equalities and literal fresh survivors\n'
           'PASS 8 demand, first-exception and unused-payload observations\n').encode()
+# Reviewed extensions may add an independent Main and reversible helper copies.
+# The default CLI, frozen owner and complete expected inventory stay unchanged.
+EXTRA_SOURCES=[]
+EXTRA_PINS=[]
 
 
 def main():
@@ -66,10 +70,18 @@ def main():
                 H.require(changed.replace(new,old)==raw,'module/export-header-only adaptation')
                 (src/(name+'.hs')).write_bytes(changed)
             shutil.copy2(HERE/'Main.hs',src/'Main.hs')
+            for source,name,before,after in EXTRA_SOURCES:
+                raw=source.read_bytes()
+                H.require(raw.count(before)==1 and after not in raw,'unique extension header')
+                changed=raw.replace(before,after)
+                H.require(changed.replace(after,before)==raw,'header-only extension inverse')
+                (src/name).write_bytes(changed)
             pins=H.file_pins(src)
             pins.update({str(f):H.sha(f) for f in [Path(__file__),hp,HERE/'Main.hs',ROOT/OWNER,
                 HERE.parent/'patricia/adapt_oracles.py',HERE.parent/'patricia/OracleTypes.hs',
                 producer/'receipt.json',producer/'host.o',producer/'supervisor.o']})
+            pins.update({str(f):H.sha(f) for f in EXTRA_PINS})
+            pins.update({str(row[0]):H.sha(row[0]) for row in EXTRA_SOURCES})
             ledger=H.load(src/'adaptations.json')
             pins.update({row['source']:row['source_sha256'] for row in ledger['changes']})
             objects=out/'objects';shutil.copytree(producer/'objects',objects)
