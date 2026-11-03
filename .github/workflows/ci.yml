@@ -299,6 +299,12 @@ jobs:
             .mlf-build/source-context-cache-guard/results/**/*.stdout
             .mlf-build/source-context-cache-guard/results/**/*.stderr
             .mlf-build/source-context-cache-guard/results/**/*.legacy-bytes
+            .mlf-build/contract-context-guard/bounded-receipt.json
+            .mlf-build/contract-context-guard/build.log
+            .mlf-build/contract-context/receipt.json
+            .mlf-build/contract-context/**/command.json
+            .mlf-build/contract-context/**/stdout
+            .mlf-build/contract-context/**/stderr
             .mlf-build/owned-source-context-guard/
             .mlf-build/owned-source-context/**/*.json
             .mlf-build/owned-source-context/**/stdout

@@ -121,7 +121,13 @@ main = do
   op<-plan (FS.prepareSourcePlan M.empty [] [] [] scope [] literal)
   ng<-expect "new finalized group" (S.prepareGroupSparse np M.empty ["root"])
   og<-expect "old finalized group" (FS.prepareGroup op M.empty ["root"])
-  obj<-expect "compile group" (I.compileLoweredGroup "root" [] [] (S.groupMembers ng))
+  -- Preserve the malformed module fixture as a rejection, not a success oracle.
+  invalid<-expect "compile invalid identity fixture" (I.compileLoweredGroup "root" [] [] (S.groupMembers ng))
+  case S.finishGroup ng invalid of
+    T.Left err -> check "invalid module identity rejected"
+      (B.unpack err == "<module identity>:1:1: unexpected root; expected constructor name")
+    T.Right _ -> fail "invalid module identity accepted"
+  obj<-expect "compile group" (I.compileLoweredGroup "SparseContractControl" [] [] (S.groupMembers ng))
   nf<-expect "new finish" (S.finishGroup ng obj)
   ofn<-expect "frozen finish" (FS.finishGroup og obj)
   let oldFinal=M.map (\(FS.SourceContract ty cs p)->S.SourceContract ty cs p) (FS.finalGroupContracts ofn)

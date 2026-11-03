@@ -215,7 +215,14 @@ def main():
     if args.write:
         destination.write_text(encoded)
     elif not args.graph_only:
-        if destination.read_text() != encoded:
+        # Package.Command reads the lock as JSON and compares its snapshot.
+        # Whitespace/key order are not source-graph changes. Keep duplicate keys
+        # invalid and compare canonical JSON (not Python bool/int equality).
+        # snapshot_sha256 below remains the canonical snapshot digest, not the
+        # digest of the possibly formatted lock file.
+        saved = json.dumps(read(destination), sort_keys=True, separators=(',', ':'),
+                           ensure_ascii=False, allow_nan=False) + '\n'
+        if saved != encoded:
             raise ValueError('lock differs from actual local manifest/source graph')
     print(json.dumps({'static_only':True, 'packages':len(result['packages']),
                       'source_hashes':sum(len(p['sources']) for p in result['packages']),
