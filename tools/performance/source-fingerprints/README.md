@@ -96,3 +96,64 @@ each pair and validate outputs within each ABI; the full cross-version raw
 byte comparison is for PR 32 versus the candidate. For full-verify cost
 replay the warm PR 32 study's candidate snapshot afresh in fixed order
 sample, full, full, sample.
+
+## Foundation results
+
+Apple M1 Max, macOS 26.6.2, GHC 9.14.1. The implementation commit was
+`86d158adedc33eb4d1c1f29084b720aa6441b7f7`. Each row compares the
+arithmetic means of two runs per arm in its own ABBA series. [All samples,
+identities and artifact hashes](results.json) include both successful and
+unfavorable observations.
+
+| Baseline | State | Wall s, baseline / candidate | Change | CPU s, baseline / candidate | Peak RSS MiB, baseline / candidate |
+|---|---|---:|---:|---:|---:|
+| PR 32 | Cold | 26.37 / 25.17 | −4.6% | 25.82 / 24.56 | 122.0 / 122.0 |
+| PR 32 | Warm | 9.96 / 7.92 | −20.5% | 9.50 / 7.73 | 127.7 / 115.6 |
+| PR 32 | Version edit | 9.72 / 7.84 | −19.3% | 9.48 / 7.76 | 117.8 / 125.8 |
+| PR 25 | Cold | 26.54 / 25.07 | −5.5% | 25.98 / 24.35 | 177.4 / 125.4 |
+| PR 25 | Warm | 10.57 / 7.59 | −28.1% | 9.93 / 7.55 | 177.7 / 116.8 |
+| PR 25 | Version edit | 10.30 / 7.77 | −24.5% | 9.98 / 7.68 | 177.6 / 121.9 |
+
+Both pairs won in each end-to-end row. The cold query cache's logical size
+was 32,228,073 B on PR 32 and 4,322,919 B on the candidate. After the edit
+it was 32,410,629 / 4,342,549 B. PR 25's cold and edited caches in the
+separate series were 104,205,148 B and 104,562,014 B. These are fresh
+cache measurements; existing unreachable records are not garbage collected.
+Every stage had the required inference/reuse counts. Final interface and
+object bytes matched PR 32 for both source states. In each candidate run
+the independent reader matched all 505 distinct raw headers and bodies,
+83 physical datatype contexts and the expected complete-input SHA.
+
+The scan experiment used the same 504 candidate files in both readers. All
+2,862,221 symbol-section bytes were eligible. Mean CPU for decoding was
+0.8315 s before and 0.7968 s after (−4.2%). Mean wall was 0.8445 / 0.8533 s
+(+1.0%); this isolated comparison did not establish a wall-time win. The
+end-to-end table includes the change in key representation and the new ICH.
+It does not time key construction, pure disk I/O or encoding independently.
+
+In the separate warm audit, the default bucket selected 17 of 504 groups.
+Mean wall was 7.876 s sampled and 8.855 s for verifying all 504 (+0.979 s,
++12.4%). All four runs reused every group and reproduced the cold artifacts.
+
+## Reproduction
+
+Use verify-built producer directories and a fresh output directory. The
+Foundation argument is the libraries/mlf-foundation directory from PR 25.
+
+```sh
+python3 tools/performance/foundation-query/compare.py --baseline-label 32 "$pr32/bin/emlf" "$candidate/bin/emlf" "$foundation" "$study"
+python3 tools/performance/source-fingerprints/compare-decode.py "$pr32" "$candidate" "$study/1-candidate" "$wire"
+python3 tools/performance/source-fingerprints/verify-cost.py "$candidate/bin/emlf" "$study" "$audit"
+python3 tools/performance/foundation-query/check-raw.py "$study/0-32" "$study/1-candidate" "$pr32/bin/emlf" "$candidate/bin/emlf"
+python3 tools/shared/test_source_fingerprints.py "$candidate/bin/emlf" "$controls"
+```
+
+The CLI control tests a stale, independently typed body of the same name and
+type under an edited input, a valid CRC with a wrong ICH, a wrong-address
+record, truncation, sampled/full repair and a subsequent warm hit. The GHC
+binary corpus includes exact wire round trips and negatives across the
+symbol-size and count thresholds, ASCII/Unicode and CRC boundaries. Separate
+producer-bound Query/Session controls cover legacy records, scope, dependency
+types, datatype layout, raw evidence, resource protection, and scratch/lock
+behavior. The builtin control changes actual builtin declarations under a fixed
+compiler identity, then varies only the compiler identity.

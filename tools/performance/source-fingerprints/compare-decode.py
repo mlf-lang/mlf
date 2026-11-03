@@ -55,12 +55,16 @@ def main():
     hashes = [sha(path) for path in paths]
     manifest = out/'paths'
     manifest.write_text(''.join(str(path)+'\n' for path in paths))
-    eligible = 0
+    eligible = eligible_bytes = symbol_bytes = 0
     for path in paths:
         raw = path.read_bytes()
         count,_,size = struct.unpack_from('<III',raw,28)
-        eligible += int(len(raw)>=1024 and 0<count<=1024 and size<=65536)
+        symbol_bytes += size
+        if len(raw)>=1024 and 0<count<=1024 and size<=65536:
+            eligible += 1
+            eligible_bytes += size
     record = {'record_count':len(paths),'eligible':eligible,
+              'total_symbol_section_bytes':symbol_bytes,'eligible_symbol_section_bytes':eligible_bytes,
               'manifest_sha256':hashlib.sha256(''.join(hashes).encode()).hexdigest(),
               'probe_sha256':{k:sha(v) for k,v in executables.items()},'samples':[]}
     for name in ['baseline','candidate','candidate','baseline']*2:
