@@ -116,6 +116,8 @@ There is one probe sample per phase and two plain samples per version. These
 measure this Foundation source-cache workload. They do not qualify either the
 46-module or 80-module native compiler workload.
 
+The [warm-read follow-up](warm/README.md) splits cache acquisition, decoding, key checks, xMLF validation, finalization and output on the same 504-group workload.
+
 ## Correctness controls
 
 * The mutation control compiles Data twice at GHC -O0. The second build adds a
