@@ -77,8 +77,9 @@ normal absent-file miss still uses the initial address lookup.
 
 On a matching prefix the same byte snapshot goes through CRC, canonical graph
 validation and checked raw admission. The first root must be the same text as
-the input field of the 302/303 payload. The result ICH still covers the input
-and raw value using the existing canonical single root 304. A forged prefix
+the input field in the payload. The 302/303 result ICH uses canonical root
+304. For 305/306 the reader independently reconstructs the addressed template
+from the admitted raw value when verifying the ICH. A forged prefix
 cannot turn a differently addressed payload into a hit. With a damaged body,
 a wrong address can now be reported before a CRC failure. A matching address
 preserves the full integrity checks and their errors.

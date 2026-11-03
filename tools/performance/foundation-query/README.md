@@ -18,6 +18,43 @@ The initial PR 29 head was `e4f6e42b`. During qualification it advanced to
 workflow and its private C3 test adapter and regression. Both executable
 identities were reauthenticated after aligning the branch with that head.
 
+The repeat on the aligned head used the same source paths, executables and
+cache states. Times below are arithmetic means on an Apple M1 Max. Each
+of the two matched pairs favored the candidate in every state.
+
+| State | #33 wall s | Candidate wall s | Wall reduction | CPU s, #33 / candidate | Peak RSS MiB, #33 / candidate |
+|---|---:|---:|---:|---:|---:|
+| Cold, installed Prelude | 20.001 | 19.562 | 2.20% | 19.49 / 19.16 | 116.6 / 103.6 |
+| Warm | 4.048 | 3.367 | 16.83% | 3.61 / 3.30 | 164.5 / 103.7 |
+| Version edit | 3.711 | 3.424 | 7.73% | 3.60 / 3.39 | 158.5 / 113.8 |
+| Cold, both stores empty | 20.232 | 19.551 | 3.37% | 19.85 / 19.24 | 119.5 / 103.8 |
+
+Both cold series inferred 504 groups. Warm runs reused all 504, and the edit
+inferred one and reused 503. The installed cold and warm query caches were
+104,216,375 B on #33 and 4,323,425 B on the candidate. After the edit they
+were 104,573,241 B and 4,343,056 B. The 312,221 B interface and 1,232,955 B
+object matched the original #29 output byte for byte. The edited object grew
+by one byte. An independent replay checked all 505 raw group versions and 83
+contexts against their full v7 inputs. The two compiler families agreed on
+511 exported binding schemes and evaluated both Version values.
+
+Separate diagnostic runs enabled the timers in off/on/on/off order on a
+single binary. Every run produced the same 597 physical cache records,
+reports and formal artifacts. Control and timed means were 19.74 / 19.56 s
+cold, 3.52 / 3.51 s warm and 3.66 / 3.56 s after the edit. Timers are nested
+and force only the observed boundary. On warm reads, key lookup took 0.290 s
+including 0.134 s forcing the key length. Reading and admitting 504 groups
+took 1.602 s, including 0.080 s acquiring the bytes and 0.726 s decoding.
+The diagnostic executable's 17 sampled ICH checks took 0.025 s. On cold
+builds, inference took 15.357 s. Encoding and hashing source records took
+1.091 s, writing their buffers took 0.120 s, and 16 publication batches took
+0.137 s. Buffer writes include user-space work. UTF-8 and SHA sub-timers
+cover only the three keys that took the in-memory path. All 504 keys are
+included in the aggregate lookup span.
+
+The 46-module modular native compile, LLVM emission, link and checked
+execution passed. The 80-module native cold build was not repeated.
+
 The compiler still checks raw xMLF, binding ownership, parameter types and
 evidence before reuse. A private receipt pairs the checked term with the
 actual admitted interface. The common small-object finalization path proves
@@ -42,6 +79,8 @@ On the GHC host the right operand of strict integer operations depends on
 the left, preserving error order while allowing direct arithmetic and branches.
 ST and IO array indexing uses a checked unsigned range on the validated
 array size. These changes leave the source-language primitive ABI unchanged.
+
+## Historical Foundation comparison with PR 25
 
 This study compares the ordinary GHC-hosted `emlf --compile-crate` entry
 point on the same 14 Foundation modules from PR 25. PR 25 was
