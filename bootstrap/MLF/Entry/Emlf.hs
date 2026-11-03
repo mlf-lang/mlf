@@ -107,8 +107,18 @@ module MLF.Entry.Emlf where {
                   else runArgs mode paths arguments;
       [] -> runArgs mode paths arguments
     };
+  compileCrateCommand verifyAll arguments = case arguments of {
+    ["-Zincremental-verify-ich", file, "-o", prefix] -> compileCrateCommand True [file, "-o", prefix];
+    [file, "-o", prefix, "-Zincremental-verify-ich"] -> compileCrateCommand True [file, "-o", prefix];
+    [file, "-o", prefix] -> do {
+      result <- CrateSession.compileSpecFileWithVerification verifyAll Prepared.cratePrelude file prefix;
+      case result of { Left message -> fatal message; Right () -> ioReturn () }
+    };
+    _ -> fatal crateUsage
+  };
   runArgs :: PreludeMode -> [] String -> [] String -> IO ();
   runArgs mode paths arguments = case arguments of {
+    (:) "-Zincremental-verify-ich" ((:) "--compile-crate" rest) -> compileCrateCommand True rest;
     (:) "--compile" rest -> NativeBuild.run mode paths rest;
     ["--native-install-info"] -> do {
       result <- Prepared.nativeInstallInfo;
@@ -169,49 +179,7 @@ module MLF.Entry.Emlf where {
                                    _ -> sourceCommand mode paths (PrintSource False) [] arguments
                                  }
                             else if MLF.Primitive.eqString matchValueShared7 "--compile-crate"
-                                 then case matchValueShared8 of {
-                                        (:) matchValueShared33 matchValueShared34 ->
-                                          case matchValueShared34 of {
-                                            (:) matchValueShared35 matchValueShared36 ->
-                                              if MLF.Primitive.eqString matchValueShared35 "-o"
-                                              then case matchValueShared36 of {
-                                                     (:) matchValueShared37 matchValueShared38 ->
-                                                       case matchValueShared38 of {
-                                                         [] ->
-                                                           let {
-                                                             file = matchValueShared33
-                                                           } in
-                                                           let {
-                                                             prefix = matchValueShared37
-                                                           } in
-                                                           do {
-                                                             result <-
-                                                               CrateSession.compileSpecFileWithPrelude Prepared.cratePrelude file prefix;
-                                                             case result of {
-                                                               Left message -> fatal message;
-                                                               Right _ -> ioReturn ()
-                                                             }
-                                                           };
-                                                         _ ->
-                                                           sourceCommand mode paths
-                                                             (PrintSource False)
-                                                             []
-                                                             arguments
-                                                       };
-                                                     _ ->
-                                                       sourceCommand mode paths (PrintSource False)
-                                                         []
-                                                         arguments
-                                                   }
-                                              else sourceCommand mode paths (PrintSource False) []
-                                                     arguments;
-                                            _ ->
-                                              sourceCommand mode paths (PrintSource False) []
-                                                arguments
-                                          };
-                                        _ ->
-                                          sourceCommand mode paths (PrintSource False) [] arguments
-                                      }
+                                 then compileCrateCommand False matchValueShared8
                                  else if MLF.Primitive.eqString matchValueShared7 "--show-crate"
                                       then case matchValueShared8 of {
                                              (:) matchValueShared31 matchValueShared32 ->
@@ -907,7 +875,7 @@ module MLF.Entry.Emlf where {
     "Executable compilation: emlf [--no-prelude] [-i DIR ...] SOURCE -o OUTPUT [--build-dir FRESH]\n       emlf --compile SOURCE -o OUTPUT\nStandard libraries and runtime are reused automatically; user code is freshly compiled with one Clang -O2 job.\nInstalled native libraries: emlf --native-install-info\n       emlf [-i DIR ...] --emit-native-llvm [FILE | --expr SOURCE]\n       emlf --emit-native-library-llvm\n       emlf --native-library-metadata\nNative IR requires the authenticated link inputs from --native-install-info. Library emission and metadata commands are installation build steps.\n";
   crateUsage :: String;
   crateUsage =
-    "Crate compilation: emlf --compile-crate SPEC -o PREFIX\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci [--cache DIR [ --query-report FILE ]]\n";
+    "Crate compilation: emlf [-Zincremental-verify-ich] --compile-crate SPEC -o PREFIX\n       emlf --show-crate FILE.mlfci\n       emlf --link-crate FILE.mlfci\n       emlf --run-crate FILE.mlfci [-- ARGS...]\n       emlf --crate-to-llvm[-gc] FILE.mlfci [--cache DIR [ --query-report FILE ]]\n";
   baseUsage :: String;
   baseUsage =
     "Usage: emlf [--no-prelude] [-i DIR ...] [--type] [FILE | --expr SOURCE]\n       emlf --check [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --run [FILE | --expr SOURCE] [-- ARG ...]\n       emlf --run-xmlf [XMLF_FILE] [-- ARG ...]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm [XMLF_FILE]\n       emlf [--no-prelude] [-i DIR ...] --emit-llvm-gc [FILE | --expr SOURCE]\n       emlf --xmlf-to-llvm[-io]-gc [XMLF_FILE]\n       emlf --llvm-runtime\nWith no FILE, read eMLF from standard input.\nImports load Foo.Bar from marked Foo/Bar.hs or legacy Foo/Bar.emlf beside the entry or in -i roots; ambiguous duplicates are rejected.\nThe standard prelude supplies Monad and Monad IO; --no-prelude disables it.\nAll LLVM commands emit the compact BDWGC ABI; -gc spellings are aliases.\nLink LLVM IR with clang, runtime/mlf_runtime.c, GMP and BDWGC.\n"

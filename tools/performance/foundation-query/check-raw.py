@@ -17,14 +17,23 @@ def require(value, message):
         raise ValueError(message)
 
 
-def read_group(cache, key, contexts, compiler):
+def read_group(cache, key, contexts, compiler, baseline_fields=None):
     doc = reader.read_document((cache / (key + '.mlfq')).read_bytes(), 2)
     require(len(doc.roots) == 1, 'query root inventory')
-    ref, fields, header, body = wire.graph_node(doc, doc.roots[0], 301, 4)
+    root = doc.roots[0]
+    if doc.nodes[root].data[0] == 303:
+        ref, stored_key, _, header, body = wire.graph_node(doc, root, 303, 5)
+        require(baseline_fields is not None, 'comparison needs an exact-key reference compiler')
+        require(wire.graph_text(doc, stored_key) == key == typed.verify_source_result(doc),
+                'record input and independently recomputed result fingerprint')
+        fields = baseline_fields.copy()
+        fields[2] = compiler
+    else:
+        ref, field_list, header, body = wire.graph_node(doc, root, 301, 4)
+        fields = [wire.graph_text(doc, child) for child in wire.graph_node(doc, field_list, 1)]
     typed.validate_type(doc, header, 'UnitInterface')
     typed.validate_type(doc, body, 'XTerm')
     digest = wire.graph_text(doc, ref)
-    fields = [wire.graph_text(doc, child) for child in wire.graph_node(doc, fields, 1)]
     if digest not in contexts:
         raw = (cache / ('context-' + digest + '.mlfqc')).read_bytes()
         require(hashlib.sha256(raw).hexdigest() == digest, 'context digest')
@@ -36,7 +45,7 @@ def read_group(cache, key, contexts, compiler):
     restored = wire.source_key_from_binary(context, declarations, fields)
     require(hashlib.sha256(restored.encode()).hexdigest() == key, 'complete key/address mismatch')
     require(fields[2] == compiler, 'stored compiler identity differs from executable')
-    return doc, header, body, raw, fields[:2] + fields[3:]
+    return doc, header, body, raw, fields
 
 
 def main():
@@ -67,9 +76,10 @@ def main():
             keys = tuple(g['query_key'] for g in groups)
             if keys in visited:
                 continue
-            left, right = [read_group(run / 'cache', key, table, compiler)
-                           for run, key, table, compiler in zip(runs, keys, contexts, compilers)]
-            require(left[3:] == right[3:], 'context or key field changed')
+            left = read_group(runs[0] / 'cache', keys[0], contexts[0], compilers[0])
+            right = read_group(runs[1] / 'cache', keys[1], contexts[1], compilers[1], left[4])
+            require(left[3] == right[3] and left[4][:2] + left[4][3:] == right[4][:2] + right[4][3:],
+                    'actual context or input fields changed')
             wire.require_graph_equal(left[0], left[1], right[0], right[1], 'raw header')
             wire.require_graph_equal(left[0], left[2], right[0], right[2], 'raw body')
             visited.add(keys)

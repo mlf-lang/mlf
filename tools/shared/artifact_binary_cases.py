@@ -41,6 +41,23 @@ def corpus():
     def good(name, roots, **kw):
         cases.append(Case(name, tree_document(roots), True, roots=tuple(roots), **kw))
     def bad(name, data, **kw): cases.append(Case(name, data, False, **kw))
+    # Exercise the fused and checksum-first symbol paths with independently
+    # authored bytes at both thresholds. All values remain within wire limits.
+    multibyte = 'a' * 1025 + 'é中😀' + 'b' * 32
+    good('scan-mixed-widths', (('text',''),('text',multibyte),('text','end')))
+    good('scan-symbol-cap', (('text','a' * 65533),))       # 3-byte length = 65536
+    good('scan-symbol-over-cap', (('text','a' * 65534),))
+    for count in (1024,1025):
+        good('scan-count-'+str(count), tuple(('text',str(i)) for i in range(count)))
+    valid = tree_document((('text',multibyte),))
+    location = valid.index('😀'.encode())
+    for name, replacement in [('continuation',0x41),('overlong',0x80)]:
+        mutated = bytearray(valid)
+        mutated[location+1] = replacement
+        bad('scan-invalid-'+name,repair_crc(mutated))
+    for name,offset in [('symbol',location),('node',struct.unpack_from('<I',valid,44)[0]),('root',-1)]:
+        mutated = bytearray(valid); mutated[offset] ^= 1
+        bad('scan-crc-'+name,bytes(mutated))
     good('empty', ())
     good('int-zero', (('int', 0),))
     good('all-scalars', SCALAR_ROOTS)

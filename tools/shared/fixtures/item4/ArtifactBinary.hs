@@ -1200,7 +1200,38 @@ sourceAdmissionTests directory = do
           need (label ++ " actual verified memo") (not (null next) && reused == expectedReuse)
           need (label ++ " exact complete object") (U.encodeObject raw == U.encodeObject object && U.encodeInterface (U.objectInterface raw) == U.encodeInterface (U.objectInterface object))
           pure next
-    Q.writeSourceCached T.Nothing (B.literal directory) (B.literal path) key object >>= expect "actual schema301 publication"
+    Q.writeLegacySourceCached T.Nothing (B.literal directory) (B.literal path) key object >>= expect "actual schema301 publication"
+    originalSha <- P.byteArrayFromString key >>= P.byteArrayDigest
+    let readExactWithAudit strict = Q.readLocalSourceFile strict [] (B.literal directory)
+          key originalSha encoded "RawGroup" [] [] ["value"] (B.literal path)
+    readExactWithAudit True >>= rejected "full audit upgrades the old exact-key record"
+      "legacy source record has no result fingerprint"
+
+    -- Fixed complete inputs guarantee both sample arms on every executable and
+    -- checkout path. Damage only the ICH, with a valid canonical CRC and body.
+    forM_ [("0","f6af59bc522f44fbb7a149eb635a732a674008f58115d49889207325aef2f6eb",False),
+           ("61","07b64870cd2a03ed8e27d6174b0195fd0d7370e0775b69ca8e79c452e3753b22",True)] $
+      \(crate,expected,sampled) -> do
+        let full = U.pack ["MLF-SOURCE-CRATE-QUERY-7",crate,"compiler","member","bindings",
+                           encoded,"source-group","contracts","scope"]
+            target = B.literal (directory ++ "/audit-" ++ B.unpack crate ++ ".mlfq")
+        sha <- P.byteArrayFromString full >>= P.byteArrayDigest
+        need "independent full-input SHA selects expected sample arm" (sha == expected && Q.sampledSourceInput sha == sampled)
+        Q.writeSourceCached T.Nothing (B.literal directory) target full object >>= expect "write fingerprint record"
+        rawBytes <- Storage.readRaw target >>= expect "actual fingerprint record bytes"
+        roots <- W.decode W.defaultLimits 2 rawBytes >>= expect "actual fingerprint record"
+        case roots of
+          [W.VNode 303 [ref, W.VText seen, _, header, body]] | seen == sha -> do
+            Storage.write 2 target [W.VNode 303 [ref,W.VText sha,W.VText (B.literal (replicate 64 '0')),header,body]]
+              >>= expect "mutate only result hash, with a correct CRC"
+          _ -> error "expected published shared source fingerprint"
+        let tryAudit strict = Q.readLocalSourceFile strict [] (B.literal directory)
+              full sha encoded "RawGroup" [] [] ["value"] target
+        (_,_,ordinary) <- tryAudit False
+        case ordinary of
+          T.Left message -> need "sampled default rejects wrong ICH" (sampled && message == "cached source result fingerprint mismatch")
+          T.Right _ -> need "unsampled default accepts checked value" (not sampled)
+        tryAudit True >>= rejected "full mode always detects wrong ICH" "cached source result fingerprint mismatch"
     bytes <- readBounded path
     graph <- W.decodeGraph W.defaultLimits 2 bytes >>= expect "actual binary source record"
     reference <- case W.graphRoots graph of

@@ -6,7 +6,7 @@ from pathlib import Path
 import hashlib
 import json
 import re
-from artifact_binary_reference import Invalid, MAGIC, read_document, physical_inventory, require
+from artifact_binary_reference import Invalid, MAGIC, read_document, physical_inventory, require, tree_document
 
 CONTRACT_PATH = Path(__file__).with_name('artifact_structure_contract.json')
 CONTRACT = json.loads(CONTRACT_PATH.read_text(encoding='utf-8'))
@@ -154,8 +154,35 @@ def inspect_artifact(raw, schema):
             fields=[text(x) for x in list_values(compact)]
             require(len(fields)==8 and fields[0] in ('MLF-SOURCE-CRATE-QUERY-6','MLF-SOURCE-CRATE-QUERY-7'),'complete compact source key')
             require(not list_values(value_node(iface,240,8)[3]),'shared query header has no duplicated datatype list')
+        elif tag in (302, 303):
+            shape = ('String','String','RawUnitObject') if tag == 302 else (
+                'String','String','String','UnitInterface','XTerm')
+            require(len(children) == len(shape), 'fingerprinted source query arity')
+            for child, family in zip(children, shape):
+                validate_type(doc, child, family)
+            fields = doc.values()[0][2]
+            require(all(re.fullmatch('[0-9a-f]{64}',text(value)) for value in fields[:2 if tag==302 else 3]),
+                    'source query SHA-256 spelling')
+            if tag == 303:
+                require(not list_values(value_node(fields[3],240,8)[3]), 'inline data in contextual header')
         else: raise Invalid('closed query envelope tag')
     return doc
+
+
+def verify_source_result(doc):
+    """Hash the bounded canonical result independently of the production writer."""
+    _, tag, fields = doc.values()[0]
+    if tag == 303:
+        ref, key, result, header, body = fields
+        material = (key, ref, header, body)
+    elif tag == 302:
+        key, result, unit = fields
+        material = (key, unit)
+    else:
+        raise Invalid('missing source result fingerprint')
+    raw = tree_document([('node',304,material)],schema=2)
+    require(hashlib.sha256(raw).hexdigest() == text(result),'source result fingerprint')
+    return text(key)
 
 
 def cache_snapshot(root, active_hashes):
@@ -163,9 +190,19 @@ def cache_snapshot(root, active_hashes):
     for key in active_hashes:
         require(re.fullmatch('[0-9a-f]{64}',key) is not None,'query filename digest')
         name=key+'.mlfq'; require(name in files,'reachable record exists');raw=(root/name).read_bytes()
+        full=None
         if raw.startswith(MAGIC):
             doc=inspect_artifact(raw,2);value=doc.values()[0];details[name]=doc.accounting()
-            if value[1]==300:
+            if value[1] in (302,303):
+                require(verify_source_result(doc)==key, 'stored fingerprint matches source query filename')
+                representation='MLFBIN-QUERY-INLINE-2'
+                if value[1]==303:
+                    digest=text(value[2][0]); context='context-'+digest+'.mlfqc'
+                    require(context in files and files[context]['sha256']==digest,'context exact physical SHA256')
+                    cdoc=inspect_artifact((root/context).read_bytes(),1)
+                    contexts.add(context); details[context]=cdoc.accounting()
+                    representation='MLFBIN-QUERY-SHARED-2'
+            elif value[1]==300:
                 full=text(value[2][0]); representation='MLFBIN-QUERY-INLINE-1'
             else:
                 ref,compact,_,_=value[2];digest=text(ref);context='context-'+digest+'.mlfqc'
@@ -188,7 +225,8 @@ def cache_snapshot(root, active_hashes):
                 require(len(carrier)==2 and carrier[0]=='MLF-SOURCE-QUERY-CONTEXT-1' and len(compact)==8,'legacy context/key shape')
                 full=pack(compact[:5]+[carrier[1]]+compact[5:]);contexts.add(context)
             else:full=fields[1]
-        require(hashlib.sha256(full.encode('utf-8')).hexdigest()==key,'unchanged full logical source/query SHA filename')
+        if full is not None:
+            require(hashlib.sha256(full.encode('utf-8')).hexdigest()==key,'unchanged full logical source/query SHA filename')
         records[name]=representation
     reachable=set(records)|contexts;others=set(files)-reachable
     return dict(inventory, all_cache_logical_bytes=inventory['all_logical_bytes'],

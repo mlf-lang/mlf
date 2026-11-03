@@ -40,9 +40,9 @@
     "shared-sources.json"
   ],
   "current_files": {
-    "bootstrap/MLF/BuiltinPreludeData.hs": "642ef051070c2e3a59ad22d228b0eeb106b8704707853edc048c365b63b2dd63",
+    "bootstrap/MLF/BuiltinPreludeData.hs": "26f4d0e33303a6df0d58ffc19c32da1cd4280cec3bad7e2b9dabc9231de6158d",
     "bootstrap/MLF/Entry/BuiltinPrelude.hs": "740f515891b0a77e8139906a16917d14ca043cb098b5e2c617f3b04c2252ca92",
-    "bootstrap/MLF/Entry/Emlf.hs": "d52b9ba6295b31ef4686291e80c2fbdeba9d669c6f2eb362ed41c9787f9cfda3",
+    "bootstrap/MLF/Entry/Emlf.hs": "1139acc16fbc54d5f832e87a0791788e49dc987bf71bdb5614f110206d71ce91",
     "bootstrap/MLF/NativeBuild.hs": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
     "bootstrap/MLF/PreparedCompiler.hs": "b36a1e3f8caa566fce8b0cb1b134a1a13dcfd4bab60bb61d4afb279a2a4a93bd",
     "bootstrap/MLF/PreparedLibraryData.hs": "eececfa9f5b0ef2901e749b4a1798ac2cf78bea3378d9e33fcbc0a0ded94c6b1",
@@ -74,14 +74,14 @@
     "libraries/mlf-async/mlf-package.json": "15e9ac789b283257d3ff3f1ab3053f03430859a6cbadd621d214f113994778ff",
     "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs": "b131cfa9edf6b3b08762ed5420150ac1542617c9cf46e912fff60ecd381bc218",
     "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs": "337d5eebf8d1eda3a750f07cc865e25ffe63716719eb133b36aec313b97748e3",
-    "libraries/mlf-crates/Bootstrap/Bitstream.hs": "e7174a070363ea28c649553b4d27b230cc5c78a4641a721febf21e24e78a1b5e",
+    "libraries/mlf-crates/Bootstrap/Bitstream.hs": "c4e03268a4304b7a38af776eb43a9d06a0205b9b213d37582e0a0e17432118aa",
     "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs": "1961cf629b1d6e4cc1956489d0f1f028907b3584b4c3ae0fec1fc34626f856ee",
     "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs": "6a8767a44343e5528e2bd34927b72f5d8aa1016da3545d28c144276b1d056f8d",
     "libraries/mlf-crates/Bootstrap/Crate.hs": "2a5a614103afb126f8dc1ed7fe286ced827f9f87471eade176b1610a25768df1",
     "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": "80e484184b84f6e78276f7dc8ff8c0e97cfeeab1370dd839dd7bc75c8a56eb0c",
     "libraries/mlf-crates/Bootstrap/CrateCodegen.hs": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
-    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "c11de145cafde5651f1dd8fbb2d5e178a75973f75546c4084c7a087aca648ae1",
-    "libraries/mlf-crates/Bootstrap/CrateSession.hs": "5c7e2e09cdd149f38bf70a051602a661dd3b13912666ee0a47b6f3f80f461de4",
+    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "06f67a33ea91ae908e084d986b24df309ebbd94747af4e44f8969a64b6217134",
+    "libraries/mlf-crates/Bootstrap/CrateSession.hs": "4cd42c85ef4ca94498c8532440fa91ccebd2c2660056c7271630dce9e7efd2cd",
     "libraries/mlf-crates/Bootstrap/ImportParameters.hs": "16efe338a956ef66deda14c67251b999dc7934cbe5bd7dfffebbec8b03a2fbcf",
     "libraries/mlf-crates/Bootstrap/ImportedRoot.hs": "345418996f5ceaea45afdca54b614d506803bf583f3113ce6e5042727f48d7dc",
     "libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "67717b726ec69df1a9a2615bf3a7e45ae5c3ff7ebe6a6bea62a44215760efb7b",
@@ -172,7 +172,7 @@
     "libraries/mlf-xmlf/mlf-package.json": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3",
     "mlf-package.json": "f5f51c2b2954516c86ead23f7a6054d5d317285b47b0982dabcc0269d56bd52f",
     "mlf-shared.cabal": "c339f7b16bcd1e5ed73b5e5affff7315a1b9c6bb93c960073279e0cbfc9196ea",
-    "mlf.lock": "2d6a30644af9d2dda904a19121a51beb5c980b554d74bdd510781e3445ffc278",
+    "mlf.lock": "7c3dfc935cb1a3c88be62875d96f51f059f173db87336174578eaee42c25e136",
     "package/MLF/Entry/Mlfpkg.hs": "26dab5260f36e5d67ba85d4c74ab4cad6bd76b8772056ea1f22d7e9ea0264711",
     "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
     "runtime/mlf_build_runner_hash.h": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -233,7 +233,7 @@
     "tools/shared/verify_builtin_prelude.py": "778fedebd6a038b6d1b67026f5ca8a4f0da1c13e126948f428b9f912fcacf07d",
     "tools/shared/verify_prepared_libraries.py": "e22b3df44b822ff9fa2339379d7796b7f6970854c283900a916c555244960dce"
   },
-  "current_inventory_sha256": "7b2066df11cc01afbc816df852adf38b577929f0284b48940f43074585ea85e9",
+  "current_inventory_sha256": "2c76ceb4b4cf208d5ece1d304c8dcaeef4e9d113d8f6bafb1e3065be4a4b07ae",
   "current_registry": {
     "Async.Process": "482169c6d92a16b5a3071088ec24ee7206324995f8e69f6df073cc24559fcb73",
     "Async.Process.Internal": "ef551f51dcf7da4b48e49f2807e2d5efe84c009cfa911913402c493fce7a25bc",
@@ -242,7 +242,7 @@
     "Async.Task.Internal": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00",
     "Bootstrap.ArtifactStorage": "b131cfa9edf6b3b08762ed5420150ac1542617c9cf46e912fff60ecd381bc218",
     "Bootstrap.ArtifactStructure": "337d5eebf8d1eda3a750f07cc865e25ffe63716719eb133b36aec313b97748e3",
-    "Bootstrap.Bitstream": "e7174a070363ea28c649553b4d27b230cc5c78a4641a721febf21e24e78a1b5e",
+    "Bootstrap.Bitstream": "c4e03268a4304b7a38af776eb43a9d06a0205b9b213d37582e0a0e17432118aa",
     "Bootstrap.BuiltinPreludeContext": "1961cf629b1d6e4cc1956489d0f1f028907b3584b4c3ae0fec1fc34626f856ee",
     "Bootstrap.BuiltinPreludeLiteral": "6a8767a44343e5528e2bd34927b72f5d8aa1016da3545d28c144276b1d056f8d",
     "Bootstrap.ClassDemand": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
@@ -253,8 +253,8 @@
     "Bootstrap.Crate": "2a5a614103afb126f8dc1ed7fe286ced827f9f87471eade176b1610a25768df1",
     "Bootstrap.CrateArtifact": "80e484184b84f6e78276f7dc8ff8c0e97cfeeab1370dd839dd7bc75c8a56eb0c",
     "Bootstrap.CrateCodegen": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
-    "Bootstrap.CrateQuery": "c11de145cafde5651f1dd8fbb2d5e178a75973f75546c4084c7a087aca648ae1",
-    "Bootstrap.CrateSession": "5c7e2e09cdd149f38bf70a051602a661dd3b13912666ee0a47b6f3f80f461de4",
+    "Bootstrap.CrateQuery": "06f67a33ea91ae908e084d986b24df309ebbd94747af4e44f8969a64b6217134",
+    "Bootstrap.CrateSession": "4cd42c85ef4ca94498c8532440fa91ccebd2c2660056c7271630dce9e7efd2cd",
     "Bootstrap.Data": "a5dd15a451fa0d4123501d45ec17f9930abffc85dd571ab0ac50650733f6bcb7",
     "Bootstrap.Dependency": "5d0082ace3184c213c53f34d9259437506fa3db368d646b3599162018f7db27d",
     "Bootstrap.Desugar": "087d3e310dbd218800d56a77bce8f861981542089f5cd260c04264bf3c33c388",
@@ -318,10 +318,10 @@
     "Bootstrap.X.Pretty": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
     "Bootstrap.X.Syntax": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
     "Bootstrap.X.Type": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
-    "MLF.BuiltinPreludeData": "642ef051070c2e3a59ad22d228b0eeb106b8704707853edc048c365b63b2dd63",
+    "MLF.BuiltinPreludeData": "26f4d0e33303a6df0d58ffc19c32da1cd4280cec3bad7e2b9dabc9231de6158d",
     "MLF.Entry.BuiltinPrelude": "740f515891b0a77e8139906a16917d14ca043cb098b5e2c617f3b04c2252ca92",
     "MLF.Entry.CompilerTests": "45d7fdabe9d3ed340442f4154a7e953ff7df7279b788570d7e976b1d22c41695",
-    "MLF.Entry.Emlf": "d52b9ba6295b31ef4686291e80c2fbdeba9d669c6f2eb362ed41c9787f9cfda3",
+    "MLF.Entry.Emlf": "1139acc16fbc54d5f832e87a0791788e49dc987bf71bdb5614f110206d71ce91",
     "MLF.Entry.Mlfpkg": "26dab5260f36e5d67ba85d4c74ab4cad6bd76b8772056ea1f22d7e9ea0264711",
     "MLF.Entry.TupleList": "e817f6037216da8cff7d615e617adcccd58bf687b6e9dacc3155ad8e4a9f6bd8",
     "MLF.NativeBuild": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
@@ -367,13 +367,13 @@
     "Tests.TupleList": "2ff183466ff22c3627aa58f0b73d9503ef1dc979f7b0e9c1f7744cd9933996f8",
     "Tests.TupleListLegacy": "60176aca5512cf858f1c5fcde5819741a28073b4b504049a301a54f0492ab6b0"
   },
-  "current_registry_sha256": "244cb40ec7536e174f3f48ac5c18ce9dc8d006851abe7171d391895b93152f0c",
+  "current_registry_sha256": "869fa7f723d9cf2c14a9c6aaa9487dd9df599893755039fc0c3f97c5d7ae8f2d",
   "deltas": {
     "bootstrap/MLF/BuiltinPreludeData.hs": {
       "file": "deltas/000.json",
-      "new": "642ef051070c2e3a59ad22d228b0eeb106b8704707853edc048c365b63b2dd63",
+      "new": "26f4d0e33303a6df0d58ffc19c32da1cd4280cec3bad7e2b9dabc9231de6158d",
       "old": "4f296f9009fad3b75842125f0107e5aefc2591a5fe26b4c53aac4a95aed32236",
-      "sha256": "b7d97fe31696399c93b4a880ef511734b5e21b741f579edb37a833be8f47c0de"
+      "sha256": "2d7d4f246590dbe164bd618a7577b2325805c60ee53b316522ad7d808017e26a"
     },
     "bootstrap/MLF/Entry/BuiltinPrelude.hs": {
       "file": "deltas/031.json",
@@ -383,9 +383,9 @@
     },
     "bootstrap/MLF/Entry/Emlf.hs": {
       "file": "deltas/028.json",
-      "new": "d52b9ba6295b31ef4686291e80c2fbdeba9d669c6f2eb362ed41c9787f9cfda3",
+      "new": "1139acc16fbc54d5f832e87a0791788e49dc987bf71bdb5614f110206d71ce91",
       "old": "d5da6a564e6227a65ddb88a0c328495256e0ad817ca94f32957ba2d64b13ee19",
-      "sha256": "e58973f4c145a07dc99e4e9ba484c7ed8782961ed6328e748f8cb7af33b47f05"
+      "sha256": "fcdba54319b00afbec5c577ccae4e322dc454a23b67bba0e391750519aff760b"
     },
     "bootstrap/MLF/PreparedCompiler.hs": {
       "file": "deltas/001.json",
@@ -437,15 +437,15 @@
     },
     "libraries/mlf-crates/Bootstrap/CrateQuery.hs": {
       "file": "deltas/009.json",
-      "new": "c11de145cafde5651f1dd8fbb2d5e178a75973f75546c4084c7a087aca648ae1",
+      "new": "06f67a33ea91ae908e084d986b24df309ebbd94747af4e44f8969a64b6217134",
       "old": "3b3b7a5de8b1f83b0a369e9a47ead5666d1169490e5466e2d8a9983b20eeb8b9",
-      "sha256": "6405546959532b590125a0b79525a1822799854ecc0caca29afc61b8a08d77c6"
+      "sha256": "625026e64769f2c885e4e48389d647ebb2295eef41aeca281637d29f7c49efd7"
     },
     "libraries/mlf-crates/Bootstrap/CrateSession.hs": {
       "file": "deltas/010.json",
-      "new": "5c7e2e09cdd149f38bf70a051602a661dd3b13912666ee0a47b6f3f80f461de4",
+      "new": "4cd42c85ef4ca94498c8532440fa91ccebd2c2660056c7271630dce9e7efd2cd",
       "old": "e3002483e06d189b31e3d93e876618c0a65fc807be654f6757452f087088e2a1",
-      "sha256": "3b437618590df83a4d7d143a22273df393e95a9b8573e29ab1d080dbb0072158"
+      "sha256": "5e307eccf2862fd1111035bfaf2fa417aa4b2ee6c2059933cd09d914c223a314"
     },
     "libraries/mlf-crates/Bootstrap/InferenceUnit.hs": {
       "file": "deltas/030.json",
@@ -539,9 +539,9 @@
     },
     "mlf.lock": {
       "file": "deltas/024.json",
-      "new": "2d6a30644af9d2dda904a19121a51beb5c980b554d74bdd510781e3445ffc278",
+      "new": "7c3dfc935cb1a3c88be62875d96f51f059f173db87336174578eaee42c25e136",
       "old": "123f426bda8ed1ede2bebce0b1c74e3c37e995f3ba0ace7c091c6d4f41a5379a",
-      "sha256": "dadb6ab51ba436eb205a3acce2ac4aed1b4713aae6976852b13fc1cd0dddc919"
+      "sha256": "9c6953a3d00639186ef46a2dfdeff7c54f0ef4f12defb6da1a18d5a3bfec5812"
     },
     "runtime/mlf_runtime.c": {
       "file": "deltas/025.json",
@@ -565,17 +565,17 @@
   "format": "binary-source-migration-v1",
   "generation": {
     "compiler": {
-      "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/emlf",
-      "sha256": "859f616131ef55368be2b023f1ebcf1781c09fc80fdc558f2ddf29d76d89c4d8"
+      "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/bin/emlf",
+      "sha256": "5a157d62fc142bfb51c8bc163474d89a4bda7588816f317f235670fcdcdb0210"
     },
     "generator": {
-      "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/builtin-prelude",
-      "sha256": "02aff841f11817911479f0ab693db87492a149efb6281ccb6ce6d057437f0c0e"
+      "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/bin/builtin-prelude",
+      "sha256": "74db2554c9472e2b540ae53aca9f7c5f17ffc97073106bd9da713af0040bd4ca"
     },
     "literal_sha256": "6a8767a44343e5528e2bd34927b72f5d8aa1016da3545d28c144276b1d056f8d",
-    "output_sha256": "642ef051070c2e3a59ad22d228b0eeb106b8704707853edc048c365b63b2dd63",
-    "receipt_sha256": "85f90fb36b4867c1d5028092d521635c2196217fa9e846ffac260e3ea9b56619",
-    "source_identity": "builtin-source-v1:e53165c558f48854166134fa80b5fd4fac4341a529764af0defdb66145671cef"
+    "output_sha256": "26f4d0e33303a6df0d58ffc19c32da1cd4280cec3bad7e2b9dabc9231de6158d",
+    "receipt_sha256": "f286ade3f62f7283182fc2862159dc4f30e31630981d22aa8367a69c0ae63b71",
+    "source_identity": "builtin-source-v1:cb00133a43241908b1a5022ff452cba89b49e03eedcd917ddac26f8860a5292d"
   },
   "maintenance": {
     "a1-private-index/test_current.py": {
@@ -586,15 +586,15 @@
     },
     "patricia/adapt_oracles.py": {
       "file": "maintenance-deltas/001.json",
-      "new": "aa34411546e5acca0a3706df881a36ec9918e73b14f30353b39521523dadc5bc",
+      "new": "5e5cab65731a2a1f62fe5fda55934c6086053e9050a64e42b250a320832e617d",
       "old": "ab2e55b49aab5c25b4e5e560f40a78b436bde419485f84a466a1036fbfac9588",
-      "sha256": "0f84696884a1de91ba499be31c31beba910fb525d6851a6765d01441f7b1920f"
+      "sha256": "52889d6758a29ccecfbdd5da2836d156735c9c762790ea0e059db9ea34cd6194"
     },
     "patricia/run_integrated.py": {
       "file": "maintenance-deltas/002.json",
-      "new": "81349812ecd1778411caf9f11c7e5a8efd5c71a9babad93564ee55c052d011af",
+      "new": "f259a173fcc647ca910a4a5bf788280c16d6b7a83bff001fa500da027cd4e177",
       "old": "58f062de7bb7b676e0ada316f031f1c16fba0143bd382c76a1551aab1b39ac3d",
-      "sha256": "2cff972a174a815adfe88971a4be90027a75471b96c9316fc5fbfbe56242318b"
+      "sha256": "a3c458f4463401b12d5e9481d7d31c16e57c502ac133712d21989544dfc8ec67"
     },
     "patricia/source_migration.py": {
       "file": "maintenance-deltas/003.json",
@@ -604,9 +604,9 @@
     },
     "patricia/test_adapters.py": {
       "file": "maintenance-deltas/004.json",
-      "new": "ee23fa9331b74c737b01b18a98d01bf4d55497ba133af3df55b0a4e4a459f3d5",
+      "new": "eb6ef6bebc35c8ec547f7c7be4614fb2e8d93bcfa068498d38854cb0f93620ce",
       "old": "5016cf9f5646139bc8a1f3dc3783b7e898ebc65f9a2600a5826ed059803cac5d",
-      "sha256": "59c9406d0d78ae5ea91703b14ab50f39b18f9bbffbe8316de4a6ca5a96f8ee87"
+      "sha256": "f47b60023de7b01ec30a3885323da7364a01e41d6e2e17b130ad5fb302455070"
     },
     "validation-reuse/test_contract.py": {
       "file": "maintenance-deltas/005.json",

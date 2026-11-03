@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Prelude
+import SourceKeyWitness (sourceKeys, fullKey)
 import Control.Monad(foldM,unless)
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Std as Std
@@ -73,18 +74,19 @@ closed ds values parameters rhs=
  in T.XWithData ds(foldr(\(n,term)b->T.XLet n term b)rhs bindings)
 -- Read the actual default binary raw record. The compact key has no user
 -- context field. Verify its carrier, then use normal checked-record admission.
-decodeRawSourceCache cache digest final=do
+decodeRawSourceCache keys cache digest final=do
  let iface=U.objectInterface final; ds=U.unitData iface; name=U.unitName iface
      file=B.literal(cache++"/"++B.unpack digest++".mlfq")
  input<-Storage.read 2 file >>= expect "raw record wire"
  graph<-case input of Storage.BinaryInput g->pure g; _->error "expected binary source record"
  query<-expect "shared source record"(Q.binaryQuery graph)
  case query of
-  Q.BinaryShared ref fields _ bodyIndex->do
+  Q.LocalQuery stored result (Q.SharedPayload ref _ bodyIndex)->do
    assert "source context reference is a safe SHA"(Q.validSourceContextDigest ref)
    actual<-Prim.fileDigest(Q.sourceContextPath(B.literal cache)ref)
    assert "actual source context SHA"(actual==ref)
-   key<-expect "restore complete source key"(Q.restoreSourceCacheKey(Q.encodeSourceDatatypes ds)(U.pack fields))
+   key<-fullKey keys digest
+   assert "stored input and result fingerprints" (stored==digest && Q.validSourceContextDigest result)
    body<-expect "raw parameter spine"(Structure.fromGraphXTerm graph bodyIndex)
    let parameters=[(X.nameHint n,ty)|(n,ty)<-fst(U.splitParameters body)]
    (_,_,decoded)<-Q.readBinarySourceGraph [] (B.literal cache) key name parameters ds (map fst(U.unitBindings iface)) graph
@@ -113,7 +115,8 @@ main=do
  let plan=case rawPlan of SI.SourcePlan a b c d e f g _ i j -> SI.SourcePlan a b c d e f g (error "POISON old global lowering forced") i j
  (objects,cold,contracts)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "cold source SCC compilation"
  assert "cold inferred all groups" (Q.inferredCount cold==fromIntegral(length(SI.planGroups plan))&&Q.reusedCount cold==0)
- mapM_ (\(key,object) -> decodeRawSourceCache cache key object >>= checkBindingInventory . snd)
+ keys<-sourceKeys "dispatch" plan [] M.empty contracts
+ mapM_ (\(key,object) -> decodeRawSourceCache keys cache key object >>= checkBindingInventory . snd)
    (zip (Q.queryKeys cold) objects)
  values<-foldM collect [] objects
  mapM_ (\(n,_,wanted,slots)->if n=="signedUse" then pure() else do
@@ -129,7 +132,7 @@ main=do
      [(groupId,digest)]=[(gid,digest)|Q.GroupResult gid names _ _ digest<-reports,names==["sameDeps"]]
      [compact]=[obj|obj<-objects,U.unitName(U.objectInterface obj)==groupId]
      cacheFile=cache++"/"++B.unpack digest++".mlfq"
- (exactKey,rawObject)<-decodeRawSourceCache cache digest compact
+ (exactKey,rawObject)<-decodeRawSourceCache keys cache digest compact
  let rawIface=U.objectInterface rawObject
  let rawParameters=map(\(n,t)->(X.nameHint n,t))(fst(U.splitParameters(strip(U.objectTerm rawObject))))
  _<-expect "counterexample generic validator accepts compact with same dependency context"(Q.decodeCached exactKey groupId rawParameters (U.unitData rawIface) ["sameDeps"] (Q.encodeCached exactKey compact))
@@ -230,7 +233,8 @@ supportProtectionChecks cache=do
  let Q.QueryReport _ _ rows=report
      [(gid,digest)]=[(gid,digest)|Q.GroupResult gid ns _ _ digest<-rows,ns==["guarded"]]
      [final]=[o|o<-objects,U.unitName(U.objectInterface o)==gid]
- (_,raw)<-decodeRawSourceCache cache digest final
+ keys<-sourceKeys "managed-support" plan [] M.empty contracts
+ (_,raw)<-decodeRawSourceCache keys cache digest final
  assert "selected managed proof veto preserves exact original object"(U.encodeObject raw==U.encodeObject final)
  values<-foldM collect [] objects
  evaluate(vb(lookupValue values "safeBool"))>>=assert "safe proof runtime".(==42)
