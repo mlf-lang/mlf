@@ -230,7 +230,8 @@ class AdapterTests(unittest.TestCase):
             solver.write_bytes(prebinary_read_bytes(ROOT/solver.relative_to(root)))
             path = root/'libraries/mlf-crates/Bootstrap/CrateSession.hs'
             path.parent.mkdir(parents=True)
-            for index,source in enumerate(['', 'module Bootstrap.CrateSession (compileSpecFile) where {\n'*2]):
+            for index,source in enumerate(['', (graph.LIVE_SESSION_HEADER+'\n')*2,
+                                           'module Bootstrap.CrateSession (compileSpecFile) where {\n']):
                 path.write_text(source)
                 with self.assertRaisesRegex(ValueError, 'unique private header'):
                     graph.prepare(root,root/('out'+str(index)))

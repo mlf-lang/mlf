@@ -152,7 +152,8 @@ def main():
     # Prevent loader cache files in the authenticated source tree.
     sys.dont_write_bytecode = True
     python = regular(Path(sys.executable).resolve(strict=True))
-    inputs = [regular(__file__), fixture, controls, *inspectors, build_path, direct_path,
+    witness = regular(source / 'tools/shared/fixtures/item4/SourceKeyWitness.hs')
+    inputs = [regular(__file__), fixture, witness, controls, *inspectors, build_path, direct_path,
               regular(source / 'host/ghc/cbits/host.c'),
               regular(source / 'runtime/mlf_process_supervisor.c'),
               regular(source / 'runtime/mlf_byte_file.h'),
@@ -229,8 +230,12 @@ def main():
             flags.extend(['-package', package])
         ghc, cc = producer['ghc']['path'], producer['cc']['path']
         main_object, main_interface = output / 'SourceContextCache.o', output / 'SourceContextCache.hi'
+        witness_object = output / 'SourceKeyWitness.o'
+        witness_interface = output / 'SourceKeyWitness.hi'
+        runner.run('compile-key-witness', [ghc, '-c', *flags, *build.EXHAUSTIVENESS_FLAGS,
+            '-i', '-i' + str(producer_dir / 'objects'), '-o', witness_object, '-ohi', witness_interface, witness], timeout=120)
         runner.run('compile-fixture', [ghc, '-c', *flags, *build.EXHAUSTIVENESS_FLAGS,
-            '-i', '-i' + str(producer_dir / 'objects'), '-o', main_object, '-ohi', main_interface, fixture], timeout=120)
+            '-i', '-i' + str(producer_dir / 'objects'), '-i' + str(output), '-o', main_object, '-ohi', main_interface, fixture], timeout=120)
         transport = []
         for name, relative in [('host', 'host/ghc/cbits/host.c'), ('supervisor', 'runtime/mlf_process_supervisor.c')]:
             obj = output / (name + '.o')
@@ -241,9 +246,9 @@ def main():
                         if name.endswith('.o') and name != 'objects/Main.o']
         require(link_objects, 'no authenticated linkable producer objects')
         binary = output / 'source-context-cache'
-        runner.run('link-fixture', [ghc, *flags, '-rtsopts=ignoreAll', main_object,
+        runner.run('link-fixture', [ghc, *flags, '-rtsopts=ignoreAll', main_object, witness_object,
                    *link_objects, *transport, '-o', binary], timeout=120)
-        artifacts.update({str(path): sha(path) for path in [binary, main_object, main_interface, *transport]})
+        artifacts.update({str(path): sha(path) for path in [binary, main_object, main_interface, witness_object, witness_interface, *transport]})
         record['artifacts'] = artifacts
         save()
         inner = output / 'controls'

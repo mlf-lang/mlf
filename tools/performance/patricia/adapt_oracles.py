@@ -7,6 +7,9 @@ def require(value,message):
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 
+# Exact public surface of the authenticated live owner. Frozen projected
+# sessions still have the historical compileSpecFile-only module header.
+LIVE_SESSION_HEADER = 'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification) where {'
 RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
 OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
 NEW_INDEX = b'Rank.indexMap selected'
@@ -136,7 +139,7 @@ def prepare(root,out):
     # Preserve the public adapter's pure header failure before full source
     # admission or any output. Positive inputs still pass the entire binary gate.
     header_source=(root/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_text()
-    require(header_source.count('module Bootstrap.CrateSession (compileSpecFile) where {')==1
+    require(header_source.count(LIVE_SESSION_HEADER)==1
             and 'module SessionUnderTest where {' not in header_source,'unique private header')
     # Admit binary131 bytes; runtime test copies below remain entirely current.
     binary_contract(root).live_registry(root)
@@ -205,7 +208,7 @@ def prepare(root,out):
         require(''.join(difflib.restore(difference,2))==s,'exact adapted inverse')
         (out/(name+'.ndiff')).write_text(''.join(difference))
         changes.append({'source':str(path),'source_sha256':sha(original.encode()),'adapted':str(out/name),'adapted_sha256':sha(raw),'algorithm_body_unchanged':frozen,'inverse_verified':True})
-    owner=root/'libraries/mlf-crates/Bootstrap/CrateSession.hs';s=owner.read_text();before='module Bootstrap.CrateSession (compileSpecFile) where {';after='module SessionUnderTest where {'
+    owner=root/'libraries/mlf-crates/Bootstrap/CrateSession.hs';s=owner.read_text();before=LIVE_SESSION_HEADER;after='module SessionUnderTest where {'
     require(s.count(before)==1 and after not in s,'unique private header')
     adapted=s.replace(before,after);require(adapted.replace(after,before)==s,'private header inverse')
     (out/'SessionUnderTest.hs').write_text(adapted)

@@ -27,8 +27,10 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def compile_crate(binary, spec, prefix):
+def compile_crate(binary, spec, prefix, verify_all=False):
     argv = [str(binary), '--compile-crate', str(spec), '-o', str(prefix)]
+    if verify_all:
+        argv.insert(1, '-Zincremental-verify-ich')
     env = dict(os.environ, GHCRTS='', GHC_ENVIRONMENT='-', LANG='C.UTF-8', LC_ALL='C.UTF-8', TZ='UTC')
     with prefix.with_suffix('.stdout').open('xb') as out, prefix.with_suffix('.stderr').open('xb') as err:
         start = time.monotonic_ns()
@@ -50,7 +52,8 @@ def compile_crate(binary, spec, prefix):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('pr25', type=Path)
+    parser.add_argument('baseline', type=Path)
+    parser.add_argument('--baseline-label', choices=['25','32'], default='25')
     parser.add_argument('candidate', type=Path)
     parser.add_argument('foundation', type=Path, help='mlf-foundation directory from the PR 25 checkout')
     parser.add_argument('output', type=Path, help='new, empty study directory')
@@ -59,7 +62,7 @@ def main():
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    binaries = {'25': args.pr25.resolve(strict=True), 'candidate': args.candidate.resolve(strict=True)}
+    binaries = {args.baseline_label: args.baseline.resolve(strict=True), 'candidate': args.candidate.resolve(strict=True)}
     sources = output / 'input'
     shutil.copytree(args.foundation.resolve() / 'Bootstrap', sources / 'Bootstrap')
     modules = [('Bootstrap.' + f.stem, f) for f in sorted((sources / 'Bootstrap').glob('*.hs'))]
@@ -81,7 +84,7 @@ def main():
                 seed_spec.write_text(crate_spec([('Bootstrap.Version', version)], 'seed', seed / 'cache', seed / 'builtin/unit'))
                 compile_crate(binary, seed_spec, seed / 'unit')
                 shutil.copytree(seed / 'builtin', output / ('builtin-' + arm))
-    order = ['25', 'candidate', 'candidate', '25']
+    order = [args.baseline_label, 'candidate', 'candidate', args.baseline_label]
     record = dict(order=order, first_install=args.first_install, complete=False, binaries={k: digest(v) for k, v in binaries.items()},
                   sources={n: digest(f) for n, f in modules}, samples=[])
     def save():

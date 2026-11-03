@@ -20,10 +20,13 @@ expect (T.Left message) = fail (B.unpack message)
 expect (T.Right a) = pure a
 
 main = runEntry $ do
-  [mode, path, expected] <- getArgs
+  args <- getArgs
+  (mode,path,expected,compiler) <- case args of
+    [m,p,e] -> pure (m,p,e,B.literal (replicate 64 'a'))
+    [m,p,e,identity] | Q.validSourceContextDigest (B.literal identity) -> pure (m,p,e,B.literal identity)
+    _ -> fail "expected MODE PATH HIT-OR-MISS [COMPILER-SHA]"
   let fixed = "MLF-SOURCE-CRATE-QUERY-7"
       cache = B.literal path
-      compiler = B.literal (replicate 64 'a')
   case (mode,U.unpack Q.sourceQueryFormat) of
     ("original",_) | Q.sourceQueryFormat == fixed -> pure ()
     ("changed",T.Right [tag,literal]) | tag == fixed && P.stringLength literal > 0 -> pure ()

@@ -85,7 +85,8 @@ def main():
                     if rank_view:previous=A.with_rank_view(previous)
                     H.require(H.sha(source/V.CONSTRAINT)==V.CONSTRAINT_SHA,'unchanged generated constraint owner')
                     for name,data in [('V1FrozenSession',previous),('V1SessionUnderTest',raw)]:
-                        old_header=b'module Bootstrap.CrateSession (compileSpecFile) where {'
+                        old_header=(A.LIVE_SESSION_HEADER.encode() if name=='V1SessionUnderTest' else
+                                    b'module Bootstrap.CrateSession (compileSpecFile) where {')
                         new_header=('module '+name+' where {').encode()
                         H.require(data.count(old_header)==1,'one private session header')
                         changed=data.replace(old_header,new_header)
