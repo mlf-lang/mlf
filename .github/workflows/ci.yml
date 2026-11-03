@@ -224,6 +224,11 @@ jobs:
         if: matrix.optimization == '2'
         run: |
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/permission-view-guard python3 -B tools/performance/permission-view/run_controls.py --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/permission-view-20261101/ci-controls
+      - name: Check private-owner header adapters
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/performance/c3-delayed-index/test_private_owner_headers.py
+          python3 -O -B tools/performance/c3-delayed-index/test_private_owner_headers.py
       - name: Check delayed fresh indexes against frozen private session
         if: matrix.optimization == '2'
         run: |

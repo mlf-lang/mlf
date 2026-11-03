@@ -23,6 +23,30 @@ EXTRA_SOURCES=[]
 EXTRA_PINS=[]
 
 
+LEGACY_OWNER_HEADER=b'module Bootstrap.CrateSession (compileSpecFile) where {'
+
+
+def adapt_private_owner(raw,name,live_header):
+    """Rename only the exact role-specific owner header, retaining every body byte."""
+    if type(raw) is not bytes or type(live_header) is not bytes:
+        raise RuntimeError('private-owner headers require bytes')
+    if name not in ('LegacySession','CandidateSession'):
+        raise RuntimeError('unknown private-owner role')
+    old=LEGACY_OWNER_HEADER if name=='LegacySession' else live_header
+    new=('module '+name+' where {').encode()
+    # The live literal comes from the authenticated Patricia adapter, after prepare().
+    # Anchor it as a complete declaration, not a substring in a comment or export list.
+    declarations=re.findall(rb'(?m)^[ \t]*module\s+([A-Z][\w.]*)\b',raw)
+    if (not old or raw.count(old)!=1 or new in raw
+            or declarations!=[b'Bootstrap.CrateSession']
+            or not re.search(rb'(?m)^'+re.escape(old)+rb'$',raw)):
+        raise RuntimeError('unique private-owner header')
+    changed=raw.replace(old,new,1)
+    if changed.count(new)!=1 or changed.replace(new,old,1)!=raw:
+        raise RuntimeError('module/export-header-only adaptation')
+    return changed
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--producer',type=Path,required=True)
@@ -63,11 +87,7 @@ def main():
             frozen=subprocess.check_output(['git','show',BASELINE+':'+OWNER],cwd=ROOT)
             H.require(hashlib.sha256(frozen).hexdigest()==BASELINE_SHA,'frozen full private-owner oracle')
             for name,raw in [('LegacySession',frozen),('CandidateSession',(ROOT/OWNER).read_bytes())]:
-                old=b'module Bootstrap.CrateSession (compileSpecFile) where {'
-                new=('module '+name+' where {').encode()
-                H.require(raw.count(old)==1 and new not in raw,'unique private-owner header')
-                changed=raw.replace(old,new)
-                H.require(changed.replace(new,old)==raw,'module/export-header-only adaptation')
+                changed=adapt_private_owner(raw,name,A.LIVE_SESSION_HEADER.encode())
                 (src/(name+'.hs')).write_bytes(changed)
             shutil.copy2(HERE/'Main.hs',src/'Main.hs')
             for source,name,before,after in EXTRA_SOURCES:
