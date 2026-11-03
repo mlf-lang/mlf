@@ -90,8 +90,8 @@ def builtin_datatypes():
     evidence=data('MLFStackEvidence',[],constructor('MLFStackEvidence',applied('MLFCallStack')))
     return [data('MLFLegacyUnit',[],constructor('MLFLegacyUnit')),*source[:5],stack,evidence,*source[5:]]
 
-def logical_context(declarations):
-    """Independent source-v6 datatype identity, including frozen builtin families.
+def logical_context(declarations, key_format):
+    """Independent datatype projection of the complete v6 or v7 source query key.
     This is a logical key oracle; it is never stored as a binary payload.
     """
     def tagged(tag,*fields): return pack([tag,*fields])
@@ -131,7 +131,9 @@ def logical_context(declarations):
             cname,fields=value_node(constructor,25,2)
             cs.append(tagged('constructor',text(cname),pack([field(canonical_field(x,scope,len(binders))) for x in list_values(fields)])))
         return tagged('data',text(name),ps,pack(cs))
-    return pack([data(x) for x in [*builtin_datatypes(),*declarations]])
+    require(key_format in ('MLF-SOURCE-CRATE-QUERY-6','MLF-SOURCE-CRATE-QUERY-7'), 'known source key format')
+    builtins = builtin_datatypes() if key_format == 'MLF-SOURCE-CRATE-QUERY-6' else []
+    return pack([data(x) for x in [*builtins,*declarations]])
 
 
 def inspect_artifact(raw, schema):
@@ -150,7 +152,7 @@ def inspect_artifact(raw, schema):
             value=doc.values()[0];ref,compact,iface,body=value[2]
             require(re.fullmatch('[0-9a-f]{64}',text(ref)) is not None,'safe context digest')
             fields=[text(x) for x in list_values(compact)]
-            require(len(fields)==8 and fields[0]=='MLF-SOURCE-CRATE-QUERY-6','complete source-v6 compact key')
+            require(len(fields)==8 and fields[0] in ('MLF-SOURCE-CRATE-QUERY-6','MLF-SOURCE-CRATE-QUERY-7'),'complete compact source key')
             require(not list_values(value_node(iface,240,8)[3]),'shared query header has no duplicated datatype list')
         else: raise Invalid('closed query envelope tag')
     return doc
@@ -171,7 +173,7 @@ def cache_snapshot(root, active_hashes):
                 cdoc=inspect_artifact((root/context).read_bytes(),1)
                 declarations=list_values(value_node(cdoc.values()[0],244,1)[0])
                 fields=[text(x) for x in list_values(compact)]
-                full=pack(fields[:5]+[logical_context(declarations)]+fields[5:])
+                full=pack(fields[:5]+[logical_context(declarations,fields[0])]+fields[5:])
                 contexts.add(context);details[context]=cdoc.accounting();representation='MLFBIN-QUERY-SHARED-1'
         else:
             try:fields=unpack(raw.decode('utf-8','strict'))

@@ -169,8 +169,8 @@ def source_key_from_binary(context, declarations, compact):
     require(graph_node(context, context.roots[0], 244, 1) == (declarations,),
             'logical source key uses the independently validated context root')
     values = context.values()[0]
-    logical = typed.logical_context(typed.list_values(typed.value_node(values, 244, 1)[0]))
-    require(len(compact) == 8 and compact[0] == 'MLF-SOURCE-CRATE-QUERY-6', 'complete compact source key')
+    require(len(compact) == 8 and compact[0] == 'MLF-SOURCE-CRATE-QUERY-7', 'complete compact source key')
+    logical = typed.logical_context(typed.list_values(typed.value_node(values, 244, 1)[0]), compact[0])
     return pack(compact[:5] + [logical] + compact[5:])
 
 def require(ok, message):
@@ -437,7 +437,7 @@ def decoder_seed_snapshot(cache):
     source_records = ["record.mlfq", "second.mlfq", "box.mlfq"]
     record_leaves = source_records + ["pooled.mlfq", "fallback.mlfq", "legacy2.mlfq"]
     selected, references = {}, {}
-    expected_compact = ["MLF-SOURCE-CRATE-QUERY-6", "crate:α😀", "compiler", "member:opaque:😀",
+    expected_compact = ["MLF-SOURCE-CRATE-QUERY-7", "crate:α😀", "compiler", "member:opaque:😀",
                         "bindings", "source-group", "observed-contracts", "scope-table:α😀"]
     fields = ["st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns", "st_blocks"]
 
@@ -549,7 +549,7 @@ def window_snapshot(cache, references, hidden):
             'exact window tree; no stage, missing raw record, or uncounted backup')
     result = {'hidden': hidden, 'references': references, 'directories': directories,
               'records': {}, 'contexts': {}, 'locks': {}, 'context_locations': {}}
-    compact = ['MLF-SOURCE-CRATE-QUERY-6', 'crate:α😀', 'compiler', 'member:opaque:😀',
+    compact = ['MLF-SOURCE-CRATE-QUERY-7', 'crate:α😀', 'compiler', 'member:opaque:😀',
                'bindings', 'source-group', 'observed-contracts', 'scope-table:α😀']
     for rel, reference in records.items():
         identity, raw = window_sample(cache / rel, 65536)
@@ -818,7 +818,7 @@ def session_window_audit(root, leaf, cold_snapshot):
     context_graph, declarations = binary_context(carrier_raw, reference)
     compact_fields = unpack(compact)
     require(carrier_id['sha256'] == reference and len(compact_fields) == 8 and
-            compact_fields[0] == 'MLF-SOURCE-CRATE-QUERY-6', 'real binary target carrier and complete compact key')
+            compact_fields[0] == 'MLF-SOURCE-CRATE-QUERY-7', 'real binary target carrier and complete compact key')
     full_key = source_key_from_binary(context_graph, declarations, compact_fields)
     require(digest(full_key.encode('utf-8')) + '.mlfq' == leaf, 'unaltered complete source-key filename')
     original_id, original = window_sample(root / 'target.original.mlfq', 2 * 1024**2)
@@ -1801,7 +1801,7 @@ def main():
 
         window_cache, session_raw_cache = run_added_window_controls(fixture, out, record, save)
 
-        cache_roots = [out / "helper-cache", out / "raw-final-cache", out / "query/cache", out / "session/cache",
+        cache_roots = [out / "helper-cache", out / "raw-final-cache", out / "raw-final-cache-inputs", out / "query/cache", out / "session/cache",
                        *[out / ("left-" + mode) / "cache" for mode in ["legacy", "source", "session"]],
                        *[out / name / "cache" for name in ["empty-success", "empty-directory-failure", "cleanup-dual-failure", "concurrent"]]]
         cache_roots += [out / "memo-helper-cache", out / "memo-query/cache", out / "memo-session/cache"]

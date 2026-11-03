@@ -446,7 +446,7 @@ admissionTests = do
   putStrLn "PASS production-admission-distinct-from-raw-codec"
 
 
--- R2 regression: keep the original source-v6 key and actual schema301 empty
+-- R2 regression: keep the source key and actual schema301 empty
 -- context/int-only raw body fixed. Only the caller's expected datatype list
 -- changes. A body that does not mention Other must not bypass key/context
 -- binding, including after a genuine invocation-local memo was established.
@@ -454,8 +454,8 @@ sourceAdmissionTests directory = do
   exists <- doesPathExist directory; need "fresh source-admission directory" (not exists); createDirectory directory
   bracket (P.acquireFileLock (B.literal (directory ++ "/.lock"))) P.releaseFileLock $ \_ -> do
     object <- expect "actual int-only empty-context raw inference" (InferenceUnit.compileLoweredGroup "RawGroup" [] [] [("value",T.Nothing,T.SIntLit 41)])
-    let encoded=Q.encodeDatatypeContext []
-        key=U.pack ["MLF-SOURCE-CRATE-QUERY-6","binary-source-admission","compiler","member","bindings",encoded,"source-group","contracts","scope"]
+    let encoded=Q.encodeSourceDatatypes []
+        key=U.pack ["MLF-SOURCE-CRATE-QUERY-7","binary-source-admission","compiler","member","bindings",encoded,"source-group","contracts","scope"]
         path=directory ++ "/record.mlfq"
         other=[T.DataDecl "Other" [] [T.ConstructorDecl "Other" []]]
         mismatch="cached source query datatype context mismatch"

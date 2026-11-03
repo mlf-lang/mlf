@@ -60,8 +60,12 @@ def prepare(root, out, suite):
         copy(base+'p2/FrozenFingerprint.hs',transform=lambda s:'{-# OPTIONS_GHC -fno-enable-rewrite-rules -fomit-interface-pragmas -dcore-lint #-}\n'+s)
         copy(base+'p2/FingerprintDifferential.hs','P2Controls.hs',main_as('P2Controls'))
         copy(base+'p2/NativeCompatibilityControls.hs')
-        for name in ['FrozenPrefix.hs','FrozenInferenceUnit.hs','QueryV6Bridge.hs']:
+        for name in ['FrozenPrefix.hs','FrozenInferenceUnit.hs']:
             copy(base+'p3/'+name)
+        # This historical bridge projects only an empty group and an opaque
+        # caller-supplied context. Keep its controls and inverse transcript.
+        copy(base+'p3/QueryV6Bridge.hs', transform=lambda s:
+             s.replace('MLF-SOURCE-CRATE-QUERY-6','MLF-SOURCE-CRATE-QUERY-7'))
         def prefix(s):
             s=main_as('P3Controls')(s)
             seeds='[(-1,-1),(-123456789012345678901234567890,3),(0,1),(9,-23),(2147483650,2147483640)]'

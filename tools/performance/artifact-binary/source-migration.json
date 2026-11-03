@@ -76,8 +76,8 @@
     "libraries/mlf-crates/Bootstrap/Crate.hs": "076454dbc79f0749f8232c8d8cb85b410db5f8bde7dc0ccaca45fc7858a0022c",
     "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": "80e484184b84f6e78276f7dc8ff8c0e97cfeeab1370dd839dd7bc75c8a56eb0c",
     "libraries/mlf-crates/Bootstrap/CrateCodegen.hs": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
-    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "b681ed32b80d67c8cf5c2c87066055f6167cc78875c02105b49c550aaaac80d5",
-    "libraries/mlf-crates/Bootstrap/CrateSession.hs": "7f8beef258be08578e8a773e41d1d6dc1774668d407cbc139ee821fb86d6d865",
+    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "b71360f323f606f2b324ba09048de4aaa9e87d3a5b8495414f319ce817209e5d",
+    "libraries/mlf-crates/Bootstrap/CrateSession.hs": "d955a8dfff0145df8d6a08381c1dfe229ea8e45d63880e0269df80db01ca907d",
     "libraries/mlf-crates/Bootstrap/ImportParameters.hs": "16efe338a956ef66deda14c67251b999dc7934cbe5bd7dfffebbec8b03a2fbcf",
     "libraries/mlf-crates/Bootstrap/ImportedRoot.hs": "345418996f5ceaea45afdca54b614d506803bf583f3113ce6e5042727f48d7dc",
     "libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "2f71e6d2ff12f48a2c1ae9f092159163322b15c98a637853e8cd78591ece2a6b",
@@ -168,7 +168,7 @@
     "libraries/mlf-xmlf/mlf-package.json": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3",
     "mlf-package.json": "f5f51c2b2954516c86ead23f7a6054d5d317285b47b0982dabcc0269d56bd52f",
     "mlf-shared.cabal": "c339f7b16bcd1e5ed73b5e5affff7315a1b9c6bb93c960073279e0cbfc9196ea",
-    "mlf.lock": "6a21ecca6d6e909b3e664345c0f57d8c16a41bbd0d22005e1e00383611b8bd17",
+    "mlf.lock": "7d8cfab279595c29ebbe7dc507ad54fac288d40e986fed5c47c8c03f4447deb2",
     "package/MLF/Entry/Mlfpkg.hs": "26dab5260f36e5d67ba85d4c74ab4cad6bd76b8772056ea1f22d7e9ea0264711",
     "runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
     "runtime/mlf_build_runner_hash.h": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
@@ -229,7 +229,7 @@
     "tools/shared/verify_builtin_prelude.py": "778fedebd6a038b6d1b67026f5ca8a4f0da1c13e126948f428b9f912fcacf07d",
     "tools/shared/verify_prepared_libraries.py": "e22b3df44b822ff9fa2339379d7796b7f6970854c283900a916c555244960dce"
   },
-  "current_inventory_sha256": "50ea749e6a510c2fd10badc6f352f484dd3b63a7df3e72b28f8395d747267ea2",
+  "current_inventory_sha256": "acaf727b0b539f95d8a32197e4bb2e11a734bf8e52dd2d4f94a45c84b609e4b0",
   "current_registry": {
     "Async.Process": "482169c6d92a16b5a3071088ec24ee7206324995f8e69f6df073cc24559fcb73",
     "Async.Process.Internal": "ef551f51dcf7da4b48e49f2807e2d5efe84c009cfa911913402c493fce7a25bc",
@@ -249,8 +249,8 @@
     "Bootstrap.Crate": "076454dbc79f0749f8232c8d8cb85b410db5f8bde7dc0ccaca45fc7858a0022c",
     "Bootstrap.CrateArtifact": "80e484184b84f6e78276f7dc8ff8c0e97cfeeab1370dd839dd7bc75c8a56eb0c",
     "Bootstrap.CrateCodegen": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
-    "Bootstrap.CrateQuery": "b681ed32b80d67c8cf5c2c87066055f6167cc78875c02105b49c550aaaac80d5",
-    "Bootstrap.CrateSession": "7f8beef258be08578e8a773e41d1d6dc1774668d407cbc139ee821fb86d6d865",
+    "Bootstrap.CrateQuery": "b71360f323f606f2b324ba09048de4aaa9e87d3a5b8495414f319ce817209e5d",
+    "Bootstrap.CrateSession": "d955a8dfff0145df8d6a08381c1dfe229ea8e45d63880e0269df80db01ca907d",
     "Bootstrap.Data": "bc8a272deac7f59527c109b90fcdd6c220f80ba622ce642db340de01cd4a1d68",
     "Bootstrap.Dependency": "5d0082ace3184c213c53f34d9259437506fa3db368d646b3599162018f7db27d",
     "Bootstrap.Desugar": "087d3e310dbd218800d56a77bce8f861981542089f5cd260c04264bf3c33c388",
@@ -363,7 +363,7 @@
     "Tests.TupleList": "2ff183466ff22c3627aa58f0b73d9503ef1dc979f7b0e9c1f7744cd9933996f8",
     "Tests.TupleListLegacy": "60176aca5512cf858f1c5fcde5819741a28073b4b504049a301a54f0492ab6b0"
   },
-  "current_registry_sha256": "d1299f394b9f16e8a6b17089da3647841033e6287e975385ac6f858d4f812dee",
+  "current_registry_sha256": "a8cf3e1380687488202dd2f4598c79c45e49aaf70bf37c7d76ac55605ace7446",
   "deltas": {
     "bootstrap/MLF/BuiltinPreludeData.hs": {
       "file": "deltas/000.json",
@@ -421,15 +421,15 @@
     },
     "libraries/mlf-crates/Bootstrap/CrateQuery.hs": {
       "file": "deltas/009.json",
-      "new": "b681ed32b80d67c8cf5c2c87066055f6167cc78875c02105b49c550aaaac80d5",
+      "new": "b71360f323f606f2b324ba09048de4aaa9e87d3a5b8495414f319ce817209e5d",
       "old": "3b3b7a5de8b1f83b0a369e9a47ead5666d1169490e5466e2d8a9983b20eeb8b9",
-      "sha256": "537f1b42d593316d4d0d82e90431a6db06a70afaef5f4151b21f4ad307da4eaf"
+      "sha256": "d7a4cc34c6174421e1cbe3e24b623bcfae190fc0663c6668d6e99ebd80ec87af"
     },
     "libraries/mlf-crates/Bootstrap/CrateSession.hs": {
       "file": "deltas/010.json",
-      "new": "7f8beef258be08578e8a773e41d1d6dc1774668d407cbc139ee821fb86d6d865",
+      "new": "d955a8dfff0145df8d6a08381c1dfe229ea8e45d63880e0269df80db01ca907d",
       "old": "e3002483e06d189b31e3d93e876618c0a65fc807be654f6757452f087088e2a1",
-      "sha256": "d74585708285189e8291217cb89020e150776fcfcd6df7d3fc317aefb6773aed"
+      "sha256": "ed659e27e5ec452c0450b8667f2da58f4818376f49366e93a1d21dbabc4d13ba"
     },
     "libraries/mlf-crates/Bootstrap/PreparedLibraries.hs": {
       "file": "deltas/011.json",
@@ -511,9 +511,9 @@
     },
     "mlf.lock": {
       "file": "deltas/024.json",
-      "new": "6a21ecca6d6e909b3e664345c0f57d8c16a41bbd0d22005e1e00383611b8bd17",
+      "new": "7d8cfab279595c29ebbe7dc507ad54fac288d40e986fed5c47c8c03f4447deb2",
       "old": "123f426bda8ed1ede2bebce0b1c74e3c37e995f3ba0ace7c091c6d4f41a5379a",
-      "sha256": "eef26d34255985a218e299afaeab966ff1028e1cbe708d4d33c40315e48407b9"
+      "sha256": "f1dae6761ca53f99c7a0591d9ce720e74b886b17b7475b29c6f4edadd5696281"
     },
     "runtime/mlf_runtime.c": {
       "file": "deltas/025.json",

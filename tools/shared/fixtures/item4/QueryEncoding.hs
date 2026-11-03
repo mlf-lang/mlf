@@ -55,7 +55,7 @@ expandExpression scopes text = pack $ case unpack text of
     statement ["do-letrec",bs]=["do-letrec",many recursive bs]
     statement _=error "statement"
 expandQuery text = case unpack (B.unpack text) of
-  ["MLF-SOURCE-CRATE-QUERY-6",crate,compiler,lowered,bindings,context,source,contracts,table] ->
+  ["MLF-SOURCE-CRATE-QUERY-7",crate,compiler,lowered,bindings,context,source,contracts,table] ->
     let scopes=unpack table
         member row=case unpack row of
           ["member",name,annotation,body] -> pack ["member",name,annotation,expandExpression scopes body]
