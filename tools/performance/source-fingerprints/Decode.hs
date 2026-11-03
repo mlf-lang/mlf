@@ -30,8 +30,8 @@ main = do
     result <- W.decodeGraph W.defaultLimits 2 bytes
     case result of
       T.Left message -> fail (H.unpack message)
-      T.Right graph -> case W.graphRoots graph of
-        [root] -> case W.lookupGraphNode graph root of
+      T.Right graph -> case reverse (W.graphRoots graph) of
+        root:prefix | length prefix <= 1 -> case W.lookupGraphNode graph root of
           T.Right (W.GNode 303 refs) | length refs == 5 -> pure ()
           _ -> fail "wrong envelope"
         _ -> fail "wrong root count"

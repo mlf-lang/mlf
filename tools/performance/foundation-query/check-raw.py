@@ -19,8 +19,7 @@ def require(value, message):
 
 def read_group(cache, key, contexts, compiler, baseline_fields=None):
     doc = reader.read_document((cache / (key + '.mlfq')).read_bytes(), 2)
-    require(len(doc.roots) == 1, 'query root inventory')
-    root = doc.roots[0]
+    root = typed.query_payload_root(doc)
     if doc.nodes[root].data[0] == 303:
         ref, stored_key, _, header, body = wire.graph_node(doc, root, 303, 5)
         require(baseline_fields is not None, 'comparison needs an exact-key reference compiler')

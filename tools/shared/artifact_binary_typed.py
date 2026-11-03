@@ -136,10 +136,30 @@ def logical_context(declarations, key_format):
     return pack([data(x) for x in [*builtins,*declarations]])
 
 
+def query_payload_root(doc):
+    if len(doc.roots) == 1:
+        return doc.roots[0]
+    require(len(doc.roots) == 2, 'source query root count')
+    address, root = doc.roots
+    require(address == 0 and doc.nodes[address].kind == 2 and doc.nodes[address].data == 0,
+            'source query address must own the first symbol')
+    require(re.fullmatch('[0-9a-f]{64}',doc.symbols[0]), 'invalid source query address')
+    payload = doc.nodes[root]
+    require(payload.kind == 3, 'addressed query payload node')
+    tag, children = payload.data
+    require((tag == 302 and len(children) == 3 and children[0] == address) or
+            (tag == 303 and len(children) == 5 and children[1] == address),
+            'source query address disagrees with payload')
+    return root
+
+
 def inspect_artifact(raw, schema):
     doc=read_document(raw,schema)
-    require(len(doc.roots)==1,'one artifact root')
-    root=doc.roots[0]
+    if schema == 2:
+        root = query_payload_root(doc)
+    else:
+        require(len(doc.roots)==1,'one artifact root')
+        root = doc.roots[0]
     if schema in (1,3,4): validate_type(doc,root,{1:'DataContext',3:'CrateInterfaceFields',4:'CrateObjectFields'}[schema])
     else:
         node=doc.nodes[root];require(node.kind==3,'query node root');tag,children=node.data
@@ -149,7 +169,7 @@ def inspect_artifact(raw, schema):
         elif tag==301:
             require(len(children)==4,'shared query arity')
             for i,t in zip(children,('String',('list','String'),'UnitInterface','XTerm')):validate_type(doc,i,t)
-            value=doc.values()[0];ref,compact,iface,body=value[2]
+            value=doc.values()[-1];ref,compact,iface,body=value[2]
             require(re.fullmatch('[0-9a-f]{64}',text(ref)) is not None,'safe context digest')
             fields=[text(x) for x in list_values(compact)]
             require(len(fields)==8 and fields[0] in ('MLF-SOURCE-CRATE-QUERY-6','MLF-SOURCE-CRATE-QUERY-7'),'complete compact source key')
@@ -160,7 +180,7 @@ def inspect_artifact(raw, schema):
             require(len(children) == len(shape), 'fingerprinted source query arity')
             for child, family in zip(children, shape):
                 validate_type(doc, child, family)
-            fields = doc.values()[0][2]
+            fields = doc.values()[-1][2]
             require(all(re.fullmatch('[0-9a-f]{64}',text(value)) for value in fields[:2 if tag==302 else 3]),
                     'source query SHA-256 spelling')
             if tag == 303:
@@ -171,7 +191,8 @@ def inspect_artifact(raw, schema):
 
 def verify_source_result(doc):
     """Hash the bounded canonical result independently of the production writer."""
-    _, tag, fields = doc.values()[0]
+    query_payload_root(doc)
+    _, tag, fields = doc.values()[-1]
     if tag == 303:
         ref, key, result, header, body = fields
         material = (key, ref, header, body)
@@ -192,16 +213,16 @@ def cache_snapshot(root, active_hashes):
         name=key+'.mlfq'; require(name in files,'reachable record exists');raw=(root/name).read_bytes()
         full=None
         if raw.startswith(MAGIC):
-            doc=inspect_artifact(raw,2);value=doc.values()[0];details[name]=doc.accounting()
+            doc=inspect_artifact(raw,2);value=doc.values()[-1];details[name]=doc.accounting()
             if value[1] in (302,303):
                 require(verify_source_result(doc)==key, 'stored fingerprint matches source query filename')
-                representation='MLFBIN-QUERY-INLINE-2'
+                representation='MLFBIN-QUERY-INLINE-3' if len(doc.roots)==2 else 'MLFBIN-QUERY-INLINE-2'
                 if value[1]==303:
                     digest=text(value[2][0]); context='context-'+digest+'.mlfqc'
                     require(context in files and files[context]['sha256']==digest,'context exact physical SHA256')
                     cdoc=inspect_artifact((root/context).read_bytes(),1)
                     contexts.add(context); details[context]=cdoc.accounting()
-                    representation='MLFBIN-QUERY-SHARED-2'
+                    representation='MLFBIN-QUERY-SHARED-3' if len(doc.roots)==2 else 'MLFBIN-QUERY-SHARED-2'
             elif value[1]==300:
                 full=text(value[2][0]); representation='MLFBIN-QUERY-INLINE-1'
             else:

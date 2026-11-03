@@ -22,7 +22,8 @@ module Bootstrap.Bitstream (
   parsedDepth, parsedWork, getChildIds, getEntry, buildChildren, buildParsed,
   getNodes, getNodesAt, getRoots, getRootsAt, canonicalGraph, canonicalTasks,
   collectRoots, decode, decodeChecked, decodeTables,
-  Graph, GraphNode(..), decodeGraph, decodeGraphWithText, graphRoots, lookupGraphNode,
+  Graph, GraphNode(..), decodeGraph, decodeGraphWithText, decodeGraphWithGate,
+  firstShortTextMatches, graphRoots, lookupGraphNode,
   ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, realizeGraphPlan, graphNodeDepth, graphResourceStats,
   resourceBytes, resourceNodes, resourceEdges, resourceSymbols,
   resourceSymbolBytes, resourceDepth, resourceMaxSymbolBytes,
@@ -1279,6 +1280,23 @@ module Bootstrap.Bitstream (
     };
   decodeGraphChecked :: [] String -> Limits -> Int -> ByteArray -> IO (Either String Graph);
   decodeGraphChecked hints limits schema bytes =
+    decodeGraphAfterHeader hints limits schema (\_ _ -> ioReturn (Right ())) bytes;
+  -- A schema can reject from bounded framing before CRC/table allocation.
+  -- Passing the gate still runs the ordinary checksum and canonical graph reader.
+  decodeGraphWithGate :: Limits -> Int -> (ByteArray -> Layout -> IO (Either String ())) ->
+    ByteArray -> IO (Either String Graph);
+  decodeGraphWithGate limits schema gate bytes = catchIOError
+    (decodeGraphAfterHeader [] limits schema gate bytes)
+    (\error -> ioReturn (Left ("binary decode IO failure: " ++ textFromChars (ioeGetErrorString error))));
+  -- The geometry comes from getHeader. A short symbol has a one-byte length.
+  firstShortTextMatches :: ByteArray -> Layout -> String -> IO Bool;
+  firstShortTextMatches bytes (Layout _ count section _ _ _ _ _ _ _ _ _) expected =
+    let { n = stringLength expected } in
+    if count == 0 || n >= 128 || section < n + 1 then ioReturn False else do {
+      size <- readByteArray bytes 80;
+      if size == n then sameAscii bytes 81 expected n 0 else ioReturn False
+    };
+  decodeGraphAfterHeader hints limits schema gate bytes =
     if not (validLimits limits) then ioReturn (Left "invalid binary codec limits")
     else if schema < 0 || schema > 2147483647 then ioReturn (Left "binary schema ID out of range")
     else do {
@@ -1290,7 +1308,13 @@ module Bootstrap.Bitstream (
           header <- runSection bytes 8 72 (getHeader limits schema size);
           case header of {
             Left message -> ioReturn (Left message);
-            Right (Header geometry expectedCRC) -> checkedGraphTables hints limits bytes size geometry expectedCRC
+            Right (Header geometry expectedCRC) -> do {
+              allowed <- gate bytes geometry;
+              case allowed of {
+                Left message -> ioReturn (Left message);
+                Right () -> checkedGraphTables hints limits bytes size geometry expectedCRC
+              }
+            }
           }
         }
       }

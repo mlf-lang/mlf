@@ -1,140 +1,140 @@
 {
   "candidate_verified": true,
   "canonical": {
-    "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/bootstrap/MLF/BuiltinPreludeData.hs",
-    "sha256": "26f4d0e33303a6df0d58ffc19c32da1cd4280cec3bad7e2b9dabc9231de6158d"
+    "path": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/bootstrap/MLF/BuiltinPreludeData.hs",
+    "sha256": "f6bfd125bd7f35f88d97bbd62a6a274ae6df92a0339cfea3f5f981eac94944d5"
   },
   "commands": [
     {
       "argv": [
-        "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/bin/emlf",
+        "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/bin/emlf",
         "--verify-builtin-prelude",
-        "builtin-source-v1:cb00133a43241908b1a5022ff452cba89b49e03eedcd917ddac26f8860a5292d"
+        "builtin-source-v1:d2a8fdc1a9811046aff42749832d9a403e3553798e8c6a1217544c4b057d87af"
       ],
-      "cwd": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf",
+      "cwd": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf",
       "exit_code": 0,
       "input_pins_verified_after": true,
       "input_pins_verified_before": true,
       "label": "check-candidate",
       "stderr": {
-        "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/builtin-verification/check-candidate.stderr",
+        "path": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/builtin-verification/check-candidate.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
-        "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/builtin-verification/check-candidate.stdout",
+        "path": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/builtin-verification/check-candidate.stdout",
         "sha256": "a362da91520982e2fd7bf5b4c57b4e585c1306cac064d6b3b03028d3012b1028"
       },
       "timeout_seconds": 1800
     },
     {
       "argv": [
-        "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/bin/builtin-prelude",
-        "builtin-source-v1:cb00133a43241908b1a5022ff452cba89b49e03eedcd917ddac26f8860a5292d"
+        "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/bin/builtin-prelude",
+        "builtin-source-v1:d2a8fdc1a9811046aff42749832d9a403e3553798e8c6a1217544c4b057d87af"
       ],
-      "cwd": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf",
+      "cwd": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf",
       "exit_code": 0,
       "input_pins_verified_after": true,
       "input_pins_verified_before": true,
       "label": "fresh-literal",
       "stderr": {
-        "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/builtin-verification/fresh-literal.stderr",
+        "path": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/builtin-verification/fresh-literal.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
-        "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/builtin-verification/fresh-literal.stdout",
-        "sha256": "26f4d0e33303a6df0d58ffc19c32da1cd4280cec3bad7e2b9dabc9231de6158d"
+        "path": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/builtin-verification/fresh-literal.stdout",
+        "sha256": "f6bfd125bd7f35f88d97bbd62a6a274ae6df92a0339cfea3f5f981eac94944d5"
       },
       "timeout_seconds": 1800
     }
   ],
   "compiler": {
-    "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/bin/emlf",
-    "sha256": "5a157d62fc142bfb51c8bc163474d89a4bda7588816f317f235670fcdcdb0210"
+    "path": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/bin/emlf",
+    "sha256": "daad01b6b227e727080db30f49d0a213da2322b5ae840a522b58ea10a66ae8bf"
   },
   "complete": true,
   "exact_regeneration": true,
   "format": "builtin-prelude-verification-v1",
   "generator": {
-    "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/bin/builtin-prelude",
-    "sha256": "74db2554c9472e2b540ae53aca9f7c5f17ffc97073106bd9da713af0040bd4ca"
+    "path": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/bin/builtin-prelude",
+    "sha256": "c66b4e175499b1ae17a88fc88ad477dc6aab4e0d144a9e6de779d0c6391a9724"
   },
   "immutable_inputs_verified_after": true,
   "inputs": {
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/bin/builtin-prelude": "74db2554c9472e2b540ae53aca9f7c5f17ffc97073106bd9da713af0040bd4ca",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/.mlf-build/fingerprint/release/bin/emlf": "5a157d62fc142bfb51c8bc163474d89a4bda7588816f317f235670fcdcdb0210",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/bootstrap/MLF/BuiltinPreludeData.hs": "26f4d0e33303a6df0d58ffc19c32da1cd4280cec3bad7e2b9dabc9231de6158d",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/bootstrap/MLF/Entry/BuiltinPrelude.hs": "740f515891b0a77e8139906a16917d14ca043cb098b5e2c617f3b04c2252ca92",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/cabal.project": "d31917fa5dd1ba84d53f1961d5e8f6629474d92b53c7b9f2176d3f4b03da047a",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-async/mlf-package.json": "15e9ac789b283257d3ff3f1ab3053f03430859a6cbadd621d214f113994778ff",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/ArtifactStorage.hs": "b131cfa9edf6b3b08762ed5420150ac1542617c9cf46e912fff60ecd381bc218",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/ArtifactStructure.hs": "337d5eebf8d1eda3a750f07cc865e25ffe63716719eb133b36aec313b97748e3",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/Bitstream.hs": "c4e03268a4304b7a38af776eb43a9d06a0205b9b213d37582e0a0e17432118aa",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs": "1961cf629b1d6e4cc1956489d0f1f028907b3584b4c3ae0fec1fc34626f856ee",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs": "6a8767a44343e5528e2bd34927b72f5d8aa1016da3545d28c144276b1d056f8d",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/CrateArtifact.hs": "80e484184b84f6e78276f7dc8ff8c0e97cfeeab1370dd839dd7bc75c8a56eb0c",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "67717b726ec69df1a9a2615bf3a7e45ae5c3ff7ebe6a6bea62a44215760efb7b",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/Separate.hs": "a8af345dbfac5000fb9adcd3fc4c9aa1663c5496667f1026590d0a516a7fcb30",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/SourceEquality.hs": "031ca10290b4b6bce9526c65fc6cbcea096def8df17fd6e9333710480d52077a",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/Bootstrap/SourceInference.hs": "a712be804bc1f7a9f65ea6bcc93f01b82c4cb2ca3b8db8571a5c1a490561679e",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-crates/mlf-package.json": "993a5c35bc9e51ce985a42e661c10f60fe30ae52bf122cdb54a52362921de44d",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-developer-tools/mlf-package.json": "be337ee042323db004efa8e419db889fe24cf01b287112507c3593b30c5b3b71",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/Fresh.hs": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/Host.hs": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/IntMap.hs": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/IntRank.hs": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/IntSet.hs": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/IntTree.hs": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/Map.hs": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/ST.hs": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/Std.hs": "d8ac87643ba3c81b1a87a46f59386f4a8f27eaad3515100b5374737f9747ca17",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/Types.hs": "699b031d3b623b06db1bcbee5b8e0b7e68da04ae94407d62d1c7400eec2abdcd",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/Bootstrap/Unicode.hs": "fb8a1f8a0147d416d3b5bfd637d53121e584de6f8856d2c380ec360d2df47adf",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-foundation/mlf-package.json": "a9ac453158faca16e7a30d71ee9ed640a16ba41444dd09d3de796effdf525f9b",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Dependency.hs": "5d0082ace3184c213c53f34d9259437506fa3db368d646b3599162018f7db27d",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Desugar.hs": "087d3e310dbd218800d56a77bce8f861981542089f5cd260c04264bf3c33c388",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Layout.hs": "9d602c1743537623ae64a34dc6d34ee79c367ee57cb4214dc7e2e8509a9de411",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Lexer.hs": "5089cd7c59afff73e0f89660a84259d1f5dcf18fbfec07a7e5ad0ae1d22b4f08",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Module.hs": "ec373435f9cc73abe56bfd68649172d106619488cce906846b8a6bc5b291853e",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Parsec.hs": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Parser.hs": "b5c36f2a6e77d3fbc237f43e92e2387a72e3ee299fedd93b026d00577fe734f6",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Prelude.hs": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/Bootstrap/Surface.hs": "6722b465232d5e88692bea0fdddfa07c02eb1c5fa65476c7fdb922042a194ff8",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-frontend/mlf-package.json": "e403851fc996545653accd9d83dac00fe063e4d2ab8a37475195857ba63db984",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/ClassDemand.hs": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/Classes.hs": "28b098e1a881b25a289f79a33252c7a1842664ea6cdc3633169231aad85cbdbc",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/CompilerCore.hs": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/Constraint.hs": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/Elaborate.hs": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/Evidence.hs": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": "fce5aa8a9bfd7b971d8a113f4ddc23379873f0d13ca9c94427139477d6e23f59",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/Graph.hs": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/Bootstrap/Graph/Solver.hs": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-inference/mlf-package.json": "f70784559899825490f5ca6f1d381af6976bcba0801522d1e7b8cf83a32512ef",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-interpreter/mlf-package.json": "ffd00c762c3959dd6f93fc88f02076bb966ec1a45e6efee7c4b3c5d2d53a9761",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-language-core/Bootstrap/Data.hs": "a5dd15a451fa0d4123501d45ec17f9930abffc85dd571ab0ac50650733f6bcb7",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-language-core/Bootstrap/Kind.hs": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-language-core/Bootstrap/Kinding.hs": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-language-core/Bootstrap/Primitive.hs": "924cd0a7ac6a3a8b1790ab28e4c2124e608a6519e1746d38fe3044595d2a34a5",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-language-core/mlf-package.json": "9d653cc825134f8d98919874e6b6d7e58cbd614751bfa0562af6e58f7a30366b",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-llvm/mlf-package.json": "70711a945f09eeedf2f4b5cfb386518cd4c5e42de62f60f3dcadfae22d6bac40",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-package-core/mlf-package.json": "b3473060f87653553b6067fb6b8b705ddb2a4a4092745ec642395e50ca645cd9",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-xmlf/Bootstrap/X/Check.hs": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-xmlf/Bootstrap/X/Checked.hs": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-xmlf/Bootstrap/X/Parser.hs": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-xmlf/Bootstrap/X/Type.hs": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/libraries/mlf-xmlf/mlf-package.json": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/mlf-package.json": "f5f51c2b2954516c86ead23f7a6054d5d317285b47b0982dabcc0269d56bd52f",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/mlf-shared.cabal": "c339f7b16bcd1e5ed73b5e5affff7315a1b9c6bb93c960073279e0cbfc9196ea",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/shared-sources.json": "fff446a7a55b035b84f2cd0b34cc22fb218103dc5e7d447e63829946493da23f",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/testing/mlf-package.json": "9a81067617c5742f588dc4496da260bce9d5d721dc43c4bf10765d61055ea016",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/testing/tools/mlf-package.json": "6e9359eaa1d433f5b2d0b2bed31eab43198fa9b1b89aa5c2670c853521dcb608",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/tests/mlf-package.json": "f1c57a91cbf228a1e4777bbbd470e51b9991f663466987e6a25f7eb6e24fe598",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/tests/shared/mlf-package.json": "0edc84f33ccac41596973dcd646951ab007ef8f560fe4f163e42f3c682ecdc1f",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/tools/shared/builtin_prelude_identity.py": "d8e453392552bd90fd0bcd7f6581a4353e9d5354080eed37f00718654480774a",
-    "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/tools/shared/verify_builtin_prelude.py": "778fedebd6a038b6d1b67026f5ca8a4f0da1c13e126948f428b9f912fcacf07d",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/bin/builtin-prelude": "c66b4e175499b1ae17a88fc88ad477dc6aab4e0d144a9e6de779d0c6391a9724",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/.mlf-build/fingerprint/release/bin/emlf": "daad01b6b227e727080db30f49d0a213da2322b5ae840a522b58ea10a66ae8bf",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/bootstrap/MLF/BuiltinPreludeData.hs": "f6bfd125bd7f35f88d97bbd62a6a274ae6df92a0339cfea3f5f981eac94944d5",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/bootstrap/MLF/Entry/BuiltinPrelude.hs": "740f515891b0a77e8139906a16917d14ca043cb098b5e2c617f3b04c2252ca92",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/cabal.project": "d31917fa5dd1ba84d53f1961d5e8f6629474d92b53c7b9f2176d3f4b03da047a",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-async/mlf-package.json": "15e9ac789b283257d3ff3f1ab3053f03430859a6cbadd621d214f113994778ff",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/ArtifactStorage.hs": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/ArtifactStructure.hs": "337d5eebf8d1eda3a750f07cc865e25ffe63716719eb133b36aec313b97748e3",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/Bitstream.hs": "8e001614b1b574d2bfd2c2ac92ac365aea722a0c3a28b2c1d60293c1919520dc",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs": "1961cf629b1d6e4cc1956489d0f1f028907b3584b4c3ae0fec1fc34626f856ee",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs": "6a8767a44343e5528e2bd34927b72f5d8aa1016da3545d28c144276b1d056f8d",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/CrateArtifact.hs": "80e484184b84f6e78276f7dc8ff8c0e97cfeeab1370dd839dd7bc75c8a56eb0c",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "67717b726ec69df1a9a2615bf3a7e45ae5c3ff7ebe6a6bea62a44215760efb7b",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/Separate.hs": "a8af345dbfac5000fb9adcd3fc4c9aa1663c5496667f1026590d0a516a7fcb30",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/SourceEquality.hs": "031ca10290b4b6bce9526c65fc6cbcea096def8df17fd6e9333710480d52077a",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/Bootstrap/SourceInference.hs": "a712be804bc1f7a9f65ea6bcc93f01b82c4cb2ca3b8db8571a5c1a490561679e",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-crates/mlf-package.json": "993a5c35bc9e51ce985a42e661c10f60fe30ae52bf122cdb54a52362921de44d",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-developer-tools/mlf-package.json": "be337ee042323db004efa8e419db889fe24cf01b287112507c3593b30c5b3b71",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/Fresh.hs": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/Host.hs": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/IntMap.hs": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/IntRank.hs": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/IntSet.hs": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/IntTree.hs": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/Map.hs": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/ST.hs": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/Std.hs": "d8ac87643ba3c81b1a87a46f59386f4a8f27eaad3515100b5374737f9747ca17",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/Types.hs": "699b031d3b623b06db1bcbee5b8e0b7e68da04ae94407d62d1c7400eec2abdcd",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/Bootstrap/Unicode.hs": "fb8a1f8a0147d416d3b5bfd637d53121e584de6f8856d2c380ec360d2df47adf",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-foundation/mlf-package.json": "a9ac453158faca16e7a30d71ee9ed640a16ba41444dd09d3de796effdf525f9b",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Dependency.hs": "5d0082ace3184c213c53f34d9259437506fa3db368d646b3599162018f7db27d",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Desugar.hs": "087d3e310dbd218800d56a77bce8f861981542089f5cd260c04264bf3c33c388",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Layout.hs": "9d602c1743537623ae64a34dc6d34ee79c367ee57cb4214dc7e2e8509a9de411",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Lexer.hs": "5089cd7c59afff73e0f89660a84259d1f5dcf18fbfec07a7e5ad0ae1d22b4f08",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Module.hs": "ec373435f9cc73abe56bfd68649172d106619488cce906846b8a6bc5b291853e",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Parsec.hs": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Parser.hs": "b5c36f2a6e77d3fbc237f43e92e2387a72e3ee299fedd93b026d00577fe734f6",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Prelude.hs": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/Bootstrap/Surface.hs": "6722b465232d5e88692bea0fdddfa07c02eb1c5fa65476c7fdb922042a194ff8",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-frontend/mlf-package.json": "e403851fc996545653accd9d83dac00fe063e4d2ab8a37475195857ba63db984",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/ClassDemand.hs": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/Classes.hs": "28b098e1a881b25a289f79a33252c7a1842664ea6cdc3633169231aad85cbdbc",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/CompilerCore.hs": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/Constraint.hs": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/Elaborate.hs": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/Evidence.hs": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": "fce5aa8a9bfd7b971d8a113f4ddc23379873f0d13ca9c94427139477d6e23f59",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/Graph.hs": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/Bootstrap/Graph/Solver.hs": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-inference/mlf-package.json": "f70784559899825490f5ca6f1d381af6976bcba0801522d1e7b8cf83a32512ef",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-interpreter/mlf-package.json": "ffd00c762c3959dd6f93fc88f02076bb966ec1a45e6efee7c4b3c5d2d53a9761",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-language-core/Bootstrap/Data.hs": "a5dd15a451fa0d4123501d45ec17f9930abffc85dd571ab0ac50650733f6bcb7",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-language-core/Bootstrap/Kind.hs": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-language-core/Bootstrap/Kinding.hs": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-language-core/Bootstrap/Primitive.hs": "924cd0a7ac6a3a8b1790ab28e4c2124e608a6519e1746d38fe3044595d2a34a5",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-language-core/mlf-package.json": "9d653cc825134f8d98919874e6b6d7e58cbd614751bfa0562af6e58f7a30366b",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-llvm/mlf-package.json": "70711a945f09eeedf2f4b5cfb386518cd4c5e42de62f60f3dcadfae22d6bac40",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-package-core/mlf-package.json": "b3473060f87653553b6067fb6b8b705ddb2a4a4092745ec642395e50ca645cd9",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-xmlf/Bootstrap/X/Check.hs": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-xmlf/Bootstrap/X/Checked.hs": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-xmlf/Bootstrap/X/Parser.hs": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-xmlf/Bootstrap/X/Type.hs": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/libraries/mlf-xmlf/mlf-package.json": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/mlf-package.json": "f5f51c2b2954516c86ead23f7a6054d5d317285b47b0982dabcc0269d56bd52f",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/mlf-shared.cabal": "c339f7b16bcd1e5ed73b5e5affff7315a1b9c6bb93c960073279e0cbfc9196ea",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/shared-sources.json": "fff446a7a55b035b84f2cd0b34cc22fb218103dc5e7d447e63829946493da23f",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/testing/mlf-package.json": "9a81067617c5742f588dc4496da260bce9d5d721dc43c4bf10765d61055ea016",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/testing/tools/mlf-package.json": "6e9359eaa1d433f5b2d0b2bed31eab43198fa9b1b89aa5c2670c853521dcb608",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/tests/mlf-package.json": "f1c57a91cbf228a1e4777bbbd470e51b9991f663466987e6a25f7eb6e24fe598",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/tests/shared/mlf-package.json": "0edc84f33ccac41596973dcd646951ab007ef8f560fe4f163e42f3c682ecdc1f",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/tools/shared/builtin_prelude_identity.py": "d8e453392552bd90fd0bcd7f6581a4353e9d5354080eed37f00718654480774a",
+    "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/tools/shared/verify_builtin_prelude.py": "778fedebd6a038b6d1b67026f5ca8a4f0da1c13e126948f428b9f912fcacf07d",
     "/opt/homebrew/Cellar/python@3.14/3.14.8/Frameworks/Python.framework/Versions/3.14/bin/python3.14": "e401ac7a95cda75dee34a0cfe1e4faf0a6df1a501cf67887f177fb78cd4eb60a"
   },
   "orchestrator": {
@@ -143,7 +143,7 @@
   },
   "scope": "canonical builtin source freshness and exact regeneration",
   "source_files_rewritten": false,
-  "source_identity": "builtin-source-v1:cb00133a43241908b1a5022ff452cba89b49e03eedcd917ddac26f8860a5292d",
+  "source_identity": "builtin-source-v1:d2a8fdc1a9811046aff42749832d9a403e3553798e8c6a1217544c4b057d87af",
   "source_identity_inputs": {
     "builtin_interface": "mlf-primitive/shared-haskell-v1/11",
     "format": "builtin-source-v1",
@@ -151,7 +151,7 @@
     "modules": {
       "Bootstrap.ArtifactStorage": {
         "path": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
-        "sha256": "b131cfa9edf6b3b08762ed5420150ac1542617c9cf46e912fff60ecd381bc218"
+        "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7"
       },
       "Bootstrap.ArtifactStructure": {
         "path": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
@@ -159,7 +159,7 @@
       },
       "Bootstrap.Bitstream": {
         "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
-        "sha256": "c4e03268a4304b7a38af776eb43a9d06a0205b9b213d37582e0a0e17432118aa"
+        "sha256": "8e001614b1b574d2bfd2c2ac92ac365aea722a0c3a28b2c1d60293c1919520dc"
       },
       "Bootstrap.BuiltinPreludeContext": {
         "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
@@ -357,10 +357,10 @@
     "primitive_abi": "mlf-primitive-132-v7",
     "source_syntax": "shared-haskell-v1"
   },
-  "source_root": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf",
+  "source_root": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf",
   "toolchain_qualification": false,
   "verification_driver": {
-    "path": "/Users/ares/.codex/worktrees/local-source-query-sha256/mlf/tools/shared/verify_builtin_prelude.py",
+    "path": "/Users/ares/.codex/worktrees/source-query-early-sha/mlf/tools/shared/verify_builtin_prelude.py",
     "sha256": "778fedebd6a038b6d1b67026f5ca8a4f0da1c13e126948f428b9f912fcacf07d"
   }
 }

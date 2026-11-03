@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 
-from artifact_binary_reference import read_document, tree_document
+from artifact_binary_reference import Invalid, tree_document
 from artifact_binary_typed import inspect_artifact, verify_source_result, pack
 
 
@@ -61,16 +61,18 @@ def main():
         return cache / (key + '.mlfq')
 
     def replace_result(raw):
-        root = read_document(raw, 2).values()[0]
+        prefix, root = inspect_artifact(raw, 2).values()
         require(root[1] == 303, 'expected shared fingerprint record')
         ref, key, _, header, body = root[2]
         replacement = ('text','0'*64)
-        return tree_document([('node',303,(ref,key,replacement,header,body))],schema=2)
+        return tree_document([prefix,('node',303,(ref,key,replacement,header,body))],schema=2)
 
     keys, cold = run('cold', 'all')
     pristine = {k: record_path(k).read_bytes() for k in keys}
     for k in keys:
-        require(verify_source_result(inspect_artifact(pristine[k],2)) == k, 'independent result hash')
+        doc = inspect_artifact(pristine[k],2)
+        require(len(doc.roots) == 2 and pristine[k][80:145] == bytes([64]) + k.encode() and
+                verify_source_result(doc) == k, 'independent early address and result hash')
     require(run('default-warm',set())[1] == cold, 'default warm output')
     require(run('strict-warm',set(),'prefix')[1] == cold, 'full warm output')
 
@@ -94,6 +96,25 @@ def main():
         record_path(keys[0]).write_bytes(bad)
         require(run(stage,{keys[0]})[1] == cold and record_path(keys[0]).read_bytes() == pristine[keys[0]],
                 stage + ' did not restore the original')
+    # A genuine old single-root fingerprint record retains its hits in both modes.
+    victim = keys[0]
+    address, payload = inspect_artifact(pristine[victim],2).values()
+    legacy = tree_document([payload],schema=2)
+    record_path(victim).write_bytes(legacy)
+    require(run('single-root-warm',set())[1] == cold and run('single-root-strict',set(),'prefix')[1] == cold
+            and record_path(victim).read_bytes() == legacy, 'old fingerprint record lost its checked hit')
+    # The apparent address matches the expected input, but the intact payload belongs to another key.
+    other_payload = inspect_artifact(pristine[keys[1]],2).values()[-1]
+    forged = tree_document([address,other_payload],schema=2)
+    try:
+        inspect_artifact(forged,2)
+    except Invalid as error:
+        require('address disagrees with payload' in str(error), 'wrong independent rejection')
+    else:
+        raise ValueError('independent reader accepted a detached address')
+    record_path(victim).write_bytes(forged)
+    require(run('forged-address',{victim})[1] == cold and record_path(victim).read_bytes() == pristine[victim],
+            'detached address was trusted')
     # Replace an edited definition with the previous, independently checked
     # body of the same name and type. Preserve the edited input SHA and ICH,
     # and regenerate the CRC. Full verification must repair this one value.
@@ -105,10 +126,10 @@ def main():
     require(len(fresh) == len(stale) == 1 and edited_output != cold, 'single edit')
     changed = fresh.pop()
     correct = record_path(changed).read_bytes()
-    old = inspect_artifact(pristine[stale.pop()],2).values()[0][2]
-    current = inspect_artifact(correct,2).values()[0][2]
+    old = inspect_artifact(pristine[stale.pop()],2).values()[-1][2]
+    current = inspect_artifact(correct,2).values()[-1][2]
     require(current[0] == old[0] and current[-1] != old[-1], 'same carrier, distinct old raw body')
-    transplanted = tree_document([('node',303,(*current[:3],*old[3:]))],schema=2)
+    transplanted = tree_document([current[1],('node',303,(*current[:3],*old[3:]))],schema=2)
     inspect_artifact(transplanted,2)
     record_path(changed).write_bytes(transplanted)
     require(run('strict-transplant-repair',{changed},'suffix')[1] == edited_output and

@@ -1220,13 +1220,47 @@ sourceAdmissionTests directory = do
         Q.writeSourceCached T.Nothing (B.literal directory) target full object >>= expect "write fingerprint record"
         rawBytes <- Storage.readRaw target >>= expect "actual fingerprint record bytes"
         roots <- W.decode W.defaultLimits 2 rawBytes >>= expect "actual fingerprint record"
+        let loadInput digest strict = Q.readLocalSourceFile strict [] (B.literal directory)
+              full digest encoded "RawGroup" [] [] ["value"] target
+            tryAudit = loadInput sha
+            other = B.literal (replicate 64 '0')
+            address = W.VText sha
+        raw <- byteList rawBytes
+        case splitAt 76 raw of
+          (before,crc:after) -> fromBytes (before ++ (P.xorInt crc 1 : after)) >>= \bad ->
+            Storage.writeRaw target bad >>= expect "damage outer CRC"
+          _ -> error "missing CRC in source fixture"
+        -- Wrong address wins even when full decoding would have failed the CRC.
+        forM_ [False,True] $ \strict -> do
+          loadInput other strict >>= rejected "wrong address before CRC" "cached query key mismatch"
+          tryAudit strict >>= rejected "matching address still checks CRC" "binary checksum mismatch"
+        Storage.write 2 target [W.VText "",W.VInt 1] >>= expect "short symbol area"
+        tryAudit False >>= rejected "short address safely misses" "cached query key mismatch"
+        let inline = Q.localPayloadFields T.Nothing object
+        ich <- Q.localResultHash sha inline >>= expect "inline raw ICH"
+        Storage.write 2 target [address,W.VNode 302 ([address,W.VText ich] ++ inline)]
+          >>= expect "two-root inline source record"
+        (_,_,inlineHit) <- tryAudit True
+        checkedInline <- expect "inline checked hit" inlineHit
+        need "inline raw body preserved" (U.encodeObject checkedInline == U.encodeObject object)
         case roots of
-          [W.VNode 303 [ref, W.VText seen, _, header, body]] | seen == sha -> do
-            Storage.write 2 target [W.VNode 303 [ref,W.VText sha,W.VText (B.literal (replicate 64 '0')),header,body]]
+          [W.VText prefix,payload@(W.VNode 303 [ref,W.VText seen,result,header,body])] | prefix == sha && seen == sha -> do
+            (_,stats) <- expect "single-root resource demand" (W.planMeasured W.defaultLimits [payload])
+            let work = W.resourceExpandedWork stats
+                cap n = case W.defaultLimits of
+                  W.Limits z c t total nodes edges depth _ -> W.Limits z c t total nodes edges depth n
+            W.encode (cap work) 2 [address,payload] >>= reject "address exceeds exact single-root work cap"
+            fallback <- Q.encodeAddressedSource (cap work) address payload >>= expect "preserve prior wire budget"
+            legacy <- W.decode (cap work) 2 fallback >>= expect "budget fallback checked under original cap"
+            need "only the original single-root representation fits" (sameValues legacy [payload])
+            Q.encodeAddressedSource (cap (work-1)) address payload >>= reject "fallback cannot bypass resource cap"
+            Storage.write 2 target [address,W.VNode 303 [ref,W.VText other,result,header,body]]
+              >>= expect "valid CRC with detached address"
+            tryAudit False >>= rejected "matching prefix cannot authorize another payload"
+              "source query address disagrees with payload"
+            Storage.write 2 target [address,W.VNode 303 [ref,address,W.VText other,header,body]]
               >>= expect "mutate only result hash, with a correct CRC"
-          _ -> error "expected published shared source fingerprint"
-        let tryAudit strict = Q.readLocalSourceFile strict [] (B.literal directory)
-              full sha encoded "RawGroup" [] [] ["value"] target
+          _ -> error "expected published addressed source fingerprint"
         (_,_,ordinary) <- tryAudit False
         case ordinary of
           T.Left message -> need "sampled default rejects wrong ICH" (sampled && message == "cached source result fingerprint mismatch")
