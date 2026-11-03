@@ -57,7 +57,7 @@ sources. The intervening commit changed the P2 test harness and CI.
 Source keys stay at v7 and the MLFBIN schemas retain their existing encoding.
 The running executable's SHA is still in every full key, so a compiler change
 recomputes those groups. Identical context blobs retain their content addresses.
-The wire limits and the checked legacy readers are unchanged.
+The wire limits and the checked legacy readers are unchanged. [Source v7 key and migration](../source-key-builtins/README.md).
 
 ## Protocol
 
@@ -118,3 +118,62 @@ step took 6.34 s. The diagnostic build's raw headers, bodies, context files
 and final outputs were compared with the plain compiler before using the
 timings. The end-to-end results below use plain executables. Phase timings
 are nested and differ across runs.
+
+## Measured results
+
+Apple M1 Max, macOS 26.6.2, GHC 9.14.1, 4 November 2026. Each cell lists
+the two observations for its arm in execution order. A negative percentage
+denotes less wall time. [All samples and executable identities](results.json).
+
+| State | PR 25 wall s | Candidate wall s | Change in mean wall | Mean CPU s, 25 / candidate | Mean peak RSS MiB, 25 / candidate |
+|---|---:|---:|---:|---:|---:|
+| Cold, installed Prelude | 24.06 / 24.05 | 25.16 / 23.44 | +1.0% | 23.88 / 23.33 | 177.2 / 123.7 |
+| Warm | 9.33 / 9.42 | 8.69 / 8.85 | -6.5% | 9.02 / 8.65 | 177.1 / 117.4 |
+| Version edit | 9.14 / 9.35 | 8.93 / 8.88 | -3.7% | 9.01 / 8.84 | 177.2 / 120.3 |
+| Cold, empty installation | 23.63 / 24.07 | 25.01 / 23.89 | +2.5% | 23.69 / 23.61 | 176.8 / 124.3 |
+
+Both warm pairs and both edit pairs favored the candidate. The two cold pairs
+went in opposite directions for each installation state. Neither cold series
+met the predeclared threshold.
+
+Each sequence recorded 504 inferred groups on cold compile, 504 reused groups
+on warm read, and one inferred plus 503 reused after the edit. The cold query
+cache was 104,053,739 B on PR 25 and 32,076,660 B on PR 29 and the candidate.
+After the edit those totals were 104,410,605 and 32,259,216 B. The candidate's
+original final interface and object were 312,193 and 1,232,927 B. The edited
+object was 1,232,928 B. Both states matched the corresponding PR 29
+formal output byte for byte. The independent audit also checked all 505
+distinct raw group versions and 83 context files in each candidate sequence.
+
+For comparison, the earlier plain PR 29 means were 37.91 s cold, 23.69 s
+warm and 23.55 s for the edit. Its paired PR 25 means were 27.37, 10.37 and
+10.32 s. The separately measured empty-installation mean before embedding
+the formal object was 32.40 s on C6 versus 25.58 s on PR 25. Capturing the split
+object increased the generated module by 608,134 B and the GHC executable by 934,128 B.
+
+### Iterations
+
+| Study | PR 25 cold / warm / edit, s | Candidate cold / warm / edit, s |
+|---|---:|---:|
+| C3, key text hints | 26.35 / 10.29 / 9.85 | 26.67 / 9.64 / 9.49 |
+| C4, shared builtin maps | 26.23 / 10.10 / 10.10 | 26.16 / 9.41 / 9.40 |
+| C5, GHC inlining trial | 26.06 / 10.03 / 10.09 | 26.73 / 9.54 / 9.40 |
+| C6, binding inventory | 25.82 / 10.19 / 9.97 | 25.93 / 9.47 / 9.49 |
+| C7, forward symbol scan | 24.87 / 9.39 / 9.43 | 25.08 / 8.92 / 8.80 |
+| C8, verified installation | 24.06 / 9.38 / 9.24 | 24.30 / 8.77 / 8.90 |
+
+The three initial development pilots measured only the candidate. The raw
+data includes all three, every paired series and both empty-installation
+series. C5's adapter inlining was dropped. C7 added an early malformed-prefix
+control and kept the legacy scalar reader. The C8 control holds the compiler
+identity, interface and exports fixed, inserts a valid private binding in the
+linked term and verifies rejection. It also checks the fallback for a damaged
+embedded literal.
+
+The local checks included the official optimized bootstrap build and fresh
+Prelude regeneration, all 131 modules' shared syntax/name resolution, the
+125-case binary corpus, typed admission/bounds, source SCCs, query/session
+controls, a real builtin mutation under the same supplied compiler identity,
+and a focused codec program emitted to LLVM, linked and executed. The
+previous 46-module native success and the 80-module, 900 s timeout belong
+to the earlier PR 29 work. Neither full native workload was rerun here.
