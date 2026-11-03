@@ -7,6 +7,7 @@ module Bootstrap.ArtifactStructure where {
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Bitstream as W;
@@ -1028,16 +1029,36 @@ module Bootstrap.ArtifactStructure where {
   decodeGraphValue shape graph index = decodeInput shape (GraphInput graph index);
   decodeInput :: DecodeShape -> DecodeInput -> Either String Decoded;
   decodeInput shape input = do {
-    results <- decodeTasks (W.maxExpandedWork W.defaultLimits)
-      [DecodeOne shape input] [] M.empty;
+    results <- decodeWork (W.maxExpandedWork W.defaultLimits)
+      [DecodeOne shape input] [] (NodeMemo IM.empty);
     case results of {
       [result] -> Right result;
       _ -> Left "binary typed decoder result stack mismatch"
     }
   };
+  -- Node IDs are local to this admitted graph. Reusing an ID also requires
+  -- the exact recursively described shape; an empty list can have many types.
+  data DecodeMemo = NodeMemo (IntMap (Map DecodeShape Decoded))
+    | OrderedMemo (Map ((,) DecodeShape Int) Decoded);
+  findDecoded shape index memo = case memo of {
+    OrderedMemo entries -> M.lookup compareDecodeKey ((,) shape index) entries;
+    NodeMemo nodes -> case IM.lookup index nodes of {
+      Nothing -> Nothing; Just shapes -> M.lookup compareShape shape shapes
+    }
+  };
+  rememberDecoded shape index value memo = case memo of {
+    OrderedMemo entries -> let { next = M.insert compareDecodeKey ((,) shape index) value entries }
+      in seq next (OrderedMemo next);
+    NodeMemo nodes -> let {
+      update = \_ old -> M.insert compareShape shape value old;
+      next = IM.insertWith update index (M.singleton shape value) nodes
+    } in seq next (NodeMemo next)
+  };
   decodeTasks :: Int -> [] DecodeTask -> [] Decoded ->
     Map ((,) DecodeShape Int) Decoded -> Either String ([] Decoded);
-  decodeTasks remaining tasks values memo = case tasks of {
+  decodeTasks remaining tasks values memo = decodeWork remaining tasks values (OrderedMemo memo);
+  decodeWork :: Int -> [] DecodeTask -> [] Decoded -> DecodeMemo -> Either String ([] Decoded);
+  decodeWork remaining tasks values memo = case tasks of {
     [] -> Right values;
     (:) task rest -> case task of {
       DecodeOne shape input ->
@@ -1045,37 +1066,37 @@ module Bootstrap.ArtifactStructure where {
         else let { next = remaining - 1 } in case input of {
           ValueInput _ -> do {
             view <- inspectInput shape next input;
-            decodeOne next shape view rest values memo
+            decodeShapeWork next shape view rest values memo
           };
-          GraphInput _ index -> case M.lookup compareDecodeKey ((,) shape index) memo of {
-            Just result -> decodeTasks next rest ((:) result values) memo;
+          GraphInput _ index -> case findDecoded shape index memo of {
+            Just result -> decodeWork next rest ((:) result values) memo;
             Nothing -> do {
               view <- inspectInput shape next input;
-              decodeOne next shape view ((:) (DecodeRemember shape index) rest) values memo
+              decodeShapeWork next shape view ((:) (DecodeRemember shape index) rest) values memo
             }
           }
         };
       DecodeFields fields -> case fields of {
-        [] -> decodeTasks remaining rest values memo;
-        (:) ((,) shape input) more -> decodeTasks remaining
+        [] -> decodeWork remaining rest values memo;
+        (:) ((,) shape input) more -> decodeWork remaining
           ((:) (DecodeOne shape input) ((:) (DecodeFields more) rest)) values memo
       };
       DecodeRepeated shape fields -> case fields of {
-        [] -> decodeTasks remaining rest values memo;
-        (:) input more -> decodeTasks remaining
+        [] -> decodeWork remaining rest values memo;
+        (:) input more -> decodeWork remaining
           ((:) (DecodeOne shape input) ((:) (DecodeRepeated shape more) rest)) values memo
       };
       DecodeClose tag count -> do {
         split <- takeDecoded count values [];
         case split of { (,) children previous -> do {
           result <- assembleDecoded tag children;
-          decodeTasks remaining rest ((:) result previous) memo
+          decodeWork remaining rest ((:) result previous) memo
         } }
       };
       DecodeRemember shape index -> case values of {
         [] -> Left "binary typed decoder memo stack underflow";
-        (:) result _ -> let { nextMemo = M.insert compareDecodeKey ((,) shape index) result memo } in
-          seq nextMemo (decodeTasks remaining rest values nextMemo)
+        (:) result _ -> let { nextMemo = rememberDecoded shape index result memo } in
+          seq nextMemo (decodeWork remaining rest values nextMemo)
       }
     }
   };
@@ -1083,7 +1104,9 @@ module Bootstrap.ArtifactStructure where {
     [] DecodeTask -> [] Decoded -> Map ((,) DecodeShape Int) Decoded ->
     Either String ([] Decoded);
   scheduleFields remaining tag fields rest values memo =
-    decodeTasks remaining
+    scheduleWork remaining tag fields rest values (OrderedMemo memo);
+  scheduleWork remaining tag fields rest values memo =
+    decodeWork remaining
       ((:) (DecodeFields fields) ((:) (DecodeClose tag (S.length fields)) rest)) values memo;
   expectInt :: Decoded -> Either String Int;
   expectInt value = case value of {
@@ -1446,7 +1469,11 @@ module Bootstrap.ArtifactStructure where {
     S.bindEither (decodeGraphValue (ShapeList ShapeText) graph index) (expectList expectText);
   decodeOne :: Int -> DecodeShape -> DecodeView -> [] DecodeTask -> [] Decoded ->
     Map ((,) DecodeShape Int) Decoded -> Either String ([] Decoded);
-  decodeOne remaining shape value rest values memo = case shape of {
+  decodeOne remaining shape value rest values memo =
+    decodeShapeWork remaining shape value rest values (OrderedMemo memo);
+  decodeShapeWork :: Int -> DecodeShape -> DecodeView -> [] DecodeTask -> [] Decoded -> DecodeMemo -> Either String ([] Decoded);
+  decodeShapeWork remaining shape value rest values memo =
+    let { decodeTasks = decodeWork; scheduleFields = scheduleWork } in case shape of {
     ShapeInt -> case value of {
       ViewInt number -> decodeTasks remaining rest ((:) (DecodedInt number) values) memo;
       _ -> malformed "Int"

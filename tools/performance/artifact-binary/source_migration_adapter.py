@@ -8,13 +8,13 @@ from pathlib import Path
 import hashlib
 import types
 
-FINAL_MANIFEST_SHA256 = 'b18a80cbd2657edebb65bfa6081b6a4d1f91c473cf3e6d4d5a1295c8708d948b'
-CONTRACT_SOURCE_SHA256 = '188a49caf7efb8e954620d13b543ee3f52c4f8750d364e5c239a7b9ccf6e7e8a'
+FINAL_MANIFEST_SHA256 = 'bd96069b029ff0e7b0b6756dd0f57126c8b016ddf89d4359a8ae83243438e29e'
+CONTRACT_SOURCE_SHA256 = 'f6c81c97a1284442c5825d38fc806639af9b49e8634b516d649dfa8c7583910d'
 
 
 def live_contract(history_root, source_root=None):
     if FINAL_MANIFEST_SHA256 is None:
-        raise ValueError('binary source migration is not frozen; live131 admission is unavailable')
+        raise ValueError('binary source migration is not frozen; live132 admission is unavailable')
     directory = Path(__file__).resolve().parent
     path = directory / 'source_contract.py'
     raw = path.read_bytes()

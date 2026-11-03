@@ -148,7 +148,8 @@ def query_payload_root(doc):
     require(payload.kind == 3, 'addressed query payload node')
     tag, children = payload.data
     require((tag == 302 and len(children) == 3 and children[0] == address) or
-            (tag == 303 and len(children) == 5 and children[1] == address),
+            (tag == 303 and len(children) == 5 and children[1] == address) or
+            (tag in (305,306) and len(children) == (3 if tag == 305 else 5) and children[0] == address),
             'source query address disagrees with payload')
     return root
 
@@ -174,16 +175,18 @@ def inspect_artifact(raw, schema):
             fields=[text(x) for x in list_values(compact)]
             require(len(fields)==8 and fields[0] in ('MLF-SOURCE-CRATE-QUERY-6','MLF-SOURCE-CRATE-QUERY-7'),'complete compact source key')
             require(not list_values(value_node(iface,240,8)[3]),'shared query header has no duplicated datatype list')
-        elif tag in (302, 303):
-            shape = ('String','String','RawUnitObject') if tag == 302 else (
+        elif tag in (302,303,305,306):
+            if tag in (305,306):
+                require(len(doc.roots) == 2, 'source result slot requires an addressed record')
+            shape = ('String','String','RawUnitObject') if tag in (302,305) else (
                 'String','String','String','UnitInterface','XTerm')
             require(len(children) == len(shape), 'fingerprinted source query arity')
             for child, family in zip(children, shape):
                 validate_type(doc, child, family)
             fields = doc.values()[-1][2]
-            require(all(re.fullmatch('[0-9a-f]{64}',text(value)) for value in fields[:2 if tag==302 else 3]),
+            require(all(re.fullmatch('[0-9a-f]{64}',text(value)) for value in fields[:2 if tag in (302,305) else 3]),
                     'source query SHA-256 spelling')
-            if tag == 303:
+            if tag in (303,306):
                 require(not list_values(value_node(fields[3],240,8)[3]), 'inline data in contextual header')
         else: raise Invalid('closed query envelope tag')
     return doc
@@ -193,6 +196,12 @@ def verify_source_result(doc):
     """Hash the bounded canonical result independently of the production writer."""
     query_payload_root(doc)
     _, tag, fields = doc.values()[-1]
+    if tag in (305,306):
+        key, result, *body = fields
+        template = ('node', tag, (key, ('text', '~'*64), *body))
+        raw = tree_document([key, template], schema=2)
+        require(hashlib.sha256(raw).hexdigest() == text(result), 'source result slot fingerprint')
+        return text(key)
     if tag == 303:
         ref, key, result, header, body = fields
         material = (key, ref, header, body)
@@ -214,15 +223,16 @@ def cache_snapshot(root, active_hashes):
         full=None
         if raw.startswith(MAGIC):
             doc=inspect_artifact(raw,2);value=doc.values()[-1];details[name]=doc.accounting()
-            if value[1] in (302,303):
+            if value[1] in (302,303,305,306):
                 require(verify_source_result(doc)==key, 'stored fingerprint matches source query filename')
-                representation='MLFBIN-QUERY-INLINE-3' if len(doc.roots)==2 else 'MLFBIN-QUERY-INLINE-2'
-                if value[1]==303:
-                    digest=text(value[2][0]); context='context-'+digest+'.mlfqc'
+                version = 4 if value[1] in (305,306) else 3 if len(doc.roots)==2 else 2
+                representation=f'MLFBIN-QUERY-INLINE-{version}'
+                if value[1] in (303,306):
+                    digest=text(value[2][2 if value[1]==306 else 0]); context='context-'+digest+'.mlfqc'
                     require(context in files and files[context]['sha256']==digest,'context exact physical SHA256')
                     cdoc=inspect_artifact((root/context).read_bytes(),1)
                     contexts.add(context); details[context]=cdoc.accounting()
-                    representation='MLFBIN-QUERY-SHARED-3' if len(doc.roots)==2 else 'MLFBIN-QUERY-SHARED-2'
+                    representation=f'MLFBIN-QUERY-SHARED-{version}'
             elif value[1]==300:
                 full=text(value[2][0]); representation='MLFBIN-QUERY-INLINE-1'
             else:

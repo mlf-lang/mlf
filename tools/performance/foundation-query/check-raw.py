@@ -20,8 +20,12 @@ def require(value, message):
 def read_group(cache, key, contexts, compiler, baseline_fields=None):
     doc = reader.read_document((cache / (key + '.mlfq')).read_bytes(), 2)
     root = typed.query_payload_root(doc)
-    if doc.nodes[root].data[0] == 303:
-        ref, stored_key, _, header, body = wire.graph_node(doc, root, 303, 5)
+    tag = doc.nodes[root].data[0]
+    if tag in (303,306):
+        if tag == 306:
+            stored_key, _, ref, header, body = wire.graph_node(doc, root, tag, 5)
+        else:
+            ref, stored_key, _, header, body = wire.graph_node(doc, root, tag, 5)
         require(baseline_fields is not None, 'comparison needs an exact-key reference compiler')
         require(wire.graph_text(doc, stored_key) == key == typed.verify_source_result(doc),
                 'record input and independently recomputed result fingerprint')

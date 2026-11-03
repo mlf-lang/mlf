@@ -33,7 +33,8 @@ module Bootstrap.Unicode where {
   isAlphaNum :: Int -> Bool;
   isAlphaNum c =
     if (c < 128)
-    then (((c >= 48) && (c <= 57)) || (((c >= 65) && (c <= 90)) || ((c >= 97) && (c <= 122))))
+    -- Folding ASCII case reduces both letter intervals to the lower one.
+    then unsignedLtInt (c - 48) 10 || unsignedLtInt (orInt c 32 - 97) 26
     else unicodeMember c isAlphaNumRanges 0 778;
   isAlphaNumRanges :: String;
   isAlphaNumRanges =

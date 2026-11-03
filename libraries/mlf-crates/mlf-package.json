@@ -41,7 +41,8 @@
       "Bootstrap.PreparedLibraryLiteral": "Bootstrap/PreparedLibraryLiteral.hs",
       "Bootstrap.Separate": "Bootstrap/Separate.hs",
       "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs",
-      "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs"
+      "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs",
+      "Bootstrap.SourceUnit": "Bootstrap/SourceUnit.hs"
     }
   },
   "source-syntax": "shared-haskell-v1"

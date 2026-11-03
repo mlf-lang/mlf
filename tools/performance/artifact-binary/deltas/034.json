@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 55534,
+  "new_sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077",
+  "old_bytes": 55482,
+  "old_sha256": "fb8a1f8a0147d416d3b5bfd637d53121e584de6f8856d2c380ec360d2df47adf",
+  "path": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+  "splices": [
+    {
+      "new": "LS0gRm9sZGluZyBBU0NJSSBjYXNlIHJlZHVjZXMgYm90aCBsZXR0ZXIgaW50ZXJ2YWxzIHRvIHRoZSBsb3dlciBvbmUuCiAgICB0aGVuIHVuc2lnbmVkTHRJbnQgKGMgLSA0OCkgMTAgfHwgdW5zaWduZWRMdEludCAob3JJbnQgYyAzMiAtIDk3KSAyNg==",
+      "new_at": 11786,
+      "old": "dGhlbiAoKChjID49IDQ4KSAmJiAoYyA8PSA1NykpIHx8ICgoKGMgPj0gNjUpICYmIChjIDw9IDkwKSkgfHwgKChjID49IDk3KSAmJiAoYyA8PSAxMjIpKSkp",
+      "old_at": 11786
+    }
+  ]
+}

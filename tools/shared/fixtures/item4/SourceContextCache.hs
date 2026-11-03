@@ -107,13 +107,18 @@ recordParts record = case record of
 -- Legacy poisons need full inputs. Reconstruct those from the test program,
 -- never from the record under test. Keep the current envelope for new poisons.
 localRecordParts keys record = case record of
-  BinaryInput [Wire.VText address,Wire.VNode 303 [Wire.VText ref,Wire.VText digest,Wire.VText ich,header,body]] -> do
+  BinaryInput [Wire.VText address,Wire.VNode 303 [Wire.VText ref,Wire.VText digest,Wire.VText ich,header,body]] ->
+    decoded address digest ich ref header body
+  BinaryInput [Wire.VText address,Wire.VNode 306 [Wire.VText digest,Wire.VText ich,Wire.VText ref,header,body]] ->
+    decoded address digest ich ref header body
+  _ -> error "expected a fingerprinted source record"
+ where
+  decoded address digest ich ref header body = do
     need "address matches stored input and hashes are valid"
       (address == digest && Q.validSourceContextDigest digest && Q.validSourceContextDigest ich)
     input <- fullKey keys digest
     (compact,_) <- splitKey input
     pure (ref,compact,Payload header body)
-  _ -> error "expected a fingerprinted source record"
 localRecord ref input (Payload header body) = do
   digest <- fingerprint input
   ich <- Q.localResultHash digest [Wire.VText ref,header,body] >>= expect "poison ICH"

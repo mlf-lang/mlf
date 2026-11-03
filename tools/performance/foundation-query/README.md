@@ -1,5 +1,48 @@
 # Foundation source crate compilation
 
+## Foundation comparison with PR 33
+
+The November 4 comparison uses the 14 PR 25 Foundation modules, 504 input
+SCCs and one edit from Version 0.3.0 to 0.3.1. PR 33 at `17d36c32` is arm
+A. The candidate is built from PR 29 on a separate branch. Both use the
+same GHC 9.14.1 release producer and flags. Each compilation is a new
+ordinary CLI process. The two installed-Prelude pairs use A, B, B, A with an
+empty query cache for each cold run, followed by its warm and edited runs.
+A separate A, B, B, A starts each cold run with both stores empty. The
+decision rule requires two paired wins and at least a 2% mean wall reduction
+in each state. Every observation and the recorded compiler and input
+identities are in the [comparison data](pr33-comparison.json).
+
+The initial PR 29 head was `e4f6e42b`. During qualification it advanced to
+`3283899e`, on the same base `c5928b5b`. The three changed files are the CI
+workflow and its private C3 test adapter and regression. Both executable
+identities were reauthenticated after aligning the branch with that head.
+
+The compiler still checks raw xMLF, binding ownership, parameter types and
+evidence before reuse. A private receipt pairs the checked term with the
+actual admitted interface. The common small-object finalization path proves
+its wire bounds before editing the same XThen forests as the full graph path.
+Large or deep objects use the full planner. Both paths independently check
+rewritten terms and checksums. The binary reader indexes exact decode shapes
+by validated node ID. Small complete keys are forced and hashed in memory
+under the usual cache lock.
+
+The query writer hashes and patches one canonical record template. POSIX
+writers stage at most 32 checked records in a newly claimed private directory
+under the cache lock and publish them with ordinary same-filesystem renames.
+Failure flushes preceding successful SCCs. An occupied staging name and
+Windows use the existing per-file publication path. The prepared Prelude
+generator emits the two ordinary binary artifacts. The official build
+independently regenerates both from the checked builtin. A normal installation
+hit compares the exact bytes of both bounded files under the lock. A mismatch
+takes the formal reader and repair path. Full ICH mode retains that formal
+installation check. [Source fingerprint format](../source-fingerprints/README.md).
+
+On the GHC host the right operand of strict integer operations depends on
+the left, preserving error order while allowing direct arithmetic and branches.
+ST and IO array indexing uses a checked unsigned range on the validated
+array size. These changes leave the source-language primitive ABI unchanged.
+
 This study compares the ordinary GHC-hosted `emlf --compile-crate` entry
 point on the same 14 Foundation modules from PR 25. PR 25 was
 `c5928b5be73cd78d194405e734aa012415570e1a`. The candidate starts at
