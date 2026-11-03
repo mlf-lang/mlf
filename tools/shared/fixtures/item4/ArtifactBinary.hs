@@ -1254,6 +1254,15 @@ sourceAdmissionTests directory = do
             legacy <- W.decode (cap work) 2 fallback >>= expect "budget fallback checked under original cap"
             need "only the original single-root representation fits" (sameValues legacy [payload])
             Q.encodeAddressedSource (cap (work-1)) address payload >>= reject "fallback cannot bypass resource cap"
+            let byteCap = case W.defaultLimits of
+                  W.Limits _ c t total nodes edges depth limit ->
+                    let size = W.resourceBytes stats
+                    in W.Limits size c (min size t) (min size total) nodes edges depth limit
+            W.encode byteCap 2 [address,payload] >>= reject "extra root exceeds exact single-root file size"
+            fallbackBytes <- Q.encodeAddressedSource byteCap address payload >>= expect "exact file-size fallback"
+            oldBytes <- W.encode byteCap 2 [payload] >>= expect "original size-limited encoding"
+            sameBytes <- Storage.sameBytes fallbackBytes oldBytes
+            need "file-size fallback preserves exact prior bytes" sameBytes
             Storage.write 2 target [address,W.VNode 303 [ref,W.VText other,result,header,body]]
               >>= expect "valid CRC with detached address"
             tryAudit False >>= rejected "matching prefix cannot authorize another payload"

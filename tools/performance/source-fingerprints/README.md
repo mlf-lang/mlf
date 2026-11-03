@@ -164,6 +164,46 @@ In the separate warm audit, the default bucket selected 17 of 504 groups.
 Mean wall was 7.876 s sampled and 8.855 s for verifying all 504 (+0.979 s,
 +12.4%). All four runs reused every group and reproduced the cold artifacts.
 
+## Addressed record experiment on PR 29
+
+The baseline was `6927bfacedd141d7182cc53f5e7a99f1cd3c9411` and the implementation
+was `000356d37e083bd7cad1443cadb1564bb6cd6363`. On the same 14 Foundation
+modules, the ordinary CLI ran in fixed order 29, candidate, candidate, 29. Each
+sequence used the same source paths and a fresh cache with a verified Prelude.
+A separate experiment loaded all 504 physical candidate records before timing.
+Both modes ran in one optimized GHC executable and validated the same payload
+SHA on success. For the mismatch case each record was queried under the next
+record's SHA. The order was full, early, early, full, twice per case.
+
+| 504 preloaded records | Full decoder, wall / CPU s | Address gate, wall / CPU s |
+|---|---:|---:|
+| Matching address | 0.789 / 0.786 | 0.791 / 0.788 |
+| Wrong address | 0.784 / 0.782 | 0.00309 / 0.00308 |
+
+| Ordinary CLI | Wall s, base / candidate | CPU s, base / candidate | Peak RSS MiB, base / candidate |
+|---|---:|---:|---:|
+| Cold | 23.79 / 24.06 | 23.60 / 23.87 | 117.7 / 119.6 |
+| Warm | 7.43 / 7.65 | 7.36 / 7.54 | 116.4 / 118.4 |
+| Version edit | 7.45 / 7.72 | 7.40 / 7.62 | 121.5 / 122.6 |
+
+The addressed reader avoided 99.6% of the wire time for these deliberately
+misplaced records. In this end-to-end series the normal cold, warm and edited
+compiles took 1.1%, 3.0% and 3.6% longer. The gate costs about 0.0024 s across
+504 correct addresses in the isolated comparison. The ordinary timings include
+all compilation stages and each compiler's selected ICH bucket.
+
+Cold cache size was 4,322,919 / 4,323,425 B and after the edit it was
+4,342,549 / 4,343,056 B. Inferred/reused counts were 504/0, 0/504 and 1/503.
+Both matched pairs agreed on every final interface/object byte and on the
+505 distinct raw headers/bodies and 83 physical datatype contexts. Every
+candidate record in the experiment had the two-root layout. [All samples,
+compiler identities and workload checks](early-address-results.json).
+
+```sh
+python3 tools/performance/foundation-query/compare.py --baseline-label 29 "$pr29/bin/emlf" "$candidate/bin/emlf" "$foundation" "$study"
+python3 tools/performance/source-fingerprints/compare-decode.py --addresses "$candidate" "$candidate" "$study/1-candidate" "$wire"
+```
+
 ## Reproduction
 
 Use verify-built producer directories and a fresh output directory. The
