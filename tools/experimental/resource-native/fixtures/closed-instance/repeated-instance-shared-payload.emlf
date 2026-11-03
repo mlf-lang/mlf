@@ -1,0 +1,1 @@
+data Maybe a = Nothing | Just a; let maybe : forall b a. b -> (a -> b) -> Maybe a -> b = \fallback f value -> case value of { Nothing -> fallback; Just x -> f x } in let n : Int = addInt 20 1 in let shared : Maybe Int = Just n in addInt (maybe 0 (\x -> addInt x 1) shared) (maybe 0 (\x -> addInt x 1) shared)

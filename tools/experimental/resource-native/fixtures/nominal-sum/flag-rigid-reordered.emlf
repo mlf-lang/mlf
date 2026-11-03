@@ -1,0 +1,1 @@
+data Flag = Flexible | Rigid; case Rigid of { Rigid -> 22; Flexible -> 20 }

@@ -1790,10 +1790,20 @@ module Bootstrap.Module where {
                 (map (\inst -> candidates (fst inst)) instances)
                 reach)
          };
+  -- Both callers consume one actual namespace resolution and the same pure link.
+  -- The evidence route retains that resolution; the ordinary route discards it.
   linkModules :: PreludeMode -> [] SourceModule -> Either String LinkedModule;
-  linkModules mode supplied =
+  linkModules mode supplied = mapEither fst (linkModulesWithResolution mode supplied);
+  linkModulesWithResolution :: PreludeMode -> [] SourceModule ->
+    Either String ((,) LinkedModule ResolvedCrate);
+  linkModulesWithResolution mode supplied = do {
+    crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
+    linked <- linkResolvedModules crate;
+    Right ((,) linked crate)
+  };
+  linkResolvedModules :: ResolvedCrate -> Either String LinkedModule;
+  linkResolvedModules crate =
     do {
-      crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
       let {
         names = resolvedCrateNames crate
       };

@@ -54,14 +54,61 @@ class GateControls(unittest.TestCase):
             self.assertEqual(recorded,original)
     def test_manifest_fail_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary); (root/'M.hs').write_text('module M where {}')
+            root=Path(temporary).resolve(); (root/'M.hs').write_text('module M where {}')
             manifest=root/'mlf-package.json'
             value={'format':1,'name':'fixture','version':'1','dependencies':{},'library':{'modules':{'M':'M.hs'}}}
             manifest.write_text(json.dumps(value))
             with patch.object(gate,'ROOT',root):
-                self.assertEqual(gate.manifest_inputs(manifest,'fixture',1,{})[1], [('M',root/'M.hs')])
-                for name,count,deps in [('wrong',1,{}),('fixture',2,{}),('fixture',1,{'dep':'../dep'})]:
-                    with self.assertRaises(ValueError):gate.manifest_inputs(manifest,name,count,deps)
+                self.assertEqual(gate.manifest_inputs(manifest,'fixture',{'M':'M.hs'},{})[1], [('M',root/'M.hs')])
+                for name,modules,deps in [('wrong',{'M':'M.hs'},{}),
+                                          ('fixture',{'M':'M.hs','N':'N.hs'},{}),
+                                          ('fixture',{'M':'M.hs'},{'dep':'../dep'})]:
+                    with self.assertRaises(ValueError):gate.manifest_inputs(manifest,name,modules,deps)
+    def test_reviewed_repository_inventory(self):
+        original = {'Fresh', 'Host', 'IntMap', 'IntSet', 'Map', 'Regex', 'ST',
+                    'Set', 'Std', 'Types', 'Unicode', 'Version'}
+        self.assertEqual(gate.FOUNDATION_MODULES,
+                         {'Bootstrap.'+name: 'Bootstrap/'+name+'.hs'
+                          for name in original | {'IntTree', 'IntRank'}})
+        foundation = gate.ROOT/'libraries/mlf-foundation/mlf-package.json'
+        framework = gate.ROOT/'testing/mlf-package.json'
+        self.assertEqual(len(gate.manifest_inputs(foundation,'mlf-foundation',
+                         gate.FOUNDATION_MODULES,{})[1]),14)
+        modules = gate.manifest_inputs(framework,'mlf-test',gate.FRAMEWORK_MODULES,
+                                      {'mlf-foundation':'../libraries/mlf-foundation'})[1]
+        self.assertEqual(len(modules),14)
+        self.assertEqual(sum(p.suffix=='.hs' for _,p in modules),7)
+        self.assertEqual(sum(p.suffix=='.emlf' for _,p in modules),7)
+    def test_equal_size_module_replacement_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            for name in ['M.hs','N.hs','M.emlf']:(root/name).write_text('module M where {}')
+            manifest=root/'mlf-package.json'
+            for modules in [{'N':'M.hs'},{'M':'N.hs'},{'M':'M.emlf'}]:
+                manifest.write_text(json.dumps({'format':1,'name':'fixture',
+                                                'library':{'modules':modules}}))
+                with patch.object(gate,'ROOT',root), self.subTest(modules=modules), self.assertRaises(ValueError):
+                    gate.manifest_inputs(manifest,'fixture',{'M':'M.hs'},{})
+    def test_missing_and_extra_modules_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);manifest=root/'mlf-package.json'
+            for name in ['M.hs','N.hs']:(root/name).write_text('module M where {}')
+            for modules in [{},{'M':'M.hs','N':'N.hs'}]:
+                manifest.write_text(json.dumps({'format':1,'name':'fixture',
+                                                'library':{'modules':modules}}))
+                with patch.object(gate,'ROOT',root), self.subTest(modules=modules), self.assertRaises(ValueError):
+                    gate.manifest_inputs(manifest,'fixture',{'M':'M.hs'},{})
+    def test_exact_dependency_route_is_retained(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);(root/'M.hs').write_text('module M where {}')
+            manifest=root/'mlf-package.json'
+            for deps in [{'dep':{'path':'../wrong'}},
+                         {'dep':{'path':'../dep'},'extra':{'path':'../extra'}}]:
+                manifest.write_text(json.dumps({'format':1,'name':'fixture',
+                              'dependencies':deps,'library':{'modules':{'M':'M.hs'}}}))
+                with patch.object(gate,'ROOT',root), self.subTest(deps=deps), self.assertRaises(ValueError):
+                    gate.manifest_inputs(manifest,'fixture',{'M':'M.hs'},{'dep':'../dep'})
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'requires Linux /proc watchdog')
     def test_watchdog_success_and_error(self):
         for status in [0,1]:
             with self.subTest(status=status), tempfile.TemporaryDirectory() as temporary:
@@ -73,6 +120,7 @@ class GateControls(unittest.TestCase):
                 self.assertEqual(receipt['exit_code'],status)
                 self.assertEqual(receipt['complete'],status==0)
                 self.assertIsNone(receipt['reason'])
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'requires Linux /proc watchdog')
     def test_watchdog_final_output_floor(self):
         with tempfile.TemporaryDirectory() as temporary:
             command=[sys.executable,str(gate.WATCHDOG),'--seconds','5','--address-space-mib','256',

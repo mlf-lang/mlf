@@ -1,0 +1,1 @@
+data Ring = Ring Int Ring; let rec r : Ring = Ring 42 r in case r of { Ring n _ -> n }

@@ -9,7 +9,10 @@ import hashlib
 import json
 from typing import Any
 
-VERSION = "resource-ir-planning-kernel/3"
+VERSION = "resource-ir-field-sum/1"
+SCALAR_SHAPES = {'#i64', '#bool'}
+SCALAR_PRIMITIVES = {'addInt': '#i64', 'subInt': '#i64', 'mulInt': '#i64',
+                     'eqInt': '#bool', 'ltInt': '#bool'}
 
 
 class CheckError(ValueError):
@@ -127,12 +130,18 @@ class CheckedProgram:
 
 class Checker:
     def __init__(self, program: Any):
-        if not isinstance(program, dict) or type(program.get("version")) is not int or program["version"] not in (1, 2, 3):
-            fail("program.version", "VERSION", "only versions 1, 2 and 3 are supported")
+        if not isinstance(program, dict) or type(program.get("version")) is not int or program["version"] not in (1, 2, 3, 4, 5, 6, 7):
+            fail("program.version", "VERSION", "only resource IR versions 1 through 7 are supported")
         self.v2 = program["version"] >= 2
-        self.v3 = program["version"] == 3
+        self.v3 = program["version"] >= 3
+        self.v4 = program["version"] >= 4
+        self.v5 = program["version"] >= 5
+        self.v6 = program["version"] >= 6
+        self.v7 = program["version"] == 7
         keys = {"version", "layouts", "codes", "entry"} | ({"signatures", "functions"} if self.v2 else set())
+        if self.v6: keys.add("families")
         self.program = object_keys(program, keys, "program")
+        self.families = program.get("families", {})
         self.layouts = program["layouts"]
         self.codes = program["codes"]
         self.signatures = program.get("signatures", {})
@@ -158,22 +167,63 @@ class Checker:
 
     def layout(self, value: Any, path: str) -> str:
         value = name(value, path)
-        if value.startswith("@") and self.v2:
+        if value.startswith('%'):
+            if not self.v6 or value[1:] not in self.families:
+                fail(path, 'FAMILY', 'unknown or version-ineligible nominal family shape')
+        elif value.startswith('#'):
+            if not self.v4 or value not in SCALAR_SHAPES:
+                fail(path, 'LAYOUT', 'unknown or version-ineligible intrinsic scalar shape')
+        elif value.startswith("@") and self.v2:
             if value[1:] not in self.signatures:
                 fail(path, "SIGNATURE", f"unknown callable signature {value!r}")
         elif value not in self.layouts:
             fail(path, "LAYOUT", f"unknown layout {value!r}")
         return value
 
+    def family(self, value: Any, path: str) -> list[str]:
+        value = name(value, path)
+        if value not in self.families:
+            fail(path, 'FAMILY', 'unknown nominal family')
+        return self.families[value]['variants']
+
+    def variant_fields(self, family: str, variant: str) -> list[str]:
+        return self.families[family].get('fields', {}).get(variant, [])
+
     def schemas(self) -> None:
+        if not isinstance(self.families, dict) or len(self.families) > 64:
+            fail('families', 'FAMILY', 'expected at most 64 finite nominal families')
+        for family, spec in self.families.items():
+            name(family, 'families')
+            if family.startswith(('@', '#', '%')):
+                fail('families', 'FAMILY', 'family names cannot occupy reserved namespaces')
+            object_keys(spec, {'variants', 'fields'} if self.v7 else {'variants'}, 'families.' + family)
+            variants = sequence(spec['variants'], 'families.' + family + '.variants')
+            if not 1 <= len(variants) <= 64:
+                fail('families.' + family, 'FAMILY', 'a family needs 1 to 64 variants')
+            for variant in variants: name(variant, 'families.' + family + '.variants')
+            if len(set(variants)) != len(variants):
+                fail('families.' + family, 'FAMILY', 'variant names must be unique within their family')
         if not isinstance(self.layouts, dict) or not self.layouts:
             fail("layouts", "SCHEMA", "expected nonempty layout object")
         if not isinstance(self.signatures, dict) or not isinstance(self.functions, dict):
             fail("program", "SCHEMA", "signatures and functions must be objects")
+        if self.v7:
+            for family, spec in self.families.items():
+                fields = spec['fields']
+                if not isinstance(fields, dict) or set(fields) != set(spec['variants']):
+                    fail('families.' + family, 'FIELDS', 'complete variant field inventory required')
+                for variant in spec['variants']:
+                    types = sequence(fields[variant], 'families.' + family + '.fields.' + variant)
+                    if len(types) > 32:
+                        fail('families.' + family, 'FIELDS', 'at most 32 fields per variant')
+                    for shape in types:
+                        shape = self.layout(shape, 'families.' + family + '.fields.' + variant)
+                        if shape not in SCALAR_SHAPES and not shape.startswith('%'):
+                            fail('families.' + family, 'FIELD_SHAPE', 'sum fields admit only intrinsic Int/Bool or registered sum')
         for signature, spec in self.signatures.items():
             name(signature, "signatures")
-            if signature.startswith("@"):
-                fail("signatures", "SCHEMA", "signature names cannot start with @")
+            if signature.startswith(("@", "#", "%")):
+                fail("signatures", "SCHEMA", "signature names cannot start with @, # or %")
             object_keys(spec, {"argument", "result", "protocol", "result_identity"}, f"signatures.{signature}")
             if spec["protocol"] not in ("repeat", "once") or spec["result_identity"] not in ("argument", "unknown"):
                 fail(f"signatures.{signature}", "SCHEMA", "invalid callable protocol/identity contract")
@@ -186,8 +236,8 @@ class Checker:
             fail("layouts", "SCHEMA", "expected nonempty layout object")
         for layout, fields in self.layouts.items():
             name(layout, "layouts")
-            if self.v2 and layout.startswith("@"):
-                fail("layouts", "SCHEMA", "data layout names cannot start with @")
+            if layout.startswith(('#', '%')) or (self.v2 and layout.startswith("@")):
+                fail("layouts", "SCHEMA", "data layout names cannot use reserved @, # or % namespaces")
             if not isinstance(fields, dict):
                 fail(f"layouts.{layout}", "SCHEMA", "fields must be an object")
             for field, target in fields.items():
@@ -315,12 +365,24 @@ class Checker:
                                 "application": {"out", "in", "function", "argument"}})
             if self.v3:
                 schemas["application_borrow"] = {"out", "in", "function", "argument"}
+            if self.v4:
+                schemas.update({'scalar': {'out', 'in', 'kind', 'value'},
+                                'prim2': {'out', 'in', 'primitive', 'left', 'right'},
+                                'finish_scalar': {'value'}})
+            if self.v5:
+                schemas['select_i64'] = {'out', 'in', 'condition', 'then', 'else'}
+            if self.v6:
+                schemas.update({'construct_nullary': {'out', 'in', 'family', 'variant'},
+                                'case_i64': {'out', 'in', 'family', 'scrutinee', 'arms'}})
+            if self.v7:
+                schemas.update({'construct_sum': {'out', 'in', 'family', 'variant', 'fields'},
+                                'case_fields_i64': {'out', 'in', 'family', 'scrutinee', 'arms'}})
             if op not in schemas:
                 fail(p, "UNSUPPORTED", f"unsupported operation {op!r}")
             object_keys(instruction, {"op"} | schemas[op], p)
             self.ops += 1
             i = instruction
-            terminal = op in ("return", "finish", "choose")
+            terminal = op in ("return", "finish", "finish_scalar", "choose")
             if terminal and index != len(body) - 1:
                 fail(p, "TERMINAL", "instructions after terminal are not allowed")
             if op in ("new_root", "new_below"):
@@ -336,6 +398,145 @@ class Checker:
                 for value in imported:
                     state.order.add(group, value.group, True)
                 self.bind(state, i["out"], Value(group, "key"), p)
+            elif op == 'scalar':
+                authority = self.authority(state, i['in'], p + '.in')
+                if i['kind'] not in ('i64', 'bool'):
+                    fail(p, 'SCALAR_KIND', 'only exact i64 and bool scalar kinds are supported')
+                if i['kind'] == 'i64':
+                    if type(i['value']) is not int or not -(1 << 63) <= i['value'] < (1 << 63):
+                        fail(p, 'SCALAR_VALUE', 'i64 literal must be a canonical signed 64-bit JSON integer')
+                elif type(i['value']) is not bool:
+                    fail(p, 'SCALAR_VALUE', 'bool literal must be a JSON boolean')
+                self.bind(state, i['out'], Value(authority.group, 'ref', layout='#' + i['kind'],
+                                               ready=True, identity=self.identity()), p)
+            elif op == 'prim2':
+                authority = self.authority(state, i['in'], p + '.in')
+                primitive = name(i['primitive'], p + '.primitive')
+                if primitive not in SCALAR_PRIMITIVES:
+                    fail(p, 'PRIMITIVE', 'primitive is outside the exact five-operation scalar contract')
+                for key in ('left', 'right'):
+                    operand = self.get(state, i[key], p + '.' + key, kind='ref', own=True)
+                    if operand.layout != '#i64':
+                        fail(p, 'LAYOUT', 'scalar binary primitive requires intrinsic i64 operands')
+                    if not operand.ready:
+                        fail(p, 'DEMAND', 'scalar primitive operands must be explicitly forced/ready')
+                self.bind(state, i['out'], Value(authority.group, 'ref', layout=SCALAR_PRIMITIVES[primitive],
+                                               ready=True, identity=self.identity()), p)
+            elif op in ('construct_nullary', 'construct_sum'):
+                authority = self.authority(state, i['in'], p + '.in')
+                variants = self.family(i['family'], p + '.family')
+                variant = name(i['variant'], p + '.variant')
+                if variant not in variants:
+                    fail(p, 'VARIANT', 'constructor variant is not registered in this family')
+                types = self.variant_fields(i['family'], variant)
+                supplied = sequence(i['fields'], p + '.fields') if op == 'construct_sum' else []
+                if len(supplied) != len(types):
+                    fail(p, 'ARITY', 'constructor must supply the full declared field vector')
+                for index, (variable, shape) in enumerate(zip(supplied, types)):
+                    field = self.get(state, variable, p + f'.fields[{index}]', kind='ref', own=True)
+                    if field.layout != shape: fail(p, 'LAYOUT', 'constructor field has wrong exact shape')
+                    if not state.order.below(field.group, authority.group):
+                        fail(p, 'UPWARD_SUPPORT', 'constructor field not proven Down(authority)')
+                self.bind(state, i['out'], Value(authority.group, 'ref', layout='%' + i['family'],
+                                               ready=True, identity=self.identity()), p)
+            elif op == 'case_fields_i64':
+                authority = self.authority(state, i['in'], p + '.in')
+                variants = self.family(i['family'], p + '.family')
+                scrutinee = self.get(state, i['scrutinee'], p + '.scrutinee', kind='ref', own=True)
+                if scrutinee.layout != '%' + i['family']:
+                    fail(p, 'FAMILY', 'factory scrutinee requires exact declared family')
+                if not scrutinee.ready: fail(p, 'DEMAND', 'factory needs explicitly forced/ready parent')
+                if not state.order.below(scrutinee.group, authority.group):
+                    fail(p, 'UPWARD_SUPPORT', 'parent is not proven Down(factory authority)')
+                arms = i['arms']
+                if not isinstance(arms, dict) or set(arms) != set(variants):
+                    fail(p, 'ARMS', 'factory needs exactly every declared variant arm')
+                for variant in variants:
+                    arm_path = p + '.arms.' + variant
+                    arm = object_keys(arms[variant], {'code', 'captures'}, arm_path)
+                    code = name(arm['code'], arm_path + '.code')
+                    if code not in self.codes or self.codes[code]['result'] != '#i64':
+                        fail(arm_path, 'FACTORY', 'factory arm must name checked Int-result thunk code')
+                    expected = self.codes[code]['captures']; supplied = arm['captures']
+                    if not isinstance(supplied, dict) or set(supplied) != set(expected):
+                        fail(arm_path, 'CAPTURES', 'factory capture names must match thunk signature exactly')
+                    if len(supplied) > 64: fail(arm_path, 'CAPTURE_LIMIT', 'at most 64 captures per arm')
+                    field_count = external_count = 0
+                    for capture in sorted(expected):
+                        binding = supplied[capture]; contract = expected[capture]
+                        if not isinstance(binding, dict): fail(arm_path, 'CAPTURE_BINDING', 'typed capture binding required')
+                        if binding.get('kind') == 'field':
+                            object_keys(binding, {'kind', 'index'}, arm_path + '.' + capture)
+                            index = binding['index']; fields = self.variant_fields(i['family'], variant)
+                            if type(index) is not int or not 0 <= index < len(fields):
+                                fail(arm_path, 'FIELD_INDEX', 'capture field index outside complete variant vector')
+                            if contract['layout'] != fields[index]: fail(arm_path, 'LAYOUT', 'field capture shape differs')
+                            if contract['relation'] != 'down':
+                                fail(arm_path, 'CAPTURE_RELATION', 'field capture proves Down only, never same/strict')
+                            field_count += 1
+                        elif binding.get('kind') == 'external':
+                            object_keys(binding, {'kind', 'value'}, arm_path + '.' + capture)
+                            value = self.get(state, binding['value'], arm_path + '.' + capture, kind='ref', own=True)
+                            if value.layout != contract['layout']: fail(arm_path, 'LAYOUT', 'external capture shape differs')
+                            if not state.order.below(value.group, authority.group):
+                                fail(arm_path, 'UPWARD_SUPPORT', 'external capture not proven Down(authority)')
+                            if contract['relation'] == 'same' and value.group != authority.group:
+                                fail(arm_path, 'CAPTURE_RELATION', 'same external capture needs exact group proof')
+                            if contract['relation'] == 'below' and not state.order.below(value.group, authority.group, strict=True):
+                                fail(arm_path, 'CAPTURE_RELATION', 'strict external capture needs strict proof')
+                            external_count += 1
+                        else: fail(arm_path, 'CAPTURE_BINDING', 'unknown factory capture binding kind')
+                    if field_count > 32 or external_count > 32:
+                        fail(arm_path, 'CAPTURE_LIMIT', 'at most 32 field and 32 external bindings per arm')
+                group = self.fresh(); state.order.add(authority.group, group)
+                self.bind(state, i['out'], Value(group, 'ref', layout='#i64', identity=self.identity()), p)
+            elif op == 'case_i64':
+                authority = self.authority(state, i['in'], p + '.in')
+                variants = self.family(i['family'], p + '.family')
+                if any(self.variant_fields(i['family'], v) for v in variants):
+                    fail(p, 'FACTORY', 'field-bearing families require case_fields_i64')
+                scrutinee = self.get(state, i['scrutinee'], p + '.scrutinee', kind='ref', own=True)
+                if scrutinee.layout != '%' + i['family']:
+                    fail(p, 'FAMILY', 'case scrutinee must have the exact declared nominal family')
+                if not scrutinee.ready:
+                    fail(p, 'DEMAND', 'case scrutinee must be explicitly forced/ready')
+                arms = i['arms']
+                if not isinstance(arms, dict) or set(arms) != set(variants):
+                    fail(p, 'ARMS', 'case requires exactly every declared constructor, no default')
+                variables = [name(arms[v], p + '.arms.' + v) for v in variants]
+                if len(set(variables)) != len(variables) or i['in'] in variables:
+                    fail(p, 'OWNERSHIP', 'case consumes independent branch capabilities, not its authority')
+                for variable in variables:
+                    value = self.get(state, variable, p + '.arms', kind='ref', own=True)
+                    if value.layout != '#i64':
+                        fail(p, 'LAYOUT', 'case alternatives must be intrinsic Int cursors')
+                    if not state.order.below(value.group, authority.group):
+                        fail(p, 'UPWARD_SUPPORT', 'case alternative is not proven Down(authority)')
+                for variable in variables: self.consume(state, variable, p + '.arms')
+                group = self.fresh(); state.order.add(authority.group, group)
+                self.bind(state, i['out'], Value(group, 'ref', layout='#i64'), p)
+            elif op == 'select_i64':
+                authority = self.authority(state, i['in'], p + '.in')
+                condition = self.get(state, i['condition'], p + '.condition', kind='ref', own=True)
+                if condition.layout != '#bool':
+                    fail(p, 'LAYOUT', 'Int selection requires intrinsic Bool condition')
+                if not condition.ready:
+                    fail(p, 'DEMAND', 'selection condition must be explicitly forced/ready')
+                if i['then'] == i['else'] or i['in'] in (i['then'], i['else']):
+                    fail(p, 'OWNERSHIP', 'selection consumes two distinct branch capabilities, not its authority')
+                for key in ('then', 'else'):
+                    alternative = self.get(state, i[key], p + '.' + key, kind='ref', own=True)
+                    if alternative.layout != '#i64':
+                        fail(p, 'LAYOUT', 'selection alternatives must both have intrinsic Int shape')
+                    if not state.order.below(alternative.group, authority.group):
+                        fail(p, 'UPWARD_SUPPORT', 'selection alternative is not proven Down(authority)')
+                self.consume(state, i['then'], p + '.then')
+                self.consume(state, i['else'], p + '.else')
+                group = self.fresh()
+                state.order.add(authority.group, group)
+                # Abstract selected group, not physical allocation; neither readiness
+                # nor a specific alternative's symbolic identity is established.
+                self.bind(state, i['out'], Value(group, 'ref', layout='#i64'), p)
             elif op in ("alloc", "thunk", "hole", "closure"):
                 authority = self.authority(state, i["in"], p + ".in")
                 if op in ("thunk", "closure"):
@@ -488,6 +689,16 @@ class Checker:
                 if state.result_identity is not None and result.identity != state.result_identity:
                     fail(p, "IDENTITY", "declared argument identity is not preserved by the actual return")
                 self.consume(state, i["value"], p)
+                self.finish(state, p)
+            elif op == 'finish_scalar':
+                if not state.finish_allowed or state.result_layout is not None:
+                    fail(p, 'RETURN', 'finish_scalar is entry-only')
+                result = self.get(state, i['value'], p, kind='ref', own=True)
+                if result.layout not in SCALAR_SHAPES:
+                    fail(p, 'LAYOUT', 'finish_scalar requires intrinsic i64 or bool')
+                if not result.ready:
+                    fail(p, 'DEMAND', 'finish_scalar requires an explicitly forced/ready scalar')
+                self.consume(state, i['value'], p)
                 self.finish(state, p)
             elif op == "finish":
                 if not state.finish_allowed:

@@ -181,7 +181,7 @@ module Bootstrap.LLVM.Library
     -- Whole-program strict-wrapper erasure changes constructor representation.
     -- Independently compiled library and root cannot infer the same candidate
     -- set, so this boundary always preserves the ordinary boxed datatype ABI.
-    optimized = Optimize.optimize (X.erase (Checked.term checked));
+    optimized = Optimize.optimizeOwned (X.erase (Checked.term checked));
     -- The installed nominal census rules out independent library construction
     -- of these fresh root types. Their local sites still undergo the ordinary
     -- all-site/escaping-constructor proof; shared constructors remain open.

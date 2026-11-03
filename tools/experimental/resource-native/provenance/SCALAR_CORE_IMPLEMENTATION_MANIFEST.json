@@ -1,0 +1,13 @@
+{
+  "schema": "independent-new-scalar-core-manifest/1",
+  "implementation": "resource-ir-scalar-foundation/1",
+  "root": "/workspace/scratch/c43337ba2cad/rebuild-scalar-core-20261102",
+  "files": {
+    "resource_ir/checker.py": "d9de7e0a64a1bd91a383e33cdd61f6fb7d7972cd68a300e20eac37aaae610376",
+    "resource_ir/runtime.py": "d55be34332225a788de9cb38ea74374c74af62b77ef2ef2d6c6e9b44d3fdd132",
+    "resource_ir/__init__.py": "3729ca2025fb561e44b92cdf6d92090865e404c8342406d12d03d59d4846b409",
+    "native/rir_runtime.c": "32de1f8838e8f7aa9eedac948ebc1bae6be256b2b11ae4c0f4eeaff0b43b38cf",
+    "native/rir_runtime.h": "93127496d028da5e12dd2ae7e426ce6c490f4b885b9e3baabd8bfaf3d6c62d05",
+    "codegen.py": "0abf5ce9a085051e50efc07802b745ac9553078b0d68bb2a2a433635af40c7ab"
+  }
+}

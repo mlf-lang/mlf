@@ -7,7 +7,7 @@ from pathlib import Path
 import run_native
 BASE=Path(__file__).resolve().parent
 NORMAL=['unit','unsigned_ring','mutual_ring','concrete_identity','ignored_bottom','hidden_capture','nominal_unit']
-NEGATIVE={'unsupported_poly':'unsupported runtime representation','unsupported_scalar':'ResourceExport: unsupported fragment','bad_type':'Inference:','bad_parse':'Parsing:'}
+NEGATIVE={'unsupported_poly':'unsupported runtime representation','scalar-foundation/unsupported-quotient':'ResourceExport: unsupported fragment','bad_type':'Inference:','bad_parse':'Parsing:'}
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--build-parent',type=Path,required=True);args=p.parse_args();records=[]
     for name in NORMAL+['blackhole']:

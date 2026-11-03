@@ -1,0 +1,1 @@
+let min : Int -> Int -> Int = \a -> \b -> if (a < b) then a else b in min (min 20 22) (min 8 9)

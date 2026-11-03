@@ -1,0 +1,1 @@
+let n : Int = 20 in let f : Int -> Int = \x -> addInt n x in f 22

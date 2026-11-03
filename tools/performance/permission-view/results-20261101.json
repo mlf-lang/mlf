@@ -1,0 +1,575 @@
+{
+  "baseline_ref": "01ef8e70741c9f9ac4f27e489d059c96a4b33df5",
+  "complete": true,
+  "decision": "Accepted: strict-positive predefined compiler point gain, mechanism, all finite retained gates and two guard cells passed.",
+  "diagnostic_mechanism": {
+    "avoided_second_constructors": 15627,
+    "changed": 55925,
+    "construct": 127477,
+    "fresh": 711,
+    "observed_rebindings": 71552,
+    "raw_bytes_equal": true,
+    "reused": 0,
+    "shared": 15627
+  },
+  "evidence": {
+    "baseline-auth.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/baseline-auth.json",
+      "sha256": "279823a3baf8cac009e552313a84f58d1e92a7fd9a0f97442cb745a5d8234f80"
+    },
+    "baseline-producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/baseline-producer/receipt.json",
+      "sha256": "279823a3baf8cac009e552313a84f58d1e92a7fd9a0f97442cb745a5d8234f80"
+    },
+    "builtin-refresh/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/builtin-refresh/receipt.json",
+      "sha256": "8907d24e945fde83f19a64543506616a63925d2c50aabb66d7caac369926b190"
+    },
+    "candidate-build/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/candidate-build/command.json",
+      "sha256": "cb72313fdb396e51990d9fe6a633c8c3ece7957151f4cb07089715566a85e422"
+    },
+    "candidate-card.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/candidate-card.json",
+      "sha256": "3ac1bb1509c4c40b858360941174123132df04493b4fd0bc75e03294e4dc1f20"
+    },
+    "controls-o0-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/controls-o0-01/receipt.json",
+      "sha256": "ce53e6e8a1271ea2cc546ce413278f7b5762287f7e3bcd93edc925a4ae851183"
+    },
+    "controls-o2-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/controls-o2-01/receipt.json",
+      "sha256": "d0d51bca21302623e3e397c74f2073a9ade2dd7037111ebe87394b0a008e5139"
+    },
+    "discovery-config.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/discovery-config.json",
+      "sha256": "43157efcbc97de12989565f31a3c0fe3e6d5833764683f59357679b266104576"
+    },
+    "discovery-summary.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/discovery-summary.json",
+      "sha256": "ada4b397fde0bfcd92304f612b15b7a93fde5def980f9e6be3d51f35053c4ae0"
+    },
+    "discovery/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/discovery/plan.json",
+      "sha256": "d6267c10cc0b180e91411492f2d327042e41d43c5ddef3372fda86aae30a352e"
+    },
+    "discovery/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/discovery/receipt.json",
+      "sha256": "7aad3b4cf321a5fcff318950a80710ae7c7f0d76cc28cc46e6c4431572d51711"
+    },
+    "gates.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/gates.json",
+      "sha256": "e66e10c3bc746aa8a33d6aa32fe8ff42890c13902024ac25f241264e8fef5569"
+    },
+    "guard-config.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/guard-config.json",
+      "sha256": "4df04256003a60d320c367cc3691d647bb5df1e9fbd82ade4a511c90741d3767"
+    },
+    "guards/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/guards/plan.json",
+      "sha256": "3c2a269de49492e32b0f94044383dcd20b967c8e09998501053fbe227ea09c48"
+    },
+    "guards/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/guards/receipt.json",
+      "sha256": "1de8a3dae152cbbdbd65e56d2f9a7dcbf1908a6ab1ca22e0eccb87ff908fb20e"
+    },
+    "mechanism-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/mechanism-01/receipt.json",
+      "sha256": "ffd4cb80584e2b05b9af8baf16f4547507b7accb797e30f222fa79cccbce1171"
+    },
+    "mechanism-02/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/mechanism-02/receipt.json",
+      "sha256": "6ba088a20dab5ceb66d3822b2699544148108360b0cedf7fafa51d3a64bc80d7"
+    },
+    "mechanism-03/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/mechanism-03/receipt.json",
+      "sha256": "11f73a74294818e8a4ac885ef77016bcd9851a55cb35bc34c1931a9a90770c52"
+    },
+    "post-rebase-integration.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/post-rebase-integration.json",
+      "sha256": "4b48993cea07170c6a0f957e178568124f1272cb99a60de2b69d8cf8158d8333"
+    },
+    "producer-v2/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/producer-v2/receipt.json",
+      "sha256": "f52d62f0822b2e81d3b821d4d22151c0973a4b21a484780cd2566075483c4a7b"
+    },
+    "producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/producer/receipt.json",
+      "sha256": "7e1de946b9b85b32364c6884cd67c639a2e775fb590fb1eca41570eb1b81acde"
+    },
+    "qualification.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/qualification.json",
+      "sha256": "54ab10bb82b876903ef5d784065a0c6bceba191475444f0e3d1f207e4fc85a98"
+    }
+  },
+  "evidence_limits": [
+    "New adaptation of historical C1, original patch not recovered.",
+    "Only 8 ordinary compiler runs, 2 analysis blocks; ABBA improves, BAAB slows slightly; median comparison favors baseline.",
+    "No independent confirmation, confidence interval or stable/portable speedup claim.",
+    "Frozen 711-group target completes checked crates, not current-source self-bootstrap or a new GHC comparison.",
+    "Diagnostic counts do not represent ordinary exclusive CPU or physical allocations."
+  ],
+  "format": "permission-view-results-v1",
+  "integration_suites": [
+    {
+      "exit_code": 0,
+      "name": "p123"
+    },
+    {
+      "exit_code": 0,
+      "name": "graph"
+    },
+    {
+      "exit_code": 0,
+      "name": "map-balance"
+    },
+    {
+      "exit_code": 0,
+      "name": "validation"
+    },
+    {
+      "exit_code": 0,
+      "name": "builtin"
+    },
+    {
+      "exit_code": 0,
+      "name": "files"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-library"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-containers"
+    },
+    {
+      "exit_code": 0,
+      "name": "fingerprint"
+    },
+    {
+      "exit_code": 0,
+      "name": "direct"
+    },
+    {
+      "exit_code": 0,
+      "name": "batch-optimizer"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-io"
+    },
+    {
+      "exit_code": 0,
+      "name": "locked-plan"
+    },
+    {
+      "exit_code": 0,
+      "name": "manifest"
+    }
+  ],
+  "ordinary_comparison": {
+    "complete": true,
+    "evidence": "Fixed small descriptive window; no confidence interval, significance or portability claim.",
+    "guards": {
+      "flat_functions-512": {
+        "blocks": [
+          {
+            "block": 0,
+            "log_ratio": -0.011997286171077187,
+            "order": "ABBA"
+          }
+        ],
+        "gain": 0.011925605676838757,
+        "geometric_seconds": {
+          "A": 3.8689256480967433,
+          "B": 3.822786366424534
+        },
+        "meaningful_regression": false,
+        "median_seconds": {
+          "A": 3.869900438,
+          "B": 3.8229914165
+        },
+        "ratio": 0.9880743943231612,
+        "runs": 4
+      },
+      "higher_order_chain-128": {
+        "blocks": [
+          {
+            "block": 1,
+            "log_ratio": -0.0006439961747380039,
+            "order": "BAAB"
+          }
+        ],
+        "gain": 0.0006437888537085268,
+        "geometric_seconds": {
+          "A": 0.9339838996463502,
+          "B": 0.9333826112222147
+        },
+        "meaningful_regression": false,
+        "median_seconds": {
+          "A": 0.934054771,
+          "B": 0.9334586874999999
+        },
+        "ratio": 0.9993562111462915,
+        "runs": 4
+      }
+    },
+    "guards_complete": true,
+    "positive_primary": true,
+    "primary": {
+      "compiler": {
+        "blocks": [
+          {
+            "block": 0,
+            "log_ratio": -0.0024423228939699686,
+            "order": "ABBA"
+          },
+          {
+            "block": 1,
+            "log_ratio": 7.56231746025602e-06,
+            "order": "BAAB"
+          }
+        ],
+        "gain": 0.0012166395814762199,
+        "geometric_seconds": {
+          "A": 43.72215011596167,
+          "B": 43.66895601754333
+        },
+        "median_seconds": {
+          "A": 43.692865312500004,
+          "B": 43.7078682915
+        },
+        "ratio": 0.9987833604185238,
+        "runs": 8
+      }
+    },
+    "timing_rule_passed": true
+  },
+  "ordinary_legs": [
+    {
+      "block": 0,
+      "case": "compiler",
+      "child_system_seconds": 1.290867,
+      "child_user_seconds": 42.129923,
+      "fresh": 711,
+      "position": 0,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 43.81253175,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "child_system_seconds": 1.321845,
+      "child_user_seconds": 42.170148,
+      "fresh": 711,
+      "position": 1,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 43.866026083,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "child_system_seconds": 1.27895,
+      "child_user_seconds": 42.070239,
+      "fresh": 711,
+      "position": 2,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 43.6644965,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "child_system_seconds": 1.286646,
+      "child_user_seconds": 42.442097,
+      "fresh": 711,
+      "position": 3,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 43.9318785,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "child_system_seconds": 1.262194,
+      "child_user_seconds": 41.976116,
+      "fresh": 711,
+      "position": 0,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 43.395442542,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "child_system_seconds": 1.283193,
+      "child_user_seconds": 42.091976,
+      "fresh": 711,
+      "position": 1,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 43.572098416,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "child_system_seconds": 1.291836,
+      "child_user_seconds": 42.056098,
+      "fresh": 711,
+      "position": 2,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 43.573198875,
+      "window": "discovery"
+    },
+    {
+      "block": 1,
+      "case": "compiler",
+      "child_system_seconds": 1.30888,
+      "child_user_seconds": 42.24277,
+      "fresh": 711,
+      "position": 3,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 43.751240083,
+      "window": "discovery"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "child_system_seconds": 0.703591,
+      "child_user_seconds": 3.006457,
+      "fresh": 515,
+      "position": 0,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 3.783045792,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "child_system_seconds": 0.7139869999999999,
+      "child_user_seconds": 3.033215,
+      "fresh": 515,
+      "position": 1,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 3.783396375,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "child_system_seconds": 0.742968,
+      "child_user_seconds": 3.047791,
+      "fresh": 515,
+      "position": 2,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 3.862586458,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "child_system_seconds": 0.751451,
+      "child_user_seconds": 3.075661,
+      "fresh": 515,
+      "position": 3,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 3.956755084,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "child_system_seconds": 0.088848,
+      "child_user_seconds": 0.879713,
+      "fresh": 6,
+      "position": 0,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 0.945376,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "child_system_seconds": 0.085784,
+      "child_user_seconds": 0.888504,
+      "fresh": 6,
+      "position": 1,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 0.945560875,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "child_system_seconds": 0.08111499999999999,
+      "child_user_seconds": 0.8613,
+      "fresh": 6,
+      "position": 2,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 0.922548667,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "child_system_seconds": 0.083702,
+      "child_user_seconds": 0.891562,
+      "fresh": 6,
+      "position": 3,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 0.921541375,
+      "window": "guards"
+    }
+  ],
+  "post_rebase_integration": {
+    "checks": [
+      "ghc-good-run",
+      "ghc-bad-run",
+      "standalone-map-basic-run",
+      "standalone-map-bulk-run",
+      "standalone-map-sorted-run",
+      "standalone-map-rank-run",
+      "standalone-set-basic-run",
+      "standalone-set-sorted-run",
+      "standalone-rank-views-run",
+      "standalone-lazy-payloads-run",
+      "standalone-bad-run"
+    ],
+    "ci_policy": "passed after integration",
+    "complete": true,
+    "native_batch_contract_tests": {
+      "normal": 7,
+      "passed": true,
+      "python_optimized": 7
+    },
+    "native_batches": [
+      {
+        "name": "map-basic",
+        "output_lines": 1352
+      },
+      {
+        "name": "map-bulk",
+        "output_lines": 1196
+      },
+      {
+        "name": "map-sorted",
+        "output_lines": 400
+      },
+      {
+        "name": "map-rank",
+        "output_lines": 29
+      },
+      {
+        "name": "set-basic",
+        "output_lines": 680
+      },
+      {
+        "name": "set-sorted",
+        "output_lines": 400
+      },
+      {
+        "name": "rank-views",
+        "output_lines": 41
+      },
+      {
+        "name": "lazy-payloads",
+        "output_lines": 9
+      }
+    ],
+    "native_inventory": {
+      "index_view_checks": 35,
+      "lazy_payload_checks": 9,
+      "map_cases": 9,
+      "output_lines": 4107,
+      "selected_payload_error_checks": 1,
+      "set_cases": 7,
+      "signed_keys": 199
+    },
+    "new_native_runner_source": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_native.py",
+      "sha256": "daa9d7dc04be57c98d43abdf0430522838f60598a8d2439e5130af4fbf908fd9"
+    },
+    "old_native_runner_source": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/baseline-source/tools/performance/patricia/run_native.py",
+      "sha256": "ff8925c8e9c48959c816f7e69cdb80dc6f915879ec44bf1c15b92d036fdec840"
+    },
+    "ordinary_samples_added": 0,
+    "original_full_fixture_model_and_error_bytes_equal": true,
+    "production_inputs_identical_to_tested_producer": true,
+    "receipts": {
+      "post-rebase-authentication.json": {
+        "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/post-rebase-authentication.json",
+        "sha256": "90680d120d7ea92de9fcc957b4c2b0312166ead3f863a5d623844567683f5921"
+      },
+      "post-rebase-native-containers/receipt.json": {
+        "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101/post-rebase-native-containers/receipt.json",
+        "sha256": "24982d122e452abaa67fd8022ac3e5a88a0bc3568ce9a6bc5b5b0da9da104250"
+      }
+    },
+    "remote_parent": "1fbb8b63073d645a763e03a453519cd38852f0f4",
+    "upstream_changes": "Native test organization and CI contract tests only; no compiler, runtime, build configuration, producer authenticator or benchmark controller changes."
+  },
+  "preparation_failures": [
+    "Initial ordinary qualification rejected stale builtin source token; canonical literal freshly regenerated, identity-only byte change.",
+    "Diagnostic object-only relink failed: an inlined GHC worker reference required dependent recompilation.",
+    "Diagnostic make succeeded; target launch did not start because output/log directory collided. Fresh target subsequently used the same compiled diagnostic binary."
+  ],
+  "production_delta": {
+    "added_sources": {},
+    "changed_sources": {
+      "Bootstrap.Graph": {
+        "new": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+        "old": "c515ef78483563eea91a4d9a26a0ef3165586961f7d3271d4a470816951aa6b4",
+        "reviewed_change": "Reuse dense permission views within one rebind only when all flexible binding parents are equal; retain construction fallback and query order."
+      },
+      "MLF.BuiltinPreludeData": {
+        "new": "c1e1240c275abc0dbd17954d8cbe8f76599344d089edb5648a2117feab8c33ad",
+        "old": "a40b64e7420a93d9dbbb393df479ec68134ea8d432a9c293fe92b939e0a4eff2",
+        "reviewed_change": "Fresh complete canonical regeneration with identity-only byte change for the Graph preparation closure."
+      }
+    },
+    "format": "permission-view-source-migration-v1",
+    "host_sources": {},
+    "module_count": 128,
+    "parent_manifest_sha256": "10f2da2458cbda85d61787be112fcb09e28d93cf97ebbd7b974eaccac5466f6b",
+    "parent_ref": "01ef8e70741c9f9ac4f27e489d059c96a4b33df5",
+    "removed_sources": {},
+    "unchanged_sources": 126
+  },
+  "raw_directory": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/permission-view-20261101"
+}

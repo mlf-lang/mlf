@@ -1,0 +1,1 @@
+data Flag = Flexible | Rigid; data Other = OtherA | OtherB; case Flexible of { Flexible -> 20; OtherB -> 22 }

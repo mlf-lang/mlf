@@ -1,0 +1,1 @@
+let min : Int -> Int -> Int = \a -> \b -> if (a < b) then a else b in min 22 20

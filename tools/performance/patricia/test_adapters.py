@@ -27,8 +27,50 @@ sparse_spec=importlib.util.spec_from_file_location('sparse_contracts_contract',
 sparse=importlib.util.module_from_spec(sparse_spec)
 sparse_spec.loader.exec_module(sparse)
 
-def before_sparse_registry(base):
+c3_spec=importlib.util.spec_from_file_location('c3_session_contract',
+    ROOT/'tools/performance/c3-delayed-index/source_contract.py')
+c3=importlib.util.module_from_spec(c3_spec)
+c3_spec.loader.exec_module(c3)
+survivors_spec=importlib.util.spec_from_file_location('c3_survivor_contract',
+    ROOT/'tools/performance/c3-survivors/source_contract.py')
+survivors=importlib.util.module_from_spec(survivors_spec)
+survivors_spec.loader.exec_module(survivors)
+full_spec=importlib.util.spec_from_file_location('projection_patch_contract',
+    ROOT/'tools/performance/full-compiler/source_contract.py')
+full=importlib.util.module_from_spec(full_spec)
+full_spec.loader.exec_module(full)
+
+def before_full_registry(base):
     return migration.apply_changes(migration.migrate(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.full_delta()['changed_sources'].items()})
+
+def before_survivors_registry(base):
+    return migration.apply_changes(before_full_registry(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.survivors_delta()['changed_sources'].items()})
+
+def before_c3_registry(base):
+    return migration.apply_changes(before_survivors_registry(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.c3_delta()['changed_sources'].items()})
+
+def before_canonical_carry_registry(base):
+    return migration.apply_changes(before_c3_registry(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.canonical_carry_delta()['changed_sources'].items()})
+
+def before_permission_registry(base):
+    previous=migration.apply_changes(before_canonical_carry_registry(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.permission_delta()['changed_sources'].items()})
+    return previous
+
+def before_sparse_registry(base):
+    previous=migration.apply_changes(before_permission_registry(base),
+        {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
+         for name,row in migration.batch_delta()['changed_sources'].items()})
+    return migration.apply_changes(previous,
         {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
          for name,row in migration.sparse_delta()['changed_sources'].items()})
 
@@ -89,7 +131,7 @@ class AdapterTests(unittest.TestCase):
         key = 'host/ghc/MLF/Host/Base.hs'
         row = manifest['host_sources'][key]
         for field in ['old', 'retained_F1_parent']:
-            self.assertEqual(migration.host_sources({key: row[field]}), {key: row['new']})
+            self.assertEqual(migration.host_sources({key: row[field]}), {key: '50780c7183d62aa7568c0a799fdf5829b6ea60cbbc67cca7fd1a3f08bc4ba9c5'})
         with self.assertRaisesRegex(ValueError, 'exact frozen host parent'):
             migration.host_sources({key: '0'*64})
 
@@ -149,6 +191,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_datatype_session_projection_preserves_previous_complete_owner(self):
         source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=graph.without_delayed_indexes(source)
         source=sparse.restore_previous_owner(source)
         previous=datatype.restore_previous_owner(contract.restore_previous_owner(source))
         expected=migration.design_delta()['changed_sources']['Bootstrap.CrateSession']['new']
@@ -174,6 +217,7 @@ class AdapterTests(unittest.TestCase):
         with patch.object(migration,'contract_delta',return_value=bad),self.assertRaises(ValueError):
             migration.migrate(base)
         source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=graph.without_delayed_indexes(source)
         source=sparse.restore_previous_owner(source)
         previous=contract.restore_previous_owner(source)
         self.assertEqual(hashlib.sha256(previous).hexdigest(),delta['changed_sources']['Bootstrap.CrateSession']['old'])
@@ -203,8 +247,8 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(set(delta['changed_sources']),set(paths))
         for name,row in delta['changed_sources'].items():
             self.assertEqual(previous[name],row['old'])
-            self.assertEqual(migration.migrate(base)[name],row['new'])
-            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),row['new'])
+            self.assertEqual(before_permission_registry(base)[name],row['new'])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),migration.migrate(base)[name])
         bad=json.loads(json.dumps(delta))
         bad['changed_sources']['Bootstrap.SourceInference']['old']='0'*64
         with patch.object(migration,'sparse_delta',return_value=bad),self.assertRaises(ValueError):
@@ -217,8 +261,114 @@ class AdapterTests(unittest.TestCase):
                 with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
                     migration.sparse_delta()
 
+    def test_permission_layer_preserves_parent_and_exact_current_owners(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.permission_delta()
+        result=before_canonical_carry_registry(base)
+        current=migration.migrate(base)
+        self.assertEqual(delta['parent_manifest_sha256'],migration.BATCH_MANIFEST_SHA)
+        paths={'Bootstrap.Graph':'libraries/mlf-inference/Bootstrap/Graph.hs',
+               'MLF.BuiltinPreludeData':'bootstrap/MLF/BuiltinPreludeData.hs'}
+        self.assertEqual(set(delta['changed_sources']),set(paths))
+        for name,row in delta['changed_sources'].items():
+            self.assertEqual(before_permission_registry(base)[name],row['old'])
+            self.assertEqual(result[name],row['new'])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),current[name])
+        bad=json.loads(json.dumps(delta))
+        bad['changed_sources']['Bootstrap.Graph']['old']='0'*64
+        with patch.object(migration,'permission_delta',return_value=bad),self.assertRaises(ValueError):
+            migration.migrate(base)
+        original=(migration.HERE.parent/'permission-view/source-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'permission-view').mkdir()
+            for value in [original+b' ',b'{}']:
+                (root/'permission-view/source-migration.json').write_bytes(value)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
+                    migration.permission_delta()
+
+    def test_canonical_carry_has_exact_three_owners_and_125_unchanged_sources(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        previous=before_canonical_carry_registry(base)
+        result=before_c3_registry(base)
+        delta=migration.canonical_carry_delta()
+        paths={'Bootstrap.Separate':'libraries/mlf-crates/Bootstrap/Separate.hs',
+               'Bootstrap.CrateArtifact':'libraries/mlf-crates/Bootstrap/CrateArtifact.hs',
+               'MLF.BuiltinPreludeData':'bootstrap/MLF/BuiltinPreludeData.hs'}
+        self.assertEqual(set(delta['changed_sources']),set(paths))
+        self.assertEqual(set(result),set(previous))
+        self.assertEqual(len(result),128)
+        self.assertEqual({n for n in result if result[n]!=previous[n]},set(paths))
+        self.assertEqual({n:result[n] for n in result if n not in paths},
+                         {n:previous[n] for n in previous if n not in paths})
+        self.assertEqual(len(set(result)-set(paths)),125)
+        for name,row in delta['changed_sources'].items():
+            self.assertEqual(previous[name],row['old'])
+            self.assertEqual(result[name],row['new'])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),row['new'])
+
+    def test_canonical_carry_wrong_predecessors_and_registry_pollution_rejected(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.canonical_carry_delta()
+        for name in delta['changed_sources']:
+            bad=json.loads(json.dumps(delta));bad['changed_sources'][name]['old']='0'*64
+            with self.subTest(name=name),patch.object(migration,'canonical_carry_delta',return_value=bad),self.assertRaises(ValueError):
+                migration.migrate(base)
+        missing=dict(base);missing.pop('Bootstrap.Graph')
+        renamed={**missing,'Unexpected':base['Bootstrap.Graph']}
+        polluted={**base,'Bootstrap.Graph':'0'*64}
+        for bad in (missing,renamed,polluted,migration.migrate(base)):
+            with self.subTest(count=len(bad)),self.assertRaises(ValueError):
+                migration.migrate(bad)
+
+    def test_canonical_carry_manifest_tamper_and_rehashed_scope_errors_rejected(self):
+        original=(migration.HERE.parent/'canonical-carry/source-migration.json').read_bytes()
+        delta=json.loads(original)
+        changed=[]
+        for name in delta['changed_sources']:
+            bad=json.loads(original);bad['changed_sources'][name]['new']='1'*64
+            changed.append(json.dumps(bad).encode())
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'canonical-carry').mkdir()
+            path=root/'canonical-carry/source-migration.json'
+            for raw in (original+b' ',b'{}',*changed):
+                path.write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
+                    migration.canonical_carry_delta()
+            missing=json.loads(original);missing['changed_sources'].pop('Bootstrap.Separate')
+            extra=json.loads(original);extra['changed_sources']['Bootstrap.Graph']=delta['changed_sources']['Bootstrap.Separate']
+            host=json.loads(original);host['host_sources']={'Unexpected':'1'*64}
+            for bad in (missing,extra,host):
+                raw=json.dumps(bad).encode();path.write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),patch.object(migration,'CANONICAL_CARRY_MANIFEST_SHA',hashlib.sha256(raw).hexdigest()),self.assertRaises(ValueError):
+                    migration.canonical_carry_delta()
+
+    def test_batch_layer_preserves_parent_and_exact_current_owners(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.batch_delta()
+        result=migration.migrate(base)
+        self.assertEqual(delta['parent_manifest_sha256'],migration.SPARSE_MANIFEST_SHA)
+        paths={'Bootstrap.LLVM':'libraries/mlf-llvm/Bootstrap/LLVM.hs',
+               'Bootstrap.LLVM.Library':'libraries/mlf-llvm/Bootstrap/LLVM/Library.hs',
+               'Bootstrap.LLVM.Optimize':'libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs'}
+        self.assertEqual(set(delta['changed_sources']),set(paths))
+        for name,row in delta['changed_sources'].items():
+            self.assertEqual(result[name],row['new'])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),row['new'])
+        bad=json.loads(json.dumps(delta))
+        bad['changed_sources']['Bootstrap.LLVM.Optimize']['old']='0'*64
+        with patch.object(migration,'batch_delta',return_value=bad),self.assertRaises(ValueError):
+            migration.migrate(base)
+        original=(migration.HERE.parent/'batch-replacement/source-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'batch-replacement').mkdir()
+            for value in [original+b' ',b'{}']:
+                (root/'batch-replacement/source-migration.json').write_bytes(value)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
+                    migration.batch_delta()
+
     def test_sparse_projection_rejects_owner_or_edit_corruption(self):
         source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=graph.without_delayed_indexes(source)
         previous=sparse.restore_previous_owner(source)
         self.assertEqual(graph.without_sparse_contracts(source),previous)
         self.assertEqual(hashlib.sha256(previous).hexdigest(),
@@ -248,6 +398,192 @@ class AdapterTests(unittest.TestCase):
             for bad in [original+b' ',b'{}']:
                 (root/'session-delta.json').write_bytes(bad)
                 with patch.object(datatype,'HERE',root),self.assertRaises(ValueError):datatype.manifest()
+
+    def test_c3_registry_matches_all_live_shared_owners(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        result=migration.migrate(base)
+        found={}
+        inventory=json.loads((ROOT/'shared-sources.json').read_bytes())
+        for row in inventory['modules']:
+            name=row['module']
+            self.assertNotIn(name,found)
+            found[name]=hashlib.sha256((ROOT/row['path']).read_bytes()).hexdigest()
+        self.assertEqual(found,result)
+        delta=migration.c3_delta()
+        parent=before_c3_registry(base)
+        self.assertEqual(delta['parent_manifest_sha256'],migration.CANONICAL_CARRY_MANIFEST_SHA)
+        self.assertEqual({n for n in result if result[n]!=parent[n]}, {'Bootstrap.CrateSession'})
+        owner=delta['changed_sources']['Bootstrap.CrateSession']
+        self.assertEqual(owner['old'],c3.OLD_SHA)
+        self.assertEqual(owner['new'],c3.NEW_SHA)
+
+    def test_c3_registry_rejects_wrong_parent_and_manifest(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.c3_delta()
+        for section in ['changed_sources']:
+            for name in delta[section]:
+                bad=json.loads(json.dumps(delta))
+                bad[section][name]['old']='0'*64
+                with patch.object(migration,'c3_delta',return_value=bad),self.assertRaises(ValueError):
+                    migration.migrate(base)
+        original=(migration.HERE.parent/'c3-delayed-index/source-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'c3-delayed-index').mkdir()
+            for value in [original+b' ',b'{}']:
+                (root/'c3-delayed-index/source-migration.json').write_bytes(value)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):
+                    migration.c3_delta()
+            extra=json.loads(original);extra['changed_sources']['Bootstrap.Graph']=delta['changed_sources']['Bootstrap.CrateSession']
+            host=json.loads(original);host['host_sources']={'Unexpected':'1'*64}
+            zero=json.loads(original);zero['changed_sources']['Bootstrap.CrateSession']['new']='0'*64
+            for bad in [extra,host,zero]:
+                raw=json.dumps(bad).encode()
+                (root/'c3-delayed-index/source-migration.json').write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),patch.object(migration,'C3_MANIFEST_SHA',hashlib.sha256(raw).hexdigest()),self.assertRaises(ValueError):
+                    migration.c3_delta()
+
+    def test_c3_projection_requires_complete_owner_and_exact_inverse(self):
+        source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=graph.without_survivor_merge(source)
+        previous=c3.restore_previous_owner(source)
+        self.assertEqual(hashlib.sha256(previous).hexdigest(),
+            '18abedc7f96452392ed3401f1ae607233ec13e2a5ba24bd1c0cba344820c382f')
+        self.assertEqual(c3.current_or_parent(source),previous)
+        self.assertEqual(c3.current_or_parent(previous),previous)
+        self.assertEqual(graph.without_delayed_indexes(source),previous)
+        with self.assertRaises(ValueError):c3.restore_previous_owner(previous)
+        with self.assertRaises(ValueError):c3.current_or_parent(source+b'\n')
+        for index,edit in enumerate(c3.manifest()['edits']):
+            for value in [source.replace(edit['new'].encode(),b'',1),source+edit['new'].encode()]:
+                with self.assertRaises(ValueError):c3.current_or_parent(value)
+            bad=json.loads(json.dumps(c3.manifest()))
+            bad['edits'][index]['old']+='\n'
+            with patch.object(c3,'manifest',return_value=bad),self.assertRaises(ValueError):
+                c3.restore_previous_owner(source)
+
+    def test_c3_projection_manifest_is_fixed(self):
+        original=(c3.HERE/'session-delta.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for value in [original+b' ',b'{}']:
+                (root/'session-delta.json').write_bytes(value)
+                with patch.object(c3,'HERE',root),self.assertRaises(ValueError):c3.manifest()
+
+    def test_survivors_layer_preserves_exact_c3_parent_and_live_owner(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.survivors_delta();result=before_full_registry(base)
+        previous=before_survivors_registry(base)
+        self.assertEqual(delta['parent_manifest_sha256'],migration.C3_MANIFEST_SHA)
+        self.assertEqual({n for n in result if result[n]!=previous[n]}, {'Bootstrap.CrateSession'})
+        self.assertEqual(len(result),128)
+        row=delta['changed_sources']['Bootstrap.CrateSession']
+        self.assertEqual(row['old'],c3.NEW_SHA)
+        self.assertEqual(row['old'],survivors.OLD_SHA)
+        self.assertEqual(row['new'],survivors.NEW_SHA)
+        self.assertEqual(row['new'],result['Bootstrap.CrateSession'])
+        self.assertEqual(row['old'],previous['Bootstrap.CrateSession'])
+
+    def test_survivors_inverse_recovers_complete_previous_owner(self):
+        source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=graph.without_projection_patch(source)
+        previous=survivors.restore_previous_owner(source)
+        self.assertEqual(hashlib.sha256(previous).hexdigest(),
+            '157b4d8d07986b1074cc612b89e2482783b3c80164db5f6dc74b1ece14fa7094')
+        self.assertEqual(graph.without_survivor_merge(source),previous)
+        self.assertEqual(survivors.current_or_parent(previous),previous)
+        earlier=c3.restore_previous_owner(previous)
+        self.assertEqual(survivors.current_or_parent(earlier),earlier)
+        self.assertEqual(graph.without_delayed_indexes(source),earlier)
+        for bad in [source+b'\n',source[:-1],previous]:
+            with self.assertRaises(ValueError):survivors.restore_previous_owner(bad)
+        for edit in survivors.manifest()['edits']:
+            for bad in [source.replace(edit['new'].encode(),b'',1),source+edit['new'].encode()]:
+                with self.assertRaises(ValueError):survivors.current_or_parent(bad)
+        bad=json.loads(json.dumps(survivors.manifest()));bad['edits'][0]['old']+='\n'
+        with patch.object(survivors,'manifest',return_value=bad),self.assertRaises(ValueError):
+            survivors.restore_previous_owner(source)
+
+    def test_survivors_source_inverse_manifest_is_fixed(self):
+        original=(survivors.HERE/'session-delta.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for bad in [original+b' ',b'{}']:
+                (root/'session-delta.json').write_bytes(bad)
+                with patch.object(survivors,'HERE',root),self.assertRaises(ValueError):survivors.manifest()
+
+    def test_survivors_registry_rejects_wrong_predecessor_and_scope(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.survivors_delta();bad=json.loads(json.dumps(delta))
+        bad['changed_sources']['Bootstrap.CrateSession']['old']='0'*64
+        with patch.object(migration,'survivors_delta',return_value=bad),self.assertRaises(ValueError):
+            migration.migrate(base)
+        original=(migration.HERE.parent/'c3-survivors/source-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'c3-survivors').mkdir();path=root/'c3-survivors/source-migration.json'
+            for raw in [original+b' ',b'{}']:
+                path.write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):migration.survivors_delta()
+            extra=json.loads(original);extra['changed_sources']['Bootstrap.Graph']=delta['changed_sources']['Bootstrap.CrateSession']
+            host=json.loads(original);host['host_sources']={'Unexpected':'1'*64}
+            zero=json.loads(original);zero['changed_sources']['Bootstrap.CrateSession']['new']='0'*64
+            for bad in [extra,host,zero]:
+                raw=json.dumps(bad).encode();path.write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),patch.object(migration,'SURVIVORS_MANIFEST_SHA',hashlib.sha256(raw).hexdigest()),self.assertRaises(ValueError):
+                    migration.survivors_delta()
+
+    def test_projection_layer_has_exact_parent_and_one_current_owner(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.full_delta();result=migration.migrate(base);previous=before_full_registry(base)
+        self.assertEqual(delta['parent_manifest_sha256'],migration.SURVIVORS_MANIFEST_SHA)
+        self.assertEqual(len(result),128)
+        self.assertEqual({n for n in result if result[n]!=previous[n]}, {'Bootstrap.CrateSession'})
+        row=delta['changed_sources']['Bootstrap.CrateSession']
+        self.assertEqual(row['old'],survivors.NEW_SHA)
+        self.assertEqual(row['old'],full.OLD_SHA)
+        self.assertEqual(row['new'],full.NEW_SHA)
+        self.assertEqual(previous['Bootstrap.CrateSession'],row['old'])
+        self.assertEqual(result['Bootstrap.CrateSession'],row['new'])
+
+    def test_projection_inverse_recovers_complete_accepted_owner(self):
+        source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        previous=full.restore_previous_owner(source)
+        self.assertEqual(hashlib.sha256(previous).hexdigest(),
+            '51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9')
+        self.assertEqual(graph.without_projection_patch(source),previous)
+        self.assertEqual(full.current_or_parent(previous),previous)
+        self.assertEqual(graph.without_survivor_merge(source),survivors.restore_previous_owner(previous))
+        for bad in [source+b'\n',source[:-1],previous]:
+            with self.assertRaises(ValueError):full.restore_previous_owner(bad)
+        for e in full.manifest()['edits']:
+            for bad in [source.replace(e['new'].encode(),b'',1),source+e['new'].encode()]:
+                with self.assertRaises(ValueError):full.current_or_parent(bad)
+        bad=json.loads(json.dumps(full.manifest()));bad['edits'][0]['old']+='\n'
+        with patch.object(full,'manifest',return_value=bad),self.assertRaises(ValueError):full.restore_previous_owner(source)
+
+    def test_projection_inverse_manifest_is_fixed(self):
+        original=(full.HERE/'session-delta.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for bad in [original+b' ',b'{}']:
+                (root/'session-delta.json').write_bytes(bad)
+                with patch.object(full,'HERE',root),self.assertRaises(ValueError):full.manifest()
+
+    def test_projection_registry_rejects_bad_predecessor_scope_and_hash(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        delta=migration.full_delta();bad=json.loads(json.dumps(delta));bad['changed_sources']['Bootstrap.CrateSession']['old']='0'*64
+        with patch.object(migration,'full_delta',return_value=bad),self.assertRaises(ValueError):migration.migrate(base)
+        original=(migration.HERE.parent/'full-compiler/source-migration.json').read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'full-compiler').mkdir();path=root/'full-compiler/source-migration.json'
+            for raw in [original+b' ',b'{}']:
+                path.write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),self.assertRaises(ValueError):migration.full_delta()
+            extra=json.loads(original);extra['changed_sources']['Bootstrap.Graph']=delta['changed_sources']['Bootstrap.CrateSession']
+            host=json.loads(original);host['host_sources']={'Unexpected':'1'*64}
+            zero=json.loads(original);zero['changed_sources']['Bootstrap.CrateSession']['new']='0'*64
+            for bad in [extra,host,zero]:
+                raw=json.dumps(bad).encode();path.write_bytes(raw)
+                with patch.object(migration,'HERE',root/'patricia'),patch.object(migration,'FULL_MANIFEST_SHA',hashlib.sha256(raw).hexdigest()),self.assertRaises(ValueError):migration.full_delta()
 
 
 class CoreProofTests(unittest.TestCase):

@@ -39,8 +39,23 @@ module Bootstrap.CompilerCore where {
       Left e -> Left (CompileError p e);
       Right a -> Right a
     };
+  -- Evidence is issued by the same successful ordinary inference/check pass.
+  -- The original entrypoint projects its result without repeating any phase.
+  data CompilationEvidence = CompilationEvidence Compilation SProgram Typed (IntMap XTerm) XErased;
+  evidenceCompilation :: CompilationEvidence -> Compilation;
+  evidenceCompilation (CompilationEvidence compiled _ _ _ _) = compiled;
+  evidenceProgram :: CompilationEvidence -> SProgram;
+  evidenceProgram (CompilationEvidence _ program _ _ _) = program;
+  evidenceSkeleton :: CompilationEvidence -> Typed;
+  evidenceSkeleton (CompilationEvidence _ _ typed _ _) = typed;
+  evidenceTerms :: CompilationEvidence -> IntMap XTerm;
+  evidenceTerms (CompilationEvidence _ _ _ evidence _) = evidence;
+  evidenceErasure :: CompilationEvidence -> XErased;
+  evidenceErasure (CompilationEvidence _ _ _ _ erased) = erased;
   finishCompilation :: (,) SProgram (Map String String) -> Either CompileError Compilation;
-  finishCompilation ((,) program names) =
+  finishCompilation lowered = L.mapEither evidenceCompilation (finishCompilationWithEvidence lowered);
+  finishCompilationWithEvidence :: (,) SProgram (Map String String) -> Either CompileError CompilationEvidence;
+  finishCompilationWithEvidence ((,) program names) =
     case program of {
       SClassProgram _ _ _ _ ->
         Left (CompileError Inference "class translation did not produce a core program");
@@ -70,11 +85,12 @@ module Bootstrap.CompilerCore where {
           };
           if L.not (T.alphaEq ty expected)
           then Left (CompileError Verification "elaboration changed the inferred type")
-          else if L.not
-                    (X.equalErased (X.erase term)
-                       (C.eraseSourceWith evidence (C.skeleton constraints)))
-               then Left (CompileError Verification "elaboration changed source erasure")
-               else Right (Compilation checked graph (Classes.prettyQualified names ty))
+          else let { originalErasure = C.eraseSourceWith evidence (C.skeleton constraints) } in
+            if L.not (X.equalErased (X.erase term) originalErasure)
+            then Left (CompileError Verification "elaboration changed source erasure")
+            else Right (CompilationEvidence
+              (Compilation checked graph (Classes.prettyQualified names ty))
+              program (C.skeleton constraints) evidence originalErasure)
         }
     }
 }

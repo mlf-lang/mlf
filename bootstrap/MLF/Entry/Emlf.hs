@@ -14,6 +14,8 @@ module MLF.Entry.Emlf where {
   import qualified MLF.PreparedCompiler as Prepared;
   import qualified MLF.NativeBuild as NativeBuild;
   import qualified MLF.ResourceExport as ResourceExport;
+  import qualified MLF.ResourceModules as ResourceModules;
+  import qualified MLF.ResourceModuleExport as ResourceModuleExport;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Parser as Parse;
@@ -111,6 +113,7 @@ module MLF.Entry.Emlf where {
   runArgs :: PreludeMode -> [] String -> [] String -> IO ();
   runArgs mode paths arguments = case arguments of {
     (:) "--emit-resource-json" rest -> resourceSourceCommand mode paths rest;
+    (:) "--emit-resource-module-json" rest -> resourceModuleCommand mode paths rest;
     (:) "--compile" rest -> NativeBuild.run mode paths rest;
     ["--native-install-info"] -> do {
       result <- Prepared.nativeInstallInfo;
@@ -764,6 +767,29 @@ module MLF.Entry.Emlf where {
           }
         }
     };
+  -- Additive module route: explicit stdin/current-root policy only. Ordinary
+  -- loader/inference/checking and compiler-owned intrinsic injection stay intact.
+  resourceModuleCommand :: PreludeMode -> [] String -> [] String -> IO ();
+  resourceModuleCommand mode paths arguments = case mode of {
+    ImplicitPrelude -> fatal "ResourceModule: explicit --no-prelude required";
+    NoImplicitPrelude -> if L.not (L.null paths) then fatal "ResourceModule: arbitrary include roots are outside this policy"
+      else case arguments of {
+        ["-"] -> do {
+          input <- getContents;
+          compiled <- ResourceModules.compileCaptured "<stdin>" input;
+          case compiled of {
+            Left error -> fatal (C.prettyError error);
+            Right result -> case ResourceModuleExport.exportCaptured
+              "c5928b5be73cd78d194405e734aa012415570e1a"
+              "5b68d1d794eefe163d5484b99344dc2cc81806f60118e6863933acb06371e976" result of {
+                Left message -> fatal ("ResourceModule: unsupported fragment: " ++ message);
+                Right output -> putStrLn output
+              }
+          }
+        };
+        _ -> fatal "ResourceModule: only an explicit captured stdin root is admitted"
+      }
+  };
   -- Experimental standalone-only projection of the actual source compiler result.
   -- Reject named modules/imports before resolution: the runner binds one input.
   resourceSourceCommand :: PreludeMode -> [] String -> [] String -> IO ();
@@ -780,7 +806,7 @@ module MLF.Entry.Emlf where {
               compiled <- Prepared.compileSourceWithImports mode paths file input;
               case compiled of {
                 Left error -> fatal (C.prettyError error);
-                Right result -> case ResourceExport.exportChecked "7bf7ac6db5e3db2daff2e0a1c249e68ae0db2d0c" "607a1cdc57e044fd76ea21aae572395f553b4a663d22f77a30e46059a8548a4f" (Prepared.checkedTerm result) of {
+                Right result -> case ResourceExport.exportChecked "c5928b5be73cd78d194405e734aa012415570e1a" "5b68d1d794eefe163d5484b99344dc2cc81806f60118e6863933acb06371e976" (Prepared.checkedTerm result) of {
                   Left message -> fatal ("ResourceExport: unsupported fragment: " ++ message);
                   Right output -> putStrLn output
                 }

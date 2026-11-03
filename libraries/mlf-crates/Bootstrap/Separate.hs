@@ -1038,6 +1038,15 @@ module Bootstrap.Separate where {
                                  [] DataDecl ->
                                  [] DataDecl -> String -> Either String UnitObject;
   decodeContextualObjectAfter prefix headerData bodyData input =
+    decodeContextualObjectAfterWithCanonical prefix headerData bodyData input
+      (\object canonical -> Right object);
+  decodeContextualObjectAfterWithCanonical :: forall a. (,) Int Int ->
+                                              [] DataDecl ->
+                                              [] DataDecl ->
+                                              String ->
+                                              (UnitObject -> String -> Either String a) ->
+                                              Either String a;
+  decodeContextualObjectAfterWithCanonical prefix headerData bodyData input success =
     do {
       fields <- unpack input;
       let {
@@ -1077,9 +1086,12 @@ module Bootstrap.Separate where {
                              let {
                                object = CheckedUnitObject restored checked
                              };
-                             ensure (eqString input (encodeContextualObject object))
+                             let {
+                               canonical = encodeContextualObject object
+                             };
+                             ensure (eqString input canonical)
                                "noncanonical contextual inference fragment";
-                             Right object
+                             success object canonical
                            };
                          _ ->
                            Left

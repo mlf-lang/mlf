@@ -1,12 +1,14 @@
 {
-  "audit_status": "accepted",
-  "audit_receipt": "provenance/NATIVE_RUNTIME_ACCEPTANCE.json",
-  "audit_receipt_sha256": "f9f7f07886608d15bc97e370964757e72e2f9295d32a6ec35f78b4d663954bfe",
-  "runtime_root": "/workspace/scratch/c43337ba2cad/resource-ir-native-runtime-20261031",
-  "runtime_location": "runtime",
+  "audit_receipt": "provenance/NATIVE_LIFECYCLE_ACCEPTANCE.json",
+  "audit_receipt_sha256": "8a3d126888fe1e556ef0582d835e2076dcdd4b92d68c773b7094c7c2d64c6c7f",
   "files": {
-    "rir_runtime.h": "9c6727371b21b1d762f1d48244504d9be970a2a47f666bc8321081e232c8bf43",
-    "rir_runtime.c": "67a96b47737c96ff904f93ad0e47b0d3a729b5ca4a1fe73d4d6bbb3e58f85be2"
+    "rir_runtime.c": "01e37374c17e32e155296d244cede59c78fa844a857ee2f4c884d4b8733d3728",
+    "rir_runtime.h": "218b05aaf832b0be3cf5eaa2c20624c21cb383b0899c1ee03a1c062c5c01d35c"
   },
-  "implementation_manifest_sha256": "7ca3697fc484645e1003ca4bbe9639ad2ee08e240cba2c33617ba18444f6fad3"
+  "identity": "resource-ir-terminal-destroy/1",
+  "implementation_manifest": "provenance/TERMINAL_IMPLEMENTATION_MANIFEST.json",
+  "implementation_manifest_sha256": "c55bcd2e296c15bacfd69e1577be625491ec1e8823cf904b3fce50a624eb611e",
+  "runtime_location": "runtime",
+  "schema": "source-terminal-native-lock/1",
+  "source_integration_status": "parent-authorized-new-candidate; independent source acceptance pending"
 }

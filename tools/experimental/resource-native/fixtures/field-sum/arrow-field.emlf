@@ -1,0 +1,1 @@
+data Tag = Empty | With (Int -> Int); case With (\x -> x) of { Empty -> 0; With f -> f 20 }

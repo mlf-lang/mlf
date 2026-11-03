@@ -1,0 +1,17 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.CrateSession": {
+      "new": "1210cfc8605bb8e45fd6801661175f892ebeddef561afa097b3fa3eafdde3c37",
+      "old": "51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9",
+      "reviewed_change": "Only the private A1 projection/restoration views: reuse cached selected-map cardinality and directly fold the ascending solved node map into its filtered original-node list. No change to checks, restoration, delta comparison, per-key patches, indices, scopes or failure order."
+    }
+  },
+  "format": "owned-projection-view-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "de9192eeaa64cc15ef8039ce2db936db0ed4d23b4578ecd40ac293c066730aff",
+  "parent_ref": "5172c4ade3b3141da2e64593c383892575b36699",
+  "removed_sources": {},
+  "unchanged_sources": 127
+}

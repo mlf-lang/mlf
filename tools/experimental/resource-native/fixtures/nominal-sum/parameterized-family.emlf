@@ -1,0 +1,1 @@
+data Tag a = None | One a; case One 20 of { None -> 0; One x -> x }

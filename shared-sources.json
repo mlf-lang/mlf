@@ -29,6 +29,21 @@
       "role": "implementation"
     },
     {
+      "module": "MLF.ResourceModuleExport",
+      "path": "bootstrap/MLF/ResourceModuleExport.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.ResourceProjection",
+      "path": "bootstrap/MLF/ResourceProjection.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "MLF.ResourceModules",
+      "path": "bootstrap/MLF/ResourceModules.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Async.Process.Internal",
       "path": "libraries/mlf-async/Async/Process/Internal.hs",
       "role": "implementation"

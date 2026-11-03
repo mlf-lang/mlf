@@ -1,0 +1,1 @@
+let c : Bool = ltInt 20 22 in let n : Int = if c then 20 else 22 in addInt n n

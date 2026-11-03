@@ -1,0 +1,69 @@
+{
+  "schema": "terminal-destroy-native-independent-acceptance/1",
+  "verdict": "ACCEPTED_BOUNDED_OPT_IN_LIFECYCLE",
+  "identity": "resource-ir-terminal-destroy/1",
+  "contract_sha256": "92cd46f8e986bb0f11913d139165e57d3fea6209d3ca469f7a90d7d03e260202",
+  "implementation_manifest_sha256": "c55bcd2e296c15bacfd69e1577be625491ec1e8823cf904b3fce50a624eb611e",
+  "native_sha256": {
+    "rir_runtime.c": "01e37374c17e32e155296d244cede59c78fa844a857ee2f4c884d4b8733d3728",
+    "rir_runtime.h": "218b05aaf832b0be3cf5eaa2c20624c21cb383b0899c1ee03a1c062c5c01d35c"
+  },
+  "review_sha256": "482758d6818fd3d1029fb2bb0efdf6f8315b11550d2464c4866b7ae76ff592b0",
+  "independent_runs": {
+    "cases_per_run": 36,
+    "successful_profiles": [
+      "O0",
+      "O2",
+      "ASan+UBSan detect_leaks=0"
+    ],
+    "physical_frees_per_run": 122,
+    "physical_live_blocks_at_end": 0,
+    "physical_live_bytes_at_end": 0,
+    "summary_sha256": "a1b40e48cffa2ae46dc3dfcb5c8df2f44afa343362998db4e55c357e042a3b80",
+    "commands_sha256": "f4a62fafa163ececf4e8135f5ef16c1c15f5a379aa124ba4fb6ba7804ffc6b79"
+  },
+  "author_evidence_verified": {
+    "commands": 78,
+    "raw_streams": 156,
+    "stable_inputs": 5,
+    "results_sha256": "a99a07b68c9366cbbc702d522a5acbfd7d9239527b9dad8a65b7b6f4aab6164a",
+    "frozen_plan_sha256": "e89081865903c11057de36380e021272845876e88101de79b9154074b5ff9b42"
+  },
+  "independent_force7_extension": {
+    "executions": 2,
+    "profiles": [
+      "O2",
+      "ASan+UBSan detect_leaks=0"
+    ],
+    "passed": true,
+    "summary_sha256": "a8d19720a9986ba7d1d27ae654bc09e004555ba9d69758a0734aebc2d09ef09a",
+    "commands_sha256": "cd2b2badd710c0f5919cb664a75bde0846ba6d78ca88eb33b85a66b4ddc6803b"
+  },
+  "lsan_supported": false,
+  "lsan_failure": "LeakSanitizer does not work under ptrace; failed attempt and supported sanitizer rerun retained",
+  "wrapper_parity_sha256": "9313a46ec0dfa47b6c5a7cbc41cf41ebc5a71b2af45d144fee8f609e2c968c27",
+  "source_frontend_adoption": false,
+  "default_failure_policy_changed": false,
+  "requires": [
+    "exclusive whole-domain capability surrender after outer API return",
+    "trusted complete raw allocation headers and matching nonreentrant free",
+    "external disjoint outputs; no surviving aliases",
+    "no semantic finalizers or foreign resource obligations"
+  ],
+  "not_accepted": [
+    "resumable language exceptions",
+    "IO/ST/async or foreign-resource lifetimes",
+    "general mutable-cycle reclamation",
+    "full MLF-native GC replacement",
+    "performance improvement",
+    "arbitrary memory corruption recovery"
+  ],
+  "provenance_note": "Exact contract author-proposed and independently ACKed before edits; separate explicit author ACK file recorded afterward with honest chronology.",
+  "replay_entry_review": {
+    "script_sha256": "46fa93478c56214f8a0112d0de5e26b22982906e6066749d4c5c6f1812057d41",
+    "source_reviewed": true,
+    "existing_base_extension_executions_verified": 2,
+    "complete_default_path_separately_executed": false,
+    "result_sha256": "fbfb295332d07420233cab66eb6dfc94e3c41b813efd89285dd80aa5762d20c9"
+  }
+}

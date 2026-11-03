@@ -720,7 +720,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
            originals = IM.toList selected
          } in
          let {
-           count = L.length originals
+           count = IM.size selected
          } in
          let {
            forward =
@@ -801,6 +801,13 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                      (\checkedScopes ->
                         Right ((,,,) originals backward count solved))));
 
+  -- This is the same ascending filtered view as toList followed by filter, but
+  -- constructs its list spine once and leaves unselected Node payloads lazy.
+  projectedOriginalNodes :: Int -> IntMap Node -> [] ((,) Int Node);
+  projectedOriginalNodes count nodes =
+    IM.foldrWithKey
+      (\n node rest -> if n < count then (:) ((,) n node) rest else rest)
+      [] nodes;
   restoreProjectionPlan :: Graph -> [] ((,) Int Node) -> Rank.MapIndex Node -> Int -> Graph ->
     Either String ((,,) Graph ([] ((,) Int Node)) ([] ((,) Int Node)));
   restoreProjectionPlan current originals backward count solved =
@@ -817,12 +824,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
          } in
          G.bindE
            (S.restoreProjectedNodes withAliases backward 0 originals
-              (L.filter
-                 (\entry ->
-                    case entry of {
-                      (,) n v -> (n < count)
-                    })
-                 (IM.toList (G.nodes solved))))
+              (projectedOriginalNodes count (G.nodes solved)))
            (\restored ->
               case S.projectionChanges originals restored of {
                 (,,) removedNodes changedNodes deleted ->
@@ -877,6 +879,15 @@ module Bootstrap.CrateSession (compileSpecFile) where {
   expanded :: forall s. Int -> Int -> Session s ->
     ST s (Either String ((,,,) Int (IntMap Int) ([] ((,) Int Int)) (Session s)));
   expanded source target state =
+    ST.bindE (expandedGraph source target state)
+      (\((,,,) root copies frontier next) ->
+        let { fresh = S.allocatedNodes (G.nextId (graph state)) (G.nextId next) (G.nodes next) } in
+        stBind (ST.fold addNode (withGraph next state) fresh)
+          (\indexed -> ST.pureE ((,,,) root copies frontier indexed)));
+  -- This result is a Graph, never a Session with incomplete reverse indexes.
+  expandedGraph :: forall s. Int -> Int -> Session s ->
+    ST s (Either String ((,,,) Int (IntMap Int) ([] ((,) Int Int)) Graph));
+  expandedGraph source target state =
     let { old = graph state } in
     case IM.lookup (G.resolve old source) (G.nodes old) of {
       Nothing -> ST.failE "missing instance source";
@@ -890,9 +901,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
             Just destination ->
               ST.bindE (stReturn (G.expandWithScopes (S.scopeIntervals (scopeIndex state)) source destination old))
                 (\((,) ((,,) root copies frontier) next) ->
-                  let { fresh = S.allocatedNodes (G.nextId old) (G.nextId next) (G.nodes next) } in
-                  stBind (ST.fold addNode (withGraph next state) fresh)
-                    (\indexed -> ST.pureE ((,,,) root copies frontier indexed)))
+                  ST.pureE ((,,,) root copies frontier next))
           }
         }
     };
@@ -1345,16 +1354,104 @@ module Bootstrap.CrateSession (compileSpecFile) where {
         Just grafted -> stReturn (Just grafted);
         Nothing -> congruentExpansionGraft first target root frontier state
       });
+  -- The owned expansion is connected through its copied root and has no Gen
+  -- boundary. Visit old components using their complete old Store, then add
+  -- fresh nodes directly to the same ascending projection used by solverUnify.
+  expandedFallbackPlan :: forall s. [] ((,) Int Int) -> Session s -> Graph -> Int ->
+    [] ((,) Int Node) -> ST s (Either String ((,,) Graph ([] ((,) Int Node)) ([] ((,) Int Node))));
+  expandedFallbackPlan equations state current first fresh =
+    let { canonical = L.map (\((,) a b) -> (,) (G.resolve current a) (G.resolve current b)) equations } in
+    ST.bindE (stReturn
+      (G.mapE_ (\n -> G.check (IM.member n (G.nodes current)) ("missing graph node " ++ showInt n))
+        (L.concatMap G.equationNodes canonical)))
+      (\checked ->
+        let { pending = L.filter (\((,) a b) -> L.not (a == b)) canonical } in
+        case pending of {
+          [] -> ST.pureE ((,,) current [] []);
+          (:) head tail ->
+            ST.bindE (componentCanonicalNodesVisit state IM.empty IS.empty
+              (L.append (L.filter (\n -> n < first) (L.concatMap G.equationNodes pending))
+                (S.expandedOldSeeds first fresh)))
+              (\((,) connected boundaries) -> stReturn
+                (G.bindE (unifyProjection pending current (scopeIndex state)
+                  (IM.union connected (G.nodesFromDistinctAscList fresh)) boundaries)
+                  (\((,,,) originals backward count solved) ->
+                    restoreProjectionPlan current originals backward count solved)))
+        });
+  -- Restoration introduces no new real identities. Its removed list contains
+  -- every changed or deleted node, and changed contains the replacements.
+  -- Reuse the exact original payload for unchanged fresh nodes, including
+  -- descendants absent from changed; never query the patched map again.
+  survivingFreshFromDelta :: [] ((,) Int Node) -> [] ((,) Int Node) ->
+    [] ((,) Int Node) -> [] ((,) Int Node);
+  survivingFreshFromDelta fresh removed changed = case fresh of {
+    [] -> [];
+    (:) entry@((,) n node) rest -> case removed of {
+      [] -> fresh;
+      (:) ((,) m old) following ->
+        if m < n then survivingFreshFromDelta fresh following changed
+        else if n < m then (:) entry (survivingFreshFromDelta rest removed changed)
+        else changedFreshFromDelta n rest following changed
+    }
+  };
+  changedFreshFromDelta :: Int -> [] ((,) Int Node) -> [] ((,) Int Node) ->
+    [] ((,) Int Node) -> [] ((,) Int Node);
+  changedFreshFromDelta identity fresh removed changed = case changed of {
+    [] -> survivingFreshFromDelta fresh removed [];
+    (:) entry@((,) n node) rest ->
+      if n < identity then changedFreshFromDelta identity fresh removed rest
+      else if n == identity then (:) entry (survivingFreshFromDelta fresh removed rest)
+      else survivingFreshFromDelta fresh removed changed
+  };
+  unifyExpandedFallback :: forall s. [] ((,) Int Int) -> Session s -> Graph -> Int ->
+    [] ((,) Int Node) -> ST s (Either String (Session s));
+  unifyExpandedFallback equations state current first fresh =
+    stBind (expandedFallbackPlan equations state current first fresh)
+      (\answer -> case answer of {
+        -- Legacy expansion already published fresh edges before a rejection.
+        -- Preserve that failure epoch, including callers' old Store handles.
+        Left message -> stBind (ST.fold addNode (withGraph current state) fresh)
+          (\indexed -> ST.failE message);
+        Right ((,,) patched removed changed) ->
+          stBind (patchIndexedNodes state
+            (L.filter (\((,) n v) -> n < first) removed)
+            (L.filter (\((,) n v) -> n < first) changed))
+            -- The old leading lookup forced mkGraph before any publication,
+            -- even when all fresh identities were deleted. Keep that boundary.
+            (\oldIndexed -> seq patched (stBind
+              (ST.fold addNode oldIndexed
+                (survivingFreshFromDelta fresh removed changed))
+              (\indexed -> ST.pureE (withGraph patched indexed))))
+      });
   instantiateWithFreshBottom :: forall s. Int -> Int -> Session s -> ST s (Either String (Session s));
   instantiateWithFreshBottom source target state =
-    let { oldGraph = graph state } in
-    ST.bindE (expanded source target state)
-      (\((,,,) root copies frontier next) ->
-        stBind (expansionBottomGraft (G.nextId oldGraph) target root frontier next)
-          (\answer -> case answer of {
-            Just grafted -> ST.pureE grafted;
-            Nothing -> solverUnify (L.append frontier ((:) ((,) root target) [])) next
-          }));
+    ST.bindE (expandedGraph source target state)
+      (\((,,,) root copies frontier current) ->
+        let { first = G.nextId (graph state);
+          fresh = S.allocatedNodes first (G.nextId current) (G.nodes current);
+          oldTarget = G.resolve current target;
+          equations = L.append frontier ((:) ((,) root target) []);
+          ordinary = stBind (ST.fold addNode (withGraph current state) fresh)
+            (\next -> stBind (expansionBottomGraft first target root frontier next)
+              (\answer -> case answer of {
+                Just grafted -> ST.pureE grafted;
+                Nothing -> solverUnify equations next
+              }))
+        } in
+        case fresh of {
+          [] -> ordinary;
+          (:) head tail ->
+            seq (G.strictGraph current) (seq (S.strictScopes (scopeIndex state))
+              (seq (S.forceExpansionEdges fresh)
+                (if root >= first && root < G.nextId current && oldTarget < first &&
+                    S.fallbackStageEligible first root oldTarget frontier current &&
+                    L.all (\((,) n v) -> L.not (G.isGen (G.tag v))) fresh &&
+                    S.fallbackPrefixRejected current first
+                      (IM.fromList (L.map (\((,) original proxy) -> (,) proxy original) frontier))
+                      ((:) ((,) root oldTarget) [])
+                 then unifyExpandedFallback equations state current first fresh
+                 else ordinary)))
+        });
   instantiateClosed :: forall s. Int -> Int -> Session s -> ST s (Either String (Session s));
   instantiateClosed source target state =
     stBind (groundGraft source target state)

@@ -35,6 +35,8 @@ class Node:
     code: str | None = None
     token_slots: dict[str, int] = field(default_factory=dict)
     spent: bool = False
+    scalar: int | bool | None = None
+    variant: str | None = None
 
 
 @dataclass
@@ -65,6 +67,7 @@ class _Machine:
         self.events: list[dict] = []
         self.events_omitted = 0
         self.depth = 0
+        self.result: dict | None = None
         self.closing: deque[int] = deque()
         self.in_close = False
         self.metrics = {key: 0 for key in (
@@ -92,9 +95,9 @@ class _Machine:
         signature = self.signature(shape)
         return signature is not None and signature["protocol"] == "once"
 
-    def event(self, kind: str, **attributes: Any) -> None:
+    def event(self, event_name: str, **attributes: Any) -> None:
         if len(self.events) < self.event_limit:
-            self.events.append({"event": kind, **attributes})
+            self.events.append({"event": event_name, **attributes})
         elif self.event_limit:
             self.events_omitted += 1
 
@@ -331,6 +334,53 @@ class _Machine:
                    out=source_out, frame=frame_id, opcode=opcode)
         return result
 
+    def ready_scalar(self, handle: Handle, layout: str) -> int | bool:
+        self.live(handle)
+        node = self.node(handle)
+        if not handle.own or node.state != 'READY' or node.layout != layout or node.code or node.slots:
+            raise RuntimeFault('INVARIANT', 'scalar payload requires an owned ready exact intrinsic node')
+        if layout == '#i64':
+            valid = type(node.scalar) is int and -(1 << 63) <= node.scalar < (1 << 63)
+        else:
+            valid = layout == '#bool' and type(node.scalar) is bool
+        if not valid:
+            raise RuntimeFault('INVARIANT', 'scalar node has invalid payload')
+        return node.scalar
+
+    def variant_fields(self, family: str, variant: str) -> list[str]:
+        return self.program['families'][family].get('fields', {}).get(variant, [])
+
+    def sum_tag(self, handle: Handle, family: str) -> str:
+        self.live(handle); node = self.node(handle)
+        families = self.program.get('families', {})
+        if family not in families or not handle.own or node.layout != '%' + family or node.state != 'READY' or node.code:
+            raise RuntimeFault('INVARIANT', 'sum discriminator requires an owned ready exact-family node')
+        if node.variant not in families[family]['variants']:
+            raise RuntimeFault('INVARIANT', 'sum variant is not registered in the exact family')
+        if len(node.slots) != len(self.variant_fields(family, node.variant)):
+            raise RuntimeFault('INVARIANT', 'sum payload arity differs from variant')
+        return node.variant
+
+    def ready_sum(self, handle: Handle, family: str) -> str:
+        variant = self.sum_tag(handle, family); node = self.node(handle)
+        fields = self.variant_fields(family, variant)
+        if list(node.slots) != [str(i) for i in range(len(fields))]:
+            raise RuntimeFault('INVARIANT', 'sum payload positions not in declared order')
+        for index, shape in enumerate(fields):
+            if self.nodes[node.slots[str(index)]].layout != shape:
+                raise RuntimeFault('INVARIANT', 'sum payload field shape differs')
+        return variant
+
+    def validate_sum_cursor(self, handle: Handle) -> None:
+        node = self.node(handle)
+        if node.layout.startswith('%'):
+            family = node.layout[1:]
+            if family not in self.program.get('families', {}):
+                raise RuntimeFault('INVARIANT', 'sum cursor has unregistered nominal family')
+            if node.state == 'READY': self.sum_tag(handle, family)
+            elif node.state == 'CLOSURE':
+                raise RuntimeFault('INVARIANT', 'nominal sum cannot carry callable closure state')
+
     def invoke(self, callee: Handle, argument: Handle, ceiling: Handle, *, parent_frame: int | None = None) -> Handle:
         """Consume owned callee/argument; return raw owned result at caller ceiling."""
         node = self.node(callee)
@@ -399,6 +449,8 @@ class _Machine:
         return result
 
     def force(self, cursor: Handle, *, parent_frame: int | None = None) -> Handle:
+        expected_layout = self.node(cursor).layout
+        self.validate_sum_cursor(cursor)
         self.metrics["force_calls"] += 1
         self.depth += 1
         self.metrics["max_force_depth"] = max(self.metrics["max_force_depth"], self.depth)
@@ -408,6 +460,9 @@ class _Machine:
             while True:
                 self.tick()
                 node = self.node(cursor)
+                if expected_layout.startswith('%') and node.layout != expected_layout:
+                    raise RuntimeFault('INVARIANT', 'sum Force cursor crossed a nominal family')
+                self.validate_sum_cursor(cursor)
                 if node.state in ("READY", "CLOSURE"):
                     break
                 if node.state in ("HOLE", "BUSY"):
@@ -456,6 +511,9 @@ class _Machine:
                 else:
                     raise RuntimeFault("INVARIANT", f"unknown node state {node.state}")
             final = self.node(cursor)
+            if expected_layout.startswith('%') and final.layout != expected_layout:
+                raise RuntimeFault('INVARIANT', 'Force changed nominal sum family')
+            self.validate_sum_cursor(cursor)
             # Every physical pending node gets its own slot before any pin ends.
             for destination, pin in pending:
                 self.slot(destination, "$target", final)
@@ -499,6 +557,145 @@ class _Machine:
                 for imported in i["imports"]:
                     self.live(frame[imported])
                 frame[i["out"]] = self.new_group()
+            elif op in ('scalar', 'prim2'):
+                primitive = None
+                if op == 'scalar':
+                    kind, value = i['kind'], i['value']
+                else:
+                    primitive = i['primitive']
+                    left = self.ready_scalar(frame[i['left']], '#i64')
+                    right = self.ready_scalar(frame[i['right']], '#i64')
+                    kind = 'i64'
+                    if primitive == 'addInt': value = left + right
+                    elif primitive == 'subInt': value = left - right
+                    elif primitive == 'mulInt': value = left * right
+                    elif primitive == 'eqInt': kind, value = 'bool', left == right
+                    elif primitive == 'ltInt': kind, value = 'bool', left < right
+                    else: raise RuntimeFault('UNSUPPORTED', 'unknown scalar primitive')
+                    if kind == 'i64': value = (value + (1 << 63)) % (1 << 64) - (1 << 63)
+                handle = self.allocate(frame[i['in']], '#' + kind, 'READY', {},
+                                       source_out=i['out'], frame_id=frame_id, opcode=op)
+                self.node(handle).scalar = value
+                frame[i['out']] = handle
+                self.event('scalar_value', node=handle.node, kind=kind, value=value,
+                           opcode=op, primitive=primitive)
+            elif op in ('construct_nullary', 'construct_sum'):
+                family, variant = i['family'], i['variant']
+                variants = self.program['families'][family]['variants']
+                if variant not in variants: raise RuntimeFault('INVARIANT', 'unknown sum variant')
+                types = self.variant_fields(family, variant)
+                values = i['fields'] if op == 'construct_sum' else []
+                if len(values) != len(types): raise RuntimeFault('INVARIANT', 'sum constructor arity differs')
+                fields = {}
+                for index, (variable, shape) in enumerate(zip(values, types)):
+                    handle = self.live(frame[variable]); node = self.node(handle)
+                    if not handle.own or node.layout != shape: raise RuntimeFault('INVARIANT', 'sum field needs owned typed cursor')
+                    fields[str(index)] = handle
+                handle = self.allocate(frame[i['in']], '%' + family, 'READY', fields,
+                                       source_out=i['out'], frame_id=frame_id, opcode=op)
+                self.node(handle).variant = variant; frame[i['out']] = handle
+                self.event('sum_value', node=handle.node, family='%' + family, variant=variant,
+                           variant_index=variants.index(variant))
+            elif op == 'case_fields_i64':
+                authority = self.live(frame[i['in']])
+                if not authority.own and i['in'] != '$home':
+                    raise RuntimeFault('INVARIANT', 'factory needs owning or activation authority')
+                family = i['family']; variants = self.program['families'][family]['variants']
+                scrutinee = frame[i['scrutinee']]; variant = self.sum_tag(scrutinee, family)
+                if set(i['arms']) != set(variants): raise RuntimeFault('INVARIANT', 'factory arms not exhaustive')
+                # Every arm/callback/external guard precedes selected payload reads.
+                for arm_variant in variants:
+                    arm = i['arms'][arm_variant]; spec = self.program['codes'].get(arm['code'])
+                    if not spec or spec['result'] != '#i64' or set(arm['captures']) != set(spec['captures']) or len(arm['captures']) > 64:
+                        raise RuntimeFault('INVARIANT', 'factory callback signature differs')
+                    fields = self.variant_fields(family, arm_variant); field_count = external_count = 0
+                    for capture in sorted(spec['captures']):
+                        binding = arm['captures'][capture]; layout = spec['captures'][capture]['layout']
+                        if binding['kind'] == 'field':
+                            index = binding['index']
+                            if type(index) is not int or not 0 <= index < len(fields) or fields[index] != layout:
+                                raise RuntimeFault('INVARIANT', 'factory field capture descriptor differs')
+                            field_count += 1
+                        elif binding['kind'] == 'external':
+                            value = self.live(frame[binding['value']])
+                            if not value.own or self.node(value).layout != layout:
+                                raise RuntimeFault('INVARIANT', 'factory external capture not owned/exact type')
+                            external_count += 1
+                        else: raise RuntimeFault('INVARIANT', 'unknown factory binding kind')
+                    if field_count > 32 or external_count > 32:
+                        raise RuntimeFault('INVARIANT', 'factory capture bound exceeded')
+                self.ready_sum(scrutinee, family); parent = self.node(scrutinee)
+                if any(self.nodes[n].state == 'HOLE' for n in parent.slots.values()):
+                    raise RuntimeFault('INVARIANT', 'factory selected payload still has raw construction HOLE')
+                arm = i['arms'][variant]; spec = self.program['codes'][arm['code']]
+                captures = {}; temporary = []; field_indices = {}; field_mask = 0
+                for capture in sorted(spec['captures']):
+                    binding = arm['captures'][capture]
+                    if binding['kind'] == 'field':
+                        index = binding['index']; target = self.nodes[parent.slots[str(index)]]
+                        value = self.acquire(target); temporary.append(value); field_indices[capture] = index; field_mask |= 1 << index
+                        self.event('sum_field_capture', scrutinee=parent.identity, family='%' + family,
+                                   variant=variant, variant_index=variants.index(variant), capture=capture,
+                                   field_index=index, node=target.identity, owner=value.identity,
+                                   layout=target.layout, frame=frame_id)
+                    else: value = frame[binding['value']]
+                    captures[capture] = value
+                result = self.allocate(authority, '#i64', 'THUNK', captures, arm['code'],
+                                       source_out=i['out'], frame_id=frame_id, opcode=op)
+                for value in temporary: self.drop(value)
+                frame[i['out']] = result; node = self.node(result)
+                self.event('case_fields_i64', scrutinee=parent.identity, family='%' + family,
+                           variant=variant, variant_index=variants.index(variant), code=arm['code'],
+                           result=node.identity, owner=result.identity, group=node.group, layout='#i64',
+                           frame=frame_id, out=i['out'], field_mask=field_mask, captures=dict(node.slots),
+                           field_indices=field_indices)
+            elif op == 'case_i64':
+                authority = self.live(frame[i['in']])
+                if not authority.own and i['in'] != '$home':
+                    raise RuntimeFault('INVARIANT', 'case needs owning or activation authority')
+                family = i['family']; variants = self.program['families'][family]['variants']
+                if any(self.variant_fields(family, v) for v in variants): raise RuntimeFault('INVARIANT', 'old case is nullary-only')
+                scrutinee = frame[i['scrutinee']]; variant = self.ready_sum(scrutinee, family)
+                if set(i['arms']) != set(variants): raise RuntimeFault('INVARIANT', 'case is not exhaustive')
+                alternatives = [frame[i['arms'][v]] for v in variants]
+                identities = [h.identity for h in alternatives]
+                if len(set(identities)) != len(identities) or authority.identity in identities:
+                    raise RuntimeFault('INVARIANT', 'case branch capabilities must be independent')
+                for alternative in alternatives:
+                    node = self.node(alternative)
+                    if not alternative.own or alternative.loans or node.layout != '#i64' or node.state == 'HOLE':
+                        raise RuntimeFault('INVARIANT', 'case needs owned typed non-ticket alternatives without loans')
+                index = variants.index(variant); selected = alternatives[index]; node = self.node(selected)
+                self.event('case_i64', scrutinee=scrutinee.node, family='%' + family, variant=variant,
+                           variant_index=index, result=node.identity, owner=selected.identity,
+                           group=node.group, layout=node.layout, frame=frame_id, out=i['out'],
+                           alternatives={v: h.node for v, h in zip(variants, alternatives)})
+                for variable in i['arms'].values(): del frame[variable]
+                for j, alternative in enumerate(alternatives):
+                    if j != index: self.drop(alternative)
+                frame[i['out']] = selected
+            elif op == 'select_i64':
+                authority = self.live(frame[i['in']])
+                if not authority.own and i['in'] != '$home':
+                    raise RuntimeFault('INVARIANT', 'selection needs owning or activation authority')
+                condition = frame[i['condition']]
+                decision = self.ready_scalar(condition, '#bool')
+                left, right = frame[i['then']], frame[i['else']]
+                if left.identity == right.identity or authority.identity in (left.identity, right.identity):
+                    raise RuntimeFault('INVARIANT', 'selection branch capabilities must be independent')
+                for alternative in (left, right):
+                    node = self.node(alternative)
+                    if not alternative.own or alternative.loans or node.layout != '#i64' or node.state == 'HOLE':
+                        raise RuntimeFault('INVARIANT', 'selection requires owned typed non-ticket cursors without loans')
+                selected, unselected = (left, right) if decision else (right, left)
+                node = self.node(selected)
+                self.event('select_i64', condition_node=condition.node, condition_value=decision,
+                           then_node=left.node, else_node=right.node, result=node.identity,
+                           owner=selected.identity, group=node.group, layout=node.layout,
+                           frame=frame_id, out=i['out'])
+                del frame[i['then']]; del frame[i['else']]
+                self.drop(unselected)
+                frame[i['out']] = selected
             elif op in ("alloc", "thunk", "hole", "closure", "application", "application_borrow"):
                 moved = []
                 if op in ("application", "application_borrow"):
@@ -583,12 +780,24 @@ class _Machine:
             elif op == "choose":
                 return self.block(i["then"] if i["condition"] else i["else"], frame, frame_id=frame_id)
             elif op == "return":
+                self.validate_sum_cursor(frame[i["value"]])
                 result = frame.pop(i["value"])
                 if not result.own or set(frame) != {"$home"}:
                     raise RuntimeFault("INVARIANT", "incorrect return custody")
                 if self.once(self.node(result).layout) and result.token is None:
                     raise RuntimeFault("INVARIANT", "Once result lacks its transferred permission")
                 return result
+            elif op == 'finish_scalar':
+                handle = frame[i['value']]
+                layout = self.node(handle).layout
+                value = self.ready_scalar(handle, layout)
+                if set(frame) != {i['value']} or handle.loans:
+                    raise RuntimeFault('INVARIANT', 'scalar finish leaked local capabilities')
+                self.drop(frame.pop(i['value']))
+                if self.handles or self.groups or self.nodes or self.closing or self.tokens:
+                    raise RuntimeFault('INVARIANT', 'scalar finish left managed storage')
+                self.result = {'kind': layout[1:], 'value': value}
+                return None
             elif op == "finish":
                 if frame:
                     raise RuntimeFault("INVARIANT", "entry leaked local handles")
@@ -601,7 +810,7 @@ class _Machine:
         self.block(self.program["entry"], {})
         if self.handles or self.groups or self.nodes or self.closing or self.tokens:
             raise RuntimeFault("INVARIANT", "finished program left managed storage or capabilities")
-        return {"status": "completed", "sha256": self.checked.sha256, "metrics": {
+        return {"status": "completed", "sha256": self.checked.sha256, "result": self.result, "metrics": {
                     **self.metrics, "live_groups": len(self.groups), "live_nodes": len(self.nodes),
                     "live_handles": len(self.handles)},
                 "live_tokens": len(self.tokens),

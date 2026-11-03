@@ -97,13 +97,16 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_129_modules_13_executables(self):
+    def test_closed_corpus_has_matching_132_modules_13_executables(self):
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 129)
+        self.assertEqual(len(manifest['modules']), 132)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 129)
+        self.assertEqual(len(modules), 132)
         for name, path, role in (
             ('MLF.ResourceExport', 'bootstrap/MLF/ResourceExport.hs', 'implementation'),
+            ('MLF.ResourceModules', 'bootstrap/MLF/ResourceModules.hs', 'implementation'),
+            ('MLF.ResourceProjection', 'bootstrap/MLF/ResourceProjection.hs', 'implementation'),
+            ('MLF.ResourceModuleExport', 'bootstrap/MLF/ResourceModuleExport.hs', 'implementation'),
             ('Bootstrap.IntTree', 'libraries/mlf-foundation/Bootstrap/IntTree.hs', 'implementation'),
             ('Bootstrap.IntRank', 'libraries/mlf-foundation/Bootstrap/IntRank.hs', 'implementation'),
             ('Bootstrap.CrateSession', 'libraries/mlf-crates/Bootstrap/CrateSession.hs', 'implementation'),

@@ -1,0 +1,1 @@
+let rec b : Int = b in if false then 42 else b
