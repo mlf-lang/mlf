@@ -1317,8 +1317,13 @@ module Bootstrap.CrateQuery where {
     }
   };
   writeBinaryCache :: String -> [] W.Value -> IO (Either String ());
-  writeBinaryCache destination roots = do {
-    written <- Storage.write 2 (destination ++ ".new") roots;
+  writeBinaryCache destination roots = publishQueryBytes destination (Storage.encode 2 roots);
+  publishQueryBytes destination encoding = do {
+    encoded <- encoding;
+    written <- case encoded of {
+      Left error -> ioReturn (Left error);
+      Right bytes -> Storage.writeRaw (destination ++ ".new") bytes
+    };
     case written of {
       Left error -> ioReturn (Left error);
       Right _ -> do {
@@ -1422,7 +1427,21 @@ module Bootstrap.CrateQuery where {
   };
   binaryQuery :: W.Graph -> Either String BinaryQuery;
   binaryQuery graph = case W.graphRoots graph of {
-    [root] -> do {
+    [root] -> binaryQueryRoot graph root;
+    [address, root] -> do {
+      prefix <- binaryQueryText graph address;
+      record <- binaryQueryRoot graph root;
+      case record of {
+        LocalQuery saved _ _ -> do {
+          ensure (eqString saved prefix) "source query address disagrees with payload";
+          Right record
+        };
+        _ -> Left "invalid addressed source query payload"
+      }
+    };
+    _ -> Left "malformed binary query roots"
+  };
+  binaryQueryRoot graph root = do {
       value <- W.lookupGraphNode graph root;
       case value of {
         W.GNode 300 [key, object] -> do {
@@ -1454,8 +1473,6 @@ module Bootstrap.CrateQuery where {
         };
         _ -> Left "malformed binary query roots"
       }
-    };
-    _ -> Left "malformed binary query roots"
   };
   sourceInputHash :: String -> IO String;
   sourceInputHash key = do { bytes <- byteArrayFromString key; byteArrayDigest bytes };
@@ -1480,6 +1497,17 @@ module Bootstrap.CrateQuery where {
       }
     }
   };
+  -- The extra root costs one reference and 65 units of expanded work. At a
+  -- wire limit use the previous checked layout, under exactly the same caps.
+  encodeAddressedSource limits address payload = do {
+    encoded <- W.encode limits 2 [address, payload];
+    case encoded of {
+      Left message -> if eqString message "binary expanded-work limit exceeded"
+        || eqString message "binary file byte limit exceeded"
+        then W.encode limits 2 [payload] else ioReturn encoded;
+      Right _ -> ioReturn encoded
+    }
+  };
   writeLocalSourceRecord encodings cacheDir destination input expectedContext object =
     let { declarations = Separate.unitData (Separate.objectInterface object);
       encode = case encodings of {
@@ -1501,10 +1529,13 @@ module Bootstrap.CrateQuery where {
           result <- localResultHash input fields;
           case result of {
             Left message -> ioReturn (Left message);
-            Right digest -> case fields of {
-              [value] -> writeBinaryCache destination [W.VNode 302 [W.VText input, W.VText digest, value]];
-              [context, metadata, body] -> writeBinaryCache destination
-                [W.VNode 303 [context, W.VText input, W.VText digest, metadata, body]];
+            Right digest -> let {
+              address = W.VText input;
+              write = \payload -> publishQueryBytes destination
+                (encodeAddressedSource W.defaultLimits address payload)
+            } in case fields of {
+              [value] -> write (W.VNode 302 [address, W.VText digest, value]);
+              [context, metadata, body] -> write (W.VNode 303 [context, address, W.VText digest, metadata, body]);
               _ -> ioReturn (Left "invalid local source payload")
             }
           }
@@ -1608,8 +1639,20 @@ module Bootstrap.CrateQuery where {
             })
         }
     };
+  -- Two roots distinguish addressed records from all previous query layouts.
+  -- The first is VText input: canonical first-use order puts its 64 ASCII bytes
+  -- in symbol zero. It is interned with the input field of the payload root.
+  sourceAddressGate input bytes geometry = case geometry of {
+    W.Layout _ _ _ _ _ _ _ roots _ _ _ _ ->
+      if roots == 1 then ioReturn (Right ())
+      else if roots /= 2 then ioReturn (Left "malformed binary query roots")
+      else do {
+        matches <- W.firstShortTextMatches bytes geometry input;
+        ioReturn (ensure (matches && validSourceContextDigest input) "cached query key mismatch")
+      }
+  };
   readLocalSourceFile verifyAll previous cacheDir key input expectedContext name bindings datatypes names path = do {
-    acquired <- Storage.read 2 path;
+    acquired <- Storage.readUsing (W.decodeGraphWithGate W.defaultLimits 2 (sourceAddressGate input)) path;
     case acquired of {
       Left message -> ioReturn ((,,) [] False (Left message));
       Right (Storage.LegacyText text) -> if verifyAll
@@ -1625,7 +1668,15 @@ module Bootstrap.CrateQuery where {
   readSourceCacheFileWithWindow :: [] SourceContextRead -> String -> String -> String ->
     [] ((,) String XType) -> [] DataDecl -> [] String -> String ->
     IO ((,,) ([] SourceContextRead) Bool (Either String Separate.UnitObject));
-  readSourceCacheFileWithWindow previous cacheDir key name bindings datatypes names path = do {
+  readSourceCacheFileWithWindow previous cacheDir key name bindings datatypes names path =
+    case sourceCacheParts key of {
+      Just ((,) _ context) -> do {
+        input <- sourceInputHash key;
+        readLocalSourceFile False previous cacheDir key input context name bindings datatypes names path
+      };
+      Nothing -> readOtherQueryFile previous cacheDir key name bindings datatypes names path
+    };
+  readOtherQueryFile previous cacheDir key name bindings datatypes names path = do {
     -- Long fields of the expected key are often present verbatim as symbols.
     -- They are only decoding hints; the full stored key and object are checked below.
     let { hints = case Separate.unpack key of { Right fields -> fields; Left _ -> [] } };

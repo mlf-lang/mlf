@@ -37,10 +37,11 @@ module Bootstrap.ArtifactStorage where {
   };
   decode :: Int -> ByteArray -> IO (Either String Input);
   decode = decodeWithText [];
-  decodeWithText hints schema bytes = do {
+  decodeWithText hints schema = decodeUsing (W.decodeGraphWithText hints W.defaultLimits schema);
+  decodeUsing decodeGraph bytes = do {
     binary <- W.hasMagic bytes;
     if binary then do {
-      decoded <- W.decodeGraphWithText hints W.defaultLimits schema bytes;
+      decoded <- decodeGraph bytes;
       ioReturn (mapEither BinaryInput decoded)
     } else do {
       decoded <- W.strictUtf8 maxBytes bytes;
@@ -49,9 +50,10 @@ module Bootstrap.ArtifactStorage where {
   };
   read :: Int -> String -> IO (Either String Input);
   read = readWithText [];
-  readWithText hints schema path = do {
+  readWithText hints schema = readUsing (W.decodeGraphWithText hints W.defaultLimits schema);
+  readUsing decodeGraph path = do {
     raw <- readRaw path;
-    case raw of { Left error -> ioReturn (Left error); Right bytes -> decodeWithText hints schema bytes }
+    case raw of { Left error -> ioReturn (Left error); Right bytes -> decodeUsing decodeGraph bytes }
   };
   encode :: Int -> [] W.Value -> IO (Either String ByteArray);
   encode schema roots = W.encode W.defaultLimits schema roots;

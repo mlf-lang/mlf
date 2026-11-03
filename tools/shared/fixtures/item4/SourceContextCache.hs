@@ -107,8 +107,9 @@ recordParts record = case record of
 -- Legacy poisons need full inputs. Reconstruct those from the test program,
 -- never from the record under test. Keep the current envelope for new poisons.
 localRecordParts keys record = case record of
-  BinaryInput [Wire.VNode 303 [Wire.VText ref, Wire.VText digest, Wire.VText ich, header, body]] -> do
-    need "stored input and loaded-value SHA" (Q.validSourceContextDigest digest && Q.validSourceContextDigest ich)
+  BinaryInput [Wire.VText address,Wire.VNode 303 [Wire.VText ref,Wire.VText digest,Wire.VText ich,header,body]] -> do
+    need "address matches stored input and hashes are valid"
+      (address == digest && Q.validSourceContextDigest digest && Q.validSourceContextDigest ich)
     input <- fullKey keys digest
     (compact,_) <- splitKey input
     pure (ref,compact,Payload header body)
@@ -116,7 +117,8 @@ localRecordParts keys record = case record of
 localRecord ref input (Payload header body) = do
   digest <- fingerprint input
   ich <- Q.localResultHash digest [Wire.VText ref,header,body] >>= expect "poison ICH"
-  pure (BinaryInput [Wire.VNode 303 [Wire.VText ref,Wire.VText digest,Wire.VText ich,header,body]])
+  let address = Wire.VText digest
+  pure (BinaryInput [address,Wire.VNode 303 [Wire.VText ref,address,Wire.VText ich,header,body]])
 payloadFor raw = Payload
   (Structure.toUnitInterface (U.withInterfaceData (U.objectInterface raw) []
     (U.fingerprint (Pretty.prettyTerm (U.objectBody raw)))))

@@ -15,8 +15,10 @@ record. Use a fresh private cache for untrusted input caches.
 
 ## Format and checks
 
-The wire stays at MLFBIN v1, schema 2. Root 302 is
-`[input SHA, result SHA, raw unit]`. Root 303 is
+The wire stays at MLFBIN v1, schema 2. New local records have two ordered
+roots, the input SHA text followed by the raw query record. The input text is
+interned with the corresponding field of the second root. Its payload tag 302 is
+`[input SHA, result SHA, raw unit]`. Tag 303 is
 `[context SHA, input SHA, result SHA, contextual header, body]`. Each SHA is
 64 lowercase hexadecimal characters. The format discriminators are separate
 from old exact-key roots 300/301. The source **key material version** stays at
@@ -49,6 +51,32 @@ verification when that value rehashes to its stored ICH.
 Context blobs, formal interface/object files and lowered-only QUERY4 have
 their own checks.
 
+## Rejecting a misplaced record before graph decoding
+
+The root count in the validated 80-byte header distinguishes the addressed
+layout from previous single-root queries. Canonical first-use order puts the
+first root at symbol zero. Its length byte is 64, followed by the 64 ASCII
+bytes of the input SHA. Both source drivers compare these bytes against the
+independently computed cache address before CRC, symbol decoding or node
+allocation. The file is acquired once under the existing byte limit. A
+normal absent-file miss still uses the initial address lookup.
+
+On a matching prefix the same byte snapshot goes through CRC, canonical graph
+validation and checked raw admission. The first root must be the same text as
+the input field of the 302/303 payload. The result ICH still covers the input
+and raw value using the existing canonical single root 304. A forged prefix
+cannot turn a differently addressed payload into a hit. With a damaged body,
+a wrong address can now be reported before a CRC failure. A matching address
+preserves the full integrity checks and their errors.
+
+Old single-root 302/303 records use their checked reader, including strict ICH
+mode. Older exact-key and text records retain their existing migration rules.
+Earlier compilers safely reject two-root queries. The extra address root counts
+toward expanded work and file size. If it alone would exceed either cap, the
+writer tries the single-root fingerprint record under the same limits. Invalid
+payloads and publication failures still propagate to the caller. Source keys
+stay at v7 and the separately shared datatype context format is unchanged.
+
 ## End-to-end protocol (fixed before measurement)
 
 Compare PR #32 at 84f60997350ee0e0de46d13e2efb17de78248a57 to the
@@ -77,8 +105,9 @@ and admits node tables only after CRC matches. This fast path allows at most
 64 KiB of symbol data and 1,024 symbols before the CRC gate. Files smaller than
 1 KiB, files with supplied text hints, larger sections and declined parses use
 the original checksum-first path. Corruption keeps its old diagnostic priority.
-This does not make a single-pass claim about graph traversal, the entire disk
-pipeline or invalid input.
+The addressed layout additionally peeks at the first symbol (at most 65 bytes)
+before the combined scan. This does not make a single-pass claim about graph
+traversal, the entire disk pipeline or invalid input.
 
 The isolated scan comparison uses the same 504 physical Foundation records
 from one candidate cold sequence, both GHC producer builds, with bytes loaded
@@ -134,6 +163,46 @@ It does not time key construction, pure disk I/O or encoding independently.
 In the separate warm audit, the default bucket selected 17 of 504 groups.
 Mean wall was 7.876 s sampled and 8.855 s for verifying all 504 (+0.979 s,
 +12.4%). All four runs reused every group and reproduced the cold artifacts.
+
+## Addressed record experiment on PR 29
+
+The baseline was `6927bfacedd141d7182cc53f5e7a99f1cd3c9411` and the implementation
+was `000356d37e083bd7cad1443cadb1564bb6cd6363`. On the same 14 Foundation
+modules, the ordinary CLI ran in fixed order 29, candidate, candidate, 29. Each
+sequence used the same source paths and a fresh cache with a verified Prelude.
+A separate experiment loaded all 504 physical candidate records before timing.
+Both modes ran in one optimized GHC executable and validated the same payload
+SHA on success. For the mismatch case each record was queried under the next
+record's SHA. The order was full, early, early, full, twice per case.
+
+| 504 preloaded records | Full decoder, wall / CPU s | Address gate, wall / CPU s |
+|---|---:|---:|
+| Matching address | 0.789 / 0.786 | 0.791 / 0.788 |
+| Wrong address | 0.784 / 0.782 | 0.00309 / 0.00308 |
+
+| Ordinary CLI | Wall s, base / candidate | CPU s, base / candidate | Peak RSS MiB, base / candidate |
+|---|---:|---:|---:|
+| Cold | 23.79 / 24.06 | 23.60 / 23.87 | 117.7 / 119.6 |
+| Warm | 7.43 / 7.65 | 7.36 / 7.54 | 116.4 / 118.4 |
+| Version edit | 7.45 / 7.72 | 7.40 / 7.62 | 121.5 / 122.6 |
+
+The addressed reader avoided 99.6% of the wire time for these deliberately
+misplaced records. In this end-to-end series the normal cold, warm and edited
+compiles took 1.1%, 3.0% and 3.6% longer. The gate costs about 0.0024 s across
+504 correct addresses in the isolated comparison. The ordinary timings include
+all compilation stages and each compiler's selected ICH bucket.
+
+Cold cache size was 4,322,919 / 4,323,425 B and after the edit it was
+4,342,549 / 4,343,056 B. Inferred/reused counts were 504/0, 0/504 and 1/503.
+Both matched pairs agreed on every final interface/object byte and on the
+505 distinct raw headers/bodies and 83 physical datatype contexts. Every
+candidate record in the experiment had the two-root layout. [All samples,
+compiler identities and workload checks](early-address-results.json).
+
+```sh
+python3 tools/performance/foundation-query/compare.py --baseline-label 29 "$pr29/bin/emlf" "$candidate/bin/emlf" "$foundation" "$study"
+python3 tools/performance/source-fingerprints/compare-decode.py --addresses "$candidate" "$candidate" "$study/1-candidate" "$wire"
+```
 
 ## Reproduction
 
