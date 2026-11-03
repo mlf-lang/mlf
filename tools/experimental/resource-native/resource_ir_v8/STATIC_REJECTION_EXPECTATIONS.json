@@ -1,0 +1,337 @@
+{
+  "status": "static predictions from guards, not execution evidence",
+  "fixtures": {
+    "seventeen_schemes_reject": [
+      "COUNT",
+      "schemes"
+    ],
+    "depth33_reject": [
+      "TYPE_DEPTH",
+      "types."
+    ],
+    "4097_declared_types_reject": [
+      "COUNT",
+      "declarations"
+    ],
+    "1025_uses_reject": [
+      "COUNT",
+      "instantiations"
+    ],
+    "1025_environments_reject": [
+      "ENVIRONMENT_COUNT",
+      "instantiations."
+    ],
+    "canonical_types_limit_overflow": [
+      "TYPE_COUNT",
+      "layouts."
+    ],
+    "4097_derived_types_reject": [
+      "TYPE_COUNT",
+      "instantiations["
+    ],
+    "extra_top_key": [
+      "SCHEMA",
+      "declarations"
+    ],
+    "executable_program_not_accepted": [
+      "SCHEMA",
+      "declarations"
+    ],
+    "extra_type_key": [
+      "SCHEMA",
+      "types.I"
+    ],
+    "unknown_type_tag": [
+      "SCHEMA",
+      "types.I.tag"
+    ],
+    "unknown_arrow_reference": [
+      "TYPE_REFERENCE",
+      "types.AA.argument"
+    ],
+    "type_cycle": [
+      "TYPE_CYCLE",
+      "types.AA"
+    ],
+    "signature_cycle": [
+      "TYPE_CYCLE",
+      "signatures.F"
+    ],
+    "opaque_callable_atom": [
+      "CLOSED_ATOM",
+      "types.I.layout"
+    ],
+    "unknown_closed_atom": [
+      "LAYOUT",
+      "types.I.layout"
+    ],
+    "unknown_intrinsic_atom": [
+      "CLOSED_ATOM",
+      "types.I.layout"
+    ],
+    "unknown_nominal_family": [
+      "FAMILY",
+      "types.I.layout"
+    ],
+    "rigid_unknown_scope": [
+      "SCOPE",
+      "types.A.scheme"
+    ],
+    "rigid_bool_index": [
+      "COUNT",
+      "types.A.index"
+    ],
+    "rigid_negative_index": [
+      "COUNT",
+      "types.A.index"
+    ],
+    "rigid_index_out_of_bounds": [
+      "COUNT",
+      "types.A.index"
+    ],
+    "unused_rigid_still_checked": [
+      "SCOPE",
+      "types.Unused.scheme"
+    ],
+    "zero_parameters": [
+      "COUNT",
+      "schemes.S.parameters"
+    ],
+    "nine_parameters": [
+      "COUNT",
+      "schemes.S.parameters"
+    ],
+    "bool_parameter_count": [
+      "COUNT",
+      "schemes.S.parameters"
+    ],
+    "nonarrow_scheme_body": [
+      "SCHEME_BODY",
+      "schemes.S.body"
+    ],
+    "generic_nominal_atom": [
+      "GENERIC_ATOM",
+      "types.AA"
+    ],
+    "generic_once_contract": [
+      "GENERIC_CONTRACT",
+      "types.AA"
+    ],
+    "generic_identity_refinement": [
+      "GENERIC_CONTRACT",
+      "types.AA"
+    ],
+    "nested_generic_identity_refinement": [
+      "GENERIC_CONTRACT",
+      "types.Inner"
+    ],
+    "unused_open_once_type": [
+      "GENERIC_CONTRACT",
+      "types.Unused"
+    ],
+    "unused_open_identity_type": [
+      "GENERIC_CONTRACT",
+      "types.Unused"
+    ],
+    "unused_open_once_signature": [
+      "GENERIC_CONTRACT",
+      "signatures.Unused"
+    ],
+    "unused_open_identity_signature": [
+      "GENERIC_CONTRACT",
+      "signatures.Unused"
+    ],
+    "wrong_identity_domain_result": [
+      "IDENTITY",
+      "types.Bad"
+    ],
+    "unknown_protocol": [
+      "CONTRACT",
+      "types.AA.protocol"
+    ],
+    "unknown_identity_contract": [
+      "CONTRACT",
+      "types.AA.result_identity"
+    ],
+    "missing_use_argument": [
+      "ARITY",
+      "instantiations.i.arguments"
+    ],
+    "extra_use_argument": [
+      "ARITY",
+      "instantiations.i.arguments"
+    ],
+    "open_use_argument": [
+      "USE_ARGUMENT",
+      "instantiations.i.arguments"
+    ],
+    "arrow_use_argument": [
+      "USE_ARGUMENT",
+      "instantiations.i.arguments"
+    ],
+    "physical_ref_not_type_id_argument": [
+      "TYPE_REFERENCE",
+      "instantiations.i.arguments[0]"
+    ],
+    "unknown_use_scheme": [
+      "SCOPE",
+      "instantiations.i.scheme"
+    ],
+    "nonlist_use_vector": [
+      "SCHEMA",
+      "instantiations.i.arguments"
+    ],
+    "physical_data_open_field": [
+      "OPEN_FIELD",
+      "layouts.Bad.value"
+    ],
+    "physical_data_once_field": [
+      "ONCE_FIELD",
+      "layouts.Bad.value"
+    ],
+    "family_callable_field": [
+      "FIELD_SHAPE",
+      "families.Bad.fields.X[0]"
+    ],
+    "family_missing_variant_fields": [
+      "SCHEMA",
+      "families.Bad.fields"
+    ],
+    "family_duplicate_variant": [
+      "VARIANT",
+      "families.Bad.variants"
+    ],
+    "reserved_data_logical": [
+      "NAMESPACE",
+      "layouts"
+    ],
+    "reserved_signature_logical": [
+      "NAMESPACE",
+      "signatures"
+    ],
+    "reserved_data_callable": [
+      "NAMESPACE",
+      "layouts"
+    ],
+    "reserved_signature_callable": [
+      "NAMESPACE",
+      "signatures"
+    ],
+    "reserved_data_scalar": [
+      "NAMESPACE",
+      "layouts"
+    ],
+    "reserved_signature_scalar": [
+      "NAMESPACE",
+      "signatures"
+    ],
+    "reserved_data_family": [
+      "NAMESPACE",
+      "layouts"
+    ],
+    "reserved_signature_family": [
+      "NAMESPACE",
+      "signatures"
+    ],
+    "foreign_rigid_in_scheme": [
+      "SCOPE",
+      "schemes.S.body"
+    ],
+    "duplicate_json_key": [
+      "DUPLICATE_KEY",
+      "declarations["
+    ],
+    "nonfinite_json": [
+      "JSON",
+      "declarations"
+    ],
+    "unused_open_nominal_type": [
+      "GENERIC_ATOM",
+      "types.Unused"
+    ],
+    "reserved_type_id_logical": [
+      "NAMESPACE",
+      "types"
+    ],
+    "reserved_scheme_id_logical": [
+      "NAMESPACE",
+      "schemes"
+    ],
+    "reserved_use_id_logical": [
+      "NAMESPACE",
+      "instantiations"
+    ],
+    "reserved_family_id_logical": [
+      "NAMESPACE",
+      "families"
+    ],
+    "reserved_variant_name_logical": [
+      "NAMESPACE",
+      "families.F.variants"
+    ],
+    "reserved_field_name_logical": [
+      "NAMESPACE",
+      "layouts.D"
+    ],
+    "family65_reject": [
+      "COUNT",
+      "families"
+    ],
+    "variant65_reject": [
+      "COUNT",
+      "families.F.variants"
+    ],
+    "field33_reject": [
+      "COUNT",
+      "families.F.fields.v0"
+    ]
+  },
+  "query_failures": {
+    "unknown_reference": [
+      "REFERENCE",
+      "query.reference"
+    ],
+    "unknown_scope": [
+      "SCOPE",
+      "query.scope"
+    ],
+    "open_reference_without_scope": [
+      "SCOPE",
+      "query.reference"
+    ],
+    "foreign_rigid_scope": [
+      "SCOPE",
+      "query.reference"
+    ],
+    "closed_refined_arrow_in_generic_scope": [
+      "GENERIC_CONTRACT",
+      "query.reference"
+    ],
+    "unknown_instantiation": [
+      "USE",
+      "query.instantiation"
+    ],
+    "nominal_atom_in_generic_scope": [
+      "GENERIC_ATOM",
+      "query.reference"
+    ]
+  },
+  "python_or_syntax_failures": {
+    "cyclic_python_input": [
+      "INPUT_CYCLE",
+      "declarations[\"types\"][\"Cycle\"]"
+    ],
+    "python_nonfinite": [
+      "INPUT_VALUE",
+      "declarations[\"types\"][\"bad\"]"
+    ],
+    "deep_malformed_json": [
+      "INPUT_DEPTH",
+      "declarations"
+    ],
+    "oversized_input": [
+      "INPUT_SIZE",
+      "declarations"
+    ]
+  }
+}

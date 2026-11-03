@@ -1,0 +1,33 @@
+name: IR8 host checks
+on:
+  pull_request:
+    paths:
+      - 'tools/experimental/resource-native/**'
+      - '.github/workflows/ir8-host.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ir8-host-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ir8-host:
+    name: Isolated IR8 host-only checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Run bounded standalone host suites
+        run: |
+          python3 -B -S tools/experimental/resource-native/tests/run_ir8_host.py \
+            --output "$RUNNER_TEMP/ir8-host"
+      - name: Retain host-only evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-host-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ir8-host
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,4463 @@
+{
+  "execution_boundary": "Host suite generates sources only. Exact generated source review before compile; compiled custody before native launch; separate freshly checked host readback oracle after native outputs.",
+  "format": "ir8-stage04-test-cases/1",
+  "host_positives": [
+    {
+      "name": "concrete_scalar",
+      "raw_bytes": 316,
+      "raw_sha256": "29374d5b32bc7e9cc32881c929076a0a2d66f74dd91ec0e767b120b720fbae0f"
+    },
+    {
+      "name": "ready_shared_identity_two_views",
+      "raw_bytes": 1652,
+      "raw_sha256": "77122888adab0913f4bed55c12d337645e3267f90e2b665e528b58344c41f7d3"
+    },
+    {
+      "name": "pending_shared_three_lambda_two_application_shape",
+      "raw_bytes": 2405,
+      "raw_sha256": "aacfd5113470d8cd0011a14b3c6808ef366fb3cbbac1951afc6241c6b190daf6"
+    },
+    {
+      "name": "closed_data_sum_factory",
+      "raw_bytes": 1397,
+      "raw_sha256": "5581d91fffe88f76da19c8cbe365543caff19a603e67598bf8abd92e7fd55847"
+    },
+    {
+      "name": "explicit_closed_identity",
+      "raw_bytes": 768,
+      "raw_sha256": "9744230729062d6e221c984d889c26c2e92aebffabc6183776e7b402832c8526"
+    },
+    {
+      "name": "closed_full_contract_alias_interchange",
+      "raw_bytes": 1278,
+      "raw_sha256": "19a0e4dd05065945bb51ceb74a490d45b9ffef04e908d1341961a73e1e0b1596"
+    },
+    {
+      "name": "dead_parameter_two_complete_vectors",
+      "raw_bytes": 1569,
+      "raw_sha256": "7a628bbfe66f6062dfad1d43ba2496ef28581713b38ac362f3500c1021ff7672"
+    },
+    {
+      "name": "loan_view_move_and_promotion",
+      "raw_bytes": 1374,
+      "raw_sha256": "6380f6f472bed57552392db9c6f9f31ad526a332a57e6f438c4018645f2242ff"
+    },
+    {
+      "name": "child_group_seal_and_scheme_authority",
+      "raw_bytes": 1480,
+      "raw_sha256": "95984b98c224ed7f8a1328bcd0baaf94ab33d96e1f3d16f13845e89d868203b5"
+    },
+    {
+      "name": "bool_before_int_and_repeated_int_view",
+      "raw_bytes": 1896,
+      "raw_sha256": "74c9a7c7834617b4bf604136a0390a8d8c50ff6b4bf6add958190f14f449761c"
+    },
+    {
+      "name": "curried_const_complete_ib_bi_views",
+      "raw_bytes": 2500,
+      "raw_sha256": "7738bd5421b679f36825b1055dd87698a556bf129d876b2ea2d26692944a3c4f"
+    },
+    {
+      "name": "two_scheme_closed_higher_order_capture",
+      "raw_bytes": 2771,
+      "raw_sha256": "5909f1ddc4317183d7c4f188e8b3e06c927fb313bd212dcd2779883ef4bce7a9"
+    },
+    {
+      "name": "concrete_callback_foreign_projected_capture",
+      "raw_bytes": 2262,
+      "raw_sha256": "6b72dfbe6111eea95404e398853fc19472dd19d34db8d1cddef6a098a3c3cd2f"
+    },
+    {
+      "name": "authority_A01_scheme_scalar_in",
+      "raw_bytes": 1275,
+      "raw_sha256": "dd3b7be28a275764ee1084127c64ea9bd5f73c37fe2c2166d31b9da359479838"
+    },
+    {
+      "name": "authority_A02_second_intro_preserves_parent_loan",
+      "raw_bytes": 1770,
+      "raw_sha256": "b811fa721a7b8ba755eabfcde5bf7474d22df87ce519be640f897725e05373aa"
+    },
+    {
+      "name": "generalize_inside_concrete_callback",
+      "raw_bytes": 1774,
+      "raw_sha256": "17aefb06a6e631ed51d012a3a97edbb3add09d36f7f377a9370355ca9390ab87"
+    },
+    {
+      "name": "boundary_factory_32_fields_32_externals",
+      "raw_bytes": 7876,
+      "raw_sha256": "ff50b5627aa13570c00c50db72e25992e651aea85d4b73569531e9dce3806af3"
+    },
+    {
+      "name": "closed_identity_retained_parameter",
+      "raw_bytes": 840,
+      "raw_sha256": "8c89476cfe599996459efbfaa80c34f7c4c20ecb986764afa839119d40c5c7d2"
+    },
+    {
+      "name": "concrete_empty_finish",
+      "raw_bytes": 152,
+      "raw_sha256": "2dd27c15272a16861f5e406c76dec2b8d0940d0ea1867cdc371923d220c14f95"
+    },
+    {
+      "name": "concrete_fill_force_hole",
+      "raw_bytes": 468,
+      "raw_sha256": "e3f499cfe00cce11dd8eeeaec266dc0e62695181590cb32e38fd59a37a9764f1"
+    },
+    {
+      "name": "concrete_primitive_selection",
+      "raw_bytes": 734,
+      "raw_sha256": "2d2d320d0b60e607f6a2526410d22398b828c648671c55f20c392644308a8445"
+    },
+    {
+      "name": "concrete_nullary_case_all_arms",
+      "raw_bytes": 734,
+      "raw_sha256": "b0cc17aef6a823e3c100790540f7692f2af062520c037d198fa911d54018bfcb"
+    },
+    {
+      "name": "concrete_standalone_thunk",
+      "raw_bytes": 530,
+      "raw_sha256": "4f41f4a588f7fe1cfe72014dcb999b47a95c1c268bc34600f049c6947a3c1130"
+    },
+    {
+      "name": "concrete_child_group_scalar",
+      "raw_bytes": 410,
+      "raw_sha256": "ecc4bf99ee634b534d20c9260ba5f06492a5454a826d23816a5effeade4eb64c"
+    },
+    {
+      "name": "noninjective_int_int_closed_calls",
+      "raw_bytes": 2496,
+      "raw_sha256": "c7963af578182b04cc456a893fd92cfffe917b05ba9b2581b1c359f8a2a9a242"
+    },
+    {
+      "name": "scoped_intermediate_dead_parameter_substitution",
+      "raw_bytes": 1918,
+      "raw_sha256": "c05f9b177b3337467e6c0eebd5faabf36316da526fc665fffe1a3f45f551a21a"
+    },
+    {
+      "name": "neutral_closed_looking_arrow_and_scalar",
+      "raw_bytes": 2069,
+      "raw_sha256": "c3d5dace3bb782ff16ba4eef9f83ffec5b7adac26d020f2611bb55df4583b257"
+    },
+    {
+      "name": "concrete_callable_field_foreign_projection",
+      "raw_bytes": 2081,
+      "raw_sha256": "f44111459be998de864c8e2104c1020eb8610a331986cbf3de5c27f75ec959e4"
+    },
+    {
+      "name": "sum_scalar_field_foreign_factory_capture",
+      "raw_bytes": 2850,
+      "raw_sha256": "9cb4d15935f8ddd15b5b0893f41b12f4470a4c2dc936740173d0f7d3e06adc83"
+    },
+    {
+      "name": "generic_thunk_and_instance_deferred_return",
+      "raw_bytes": 2094,
+      "raw_sha256": "d520e3e6449f975b82cf5700581f2d4897f45aa1363257a589a0069c1c82a753"
+    },
+    {
+      "name": "metadata_shared_DAG_depth32",
+      "raw_bytes": 3480,
+      "raw_sha256": "a48d480607bf2c765f27d31ed4b85d6d718ab2aeb47ebb2d97618057215aa244"
+    }
+  ],
+  "host_rejections": [
+    {
+      "expected_code": "SCHEME_VALUE",
+      "expected_layer": "type",
+      "expected_path": "entry[2].value",
+      "input_bytes": 1724,
+      "input_sha256": "0f2a6f5f48ae6a2ab67ffa7ad4f4961b50f4b1f0fdecfe994e7a2aac8dd21699",
+      "name": "lower_reject_scheme_force"
+    },
+    {
+      "expected_code": "OPCODE",
+      "expected_layer": "schema",
+      "expected_path": "entry[1].body[0]",
+      "input_bytes": 1691,
+      "input_sha256": "42b640c69865eb1a24410ecf4b8b26bca1c2b7014a16a63a6ff5d1606e8725be",
+      "name": "lower_mask_introduction_force"
+    },
+    {
+      "expected_code": "TYPE",
+      "expected_layer": "type",
+      "expected_path": "functions.constant.body[0].captures.saved",
+      "input_bytes": 2496,
+      "input_sha256": "19aa36c01e43d0fe3d3a65069635a6be6c5dc0216e94ce45698986f4ee41a056",
+      "name": "lower_reject_noninjective_int_int_capture_swap"
+    },
+    {
+      "expected_code": "TYPE",
+      "expected_layer": "type",
+      "expected_path": "functions.return_x.body[1].value",
+      "input_bytes": 2496,
+      "input_sha256": "1d770fb728be3310e3b3111dd8d7b7decd6f59a180e09e7715ed4e3578af69cd",
+      "name": "lower_reject_noninjective_int_int_return_swap"
+    },
+    {
+      "expected_code": "SCOPE",
+      "expected_layer": "declarations",
+      "expected_path": "query.reference",
+      "input_bytes": 2771,
+      "input_sha256": "b751e50c9ae75683975442df127e4996cd6a3aaa61f1b035ce63148126c0bd96",
+      "name": "lower_reject_cross_scheme_same_index_rigid"
+    },
+    {
+      "expected_code": "INTRODUCTION_COVERAGE",
+      "expected_layer": "coverage",
+      "expected_path": "schemes.S",
+      "input_bytes": 1487,
+      "input_sha256": "1e7c62d1424c1a4a96e83ec0e92946a3cf372d2d8185e21c6f6b9ace8cb737ee",
+      "name": "lower_reject_missing_introduction"
+    },
+    {
+      "expected_code": "ALLOCATION_SCOPE",
+      "expected_layer": "graph",
+      "expected_path": "functions.apply.body[0]",
+      "input_bytes": 2750,
+      "input_sha256": "f7f0000cf6b8427131b3d24a105c5d4f09177ff2c2813c70557c32736bf5507a",
+      "name": "lower_reject_cross_scope_allocation"
+    },
+    {
+      "expected_code": "LIVE_LOAN",
+      "expected_layer": "resource",
+      "expected_path": "entry[4]",
+      "input_bytes": 1694,
+      "input_sha256": "66167e8bbffa488b7508df69292990d4464621c3d3b074db2a95abc0d5de570c",
+      "name": "lower_reject_move_owner_with_loan"
+    },
+    {
+      "expected_code": "STRICT_IMPORT",
+      "expected_layer": "resource",
+      "expected_path": "entry[2]",
+      "input_bytes": 1751,
+      "input_sha256": "797b13da94152a0c9bf7c151057a121cf43dc29f178af68d31f73a9958bc1fb3",
+      "name": "lower_authority_A05_nonstrict_scheme_import"
+    },
+    {
+      "expected_code": "TYPE",
+      "expected_layer": "type",
+      "expected_path": "entry[3].argument",
+      "input_bytes": 1279,
+      "input_sha256": "6581fdee20008d6ea2b56953ccc4ee60178feafe1db74fcc449348cea395d4f8",
+      "name": "lower_reject_contract_alias_refinement"
+    },
+    {
+      "expected_code": "TYPE",
+      "expected_layer": "type",
+      "expected_path": "entry[3].argument",
+      "input_bytes": 1250,
+      "input_sha256": "e291f192e55168585497322c967394b3fc00f639b207a7a80a63cebec29f7f9f",
+      "name": "lower_reject_nested_arrow_protocol"
+    },
+    {
+      "expected_code": "ALLOCATION_CYCLE",
+      "expected_layer": "graph",
+      "expected_path": "functions.id",
+      "input_bytes": 1764,
+      "input_sha256": "bf3266ebc67a4ad5afaaf0e08250e570addfdfe0c8779d62972b226e6db624f8",
+      "name": "lower_reject_scoped_self_allocation_cycle"
+    },
+    {
+      "expected_code": "DUPLICATE_KEY",
+      "expected_layer": "schema",
+      "expected_path": "program",
+      "input_bytes": 25,
+      "input_sha256": "0c47bc757c443a00c76d00938d7bdce513dfce1361d66f3541ba98aea2c911f1",
+      "name": "lower_reject_duplicate_json_key"
+    },
+    {
+      "expected_code": "JSON",
+      "expected_layer": "schema",
+      "expected_path": "program",
+      "input_bytes": 15,
+      "input_sha256": "50f6f985e57e457a05aa5b5cbb99b534e5e0ddac9be6cb8773951d03815bde42",
+      "name": "lower_reject_nonfinite_json"
+    },
+    {
+      "expected_code": "SCHEMA",
+      "expected_layer": "schema",
+      "expected_path": "program",
+      "input_bytes": 330,
+      "input_sha256": "06152250577d2c80460e3e386fce8f9d8a9e99597357c571e8796dc99de74578",
+      "name": "metadata_reject_producer_accesses"
+    },
+    {
+      "expected_code": "VERSION",
+      "expected_layer": "schema",
+      "expected_path": "program.version",
+      "input_bytes": 316,
+      "input_sha256": "e98971e7271291175a510ccef9a92dcde11325c3249aee0729ef829c514347c3",
+      "name": "metadata_reject_version7"
+    },
+    {
+      "expected_code": "ONCE",
+      "expected_layer": "metadata-subset",
+      "expected_path": "metadata.types[2].protocol",
+      "input_bytes": 739,
+      "input_sha256": "04fa4af2967c36f333b27a3b85d681e4df97f5a1586139b97b73eab22aabc97d",
+      "name": "metadata_subset_once_callable"
+    },
+    {
+      "expected_code": "ONCE",
+      "expected_layer": "metadata-subset",
+      "expected_path": "metadata.types[2].protocol",
+      "input_bytes": 547,
+      "input_sha256": "b42917571cbcb7d54e3279be505551e924232ef298eff2848ffc28fdfab19ddc",
+      "name": "metadata_subset_unused_nested_once"
+    },
+    {
+      "expected_code": "OWNERSHIP",
+      "expected_layer": "resource",
+      "expected_path": "entry[3].value",
+      "input_bytes": 574,
+      "input_sha256": "5af2c7ce8284255f738571aad5b413760f0f54351ebaae1e1f8bb055d375781a",
+      "name": "metadata_lower_force_loan_owner"
+    },
+    {
+      "expected_code": "OWNERSHIP",
+      "expected_layer": "resource",
+      "expected_path": "entry[3].fields.item",
+      "input_bytes": 1441,
+      "input_sha256": "538c17a55062c44e77e7cbd5a4e5a2d890409ae806feb7850d74a0449fce6f84",
+      "name": "metadata_lower_alloc_loan_owner"
+    },
+    {
+      "expected_code": "OWNERSHIP",
+      "expected_layer": "resource",
+      "expected_path": "entry[9]",
+      "input_bytes": 1700,
+      "input_sha256": "f8c41862c80715de4268856cb1a3cf4d6ae4d8aa5fd44323ce7afe7e129003b2",
+      "name": "lower_reject_application_loan_owned_position"
+    },
+    {
+      "expected_code": "FIELD_SHAPE",
+      "expected_layer": "declarations",
+      "expected_path": "families.CallableOption.fields.Some[0]",
+      "input_bytes": 2721,
+      "input_sha256": "ccc0c40529f2df1a8d70e8b366a125760fedabdd78a1bacea9759acd01d47615",
+      "name": "metadata_lower_callable_sum_field_unsupported"
+    },
+    {
+      "expected_code": "TYPE_COUNT",
+      "expected_layer": "metadata-bounds",
+      "expected_path": "metadata.types",
+      "input_bytes": 55074,
+      "input_sha256": "a93c5ec9196ca17ce1a6e17b78cf5f33e286dfa0362e95bf8943b1528a4f9cdc",
+      "name": "metadata_fresh_types_4097"
+    },
+    {
+      "expected_code": "ROW_COUNT",
+      "expected_layer": "metadata-bounds",
+      "expected_path": "metadata.access_transport_resolution_rows",
+      "input_bytes": 60719,
+      "input_sha256": "1ee02fe927e12ab6a3c0e6d513b400e3e7f0613b998b8d710bc5f1ade63248e0",
+      "name": "metadata_public_row_overflow_n47"
+    }
+  ],
+  "interfaces": {
+    "assembly_not_execution": "prepare_design_schema.py constructs only these design JSON files and hashes existing read-only sources; no project modules are imported.",
+    "failure_precedence": [
+      "fresh lower/resource/metadata checking unchanged",
+      "host mapping/schema/bound reservations before generation",
+      "native arguments",
+      "native fixed header and byte gate",
+      "directory structure and extents",
+      "memberships and bindings",
+      "all row domains",
+      "type/env/resolution equations",
+      "origin/descriptor equations",
+      "slot/access/transport equations",
+      "final census"
+    ],
+    "failure_ties": "phase order, canonical object/table order, increasing row, declaration field order; reservations happen before their work and bound failure can precede a later semantic rejection; fixed error coords use UINT32_MAX when absent",
+    "format": "resource-ir-v8-c-packet-interfaces/1",
+    "host_error": {
+      "codes": [
+        "INPUT_KIND",
+        "SCHEMA",
+        "INTEGER",
+        "TAG",
+        "NULL_DOMAIN",
+        "REFERENCE",
+        "SUPPLEMENT",
+        "INVENTORY",
+        "EQUATION",
+        "DIRECTORY_COUNT",
+        "CREATION_UNITS",
+        "WORK_UNITS",
+        "SOURCE_BYTES",
+        "MANIFEST_BYTES",
+        "SUPPLEMENT_BYTES",
+        "SOURCE_GRAMMAR"
+      ],
+      "exact_readonly_properties": [
+        "path",
+        "layer",
+        "code",
+        "message"
+      ],
+      "failure_output": "no successful result or partial success source",
+      "layers": [
+        "packet-schema",
+        "packet-mapping",
+        "packet-bounds",
+        "packet-source"
+      ]
+    },
+    "host_manifest": {
+      "bindings": "exact object keys core,raw,declaration,resource,metadata with 64-hex values",
+      "exact_keys": [
+        "format",
+        "schema_sha256",
+        "bindings",
+        "supplement_sha256",
+        "table_counts",
+        "resolution_access_transport_rows",
+        "source_inventory_entries",
+        "packet_directory_count",
+        "packet_member_count",
+        "host_sidecars",
+        "outputs",
+        "native_status"
+      ],
+      "format": "resource-ir-v8-c-packet-emission-manifest/1",
+      "host_sidecars": "exact object keys metadata_sha256,resource_sha256,supplement_sha256; metadata covers remaps/boundaries/coverage/storage/counts; resource binds raw proof references; supplement covers Stage04 Site facts",
+      "native_status": "exact object {state:uncompiled-packet-only,packet_bytes:null,runtime_total_static_bytes:null,graph_executed:false,source_admitted:false,runtime_guards_executed:false}",
+      "outputs": "exact object keys packet_header and packet_source; each exact object bytes,sha256",
+      "packet_member_count": "number of nonempty mapped source rows plus one directory; root_complete_object_count is fixed 1 by schema, not extra storage",
+      "source_inventory_entries": "ordered by Stage03 inventory id; exact row keys source_id,key,kind,count,source_element_kind,packet_element_type,directory_id,mapping_class; values preserve original key/count/kind/element and classify direct/shared-reference/descriptor-specification/packet-header",
+      "table_counts": {
+        "exact_keys_in_domain_order": [
+          "types",
+          "callable_contracts",
+          "schemes",
+          "environments",
+          "codes",
+          "code_executions",
+          "shapes",
+          "shape_typing",
+          "representations",
+          "nominal_fields",
+          "families",
+          "type_resolutions",
+          "representation_resolutions",
+          "sites",
+          "site_executions",
+          "slots",
+          "accesses",
+          "introductions",
+          "uses",
+          "transports"
+        ],
+        "serialization_order": "canonical JSON key order; semantic table domain order is the listed 1..20 order",
+        "value_type": "non-bool plain host integer in 0..UINT32_MAX, subject to lower and packet caps"
+      }
+    },
+    "host_result": {
+      "authority": "emitted-uncompiled-packet-only, not metadata/runtime/source acceptance",
+      "exact_fields": [
+        [
+          "format",
+          "str fixed resource-ir-v8-c-packet-source/1"
+        ],
+        [
+          "canonical_ir_json",
+          "str from fresh checked raw"
+        ],
+        [
+          "metadata_json",
+          "str unchanged Stage03 canonical metadata"
+        ],
+        [
+          "bindings",
+          "tuple of five lowercase 64-hex SHA256 strings in core/raw/declaration/resource/metadata order"
+        ],
+        [
+          "supplement_json",
+          "str canonical exact supplement format"
+        ],
+        [
+          "supplement_sha256",
+          "str 64-hex"
+        ],
+        [
+          "packet_header",
+          "str bounded UTF-8 generated root declaration/getter prototypes"
+        ],
+        [
+          "packet_source",
+          "str bounded UTF-8 generated root initializer/getters"
+        ],
+        [
+          "manifest_json",
+          "str canonical manifest below"
+        ],
+        [
+          "manifest_sha256",
+          "str 64-hex"
+        ],
+        [
+          "statistics",
+          "immutable keyed tuple of creation_units,work_units,source_utf8_bytes,manifest_utf8_bytes,supplement_utf8_bytes"
+        ]
+      ],
+      "immutability": "frozen slots; every nested field is immutable str/bytes/tuple; no mutable dictionary/list retained",
+      "name": "PacketEmission",
+      "repr": "fixed status and hashes only"
+    },
+    "native_early_return": {
+      "later_failure": "report initialized fields only with safely established measurements; missing coords null, unknown counts/bytes zero; work_used successfully reserved total",
+      "length_failure": "after all arguments nonnull, check fixed-header minimum and packet maximum before reading root or initializing workspace; return header/size diagnostic with work_used=0",
+      "nonnull_report": "initialize every field first: status=ARGUMENT, phase=arguments, detail=null-argument, all optional coordinates UINT32_MAX, all counts/bytes/work/flags zero",
+      "normal_start": "precharge actual sizeof Workspace before clearing, then safe header copy precharged by actual sizeof; fixed report initialization/return writes are bounded constant overhead, not native work units",
+      "null_report": "return ARGUMENT immediately; no report/workspace/root read or write",
+      "other_null_argument": "check root, expected, workspace in that order; return ARGUMENT with field coordinate 0,1,2 respectively; workspace untouched and work_used=0"
+    },
+    "native_work_costs": {
+      "counter_failure": "atomic no counter change, no operation",
+      "fixed_control": "bounded dispatch/counter/bounds arithmetic only",
+      "record_copy": "actual sizeof bytes before memcpy",
+      "repeated_work": "charged again",
+      "row_candidate_or_DAG_child_examination": 1,
+      "scalar_equation_or_key_component": 1,
+      "scanned_byte": 1,
+      "workspace_initialization": "actual sizeof bytes before clearing"
+    },
+    "public_native": {
+      "preconditions": "valid readable immutable root and correct nonoverlapping expected/workspace/report storage/lifetimes; no arbitrary pointer-safety promise",
+      "result_authority": "structural packet only; no retained view or runtime context",
+      "signature": "Ir8PacketStatus ir8_packet_validate(const void *root, size_t root_bytes, const Ir8PacketExpectedBindings *expected, Ir8PacketWorkspace *workspace, Ir8PacketReport *report)",
+      "storage_types": "PACKET_SCHEMA_STAGE04.json non_element_types"
+    },
+    "public_python": [
+      "emit_packet(raw)",
+      "loads_packet(text)"
+    ],
+    "schema_sha256": "e4976fb839a8b738c0797100fe7b5d1fc948f2b995ab17f3c44cc8cc4fb94ba6"
+  },
+  "mutation_design_metadata_inputs": [
+    {
+      "fixture": "concrete_empty_finish",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/concrete_empty_finish.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "50bdb6d15af080c764b1c089e8ee8e69311f23b28dfef91d4f32ee22cdc9d97d"
+    },
+    {
+      "fixture": "concrete_fill_force_hole",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/concrete_fill_force_hole.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "244f890cfbaf9f440e368ba64d4eb96057b8ecd9d27484e0dafecb32b5eb88de"
+    },
+    {
+      "fixture": "closed_full_contract_alias_interchange",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/closed_full_contract_alias_interchange.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "514467a3edaa141e60853648d20cc0f6831f9e1d4a53ea8d9783f650490b8f67"
+    },
+    {
+      "fixture": "concrete_nullary_case_all_arms",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/concrete_nullary_case_all_arms.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "350dfb05bcea20b8f43feb3bc82a0d4c2079ba35033110bdfacf1e188e59051c"
+    },
+    {
+      "fixture": "pending_shared_three_lambda_two_application_shape",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/pending_shared_three_lambda_two_application_shape.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "4ce6fa240a26b8ca9bdd03f2b71b95c083d6d6c27430c3b0a6831f3491cffb2a"
+    },
+    {
+      "fixture": "curried_const_complete_ib_bi_views",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/curried_const_complete_ib_bi_views.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "5326761df6695f5e082f04281f04c877b10e798b0aaba7a9206d46e2fa49630d"
+    },
+    {
+      "fixture": "dead_parameter_two_complete_vectors",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/dead_parameter_two_complete_vectors.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "d8b4d5c77fa4862fd39b8169c00eb47a2be0a98a1049178167c64d7e187b0741"
+    },
+    {
+      "fixture": "neutral_closed_looking_arrow_and_scalar",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/neutral_closed_looking_arrow_and_scalar.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "086bb20ad854cdb0811bf4595c5eddf7806c36e5d7d515c3050b3bc1b7dc2b2b"
+    },
+    {
+      "fixture": "two_scheme_closed_higher_order_capture",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/two_scheme_closed_higher_order_capture.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "1fde3300f84404d051401308182ffcfd3b0c17b5ce20d65bfc0fd62692e28bb1"
+    },
+    {
+      "fixture": "generic_thunk_and_instance_deferred_return",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/generic_thunk_and_instance_deferred_return.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "abe2cb03dee031ee820cbd51c858e20d292a2dbb34ea81a927ede60a2fe24e99"
+    },
+    {
+      "fixture": "concrete_callable_field_foreign_projection",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/concrete_callable_field_foreign_projection.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "e4058ecb0c6d99aab903f338e52b98814f024d904529dd26ff3d4891e1855d39"
+    },
+    {
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "path": "/workspace/scratch/c43337ba2cad/implement-ir8-metadata-closure-20261103/run-stage03-03/cases/sum_scalar_field_foreign_factory_capture.metadata.json",
+      "purpose": "source-only selector design; final oracle freshly checks raw instead of trusting this archived result",
+      "sha256": "085e9518b10cb63d4aa45aef8e71911a64d8322de056603835c82e90b88203ce"
+    }
+  ],
+  "native_fixtures": [
+    {
+      "name": "concrete_empty_finish",
+      "order": 1,
+      "raw_sha256": "2dd27c15272a16861f5e406c76dec2b8d0940d0ea1867cdc371923d220c14f95",
+      "raw_utf8_bytes": 152,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "concrete_fill_force_hole",
+      "order": 2,
+      "raw_sha256": "e3f499cfe00cce11dd8eeeaec266dc0e62695181590cb32e38fd59a37a9764f1",
+      "raw_utf8_bytes": 468,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "closed_full_contract_alias_interchange",
+      "order": 3,
+      "raw_sha256": "19a0e4dd05065945bb51ceb74a490d45b9ffef04e908d1341961a73e1e0b1596",
+      "raw_utf8_bytes": 1278,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "concrete_nullary_case_all_arms",
+      "order": 4,
+      "raw_sha256": "b0cc17aef6a823e3c100790540f7692f2af062520c037d198fa911d54018bfcb",
+      "raw_utf8_bytes": 734,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "pending_shared_three_lambda_two_application_shape",
+      "order": 5,
+      "raw_sha256": "aacfd5113470d8cd0011a14b3c6808ef366fb3cbbac1951afc6241c6b190daf6",
+      "raw_utf8_bytes": 2405,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "curried_const_complete_ib_bi_views",
+      "order": 6,
+      "raw_sha256": "7738bd5421b679f36825b1055dd87698a556bf129d876b2ea2d26692944a3c4f",
+      "raw_utf8_bytes": 2500,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "dead_parameter_two_complete_vectors",
+      "order": 7,
+      "raw_sha256": "7a628bbfe66f6062dfad1d43ba2496ef28581713b38ac362f3500c1021ff7672",
+      "raw_utf8_bytes": 1569,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "neutral_closed_looking_arrow_and_scalar",
+      "order": 8,
+      "raw_sha256": "c3d5dace3bb782ff16ba4eef9f83ffec5b7adac26d020f2611bb55df4583b257",
+      "raw_utf8_bytes": 2069,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "two_scheme_closed_higher_order_capture",
+      "order": 9,
+      "raw_sha256": "5909f1ddc4317183d7c4f188e8b3e06c927fb313bd212dcd2779883ef4bce7a9",
+      "raw_utf8_bytes": 2771,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "generic_thunk_and_instance_deferred_return",
+      "order": 10,
+      "raw_sha256": "d520e3e6449f975b82cf5700581f2d4897f45aa1363257a589a0069c1c82a753",
+      "raw_utf8_bytes": 2094,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "concrete_callable_field_foreign_projection",
+      "order": 11,
+      "raw_sha256": "f44111459be998de864c8e2104c1020eb8610a331986cbf3de5c27f75ec959e4",
+      "raw_utf8_bytes": 2081,
+      "stage03_declared_accepted": true
+    },
+    {
+      "name": "sum_scalar_field_foreign_factory_capture",
+      "order": 12,
+      "raw_sha256": "9cb4d15935f8ddd15b5b0893f41b12f4470a4c2dc936740173d0f7d3e06adc83",
+      "raw_utf8_bytes": 2850,
+      "stage03_declared_accepted": true
+    }
+  ],
+  "native_mutations": [
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "abi_revision",
+          "key": "header/program",
+          "row": 0,
+          "value": 2
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 5,
+        "domain": 4294967295,
+        "field": 1,
+        "object": 4294967295,
+        "phase": 2,
+        "row": 4294967295,
+        "status": 2
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "bad-revision"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "purpose",
+          "key": "header/program",
+          "row": 0,
+          "value": 2
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 6,
+        "domain": 4294967295,
+        "field": 2,
+        "object": 4294967295,
+        "phase": 2,
+        "row": 4294967295,
+        "status": 2
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "bad-purpose"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "packet_bytes",
+          "key": "header/program",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 3,
+        "domain": 4294967295,
+        "field": 3,
+        "object": 4294967295,
+        "phase": 2,
+        "row": 4294967295,
+        "status": 2
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "bad-claimed-bytes"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "byte": 0,
+          "byte_write": true,
+          "field": "magic",
+          "key": "header/program",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 4,
+        "domain": 4294967295,
+        "field": 0,
+        "object": 4294967295,
+        "phase": 2,
+        "row": 4294967295,
+        "status": 2
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "bad-magic"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "directory_count",
+          "key": "header/program",
+          "row": 0,
+          "value": 16385
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 7,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 4294967295,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 12
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-limit-one-over"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "directory_count",
+          "key": "header/program",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 7,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 4294967295,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 12
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-count-below-minimum"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "directory_offset",
+          "key": "header/program",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 10,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 4294967295,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-offset-unaligned"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "directory_offset",
+          "key": "header/program",
+          "row": 0,
+          "value": 4294967292
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 9,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 4294967295,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-offset-outside"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "source_inventory_id",
+          "key": "packet/object-directory",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 15,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 0,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-source-id"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "element_type",
+          "key": "packet/object-directory",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 17,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 0,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-element-kind"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "element_bytes",
+          "key": "packet/object-directory",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 10,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 0,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-element-size"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "element_alignment",
+          "key": "packet/object-directory",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 10,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 0,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-element-alignment"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "count",
+          "key": "packet/object-directory",
+          "row": 0,
+          "value": 4294967295
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 8,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 0,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-count-overflow"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "object_bytes",
+          "key": "packet/object-directory",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 16,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 0,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-object-bytes"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "offset",
+          "key": "packet/object-directory",
+          "row": 0,
+          "value": 4294967295
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 10,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 0,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-nonempty-null-offset"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "owner",
+          "key": "packet/object-directory",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 25,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 0,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-owner"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "offset",
+          "key": "packet/object-directory",
+          "row": 23,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 18,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 23,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-zero-nonnull-offset"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "offset",
+          "key": "packet/object-directory",
+          "row": 21,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 11,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 21,
+        "phase": 3,
+        "row": 4294967295,
+        "status": 4
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "directory-overlap"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "byte": 0,
+          "byte_write": true,
+          "field": "bytes",
+          "key": "header/bindings",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 22,
+        "domain": 4294967295,
+        "field": 0,
+        "object": 2,
+        "phase": 4,
+        "row": 0,
+        "status": 6
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "binding-copied-wrong-byte"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "domain",
+          "key": "index/table/types",
+          "row": 0,
+          "value": 2
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 1,
+        "field": 4294967295,
+        "object": 54,
+        "phase": 4,
+        "row": 0,
+        "status": 5
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "table-registry-wrong-domain"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "typed_header_object",
+          "key": "header/program",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 4294967295,
+        "phase": 4,
+        "row": 4294967295,
+        "status": 5
+      },
+      "fixture": "concrete_empty_finish",
+      "name": "header-typed-object"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "scheme",
+          "key": "table/types",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 1,
+        "field": 3,
+        "object": 21,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-types"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "type",
+          "key": "table/callable_contracts",
+          "row": 0,
+          "value": 7
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 2,
+        "field": 1,
+        "object": 4,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-callable_contracts"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "body",
+          "key": "table/schemes",
+          "row": 0,
+          "value": 7
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 3,
+        "field": 3,
+        "object": 13,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-schemes"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "scheme",
+          "key": "table/environments",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 4,
+        "field": 1,
+        "object": 7,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-environments"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "scope",
+          "key": "table/codes",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 5,
+        "field": 3,
+        "object": 6,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-codes"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "code",
+          "key": "table/code_executions",
+          "row": 0,
+          "value": 3
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 6,
+        "field": 1,
+        "object": 5,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-code_executions"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "source_type",
+          "key": "table/shapes",
+          "row": 0,
+          "value": 7
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 7,
+        "field": 3,
+        "object": 15,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-shapes"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "shape",
+          "key": "table/shape_typing",
+          "row": 0,
+          "value": 8
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 8,
+        "field": 1,
+        "object": 14,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-shape_typing"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "shape",
+          "key": "table/representations",
+          "row": 0,
+          "value": 8
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 9,
+        "field": 1,
+        "object": 12,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-representations"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "shape",
+          "key": "table/nominal_fields",
+          "row": 0,
+          "value": 8
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 10,
+        "field": 1,
+        "object": 10,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-nominal_fields"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "shape",
+          "key": "table/families",
+          "row": 0,
+          "value": 8
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 11,
+        "field": 2,
+        "object": 8,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-families"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "type",
+          "key": "table/type_resolutions",
+          "row": 0,
+          "value": 7
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 12,
+        "field": 1,
+        "object": 20,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-type_resolutions"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "type",
+          "key": "table/representation_resolutions",
+          "row": 0,
+          "value": 7
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 13,
+        "field": 1,
+        "object": 11,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-representation_resolutions"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "scope",
+          "key": "table/sites",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 14,
+        "field": 3,
+        "object": 17,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-sites"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "site",
+          "key": "table/site_executions",
+          "row": 0,
+          "value": 11
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 15,
+        "field": 1,
+        "object": 16,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-site_executions"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "site",
+          "key": "table/slots",
+          "row": 0,
+          "value": 11
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 16,
+        "field": 1,
+        "object": 18,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-slots"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "site",
+          "key": "table/accesses",
+          "row": 0,
+          "value": 11
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 17,
+        "field": 1,
+        "object": 3,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-accesses"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "scheme",
+          "key": "table/introductions",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 18,
+        "field": 1,
+        "object": 9,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-introductions"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "scheme",
+          "key": "table/uses",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 19,
+        "field": 2,
+        "object": 22,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-uses"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "source_access",
+          "key": "table/transports",
+          "row": 0,
+          "value": 14
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 20,
+        "field": 1,
+        "object": 19,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "out-of-range-transports"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "shape",
+          "key": "descriptor/shapes",
+          "row": 0,
+          "value": 8
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 1,
+        "field": 0,
+        "object": 46,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "descriptor-reference-shapes"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "code",
+          "key": "descriptor/codes",
+          "row": 0,
+          "value": 3
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 2,
+        "field": 0,
+        "object": 43,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "descriptor-reference-codes"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "family",
+          "key": "descriptor/families",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 3,
+        "field": 0,
+        "object": 44,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "descriptor-reference-families"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "family",
+          "key": "descriptor/variants",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 4,
+        "field": 0,
+        "object": 47,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "descriptor-reference-variants"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "type",
+          "key": "descriptor/nominal-fields",
+          "row": 0,
+          "value": 7
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 5,
+        "field": 4,
+        "object": 45,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "descriptor-reference-nominal-fields"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "type",
+          "key": "descriptor/code-capture-fields",
+          "row": 0,
+          "value": 7
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 6,
+        "field": 4,
+        "object": 42,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "descriptor-reference-code-capture-fields"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "body_binding",
+          "key": "descriptor/codes",
+          "row": 0,
+          "value": 2
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 17,
+        "domain": 2,
+        "field": 6,
+        "object": 43,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "unbound-body-only"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "category",
+          "key": "table/sites",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 17,
+        "domain": 14,
+        "field": 5,
+        "object": 17,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "unknown-site-tag"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "mode",
+          "key": "table/accesses",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 17,
+        "domain": 17,
+        "field": 3,
+        "object": 3,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "invalid-access-flag"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "position",
+          "key": "vector/execution-captures/4",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 6,
+        "field": 4294967295,
+        "object": 5,
+        "phase": 5,
+        "row": 4,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "capture-position-shift"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "relation",
+          "key": "vector/code-captures/2",
+          "row": 0,
+          "value": 4294967295
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 17,
+        "domain": 5,
+        "field": 4294967295,
+        "object": 6,
+        "phase": 5,
+        "row": 2,
+        "status": 7
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "capture-relation-omission"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "sum_variant",
+          "key": "table/sites",
+          "row": 4,
+          "value": 2
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 14,
+        "field": 4294967295,
+        "object": 17,
+        "phase": 7,
+        "row": 4,
+        "status": 10
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "sum-selected-variant-outside"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "sum_variant",
+          "key": "table/sites",
+          "row": 4,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 16,
+        "field": 4294967295,
+        "object": 18,
+        "phase": 8,
+        "row": 3,
+        "status": 11
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "sum-selected-variant-slot-disagreement"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "role_variant",
+          "key": "table/slots",
+          "row": 3,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 16,
+        "field": 4294967295,
+        "object": 18,
+        "phase": 8,
+        "row": 3,
+        "status": 11
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "sum-variant-slot-wrong-declaration"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "capture_first",
+          "key": "descriptor/codes",
+          "row": 2,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 16,
+        "domain": 2,
+        "field": 4294967295,
+        "object": 43,
+        "phase": 7,
+        "row": 2,
+        "status": 10
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "capture-descriptor-slice-shift"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "path",
+          "key": "table/sites",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 21,
+        "domain": 14,
+        "field": 1,
+        "object": 17,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "concrete_nullary_case_all_arms",
+      "name": "string-inside-start"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "byte_write": true,
+          "field": null,
+          "key": "pool/strings",
+          "row": 0,
+          "value": 255
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 20,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 4294967295,
+        "phase": 5,
+        "row": 4294967295,
+        "status": 7
+      },
+      "fixture": "concrete_nullary_case_all_arms",
+      "name": "pool-invalid-utf8"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "sum_family",
+          "key": "table/sites",
+          "row": 0,
+          "value": 4294967295
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 18,
+        "domain": 14,
+        "field": 4294967295,
+        "object": 17,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "concrete_nullary_case_all_arms",
+      "name": "nullary-sum-family-null"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "correspondence_reject": true,
+      "edits": [
+        {
+          "field": "sum_variant",
+          "key": "table/sites",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": null,
+      "fixture": "concrete_nullary_case_all_arms",
+      "name": "coherent-nullary-variant-switch"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "correspondence_reject": true,
+      "edits": [
+        {
+          "byte_write": true,
+          "field": null,
+          "key": "pool/strings",
+          "row": 29,
+          "value": 102
+        }
+      ],
+      "expected_diagnostic": null,
+      "fixture": "concrete_nullary_case_all_arms",
+      "name": "coherent-variant-name-with-copied-bindings"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "byte_write": true,
+          "field": null,
+          "key": "pool/strings",
+          "row": 168,
+          "value": 65
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 21,
+        "domain": 4294967295,
+        "field": 4294967295,
+        "object": 4294967295,
+        "phase": 5,
+        "row": 4294967295,
+        "status": 7
+      },
+      "fixture": "concrete_nullary_case_all_arms",
+      "name": "pool-last-nul-missing"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "protocol",
+          "key": "table/types",
+          "row": 4,
+          "value": 2
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 17,
+        "domain": 1,
+        "field": 7,
+        "object": 21,
+        "phase": 5,
+        "row": 4,
+        "status": 7
+      },
+      "fixture": "dead_parameter_two_complete_vectors",
+      "name": "once-protocol-tag"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "argument",
+          "key": "table/types",
+          "row": 4,
+          "value": 4
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 15,
+        "domain": 1,
+        "field": 4294967295,
+        "object": 21,
+        "phase": 6,
+        "row": 4,
+        "status": 8
+      },
+      "fixture": "dead_parameter_two_complete_vectors",
+      "name": "forward-cyclic-type"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "index",
+          "key": "table/types",
+          "row": 2,
+          "value": 2
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 19,
+        "domain": 1,
+        "field": 4294967295,
+        "object": 21,
+        "phase": 6,
+        "row": 2,
+        "status": 8
+      },
+      "fixture": "dead_parameter_two_complete_vectors",
+      "name": "rigid-parameter-outside"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "component": "count",
+          "field": "arguments",
+          "key": "table/environments",
+          "row": 3,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 16,
+        "domain": 4,
+        "field": 4294967295,
+        "object": 7,
+        "phase": 5,
+        "row": 3,
+        "status": 5
+      },
+      "fixture": "dead_parameter_two_complete_vectors",
+      "name": "dead-argument-vector-collapsed"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "mode",
+          "key": "table/environments",
+          "row": 1,
+          "value": 3
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 3,
+        "field": 4294967295,
+        "object": 13,
+        "phase": 6,
+        "row": 0,
+        "status": 8
+      },
+      "fixture": "dead_parameter_two_complete_vectors",
+      "name": "wrong-neutral-mode"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "component": "object",
+          "field": "arguments",
+          "key": "table/uses",
+          "row": 0,
+          "value": 27
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 24,
+        "domain": 19,
+        "field": 4294967295,
+        "object": 22,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "dead_parameter_two_complete_vectors",
+      "name": "use-does-not-share-environment-span"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "result",
+          "key": "table/type_resolutions",
+          "row": 0,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 12,
+        "field": 4294967295,
+        "object": 20,
+        "phase": 6,
+        "row": 0,
+        "status": 8
+      },
+      "fixture": "dead_parameter_two_complete_vectors",
+      "name": "wrong-type-substitution"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "origin_kind",
+          "key": "table/site_executions",
+          "row": 0,
+          "value": 3
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 14,
+        "field": 4294967295,
+        "object": 17,
+        "phase": 7,
+        "row": 0,
+        "status": 10
+      },
+      "fixture": "neutral_closed_looking_arrow_and_scalar",
+      "name": "generic-not-instance"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "mode",
+          "key": "table/accesses",
+          "row": 3,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 18,
+        "domain": 17,
+        "field": 4294967295,
+        "object": 3,
+        "phase": 5,
+        "row": 3,
+        "status": 7
+      },
+      "fixture": "neutral_closed_looking_arrow_and_scalar",
+      "name": "scheme-not-mono"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "origin_env",
+          "key": "table/accesses",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 17,
+        "field": 4294967295,
+        "object": 3,
+        "phase": 8,
+        "row": 0,
+        "status": 11
+      },
+      "fixture": "neutral_closed_looking_arrow_and_scalar",
+      "name": "changed-access-origin"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "projection_env",
+          "key": "table/transports",
+          "row": 1,
+          "value": 4
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 20,
+        "field": 4294967295,
+        "object": 19,
+        "phase": 8,
+        "row": 1,
+        "status": 11
+      },
+      "fixture": "two_scheme_closed_higher_order_capture",
+      "name": "foreign-scheme-projection"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "scheme",
+          "key": "table/types",
+          "row": 2,
+          "value": 1
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 15,
+        "domain": 1,
+        "field": 4294967295,
+        "object": 21,
+        "phase": 6,
+        "row": 3,
+        "status": 8
+      },
+      "fixture": "two_scheme_closed_higher_order_capture",
+      "name": "capture-foreign-scope"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "role_tag",
+          "key": "table/slots",
+          "row": 0,
+          "value": 5
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 16,
+        "field": 4294967295,
+        "object": 18,
+        "phase": 8,
+        "row": 0,
+        "status": 11
+      },
+      "fixture": "pending_shared_three_lambda_two_application_shape",
+      "name": "pending-function-slot"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "role_tag",
+          "key": "table/slots",
+          "row": 1,
+          "value": 6
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 16,
+        "field": 4294967295,
+        "object": 18,
+        "phase": 8,
+        "row": 1,
+        "status": 11
+      },
+      "fixture": "pending_shared_three_lambda_two_application_shape",
+      "name": "pending-argument-slot"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "role_tag",
+          "key": "table/slots",
+          "row": 2,
+          "value": 5
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 16,
+        "field": 4294967295,
+        "object": 18,
+        "phase": 8,
+        "row": 2,
+        "status": 11
+      },
+      "fixture": "pending_shared_three_lambda_two_application_shape",
+      "name": "pending-memo-slot"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "role_tag",
+          "key": "table/slots",
+          "row": 0,
+          "value": 5
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 16,
+        "field": 4294967295,
+        "object": 18,
+        "phase": 8,
+        "row": 0,
+        "status": 11
+      },
+      "fixture": "concrete_fill_force_hole",
+      "name": "hole-memo-slot"
+    },
+    {
+      "classification": "private-readable-copy-structural-control",
+      "edits": [
+        {
+          "field": "declared_rep",
+          "key": "table/nominal_fields",
+          "row": 0,
+          "value": 0
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 10,
+        "field": 4294967295,
+        "object": 10,
+        "phase": 7,
+        "row": 0,
+        "status": 10
+      },
+      "fixture": "concrete_callable_field_foreign_projection",
+      "name": "foreign-callable-retagged"
+    },
+    {
+      "classification": "private-readable-copy-scoped-root-domain-control",
+      "edits": [
+        {
+          "field": "result",
+          "key": "table/codes",
+          "row": 0,
+          "value": 2
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 23,
+        "domain": 5,
+        "field": 4294967295,
+        "object": 6,
+        "phase": 7,
+        "row": 0,
+        "status": 8
+      },
+      "fixture": "sum_scalar_field_foreign_factory_capture",
+      "name": "scoped-code-result-outside-generic-domain"
+    },
+    {
+      "classification": "private-readable-copy-identity-control",
+      "edits": [
+        {
+          "field": "path",
+          "key": "table/sites",
+          "row": 1,
+          "value": 11
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 14,
+        "domain": 14,
+        "field": 1,
+        "object": 17,
+        "phase": 5,
+        "row": 1,
+        "status": 7
+      },
+      "fixture": "concrete_fill_force_hole",
+      "name": "duplicate-site-path-arm"
+    },
+    {
+      "classification": "private-readable-copy-identity-control",
+      "edits": [
+        {
+          "field": "path",
+          "key": "vector/use-occurrences/1",
+          "row": 0,
+          "value": 277
+        }
+      ],
+      "expected_diagnostic": {
+        "detail": 14,
+        "domain": 19,
+        "field": 0,
+        "object": 33,
+        "phase": 5,
+        "row": 0,
+        "status": 7
+      },
+      "fixture": "dead_parameter_two_complete_vectors",
+      "name": "duplicate-use-occurrence"
+    }
+  ],
+  "schema_declarations": {
+    "abi_revision": 1,
+    "acceptance": "packet ABI and corpus only; future actual runtime structs and full typed-static total remain unbound",
+    "core_sha256": "0c54e24fe48deda73547e0dd3a7e9eb285ba0b36d5d938ee8c35a312d509ee83",
+    "directory_rules": {
+      "aggregate": "one static const root, arrays only for nonempty entries, headers first, directory last",
+      "nonzero": "exact count*measured element sizeof; valid offset/alignment/disjoint extent",
+      "other_fixed_owners": "null/null",
+      "source_ids": "N-2,N-1,N-3,0..N-4,null with N=Stage03.storage_entries",
+      "unused_bytes": "all gaps/tail count as root padding; never ignored",
+      "zero_count": "offset=null, object_bytes=0; measured element size/alignment retained; no storage"
+    },
+    "domain_descriptors": [
+      {
+        "element": "ShapeSpec",
+        "id": 1,
+        "mapping_class": "descriptor-specification",
+        "registry_element": "RegisteredDescriptorRef",
+        "source_element_kind": "physical.RtShape",
+        "suffix": "shapes"
+      },
+      {
+        "element": "CodeSpec",
+        "id": 2,
+        "mapping_class": "descriptor-specification",
+        "registry_element": "RegisteredDescriptorRef",
+        "source_element_kind": "physical.RtCode",
+        "suffix": "codes"
+      },
+      {
+        "element": "FamilySpec",
+        "id": 3,
+        "mapping_class": "descriptor-specification",
+        "registry_element": "RegisteredDescriptorRef",
+        "source_element_kind": "physical.RtFamily",
+        "suffix": "families"
+      },
+      {
+        "element": "VariantSpec",
+        "id": 4,
+        "mapping_class": "descriptor-specification",
+        "registry_element": "RegisteredDescriptorRef",
+        "source_element_kind": "physical.RtVariant",
+        "suffix": "variants"
+      },
+      {
+        "element": "FieldSpec",
+        "id": 5,
+        "mapping_class": "descriptor-specification",
+        "registry_element": "RegisteredDescriptorRef",
+        "source_element_kind": "physical.RtField",
+        "suffix": "nominal-fields"
+      },
+      {
+        "element": "FieldSpec",
+        "id": 6,
+        "mapping_class": "descriptor-specification",
+        "registry_element": "RegisteredDescriptorRef",
+        "source_element_kind": "physical.RtField",
+        "suffix": "code-capture-fields"
+      }
+    ],
+    "domain_tables": [
+      {
+        "element": "Type",
+        "id": 1,
+        "inventory_key": "table/types",
+        "registry_key": "index/table/types",
+        "table": "types"
+      },
+      {
+        "element": "CallableContract",
+        "id": 2,
+        "inventory_key": "table/callable_contracts",
+        "registry_key": "index/table/callable_contracts",
+        "table": "callable_contracts"
+      },
+      {
+        "element": "Scheme",
+        "id": 3,
+        "inventory_key": "table/schemes",
+        "registry_key": "index/table/schemes",
+        "table": "schemes"
+      },
+      {
+        "element": "Env",
+        "id": 4,
+        "inventory_key": "table/environments",
+        "registry_key": "index/table/environments",
+        "table": "environments"
+      },
+      {
+        "element": "CodeTyping",
+        "id": 5,
+        "inventory_key": "table/codes",
+        "registry_key": "index/table/codes",
+        "table": "codes"
+      },
+      {
+        "element": "CodeExecution",
+        "id": 6,
+        "inventory_key": "table/code_executions",
+        "registry_key": "index/table/code_executions",
+        "table": "code_executions"
+      },
+      {
+        "element": "ShapeBinding",
+        "id": 7,
+        "inventory_key": "table/shapes",
+        "registry_key": "index/table/shapes",
+        "table": "shapes"
+      },
+      {
+        "element": "ShapeTyping",
+        "id": 8,
+        "inventory_key": "table/shape_typing",
+        "registry_key": "index/table/shape_typing",
+        "table": "shape_typing"
+      },
+      {
+        "element": "Representation",
+        "id": 9,
+        "inventory_key": "table/representations",
+        "registry_key": "index/table/representations",
+        "table": "representations"
+      },
+      {
+        "element": "NominalField",
+        "id": 10,
+        "inventory_key": "table/nominal_fields",
+        "registry_key": "index/table/nominal_fields",
+        "table": "nominal_fields"
+      },
+      {
+        "element": "FamilyTyping",
+        "id": 11,
+        "inventory_key": "table/families",
+        "registry_key": "index/table/families",
+        "table": "families"
+      },
+      {
+        "element": "TypeResolution",
+        "id": 12,
+        "inventory_key": "table/type_resolutions",
+        "registry_key": "index/table/type_resolutions",
+        "table": "type_resolutions"
+      },
+      {
+        "element": "RepresentationResolution",
+        "id": 13,
+        "inventory_key": "table/representation_resolutions",
+        "registry_key": "index/table/representation_resolutions",
+        "table": "representation_resolutions"
+      },
+      {
+        "element": "Site",
+        "id": 14,
+        "inventory_key": "table/sites",
+        "registry_key": "index/table/sites",
+        "table": "sites"
+      },
+      {
+        "element": "SiteExecution",
+        "id": 15,
+        "inventory_key": "table/site_executions",
+        "registry_key": "index/table/site_executions",
+        "table": "site_executions"
+      },
+      {
+        "element": "Slot",
+        "id": 16,
+        "inventory_key": "table/slots",
+        "registry_key": "index/table/slots",
+        "table": "slots"
+      },
+      {
+        "element": "Access",
+        "id": 17,
+        "inventory_key": "table/accesses",
+        "registry_key": "index/table/accesses",
+        "table": "accesses"
+      },
+      {
+        "element": "Intro",
+        "id": 18,
+        "inventory_key": "table/introductions",
+        "registry_key": "index/table/introductions",
+        "table": "introductions"
+      },
+      {
+        "element": "Use",
+        "id": 19,
+        "inventory_key": "table/uses",
+        "registry_key": "index/table/uses",
+        "table": "uses"
+      },
+      {
+        "element": "Transport",
+        "id": 20,
+        "inventory_key": "table/transports",
+        "registry_key": "index/table/transports",
+        "table": "transports"
+      }
+    ],
+    "element_types": [
+      {
+        "c_type": "Ir8PacketType",
+        "element_type_id": 1,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "tag",
+            "type": "U<TypeTag>"
+          },
+          {
+            "name": "atom",
+            "type": "NS"
+          },
+          {
+            "name": "scheme",
+            "type": "N<Scheme>"
+          },
+          {
+            "name": "index",
+            "type": "NU"
+          },
+          {
+            "name": "argument",
+            "type": "N<Type>"
+          },
+          {
+            "name": "result",
+            "type": "N<Type>"
+          },
+          {
+            "name": "protocol",
+            "type": "NU<Protocol>"
+          },
+          {
+            "name": "result_identity",
+            "type": "NU<ResultIdentity>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Type",
+        "table": "types"
+      },
+      {
+        "c_type": "Ir8PacketCallableContract",
+        "element_type_id": 2,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "argument",
+            "type": "R<Type>"
+          },
+          {
+            "name": "result",
+            "type": "R<Type>"
+          },
+          {
+            "name": "protocol",
+            "type": "U<Protocol>"
+          },
+          {
+            "name": "result_identity",
+            "type": "U<ResultIdentity>"
+          }
+        ],
+        "kind": "struct",
+        "name": "CallableContract",
+        "table": "callable_contracts"
+      },
+      {
+        "c_type": "Ir8PacketScheme",
+        "element_type_id": 3,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "parameters",
+            "type": "U"
+          },
+          {
+            "name": "body",
+            "type": "R<Type>"
+          },
+          {
+            "name": "neutral_env",
+            "type": "R<Env>"
+          },
+          {
+            "name": "intro",
+            "type": "R<Intro>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Scheme",
+        "table": "schemes"
+      },
+      {
+        "c_type": "Ir8PacketEnv",
+        "element_type_id": 4,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "scheme",
+            "type": "N<Scheme>"
+          },
+          {
+            "name": "mode",
+            "type": "U<EnvMode>"
+          },
+          {
+            "name": "arguments",
+            "type": "V<TypeRef>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Env",
+        "table": "environments"
+      },
+      {
+        "c_type": "Ir8PacketCodeTyping",
+        "element_type_id": 5,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "kind",
+            "type": "U<CodeKind>"
+          },
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "scope",
+            "type": "N<Scheme>"
+          },
+          {
+            "name": "callable_type",
+            "type": "N<Type>"
+          },
+          {
+            "name": "argument",
+            "type": "N<Type>"
+          },
+          {
+            "name": "result",
+            "type": "R<Type>"
+          },
+          {
+            "name": "captures",
+            "type": "V<CaptureTyping>"
+          },
+          {
+            "name": "body_path",
+            "type": "S"
+          },
+          {
+            "name": "expected_protocol",
+            "type": "NU<Protocol>"
+          },
+          {
+            "name": "expected_identity_flag",
+            "type": "Flag"
+          }
+        ],
+        "kind": "struct",
+        "name": "CodeTyping",
+        "table": "codes"
+      },
+      {
+        "c_type": "Ir8PacketCodeExecution",
+        "element_type_id": 6,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "code",
+            "type": "R<CodeTyping>"
+          },
+          {
+            "name": "env",
+            "type": "R<Env>"
+          },
+          {
+            "name": "callable_type",
+            "type": "N<Type>"
+          },
+          {
+            "name": "argument",
+            "type": "N<Type>"
+          },
+          {
+            "name": "result",
+            "type": "R<Type>"
+          },
+          {
+            "name": "captures",
+            "type": "V<ResolvedCapture>"
+          }
+        ],
+        "kind": "struct",
+        "name": "CodeExecution",
+        "table": "code_executions"
+      },
+      {
+        "c_type": "Ir8PacketShapeBinding",
+        "element_type_id": 7,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "source_tag",
+            "type": "U<ShapeSource>"
+          },
+          {
+            "name": "source_reference",
+            "type": "NS"
+          },
+          {
+            "name": "source_type",
+            "type": "N<Type>"
+          },
+          {
+            "name": "source_scheme",
+            "type": "N<Scheme>"
+          },
+          {
+            "name": "kind",
+            "type": "U<ShapeKind>"
+          },
+          {
+            "name": "argument_rep",
+            "type": "N<Representation>"
+          },
+          {
+            "name": "result_rep",
+            "type": "N<Representation>"
+          }
+        ],
+        "kind": "struct",
+        "name": "ShapeBinding",
+        "table": "shapes"
+      },
+      {
+        "c_type": "Ir8PacketShapeTyping",
+        "element_type_id": 8,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "shape",
+            "type": "R<ShapeBinding>"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "scope",
+            "type": "N<Scheme>"
+          },
+          {
+            "name": "contract",
+            "type": "N<CallableContract>"
+          }
+        ],
+        "kind": "struct",
+        "name": "ShapeTyping",
+        "table": "shape_typing"
+      },
+      {
+        "c_type": "Ir8PacketRepresentation",
+        "element_type_id": 9,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "shape",
+            "type": "R<ShapeBinding>"
+          },
+          {
+            "name": "typing",
+            "type": "R<ShapeTyping>"
+          },
+          {
+            "name": "ready_kind",
+            "type": "U<ReadyKind>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Representation",
+        "table": "representations"
+      },
+      {
+        "c_type": "Ir8PacketNominalField",
+        "element_type_id": 10,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "shape",
+            "type": "R<ShapeBinding>"
+          },
+          {
+            "name": "variant",
+            "type": "NU"
+          },
+          {
+            "name": "position",
+            "type": "U"
+          },
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "declared_rep",
+            "type": "R<Representation>"
+          }
+        ],
+        "kind": "struct",
+        "name": "NominalField",
+        "table": "nominal_fields"
+      },
+      {
+        "c_type": "Ir8PacketFamilyTyping",
+        "element_type_id": 11,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "shape",
+            "type": "R<ShapeBinding>"
+          },
+          {
+            "name": "variants",
+            "type": "V<VariantTyping>"
+          }
+        ],
+        "kind": "struct",
+        "name": "FamilyTyping",
+        "table": "families"
+      },
+      {
+        "c_type": "Ir8PacketTypeResolution",
+        "element_type_id": 12,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "env",
+            "type": "R<Env>"
+          },
+          {
+            "name": "result",
+            "type": "R<Type>"
+          }
+        ],
+        "kind": "struct",
+        "name": "TypeResolution",
+        "table": "type_resolutions"
+      },
+      {
+        "c_type": "Ir8PacketRepresentationResolution",
+        "element_type_id": 13,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "env",
+            "type": "R<Env>"
+          },
+          {
+            "name": "representation",
+            "type": "R<Representation>"
+          }
+        ],
+        "kind": "struct",
+        "name": "RepresentationResolution",
+        "table": "representation_resolutions"
+      },
+      {
+        "c_type": "Ir8PacketSite",
+        "element_type_id": 14,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "path",
+            "type": "S"
+          },
+          {
+            "name": "arm",
+            "type": "NU"
+          },
+          {
+            "name": "scope",
+            "type": "N<Scheme>"
+          },
+          {
+            "name": "principal_type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "category",
+            "type": "U<SiteCategory>"
+          },
+          {
+            "name": "code",
+            "type": "N<CodeTyping>"
+          },
+          {
+            "name": "legacy_physical",
+            "type": "NS"
+          },
+          {
+            "name": "context_tag",
+            "type": "U<SiteContext>"
+          },
+          {
+            "name": "context_intro",
+            "type": "N<Intro>"
+          },
+          {
+            "name": "context_code",
+            "type": "N<CodeTyping>"
+          },
+          {
+            "name": "context_scheme",
+            "type": "N<Scheme>"
+          },
+          {
+            "name": "sum_family",
+            "type": "N<FamilyTyping>"
+          },
+          {
+            "name": "sum_variant",
+            "type": "NU"
+          }
+        ],
+        "kind": "struct",
+        "name": "Site",
+        "table": "sites"
+      },
+      {
+        "c_type": "Ir8PacketSiteExecution",
+        "element_type_id": 15,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "site",
+            "type": "R<Site>"
+          },
+          {
+            "name": "env",
+            "type": "R<Env>"
+          },
+          {
+            "name": "origin_kind",
+            "type": "U<OriginKind>"
+          },
+          {
+            "name": "principal_type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "representation",
+            "type": "R<Representation>"
+          },
+          {
+            "name": "code_execution",
+            "type": "N<CodeExecution>"
+          }
+        ],
+        "kind": "struct",
+        "name": "SiteExecution",
+        "table": "site_executions"
+      },
+      {
+        "c_type": "Ir8PacketSlot",
+        "element_type_id": 16,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "site",
+            "type": "R<Site>"
+          },
+          {
+            "name": "role_tag",
+            "type": "U<SlotRole>"
+          },
+          {
+            "name": "role_name",
+            "type": "NS"
+          },
+          {
+            "name": "role_variant",
+            "type": "NU"
+          },
+          {
+            "name": "role_field",
+            "type": "N<NominalField>"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "relation",
+            "type": "U<Relation>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Slot",
+        "table": "slots"
+      },
+      {
+        "c_type": "Ir8PacketAccess",
+        "element_type_id": 17,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "site",
+            "type": "R<Site>"
+          },
+          {
+            "name": "origin_env",
+            "type": "R<Env>"
+          },
+          {
+            "name": "mode",
+            "type": "U<AccessMode>"
+          },
+          {
+            "name": "use_env",
+            "type": "N<Env>"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "scheme",
+            "type": "N<Scheme>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Access",
+        "table": "accesses"
+      },
+      {
+        "c_type": "Ir8PacketIntro",
+        "element_type_id": 18,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "scheme",
+            "type": "R<Scheme>"
+          },
+          {
+            "name": "container_tag",
+            "type": "U<IntroContainer>"
+          },
+          {
+            "name": "container_code",
+            "type": "N<CodeTyping>"
+          },
+          {
+            "name": "generalize_path",
+            "type": "S"
+          },
+          {
+            "name": "seal_path",
+            "type": "S"
+          },
+          {
+            "name": "body_type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "result_sites",
+            "type": "V<SiteRef>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Intro",
+        "table": "introductions"
+      },
+      {
+        "c_type": "Ir8PacketUse",
+        "element_type_id": 19,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "scheme",
+            "type": "R<Scheme>"
+          },
+          {
+            "name": "arguments",
+            "type": "V<TypeRef>"
+          },
+          {
+            "name": "env",
+            "type": "R<Env>"
+          },
+          {
+            "name": "result_type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "occurrences",
+            "type": "V<PathRef>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Use",
+        "table": "uses"
+      },
+      {
+        "c_type": "Ir8PacketTransport",
+        "element_type_id": 20,
+        "fields": [
+          {
+            "name": "id",
+            "type": "U"
+          },
+          {
+            "name": "source_access",
+            "type": "R<Access>"
+          },
+          {
+            "name": "projection_env",
+            "type": "N<Env>"
+          },
+          {
+            "name": "result_access",
+            "type": "R<Access>"
+          },
+          {
+            "name": "kind",
+            "type": "U<TransportKind>"
+          }
+        ],
+        "kind": "struct",
+        "name": "Transport",
+        "table": "transports"
+      },
+      {
+        "c_type": "Ir8PacketRegisteredRowRef",
+        "element_type_id": 21,
+        "fields": [
+          {
+            "name": "domain",
+            "type": "U<TableDomain>"
+          },
+          {
+            "name": "row",
+            "type": "U"
+          }
+        ],
+        "kind": "struct",
+        "name": "RegisteredRowRef"
+      },
+      {
+        "c_type": "Ir8PacketRegisteredDescriptorRef",
+        "element_type_id": 22,
+        "fields": [
+          {
+            "name": "domain",
+            "type": "U<DescriptorDomain>"
+          },
+          {
+            "name": "row",
+            "type": "U"
+          }
+        ],
+        "kind": "struct",
+        "name": "RegisteredDescriptorRef"
+      },
+      {
+        "c_type": "Ir8PacketTypeRef",
+        "element_type_id": 23,
+        "fields": [
+          {
+            "name": "row",
+            "type": "R<Type>"
+          }
+        ],
+        "kind": "struct",
+        "name": "TypeRef"
+      },
+      {
+        "c_type": "Ir8PacketCaptureTyping",
+        "element_type_id": 24,
+        "fields": [
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "relation",
+            "type": "U<Relation>"
+          }
+        ],
+        "kind": "struct",
+        "name": "CaptureTyping"
+      },
+      {
+        "c_type": "Ir8PacketResolvedCapture",
+        "element_type_id": 25,
+        "fields": [
+          {
+            "name": "code",
+            "type": "R<CodeTyping>"
+          },
+          {
+            "name": "position",
+            "type": "U"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          }
+        ],
+        "kind": "struct",
+        "name": "ResolvedCapture"
+      },
+      {
+        "c_type": "Ir8PacketSiteRef",
+        "element_type_id": 26,
+        "fields": [
+          {
+            "name": "row",
+            "type": "R<Site>"
+          }
+        ],
+        "kind": "struct",
+        "name": "SiteRef"
+      },
+      {
+        "c_type": "Ir8PacketPathRef",
+        "element_type_id": 27,
+        "fields": [
+          {
+            "name": "path",
+            "type": "S"
+          }
+        ],
+        "kind": "struct",
+        "name": "PathRef"
+      },
+      {
+        "c_type": "Ir8PacketVariantTyping",
+        "element_type_id": 28,
+        "fields": [
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "index",
+            "type": "U"
+          },
+          {
+            "name": "fields",
+            "type": "V<NominalFieldRef>"
+          }
+        ],
+        "kind": "struct",
+        "name": "VariantTyping"
+      },
+      {
+        "c_type": "Ir8PacketVariantRef",
+        "element_type_id": 29,
+        "fields": [
+          {
+            "name": "row",
+            "type": "R<VariantSpec>"
+          }
+        ],
+        "kind": "struct",
+        "name": "VariantRef"
+      },
+      {
+        "c_type": "Ir8PacketNominalFieldRef",
+        "element_type_id": 30,
+        "fields": [
+          {
+            "name": "row",
+            "type": "R<NominalField>"
+          }
+        ],
+        "kind": "struct",
+        "name": "NominalFieldRef"
+      },
+      {
+        "c_type": "Ir8PacketShapeSpec",
+        "element_type_id": 31,
+        "fields": [
+          {
+            "name": "shape",
+            "type": "R<ShapeBinding>"
+          },
+          {
+            "name": "typing",
+            "type": "R<ShapeTyping>"
+          },
+          {
+            "name": "representation",
+            "type": "R<Representation>"
+          },
+          {
+            "name": "kind",
+            "type": "U<ShapeKind>"
+          },
+          {
+            "name": "fields_object",
+            "type": "NU<ObjectDirectoryEntry>"
+          },
+          {
+            "name": "field_first",
+            "type": "U"
+          },
+          {
+            "name": "field_count",
+            "type": "U"
+          },
+          {
+            "name": "argument_rep",
+            "type": "N<Representation>"
+          },
+          {
+            "name": "result_rep",
+            "type": "N<Representation>"
+          }
+        ],
+        "kind": "struct",
+        "name": "ShapeSpec"
+      },
+      {
+        "c_type": "Ir8PacketCodeSpec",
+        "element_type_id": 32,
+        "fields": [
+          {
+            "name": "code",
+            "type": "R<CodeTyping>"
+          },
+          {
+            "name": "principal_env",
+            "type": "R<Env>"
+          },
+          {
+            "name": "principal_rep",
+            "type": "R<Representation>"
+          },
+          {
+            "name": "capture_object",
+            "type": "NU<ObjectDirectoryEntry>"
+          },
+          {
+            "name": "capture_first",
+            "type": "U"
+          },
+          {
+            "name": "capture_count",
+            "type": "U"
+          },
+          {
+            "name": "body_binding",
+            "type": "U<BodyBinding>"
+          }
+        ],
+        "kind": "struct",
+        "name": "CodeSpec"
+      },
+      {
+        "c_type": "Ir8PacketFamilySpec",
+        "element_type_id": 33,
+        "fields": [
+          {
+            "name": "family",
+            "type": "R<FamilyTyping>"
+          },
+          {
+            "name": "shape",
+            "type": "R<ShapeBinding>"
+          },
+          {
+            "name": "variants",
+            "type": "V<VariantRef>"
+          }
+        ],
+        "kind": "struct",
+        "name": "FamilySpec"
+      },
+      {
+        "c_type": "Ir8PacketVariantSpec",
+        "element_type_id": 34,
+        "fields": [
+          {
+            "name": "family",
+            "type": "R<FamilyTyping>"
+          },
+          {
+            "name": "index",
+            "type": "U"
+          },
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "shape",
+            "type": "R<ShapeBinding>"
+          },
+          {
+            "name": "fields_object",
+            "type": "NU<ObjectDirectoryEntry>"
+          },
+          {
+            "name": "field_first",
+            "type": "U"
+          },
+          {
+            "name": "field_count",
+            "type": "U"
+          }
+        ],
+        "kind": "struct",
+        "name": "VariantSpec"
+      },
+      {
+        "c_type": "Ir8PacketFieldSpec",
+        "element_type_id": 35,
+        "fields": [
+          {
+            "name": "owner_kind",
+            "type": "U<FieldOwner>"
+          },
+          {
+            "name": "owner",
+            "type": "U"
+          },
+          {
+            "name": "position",
+            "type": "U"
+          },
+          {
+            "name": "name",
+            "type": "S"
+          },
+          {
+            "name": "type",
+            "type": "R<Type>"
+          },
+          {
+            "name": "nominal_declared_rep",
+            "type": "N<Representation>"
+          },
+          {
+            "name": "code_principal_rep",
+            "type": "N<Representation>"
+          },
+          {
+            "name": "relation",
+            "type": "NU<Relation>"
+          }
+        ],
+        "kind": "struct",
+        "name": "FieldSpec"
+      },
+      {
+        "c_type": "unsigned char",
+        "element_type_id": 36,
+        "fields": [
+          {
+            "name": "value",
+            "type": "unsigned-char"
+          }
+        ],
+        "kind": "scalar",
+        "name": "UTF8Byte"
+      },
+      {
+        "c_type": "Ir8PacketProgramHeader",
+        "element_type_id": 37,
+        "fields": [
+          {
+            "name": "magic",
+            "type": "unsigned-char[8]"
+          },
+          {
+            "name": "abi_revision",
+            "type": "U"
+          },
+          {
+            "name": "purpose",
+            "type": "U"
+          },
+          {
+            "name": "packet_bytes",
+            "type": "U"
+          },
+          {
+            "name": "packet_alignment",
+            "type": "U"
+          },
+          {
+            "name": "directory_offset",
+            "type": "U"
+          },
+          {
+            "name": "directory_count",
+            "type": "U"
+          },
+          {
+            "name": "typed_header_object",
+            "type": "U"
+          },
+          {
+            "name": "bindings_object",
+            "type": "U"
+          },
+          {
+            "name": "string_pool_object",
+            "type": "NU"
+          },
+          {
+            "name": "resolution_access_transport_rows",
+            "type": "U"
+          }
+        ],
+        "kind": "struct",
+        "name": "ProgramHeader"
+      },
+      {
+        "c_type": "Ir8PacketTypedHeader",
+        "element_type_id": 38,
+        "fields": [
+          {
+            "name": "table",
+            "type": "Span[20]"
+          },
+          {
+            "name": "table_index",
+            "type": "Span[20]"
+          },
+          {
+            "name": "descriptor",
+            "type": "Span[6]"
+          },
+          {
+            "name": "descriptor_index",
+            "type": "Span[6]"
+          }
+        ],
+        "kind": "struct",
+        "name": "TypedHeader"
+      },
+      {
+        "c_type": "Ir8PacketDigest32",
+        "element_type_id": 39,
+        "fields": [
+          {
+            "name": "bytes",
+            "type": "unsigned-char[32]"
+          }
+        ],
+        "kind": "struct",
+        "name": "Digest32"
+      },
+      {
+        "c_type": "Ir8PacketObjectDirectoryEntry",
+        "element_type_id": 40,
+        "fields": [
+          {
+            "name": "source_inventory_id",
+            "type": "NU"
+          },
+          {
+            "name": "kind",
+            "type": "U<ObjectKind>"
+          },
+          {
+            "name": "domain_or_subkind",
+            "type": "U"
+          },
+          {
+            "name": "owner",
+            "type": "NU"
+          },
+          {
+            "name": "secondary_owner",
+            "type": "NU"
+          },
+          {
+            "name": "element_type",
+            "type": "U<ElementType>"
+          },
+          {
+            "name": "offset",
+            "type": "NU"
+          },
+          {
+            "name": "count",
+            "type": "U"
+          },
+          {
+            "name": "element_bytes",
+            "type": "U"
+          },
+          {
+            "name": "element_alignment",
+            "type": "U"
+          },
+          {
+            "name": "object_bytes",
+            "type": "U"
+          }
+        ],
+        "kind": "struct",
+        "name": "ObjectDirectoryEntry"
+      }
+    ],
+    "enums": {
+      "AccessMode": {
+        "MONO": 1,
+        "SCHEME": 2
+      },
+      "BodyBinding": {
+        "UNBOUND": 1
+      },
+      "CodeKind": {
+        "function": 1,
+        "thunk": 2
+      },
+      "EnvMode": {
+        "CLOSED": 3,
+        "CONCRETE": 1,
+        "NEUTRAL": 2
+      },
+      "FieldOwner": {
+        "code": 3,
+        "data": 1,
+        "variant": 2
+      },
+      "HeaderSubkind": {
+        "bindings": 3,
+        "program": 1,
+        "typed": 2
+      },
+      "IntroContainer": {
+        "code": 2,
+        "entry": 1
+      },
+      "NativeDetail": {
+        "alignment": 10,
+        "binding-mismatch": 22,
+        "body-binding": 26,
+        "count": 16,
+        "duplicate": 14,
+        "equation": 23,
+        "extra": 13,
+        "internal-invariant": 28,
+        "length": 3,
+        "limit": 7,
+        "magic": 4,
+        "missing": 12,
+        "none": 0,
+        "null-argument": 2,
+        "null-domain": 18,
+        "offset": 9,
+        "order": 15,
+        "overflow": 8,
+        "overlap": 11,
+        "owner": 25,
+        "purpose": 6,
+        "reference": 19,
+        "revision": 5,
+        "string-boundary": 21,
+        "tag": 17,
+        "utf8": 20,
+        "vector-sharing": 24,
+        "work-exhausted": 27
+      },
+      "NativePhase": {
+        "arguments": 1,
+        "directory": 3,
+        "final-census": 9,
+        "header-and-size": 2,
+        "memberships-and-bindings": 4,
+        "origins-and-descriptors": 7,
+        "row-domains": 5,
+        "slots-access-transports": 8,
+        "types-and-resolutions": 6
+      },
+      "NativeStatus": {
+        "ARGUMENT": 1,
+        "BINDING": 6,
+        "COUNT_LIMIT": 12,
+        "DIRECTORY": 4,
+        "EDGE_EQUATION": 11,
+        "HEADER": 2,
+        "INTERNAL": 14,
+        "MEMBERSHIP": 5,
+        "OK": 0,
+        "ORIGIN_EQUATION": 10,
+        "REPRESENTATION_EQUATION": 9,
+        "SCHEMA": 7,
+        "SIZE_LIMIT": 3,
+        "TYPE_EQUATION": 8,
+        "WORK_LIMIT": 13
+      },
+      "ObjectKind": {
+        "descriptor": 3,
+        "directory": 8,
+        "header": 7,
+        "index-descriptor": 4,
+        "index-table": 2,
+        "string-pool": 6,
+        "table": 1,
+        "vector": 5
+      },
+      "OriginKind": {
+        "CONCRETE": 1,
+        "GENERIC": 2,
+        "INSTANCE": 3
+      },
+      "Protocol": {
+        "repeat": 1
+      },
+      "ReadyKind": {
+        "data": 2,
+        "function": 4,
+        "none": 5,
+        "scalar": 1,
+        "sum": 3
+      },
+      "Relation": {
+        "below": 3,
+        "down": 2,
+        "same": 1
+      },
+      "ResultIdentity": {
+        "argument": 2,
+        "unknown": 1
+      },
+      "ShapeKind": {
+        "BOOL": 2,
+        "DATA": 3,
+        "I64": 1,
+        "OPEN": 6,
+        "REPEAT": 5,
+        "SUM": 4
+      },
+      "ShapeSource": {
+        "canonical-arrow": 2,
+        "legacy": 1,
+        "scoped-open": 3
+      },
+      "SiteCategory": {
+        "APPLICATION": 5,
+        "CLOSURE": 2,
+        "DATA": 1,
+        "HOLE": 4,
+        "SCALAR": 6,
+        "SUM": 7,
+        "THUNK": 3
+      },
+      "SiteContext": {
+        "concrete": 1,
+        "execution": 3,
+        "introduction": 2
+      },
+      "SlotRole": {
+        "argument": 5,
+        "capture": 1,
+        "field": 2,
+        "function": 4,
+        "memo": 6,
+        "variant-field": 3
+      },
+      "TransportKind": {
+        "identity": 1,
+        "project": 2
+      },
+      "TypeTag": {
+        "arrow": 3,
+        "closed": 1,
+        "rigid": 2
+      },
+      "VectorSubkind": {
+        "code-captures": 2,
+        "data-fields": 9,
+        "env": 1,
+        "execution-captures": 3,
+        "family-variant-pointers": 7,
+        "family-variants": 6,
+        "intro-sites": 4,
+        "use-occurrences": 5,
+        "variant-fields": 8
+      }
+    },
+    "fixed_objects": [
+      {
+        "domain_or_subkind": 1,
+        "element": "UTF8Byte",
+        "key": "pool/strings",
+        "kind": 6,
+        "owner": null,
+        "secondary_owner": null
+      },
+      {
+        "count": 1,
+        "domain_or_subkind": 1,
+        "element": "ProgramHeader",
+        "key": "header/program",
+        "kind": 7,
+        "owner": null,
+        "secondary_owner": null
+      },
+      {
+        "count": 1,
+        "domain_or_subkind": 2,
+        "element": "TypedHeader",
+        "key": "header/typed",
+        "kind": 7,
+        "owner": null,
+        "secondary_owner": null
+      },
+      {
+        "count": 5,
+        "domain_or_subkind": 3,
+        "element": "Digest32",
+        "key": "header/bindings",
+        "kind": 7,
+        "owner": null,
+        "secondary_owner": null
+      },
+      {
+        "count": "Stage03.storage_entries+1",
+        "domain_or_subkind": 1,
+        "element": "ObjectDirectoryEntry",
+        "key": "packet/object-directory",
+        "kind": 8,
+        "owner": null,
+        "secondary_owner": null,
+        "source_inventory_id": null
+      }
+    ],
+    "format": "resource-ir-v8-c-packet-schema/1",
+    "host_only_sidecars": [
+      "type_remap",
+      "environment_remap",
+      "boundaries",
+      "coverage",
+      "storage_inventory",
+      "counts",
+      "report",
+      "statistics",
+      "raw lower provenance/FactRefs",
+      "canonical raw/declaration/resource/metadata JSON"
+    ],
+    "limits": {
+      "R": 65536,
+      "code_plus_sites": 2048,
+      "directory_entries": 16384,
+      "environments": 1024,
+      "host_creation": 2097152,
+      "host_work": 16777216,
+      "manifest_bytes": 8388608,
+      "native_function_stack_bytes": 4096,
+      "native_max_call_chain": 16,
+      "native_work": 67108864,
+      "native_workspace_bytes": 131072,
+      "packet_bytes": 4194304,
+      "production_source_bytes": 33554432,
+      "scheme_parameters": 8,
+      "schemes": 16,
+      "source_chunk_bytes": 4096,
+      "supplement_bytes": 1048576,
+      "type_depth": 32,
+      "types": 4096,
+      "uses": 1024
+    },
+    "non_element_types": [
+      {
+        "fields": [
+          {
+            "name": "object",
+            "type": "NU<ObjectDirectoryEntry>"
+          },
+          {
+            "name": "count",
+            "type": "U"
+          }
+        ],
+        "name": "Span",
+        "rule": "count==0 iff object is null; nonempty must match directory owner/type/count"
+      },
+      {
+        "fields": [
+          {
+            "name": "type",
+            "type": "U"
+          },
+          {
+            "name": "env",
+            "type": "U"
+          },
+          {
+            "name": "phase",
+            "type": "U"
+          },
+          {
+            "name": "expected",
+            "type": "U"
+          }
+        ],
+        "name": "WalkFrame"
+      },
+      {
+        "fields": [
+          {
+            "name": "type_depth",
+            "type": "uint32_t[4096]"
+          },
+          {
+            "name": "type_scope_mask",
+            "type": "uint32_t[4096]"
+          },
+          {
+            "name": "directory_seen",
+            "type": "unsigned-char[16384]"
+          },
+          {
+            "name": "walk",
+            "type": "WalkFrame[32]"
+          },
+          {
+            "name": "work_used",
+            "type": "uint64_t"
+          },
+          {
+            "name": "scratch_state",
+            "type": "uint32_t[16]"
+          },
+          {
+            "name": "canonical_key",
+            "type": "unsigned-char[2][128]"
+          }
+        ],
+        "name": "Workspace"
+      },
+      {
+        "fields": [
+          {
+            "name": "digests",
+            "type": "Digest32[5]"
+          }
+        ],
+        "name": "ExpectedBindings"
+      },
+      {
+        "fields": [
+          {
+            "name": "status",
+            "type": "U<NativeStatus>"
+          },
+          {
+            "name": "phase",
+            "type": "NU<NativePhase>"
+          },
+          {
+            "name": "domain",
+            "type": "NU"
+          },
+          {
+            "name": "object",
+            "type": "NU"
+          },
+          {
+            "name": "row",
+            "type": "NU"
+          },
+          {
+            "name": "field",
+            "type": "NU"
+          },
+          {
+            "name": "detail",
+            "type": "U<NativeDetail>"
+          },
+          {
+            "name": "packet_bytes",
+            "type": "U"
+          },
+          {
+            "name": "declared_packet_alignment",
+            "type": "U"
+          },
+          {
+            "name": "member_bytes_sum",
+            "type": "U"
+          },
+          {
+            "name": "padding_bytes",
+            "type": "U"
+          },
+          {
+            "name": "directory_entries",
+            "type": "U"
+          },
+          {
+            "name": "member_objects",
+            "type": "U"
+          },
+          {
+            "name": "resolution_access_transport_rows",
+            "type": "U"
+          },
+          {
+            "name": "work_used",
+            "type": "uint64_t"
+          },
+          {
+            "name": "workspace_bytes",
+            "type": "U"
+          },
+          {
+            "name": "graph_executed",
+            "type": "Flag"
+          },
+          {
+            "name": "source_admitted",
+            "type": "Flag"
+          },
+          {
+            "name": "runtime_admitted",
+            "type": "Flag"
+          },
+          {
+            "name": "runtime_guards_executed",
+            "type": "Flag"
+          }
+        ],
+        "name": "Report",
+        "rule": "four final flags always 0; all fields initialized; absent diagnostic coordinates UINT32_MAX; bytes/counts zero until safely established; work_used is successfully pre-reserved units only; failed reservation leaves it unchanged and performs no operation"
+      }
+    ],
+    "null_and_tag_rules": {
+      "Access.MONO": "use_env nonnull,scheme null",
+      "Access.SCHEME": "use_env null,scheme nonnull; exact neutral Intro result site",
+      "Code.function": "callable_type/argument/expected_protocol nonnull; full contract exactly matches arrow",
+      "Code.thunk": "callable_type/argument/expected_protocol null; expected_identity_flag=0; result always nonnull",
+      "CodeSpec": "body_binding UNBOUND only; no function pointer storage",
+      "Env.CLOSED": "exact complete registered #i64/#bool vector for its Scheme",
+      "Env.CONCRETE": "id=0,scheme=null,arguments count0/null",
+      "Env.NEUTRAL": "exact Scheme neutral vector Rigid(S,0)..Rigid(S,n-1)",
+      "FieldSpec.capture": "nominal_declared_rep null,code_principal_rep/relation nonnull; code owner exact",
+      "FieldSpec.nominal": "nominal_declared_rep nonnull,code_principal_rep/relation null; data/variant owner domain exact",
+      "Intro.code": "container_code nonnull and concrete Code",
+      "Intro.entry": "container_code null",
+      "NominalField": "variant null iff DATA, otherwise exact family-local SUM variant",
+      "Shape.REPEAT": "argument_rep/result_rep nonnull; all other kinds both null",
+      "Shape.canonical-arrow": "source_type nonnull,source_reference/source_scheme null",
+      "Shape.legacy": "source_reference nonnull,source_type/source_scheme null",
+      "Shape.scoped-open": "source_type/source_scheme nonnull,source_reference null",
+      "ShapeTyping.OPEN": "scope nonnull; contract nonnull iff arrow Type",
+      "ShapeTyping.REPEAT": "scope null,contract nonnull",
+      "ShapeTyping.atom": "scope/contract null",
+      "Site.SUM": "sum_family/sum_variant both nonnull, derived from fresh raw literal constructor path; otherwise both null",
+      "Site.code": "code nonnull iff CLOSURE or THUNK; arm nonnull only existing factory-arm THUNK",
+      "Site.concrete": "context_intro/context_code/context_scheme null",
+      "Site.execution": "context_intro null,context_code/context_scheme nonnull",
+      "Site.introduction": "context_intro nonnull,context_code/context_scheme null",
+      "SiteExecution": "code_execution nonnull iff corresponding Site code nonnull",
+      "Slot.capture": "role_name nonnull; role_variant/role_field null",
+      "Slot.field": "role_field nonnull; role_name/role_variant null",
+      "Slot.other": "role_name/role_variant/role_field null",
+      "Slot.variant-field": "role_field/role_variant nonnull; role_name null",
+      "Transport.identity": "projection_env null,source=result and Mono",
+      "Transport.project": "projection_env nonnull,exact same-S complete closed vector with neutral original target",
+      "Type.arrow": "argument/result/protocol/result_identity nonnull; atom/scheme/index null; children before parent",
+      "Type.closed": "atom nonnull; scheme/index/argument/result/protocol/result_identity null",
+      "Type.rigid": "scheme/index nonnull; atom/argument/result/protocol/result_identity null; index<parameters",
+      "empty-slice": "object null, first=0,count=0",
+      "nonempty-slice": "object matches exact descriptor domain; first/count within its actual extent; complete canonical owner partition"
+    },
+    "primitive_rules": {
+      "Flag": "uint32_t exactly 0 or 1",
+      "N<T>": "nullable R<T>",
+      "NS": "nullable S",
+      "NU": "uint32_t; UINT32_MAX is sole null",
+      "R<T>": "uint32_t index in exact T domain, never null",
+      "S": "uint32_t exact string-pool start offset",
+      "U": "uint32_t; checked exact plain host integer",
+      "U64": "uint64_t",
+      "V<T>": "inline Span, exact owner/type/count",
+      "null_numeric": "UINT32_MAX",
+      "size_authority": "actual compiler sizeof/_Alignof/offsetof only",
+      "struct_packing": "ordinary C11, no packing/bitfield/union/pointer"
+    },
+    "status": "design-not-implemented-or-executed",
+    "supplement": {
+      "canonical_json": "JSON object with exact format and sites keys; sites ordered by id",
+      "format": "resource-ir-v8-c-packet-site-supplement/1",
+      "native_scope": "checks internal fact and selected Slot completeness, not raw-origin authenticity",
+      "row_keys": [
+        "site",
+        "sum_family",
+        "sum_variant"
+      ],
+      "source": "fresh checked canonical raw Site.path construct_nullary/construct_sum; independent oracle repeats derivation"
+    },
+    "vector_subkinds": [
+      {
+        "element": "TypeRef",
+        "id": 1,
+        "key_prefix": "vector/env",
+        "owner_domain": "Env",
+        "secondary_owner_domain": null
+      },
+      {
+        "element": "CaptureTyping",
+        "id": 2,
+        "key_prefix": "vector/code-captures",
+        "owner_domain": "CodeTyping",
+        "secondary_owner_domain": null
+      },
+      {
+        "element": "ResolvedCapture",
+        "id": 3,
+        "key_prefix": "vector/execution-captures",
+        "owner_domain": "CodeExecution",
+        "secondary_owner_domain": null
+      },
+      {
+        "element": "SiteRef",
+        "id": 4,
+        "key_prefix": "vector/intro-sites",
+        "owner_domain": "Intro",
+        "secondary_owner_domain": null
+      },
+      {
+        "element": "PathRef",
+        "id": 5,
+        "key_prefix": "vector/use-occurrences",
+        "owner_domain": "Use",
+        "secondary_owner_domain": null
+      },
+      {
+        "element": "VariantTyping",
+        "id": 6,
+        "key_prefix": "vector/family-variants",
+        "owner_domain": "FamilyTyping",
+        "secondary_owner_domain": null
+      },
+      {
+        "element": "VariantRef",
+        "id": 7,
+        "key_prefix": "vector/family-variant-pointers",
+        "owner_domain": "FamilyTyping",
+        "secondary_owner_domain": null
+      },
+      {
+        "element": "NominalFieldRef",
+        "id": 8,
+        "key_prefix": "vector/variant-fields",
+        "owner_domain": "FamilyTyping",
+        "secondary_owner_domain": "declared-variant-index"
+      },
+      {
+        "element": "NominalFieldRef",
+        "id": 9,
+        "key_prefix": "vector/data-fields",
+        "owner_domain": "ShapeBinding",
+        "secondary_owner_domain": null
+      }
+    ]
+  },
+  "schema_sha256": "e4976fb839a8b738c0797100fe7b5d1fc948f2b995ab17f3c44cc8cc4fb94ba6",
+  "stage03_fixture_sha256": "a12f7c43bfbe4dc1e12df0c1d6059491c1e0451e28073066d3949f8c5caed7ca",
+  "status": "source-only-not-executed"
+}

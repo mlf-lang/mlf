@@ -1,3 +1,14 @@
+# Additive IR8 static experiment
+
+The opt-in [IR8 static checkers and native metadata packets](resource_ir_v8/README_STAGE04.md)
+are separate from the maintained v7 source/runtime route below. They do not enable
+mixed-type shared-term source execution or change default behavior. The linked
+guide describes the available APIs, explicit host-only test runner and remaining
+runtime/source/GC/performance gates. Earlier integration records below retain their
+historical scope.
+
+---
+
 # Local current-PR25 integration (qualification recorded separately)
 
 This source tree composes the exact PR25 target

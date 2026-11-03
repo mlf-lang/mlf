@@ -1,0 +1,286 @@
+{
+  "seventeen_schemes_reject": {
+    "code": "COUNT",
+    "path_prefix": "schemes"
+  },
+  "depth33_reject": {
+    "code": "TYPE_DEPTH",
+    "path_prefix": "types."
+  },
+  "4097_declared_types_reject": {
+    "code": "COUNT",
+    "path_prefix": "declarations"
+  },
+  "1025_uses_reject": {
+    "code": "COUNT",
+    "path_prefix": "instantiations"
+  },
+  "1025_environments_reject": {
+    "code": "ENVIRONMENT_COUNT",
+    "path_prefix": "instantiations."
+  },
+  "canonical_types_limit_overflow": {
+    "code": "TYPE_COUNT",
+    "path_prefix": "layouts."
+  },
+  "4097_derived_types_reject": {
+    "code": "TYPE_COUNT",
+    "path_prefix": "instantiations["
+  },
+  "extra_top_key": {
+    "code": "SCHEMA",
+    "path_prefix": "declarations"
+  },
+  "executable_program_not_accepted": {
+    "code": "SCHEMA",
+    "path_prefix": "declarations"
+  },
+  "extra_type_key": {
+    "code": "SCHEMA",
+    "path_prefix": "types.I"
+  },
+  "unknown_type_tag": {
+    "code": "SCHEMA",
+    "path_prefix": "types.I.tag"
+  },
+  "unknown_arrow_reference": {
+    "code": "TYPE_REFERENCE",
+    "path_prefix": "types.AA.argument"
+  },
+  "type_cycle": {
+    "code": "TYPE_CYCLE",
+    "path_prefix": "types.AA"
+  },
+  "signature_cycle": {
+    "code": "TYPE_CYCLE",
+    "path_prefix": "signatures.F"
+  },
+  "opaque_callable_atom": {
+    "code": "CLOSED_ATOM",
+    "path_prefix": "types.I.layout"
+  },
+  "unknown_closed_atom": {
+    "code": "LAYOUT",
+    "path_prefix": "types.I.layout"
+  },
+  "unknown_intrinsic_atom": {
+    "code": "CLOSED_ATOM",
+    "path_prefix": "types.I.layout"
+  },
+  "unknown_nominal_family": {
+    "code": "FAMILY",
+    "path_prefix": "types.I.layout"
+  },
+  "rigid_unknown_scope": {
+    "code": "SCOPE",
+    "path_prefix": "types.A.scheme"
+  },
+  "rigid_bool_index": {
+    "code": "COUNT",
+    "path_prefix": "types.A.index"
+  },
+  "rigid_negative_index": {
+    "code": "COUNT",
+    "path_prefix": "types.A.index"
+  },
+  "rigid_index_out_of_bounds": {
+    "code": "COUNT",
+    "path_prefix": "types.A.index"
+  },
+  "unused_rigid_still_checked": {
+    "code": "SCOPE",
+    "path_prefix": "types.Unused.scheme"
+  },
+  "zero_parameters": {
+    "code": "COUNT",
+    "path_prefix": "schemes.S.parameters"
+  },
+  "nine_parameters": {
+    "code": "COUNT",
+    "path_prefix": "schemes.S.parameters"
+  },
+  "bool_parameter_count": {
+    "code": "COUNT",
+    "path_prefix": "schemes.S.parameters"
+  },
+  "nonarrow_scheme_body": {
+    "code": "SCHEME_BODY",
+    "path_prefix": "schemes.S.body"
+  },
+  "generic_nominal_atom": {
+    "code": "GENERIC_ATOM",
+    "path_prefix": "types.AA"
+  },
+  "generic_once_contract": {
+    "code": "GENERIC_CONTRACT",
+    "path_prefix": "types.AA"
+  },
+  "generic_identity_refinement": {
+    "code": "GENERIC_CONTRACT",
+    "path_prefix": "types.AA"
+  },
+  "nested_generic_identity_refinement": {
+    "code": "GENERIC_CONTRACT",
+    "path_prefix": "types.Inner"
+  },
+  "unused_open_once_type": {
+    "code": "GENERIC_CONTRACT",
+    "path_prefix": "types.Unused"
+  },
+  "unused_open_identity_type": {
+    "code": "GENERIC_CONTRACT",
+    "path_prefix": "types.Unused"
+  },
+  "unused_open_once_signature": {
+    "code": "GENERIC_CONTRACT",
+    "path_prefix": "signatures.Unused"
+  },
+  "unused_open_identity_signature": {
+    "code": "GENERIC_CONTRACT",
+    "path_prefix": "signatures.Unused"
+  },
+  "wrong_identity_domain_result": {
+    "code": "IDENTITY",
+    "path_prefix": "types.Bad"
+  },
+  "unknown_protocol": {
+    "code": "CONTRACT",
+    "path_prefix": "types.AA.protocol"
+  },
+  "unknown_identity_contract": {
+    "code": "CONTRACT",
+    "path_prefix": "types.AA.result_identity"
+  },
+  "missing_use_argument": {
+    "code": "ARITY",
+    "path_prefix": "instantiations.i.arguments"
+  },
+  "extra_use_argument": {
+    "code": "ARITY",
+    "path_prefix": "instantiations.i.arguments"
+  },
+  "open_use_argument": {
+    "code": "USE_ARGUMENT",
+    "path_prefix": "instantiations.i.arguments"
+  },
+  "arrow_use_argument": {
+    "code": "USE_ARGUMENT",
+    "path_prefix": "instantiations.i.arguments"
+  },
+  "physical_ref_not_type_id_argument": {
+    "code": "TYPE_REFERENCE",
+    "path_prefix": "instantiations.i.arguments[0]"
+  },
+  "unknown_use_scheme": {
+    "code": "SCOPE",
+    "path_prefix": "instantiations.i.scheme"
+  },
+  "nonlist_use_vector": {
+    "code": "SCHEMA",
+    "path_prefix": "instantiations.i.arguments"
+  },
+  "physical_data_open_field": {
+    "code": "OPEN_FIELD",
+    "path_prefix": "layouts.Bad.value"
+  },
+  "physical_data_once_field": {
+    "code": "ONCE_FIELD",
+    "path_prefix": "layouts.Bad.value"
+  },
+  "family_callable_field": {
+    "code": "FIELD_SHAPE",
+    "path_prefix": "families.Bad.fields.X[0]"
+  },
+  "family_missing_variant_fields": {
+    "code": "SCHEMA",
+    "path_prefix": "families.Bad.fields"
+  },
+  "family_duplicate_variant": {
+    "code": "VARIANT",
+    "path_prefix": "families.Bad.variants"
+  },
+  "reserved_data_logical": {
+    "code": "NAMESPACE",
+    "path_prefix": "layouts"
+  },
+  "reserved_signature_logical": {
+    "code": "NAMESPACE",
+    "path_prefix": "signatures"
+  },
+  "reserved_data_callable": {
+    "code": "NAMESPACE",
+    "path_prefix": "layouts"
+  },
+  "reserved_signature_callable": {
+    "code": "NAMESPACE",
+    "path_prefix": "signatures"
+  },
+  "reserved_data_scalar": {
+    "code": "NAMESPACE",
+    "path_prefix": "layouts"
+  },
+  "reserved_signature_scalar": {
+    "code": "NAMESPACE",
+    "path_prefix": "signatures"
+  },
+  "reserved_data_family": {
+    "code": "NAMESPACE",
+    "path_prefix": "layouts"
+  },
+  "reserved_signature_family": {
+    "code": "NAMESPACE",
+    "path_prefix": "signatures"
+  },
+  "foreign_rigid_in_scheme": {
+    "code": "SCOPE",
+    "path_prefix": "schemes.S.body"
+  },
+  "duplicate_json_key": {
+    "code": "DUPLICATE_KEY",
+    "path_prefix": "declarations["
+  },
+  "nonfinite_json": {
+    "code": "JSON",
+    "path_prefix": "declarations"
+  },
+  "unused_open_nominal_type": {
+    "code": "GENERIC_ATOM",
+    "path_prefix": "types.Unused"
+  },
+  "reserved_type_id_logical": {
+    "code": "NAMESPACE",
+    "path_prefix": "types"
+  },
+  "reserved_scheme_id_logical": {
+    "code": "NAMESPACE",
+    "path_prefix": "schemes"
+  },
+  "reserved_use_id_logical": {
+    "code": "NAMESPACE",
+    "path_prefix": "instantiations"
+  },
+  "reserved_family_id_logical": {
+    "code": "NAMESPACE",
+    "path_prefix": "families"
+  },
+  "reserved_variant_name_logical": {
+    "code": "NAMESPACE",
+    "path_prefix": "families.F.variants"
+  },
+  "reserved_field_name_logical": {
+    "code": "NAMESPACE",
+    "path_prefix": "layouts.D"
+  },
+  "family65_reject": {
+    "code": "COUNT",
+    "path_prefix": "families"
+  },
+  "variant65_reject": {
+    "code": "COUNT",
+    "path_prefix": "families.F.variants"
+  },
+  "field33_reject": {
+    "code": "COUNT",
+    "path_prefix": "families.F.fields.v0"
+  }
+}
