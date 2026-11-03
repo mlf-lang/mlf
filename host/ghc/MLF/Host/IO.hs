@@ -201,7 +201,8 @@ v_readIntArray (IntArray a) = readArray a
 v_readDoubleArray :: DoubleArray -> Int -> IO Double
 v_readDoubleArray (DoubleArray a) = readArray a
 v_readByteArray :: ByteArray -> Int -> IO Int
-v_readByteArray (ByteArray size storage) n = do
+v_readByteArray array n = do
+  ByteArray size storage <- evaluate array
   i <- evaluate (bounded "array index out of bounds" (fromIntegral size - 1) n)
   withForeignPtr storage $ \pointer -> fromIntegral <$> peekElemOff pointer i
 v_writeIntArray :: IntArray -> Int -> Int -> IO ()
@@ -209,7 +210,8 @@ v_writeIntArray (IntArray a) = writeArray a
 v_writeDoubleArray :: DoubleArray -> Int -> Double -> IO ()
 v_writeDoubleArray (DoubleArray a) = writeArray a
 v_writeByteArray :: ByteArray -> Int -> Int -> IO ()
-v_writeByteArray (ByteArray size storage) n x = do
+v_writeByteArray array n x = do
+  ByteArray size storage <- evaluate array
   i <- evaluate (bounded "array index out of bounds" (fromIntegral size - 1) n)
   value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
   withForeignPtr storage $ \pointer -> pokeElemOff pointer i value
@@ -218,7 +220,9 @@ v_lengthIntArray (IntArray a) = lengthArray a
 v_lengthDoubleArray :: DoubleArray -> IO Int
 v_lengthDoubleArray (DoubleArray a) = lengthArray a
 v_lengthByteArray :: ByteArray -> IO Int
-v_lengthByteArray (ByteArray size _) = pure (fromIntegral size)
+v_lengthByteArray array = do
+  ByteArray size _ <- evaluate array
+  pure (fromIntegral size)
 bytesArray :: B.ByteString -> IO ByteArray
 bytesArray bytes = B.useAsCStringLen bytes $ \(pointer,size) -> copyByteArray (castPtr pointer) size
 copyByteArray :: Ptr Word8 -> P.Int -> IO ByteArray
@@ -237,7 +241,8 @@ v_getByteLine = ioErrorAs "IO error: byte input failed" $ do
           if B.null one then pure acc else
             let b=B.head one in if b==10 then pure (b:acc) else readByteLine (b:acc)
 v_putBytes :: ByteArray -> Int -> Int -> IO ()
-v_putBytes (ByteArray size storage) start count = do
+v_putBytes array start count = do
+  ByteArray size storage <- evaluate array
   i <- evaluate (bounded "byte slice out of bounds" (fromIntegral size) start)
   n <- evaluate (bounded "byte slice out of bounds" (fromIntegral size-start) count)
   bytes <- withForeignPtr storage $ \pointer -> B.packCStringLen (castBytePointer pointer `plusPtr` i,n)
@@ -309,16 +314,17 @@ v_readByteFileOrError name limit = mask_ $
 v_writeByteFileOrError :: String -> ByteArray -> IO String
 v_writeByteFileOrError name array =
   if '\0' `elem` unpack name then pure (literal "file path contains NUL") else
-  case array of
-    ByteArray size _ ->
-      withByteSnapshot array $ \bytes ->
+  do
+    ByteArray size _ <- evaluate array
+    withByteSnapshot array $ \bytes ->
         B.useAsCStringLen (utf8 name) $ \(pathBytes,pathLength) -> do
           message <- c_writeByteFile pathBytes (fromIntegral pathLength) bytes (fromIntegral size)
           B.packCString message >>= evaluate . fromUtf8
 
 foreign import ccall safe "mlf_ghc_byte_array_digest" c_byteArrayDigest :: Ptr Word8 -> CSize -> CString -> IO ()
 v_byteArrayDigest :: ByteArray -> IO String
-v_byteArrayDigest array@(ByteArray size _) =
+v_byteArrayDigest array = do
+  ByteArray size _ <- evaluate array
   withByteSnapshot array $ \bytes ->
     bracket (mallocBytes 65) free $ \digest -> do
       c_byteArrayDigest bytes (fromIntegral size) digest

@@ -7,7 +7,7 @@
   "commands": [
     {
       "argv": [
-        "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/bin/emlf",
+        "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/emlf",
         "--verify-builtin-prelude",
         "builtin-source-v1:e53165c558f48854166134fa80b5fd4fac4341a529764af0defdb66145671cef"
       ],
@@ -17,18 +17,18 @@
       "input_pins_verified_before": true,
       "label": "check-candidate",
       "stderr": {
-        "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/builtin-verification/check-candidate.stderr",
+        "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/builtin-verification/check-candidate.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
-        "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/builtin-verification/check-candidate.stdout",
+        "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/builtin-verification/check-candidate.stdout",
         "sha256": "a362da91520982e2fd7bf5b4c57b4e585c1306cac064d6b3b03028d3012b1028"
       },
       "timeout_seconds": 1800
     },
     {
       "argv": [
-        "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/bin/builtin-prelude",
+        "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/builtin-prelude",
         "builtin-source-v1:e53165c558f48854166134fa80b5fd4fac4341a529764af0defdb66145671cef"
       ],
       "cwd": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf",
@@ -37,31 +37,31 @@
       "input_pins_verified_before": true,
       "label": "fresh-literal",
       "stderr": {
-        "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/builtin-verification/fresh-literal.stderr",
+        "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/builtin-verification/fresh-literal.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
-        "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/builtin-verification/fresh-literal.stdout",
+        "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/builtin-verification/fresh-literal.stdout",
         "sha256": "642ef051070c2e3a59ad22d228b0eeb106b8704707853edc048c365b63b2dd63"
       },
       "timeout_seconds": 1800
     }
   ],
   "compiler": {
-    "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/bin/emlf",
-    "sha256": "6ce658ca4a59fa8e81a36d958f3ef3252ff27da9e36e08311d10b5fdb139d88e"
+    "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/emlf",
+    "sha256": "859f616131ef55368be2b023f1ebcf1781c09fc80fdc558f2ddf29d76d89c4d8"
   },
   "complete": true,
   "exact_regeneration": true,
   "format": "builtin-prelude-verification-v1",
   "generator": {
-    "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/bin/builtin-prelude",
-    "sha256": "a0369a8bdc922629f2a2565b937d40c4e415c1819eec4506e5cf5e5ae95c59e1"
+    "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/builtin-prelude",
+    "sha256": "02aff841f11817911479f0ab693db87492a149efb6281ccb6ce6d057437f0c0e"
   },
   "immutable_inputs_verified_after": true,
   "inputs": {
-    "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/bin/builtin-prelude": "a0369a8bdc922629f2a2565b937d40c4e415c1819eec4506e5cf5e5ae95c59e1",
-    "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/bin/emlf": "6ce658ca4a59fa8e81a36d958f3ef3252ff27da9e36e08311d10b5fdb139d88e",
+    "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/builtin-prelude": "02aff841f11817911479f0ab693db87492a149efb6281ccb6ce6d057437f0c0e",
+    "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/emlf": "859f616131ef55368be2b023f1ebcf1781c09fc80fdc558f2ddf29d76d89c4d8",
     "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/bootstrap/MLF/BuiltinPreludeData.hs": "642ef051070c2e3a59ad22d228b0eeb106b8704707853edc048c365b63b2dd63",
     "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/bootstrap/MLF/Entry/BuiltinPrelude.hs": "740f515891b0a77e8139906a16917d14ca043cb098b5e2c617f3b04c2252ca92",
     "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/cabal.project": "d31917fa5dd1ba84d53f1961d5e8f6629474d92b53c7b9f2176d3f4b03da047a",

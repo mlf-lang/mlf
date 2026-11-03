@@ -864,6 +864,9 @@ sameGraphValue graph index value = do
 
 
 rawIO directory = do
+  -- Constructing a byte action must not force its array before execution.
+  _ <- evaluate (P.byteArrayDigest (error "forced digest array while constructing action"))
+  _ <- evaluate (P.writeByteFileOrError "unused" (error "forced file array while constructing action"))
   exists <- doesPathExist directory; need "fresh raw fixture directory" (not exists); createDirectory directory
   empty <- fromBytes []
   bytes <- fromBytes [0..255]

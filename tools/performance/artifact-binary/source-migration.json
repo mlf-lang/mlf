@@ -50,7 +50,7 @@
     "cabal.project": "d31917fa5dd1ba84d53f1961d5e8f6629474d92b53c7b9f2176d3f4b03da047a",
     "host/ghc/MLF/Host/Async.hs": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5",
     "host/ghc/MLF/Host/Base.hs": "50780c7183d62aa7568c0a799fdf5829b6ea60cbbc67cca7fd1a3f08bc4ba9c5",
-    "host/ghc/MLF/Host/IO.hs": "5df04cab25bd526bcbd84f5c6e4997d13c3a1b72f61bc4250d549fa6bfb5ff89",
+    "host/ghc/MLF/Host/IO.hs": "3544d5e2e062602f324976f54a32317affde010fbf4cf52acb366bbad435eb27",
     "host/ghc/MLF/Primitive.hs": "9b8e52b51dfaf0c5a31c18b0e08c5a704d10f8dc44fe2db0995bf3c8a22f2f43",
     "host/ghc/app/async-process-panic/Main.hs": "48badddd5a36322c9951a3748fd1969061172d84b92e19c385e772d1547a68a3",
     "host/ghc/app/async-process/Main.hs": "c889c5a273ec1539dbf299139722071efa3de2e1590fb929266e75ec4a3b16f6",
@@ -233,7 +233,7 @@
     "tools/shared/verify_builtin_prelude.py": "778fedebd6a038b6d1b67026f5ca8a4f0da1c13e126948f428b9f912fcacf07d",
     "tools/shared/verify_prepared_libraries.py": "e22b3df44b822ff9fa2339379d7796b7f6970854c283900a916c555244960dce"
   },
-  "current_inventory_sha256": "ac311c334cf8f780afed5b4ba35461fe00bfcdacb883f98d111ad2d35306fb75",
+  "current_inventory_sha256": "7b2066df11cc01afbc816df852adf38b577929f0284b48940f43074585ea85e9",
   "current_registry": {
     "Async.Process": "482169c6d92a16b5a3071088ec24ee7206324995f8e69f6df073cc24559fcb73",
     "Async.Process.Internal": "ef551f51dcf7da4b48e49f2807e2d5efe84c009cfa911913402c493fce7a25bc",
@@ -395,9 +395,9 @@
     },
     "host/ghc/MLF/Host/IO.hs": {
       "file": "deltas/002.json",
-      "new": "5df04cab25bd526bcbd84f5c6e4997d13c3a1b72f61bc4250d549fa6bfb5ff89",
+      "new": "3544d5e2e062602f324976f54a32317affde010fbf4cf52acb366bbad435eb27",
       "old": "0aa29495ef707741b6728652a26b0115a64d74b20deaed2b7114c6fc448e83e7",
-      "sha256": "5168f403d2a4e1d35df5f57682b7ac48d3e10c8e824d91646f76aba970ad3acc"
+      "sha256": "17cc81f114ff470a8d0458eb2cd83adba157fde011a880eb3d48725d4684e663"
     },
     "host/ghc/MLF/Primitive.hs": {
       "file": "deltas/003.json",
@@ -565,16 +565,16 @@
   "format": "binary-source-migration-v1",
   "generation": {
     "compiler": {
-      "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/bin/emlf",
-      "sha256": "6ce658ca4a59fa8e81a36d958f3ef3252ff27da9e36e08311d10b5fdb139d88e"
+      "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/emlf",
+      "sha256": "859f616131ef55368be2b023f1ebcf1781c09fc80fdc558f2ddf29d76d89c4d8"
     },
     "generator": {
-      "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/producer8/bin/builtin-prelude",
-      "sha256": "a0369a8bdc922629f2a2565b937d40c4e415c1819eec4506e5cf5e5ae95c59e1"
+      "path": "/Users/ares/.codex/worktrees/pr29-foundation-speed-20261104/mlf/.mlf-build/speed/fair-producer/bin/builtin-prelude",
+      "sha256": "02aff841f11817911479f0ab693db87492a149efb6281ccb6ce6d057437f0c0e"
     },
     "literal_sha256": "6a8767a44343e5528e2bd34927b72f5d8aa1016da3545d28c144276b1d056f8d",
     "output_sha256": "642ef051070c2e3a59ad22d228b0eeb106b8704707853edc048c365b63b2dd63",
-    "receipt_sha256": "d81283da84bd36556e7fddcfbf72dfdb51fb88caa4f4f982b441f70260ef6528",
+    "receipt_sha256": "85f90fb36b4867c1d5028092d521635c2196217fa9e846ffac260e3ea9b56619",
     "source_identity": "builtin-source-v1:e53165c558f48854166134fa80b5fd4fac4341a529764af0defdb66145671cef"
   },
   "maintenance": {
