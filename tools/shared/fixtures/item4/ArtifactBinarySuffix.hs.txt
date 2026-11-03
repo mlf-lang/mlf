@@ -103,6 +103,21 @@ readBounded path = do
   pure bytes
 splitTabs line = case break (=='\t') line of (a,[]) -> [a]; (a,_:b) -> a:splitTabs b
 wireCorpus manifest = do
+  bytes <- P.newByteArray 5 0
+  let value = B.literal "Aé"; W.Read parse = W.getUtf8 3
+  end <- W.putText bytes 3 value 0
+  need "unaligned UTF-8 write extent" (end == 27)
+  result <- parse (W.Cursor bytes 3 end) >>= expect "unaligned UTF-8 read"
+  case result of
+    (text,W.Cursor _ next _) -> need "unaligned UTF-8 roundtrip" (text == value && next == end)
+  -- A poisoned suffix makes backward scanning observable without large
+  -- allocations. The first invalid scalar must fail before touching it.
+  prefixBytes <- fromBytes [128,32,255]
+  let W.Read readSymbols = W.getSymbols W.defaultLimits 1
+  rejected <- readSymbols (W.Cursor prefixBytes 0 (4098 * 8))
+  case rejected of
+    T.Left msg -> need "invalid prefix short circuits symbol allocation" (msg == "invalid binary UTF-8 leading byte")
+    T.Right _ -> error "invalid symbol prefix admitted"
   input <- readFile manifest
   forM_ (lines input) $ \line -> case splitTabs line of
     [name,path,expected,schema,b,s,one,total,n,e,d,w] -> do
@@ -123,6 +138,14 @@ wireCorpus manifest = do
           zipWithM_ (sameGraphValue graph) (W.graphRoots graph) values
         ("reject",T.Left _,T.Left _) -> pure ()
         _ -> error ("graph decoder outcome disagrees with fixed oracle: " ++ name)
+      let hints = [B.literal (replicate 1100 'A')]
+      hinted <- W.decodeGraphWithText hints (W.Limits (read b) (read s) (read one) (read total) (read n) (read e) (read d) (read w)) (read schema) bytes
+      case (result,hinted) of
+        (T.Right values,T.Right graph) -> do
+          need (name ++ " hinted graph roots") (length values == length (W.graphRoots graph))
+          zipWithM_ (sameGraphValue graph) (W.graphRoots graph) values
+        (T.Left ordinary,T.Left withHint) -> need (name ++ " hinted rejection") (ordinary == withHint)
+        _ -> error ("hint changed wire admission: " ++ name)
       putStrLn ("PASS " ++ name)
     _ -> error "bad corpus manifest shape"
 

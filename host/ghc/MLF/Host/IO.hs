@@ -16,7 +16,9 @@ import Data.IORef
 import Data.Int (Int64)
 import Data.Word (Word8)
 import Foreign.Marshal.Alloc (mallocBytes)
-import Foreign (Ptr, alloca, peek, peekElemOff, pokeElemOff, nullPtr, free, castPtr)
+import Foreign.ForeignPtr (ForeignPtr, mallocForeignPtrBytes, withForeignPtr)
+import Foreign.Marshal.Utils (copyBytes, fillBytes)
+import Foreign (Ptr, alloca, peek, peekElemOff, pokeElemOff, nullPtr, free, castPtr, plusPtr)
 import Foreign.C
 import Control.Concurrent.MVar
 import Control.Exception
@@ -161,7 +163,9 @@ v_exitWith n = do
 -- representations coincide. The facade exports these types abstractly.
 newtype IntArray = IntArray (A.IOArray P.Int Int)
 newtype DoubleArray = DoubleArray (A.IOArray P.Int Double)
-newtype ByteArray = ByteArray (A.IOUArray P.Int Word8)
+-- The fixed length and private storage share one owner. File and digest
+-- adapters take snapshots in bulk before calling out to the host.
+data ByteArray = ByteArray !P.Int !(ForeignPtr Word8)
 newArray :: Int -> a -> IO (A.IOArray P.Int a)
 newArray n initial = do
   size <- evaluate (bounded "invalid array length" (9223372036854775807 `quot` 8) n)
@@ -189,44 +193,39 @@ v_newByteArray :: Int -> Int -> IO ByteArray
 v_newByteArray n x = do
   size <- evaluate (bounded "invalid array length" (9223372036854775807 `quot` 8) n)
   value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
-  ByteArray <$> A.newArray (0,size-1) value
+  storage <- mallocForeignPtrBytes (max 1 size)
+  withForeignPtr storage $ \pointer -> fillBytes pointer value size
+  pure (ByteArray size storage)
 v_readIntArray :: IntArray -> Int -> IO Int
 v_readIntArray (IntArray a) = readArray a
 v_readDoubleArray :: DoubleArray -> Int -> IO Double
 v_readDoubleArray (DoubleArray a) = readArray a
 v_readByteArray :: ByteArray -> Int -> IO Int
-v_readByteArray (ByteArray a) n = do
-  i <- byteIndex a n
-  fromIntegral <$> A.readArray a i
+v_readByteArray (ByteArray size storage) n = do
+  i <- evaluate (bounded "array index out of bounds" (fromIntegral size - 1) n)
+  withForeignPtr storage $ \pointer -> fromIntegral <$> peekElemOff pointer i
 v_writeIntArray :: IntArray -> Int -> Int -> IO ()
 v_writeIntArray (IntArray a) = writeArray a
 v_writeDoubleArray :: DoubleArray -> Int -> Double -> IO ()
 v_writeDoubleArray (DoubleArray a) = writeArray a
 v_writeByteArray :: ByteArray -> Int -> Int -> IO ()
-v_writeByteArray (ByteArray a) n x = do
-  i <- byteIndex a n
+v_writeByteArray (ByteArray size storage) n x = do
+  i <- evaluate (bounded "array index out of bounds" (fromIntegral size - 1) n)
   value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
-  A.writeArray a i value
+  withForeignPtr storage $ \pointer -> pokeElemOff pointer i value
 v_lengthIntArray :: IntArray -> IO Int
 v_lengthIntArray (IntArray a) = lengthArray a
 v_lengthDoubleArray :: DoubleArray -> IO Int
 v_lengthDoubleArray (DoubleArray a) = lengthArray a
 v_lengthByteArray :: ByteArray -> IO Int
-v_lengthByteArray (ByteArray a) = byteLength a
-byteLength :: A.IOUArray P.Int Word8 -> IO Int
-byteLength a = do { (_,hi) <- A.getBounds a; pure (fromIntegral hi+1) }
-byteIndex :: A.IOUArray P.Int Word8 -> Int -> IO P.Int
-byteIndex a n = do
-  (_,hi) <- A.getBounds a
-  evaluate (bounded "array index out of bounds" (fromIntegral hi) n)
+v_lengthByteArray (ByteArray size _) = pure (fromIntegral size)
 bytesArray :: B.ByteString -> IO ByteArray
-bytesArray bytes = do
-  array <- A.newArray (0,B.length bytes-1) 0
-  let fill :: P.Int -> IO ()
-      fill i | i == B.length bytes = pure ()
-             | otherwise = A.writeArray array i (B.index bytes i) >> fill (i+1)
-  fill 0
-  pure (ByteArray array)
+bytesArray bytes = B.useAsCStringLen bytes $ \(pointer,size) -> copyByteArray (castPtr pointer) size
+copyByteArray :: Ptr Word8 -> P.Int -> IO ByteArray
+copyByteArray input size = do
+  storage <- mallocForeignPtrBytes (max 1 size)
+  if size == 0 then pure () else withForeignPtr storage $ \pointer -> copyBytes pointer input size
+  pure (ByteArray size storage)
 v_byteArrayFromString :: String -> IO ByteArray
 v_byteArrayFromString = bytesArray . utf8
 v_getByteLine :: IO ByteArray
@@ -238,14 +237,11 @@ v_getByteLine = ioErrorAs "IO error: byte input failed" $ do
           if B.null one then pure acc else
             let b=B.head one in if b==10 then pure (b:acc) else readByteLine (b:acc)
 v_putBytes :: ByteArray -> Int -> Int -> IO ()
-v_putBytes (ByteArray a) start count = do
-  size <- byteLength a
-  i <- evaluate (bounded "byte slice out of bounds" size start)
-  n <- evaluate (bounded "byte slice out of bounds" (size-start) count)
-  withByteSlice a i n $ \pointer -> do
-    bytes <- B.packCStringLen (castBytePointer pointer,n)
-    ioErrorAs "IO error: output failed" (B.hPut H.stdout bytes >> H.hFlush H.stdout)
-  pure ()
+v_putBytes (ByteArray size storage) start count = do
+  i <- evaluate (bounded "byte slice out of bounds" (fromIntegral size) start)
+  n <- evaluate (bounded "byte slice out of bounds" (fromIntegral size-start) count)
+  bytes <- withForeignPtr storage $ \pointer -> B.packCStringLen (castBytePointer pointer `plusPtr` i,n)
+  ioErrorAs "IO error: output failed" (B.hPut H.stdout bytes >> H.hFlush H.stdout)
 -- The primitive owns evaluated Int64 keys/values. Machine IntMap is lossless
 -- on 64-bit hosts; retain full keys on narrower hosts instead of truncating.
 #if WORD_SIZE_IN_BITS >= 64 && !defined(MLF_TEST_NARROW_INT_TABLE)
@@ -284,12 +280,9 @@ foreign import ccall safe "mlf_ghc_read_byte_file" c_readByteFile :: CString -> 
 foreign import ccall safe "mlf_ghc_write_byte_file" c_writeByteFile :: CString -> CSize -> Ptr Word8 -> CSize -> IO CString
 castBytePointer :: Ptr Word8 -> CString
 castBytePointer = castPtr
-withByteSlice :: A.IOUArray P.Int Word8 -> P.Int -> P.Int -> (Ptr Word8 -> IO a) -> IO a
-withByteSlice array start count action = bracket (mallocBytes (max 1 count)) free $ \pointer -> do
-  let fill :: P.Int -> IO ()
-      fill i | i == count = pure ()
-             | otherwise = A.readArray array (start+i) >>= pokeElemOff pointer i >> fill (i+1)
-  fill 0
+withByteSnapshot :: ByteArray -> (Ptr Word8 -> IO a) -> IO a
+withByteSnapshot (ByteArray size storage) action = bracket (mallocBytes (max 1 size)) free $ \pointer -> do
+  withForeignPtr storage $ \source -> copyBytes pointer source size
   action pointer
 -- These two primitives return ordinary diagnostics, not HostError. Mask the
 -- ownership handoff from the safe FFI just like host(), retaining cancellation
@@ -298,7 +291,7 @@ v_readByteFileOrError :: String -> Int -> IO (String, ByteArray)
 v_readByteFileOrError name limit = mask_ $
   B.useAsCStringLen (utf8 name) $ \(pathBytes,pathLength) -> do
     bound <- evaluate limit
-    -- ByteString/IOUArray lengths use host Int, including on 32-bit GHC.
+    -- Array lengths use host Int, including on 32-bit GHC.
     -- Keep path-NUL priority over an invalid size, as in the shared C core.
     if bound > fromIntegral (maxBound :: P.Int) then do
       array <- bytesArray B.empty
@@ -310,26 +303,23 @@ v_readByteFileOrError name limit = mask_ $
       count <- peek size
       bracket (pure bytes) free $ \owned -> do
         message <- B.packCString errorPointer >>= evaluate . fromUtf8
-        raw <- if owned == nullPtr then pure B.empty
-               else B.packCStringLen (castBytePointer owned,fromIntegral count)
-        array <- bytesArray raw
+        array <- if owned == nullPtr then bytesArray B.empty
+                 else copyByteArray owned (fromIntegral count)
         pure (message,array)
 v_writeByteFileOrError :: String -> ByteArray -> IO String
 v_writeByteFileOrError name array =
   if '\0' `elem` unpack name then pure (literal "file path contains NUL") else
   case array of
-    ByteArray cells -> do
-      size <- byteLength cells
-      withByteSlice cells 0 (fromIntegral size) $ \bytes ->
+    ByteArray size _ ->
+      withByteSnapshot array $ \bytes ->
         B.useAsCStringLen (utf8 name) $ \(pathBytes,pathLength) -> do
           message <- c_writeByteFile pathBytes (fromIntegral pathLength) bytes (fromIntegral size)
           B.packCString message >>= evaluate . fromUtf8
 
 foreign import ccall safe "mlf_ghc_byte_array_digest" c_byteArrayDigest :: Ptr Word8 -> CSize -> CString -> IO ()
 v_byteArrayDigest :: ByteArray -> IO String
-v_byteArrayDigest (ByteArray cells) = do
-  size <- byteLength cells
-  withByteSlice cells 0 (fromIntegral size) $ \bytes ->
+v_byteArrayDigest array@(ByteArray size _) =
+  withByteSnapshot array $ \bytes ->
     bracket (mallocBytes 65) free $ \digest -> do
       c_byteArrayDigest bytes (fromIntegral size) digest
       B.packCStringLen (digest,64) >>= evaluate . fromUtf8

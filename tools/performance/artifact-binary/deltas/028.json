@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 60341,
+  "new_sha256": "d52b9ba6295b31ef4686291e80c2fbdeba9d669c6f2eb362ed41c9787f9cfda3",
+  "old_bytes": 60308,
+  "old_sha256": "d5da6a564e6227a65ddb88a0c328495256e0ad817ca94f32957ba2d64b13ee19",
+  "path": "bootstrap/MLF/Entry/Emlf.hs",
+  "splices": [
+    {
+      "new": "V2l0aFByZWx1ZGUgUHJlcGFyZWQuY3JhdGVQcmVsdWRl",
+      "new_at": 8823,
+      "old": "",
+      "old_at": 8823
+    }
+  ]
+}

@@ -2,10 +2,10 @@
 
 A source query caches the checked provisional xMLF object for one value SCC.
 Both source drivers hash the running executable and pass that identity into
-each key. InferenceUnit and SourceInference call Data.validateDeclarations,
-which constructs its environment from `builtinDeclarations ++ ds`. The xMLF
-checker also derives the empty environment's constructor and datatype maps
-from that builtin list. Source v7 reads the very same value.
+each key. Datatype validation in inference and in the raw xMLF checker starts
+with the ordered `Data.builtinDeclarations` and extends its maps with the user
+declarations. The empty environment derives its constructor and datatype maps
+from the same list. Source v7 reads the very same value.
 
 ## Wire contract
 

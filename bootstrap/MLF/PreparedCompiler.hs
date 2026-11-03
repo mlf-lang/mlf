@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedCompiler
   (Compilation, compileFileWithPrelude, compileSourceWithImports, compileProgramWithPrelude,
-   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin,
+   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, cratePrelude,
    emitNativeFileChunks, emitNativeSourceChunks, nativeInstallInfo,
    NativeCompilation, compileNativeFile, compileNativeSource,
    nativeChunks, nativeManifest, nativeExportCount, nativeInlineCount, nativeFallback, nativeInputs,
@@ -260,6 +260,7 @@ module MLF.PreparedCompiler
   ordinary compiled = Compilation (Core.checkedTerm compiled) (Core.sourceType compiled) False M.empty;
   original mode program = mapEither ordinary (Compiler.compileProgramWithPrelude mode program);
   prepared = Context.checkCompilerPrelude Builtin.builtin;
+  cratePrelude = case prepared of { Right witness -> Just ((,) witness Builtin.builtinObject); Left _ -> Nothing };
   rawNames = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ value _ _ _ _ _ -> value };
   rawEnvironment = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ _ value _ _ _ _ -> value };
   rawProtected = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ _ _ _ value _ _ -> value };
@@ -268,7 +269,10 @@ module MLF.PreparedCompiler
     prepared;
     fresh <- Context.prepareFresh identity;
     ensure (eqString (Literal.rawPrelude fresh) (Literal.rawPrelude Builtin.builtin))
-      "prepared Prelude differs from fresh complete preparation"
+      "prepared Prelude differs from fresh complete preparation";
+    object <- Artifact.builtinPrelude;
+    ensure (eqString (Artifact.encodeObject object) Builtin.builtinObject)
+      "prepared Prelude split object differs from fresh complete preparation"
   };
   compileFileWithPrelude mode paths file = do {
     present <- fileExists file;

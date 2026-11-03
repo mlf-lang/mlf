@@ -13,10 +13,8 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Separate as Separate;
-  import qualified Bootstrap.Data as D;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Syntax as X;
-  import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Pretty as Pretty;
   -- Class translation is a crate query, before the value dependency graph is
@@ -258,20 +256,24 @@ module Bootstrap.InferenceUnit where {
       case boundValueShared9 of {
         (,) parameters implementation ->
           do {
-            dataEnv <- D.validateDeclarations declarations;
-            bindings <-
-              Separate.collectBindings dataEnv (XEnv M.empty (M.fromList X.compareName parameters))
-                implementation;
-            ensure
-              (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) bindings))
-                 (sortBy compareString (map (\((,,) n _ _) -> n) members)))
-              "inference fragment changed declaration ownership";
+            -- Only the named external parameters may precede the declaration
+            -- spine. The checker peels leading lambdas when collecting its
+            -- inventory, so an extra lambda here must still be rejected.
+            case implementation of {
+              XAbs _ _ _ -> Left "invalid inference fragment: expected declarations ending in ()";
+              _ -> Right ()
+            };
             let {
               payload =
                 XWithData declarations
                   (foldr (\((,) n ty) term -> XAbs n ty term) implementation parameters)
             };
             checked <- Checked.check payload;
+            bindings <- Checked.declarationBindings checked;
+            ensure
+              (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) bindings))
+                 (sortBy compareString (map (\((,,) n _ _) -> n) members)))
+              "inference fragment changed declaration ownership";
             let {
               iface =
                 Separate.UnitInterface name [] [] declarations [] []

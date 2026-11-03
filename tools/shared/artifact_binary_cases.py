@@ -50,6 +50,17 @@ def corpus():
                                     ('node', 31, (('int', 9), ('text', 'b')))))
     good('same-hint-different-id', (('node', 31, (('int', 9), ('text', 'a'))),
                                     ('node', 31, (('int', 10), ('text', 'a')))))
+    # These have identical byte lengths to the decoder's optional text hint.
+    # Cross the table-CRC threshold and cover mismatches at either end.
+    run = 'A' * 1100
+    for label, value in [('equal', run), ('first', 'B' + run[1:]),
+                         ('last', run[:-1] + 'B'), ('unicode', run[:-2] + 'é')]:
+        good('long-symbol-' + label, (('text', value),))
+    valid = tree_document((('text', run),))
+    for index, label in [(valid.index(run.encode()), 'first'), (valid.index(run.encode()) + len(run) - 1, 'last')]:
+        raw = bytearray(valid)
+        raw[index] = 255
+        bad('long-symbol-invalid-' + label, repair_crc(raw))
     good('max-node-tag', (('node', 2147483647, ()),))
     base = tree_document((('int', 0),))
     empty = tree_document(())

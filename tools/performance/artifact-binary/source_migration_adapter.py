@@ -8,8 +8,8 @@ from pathlib import Path
 import hashlib
 import types
 
-FINAL_MANIFEST_SHA256 = '4f58855ea85e120d5830eb9a7b77eeb836047e1186ad8aeec04adc9da7458851'
-CONTRACT_SOURCE_SHA256 = '3785d5cc85bfce4450f8f90e818c767588558ebaec9e85b78e495e5b2bf42ea8'
+FINAL_MANIFEST_SHA256 = '51142f62876d6801d22e31ee21b548876aeae1b61d61fe6046eff0e59fb99513'
+CONTRACT_SOURCE_SHA256 = '188a49caf7efb8e954620d13b543ee3f52c4f8750d364e5c239a7b9ccf6e7e8a'
 
 
 def live_contract(history_root, source_root=None):

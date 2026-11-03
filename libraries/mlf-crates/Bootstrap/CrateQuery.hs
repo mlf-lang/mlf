@@ -1486,7 +1486,10 @@ module Bootstrap.CrateQuery where {
     [] ((,) String XType) -> [] DataDecl -> [] String -> String ->
     IO ((,,) ([] SourceContextRead) Bool (Either String Separate.UnitObject));
   readSourceCacheFileWithWindow previous cacheDir key name bindings datatypes names path = do {
-    input <- Storage.read 2 path;
+    -- Long fields of the expected key are often present verbatim as symbols.
+    -- They are only decoding hints; the full stored key and object are checked below.
+    let { hints = case Separate.unpack key of { Right fields -> fields; Left _ -> [] } };
+    input <- Storage.readWithText hints 2 path;
     case input of {
       Left error -> ioReturn ((,,) [] False (Left error));
       Right (Storage.LegacyText text) -> readSourceCachedWithWindow previous cacheDir key name

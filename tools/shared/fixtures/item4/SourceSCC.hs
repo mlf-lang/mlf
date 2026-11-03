@@ -92,6 +92,18 @@ decodeRawSourceCache cache digest final=do
    pure(key,raw)
   _->error "expected a shared source context"
 
+-- Compare the checked receipt directly to the former independent spine walk.
+checkBindingInventory raw = do
+ let (ds,body) = case U.objectTerm raw of { T.XWithData declarations term -> (declarations,term); term -> ([],term) }
+     (parameters,spine) = U.splitParameters body
+ env <- expect "raw datatype validation" (D.validateDeclarations ds)
+ old <- expect "independent raw binding inventory"
+   (U.collectBindings env (T.XEnv M.empty (M.fromList X.compareName parameters)) spine)
+ receipt <- expect "checked raw term" (U.objectChecked raw)
+ actual <- expect "receipt binding inventory" (Checked.declarationBindings receipt)
+ let same (n,t) (m,u) = X.nameId n == X.nameId m && X.nameHint n == X.nameHint m && XT.alphaEq t u
+ assert "checked raw inventory equals independent walk" (length old == length actual && and (zipWith same old actual))
+
 main=do
  hSetBuffering stdout LineBuffering
  [cache]<-getArgs
@@ -101,6 +113,8 @@ main=do
  let plan=case rawPlan of SI.SourcePlan a b c d e f g _ i j -> SI.SourcePlan a b c d e f g (error "POISON old global lowering forced") i j
  (objects,cold,contracts)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "cold source SCC compilation"
  assert "cold inferred all groups" (Q.inferredCount cold==fromIntegral(length(SI.planGroups plan))&&Q.reusedCount cold==0)
+ mapM_ (\(key,object) -> decodeRawSourceCache cache key object >>= checkBindingInventory . snd)
+   (zip (Q.queryKeys cold) objects)
  values<-foldM collect [] objects
  mapM_ (\(n,_,wanted,slots)->if n=="signedUse" then pure() else do
    let v=lookupValue values n;c=case M.lookup Prim.compareString n contracts of T.Just x->x;_->error "contract absent"

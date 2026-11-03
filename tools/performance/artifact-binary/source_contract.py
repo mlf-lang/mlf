@@ -321,7 +321,13 @@ class Contract:
                 canonical_sha(files) == value['current_inventory_sha256'], 'complete current file inventory')
         require(all(files[path] == value['current_registry'][name]
                     for name, path in value['module_paths'].items()), 'registry / file hash mismatch')
-        require(value['changed_paths'] == parent['expected_changed_paths'] and
+        # The crate CLI supplies its checked Prelude. Datatype admission shares
+        # builtin tables, and inferred exports use the checked binding inventory.
+        changed_paths = sorted([*parent['expected_changed_paths'], 'bootstrap/MLF/Entry/Emlf.hs',
+                                'libraries/mlf-language-core/Bootstrap/Data.hs',
+                                'libraries/mlf-crates/Bootstrap/InferenceUnit.hs',
+                                'bootstrap/MLF/Entry/BuiltinPrelude.hs'])
+        require(value['changed_paths'] == changed_paths and
                 value['added_paths'] == parent['expected_added_paths'] and
                 sorted(path for path in parent['files'] if parent['files'][path] != files[path]) ==
                 value['changed_paths'], 'unexpected / missing changed source path')

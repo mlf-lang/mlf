@@ -19,6 +19,8 @@ module Bootstrap.Crate where {
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.SourceInference as Source;
   import qualified Bootstrap.CrateArtifact as Artifact;
+  import qualified Bootstrap.BuiltinPreludeContext as Builtin;
+  import qualified Bootstrap.BuiltinPreludeLiteral as Literal;
   -- The package driver supplies the source inventory for exactly one crate.
   -- Dependency paths designate generated metadata, never upstream sources.
   data CrateSpec =
@@ -591,10 +593,17 @@ module Bootstrap.Crate where {
       }
     };
   parentDirectory path = Host.parentDirectory path;
-  ensureBuiltin prefix =
-    case Artifact.builtinPrelude of {
+  ensureBuiltin = ensureBuiltinWith Nothing;
+  -- Both formal readers and exact interface equality guard disk hits. A
+  -- miss can install the split object generated with the checked compiler
+  -- witness. Any failure in the embedded object's admission takes the fresh path.
+  ensureBuiltinWith witness prefix =
+    case (case witness of {
+      Nothing -> mapEither Artifact.objectInterface Artifact.builtinPrelude;
+      Just ((,) checked _) -> Right (Builtin.interface checked)
+    }) of {
       Left message -> ioReturn (Left message);
-      Right builtin ->
+      Right expected ->
         do {
           let {
             metadata = (prefix ++ ".mlfci")
@@ -616,20 +625,29 @@ module Bootstrap.Crate where {
                      case object of {
                        Left _ -> False;
                        Right prior ->
-                         eqString (Artifact.encodeInterface (Artifact.objectInterface builtin))
+                         eqString (Artifact.encodeInterface expected)
                            (Artifact.encodeInterface (Artifact.objectInterface prior))
                      }
                  };
                  result <-
                    if valid
                    then ioReturn (Right ())
-                   else Artifact.writeObjectAtomicEither prefix builtin;
+                   else case (case witness of {
+                     Just ((,) checked encoded) -> case Literal.checkedCrateObject checked encoded of {
+                       Right object -> Right object; Left _ -> Artifact.builtinPrelude
+                     };
+                     Nothing -> Artifact.builtinPrelude
+                   }) of {
+                     Left message -> ioReturn (Left message);
+                     Right builtin -> Artifact.writeObjectAtomicEither prefix builtin
+                   };
                  releaseFileLock lock;
                  ioReturn (mapEither (\_ -> metadata) result)
                }
         }
     };
-  withPrelude spec sources interfaces =
+  withPrelude = withPreludeUsing ensureBuiltin;
+  withPreludeUsing install spec sources interfaces =
     if any
          (\source ->
             (Lexer.isSharedSyntax (Modules.sourceSyntax source) || any (\entry -> Modules.isBuiltinModule (Modules.importedModule entry))
@@ -644,7 +662,7 @@ module Bootstrap.Crate where {
                     interfaces of {
                Just ((,) metadata iface) ->
                  ioReturn (mapEither (\_ -> metadata) (Artifact.validateInterface iface));
-               Nothing -> ensureBuiltin (specPrelude spec)
+               Nothing -> install (specPrelude spec)
              };
            case builtin of {
              Left message -> ioReturn (Left message);
