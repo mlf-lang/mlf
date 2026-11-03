@@ -186,7 +186,7 @@ module MLF.Entry.Emlf where {
                                                            } in
                                                            do {
                                                              result <-
-                                                               CrateSession.compileSpecFile file prefix;
+                                                               CrateSession.compileSpecFileWithPrelude Prepared.cratePrelude file prefix;
                                                              case result of {
                                                                Left message -> fatal message;
                                                                Right _ -> ioReturn ()

@@ -206,7 +206,7 @@ def apply_changes(base, changes):
         result[name]=row['new']
     return result
 
-def migrate(base):
+def through_full_compiler(base):
     raw=(HERE/'source-migration.json').read_bytes()
     if MANIFEST_SHA is None or hashlib.sha256(raw).hexdigest()!=MANIFEST_SHA:
         raise ValueError('fixed reviewed Int64/Patricia source migration required')
@@ -238,6 +238,19 @@ def migrate(base):
     result=apply_changes(result,c3_delta()['changed_sources'])
     result=apply_changes(result,survivors_delta()['changed_sources'])
     return apply_changes(result,full_delta()['changed_sources'])
+
+
+def crate_prelude():
+    path = HERE.parent / 'crate-prelude/source_contract.py'
+    spec = importlib.util.spec_from_file_location('crate_prelude_transition', path)
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    return adapter
+
+
+def migrate(base):
+    parent = through_full_compiler(base)
+    return crate_prelude().advance_registry(parent)
 
 
 def host_sources(base):

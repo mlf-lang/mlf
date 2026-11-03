@@ -75,6 +75,8 @@ class SourceContractTests(unittest.TestCase):
 
     def test_reviewed_projection_chain_and_order_are_pinned(self):
         source = (ROOT / C.OWNER).read_bytes()
+        prelude = load_projection(ROOT / 'tools/performance/crate-prelude/source_contract.py')
+        source = prelude.restore_session(source)
         projection = load_projection(ROOT / 'tools/performance/full-compiler/source_contract.py')
         self.assertEqual(C.sha(source), projection.NEW_SHA)
         source = projection.restore_previous_owner(source)

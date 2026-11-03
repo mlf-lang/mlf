@@ -3,12 +3,10 @@ module Main where
 import Prelude
 import Control.Monad(foldM,unless)
 import qualified Bootstrap.Types as T
-import qualified Bootstrap.Std as Std
 import qualified Bootstrap.Classes as C
 import qualified Bootstrap.Fresh as F
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.IntSet as IS
-import qualified Bootstrap.Set as Set
 import qualified Bootstrap.Dependency as Dependency
 import qualified Bootstrap.InferenceUnit as I
 import qualified Bootstrap.SourceInference as SI
@@ -64,8 +62,8 @@ evaluate term=do
  v<-expect"runtime"(R.evaluate env(R.REnv M.empty)(X.erase term))
  case v of R.RInteger n->pure n;_->error"not integer"
 closed ds values parameters rhs=
- let ids=foldl(\acc(n,t)->U.typeIdentities t(Set.insert Std.compareInt(X.nameId n)acc))(U.termIdentities rhs Set.empty)parameters
-     start=1+maximum(0:Set.toList ids)
+ let ids=foldl(\acc(n,t)->U.typeIdentities t(IS.insert (X.nameId n) acc))(U.termIdentities rhs IS.empty)parameters
+     start=1+maximum(0:IS.toList ids)
      step(serial,bindings)(n,_)=let(next,term)=U.freshObject serial(strip(vb(lookupValue values(X.nameHint n))))in(next,bindings++[(n,term)])
      (_,bindings)=foldl step(start,[])parameters
  in T.XWithData ds(foldr(\(n,term)b->T.XLet n term b)rhs bindings)
