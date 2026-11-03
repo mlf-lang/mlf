@@ -25,7 +25,7 @@ main = do
     (err,bytes) <- P.readByteFileOrError (H.literal path) (W.maxBytes W.defaultLimits)
     unless (err == "") (fail (H.unpack err))
     pure (key,bytes)
-  let neighbor = map fst (tail inputs ++ take 1 inputs)
+  let neighbor = map fst (drop 1 inputs ++ take 1 inputs)
   performGC
   start <- getMonotonicTimeNSec
   cpu <- getCPUTime
