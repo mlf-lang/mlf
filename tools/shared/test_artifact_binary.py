@@ -12,6 +12,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shlex
 import shutil
@@ -173,6 +174,81 @@ def dependency_parser_controls():
     return {'positive': [row[0] for row in positives], 'negative': [row[0] for row in negatives]}
 
 
+
+# This finite native gate covers the complete original fixture, not a reduced
+# transport-only substitute. Require the whole reviewed closure, including both
+# actual public artifact writers/readers, before using the modular compiler.
+NATIVE_MODULES = frozenset("""
+Bootstrap.ArtifactStorage Bootstrap.ArtifactStructure Bootstrap.Bitstream
+Bootstrap.ClassDemand Bootstrap.Classes Bootstrap.CompilerCore Bootstrap.Constraint
+Bootstrap.CrateArtifact Bootstrap.Data Bootstrap.Dependency Bootstrap.Desugar
+Bootstrap.Elaborate Bootstrap.Evidence Bootstrap.Fresh Bootstrap.Graph
+Bootstrap.Graph.Solver Bootstrap.Host Bootstrap.IntMap Bootstrap.IntRank
+Bootstrap.IntSet Bootstrap.IntTree Bootstrap.Kind Bootstrap.Kinding Bootstrap.Layout
+Bootstrap.Lexer Bootstrap.Map Bootstrap.Module Bootstrap.Parsec Bootstrap.Parser
+Bootstrap.Prelude Bootstrap.Primitive Bootstrap.ST Bootstrap.Separate Bootstrap.Set
+Bootstrap.SourceEquality Bootstrap.Std Bootstrap.Surface Bootstrap.Types
+Bootstrap.Unicode Bootstrap.X.Check Bootstrap.X.Checked Bootstrap.X.Parser
+Bootstrap.X.Pretty Bootstrap.X.Syntax Bootstrap.X.Type Main
+""".split())
+NATIVE_BUILTINS = frozenset(('MLF.Primitive', 'Prelude'))
+
+
+def native_source_closure(source, fixture, manifest):
+    """Authenticate the exact finite source closure; never fetch installed code."""
+    paths = {}
+    for row in manifest['modules']:
+        name, rel = row['module'], Path(row['path'])
+        require(name not in paths and name != 'Main', 'duplicate/reserved manifest module')
+        require(not rel.is_absolute() and '..' not in rel.parts, 'unsafe manifest source path')
+        paths[name] = source / rel
+    paths['Main'] = fixture
+    found, pending = {}, ['Main']
+    while pending:
+        name = pending.pop()
+        if name in found or name in NATIVE_BUILTINS:
+            continue
+        require(name in paths, 'native source import absent from manifest: ' + name)
+        path = regular(paths[name])
+        require(name == 'Main' or path.is_relative_to(source), 'native source outside checkout')
+        text = path.read_text(encoding='utf-8', errors='strict')
+        headers = re.findall(r'^\s*module\s+([A-Z][\w.]*)\b', text, flags=re.MULTILINE)
+        require(headers == [name], 'native source module header mismatch: ' + name)
+        imports = sorted(set(re.findall(r'^\s*import\s+(?:qualified\s+)?([A-Z][\w.]*)',
+                                       text, flags=re.MULTILINE)))
+        found[name] = {'module': name, 'path': str(path), 'bytes': path.stat().st_size,
+                       'sha256': sha(path), 'imports': imports}
+        pending.extend(imports)
+    require(set(found) == NATIVE_MODULES and len(found) == 46,
+            'native fixture must retain exact reviewed 46-module closure')
+    return [found[name] for name in sorted(found)]
+
+
+def crate_fields(values):
+    require(all(type(value) is str and '\0' not in value and
+                not any(0xd800 <= ord(c) <= 0xdfff for c in value) for value in values),
+            'crate fields require scalar strings without NUL')
+    return ''.join(str(len(value)) + ':' + value for value in values)
+
+
+def native_crate_spec(rows, directory):
+    require([row['module'] for row in rows] == sorted(NATIVE_MODULES),
+            'native crate inventory order/identity mismatch')
+    return crate_fields(['MLF-CRATE-1', 'artifact-binary-native', 'Main', 'false',
+        crate_fields([crate_fields([row['module'], row['path']]) for row in rows]), '',
+        str(directory / 'inference-cache'), str(directory / 'builtin/prelude')])
+
+
+def require_cold_queries(report):
+    groups = report.get('groups')
+    require(type(groups) is list and len(groups) > 0 and
+            type(report.get('inferred_groups')) is int and
+            report['inferred_groups'] == len(groups) and
+            type(report.get('reused_groups')) is int and report['reused_groups'] == 0 and
+            all(type(row) is dict and row.get('cached') is False for row in groups),
+            'native crate must compile every group fresh with no cache reuse')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', type=Path, default=ROOT)
@@ -215,6 +291,7 @@ def main():
             'output overlaps read-only producer')
     sys.dont_write_bytecode = True
     python = regular(Path(sys.executable).resolve(strict=True))
+    source_manifest = regular(source / 'shared-sources.json')
     runtime = regular(source / 'runtime/mlf_runtime.c')
     transport_sources = [regular(source / 'host/ghc/cbits/host.c'),
                          regular(source / 'runtime/mlf_process_supervisor.c')]
@@ -222,7 +299,7 @@ def main():
     require(regular(source / 'runtime/mlf_byte_file.h') in headers,
             'new byte-file transport header missing')
     inputs = [regular(__file__), fixture, shared, controls, *helpers, build_path,
-              direct_path, runtime, *transport_sources, *headers,
+              direct_path, source_manifest, runtime, *transport_sources, *headers,
               python, clang, pkg_config, gc_archive, *gc_headers]
     require(all(not p.is_relative_to(output) for p in inputs), 'input inside output')
     inputs = {str(p): sha(p) for p in inputs}
@@ -233,15 +310,17 @@ def main():
               'commands': [], 'source_root': str(source), 'inputs': inputs,
               'partial_write_sink': sink_identity,
               'producer_receipt': str(receipt_path), 'producer_receipt_sha256': sha(receipt_path),
-              'native_mode': 'fresh standalone LLVM and current runtime, no installed stdlib',
-              'limits': {'compile_link_seconds_each': 120, 'native_frontend_seconds': 600,
+              'native_mode': 'fresh exact46 modular crate, standalone LLVM and current runtime; no installed stdlib',
+              'limits': {'compile_link_seconds_each': 120, 'native_compile_crate_seconds': 900,
+                         'native_crate_to_llvm_seconds': 300, 'aggregate_output_bytes': 640 * 1024**2,
                          'whole_controls_seconds': 900, 'fixture_seconds_each': 180,
                          'outer_original_resource_guard_required': True},
               'limitations': ['Native scope: raw bytes, wire, typed Graph/admission and public artifact pair.',
                   'Session/Distribution complete integration coverage is GHC, not native bundle qualification.',
                   'Original source-context forty remains an independent required gate.',
                   'No Windows, 32-bit, crash durability, or hermetic system-libc qualification.',
-                  '128 MiB local native/test allocation is an estimate, not a fit claim; stop at original guard limits.']}
+                  'The monolithic --emit-llvm route remains unqualified: CI252 reported allocation failure under the unchanged address-space cap; a separate fixed-heap diagnostic timed out at600s.',
+                  '640 MiB is a bounded output allowance, not a fit guarantee; original memory guards and1800s overall deadline still apply.']}
 
     def save():
         temporary = output / 'receipt.json.new'
@@ -281,7 +360,7 @@ def main():
     try:
         record['dependency_parser_controls'] = dependency_parser_controls()
         producer = td.authenticate_build(receipt_path, producer_dir / 'bin', root=source)
-        manifest = json.loads((source / 'shared-sources.json').read_text())
+        manifest = json.loads(source_manifest.read_text())
         require(manifest['primitive_abi'] == 'mlf-primitive-132-v7' and
                 manifest['builtin_interface'] == 'mlf-primitive/shared-haskell-v1/11',
                 'this finite suite requires the new byte-file/digest ABI')
@@ -375,14 +454,46 @@ def main():
             'sha256': artifacts[str(runtime_dependencies)]}
         save()
         compiler = regular(producer_dir / 'bin/emlf')
-        native_includes = []
-        for library in ('mlf-foundation', 'mlf-language-core', 'mlf-xmlf',
-                        'mlf-frontend', 'mlf-inference', 'mlf-crates'):
-            native_includes.extend(['-i', source / 'libraries' / library])
-        runner.run('native-emit', [compiler, *native_includes, '--emit-llvm', shared], timeout=600)
-        # Reuse the captured LLVM directly: do not duplicate a potentially large
-        # IR file just to change its extension or move work outside the guard.
-        ir = regular(output / 'native-emit.stdout')
+        closure = native_source_closure(source, shared, manifest)
+        for row in closure:
+            require(not Path(row['path']).is_relative_to(output), 'native input overlaps output')
+            inputs[row['path']] = row['sha256']
+        record['native_source_closure'] = closure
+        crate = output / 'native-crate'
+        crate.mkdir()
+        spec = crate / 'fixture.spec'
+        with spec.open('xb') as stream:
+            stream.write(native_crate_spec(closure, crate).encode('utf-8'))
+        artifacts[str(spec)] = sha(spec)
+        record['native_crate_spec_sha256'] = artifacts[str(spec)]
+        save(); postcheck()
+        # Modular compilation is the supported bounded alternative to the
+        # monolithic frontend, not a fallback that drops native assertions.
+        runner.run('native-compile-crate', [compiler, '--compile-crate', spec,
+                   '-o', crate / 'fixture'], timeout=900)
+        for relative in ('fixture.mlfci', 'fixture.mlfco', 'fixture.queries',
+                         'builtin/prelude.mlfci', 'builtin/prelude.mlfco'):
+            require(regular(crate / relative).stat().st_size > 0,
+                    'missing fresh native crate artifact: ' + relative)
+        query_report = json.loads((crate / 'fixture.queries').read_text())
+        require_cold_queries(query_report)
+        record['native_cold_queries'] = {key: query_report[key]
+                                        for key in ('inferred_groups', 'reused_groups')}
+        record['native_crate_outputs'] = {}
+        for path in sorted(crate.rglob('*')):
+            info = path.lstat()
+            require(stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode),
+                    'nonregular native crate output')
+            if path.is_file():
+                path = regular(path)
+                digest = sha(path)
+                artifacts[str(path)] = digest
+                record['native_crate_outputs'][str(path.relative_to(crate))] = {
+                    'bytes': path.stat().st_size, 'sha256': digest}
+        save(); postcheck()
+        runner.run('native-crate-to-llvm', [compiler, '--crate-to-llvm', crate / 'fixture.mlfci'], timeout=300)
+        # Consume the captured IR directly; no duplicate or external scratch.
+        ir = regular(output / 'native-crate-to-llvm.stdout')
         require(ir.stat().st_size > 0, 'empty native LLVM')
         native = output / 'shared-native'
         runner.run('native-link', [clang, '-O2', '-Wno-override-module', '-x', 'ir', ir,

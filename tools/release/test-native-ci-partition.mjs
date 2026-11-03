@@ -109,7 +109,9 @@ const validate = text => {
   const binary = commandStep('tools/shared/test_artifact_binary.py');
   assert.match(binary, /^        if: matrix.optimization == '2'$/m);
   assert.match(binary, /set -euo pipefail/);
-  assert.match(binary, /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 \.mlf-build\/artifact-binary-guard python3 -B tools\/shared\/test_artifact_binary.py --source-root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --clang clang --gc-prefix "\$PWD\/\.mlf-build\/io-action-gc" --partial-write-sink \/dev\/full --output \.mlf-build\/artifact-binary-guard\/results\n/);
+  assert.ok(binary.includes('python3 -B tools/shared/test_artifact_binary_modular.py\n'));
+  assert.ok(binary.includes('python3 -O -B tools/shared/test_artifact_binary_modular.py\n'));
+  assert.match(binary, /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 \.mlf-build\/artifact-binary-guard python3 -B tools\/shared\/test_artifact_binary.py --source-root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --clang clang --gc-prefix "\$PWD\/\.mlf-build\/io-action-gc" --partial-write-sink \/dev\/full --output \.mlf-build\/artifact-binary-guard\/results\n/);
   const gcPreparation = commandStep('cp "$archive" "$prefix/lib/libgc.a"');
   assert.ok(steps.indexOf(gcPreparation) < steps.indexOf(binary), 'GC preparation precedes binary native build');
   const framework = commandStep('tools/shared/test_framework_direct.py');
@@ -197,11 +199,14 @@ const controls = [
   ['O2 artifact binary omitted',
     "      - name: Check binary artifact codecs and real native storage\n        if: matrix.optimization == '2'\n",
     "      - name: Check binary artifact codecs and real native storage\n        if: false\n"],
+  ['binary output allowance widened', '--max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--max-output-mib 641 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
+  ['binary modular normal controls omitted', '          python3 -B tools/shared/test_artifact_binary_modular.py\n', ''],
+  ['binary modular optimized controls omitted', '          python3 -O -B tools/shared/test_artifact_binary_modular.py\n', ''],
   ['binary command omitted', 'tools/shared/test_artifact_binary.py', 'tools/shared/omitted_artifact_binary.py'],
   ['binary producer receipt omitted', '--build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc"', '--clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc"'],
   ['binary native sink omitted', '--partial-write-sink /dev/full', ''],
   ['binary native dependencies omitted', '--gc-prefix "$PWD/.mlf-build/io-action-gc"', ''],
-  ['binary resource guard relaxed', '--rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--rss-mib 6144 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
+  ['binary resource guard relaxed', '--rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--rss-mib 6144 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
   ['binary evidence omitted', '            .mlf-build/artifact-binary-guard/results/**/*.json\n', ''],
   ['retained P123 omitted', 'run_integrated.py --suite p123', 'run_integrated.py --suite graph'],
   ['retained graph omitted', 'run_integrated.py --suite graph', 'run_integrated.py --suite builtin'],
