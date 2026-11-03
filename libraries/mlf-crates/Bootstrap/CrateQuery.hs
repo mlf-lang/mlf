@@ -12,6 +12,7 @@ module Bootstrap.CrateQuery where {
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.SourceInference as Source;
+  import qualified Bootstrap.SourceUnit as Unit;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Bitstream as W;
   import qualified Bootstrap.ArtifactStructure as Structure;
@@ -705,10 +706,16 @@ module Bootstrap.CrateQuery where {
                      stringSlice "0123456789abcdef" (remInt code 16) 1))
               else stringFromCode code;
   jsonFrom :: String -> Int -> String;
-  jsonFrom value position =
-    if (position >= stringLength value)
-    then ""
-    else (jsonCharacter (stringCodeAt value position) ++ jsonFrom value (position + 1));
+  jsonFrom value position = concatStringList (jsonSpans value position position);
+  jsonSpans value start position =
+    let { size = stringLength value; spanText = \end -> if start == 0 && end == size then value
+          else stringSlice value start (end - start) } in
+    if position >= size then (if position == start then [] else [spanText position])
+    else let { code = stringCodeAt value position; next = position + 1 } in
+      if code < 32 || code == 34 || code == 92
+      then let { tail = (:) (jsonCharacter code) (jsonSpans value next next) } in
+        if start == position then tail else (:) (spanText position) tail
+      else jsonSpans value start next;
   jsonString value = ("\"" ++ (jsonFrom value 0 ++ "\""));
   jsonArray values = ("[" ++ (intercalate "," values ++ "]"));
   groupJSON (GroupResult identity names cached semantic key) =
@@ -781,12 +788,7 @@ module Bootstrap.CrateQuery where {
       let {
         iface = Separate.objectInterface object
       };
-      ensure (eqString (Separate.unitName iface) expectedName) "cached group identity mismatch";
-      ensure
-        (null (Separate.unitDependencies iface) &&
-         (null (Separate.unitExports iface) &&
-          (null (Separate.unitClasses iface) && null (Separate.unitInstances iface))))
-        "cached fragment contains module metadata";
+      validateGroupIdentity expectedName iface;
       let {
         dataKey = list encodeDatatype expectedData
       };
@@ -812,23 +814,12 @@ module Bootstrap.CrateQuery where {
       let {
         implementation = snd (peelParameters inner)
       };
-      ensure
-        (eqList Separate.sameSignature (map (\((,) n ty) -> (,) (X.nameHint n) ty) parameters)
-           expectedParameters)
-        "cached dependency parameter mismatch";
+      validateGroupParameters expectedParameters parameters;
       ds <- D.validateDeclarations datatypes;
       bindings <-
         Separate.collectBindings ds (XEnv M.empty (M.fromList X.compareName parameters))
           implementation;
-      let {
-        actual =
-          Separate.sortBindings
-            (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) bindings)
-      };
-      ensure (eqList eqString (map fst actual) expectedMembers)
-        "cached declaration ownership mismatch";
-      ensure (eqList Separate.sameSignature actual (Separate.unitBindings iface))
-        "cached declaration scheme mismatch";
+      validateGroupBindings expectedMembers iface bindings;
       let {
         payload = XWithData expectedData inner
       };
@@ -848,6 +839,21 @@ module Bootstrap.CrateQuery where {
       };
       Right (Separate.CheckedUnitObject current checked)
     };
+  validateGroupIdentity expectedName iface = do {
+    ensure (eqString (Separate.unitName iface) expectedName) "cached group identity mismatch";
+    ensure (null (Separate.unitDependencies iface) && null (Separate.unitExports iface)
+      && null (Separate.unitClasses iface) && null (Separate.unitInstances iface))
+      "cached fragment contains module metadata"
+  };
+  validateGroupParameters expectedParameters parameters =
+    ensure (eqList Separate.sameSignature (map (\((,) n ty) -> (,) (X.nameHint n) ty) parameters)
+      expectedParameters) "cached dependency parameter mismatch";
+  validateGroupBindings expectedMembers iface bindings = do {
+    let { actual = Separate.sortBindings
+      (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) bindings) };
+    ensure (eqList eqString (map fst actual) expectedMembers) "cached declaration ownership mismatch";
+    ensure (eqList Separate.sameSignature actual (Separate.unitBindings iface)) "cached declaration scheme mismatch"
+  };
   decodeCached :: String ->
                   String ->
                   [] ((,) String XType) ->
@@ -1398,7 +1404,9 @@ module Bootstrap.CrateQuery where {
   };
   -- Common admission for both generations of shared records. The caller has
   -- matched the key and acquired the exact expected datatype carrier.
-  decodeSourceBody name bindings datatypes names graph context metadata bodyValue = do {
+  decodeSourceBody name bindings datatypes names graph context metadata bodyValue =
+    mapEither Unit.object (decodeSourceUnit name bindings datatypes names graph context metadata bodyValue);
+  decodeSourceUnit name bindings datatypes names graph context metadata bodyValue = do {
     -- Disk acquisition precedes this guard, retaining the old missing-context
     -- diagnostic order. Memo hits still bind the caller's full canonical data.
     ensure (eqString (encodeSourceDatatypes datatypes) context)
@@ -1406,20 +1414,23 @@ module Bootstrap.CrateQuery where {
     header <- Structure.fromGraphUnitInterface graph metadata;
     ensure (null (Separate.unitData header)) "contextual fragment contains an inline datatype header";
     body <- Structure.fromGraphXTerm graph bodyValue;
-    Storage.admit [Storage.AdmitTerm body];
-    ensure (eqString (Separate.fingerprint (Pretty.prettyTerm body))
-      (Separate.unitObjectFingerprint header)) "contextual fragment body checksum mismatch";
-    let { term = XWithData datatypes body;
-          object = Separate.UnitObject
-          (Separate.withInterfaceData header datatypes (Separate.fingerprint (Pretty.prettyTerm term))) term };
-    checked <- Storage.checkUnit object;
-    validateCached name bindings datatypes names checked
+    unit <- Unit.contextual header datatypes body;
+    let { object = Unit.object unit; iface = Separate.objectInterface object };
+    checked <- Separate.objectChecked object;
+    validateGroupIdentity name iface;
+    validateGroupParameters bindings (fst (peelParameters body));
+    -- The independent checker returns its closed declaration spine and unit
+    -- tail for this very term, after checking every external parameter.
+    actual <- Checked.declarationBindings checked;
+    validateGroupBindings names iface actual;
+    Right unit
   };
-  -- MLFBIN schema 2. Tags 300/301 carry exact keys. Tags 302/303 carry
-  -- the SHA-256 of the complete canonical v7 input plus a loaded-value ICH.
+  -- MLFBIN schema 2. Tags 300/301 carry exact keys. Tags 302/303 bind
+  -- canonical v7 inputs to the legacy ICH. Addressed tags 305/306 bind the
+  -- same inputs to the independently reproducible result-slot ICH.
   data LocalPayload = InlinePayload Int | SharedPayload String Int Int;
   data BinaryQuery = BinaryInline String Int | BinaryShared String ([] String) Int Int
-    | LocalQuery String String LocalPayload;
+    | LocalQuery String String LocalPayload | SlotQuery String String LocalPayload;
   binaryQueryText :: W.Graph -> Int -> Either String String;
   binaryQueryText graph identity = do {
     value <- W.lookupGraphNode graph identity;
@@ -1427,19 +1438,26 @@ module Bootstrap.CrateQuery where {
   };
   binaryQuery :: W.Graph -> Either String BinaryQuery;
   binaryQuery graph = case W.graphRoots graph of {
-    [root] -> binaryQueryRoot graph root;
+    [root] -> do {
+      record <- binaryQueryRoot graph root;
+      case record of {
+        SlotQuery _ _ _ -> Left "source result slot requires an addressed record"; _ -> Right record
+      }
+    };
     [address, root] -> do {
       prefix <- binaryQueryText graph address;
       record <- binaryQueryRoot graph root;
       case record of {
-        LocalQuery saved _ _ -> do {
-          ensure (eqString saved prefix) "source query address disagrees with payload";
-          Right record
-        };
+        LocalQuery saved _ _ -> bindAddress prefix saved record;
+        SlotQuery saved _ _ -> bindAddress prefix saved record;
         _ -> Left "invalid addressed source query payload"
       }
     };
     _ -> Left "malformed binary query roots"
+  };
+  bindAddress prefix saved record = do {
+    ensure (eqString saved prefix) "source query address disagrees with payload";
+    Right record
   };
   binaryQueryRoot graph root = do {
       value <- W.lookupGraphNode graph root;
@@ -1471,11 +1489,30 @@ module Bootstrap.CrateQuery where {
           resultHash <- binaryQueryText graph result;
           Right (LocalQuery inputHash resultHash (SharedPayload digest metadata body))
         };
+        W.GNode 305 [key, result, object] -> do {
+          input <- binaryQueryText graph key; digest <- binaryQueryText graph result;
+          Right (SlotQuery input digest (InlinePayload object))
+        };
+        W.GNode 306 [key, result, reference, metadata, body] -> do {
+          input <- binaryQueryText graph key; digest <- binaryQueryText graph result;
+          context <- binaryQueryText graph reference;
+          Right (SlotQuery input digest (SharedPayload context metadata body))
+        };
         _ -> Left "malformed binary query roots"
       }
   };
   sourceInputHash :: String -> IO String;
   sourceInputHash key = do { bytes <- byteArrayFromString key; byteArrayDigest bytes };
+  -- Hash the same canonical UTF-8 bytes in memory for modest inputs. Large
+  -- keys and an existing scratch path retain the original file/cleanup lane.
+  sourceLookupHash directory key = let {
+    scratch = directory ++ "/query-key.new";
+    staged = \ignored -> do { writeFile scratch key; fileDigest scratch }
+  } in if stringLength key > 262144 then staged () else do {
+    file <- fileExists scratch;
+    dir <- directoryExists scratch;
+    if file || dir then staged () else sourceInputHash key
+  };
   -- Canonical hash of the decoded raw value, separate from the input hash.
   -- Contextual objects bind their complete, separately verified carrier by
   -- reference. Re-encoding uses the ordinary graph limits on both paths.
@@ -1497,6 +1534,87 @@ module Bootstrap.CrateQuery where {
       }
     }
   };
+  -- The first two symbols are equal-width input and result slots. Hash the
+  -- canonical template with the reserved spelling (including its own CRC).
+  -- After patching and resealing, bytes must equal an ordinary full encoding
+  -- with the obtained SHA in that field. Old layouts cover wire limits, symbol
+  -- aliases or a result which is already a symbol anywhere else in the graph.
+  resultSlot :: String;
+  resultSlot = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
+  slotRoots :: String -> [] W.Value -> Either String ([] W.Value);
+  slotRoots input fields = let { address = W.VText input; slot = W.VText resultSlot } in
+    case fields of {
+      [body] -> Right [address, W.VNode 305 [address, slot, body]];
+      [context,metadata,body] -> Right [address, W.VNode 306 [address, slot, context, metadata, body]];
+      _ -> Left "invalid local source payload"
+    };
+  slotResultHash input fields = case slotRoots input fields of {
+    Left message -> ioReturn (Left message);
+    Right roots -> do {
+      encoded <- Storage.encode 2 roots;
+      case encoded of {
+        Left message -> ioReturn (Left message);
+        Right bytes -> do { hash <- byteArrayDigest bytes; ioReturn (Right hash) }
+      }
+    }
+  };
+  uniqueResultEdge :: [] W.Entry -> Int -> Int -> Bool;
+  uniqueResultEdge entries root index = case entries of {
+    [] -> True;
+    (:) entry rest -> let { unique = case entry of {
+      W.ENode _ children -> if index == root then case children of {
+        (:) 0 ((:) 1 fields) -> not (elem eqInt 1 fields); _ -> False
+      } else not (elem eqInt 1 children);
+      _ -> True
+    } } in unique && uniqueResultEdge rest root (index + 1)
+  };
+  encodeLocalRecord input fields = let { old = \_ -> encodeLegacyLocalRecord input fields } in
+    case slotRoots input fields of {
+      Left message -> ioReturn (Left message);
+      Right roots -> case W.plan W.defaultLimits roots of {
+        Right tables@(W.Tables ((:) first@(W.Symbol address 64) ((:) (W.Symbol slot 64) _))
+          entries [0,root] _ _ _ _) ->
+          if not (eqString address input && eqString slot resultSlot && uniqueResultEdge entries root 0)
+          then old () else case W.layout W.defaultLimits tables of {
+            Left _ -> old ();
+            Right geometry -> catchIOError
+              (sealLocalRecord input fields tables geometry (80 + W.symbolSize first + W.varBytes 64))
+              (\error -> ioReturn (Left ("binary encode IO failure: " ++ textFromChars (ioeGetErrorString error))))
+          };
+        _ -> old ()
+      }
+    };
+  sealLocalRecord input fields tables@(W.Tables symbols _ _ _ _ _ _) geometry offset = do {
+    encoded <- W.encodeTables 2 geometry tables;
+    case encoded of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> do {
+        digest <- byteArrayDigest bytes;
+        if not (validSourceContextDigest digest) then ioReturn (Left "cannot fingerprint raw source result")
+        else if slotConflicts digest symbols
+          then encodeLegacyLocalRecord input fields
+          else do {
+            _ <- W.putText bytes (offset * 8) digest 0;
+            size <- lengthByteArray bytes;
+            crc <- W.checksum bytes size; _ <- W.putBits bytes 608 32 crc;
+            ioReturn (Right bytes)
+          }
+      }
+    }
+  };
+  slotConflicts digest = any (\(W.Symbol text size) -> size == 64 && eqString text digest);
+  encodeLegacyLocalRecord input fields = do {
+    result <- localResultHash input fields;
+    case result of {
+      Left message -> ioReturn (Left message);
+      Right digest -> let { address = W.VText input; write = encodeAddressedSource W.defaultLimits address } in
+        case fields of {
+          [value] -> write (W.VNode 302 [address, W.VText digest, value]);
+          [context, metadata, body] -> write (W.VNode 303 [context, address, W.VText digest, metadata, body]);
+          _ -> ioReturn (Left "invalid local source payload")
+        }
+    }
+  };
   -- The extra root costs one reference and 65 units of expanded work. At a
   -- wire limit use the previous checked layout, under exactly the same caps.
   encodeAddressedSource limits address payload = do {
@@ -1508,7 +1626,9 @@ module Bootstrap.CrateQuery where {
       Right _ -> ioReturn encoded
     }
   };
-  writeLocalSourceRecord encodings cacheDir destination input expectedContext object =
+  writeLocalSourceRecord = writeSourceRecordUsing encodeLegacyLocalRecord DirectRecords;
+  writeSourceRecordWith = writeSourceRecordUsing encodeLocalRecord;
+  writeSourceRecordUsing encoder publisher encodings cacheDir destination input expectedContext object =
     let { declarations = Separate.unitData (Separate.objectInterface object);
       encode = case encodings of {
         Nothing -> encodeSourceDatatypes; Just pool -> encodeSourceDatatypesWithPool pool
@@ -1524,22 +1644,8 @@ module Bootstrap.CrateQuery where {
       } else ioReturn (Right Nothing);
       case acquired of {
         Left message -> ioReturn (Left message);
-        Right reference -> do {
-          let { fields = localPayloadFields reference object };
-          result <- localResultHash input fields;
-          case result of {
-            Left message -> ioReturn (Left message);
-            Right digest -> let {
-              address = W.VText input;
-              write = \payload -> publishQueryBytes destination
-                (encodeAddressedSource W.defaultLimits address payload)
-            } in case fields of {
-              [value] -> write (W.VNode 302 [address, W.VText digest, value]);
-              [context, metadata, body] -> write (W.VNode 303 [context, address, W.VText digest, metadata, body]);
-              _ -> ioReturn (Left "invalid local source payload")
-            }
-          }
-        }
+        Right reference -> publishSourceBytes publisher destination input
+          (encoder input (localPayloadFields reference object))
       }
     };
   -- Use one reproducible bucket out of 32 (hex 00..07). Strict mode
@@ -1578,28 +1684,32 @@ module Bootstrap.CrateQuery where {
   readBinarySourceGraph previous cacheDir key name bindings datatypes names graph =
     case binaryQuery graph of {
       Left message -> ioReturn ((,,) [] False (Left message));
-      Right record -> case record of {
-        LocalQuery _ _ _ -> case sourceCacheParts key of {
+      Right record -> let { local = \ignored -> case sourceCacheParts key of {
           Nothing -> ioReturn ((,,) [] False (Left "unsupported source query key"));
           Just ((,) _ context) -> do {
             input <- sourceInputHash key;
             readSourceRecord False previous cacheDir key input context name bindings datatypes names graph record
           }
-        };
+        } } in case record of {
+        LocalQuery _ _ _ -> local (); SlotQuery _ _ _ -> local ();
         _ -> readSourceRecord False previous cacheDir key "" "" name bindings datatypes names graph record
       }
     };
-  readSourceRecord verifyAll previous cacheDir key input expectedContext name bindings datatypes names graph record =
+  mapSourceRead f ((,,) window hit outcome) = (,,) window hit (mapEither f outcome);
+  readSourceRecord verifyAll previous cacheDir key input expectedContext name bindings datatypes names graph record = do {
+    raw <- readSourceUnit verifyAll previous cacheDir key input expectedContext name bindings datatypes names graph record;
+    ioReturn (mapSourceRead Unit.object raw)
+  };
+  readSourceUnit verifyAll previous cacheDir key input expectedContext name bindings datatypes names graph record =
     let {
       failed = \message -> ioReturn ((,,) [] False (Left message));
       inline = \value -> do {
         object <- bindEither (Structure.fromGraphRawUnitObject graph value) Storage.checkUnit;
-        validateCached name bindings datatypes names object
+        mapEither Unit.pending (validateCached name bindings datatypes names object)
       };
       shared = \digest metadata body -> readSharedSourceContext previous cacheDir digest expectedContext
-        datatypes (\encoded -> decodeSourceBody name bindings datatypes names graph encoded metadata body)
-    } in case record of {
-      LocalQuery saved result payload ->
+        datatypes (\encoded -> decodeSourceUnit name bindings datatypes names graph encoded metadata body);
+      local = \hash saved result payload ->
         if not (validSourceContextDigest input && eqString saved input)
         then failed "cached query key mismatch"
         else if not (validSourceContextDigest result) then failed "invalid source result fingerprint"
@@ -1611,7 +1721,7 @@ module Bootstrap.CrateQuery where {
           case acquired of {
             (,,) _ _ (Right object) -> if verifyAll || sampledSourceInput input then do {
               let { reference = case payload of { InlinePayload _ -> Nothing; SharedPayload digest _ _ -> Just digest } };
-              actual <- localResultHash input (localPayloadFields reference object);
+              actual <- hash input (localPayloadFields reference (Unit.object object));
               case actual of {
                 Left message -> failed message;
                 Right digest -> if eqString digest result then ioReturn acquired
@@ -1620,7 +1730,10 @@ module Bootstrap.CrateQuery where {
             } else ioReturn acquired;
             _ -> ioReturn acquired
           }
-        };
+        }
+    } in case record of {
+      LocalQuery saved result payload -> local localResultHash saved result payload;
+      SlotQuery saved result payload -> local slotResultHash saved result payload;
       BinaryInline saved value ->
         if verifyAll then failed "legacy source record has no result fingerprint"
         else ioReturn ((,,) [] False (do {
@@ -1635,7 +1748,7 @@ module Bootstrap.CrateQuery where {
             (\encoded -> do {
               saved <- restoreSourceCacheKey encoded (Separate.pack fields);
               ensure (eqString saved key) "cached query key mismatch";
-              decodeSourceBody name bindings datatypes names graph encoded metadata body
+              decodeSourceUnit name bindings datatypes names graph encoded metadata body
             })
         }
     };
@@ -1652,15 +1765,22 @@ module Bootstrap.CrateQuery where {
       }
   };
   readLocalSourceFile verifyAll previous cacheDir key input expectedContext name bindings datatypes names path = do {
+    raw <- readLocalSourceUnit verifyAll previous cacheDir key input expectedContext name bindings datatypes names path;
+    ioReturn (mapSourceRead Unit.object raw)
+  };
+  readLocalSourceUnit verifyAll previous cacheDir key input expectedContext name bindings datatypes names path = do {
     acquired <- Storage.readUsing (W.decodeGraphWithGate W.defaultLimits 2 (sourceAddressGate input)) path;
     case acquired of {
       Left message -> ioReturn ((,,) [] False (Left message));
       Right (Storage.LegacyText text) -> if verifyAll
         then ioReturn ((,,) [] False (Left "legacy source record has no result fingerprint"))
-        else readSourceCachedWithWindow previous cacheDir key name bindings datatypes names text;
+        else do {
+          raw <- readSourceCachedWithWindow previous cacheDir key name bindings datatypes names text;
+          ioReturn (mapSourceRead Unit.pending raw)
+        };
       Right (Storage.BinaryInput graph) -> case binaryQuery graph of {
         Left message -> ioReturn ((,,) [] False (Left message));
-        Right record -> readSourceRecord verifyAll previous cacheDir key input
+        Right record -> readSourceUnit verifyAll previous cacheDir key input
           expectedContext name bindings datatypes names graph record
       }
     }
@@ -1690,13 +1810,101 @@ module Bootstrap.CrateQuery where {
     }
   };
   -- Commands receive NUL-separated argv directly; paths never enter a shell.
-  cacheCommand arguments =
+  cacheCommand = cacheCommandIn "";
+  cacheCommandIn cwd arguments =
     do {
       command <- Host.hostArguments arguments;
-      runProcess ""
+      runProcess cwd
         (concatMapString (\field -> (field ++ stringFromCode 0))
            ((:) "1800" ((:) "" ((:) "" ((:) "" command)))))
     };
+  -- Every listed name originates in a successfully written record under the
+  -- cache lock. One mv publishes a bounded batch of ordinary same-filesystem
+  -- atomic renames. A reader may only admit each resulting file through the
+  -- normal input, graph, carrier and raw-object checks.
+  data SourcePublisher = DirectRecords | StagedRecords String IntArray ByteArray;
+  batchRecords :: Int;
+  batchRecords = 32;
+  recordSuffix digest = digest ++ ".mlfq";
+  publishSourceBytes DirectRecords destination input encoding = publishQueryBytes destination encoding;
+  publishSourceBytes publisher@(StagedRecords directory count names) destination input encoding = do {
+    encoded <- encoding;
+    case encoded of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> do {
+        index <- readIntArray count 0;
+        let { name = recordSuffix input; path = directory ++ "/" ++ name };
+        isDirectory <- directoryExists destination;
+        if isDirectory then ioReturn (Left "cannot publish inference query cache") else do {
+          written <- Storage.writeRaw path bytes;
+          case written of {
+            Left message -> do {
+              _ <- cacheCommandIn directory ["/bin/rm","-f",name];
+              ioReturn (Left message)
+            };
+            Right () -> do {
+              storeRecordName names (64 * index) input 0;
+              writeIntArray count 0 (index + 1);
+              if index + 1 == batchRecords then flushSourceRecords publisher else ioReturn (Right ())
+            }
+          }
+        }
+      }
+    }
+  };
+  storeRecordName names offset text i = if i == 64 then ioReturn () else do {
+    writeByteArray names (offset + i) (stringCodeAt text i);
+    storeRecordName names offset text (i + 1)
+  };
+  loadRecordName names offset i acc = if i == 64 then ioReturn (recordSuffix (textFromChars (reverse acc))) else do {
+    byte <- readByteArray names (offset + i);
+    loadRecordName names offset (i + 1) ((:) (charFromCode byte) acc)
+  };
+  pendingRecordNames count names = do {
+    size <- readIntArray count 0;
+    mapM (\i -> loadRecordName names (64 * i) 0 []) (range 0 (size - 1))
+  };
+  flushSourceRecords :: SourcePublisher -> IO (Either String ());
+  flushSourceRecords DirectRecords = ioReturn (Right ());
+  flushSourceRecords (StagedRecords directory count names) = do {
+    files <- pendingRecordNames count names;
+    if null files then ioReturn (Right ()) else do {
+      code <- cacheCommandIn directory (append ["/bin/mv", "-f"] (append files [".."]));
+      if code /= 0 then ioReturn (Left "cannot publish inference query cache")
+      else do { writeIntArray count 0 0; ioReturn (Right ()) }
+    }
+  };
+  -- mkdir, without -p, claims a private directory. A previous interrupted
+  -- writer or unexpected path is never opened or swept. Windows keeps the
+  -- established single-record move supplied by its host helper.
+  withSourcePublisher cacheDir action = do {
+    windows <- Host.isWindows;
+    let { path = cacheDir ++ "/.source-query-publish" };
+    if windows then action DirectRecords else do {
+      file <- fileExists path;
+      directory <- directoryExists path;
+      if file || directory then action DirectRecords else do {
+        code <- cacheCommand ["/bin/mkdir", "-m", "700", path];
+        if code /= 0 then action DirectRecords else do {
+          count <- newIntArray 1 0; names <- newByteArray (64 * batchRecords) 0;
+          let { publisher = StagedRecords path count names };
+          result <- action publisher;
+          flushed <- flushSourceRecords publisher;
+          leftovers <- pendingRecordNames count names;
+          if null leftovers then ioReturn () else do {
+            _ <- cacheCommandIn path (append ["/bin/rm", "-f"] leftovers);
+            ioReturn ()
+          };
+          cleaned <- cacheCommand ["/bin/rmdir", path];
+          ioReturn (do {
+            value <- result; _ <- flushed;
+            ensure (cleaned == 0) "cannot clean inference query publication directory";
+            Right value
+          })
+        }
+      }
+    }
+  };
   cachePath path = if Host.absolutePath path then path else ("./" ++ path);
   -- Caller holds the cache-directory lock and has normalized cacheDir with
   -- cachePath. Clean only this fixed scratch after a normal Either return,
@@ -2006,6 +2214,10 @@ module Bootstrap.CrateQuery where {
       runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext []
         crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
   runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsPublishing DirectRecords encodings datatypeContext contractEncodings ownedContext readWindow
+      crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
+  runSourceGroupsPublishing publisher encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (QueryReport inferred reused (reverse results)) contracts));
@@ -2035,19 +2247,19 @@ module Bootstrap.CrateQuery where {
           Nothing -> sourceQueryKeyWithContext crateId compilerHash prepared contracts (fst context);
           Just pool -> sourceQueryKeyWithContractEncodings pool crateId compilerHash prepared contracts (fst context)
         } };
-        writeFile (cacheDir ++ "/query-key.new") key;
-        digest <- fileDigest (cacheDir ++ "/query-key.new");
+        digest <- sourceLookupHash cacheDir key;
         if not (validSourceContextDigest digest) then ioReturn (Left "cannot fingerprint source inference inputs")
         else do {
         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
         present <- fileExists destination;
         cachedRead <- if present then do {
-          observed <- readLocalSourceFile False readWindow cacheDir key digest (fst context) name
+          observed <- readLocalSourceUnit False readWindow cacheDir key digest (fst context) name
             bindings datatypes names destination;
           ioReturn (case observed of {
             (,,) next _ decoded -> case (do {
-              object <- decoded;
-              Source.validatePreparedRaw prepared object
+              unit <- decoded;
+              Source.validatePreparedRaw prepared (Unit.object unit);
+              Right unit
             }) of {
               Left error -> (,) [] (Left error);
               Right object -> (,) next (Right object)
@@ -2057,7 +2269,7 @@ module Bootstrap.CrateQuery where {
         let { cached = snd cachedRead };
         let { raw = case cached of {
           Right object -> Right ((,) True object);
-          Left _ -> mapEither ((,) False) (case encodings of {
+          Left _ -> mapEither (\object -> (,) False (Unit.pending object)) (case encodings of {
             Nothing -> Inference.compileLoweredGroup name
               ((:) (dependencyInterface bindings) []) datatypes members;
             Just (SourceEncodings pool _) -> Inference.compileLoweredGroupWithDatatypes pool name
@@ -2066,11 +2278,11 @@ module Bootstrap.CrateQuery where {
         } };
         case raw of {
           Left error -> ioReturn (Left error);
-          Right ((,) hit object) -> case Source.finishGroup prepared object of {
+          Right ((,) hit unit) -> case Source.finishSourceUnit prepared unit of {
             Left error -> ioReturn (Left error);
             Right finalized -> do {
               saved <- if hit then ioReturn (Right ())
-                else writeLocalSourceRecord encodings cacheDir destination digest (fst context) object;
+                else writeSourceRecordWith publisher encodings cacheDir destination digest (fst context) (Unit.object unit);
               case saved of {
                 Left error -> ioReturn (Left error);
                 Right _ -> do {
@@ -2078,7 +2290,7 @@ module Bootstrap.CrateQuery where {
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (list encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsWithReadContext encodings (snd context) (case contractEncodings of {
+                  runSourceGroupsPublishing publisher encodings (snd context) (case contractEncodings of {
                     Nothing -> Nothing;
                     Just pool -> Just (extendSourceContractEncodings finalContracts pool)
                   }) (case ownedContext of {
@@ -2137,12 +2349,12 @@ module Bootstrap.CrateQuery where {
                       then Just (prepareSourceEncodings (Source.planData plan)) else Nothing };
                 result <- if not (validSourceContextDigest compilerHash)
                   then ioReturn (Left "cannot fingerprint source query compiler")
-                  else runSourceGroupsWithOwnedContext encodings (case encodings of {
+                  else withSourcePublisher cacheDir (\publisher -> runSourceGroupsPublishing publisher encodings (case encodings of {
                   Nothing -> Nothing;
                   Just pool -> Just (emptyDatatypeContextEncoding pool)
                 }) (if shareEncoding then Just (prepareSourceContractEncodings contracts) else Nothing)
-                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing)
-                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
+                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing) []
+                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 []);
                 cleaned <- cleanupQueryKey cacheDir result;
                 releaseFileLock lock;
                 ioReturn cleaned

@@ -137,7 +137,7 @@ and <=2147483647; decode expects an exact match. Recognized binary magic
 plus any decode error is terminal and must never fall back to legacy text.
 
 Schema 2 includes exact-key query roots 300/301 and local fingerprint
-roots 302/303. The source SCC input, result checksum, sampling policy and
+roots 302/303 and addressed result-slot roots 305/306. The source SCC input, result checksum, sampling policy and
 old-record migration are specified in [Source query fingerprints](../source-fingerprints/README.md).
 
 The additive Graph reader reuses the exact validated postorder table and

@@ -65,8 +65,12 @@ def binary_query(raw, shared=True):
     document = binary_artifact(raw, 2)
     root = binary_helpers()[1].query_payload_root(document)
     if shared:
-        if document.nodes[root].data[0] == 303:
-            reference, key, result, header, body = graph_node(document, root, 303, 5)
+        tag = document.nodes[root].data[0]
+        if tag in (303,306):
+            if tag == 306:
+                key, result, reference, header, body = graph_node(document, root, tag, 5)
+            else:
+                reference, key, result, header, body = graph_node(document, root, tag, 5)
             fingerprint = binary_helpers()[1].verify_source_result(document)
             return {'document': document, 'reference': graph_text(document, reference),
                     'fingerprint': fingerprint, 'header': header, 'body': body}
@@ -1283,7 +1287,7 @@ def main():
                         target.write_bytes(b"broken-context")
                 else:
                     target = cache / next(n for n, f in current["active_records"].items()
-                                          if f == "MLFBIN-QUERY-SHARED-3")
+                                          if f in ("MLFBIN-QUERY-SHARED-3", "MLFBIN-QUERY-SHARED-4"))
                     reference_reader, _, _ = binary_helpers()
                     document = binary_artifact(target.read_bytes(), 2)
                     value = document.values()[-1]
@@ -1291,8 +1295,8 @@ def main():
                     # valid CRC; only the typed body becomes an invalid text
                     # leaf. This is a real typed-payload miss, not old text
                     # smuggled into a file whose magic happens to be binary.
-                    require(value[1] == 303, 'fingerprinted source record')
-                    malformed = ('node', 303, (*value[2][:-1], ('text', '')))
+                    require(value[1] in (303,306), 'fingerprinted source record')
+                    malformed = ('node', value[1], (*value[2][:-1], ('text', '')))
                     target.write_bytes(reference_reader.tree_document([*document.values()[:-1],malformed], schema=2))
                 repaired = driver(kind, cache, root, "42", kind + "-" + mutation)
                 require(repaired["query_report"]["inferred_groups"] >= 1 and repaired["artifact_sha256"] == changed["artifact_sha256"], "corruption miss + exact reconstruction")
@@ -1676,7 +1680,7 @@ def main():
                              "report_sha256": digest(report_path.read_bytes())})
             no_query_scratch(cache)
             final_snapshot = snapshot(cache, keys)
-            require(set(final_snapshot["active_records"].values()) == {"MLFBIN-QUERY-SHARED-3"},
+            require(set(final_snapshot["active_records"].values()) == {"MLFBIN-QUERY-SHARED-4"},
                     "all records restored to binary shared source queries")
             require(len(final_snapshot["reachable_contexts"]) == 1, "one shared context after both repairs")
             context = cache / final_snapshot["reachable_contexts"][0]

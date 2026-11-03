@@ -49,6 +49,7 @@ import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.CrateQuery as Q
 import qualified Bootstrap.InferenceUnit as InferenceUnit
+import qualified Bootstrap.SourceInference as Source
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.CrateSession as Session
 import qualified Bootstrap.CrateArtifact as CrateArtifact

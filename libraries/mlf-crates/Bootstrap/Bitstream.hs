@@ -148,22 +148,35 @@ module Bootstrap.Bitstream (
       if count > limit - size then Left "binary symbol byte limit exceeded"
       else let { next = size + count } in
         seq next (utf8SizeAt limit text (position + 1) next);
+  -- One search returns the existing value or the map extended at its actual
+  -- insertion point. Both trees use the same total comparison as the reader.
+  data Interned k v = Found v | Inserted (v -> Map k v);
+  intern :: forall k v. (k -> k -> Int) -> k -> Map k v -> Interned k v;
+  intern cmp key tree = case tree of {
+    MapEmpty -> Inserted (M.singleton key);
+    MapNode _ k v l r -> let { order = cmp key k } in
+      if order < 0 then case intern cmp key l of {
+        Found old -> Found old; Inserted fill -> Inserted (\new -> M.balance k v (fill new) r)
+      } else if order > 0 then case intern cmp key r of {
+        Found old -> Found old; Inserted fill -> Inserted (\new -> M.balance k v l (fill new))
+      } else Found v
+  };
   internSymbol :: Limits -> String -> PlanState -> Either String ((,) Int PlanState);
   internSymbol limits text (PlanState (Symbols names symbols count total) nodes work) =
     if stringLength text > maxSymbolBytes limits then Left "binary symbol byte limit exceeded"
-    else case M.lookup compareString text names of {
-      Just ((,) index bytes) -> do {
+    else case intern compareString text names of {
+      Found ((,) index bytes) -> do {
         next <- charge limits bytes (PlanState (Symbols names symbols count total) nodes work);
         Right ((,) index next)
       };
-      Nothing -> do {
+      Inserted following -> do {
         ensure (count < maxSymbols limits) "binary symbol count limit exceeded";
         size <- utf8Size (maxSymbolBytes limits) text;
         ensure (size <= maxTotalSymbolBytes limits - total) "binary total symbol byte limit exceeded";
         let {
           nextCount = count + 1;
           nextTotal = total + size;
-          nextSymbols = Symbols (M.insert compareString text ((,) count size) names)
+          nextSymbols = Symbols (following ((,) count size))
             ((:) (Symbol text size) symbols) nextCount nextTotal
         };
         next <- seq nextCount (seq nextTotal (charge limits size (PlanState nextSymbols nodes work)));
@@ -174,16 +187,16 @@ module Bootstrap.Bitstream (
   entryEdges entry = case entry of { ENode _ children -> length children; _ -> 0 };
   internEntry :: Limits -> Entry -> PlanState -> Either String ((,) Int PlanState);
   internEntry limits entry (PlanState symbols (Nodes keys entries count edges) work) =
-    case M.lookup compareEntry entry keys of {
-      Just index -> Right ((,) index (PlanState symbols (Nodes keys entries count edges) work));
-      Nothing -> do {
+    case intern compareEntry entry keys of {
+      Found index -> Right ((,) index (PlanState symbols (Nodes keys entries count edges) work));
+      Inserted following -> do {
         ensure (count < maxNodes limits) "binary node count limit exceeded";
         let { arity = entryEdges entry };
         ensure (arity <= maxEdges limits - edges) "binary edge count limit exceeded";
         let {
           nextCount = count + 1;
           nextEdges = edges + arity;
-          nextNodes = Nodes (M.insert compareEntry entry count keys) ((:) entry entries) nextCount nextEdges
+          nextNodes = Nodes (following count) ((:) entry entries) nextCount nextEdges
         };
         seq nextCount (seq nextEdges (Right ((,) count (PlanState symbols nextNodes work))))
       }
@@ -704,9 +717,10 @@ module Bootstrap.Bitstream (
       checkRead (size <= remaining / 8) "truncated binary symbol";
       checkRead (size <= maxTotalSymbolBytes limits - total) "binary total symbol byte limit exceeded";
       text <- getUtf8With hints size;
-      checkRead (not (M.member compareString text names)) "duplicate binary symbol";
+      nextNames <- case intern compareString text names of {
+        Found _ -> failRead "duplicate binary symbol"; Inserted fill -> returnRead (fill index)
+      };
       let { nextTotal = total + size;
-            nextNames = M.insert compareString text index names;
             nextSymbols = IM.insert index (Symbol text size) symbols };
       seq nextTotal (seq nextNames (seq nextSymbols
         (getSymbolsWith hints limits count (index + 1) nextTotal nextNames nextSymbols)))
@@ -761,8 +775,8 @@ module Bootstrap.Bitstream (
   };
 
   -- These two entry points own the original planner and layout. No public
-  -- Tables value is admitted as a Graph: the only table-to-graph helper is
-  -- private, and it rechecks the complete structural/canonical contract.
+  -- Tables value is admitted as a Graph: the table-to-graph helper is private
+  -- and receives only the canonical, bounded output of this planner.
   planMeasured :: Limits -> [] Value -> Either String ((,) Tables ResourceStats);
   planMeasured limits roots = do {
     tables <- plan limits roots;
@@ -794,89 +808,23 @@ module Bootstrap.Bitstream (
     Nothing -> Left "binary graph node index out of range";
     Just parsed -> Right (parsedDepth parsed)
   };
+  -- Only plan/prepareGraphPlan can call this private path. Their first-use
+  -- traversal interns each symbol and entry once, creates a node only after
+  -- its children, charges every expanded occurrence, and checks depth, table
+  -- counts and byte limits. Disk bytes always go through the separate decoder.
   graphFromPlan :: Limits -> Tables -> Either String Graph;
-  graphFromPlan limits (Tables symbolList entries roots symbolCount nodeCount rootCount edges) = do {
-    ensure (validLimits limits) "invalid binary codec limits";
-    ensure (symbolCount >= 0 && symbolCount <= maxSymbols limits &&
-      nodeCount >= 0 && nodeCount <= maxNodes limits &&
-      rootCount >= 0 && rootCount <= maxEdges limits &&
-      edges >= 0 && edges <= maxEdges limits) "binary table count limit exceeded";
-    symbols <- graphPlanSymbols limits symbolCount symbolList 0 0 M.empty IM.empty;
-    nodes <- graphPlanNodes limits symbols symbolCount nodeCount entries 0 0 edges M.empty IM.empty;
+  graphFromPlan limits (Tables symbols entries roots symbolCount _ rootCount _) = do {
+    let { table = IM.fromDistinctAscList (zip (range 0 (symbolCount - 1)) symbols) };
+    nodes <- materializeEntries limits table entries 0 IM.empty;
     graphPlanRoots limits nodes rootCount roots 0 0;
-    canonicalGraph nodes nodeCount roots;
     Right (Graph nodes roots)
   };
-  graphPlanSymbols :: Limits -> Int -> [] Symbol -> Int -> Int -> Map String Int -> IntMap Symbol -> Either String (IntMap Symbol);
-  graphPlanSymbols limits count remaining index total names symbols = case remaining of {
-    [] -> do {
-      ensure (index == count) "binary symbol count mismatch";
-      Right symbols
-    };
-    (:) (Symbol text storedSize) rest -> do {
-      ensure (index < count) "binary symbol count mismatch";
-      size <- utf8Size (maxSymbolBytes limits) text;
-      ensure (size == storedSize) "binary symbol byte count mismatch";
-      ensure (size <= maxTotalSymbolBytes limits - total) "binary total symbol byte limit exceeded";
-      ensure (not (M.member compareString text names)) "duplicate binary symbol";
-      nextIndex <- measuredAdd index 1;
-      nextTotal <- measuredAdd total size;
-      let { nextNames = M.insert compareString text index names;
-            nextSymbols = IM.insert index (Symbol text size) symbols };
-      seq nextNames (seq nextSymbols
-        (graphPlanSymbols limits count rest nextIndex nextTotal nextNames nextSymbols))
-    }
-  };
-  graphPlanChildren :: Int -> [] Int -> Either String ();
-  graphPlanChildren parent children = case children of {
-    [] -> Right ();
-    (:) index rest -> do {
-      ensure (index >= 0 && index < parent)
-        "binary node has a forward, cyclic, or out-of-range reference";
-      graphPlanChildren parent rest
-    }
-  };
-  graphPlanEntryEdges :: Int -> Int -> Entry -> Either String Int;
-  graphPlanEntryEdges parent remainingEdges entry = case entry of {
-    EInt _ -> Right 0;
-    EBits _ -> Right 0;
-    EText _ -> Right 0;
-    ENode tag children -> do {
-      ensure (tag >= 0 && tag <= 2147483647) "binary constructor tag out of range";
-      arity <- boundedLength remainingEdges children;
-      graphPlanChildren parent children;
-      Right arity
-    }
-  };
-  graphPlanNodes :: Limits -> IntMap Symbol -> Int -> Int -> [] Entry -> Int -> Int -> Int -> Map Entry Int -> IntMap Parsed -> Either String (IntMap Parsed);
-  graphPlanNodes limits symbols symbolCount count entries index nextSymbol remainingEdges keys nodes = case entries of {
-    [] -> do {
-      ensure (index == count) "binary node count mismatch";
-      ensure (remainingEdges == 0) "binary edge count mismatch";
-      ensure (nextSymbol == symbolCount) "unused binary symbol table entries";
-      Right nodes
-    };
+  materializeEntries limits symbols entries index nodes = case entries of {
+    [] -> Right nodes;
     (:) entry rest -> do {
-      ensure (index < count) "binary node count mismatch";
-      arity <- graphPlanEntryEdges index remainingEdges entry;
-      ensure (not (M.member compareEntry entry keys)) "duplicate binary structural node";
-      followingSymbol <- case entry of {
-        EText symbol -> do {
-          ensure (symbol == nextSymbol) "noncanonical binary symbol first-use order";
-          measuredAdd nextSymbol 1
-        };
-        EInt _ -> Right nextSymbol;
-        EBits _ -> Right nextSymbol;
-        ENode _ _ -> Right nextSymbol
-      };
       parsed <- buildParsed limits symbols nodes entry;
-      nextIndex <- measuredAdd index 1;
-      let { nextKeys = M.insert compareEntry entry index keys;
-            nextNodes = IM.insert index parsed nodes;
-            nextEdges = remainingEdges - arity };
-      seq nextKeys (seq nextNodes (seq nextEdges
-        (graphPlanNodes limits symbols symbolCount count rest nextIndex
-          followingSymbol nextEdges nextKeys nextNodes)))
+      let { next = IM.insert index parsed nodes } in
+        seq next (materializeEntries limits symbols rest (index + 1) next)
     }
   };
   graphPlanRoots :: Limits -> IntMap Parsed -> Int -> [] Int -> Int -> Int -> Either String ();
@@ -1109,7 +1057,9 @@ module Bootstrap.Bitstream (
       returnRead nodes
     } else do {
       entry <- getEntry limits nodeWidth symbolWidth index symbolCount remainingEdges;
-      checkRead (not (M.member compareEntry entry keys)) "duplicate binary structural node";
+      nextKeys <- case intern compareEntry entry keys of {
+        Found _ -> failRead "duplicate binary structural node"; Inserted fill -> returnRead (fill index)
+      };
       followingSymbol <- case entry of {
         EText symbol -> do {
           checkRead (symbol == nextSymbol) "noncanonical binary symbol first-use order";
@@ -1118,8 +1068,7 @@ module Bootstrap.Bitstream (
         _ -> returnRead nextSymbol
       };
       parsed <- liftEither (buildParsed limits symbols nodes entry);
-      let { nextKeys = M.insert compareEntry entry index keys;
-            nextNodes = IM.insert index parsed nodes;
+      let { nextNodes = IM.insert index parsed nodes;
             nextEdges = remainingEdges - entryEdges entry };
       seq nextKeys (seq nextNodes (seq nextEdges
         (getNodesAt limits symbols symbolCount count nodeWidth symbolWidth (index + 1)
@@ -1245,11 +1194,12 @@ module Bootstrap.Bitstream (
             decoded <- scanSymbolText table bytes (start + size) start next [];
             case decoded of {
               Nothing -> ioReturn Nothing;
-              Just ((,) text updated) -> if M.member compareString text names then ioReturn Nothing
-                else let { following = M.insert compareString text index names;
-                           entries = IM.insert index (Symbol text size) symbols } in
+              Just ((,) text updated) -> case intern compareString text names of {
+                Found _ -> ioReturn Nothing;
+                Inserted fill -> let { following = fill index; entries = IM.insert index (Symbol text size) symbols } in
                   seq following (seq entries (scanSymbolTable limits table bytes end count (index + 1)
                     (start + size) (total + size) updated following entries))
+              }
             }
           }
       }

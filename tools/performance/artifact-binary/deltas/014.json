@@ -1,16 +1,22 @@
 {
   "format": "binary-source-byte-splices-v1",
-  "new_bytes": 1706,
-  "new_sha256": "993a5c35bc9e51ce985a42e661c10f60fe30ae52bf122cdb54a52362921de44d",
+  "new_bytes": 1763,
+  "new_sha256": "4b76b1617afd21fe05d796e5ff6f92918f750808afacf11fdd32210271c1f5d3",
   "old_bytes": 1513,
   "old_sha256": "e74862bd7588f0fe6a3fc81a06c49da9f640da27dfbf14d410cfc4c604f68296",
   "path": "libraries/mlf-crates/mlf-package.json",
   "splices": [
     {
-      "new": "QXJ0aWZhY3RTdG9yYWdlIjogIkJvb3RzdHJhcC9BcnRpZmFjdFN0b3JhZ2UuaHMiLAogICAgICAiQm9vdHN0cmFwLkFydGlmYWN0U3RydWN0dXJlIjogIkJvb3RzdHJhcC9BcnRpZmFjdFN0cnVjdHVyZS5ocyIsCiAgICAgICJCb290c3RyYXAuQml0c3RyZWFtIjogIkJvb3RzdHJhcC9CaXRzdHJlYW0uaHMiLAogICAgICAiQm9vdHN0cmFwLg==",
-      "new_at": 502,
+      "new": "ICAgICAgIkJvb3RzdHJhcC5BcnRpZmFjdFN0b3JhZ2UiOiAiQm9vdHN0cmFwL0FydGlmYWN0U3RvcmFnZS5ocyIsCiAgICAgICJCb290c3RyYXAuQXJ0aWZhY3RTdHJ1Y3R1cmUiOiAiQm9vdHN0cmFwL0FydGlmYWN0U3RydWN0dXJlLmhzIiwKICAgICAgIkJvb3RzdHJhcC5CaXRzdHJlYW0iOiAiQm9vdHN0cmFwL0JpdHN0cmVhbS5ocyIsCg==",
+      "new_at": 485,
       "old": "",
-      "old_at": 502
+      "old_at": 485
+    },
+    {
+      "new": "LAogICAgICAiQm9vdHN0cmFwLlNvdXJjZVVuaXQiOiAiQm9vdHN0cmFwL1NvdXJjZVVuaXQuaHMi",
+      "new_at": 1653,
+      "old": "",
+      "old_at": 1460
     }
   ]
 }

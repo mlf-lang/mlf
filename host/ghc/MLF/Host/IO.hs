@@ -6,6 +6,7 @@ import qualified Prelude as P
 import MLF.Host.Base
 import qualified Data.ByteString as B
 import qualified Data.Array.IO as A
+import qualified Data.Array.Base as AB
 #include "MachDeps.h"
 #if WORD_SIZE_IN_BITS >= 64 && !defined(MLF_TEST_NARROW_INT_TABLE)
 import qualified Data.IntMap.Lazy as M
@@ -174,14 +175,14 @@ newArray n initial = do
 index :: A.IOArray P.Int a -> Int -> IO P.Int
 index array n = do
   (_,hi) <- A.getBounds array
-  evaluate (bounded "array index out of bounds" (fromIntegral hi) n)
+  evaluate (stIndex (fromIntegral hi + 1) n)
 readArray :: A.IOArray P.Int a -> Int -> IO a
-readArray array n = index array n >>= A.readArray array
+readArray array n = index array n >>= AB.unsafeRead array
 writeArray :: A.IOArray P.Int a -> Int -> a -> IO ()
 writeArray array n value = do
   i <- index array n
   x <- evaluate value
-  A.writeArray array i x
+  AB.unsafeWrite array i x
   pure ()
 lengthArray :: A.IOArray P.Int a -> IO Int
 lengthArray array = do { (_,hi) <- A.getBounds array; pure (fromIntegral hi+1) }
@@ -203,7 +204,7 @@ v_readDoubleArray (DoubleArray a) = readArray a
 v_readByteArray :: ByteArray -> Int -> IO Int
 v_readByteArray array n = do
   ByteArray size storage <- evaluate array
-  i <- evaluate (bounded "array index out of bounds" (fromIntegral size - 1) n)
+  i <- evaluate (stIndex (fromIntegral size) n)
   withForeignPtr storage $ \pointer -> fromIntegral <$> peekElemOff pointer i
 v_writeIntArray :: IntArray -> Int -> Int -> IO ()
 v_writeIntArray (IntArray a) = writeArray a
@@ -212,7 +213,7 @@ v_writeDoubleArray (DoubleArray a) = writeArray a
 v_writeByteArray :: ByteArray -> Int -> Int -> IO ()
 v_writeByteArray array n x = do
   ByteArray size storage <- evaluate array
-  i <- evaluate (bounded "array index out of bounds" (fromIntegral size - 1) n)
+  i <- evaluate (stIndex (fromIntegral size) n)
   value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
   withForeignPtr storage $ \pointer -> pokeElemOff pointer i value
 v_lengthIntArray :: IntArray -> IO Int

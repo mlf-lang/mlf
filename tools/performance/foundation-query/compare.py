@@ -53,7 +53,7 @@ def compile_crate(binary, spec, prefix, verify_all=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('baseline', type=Path)
-    parser.add_argument('--baseline-label', choices=['25','29','32'], default='25')
+    parser.add_argument('--baseline-label', choices=['25','29','32','33'], default='25')
     parser.add_argument('candidate', type=Path)
     parser.add_argument('foundation', type=Path, help='mlf-foundation directory from the PR 25 checkout')
     parser.add_argument('output', type=Path, help='new, empty study directory')

@@ -62,12 +62,22 @@ def main():
 
     def replace_result(raw):
         prefix, root = inspect_artifact(raw, 2).values()
-        require(root[1] == 303, 'expected shared fingerprint record')
-        ref, key, _, header, body = root[2]
+        require(root[1] == 306, 'expected shared fingerprint slot')
+        key, _, ref, header, body = root[2]
         replacement = ('text','0'*64)
-        return tree_document([prefix,('node',303,(ref,key,replacement,header,body))],schema=2)
+        return tree_document([prefix,('node',306,(key,replacement,ref,header,body))],schema=2)
 
     keys, cold = run('cold', 'all')
+    staging = cache / '.source-query-publish'
+    require(not staging.exists(), 'successful compilation left a staging directory')
+    # An interrupted/foreign staging directory is never opened or swept.
+    staging.mkdir()
+    abandoned = staging / ('f'*64 + '.mlfq')
+    abandoned.write_bytes(b'unpublished')
+    require(run('foreign-stage-warm',set())[1] == cold and abandoned.read_bytes() == b'unpublished',
+            'opened or removed foreign staging records')
+    abandoned.unlink()
+    staging.rmdir()
     pristine = {k: record_path(k).read_bytes() for k in keys}
     for k in keys:
         doc = inspect_artifact(pristine[k],2)
@@ -99,10 +109,21 @@ def main():
     # A genuine old single-root fingerprint record retains its hits in both modes.
     victim = keys[0]
     address, payload = inspect_artifact(pristine[victim],2).values()
-    legacy = tree_document([payload],schema=2)
+    require(payload[1] == 306, 'expected a version 4 shared query')
+    key, _, ref, header, body = payload[2]
+    old_material = tree_document([('node',304,(key,ref,header,body))],schema=2)
+    old_result = ('text',hashlib.sha256(old_material).hexdigest())
+    legacy_payload = ('node',303,(ref,key,old_result,header,body))
+    legacy = tree_document([legacy_payload],schema=2)
     record_path(victim).write_bytes(legacy)
     require(run('single-root-warm',set())[1] == cold and run('single-root-strict',set(),'prefix')[1] == cold
             and record_path(victim).read_bytes() == legacy, 'old fingerprint record lost its checked hit')
+    old_addressed = tree_document([address,legacy_payload],schema=2)
+    record_path(victim).write_bytes(old_addressed)
+    require(run('old-addressed-strict',set(),'prefix')[1] == cold
+            and record_path(victim).read_bytes() == old_addressed, 'old addressed record lost its checked hit')
+    record_path(victim).write_bytes(tree_document([payload],schema=2))
+    require(run('missing-slot-address',{victim})[1] == cold, 'missing slot address was accepted')
     # The apparent address matches the expected input, but the intact payload belongs to another key.
     other_payload = inspect_artifact(pristine[keys[1]],2).values()[-1]
     forged = tree_document([address,other_payload],schema=2)
@@ -128,12 +149,32 @@ def main():
     correct = record_path(changed).read_bytes()
     old = inspect_artifact(pristine[stale.pop()],2).values()[-1][2]
     current = inspect_artifact(correct,2).values()[-1][2]
-    require(current[0] == old[0] and current[-1] != old[-1], 'same carrier, distinct old raw body')
-    transplanted = tree_document([current[1],('node',303,(*current[:3],*old[3:]))],schema=2)
+    require(current[2] == old[2] and current[-1] != old[-1], 'same carrier, distinct old raw body')
+    transplanted = tree_document([current[0],('node',306,(*current[:3],*old[3:]))],schema=2)
     inspect_artifact(transplanted,2)
     record_path(changed).write_bytes(transplanted)
     require(run('strict-transplant-repair',{changed},'suffix')[1] == edited_output and
             record_path(changed).read_bytes() == correct, 'stale checked result survived the audit')
+    # One successful prerequisite must survive a later SCC error. Exercise
+    # the normal locked driver and its incomplete-batch cleanup.
+    failed_cache = out / 'partial-cache'
+    failed_spec = out / 'partial.spec'
+    failed_spec.write_text(pack(['MLF-CRATE-1','fingerprint-test','','true',
+                                 pack([pack(['FingerprintProbe', str(module)])]),'',
+                                 str(failed_cache),str(out/'builtin/unit')]))
+    preamble = module.read_text().split('module FingerprintProbe where')[0]
+    partial_program = preamble + 'module FingerprintProbe where { import MLF.Primitive; ok :: Int; ok = 1; bad :: Int; bad = if ok then 2 else 3 }\n'
+    module.write_text(partial_program)
+    failed = subprocess.run([str(compiler),'--compile-crate',str(failed_spec),'-o',str(out/'partial')],
+                            capture_output=True,timeout=180)
+    require(failed.returncode != 0 and any(failed_cache.glob('*.mlfq')) and
+            not (failed_cache/'.source-query-publish').exists(), 'partial failure lost its preceding committed SCC')
+    module.write_text(partial_program.replace('if ok then 2 else 3','ok'))
+    subprocess.run([str(compiler),'--compile-crate',str(failed_spec),'-o',str(out/'partial-fixed')],
+                   check=True,capture_output=True,timeout=180)
+    recovered = json.loads((out/'partial-fixed.queries').read_bytes())
+    require((recovered['inferred_groups'],recovered['reused_groups']) == (1,1),
+            'corrected failure did not reuse its valid prerequisite')
     print(json.dumps({'complete': True, 'stages': observations,
                       'artifacts': [hashlib.sha256(raw).hexdigest() for raw in cold]}))
 

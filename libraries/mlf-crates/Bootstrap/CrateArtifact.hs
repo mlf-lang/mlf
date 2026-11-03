@@ -616,16 +616,12 @@ module Bootstrap.CrateArtifact where {
     };
   withObjectFingerprint (CrateInterface n deps modules exports imports ds cs instances lowered bindings entry _ protection) digest =
     CrateInterface n deps modules exports imports ds cs instances lowered bindings entry digest protection;
-  -- Pair only the finalized immutable fragments with their exact pooled text.
-  -- Callers needing both the checksum and final object bytes can share this
-  -- computation; ordinary object callers retain the same lazy interface.
+  -- Derive the binary object's checksum from exact canonical field summaries.
+  -- Compatibility callers can still demand the pooled text independently.
   makeObjectWithPayload :: CrateInterface -> [] Separate.UnitObject -> (,) CrateObject String;
   makeObjectWithPayload iface fragments =
-    let {
-      payload = encodePooledPayload fragments
-    } in
-    (,) (CrateObject (withObjectFingerprint iface (Separate.fingerprint payload)) fragments)
-      payload;
+    (,) (CrateObject (withObjectFingerprint iface (fst (fingerprintPooled fragments))) fragments)
+      (encodePooledPayload fragments);
   makeObject iface fragments = fst (makeObjectWithPayload iface fragments);
   -- Prelude has one shared crate identity even when several independent leaf
   -- crates use it. Its bootstrap object is translated once; user crates still
@@ -2209,7 +2205,26 @@ module Bootstrap.CrateArtifact where {
   -- This walk only selects the route. Any uncertainty/invalid scalar returns
   -- to the original v1 planner, preserving its diagnostic/acceptance domain.
   -- No new envelope limit, fragment count, or renderer runs before selection.
-  envelopeAboveOldWork roots = envelopeOldWork [roots] 0;
+  envelopeAboveOldWork roots = not (envelopeFitsOldWork [roots] (W.maxExpandedWork W.defaultLimits))
+    && envelopeOldWork [roots] 0;
+  -- One UTF-8 scalar occupies at most four bytes. If even this upper bound
+  -- fits, the exact selector cannot pick the envelope. On uncertainty keep
+  -- its original byte count and failure order.
+  envelopeFitsOldWork pending remaining = case pending of {
+    [] -> True;
+    (:) values rest -> case values of {
+      [] -> envelopeFitsOldWork rest remaining;
+      (:) value more -> if remaining <= 0 then False else let {
+        tail = (:) more rest; next = remaining - 1
+      } in case value of {
+        W.VNode _ children -> envelopeFitsOldWork ((:) children tail) next;
+        W.VText text -> let { n = stringLength text } in
+          n <= next / 4 && n <= W.maxSymbolBytes W.defaultLimits / 4
+            && envelopeFitsOldWork tail (next - 4 * n);
+        _ -> envelopeFitsOldWork tail next
+      }
+    }
+  };
   envelopeOldWork pending work = case pending of {
     [] -> False;
     (:) values more -> case values of {

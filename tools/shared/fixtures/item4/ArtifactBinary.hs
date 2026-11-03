@@ -16,6 +16,7 @@ import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.CrateQuery as Q
 import qualified Bootstrap.InferenceUnit as InferenceUnit
+import qualified Bootstrap.SourceInference as Source
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.CrateSession as Session
 import qualified Bootstrap.CrateArtifact as CrateArtifact
@@ -1178,7 +1179,43 @@ admissionTests = do
 -- context/int-only raw body fixed. Only the caller's expected datatype list
 -- changes. A body that does not mention Other must not bypass key/context
 -- binding, including after a genuine invocation-local memo was established.
+-- Compare the localized proof edit to the full canonical graph traversal.
+-- Pretty output intentionally forgets XThen association; compare formal nodes.
+sourceNormalizationControls = do
+  let var = T.XTyVar 3
+      chain n = foldl T.XThen T.XRefl (replicate n T.XRefl)
+      term phi = T.XTypeApp (T.XIntTerm 0) phi
+      x = T.XName 4 "x"
+      ty = T.XCon "Int" []
+      trees = [term (T.XOuter var (T.XInner (chain n))) | n <- [0..48]]
+        ++ [ T.XAbs x ty (term (chain 7))
+           , T.XApp (term (chain 8)) (term (chain 8))
+           , T.XWithData [] (T.XLet x (term (chain 5)) (term (chain 6)))
+           , T.XLetRec [(x,ty,term (chain 9))] (term (chain 3))
+           , T.XCase (term (chain 6)) ty [T.XAlternative (T.XDefaultPattern T.Nothing) (term (chain 4))]
+           ]
+  forM_ trees $ \input -> do
+    graph <- expect "complete reference syntax graph" (W.planGraph W.defaultLimits [A.toXTerm input])
+    [root] <- pure (W.graphRoots graph)
+    full <- expect "whole-graph normalization"
+      (Source.finalSyntaxRun graph [Source.FinalVisit root (Source.FinalTerm input)] []
+        (Source.FinalSyntaxState T.MapEmpty T.MapEmpty 0 0 0))
+    original <- expect "reference term" (Source.finalSyntaxTerm full)
+    edit <- expect "localized normalization" (Source.editProofs input)
+    let candidate = case edit of T.Nothing -> input; T.Just changed -> changed
+    a <- W.encode W.defaultLimits 2 [A.toXTerm original] >>= expect "normalized reference shape"
+    b <- W.encode W.defaultLimits 2 [A.toXTerm candidate] >>= expect "normalized candidate shape"
+    same <- Storage.sameBytes a b; need "localized normalization changed exact syntax" same
+  let near = foldr (\_ inside -> W.VNode 8 [inside]) (W.VInt 0) [1..255::Int]
+  case (Source.smallFinalValue near, Source.smallFinalValue (W.VNode 8 [near]),
+        Source.smallFinalValue (W.VNode (-1) []), Source.smallFinalValue (W.VNode 58 [W.VNode 58 []])) of
+    (T.Just False,T.Nothing,T.Nothing,T.Just True) -> pure ()
+    _ -> error "small-source geometry did not respect depth/tag/nested boundaries"
+  case Source.smallFinalValue (W.VText (B.literal (replicate 262145 'a'))) of
+    T.Nothing -> pure (); _ -> error "small-source geometry failed to cap text work"
+
 sourceAdmissionTests directory = do
+  sourceNormalizationControls
   exists <- doesPathExist directory; need "fresh source-admission directory" (not exists); createDirectory directory
   bracket (P.acquireFileLock (B.literal (directory ++ "/.lock"))) P.releaseFileLock $ \_ -> do
     object <- expect "actual int-only empty-context raw inference" (InferenceUnit.compileLoweredGroup "RawGroup" [] [] [("value",T.Nothing,T.SIntLit 41)])
@@ -1237,6 +1274,29 @@ sourceAdmissionTests directory = do
         Storage.write 2 target [W.VText "",W.VInt 1] >>= expect "short symbol area"
         tryAudit False >>= rejected "short address safely misses" "cached query key mismatch"
         let inline = Q.localPayloadFields T.Nothing object
+        emitted <- Q.encodeLocalRecord sha inline >>= expect "single-plan inline record"
+        slot <- Q.slotResultHash sha inline >>= expect "reference slot hash"
+        expectedBytes <- W.encode W.defaultLimits 2 [address,W.VNode 305 ([address,W.VText slot] ++ inline)]
+          >>= expect "independently encode final slot"
+        same <- Storage.sameBytes emitted expectedBytes
+        need "patched record is the exact canonical encoding" same
+        damagedSlot <- byteList emitted >>= \raw -> case splitAt 76 raw of
+          (prefix,c:rest) -> fromBytes (prefix ++ (P.xorInt c 1 : rest))
+          _ -> error "truncated result slot fixture"
+        Storage.writeRaw target damagedSlot >>= expect "damage slot CRC"
+        loadInput other True >>= rejected "slot address rejects before CRC" "cached query key mismatch"
+        tryAudit True >>= rejected "slot address hit still checks CRC" "binary checksum mismatch"
+        Storage.writeRaw target emitted >>= expect "write inline slot"
+        (_,_,checkedSlot) <- tryAudit True
+        actualSlot <- expect "verified inline slot" checkedSlot
+        need "inline slot retained full raw body" (U.encodeObject actualSlot == U.encodeObject object)
+        forM_ [[W.VText Q.resultSlot],[W.VNode 42 [W.VText Q.resultSlot]]] $ \aliased -> do
+          safe <- Q.encodeLocalRecord sha aliased >>= expect "literal placeholder alias"
+          legacy <- Q.encodeLegacyLocalRecord sha aliased >>= expect "prior checked encoder"
+          equal <- Storage.sameBytes safe legacy
+          need "placeholder alias wrote through a semantic field" equal
+        need "colliding stored digest must use the independent encoder"
+          (Q.slotConflicts sha [W.Symbol Q.resultSlot 64,W.Symbol sha 64])
         ich <- Q.localResultHash sha inline >>= expect "inline raw ICH"
         Storage.write 2 target [address,W.VNode 302 ([address,W.VText ich] ++ inline)]
           >>= expect "two-root inline source record"
