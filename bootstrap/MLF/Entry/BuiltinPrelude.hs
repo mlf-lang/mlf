@@ -7,12 +7,14 @@ module MLF.Entry.BuiltinPrelude where {
   import Bootstrap.Types;
   import Bootstrap.Std (fst, snd);
   import qualified Bootstrap.BuiltinPreludeContext as Context;
+  import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.BuiltinPreludeLiteral as Literal;
 
   -- This entry imports no generated data. A build orchestrator supplies the
   -- exact nongenerated source identity and saves this deterministic output.
   source identity = do {
-    raw <- Context.prepareFresh identity;
+    object <- Artifact.builtinPrelude;
+    raw <- Context.prepareObject identity object;
     let { pieces = Literal.rawPreludePieces raw } in
     Right (concatStringList
       ["-- mlf:syntax shared-haskell-v1\n",
@@ -20,13 +22,15 @@ module MLF.Entry.BuiltinPrelude where {
        "{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,\n",
        "             KindSignatures, FlexibleContexts, FlexibleInstances,\n",
        "             MultiParamTypeClasses, OverloadedStrings #-}\n",
-       "module MLF.BuiltinPreludeData (builtin) where {\n",
+       "module MLF.BuiltinPreludeData (builtin, builtinObject) where {\n",
        "  import MLF.Primitive; import Bootstrap.Types;\n",
        "  import Bootstrap.CrateArtifact (CrateInterface(..));\n",
        "  import Bootstrap.Module (Role(..), Entity(..), ModuleSpace(..), Interface(..), Names(..));\n",
        "  import Bootstrap.SourceInference (SourceContract(..));\n",
        "  import Bootstrap.BuiltinPreludeContext (RawPrelude(..));\n",
-       "  builtin :: RawPrelude;\n  builtin = ", snd pieces, ";\n", fst pieces, "\n}\n"])
+       "  builtin :: RawPrelude;\n  builtin = ", snd pieces, ";\n", fst pieces,
+       "\n  builtinObject :: String;\n  builtinObject = ",
+       Literal.objectLiteral (Artifact.encodeObject object), "\n}\n"])
   };
   main = do {
     count <- getArgCount;

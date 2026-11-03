@@ -515,6 +515,26 @@ module Bootstrap.BuiltinPreludeLiteral where {
     definition = label ++ " :: () -> XTerm;\n" ++ label ++ " _ = " ++ pieceText result ++ ";\n"
   } in TermPieces (pieceNext result + 1)
     (L.snoc (pieceDefinitions result) definition) ("(" ++ label ++ " ())");
+  -- The installer consumes a compiler-owned literal. Rebuild and compare
+  -- the whole linked witness as well as checking the formal split object.
+  checkedCrateObject prepared encoded = do {
+    L.ensure (stringLength encoded <= 4194304) "prepared Prelude object exceeds literal limit";
+    object <- Artifact.decodeObject (Context.interface prepared) encoded;
+    L.ensure (eqString (Artifact.encodeObject object) encoded)
+      "noncanonical prepared Prelude object";
+    let { expected = Context.preparedRaw prepared };
+    rebuilt <- Context.prepareObject (Context.inputIdentity expected) object;
+    L.ensure (eqString (rawPrelude rebuilt) (rawPrelude expected))
+      "prepared Prelude object differs from its checked linked witness";
+    Right object
+  };
+  -- Keep string literals in the generated shared module bounded even when
+  -- the complete split object is large.
+  objectLiteralPieces text offset =
+    if offset == stringLength text then [] else let {
+      size = L.min 2048 (stringLength text - offset)
+    } in (:) (string (stringSlice text offset size)) (objectLiteralPieces text (offset + size));
+  objectLiteral text = "concatStringList [" ++ L.intercalate "," (objectLiteralPieces text 0) ++ "]";
   rawPreludePieces :: Context.RawPrelude -> (,) String String;
   rawPreludePieces value = case value of {
     Context.RawPrelude identity primitiveCount iface body available serial sourceNames visible values protected sourceContracts witnesses -> let {

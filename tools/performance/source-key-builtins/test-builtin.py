@@ -32,8 +32,8 @@ for mode in ['original','changed']:
     if mode=='changed':
         assert str(overlay) in (d/'build.log').read_text()
 
-def run(mode, expected):
-    report = json.loads(subprocess.check_output([out/mode/'probe',mode,cache,expected],timeout=90))
+def run(mode, expected, *identity):
+    report = json.loads(subprocess.check_output([out/mode/'probe',mode,cache,expected,*identity],timeout=90))
     print(mode,expected,report['inferred_groups'],report['reused_groups'],report['groups'][0]['query_key'])
     return cache/(report['groups'][0]['query_key']+'.mlfq')
 
@@ -51,3 +51,12 @@ assert run('original','miss')==original and original.read_bytes()==pristine
 changed.write_bytes(pristine)
 assert run('changed','miss')==changed and changed.read_bytes()==alternate
 assert run('changed','hit')==changed and run('original','hit')==original
+
+# Isolate the compiler field: same executable, source group and actual builtin.
+identity = 'b' * 64
+foreign = run('original', 'miss', identity)
+assert foreign != original
+foreign_clean = foreign.read_bytes()
+foreign.write_bytes(pristine)
+assert run('original', 'miss', identity) == foreign and foreign.read_bytes() == foreign_clean
+assert run('original', 'hit', identity) == foreign

@@ -36,10 +36,11 @@ module Bootstrap.ArtifactStorage where {
       if eqString error "" then Right bytes else Left error })
   };
   decode :: Int -> ByteArray -> IO (Either String Input);
-  decode schema bytes = do {
+  decode = decodeWithText [];
+  decodeWithText hints schema bytes = do {
     binary <- W.hasMagic bytes;
     if binary then do {
-      decoded <- W.decodeGraph W.defaultLimits schema bytes;
+      decoded <- W.decodeGraphWithText hints W.defaultLimits schema bytes;
       ioReturn (mapEither BinaryInput decoded)
     } else do {
       decoded <- W.strictUtf8 maxBytes bytes;
@@ -47,9 +48,10 @@ module Bootstrap.ArtifactStorage where {
     }
   };
   read :: Int -> String -> IO (Either String Input);
-  read schema path = do {
+  read = readWithText [];
+  readWithText hints schema path = do {
     raw <- readRaw path;
-    case raw of { Left error -> ioReturn (Left error); Right bytes -> decode schema bytes }
+    case raw of { Left error -> ioReturn (Left error); Right bytes -> decodeWithText hints schema bytes }
   };
   encode :: Int -> [] W.Value -> IO (Either String ByteArray);
   encode schema roots = W.encode W.defaultLimits schema roots;

@@ -537,9 +537,12 @@ module Bootstrap.SourceInference where {
   -- The original finite-plan gate is new source-finalizer resource policy.
   -- It is not a claim that an arbitrarily large raw source object that would
   -- later compact has inherited the old binary decoder's supported domain.
-  admitFinalSourceObject object = do {
-    tables <- Wire.plan Wire.defaultLimits [Structure.toRawUnitObject object];
-    _ <- Wire.layout Wire.defaultLimits tables;
+  admitFinalSourceObject object = mapEither fst (prepareFinalSourceObject object);
+  canonicalFinalSourceObject object = do { prepared <- prepareFinalSourceObject object; snd prepared };
+  -- Keep the delayed canonical result attached to the exact admitted object.
+  -- The graph is demanded only on the paths that normalize this object.
+  prepareFinalSourceObject object = do {
+    plan <- Wire.prepareGraphPlan Wire.defaultLimits [Structure.toRawUnitObject object];
     let { iface = Separate.objectInterface object; term = Separate.objectTerm object };
     Storage.validateUnitInterface iface;
     Storage.admit [Storage.AdmitTerm term];
@@ -548,36 +551,34 @@ module Bootstrap.SourceInference where {
     -- CheckedTerm's constructor is private. objectTerm of a checked object is
     -- exactly that receipt's term; a raw UnitObject still invokes Checked.check.
     checked <- Separate.objectChecked object;
-    Right (Separate.CheckedUnitObject iface checked)
-  };
-  canonicalFinalSourceObject object = do {
-    admitted <- admitFinalSourceObject object;
-    let { iface = Separate.objectInterface admitted; term = Separate.objectTerm admitted };
-    graph <- Wire.planGraph Wire.defaultLimits [Structure.toRawUnitObject admitted];
-    root <- case Wire.graphRoots graph of {
-      [identity] -> Right identity;
-      _ -> Left "source finalization graph root mismatch"
-    };
-    fields <- finalSyntaxNode graph root 241;
-    termIdentity <- case fields of {
-      [_,identity] -> Right identity;
-      _ -> Left "source finalization object arity mismatch"
-    };
-    -- Only recursive term/proof children are paired. The original declaration
-    -- list and every untouched type/name/pattern/literal object stay in place.
-    normalized <- finalSyntaxRun graph [FinalVisit termIdentity (FinalTerm term)] []
-      (FinalSyntaxState M.empty M.empty 0 0 0);
-    result <- finalSyntaxTerm normalized;
-    if finalSyntaxUnchanged termIdentity normalized then Right admitted else do {
-      -- Re-admit exact output geometry BEFORE recursive checker/pretty passes.
-      tables <- Wire.plan Wire.defaultLimits
-        [Structure.toRawUnitObject (Separate.UnitObject iface result)];
-      _ <- Wire.layout Wire.defaultLimits tables;
-      checked <- Checked.check result;
-      ensure (eqString (Separate.fingerprint (Pretty.prettyTerm result))
-        (Separate.unitObjectFingerprint iface)) "source finalization changed object checksum";
-      Right (Separate.CheckedUnitObject iface checked)
-    }
+    let { admitted = Separate.CheckedUnitObject iface checked };
+    Right ((,) admitted (do {
+      graph <- Wire.realizeGraphPlan plan;
+      root <- case Wire.graphRoots graph of {
+        [identity] -> Right identity;
+        _ -> Left "source finalization graph root mismatch"
+      };
+      fields <- finalSyntaxNode graph root 241;
+      termIdentity <- case fields of {
+        [_,identity] -> Right identity;
+        _ -> Left "source finalization object arity mismatch"
+      };
+      -- Only recursive term/proof children are paired. The original declaration
+      -- list and every untouched type/name/pattern/literal object stay in place.
+      normalized <- finalSyntaxRun graph [FinalVisit termIdentity (FinalTerm term)] []
+        (FinalSyntaxState M.empty M.empty 0 0 0);
+      result <- finalSyntaxTerm normalized;
+      if finalSyntaxUnchanged termIdentity normalized then Right admitted else do {
+        -- Re-admit exact output geometry BEFORE recursive checker/pretty passes.
+        tables <- Wire.plan Wire.defaultLimits
+          [Structure.toRawUnitObject (Separate.UnitObject iface result)];
+        _ <- Wire.layout Wire.defaultLimits tables;
+        checked <- Checked.check result;
+        ensure (eqString (Separate.fingerprint (Pretty.prettyTerm result))
+          (Separate.unitObjectFingerprint iface)) "source finalization changed object checksum";
+        Right (Separate.CheckedUnitObject iface checked)
+      }
+    }))
   };
 
 
@@ -1100,7 +1101,7 @@ module Bootstrap.SourceInference where {
   finalGroupContracts (FinalGroup _ contracts) = contracts;
   finishGroup :: PreparedGroup -> Separate.UnitObject -> Either String FinalGroup;
   finishGroup prepared object = do {
-    _ <- admitFinalSourceObject object;
+    admitted <- prepareFinalSourceObject object;
     validatePreparedRaw prepared object;
     usedProtected <- checkedDependencyProtected (groupParameterProtection prepared) object;
     let { expected = sortBy compareString (map sourceName (groupMembers prepared)) };
@@ -1120,7 +1121,7 @@ module Bootstrap.SourceInference where {
             Nothing -> Left "final source group lacks calling-convention metadata";
             Just ((,,) _ classes protected) -> Right ((,) name (SourceContract ty classes (protected || usedProtected)))
           }) (Separate.unitBindings (Separate.objectInterface object));
-        finalized <- canonicalFinalSourceObject object;
+        finalized <- snd admitted;
         Right (FinalGroup finalized (M.fromList compareString contracts))
       }
     }

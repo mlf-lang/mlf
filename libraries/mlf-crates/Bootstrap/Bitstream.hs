@@ -22,8 +22,8 @@ module Bootstrap.Bitstream (
   parsedDepth, parsedWork, getChildIds, getEntry, buildChildren, buildParsed,
   getNodes, getNodesAt, getRoots, getRootsAt, canonicalGraph, canonicalTasks,
   collectRoots, decode, decodeChecked, decodeTables,
-  Graph, GraphNode(..), decodeGraph, graphRoots, lookupGraphNode,
-  ResourceStats, planMeasured, planGraph, graphNodeDepth, graphResourceStats,
+  Graph, GraphNode(..), decodeGraph, decodeGraphWithText, graphRoots, lookupGraphNode,
+  ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, realizeGraphPlan, graphNodeDepth, graphResourceStats,
   resourceBytes, resourceNodes, resourceEdges, resourceSymbols,
   resourceSymbolBytes, resourceDepth, resourceMaxSymbolBytes,
   resourceExpandedNodes, resourceExpandedTextBytes, resourceExpandedWork) where {
@@ -339,9 +339,20 @@ module Bootstrap.Bitstream (
     };
   putText :: ByteArray -> Int -> String -> Int -> IO Int;
   putText bytes position text index =
-    if index == stringLength text then ioReturn position else do {
+    if position >= 0 && position % 8 == 0 then putAlignedText bytes (position / 8) text index
+    else if index == stringLength text then ioReturn position else do {
       next <- putScalar bytes position (stringCodeAt text index);
       putText bytes next text (index + 1)
+    };
+  putAlignedText bytes byteIndex text index =
+    if index == stringLength text then ioReturn (byteIndex * 8) else let {
+      code = stringCodeAt text index
+    } in if code < 128 then do {
+      writeByteArray bytes byteIndex code;
+      putAlignedText bytes (byteIndex + 1) text (index + 1)
+    } else do {
+      next <- putScalar bytes (byteIndex * 8) code;
+      putAlignedText bytes (next / 8) text (index + 1)
     };
   putSymbols :: ByteArray -> Int -> [] Symbol -> IO Int;
   putSymbols bytes position symbols = case symbols of {
@@ -416,7 +427,33 @@ module Bootstrap.Bitstream (
           first = xorInt (unsignedShiftRInt start 4) (crcNibble start) } in
     xorInt (unsignedShiftRInt first 4) (crcNibble first);
   checksum :: ByteArray -> Int -> IO Int;
-  checksum bytes size = checksumAt bytes size 0 4294967295;
+  checksum bytes size = if size < 1024 then checksumAt bytes size 0 4294967295 else do {
+    table <- newIntArray 256 0;
+    buildCRCTable table 0;
+    checksumBytes table bytes size 0 4294967295
+  };
+  -- CRC is linear over XOR. The one-byte remainder is crcByte 0 index,
+  -- while every higher input bit shifts down by eight positions.
+  buildCRCTable table index = if index == 256 then ioReturn () else do {
+    writeIntArray table index (crcByte 0 index);
+    buildCRCTable table (index + 1)
+  };
+  advanceCRC :: IntArray -> Int -> Int -> IO Int;
+  advanceCRC table crc byte = do {
+    remainder <- readIntArray table (andInt (xorInt crc byte) 255);
+    ioReturn (xorInt (unsignedShiftRInt crc 8) remainder)
+  };
+  checksumBytes table bytes size position crc = do {
+    rest <- crcRange table bytes size position crc;
+    ioReturn (xorInt rest 4294967295)
+  };
+  crcRange :: IntArray -> ByteArray -> Int -> Int -> Int -> IO Int;
+  crcRange table bytes end position crc =
+    if position == end then ioReturn crc else do {
+      byte <- if position >= 76 && position < 80 then ioReturn 0 else readByteArray bytes position;
+      next <- advanceCRC table crc byte;
+      seq next (crcRange table bytes end (position + 1) next)
+    };
   checksumAt :: ByteArray -> Int -> Int -> Int -> IO Int;
   checksumAt bytes size position crc =
     if position == size then ioReturn (xorInt crc 4294967295) else do {
@@ -587,26 +624,60 @@ module Bootstrap.Bitstream (
   };
   getUtf8 :: Int -> Read String;
   getUtf8 size = getUtf8At size [];
+  getUtf8With hints size = Read (\cursor -> case cursor of { Cursor bytes position end ->
+    let { ordinary = \ignored -> case getUtf8At size [] of { Read parse -> parse cursor } } in
+    if position < 0 || position % 8 /= 0 || size < 0 || size > (end - position) / 8
+    then ordinary () else do {
+      let { start = position / 8 };
+      text <- case find (\hint -> stringLength hint == size) hints of {
+        Just hint -> do {
+          matches <- sameAscii bytes start hint size 0;
+          if matches then ioReturn (Just hint) else alignedAscii bytes start (start + size) []
+        };
+        Nothing -> alignedAscii bytes start (start + size) []
+      };
+      case text of {
+        Nothing -> ordinary ();
+        Just value -> ioReturn (Right ((,) value (Cursor bytes (position + size * 8) end)))
+      }
+    }
+  });
+  -- A hint only supplies storage. Every byte must equal a canonical ASCII
+  -- scalar from that text; a mismatch takes the independent ordinary path.
+  sameAscii bytes start hint size index = if index == size then ioReturn True else do {
+    byte <- readByteArray bytes (start + index);
+    if byte < 128 && byte == stringCodeAt hint index then sameAscii bytes start hint size (index + 1)
+    else ioReturn False
+  };
+  -- Scan in wire order. A malformed prefix cannot allocate a list for an
+  -- unread suffix. Non-ASCII falls back to the strict scalar decoder.
+  alignedAscii bytes index end chars =
+    if index == end then ioReturn (Just (textFromChars (reverse chars))) else do {
+      code <- readByteArray bytes index;
+      if code < 128 then alignedAscii bytes (index + 1) end ((:) (charFromCode code) chars)
+      else ioReturn Nothing
+    };
+  -- Both readers use the same scalar widths, leading-bit masks and canonical
+  -- range checks. Continuations must be 10xxxxxx and stay inside this symbol.
+  utf8Width :: Int -> Int;
+  utf8Width byte = if byte < 128 then 1 else if byte >= 194 && byte <= 223 then 2
+    else if byte >= 224 && byte <= 239 then 3 else if byte >= 240 && byte <= 244 then 4 else 0;
+  utf8Lead :: Int -> Int -> Int;
+  utf8Lead byte width = andInt byte (unsignedShiftRInt 127 width);
+  canonicalScalar :: Int -> Int -> Bool;
+  canonicalScalar width code = (width < 3 || code >= 2048) && (width < 4 || code >= 65536) && scalar code;
   getUtf8At :: Int -> [] Char -> Read String;
   getUtf8At remaining chars =
     if remaining == 0 then returnRead (textFromChars (reverse chars)) else do {
       first <- getBits 8;
-      if first < 128 then getUtf8At (remaining - 1) ((:) (charFromCode first) chars)
-      else if first >= 194 && first <= 223 then do {
-        checkRead (remaining >= 2) "truncated binary UTF-8 scalar";
-        code <- getContinuation 1 (andInt first 31);
-        getUtf8At (remaining - 2) ((:) (charFromCode code) chars)
-      } else if first >= 224 && first <= 239 then do {
-        checkRead (remaining >= 3) "truncated binary UTF-8 scalar";
-        code <- getContinuation 2 (andInt first 15);
-        checkRead (code >= 2048 && scalar code) "noncanonical binary UTF-8 scalar";
-        getUtf8At (remaining - 3) ((:) (charFromCode code) chars)
-      } else if first >= 240 && first <= 244 then do {
-        checkRead (remaining >= 4) "truncated binary UTF-8 scalar";
-        code <- getContinuation 3 (andInt first 7);
-        checkRead (code >= 65536 && scalar code) "noncanonical binary UTF-8 scalar";
-        getUtf8At (remaining - 4) ((:) (charFromCode code) chars)
-      } else failRead "invalid binary UTF-8 leading byte"
+      if first < 128 then getUtf8At (remaining - 1) ((:) (charFromCode first) chars) else do {
+        let { width = utf8Width first };
+        checkRead (width > 0) "invalid binary UTF-8 leading byte";
+        checkRead (remaining >= width) "truncated binary UTF-8 scalar";
+        code <- getContinuation (width - 1) (utf8Lead first width);
+        checkRead (canonicalScalar width code) "noncanonical binary UTF-8 scalar";
+        getUtf8At (remaining - width) ((:) (charFromCode code) chars)
+      }
     };
   -- Legacy dispatch may need a strict UTF-8 bridge after raw bounded IO.
   -- The storage layer must check hasMagic FIRST: a recognized new-format
@@ -624,19 +695,20 @@ module Bootstrap.Bitstream (
   getSymbols :: Limits -> Int -> Read (IntMap Symbol);
   getSymbols limits count = getSymbolsAt limits count 0 0 M.empty IM.empty;
   getSymbolsAt :: Limits -> Int -> Int -> Int -> Map String Int -> IntMap Symbol -> Read (IntMap Symbol);
-  getSymbolsAt limits count index total names symbols =
+  getSymbolsAt = getSymbolsWith [];
+  getSymbolsWith hints limits count index total names symbols =
     if index == count then returnRead symbols else do {
       size <- getNat (maxSymbolBytes limits);
       remaining <- remainingBits;
       checkRead (size <= remaining / 8) "truncated binary symbol";
       checkRead (size <= maxTotalSymbolBytes limits - total) "binary total symbol byte limit exceeded";
-      text <- getUtf8 size;
+      text <- getUtf8With hints size;
       checkRead (not (M.member compareString text names)) "duplicate binary symbol";
       let { nextTotal = total + size;
             nextNames = M.insert compareString text index names;
             nextSymbols = IM.insert index (Symbol text size) symbols };
       seq nextTotal (seq nextNames (seq nextSymbols
-        (getSymbolsAt limits count (index + 1) nextTotal nextNames nextSymbols)))
+        (getSymbolsWith hints limits count (index + 1) nextTotal nextNames nextSymbols)))
     };
 
   -- Resource summaries are separate from codec limits. In particular these
@@ -704,11 +776,18 @@ module Bootstrap.Bitstream (
     }
   };
   planGraph :: Limits -> [] Value -> Either String Graph;
-  planGraph limits roots = do {
+  planGraph limits roots = bindEither (prepareGraphPlan limits roots) realizeGraphPlan;
+  -- The constructor stays private. Only a successful plan and layout can
+  -- supply the exact tables subsequently used for canonical graph admission.
+  data GraphPlan = GraphPlan Limits Tables;
+  prepareGraphPlan :: Limits -> [] Value -> Either String GraphPlan;
+  prepareGraphPlan limits roots = do {
     tables <- plan limits roots;
     geometry <- layout limits tables;
-    seq geometry (graphFromPlan limits tables)
+    seq geometry (Right (GraphPlan limits tables))
   };
+  realizeGraphPlan :: GraphPlan -> Either String Graph;
+  realizeGraphPlan (GraphPlan limits tables) = graphFromPlan limits tables;
   graphNodeDepth :: Graph -> Int -> Either String Int;
   graphNodeDepth (Graph nodes _) index = case IM.lookup index nodes of {
     Nothing -> Left "binary graph node index out of range";
@@ -1097,16 +1176,109 @@ module Bootstrap.Bitstream (
     (\error -> ioReturn (Left ("binary decode IO failure: " ++ textFromChars (ioeGetErrorString error))));
   decodeChecked :: Limits -> Int -> ByteArray -> IO (Either String ([] Value));
   decodeChecked limits schema bytes = do {
-    graph <- decodeGraphChecked limits schema bytes;
+    graph <- decodeGraphChecked [] limits schema bytes;
     ioReturn (bindEither graph (\value -> case value of {
       Graph nodes roots -> collectRoots nodes roots []
     }))
   };
   decodeGraph :: Limits -> Int -> ByteArray -> IO (Either String Graph);
-  decodeGraph limits schema bytes = catchIOError (decodeGraphChecked limits schema bytes)
+  decodeGraph = decodeGraphWithText [];
+  decodeGraphWithText :: [] String -> Limits -> Int -> ByteArray -> IO (Either String Graph);
+  decodeGraphWithText hints limits schema bytes = catchIOError (decodeGraphChecked hints limits schema bytes)
     (\error -> ioReturn (Left ("binary decode IO failure: " ++ textFromChars (ioeGetErrorString error))));
-  decodeGraphChecked :: Limits -> Int -> ByteArray -> IO (Either String Graph);
-  decodeGraphChecked limits schema bytes =
+  -- A small symbol section can be validated, decoded and fed to CRC32 in
+  -- one forward pass. Cap all speculative allocations BEFORE the integrity
+  -- gate. We never allocate the node graph until the entire CRC matches.
+  -- A declined scan takes the original checksum-first reader (also retaining
+  -- its exact malformed-input diagnostics). No second read on valid symbols.
+  scanSymbolLength :: IntArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> Int -> IO (Maybe ((,,) Int Int Int));
+  scanSymbolLength table bytes end pos limit shift value crc =
+    if pos == end || shift > 28 then ioReturn Nothing else do {
+      byte <- readByteArray bytes pos;
+      let { bits = andInt byte 127; next = orInt value (shiftLInt bits shift) };
+      if next > limit || (byte < 128 && shift > 0 && bits == 0) then ioReturn Nothing else do {
+        updated <- advanceCRC table crc byte;
+        if byte < 128 then ioReturn (Just ((,,) next (pos + 1) updated))
+        else seq updated (scanSymbolLength table bytes end (pos + 1) limit (shift + 7) next updated)
+      }
+    };
+  scanContinuation :: IntArray -> ByteArray -> Int -> Int -> Int -> Int -> IO (Maybe ((,) Int Int));
+  scanContinuation table bytes pos left code crc =
+    if left == 0 then ioReturn (Just ((,) code crc)) else do {
+      byte <- readByteArray bytes pos;
+      if byte < 128 || byte > 191 then ioReturn Nothing else do {
+        updated <- advanceCRC table crc byte;
+        let { next = orInt (shiftLInt code 6) (andInt byte 63) };
+        seq updated (seq next (scanContinuation table bytes (pos + 1) (left - 1) next updated))
+      }
+    };
+  scanSymbolText :: IntArray -> ByteArray -> Int -> Int -> Int -> [] Char -> IO (Maybe ((,) String Int));
+  scanSymbolText table bytes end pos crc chars =
+    if pos == end then ioReturn (Just ((,) (textFromChars (reverse chars)) crc)) else do {
+      byte <- readByteArray bytes pos;
+      updated <- advanceCRC table crc byte;
+      if byte < 128 then seq updated
+        (scanSymbolText table bytes end (pos + 1) updated ((:) (charFromCode byte) chars))
+      else let { width = utf8Width byte } in
+        if width == 0 || width > end - pos then ioReturn Nothing else do {
+          tail <- scanContinuation table bytes (pos + 1) (width - 1) (utf8Lead byte width) updated;
+          case tail of {
+            Just ((,) code next) -> if canonicalScalar width code
+              then scanSymbolText table bytes end (pos + width) next ((:) (charFromCode code) chars)
+              else ioReturn Nothing;
+            Nothing -> ioReturn Nothing
+          }
+        }
+    };
+  scanSymbolTable :: Limits -> IntArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> Int ->
+    Map String Int -> IntMap Symbol -> IO (Maybe ((,) (IntMap Symbol) Int));
+  scanSymbolTable limits table bytes end count index pos total crc names symbols =
+    if index == count then ioReturn (if pos == end then Just ((,) symbols crc) else Nothing)
+    else do {
+      prefix <- scanSymbolLength table bytes end pos (maxSymbolBytes limits) 0 0 crc;
+      case prefix of {
+        Nothing -> ioReturn Nothing;
+        Just ((,,) size start next) ->
+          if size > end - start || size > maxTotalSymbolBytes limits - total then ioReturn Nothing
+          else do {
+            decoded <- scanSymbolText table bytes (start + size) start next [];
+            case decoded of {
+              Nothing -> ioReturn Nothing;
+              Just ((,) text updated) -> if M.member compareString text names then ioReturn Nothing
+                else let { following = M.insert compareString text index names;
+                           entries = IM.insert index (Symbol text size) symbols } in
+                  seq following (seq entries (scanSymbolTable limits table bytes end count (index + 1)
+                    (start + size) (total + size) updated following entries))
+            }
+          }
+      }
+    };
+  checkedGraphTables :: [] String -> Limits -> ByteArray -> Int -> Layout -> Int -> IO (Either String Graph);
+  checkedGraphTables hints limits bytes size geometry expectedCRC =
+    let { original = \ignored -> do {
+      actual <- checksum bytes size;
+      if actual /= expectedCRC then ioReturn (Left "binary checksum mismatch")
+      else decodeGraphTables hints limits bytes geometry
+    } } in case geometry of {
+      Layout _ count length _ nodeOffset _ _ _ _ _ _ _ ->
+        if not (null hints) || size < 1024 || count == 0 || count > 1024 || length > 65536
+        then original () else do {
+          table <- newIntArray 256 0;
+          buildCRCTable table 0;
+          header <- crcRange table bytes 80 0 4294967295;
+          scanned <- scanSymbolTable limits table bytes nodeOffset count 0 80 0 header M.empty IM.empty;
+          case scanned of {
+            Nothing -> original ();
+            Just ((,) symbols partial) -> do {
+              actual <- checksumBytes table bytes size nodeOffset partial;
+              if actual /= expectedCRC then ioReturn (Left "binary checksum mismatch")
+              else decodeNodesAndRoots limits bytes geometry symbols
+            }
+          }
+        }
+    };
+  decodeGraphChecked :: [] String -> Limits -> Int -> ByteArray -> IO (Either String Graph);
+  decodeGraphChecked hints limits schema bytes =
     if not (validLimits limits) then ioReturn (Left "invalid binary codec limits")
     else if schema < 0 || schema > 2147483647 then ioReturn (Left "binary schema ID out of range")
     else do {
@@ -1118,42 +1290,42 @@ module Bootstrap.Bitstream (
           header <- runSection bytes 8 72 (getHeader limits schema size);
           case header of {
             Left message -> ioReturn (Left message);
-            Right (Header geometry expectedCRC) -> do {
-              actualCRC <- checksum bytes size;
-              if actualCRC /= expectedCRC then ioReturn (Left "binary checksum mismatch")
-              else decodeGraphTables limits bytes geometry
-            }
+            Right (Header geometry expectedCRC) -> checkedGraphTables hints limits bytes size geometry expectedCRC
           }
         }
       }
     };
   decodeTables :: Limits -> ByteArray -> Layout -> IO (Either String ([] Value));
   decodeTables limits bytes geometry = do {
-    graph <- decodeGraphTables limits bytes geometry;
+    graph <- decodeGraphTables [] limits bytes geometry;
     ioReturn (bindEither graph (\value -> case value of {
       Graph nodes roots -> collectRoots nodes roots []
     }))
   };
-  decodeGraphTables :: Limits -> ByteArray -> Layout -> IO (Either String Graph);
-  decodeGraphTables limits bytes geometry = case geometry of {
-    Layout _ symbolCount symbolLength nodeCount nodeOffset nodeLength _ rootCount rootOffset rootLength nodeWidth _ -> do {
-      symbolResult <- runSection bytes 80 symbolLength (getSymbols limits symbolCount);
+  decodeGraphTables :: [] String -> Limits -> ByteArray -> Layout -> IO (Either String Graph);
+  decodeGraphTables hints limits bytes geometry = case geometry of {
+    Layout _ symbolCount symbolLength _ _ _ _ _ _ _ _ _ -> do {
+      symbolResult <- runSection bytes 80 symbolLength (getSymbolsWith (filter (\t -> stringLength t >= 256) (take 9 hints)) limits symbolCount 0 0 M.empty IM.empty);
       case symbolResult of {
         Left message -> ioReturn (Left message);
-        Right symbols -> do {
-          nodeResult <- runSection bytes nodeOffset nodeLength (getNodes limits geometry symbols);
-          case nodeResult of {
+        Right symbols -> decodeNodesAndRoots limits bytes geometry symbols
+      }
+    }
+  };
+  decodeNodesAndRoots :: Limits -> ByteArray -> Layout -> IntMap Symbol -> IO (Either String Graph);
+  decodeNodesAndRoots limits bytes geometry symbols = case geometry of {
+    Layout _ _ _ nodeCount nodeOffset nodeLength _ rootCount rootOffset rootLength nodeWidth _ -> do {
+      nodeResult <- runSection bytes nodeOffset nodeLength (getNodes limits geometry symbols);
+      case nodeResult of {
+        Left message -> ioReturn (Left message);
+        Right nodes -> do {
+          rootResult <- runSection bytes rootOffset rootLength (getRoots limits nodes nodeWidth rootCount);
+          case rootResult of {
             Left message -> ioReturn (Left message);
-            Right nodes -> do {
-              rootResult <- runSection bytes rootOffset rootLength (getRoots limits nodes nodeWidth rootCount);
-              case rootResult of {
-                Left message -> ioReturn (Left message);
-                Right roots -> ioReturn (do {
-                  canonicalGraph nodes nodeCount roots;
-                  Right (Graph nodes roots)
-                })
-              }
-            }
+            Right roots -> ioReturn (do {
+              canonicalGraph nodes nodeCount roots;
+              Right (Graph nodes roots)
+            })
           }
         }
       }

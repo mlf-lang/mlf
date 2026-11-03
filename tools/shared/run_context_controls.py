@@ -65,6 +65,11 @@ def binary_query(raw, shared=True):
     document = binary_artifact(raw, 2)
     root = document.roots[0]
     if shared:
+        if document.nodes[root].data[0] == 303:
+            reference, key, result, header, body = graph_node(document, root, 303, 5)
+            fingerprint = binary_helpers()[1].verify_source_result(document)
+            return {'document': document, 'reference': graph_text(document, reference),
+                    'fingerprint': fingerprint, 'header': header, 'body': body}
         reference, compact, header, body = graph_node(document, root, 301, 4)
         return {'document': document, 'reference': graph_text(document, reference),
                 'compact': [graph_text(document, i) for i in graph_node(document, compact, 1)],
@@ -727,6 +732,7 @@ def session_window_snapshot(cache):
         files[name] = identity
         if name in current:
             query = binary_query(raw)
+            require(query['fingerprint']+'.mlfq'==name, 'real session record input fingerprint')
             referenced.add('context-' + query['reference'] + '.mlfqc')
             _, retained = window_sample(cache / 'retained-raw' / name, 2 * 1024**2)
             require(raw == retained, 'every original raw record independently equal retained cold copy')
@@ -828,7 +834,7 @@ def session_window_audit(root, leaf, cold_snapshot):
     poison_query = binary_query(poison3)
     c1 = unpack(poison1.decode('utf-8', 'strict'))  # explicitly historical text branch
     require(original_query['reference'] == poison_query['reference'] == reference and
-            original_query['compact'] == poison_query['compact'] == compact_fields,
+            original_query['fingerprint'] == poison_query['fingerprint'] == digest(full_key.encode()),
             'binary poison preserves actual context reference and all eight key fields')
     alpha_id, alpha_raw = window_sample(root / 'alpha-slot.inventory', 2 * 1024**2)
     alpha = unpack(alpha_raw.decode('utf-8'))
@@ -890,7 +896,7 @@ def session_window_audit(root, leaf, cold_snapshot):
     wholesale1_id, wholesale1 = window_sample(root / 'target.wholesale-cache1.mlfq', 2 * 1024**2)
     wholesale_query = binary_query(wholesale3)
     w1 = unpack(wholesale1.decode('utf-8', 'strict'))
-    require(wholesale_query['reference'] == reference and wholesale_query['compact'] == compact_fields and
+    require(wholesale_query['reference'] == reference and wholesale_query['fingerprint'] == digest(full_key.encode()) and
             not graph_equal(wholesale_query['document'], wholesale_query['body'],
                             original_query['document'], original_query['body'])[0] and
             not graph_equal(wholesale_query['document'], wholesale_query['body'],
@@ -1277,7 +1283,7 @@ def main():
                         target.write_bytes(b"broken-context")
                 else:
                     target = cache / next(n for n, f in current["active_records"].items()
-                                          if f == "MLFBIN-QUERY-SHARED-1")
+                                          if f == "MLFBIN-QUERY-SHARED-2")
                     reference_reader, _, _ = binary_helpers()
                     document = binary_artifact(target.read_bytes(), 2)
                     value = document.values()[0]
@@ -1285,7 +1291,8 @@ def main():
                     # valid CRC; only the typed body becomes an invalid text
                     # leaf. This is a real typed-payload miss, not old text
                     # smuggled into a file whose magic happens to be binary.
-                    malformed = ('node', 301, (*value[2][:3], ('text', '')))
+                    require(value[1] == 303, 'fingerprinted source record')
+                    malformed = ('node', 303, (*value[2][:-1], ('text', '')))
                     target.write_bytes(reference_reader.tree_document([malformed], schema=2))
                 repaired = driver(kind, cache, root, "42", kind + "-" + mutation)
                 require(repaired["query_report"]["inferred_groups"] >= 1 and repaired["artifact_sha256"] == changed["artifact_sha256"], "corruption miss + exact reconstruction")
@@ -1669,14 +1676,14 @@ def main():
                              "report_sha256": digest(report_path.read_bytes())})
             no_query_scratch(cache)
             final_snapshot = snapshot(cache, keys)
-            require(set(final_snapshot["active_records"].values()) == {"MLFBIN-QUERY-SHARED-1"},
+            require(set(final_snapshot["active_records"].values()) == {"MLFBIN-QUERY-SHARED-2"},
                     "all records restored to binary shared source queries")
             require(len(final_snapshot["reachable_contexts"]) == 1, "one shared context after both repairs")
             context = cache / final_snapshot["reachable_contexts"][0]
             require(context.read_bytes() == (root / "context.original").read_bytes(), "final context exact original bytes")
             memo_results[kind] = {"phases": rows, "final_cache": final_snapshot,
-                                  "mixed_legacy_scope": "Haskell checked full bytes and mtime during mixed hit only; explicit binary301 restoration is test setup; no added ctime/devino claim",
-                                  "cross_invocation_scope": "all-binary301 warm ends verified; next corrupt/missing invocations must each infer one and hit one, not reuse global state"}
+                                  "mixed_legacy_scope": "Haskell checked full bytes and mtime during mixed hit only; explicit fingerprint record restoration is test setup; no added ctime/devino claim",
+                                  "cross_invocation_scope": "all-fingerprinted warm ends verified; next corrupt/missing invocations must each infer one and hit one, not reuse global state"}
             save()
 
         # Additive directory-publication controls. All original 34 commands,
