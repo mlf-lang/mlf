@@ -14,7 +14,9 @@ import qualified Data.Map.Lazy as M
 #endif
 import Data.IORef
 import Data.Int (Int64)
-import Foreign (Ptr, alloca, peek, peekElemOff, nullPtr, free)
+import Data.Word (Word8)
+import Foreign.Marshal.Alloc (mallocBytes)
+import Foreign (Ptr, alloca, peek, peekElemOff, pokeElemOff, nullPtr, free, castPtr)
 import Foreign.C
 import Control.Concurrent.MVar
 import Control.Exception
@@ -159,7 +161,7 @@ v_exitWith n = do
 -- representations coincide. The facade exports these types abstractly.
 newtype IntArray = IntArray (A.IOArray P.Int Int)
 newtype DoubleArray = DoubleArray (A.IOArray P.Int Double)
-newtype ByteArray = ByteArray (A.IOArray P.Int Int)
+newtype ByteArray = ByteArray (A.IOUArray P.Int Word8)
 newArray :: Int -> a -> IO (A.IOArray P.Int a)
 newArray n initial = do
   size <- evaluate (bounded "invalid array length" (9223372036854775807 `quot` 8) n)
@@ -184,27 +186,47 @@ v_newIntArray n x = IntArray <$> newArray n x
 v_newDoubleArray :: Int -> Double -> IO DoubleArray
 v_newDoubleArray n x = DoubleArray <$> newArray n x
 v_newByteArray :: Int -> Int -> IO ByteArray
-v_newByteArray n x = ByteArray <$> newArray n (fromIntegral (bounded "byte value must be between 0 and 255" 255 x))
+v_newByteArray n x = do
+  size <- evaluate (bounded "invalid array length" (9223372036854775807 `quot` 8) n)
+  value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
+  ByteArray <$> A.newArray (0,size-1) value
 v_readIntArray :: IntArray -> Int -> IO Int
 v_readIntArray (IntArray a) = readArray a
 v_readDoubleArray :: DoubleArray -> Int -> IO Double
 v_readDoubleArray (DoubleArray a) = readArray a
 v_readByteArray :: ByteArray -> Int -> IO Int
-v_readByteArray (ByteArray a) = readArray a
+v_readByteArray (ByteArray a) n = do
+  i <- byteIndex a n
+  fromIntegral <$> A.readArray a i
 v_writeIntArray :: IntArray -> Int -> Int -> IO ()
 v_writeIntArray (IntArray a) = writeArray a
 v_writeDoubleArray :: DoubleArray -> Int -> Double -> IO ()
 v_writeDoubleArray (DoubleArray a) = writeArray a
 v_writeByteArray :: ByteArray -> Int -> Int -> IO ()
-v_writeByteArray (ByteArray a) n x = writeArray a n (fromIntegral (bounded "byte value must be between 0 and 255" 255 x))
+v_writeByteArray (ByteArray a) n x = do
+  i <- byteIndex a n
+  value <- evaluate (fromIntegral (bounded "byte value must be between 0 and 255" 255 x) :: Word8)
+  A.writeArray a i value
 v_lengthIntArray :: IntArray -> IO Int
 v_lengthIntArray (IntArray a) = lengthArray a
 v_lengthDoubleArray :: DoubleArray -> IO Int
 v_lengthDoubleArray (DoubleArray a) = lengthArray a
 v_lengthByteArray :: ByteArray -> IO Int
-v_lengthByteArray (ByteArray a) = lengthArray a
+v_lengthByteArray (ByteArray a) = byteLength a
+byteLength :: A.IOUArray P.Int Word8 -> IO Int
+byteLength a = do { (_,hi) <- A.getBounds a; pure (fromIntegral hi+1) }
+byteIndex :: A.IOUArray P.Int Word8 -> Int -> IO P.Int
+byteIndex a n = do
+  (_,hi) <- A.getBounds a
+  evaluate (bounded "array index out of bounds" (fromIntegral hi) n)
 bytesArray :: B.ByteString -> IO ByteArray
-bytesArray bytes = ByteArray <$> A.newListArray (0,B.length bytes-1) (map fromIntegral (B.unpack bytes))
+bytesArray bytes = do
+  array <- A.newArray (0,B.length bytes-1) 0
+  let fill :: P.Int -> IO ()
+      fill i | i == B.length bytes = pure ()
+             | otherwise = A.writeArray array i (B.index bytes i) >> fill (i+1)
+  fill 0
+  pure (ByteArray array)
 v_byteArrayFromString :: String -> IO ByteArray
 v_byteArrayFromString = bytesArray . utf8
 v_getByteLine :: IO ByteArray
@@ -217,11 +239,12 @@ v_getByteLine = ioErrorAs "IO error: byte input failed" $ do
             let b=B.head one in if b==10 then pure (b:acc) else readByteLine (b:acc)
 v_putBytes :: ByteArray -> Int -> Int -> IO ()
 v_putBytes (ByteArray a) start count = do
-  size <- lengthArray a
+  size <- byteLength a
   i <- evaluate (bounded "byte slice out of bounds" size start)
   n <- evaluate (bounded "byte slice out of bounds" (size-start) count)
-  bytes <- mapM (A.readArray a) [i..i+n-1]
-  ioErrorAs "IO error: output failed" (B.hPut H.stdout (B.pack (map fromIntegral bytes)) >> H.hFlush H.stdout)
+  withByteSlice a i n $ \pointer -> do
+    bytes <- B.packCStringLen (castBytePointer pointer,n)
+    ioErrorAs "IO error: output failed" (B.hPut H.stdout bytes >> H.hFlush H.stdout)
   pure ()
 -- The primitive owns evaluated Int64 keys/values. Machine IntMap is lossless
 -- on 64-bit hosts; retain full keys on narrower hosts instead of truncating.
@@ -255,3 +278,58 @@ runEntry entry = ((entry >> pure ()) `finally` c_shutdown)
     B.hPut H.stderr (utf8 (literal ("Runtime: "++message++"\n")))
     H.hFlush H.stderr
     X.exitFailure)
+
+
+foreign import ccall safe "mlf_ghc_read_byte_file" c_readByteFile :: CString -> CSize -> Int64 -> Ptr (Ptr Word8) -> Ptr CSize -> IO CString
+foreign import ccall safe "mlf_ghc_write_byte_file" c_writeByteFile :: CString -> CSize -> Ptr Word8 -> CSize -> IO CString
+castBytePointer :: Ptr Word8 -> CString
+castBytePointer = castPtr
+withByteSlice :: A.IOUArray P.Int Word8 -> P.Int -> P.Int -> (Ptr Word8 -> IO a) -> IO a
+withByteSlice array start count action = bracket (mallocBytes (max 1 count)) free $ \pointer -> do
+  let fill :: P.Int -> IO ()
+      fill i | i == count = pure ()
+             | otherwise = A.readArray array (start+i) >>= pokeElemOff pointer i >> fill (i+1)
+  fill 0
+  action pointer
+-- These two primitives return ordinary diagnostics, not HostError. Mask the
+-- ownership handoff from the safe FFI just like host(), retaining cancellation
+-- cleanup. They intentionally do not catch allocation failure or language panic.
+v_readByteFileOrError :: String -> Int -> IO (String, ByteArray)
+v_readByteFileOrError name limit = mask_ $
+  B.useAsCStringLen (utf8 name) $ \(pathBytes,pathLength) -> do
+    bound <- evaluate limit
+    -- ByteString/IOUArray lengths use host Int, including on 32-bit GHC.
+    -- Keep path-NUL priority over an invalid size, as in the shared C core.
+    if bound > fromIntegral (maxBound :: P.Int) then do
+      array <- bytesArray B.empty
+      pure (literal (if '\0' `elem` unpack name then "file path contains NUL"
+                     else "invalid byte file limit"), array)
+    else alloca $ \out -> alloca $ \size -> do
+      errorPointer <- c_readByteFile pathBytes (fromIntegral pathLength) bound out size
+      bytes <- peek out
+      count <- peek size
+      bracket (pure bytes) free $ \owned -> do
+        message <- B.packCString errorPointer >>= evaluate . fromUtf8
+        raw <- if owned == nullPtr then pure B.empty
+               else B.packCStringLen (castBytePointer owned,fromIntegral count)
+        array <- bytesArray raw
+        pure (message,array)
+v_writeByteFileOrError :: String -> ByteArray -> IO String
+v_writeByteFileOrError name array =
+  if '\0' `elem` unpack name then pure (literal "file path contains NUL") else
+  case array of
+    ByteArray cells -> do
+      size <- byteLength cells
+      withByteSlice cells 0 (fromIntegral size) $ \bytes ->
+        B.useAsCStringLen (utf8 name) $ \(pathBytes,pathLength) -> do
+          message <- c_writeByteFile pathBytes (fromIntegral pathLength) bytes (fromIntegral size)
+          B.packCString message >>= evaluate . fromUtf8
+
+foreign import ccall safe "mlf_ghc_byte_array_digest" c_byteArrayDigest :: Ptr Word8 -> CSize -> CString -> IO ()
+v_byteArrayDigest :: ByteArray -> IO String
+v_byteArrayDigest (ByteArray cells) = do
+  size <- byteLength cells
+  withByteSlice cells 0 (fromIntegral size) $ \bytes ->
+    bracket (mallocBytes 65) free $ \digest -> do
+      c_byteArrayDigest bytes (fromIntegral size) digest
+      B.packCStringLen (digest,64) >>= evaluate . fromUtf8

@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 1706,
+  "new_sha256": "993a5c35bc9e51ce985a42e661c10f60fe30ae52bf122cdb54a52362921de44d",
+  "old_bytes": 1513,
+  "old_sha256": "e74862bd7588f0fe6a3fc81a06c49da9f640da27dfbf14d410cfc4c604f68296",
+  "path": "libraries/mlf-crates/mlf-package.json",
+  "splices": [
+    {
+      "new": "QXJ0aWZhY3RTdG9yYWdlIjogIkJvb3RzdHJhcC9BcnRpZmFjdFN0b3JhZ2UuaHMiLAogICAgICAiQm9vdHN0cmFwLkFydGlmYWN0U3RydWN0dXJlIjogIkJvb3RzdHJhcC9BcnRpZmFjdFN0cnVjdHVyZS5ocyIsCiAgICAgICJCb290c3RyYXAuQml0c3RyZWFtIjogIkJvb3RzdHJhcC9CaXRzdHJlYW0uaHMiLAogICAgICAiQm9vdHN0cmFwLg==",
+      "new_at": 502,
+      "old": "",
+      "old_at": 502
+    }
+  ]
+}

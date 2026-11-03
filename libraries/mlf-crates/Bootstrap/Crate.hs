@@ -623,16 +623,7 @@ module Bootstrap.Crate where {
                  result <-
                    if valid
                    then ioReturn (Right ())
-                   else do {
-                          body <-
-                            Query.writeCache (prefix ++ ".mlfco") (Artifact.encodeObject builtin);
-                          case body of {
-                            Left message -> ioReturn (Left message);
-                            Right _ ->
-                              Query.writeCache metadata
-                                (Artifact.encodeInterface (Artifact.objectInterface builtin))
-                          }
-                        };
+                   else Artifact.writeObjectAtomicEither prefix builtin;
                  releaseFileLock lock;
                  ioReturn (mapEither (\_ -> metadata) result)
                }
@@ -706,12 +697,16 @@ module Bootstrap.Crate where {
                 ioReturn (Left (Modules.displayNames diagnostics message));
               Right ((,,) object payload report) ->
                 do {
-                  Artifact.writeObjectWithPayload prefix object payload;
-                  writeFile (prefix ++ ".queries")
-                    (Query.reportJSON (specIdentity spec)
-                       (Artifact.semanticFingerprint (Artifact.objectInterface object))
-                       report);
-                  ioReturn (Right ())
+                  written <- Artifact.writeObjectWithPayloadEither prefix object payload;
+                  case written of {
+                    Left message -> ioReturn (Left message);
+                    Right _ -> do {
+                      writeFile (prefix ++ ".queries")
+                        (Query.reportJSON (specIdentity spec)
+                           (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
+                      ioReturn (Right ())
+                    }
+                  }
                 }
             }
           }

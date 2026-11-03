@@ -220,7 +220,10 @@ module Bootstrap.BuiltinPreludeLiteral where {
     PShowInteger -> "PShowInteger";
     PReadInteger -> "PReadInteger";
     PIntegerToDouble -> "PIntegerToDouble";
-    PUnsignedLtInt -> "PUnsignedLtInt"
+    PUnsignedLtInt -> "PUnsignedLtInt";
+    PReadByteFileOrError -> "PReadByteFileOrError";
+    PWriteByteFileOrError -> "PWriteByteFileOrError";
+    PByteArrayDigest -> "PByteArrayDigest"
   };
   sourceType :: SType -> String;
   sourceType value = case value of {

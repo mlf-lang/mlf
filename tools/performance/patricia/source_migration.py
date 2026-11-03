@@ -1,6 +1,6 @@
 """Reviewed source identities across the numeric/Patricia ABI boundary."""
 from pathlib import Path
-import hashlib, json
+import hashlib, json, importlib.util
 HERE=Path(__file__).resolve().parent
 # Finalized once after canonical builtin regeneration, before confirmation.
 MANIFEST_SHA='35feca71afa2d2c392df2d920b890f61a5dce84fd85c8c61909f5da32d31fea6'
@@ -272,6 +272,27 @@ def apply_changes(base, changes):
         result[name]=row['new']
     return result
 
+def read_window_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-read-window/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_read_window_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def key_parts_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-key-parts/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_key_parts_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def publication_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-publication/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_publication_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
 def memo_contract():
     import importlib.util
     path=Path(__file__).resolve().parent.parent/'source-context-read-reuse/source_contract.py'
@@ -286,7 +307,7 @@ def diamond_contract():
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     return module
 
-def migrate(base):
+def migrate_to_read_window(base):
     raw=(HERE/'source-migration.json').read_bytes()
     if MANIFEST_SHA is None or hashlib.sha256(raw).hexdigest()!=MANIFEST_SHA:
         raise ValueError('fixed reviewed Int64/Patricia source migration required')
@@ -320,10 +341,12 @@ def migrate(base):
     upstream=apply_changes(result,full_delta()['changed_sources'])
     result=apply_changes(result,source_context_delta()['changed_sources'])
     result=apply_changes(result,scratch_delta()['changed_sources'])
-    return memo_contract().advance_registry(diamond_contract().merge_registry(result,upstream))
+    return read_window_contract().advance_registry(key_parts_contract().advance_registry(
+        publication_contract().advance_registry(
+            memo_contract().advance_registry(diamond_contract().merge_registry(result,upstream)))))
 
 
-def host_sources(base):
+def host_sources_to_read_window(base):
     raw=(HERE/'source-migration.json').read_bytes()
     if MANIFEST_SHA is None or hashlib.sha256(raw).hexdigest()!=MANIFEST_SHA:
         raise ValueError('fixed host ABI migration')
@@ -331,4 +354,52 @@ def host_sources(base):
     if not set(base)<=set(rows) or any(v not in (rows[k]['old'],rows[k].get('retained_F1_parent')) or not rows[k]['reviewed_change'] for k,v in base.items()):
         raise ValueError('exact frozen host parent')
     updated=apply_changes({k:row['new'] for k,row in rows.items()},design_delta()['host_sources'])
+    path=HERE.parent/'llvm-memory/source_contract.py'
+    spec=importlib.util.spec_from_file_location('utf8_host_transition',path)
+    adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
+    delta=adapter.manifest()
+    updated=apply_changes(updated,{delta['path']:{key:delta[key] for key in ['old','new','reviewed_change']}})
     return {k:updated[k] for k in base}
+
+
+# New final source edge; every historical migration above remains unchanged.
+def binary_contract(source_root=None):
+    import types
+    path = HERE.parent / 'artifact-binary/source_migration_adapter.py'
+    module = types.ModuleType('live_binary_source_adapter')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module.live_contract(HERE.parent, source_root=source_root)
+
+
+def migrate(base):
+    parent = migrate_to_read_window(base)
+    binary = binary_contract()
+    result = binary.advance_registry(parent)
+    if binary.live_registry(binary.source_root) != result:
+        raise ValueError('exact full live binary131 source registry')
+    return result
+
+
+def host_sources(base):
+    parent = host_sources_to_read_window(base)
+    binary = binary_contract()
+    binary.live_host_inventory(binary.source_root)
+    return binary.advance_legacy_host_subset(parent)
+
+
+def project_binary_registry(current):
+    binary = binary_contract()
+    return binary.registry_to_parent(current, binary.added_source_bytes(binary.source_root))
+
+
+def project_binary_owner(raw, module):
+    return binary_contract().project_owner(raw, module)
+
+
+def project_binary_file(raw, path):
+    return binary_contract().restore_path(raw, path)
+
+
+def project_binary_hosts(current):
+    return binary_contract().legacy_host_subset_to_parent(current)

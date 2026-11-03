@@ -100,8 +100,8 @@ module Bootstrap.BuiltinPreludeContext
     object <- Artifact.builtinPrelude;
     prepareObject identity object
   };
-  prepareObject :: String -> Artifact.CrateObject -> Either String RawPrelude;
-  prepareObject identity object = do {
+  prepareObjectV1 :: String -> Artifact.CrateObject -> Either String RawPrelude;
+  prepareObjectV1 identity object = do {
     let { iface = Artifact.objectInterface object };
     Artifact.validateInterface iface;
     ensure (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
@@ -219,4 +219,33 @@ module Bootstrap.BuiltinPreludeContext
       } };
       Right ((,) name (Source.SourceContract ty classes (flag || Classes.managedType source)))
     }) (Artifact.crateBindings iface));
+
+  -- N7 marked Prelude preparation owns one actual-object admission operation.
+  -- Artifact's dedicated helper reserves BOTH prepareMetadata calls below:
+  -- the direct call and the independent checkCompilerPrelude reconstruction.
+  -- The marker is not carried as a semantic receipt or attached to RawPrelude.
+  prepareObject :: String -> Artifact.CrateObject -> Either String RawPrelude;
+  prepareObject identity object = if Artifact.envelopeMarked object
+    then prepareKnownPreludeObject identity object else prepareObjectV1 identity object;
+  prepareKnownPreludeObject identity object = do {
+    let { iface = Artifact.objectInterface object };
+    ensure (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
+      "prepared Prelude is not the builtin crate";
+    ensure (null (Artifact.crateDependencies iface) && eqString (Artifact.crateEntry iface) "")
+      "prepared Prelude must have no dependencies or executable entry";
+    linkedWithProof <- Artifact.linkKnownPreludeObjectWithSpine object
+      ((,) (Artifact.FragmentState 0 M.empty [] [] S.empty)
+        (Left "ordinary crate linking has no composition receipt"));
+    let { linked = fst linkedWithProof };
+    metadata <- prepareMetadata iface;
+    case metadata of { Metadata names env sourceValues protectedNames contracts -> do {
+      body <- foldEither (\continuation declarations -> Separate.graft declarations continuation)
+        (XConstructor "()" []) (Artifact.fragmentBodies linked);
+      let { raw = RawPrelude identity (length P.allPrimitives) iface
+        (XWithData (Artifact.fragmentData linked) body) (Artifact.fragmentBindings linked)
+        (Artifact.fragmentSerial linked) names env sourceValues protectedNames contracts canonicalSources };
+      checkCompilerPrelude raw;
+      Right raw
+    } }
+  };
 }

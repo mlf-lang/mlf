@@ -371,3 +371,60 @@ the earlier large compact warm-read gap was not observed in this single
 ABBA repeat. Both the negative earlier observations and the new raw times,
 identity differences and limitations are documented in
 [the controlled study](../source-context-read-reuse/README.md).
+
+
+## Publication safety, canonical key checks, and an eight-context read window
+
+The current slice retains the CACHE-3 representation and old CACHE-1/2 readers.
+It adds fail-closed shared-context publication: an existing directory must not
+be mistaken for an installed context file, a rejected staged publication is
+cleaned up, and a cleanup failure is returned rather than reported as success.
+The cooperative lock and normal-return scratch lifecycle remain intact.
+
+On a successful CACHE-3 read, canonical compact-key fields and the independently
+validated complete context are compared separately. Their equality implies the
+same full source-query key; concatenating it solely to compare it is unnecessary.
+The stateless public decoder and rejection diagnostics remain checked. The older
+single-entry description above is historical: the two owned source drivers now
+use a per-invocation **eight-entry MRU window** of verified contexts. A hit still
+requires the same directory, digest, expected context and structural datatypes.
+Malformed/legacy/missing/inferred/written or rejected records clear the window.
+Every invocation starts empty. This bounds entries, **not retained bytes**.
+
+The strict publication, key-parts and read-window source layers are replayed in
+reverse order before the existing frozen contracts. Full owner identities,
+unique edits and the 128-module registry stay pinned; no old expected hash was
+replaced with the new one.
+
+### Current functional evidence and engineering trade-off
+
+The current local candidate passed 18 maintained build commands, **232** strict
+Python controls (normal and `-O` combined), and **40** maintained source-context
+invocations. The latter preserve the previous controls and add failed directory
+publication, canonical decoder differential checks, bounded-window/MRU tests and
+actual raw-versus-final admission checks. Independent lock probes run while
+owners are alive. Tests distinguish a final-object envelope rejection from a
+real raw alpha/name-hint counterexample rejected by PreparedRaw admission.
+
+The real Foundation workload used all **14 modules / 504 groups**. Complete cold
+cache directories used **49,387,843 vs 104,698,792 logical bytes** and
+**50,651,136 vs 105,771,008 pathname-allocated bytes**: reductions of **52.83%**
+and **52.11%**. Both representations produced identical complete formal outputs;
+one source value change inferred one group and reused 503.
+
+This is a space improvement, **not an unconditional speed improvement**. In the
+single fixed ABBA sequence, compact warm reads averaged **16.8528 s**, versus
+**16.1963 s** for CACHE-1 materialized by the **same new binary** (**4.05% slower**).
+The one-change compact path was also slower, **17.0244 vs 15.5641 s**. These costs
+are disclosed as the present engineering trade-off, not hidden by the storage
+result. Earlier candidate observations, the failed intermediate measurement,
+exact identities and all stage times are retained in the
+[Foundation study](../source-context-read-window/README.md).
+
+This evidence does not establish a statistical speedup, total disk-I/O reduction,
+cross-machine behavior, a complete compiler corpus, crash safety, malicious
+writers, Windows lock semantics or a bound on window-retained heap bytes.
+It is not native/self-host fixed-point qualification. Existing
+[CI #244](https://github.com/mlf-lang/mlf/actions/runs/41342154603) qualified the
+preceding published head `a0330773` with upstream `c5928b5b`; it does **not**
+qualify these later local changes. Their exact published head needs its own CI.

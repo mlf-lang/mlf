@@ -2,7 +2,7 @@
   "format": 1,
   "source_syntax": "shared-haskell-v1",
   "frontend_semantics": "mlf-frontend/shared-haskell-v1/8",
-  "primitive_abi": "mlf-primitive-129-v6",
+  "primitive_abi": "mlf-primitive-132-v7",
   "source_roots": [
     "libraries/mlf-async",
     "libraries/mlf-crates",
@@ -46,6 +46,21 @@
     {
       "module": "Async.Task.Internal",
       "path": "libraries/mlf-async/Async/Task/Internal.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ArtifactStorage",
+      "path": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ArtifactStructure",
+      "path": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Bitstream",
+      "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
       "role": "implementation"
     },
     {
@@ -760,5 +775,5 @@
     "host/ghc/app/source-smoke/Main.hs",
     "host/ghc/app/builtin-prelude/Main.hs"
   ],
-  "builtin_interface": "mlf-primitive/shared-haskell-v1/10"
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/11"
 }

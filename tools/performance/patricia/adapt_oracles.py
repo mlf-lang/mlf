@@ -11,6 +11,40 @@ RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
 OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
 NEW_INDEX = b'Rank.indexMap selected'
 
+def binary_contract(source_root=None):
+    import types
+    path = Path(__file__).resolve().parent / 'source_migration.py'
+    module = types.ModuleType('binary_live_owner_migration')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module.binary_contract(source_root=source_root)
+
+
+def project_binary_owner(raw, source_root=None):
+    return binary_contract(source_root).project_owner(raw, 'Bootstrap.CrateSession')
+
+
+def read_window_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-read-window/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_read_window_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def key_parts_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-key-parts/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_key_parts_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def publication_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-publication/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_publication_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
 def memo_contract():
     import importlib.util
     path=Path(__file__).resolve().parent.parent/'source-context-read-reuse/source_contract.py'
@@ -19,8 +53,18 @@ def memo_contract():
     return module
 
 def without_context_read_reuse(raw):
+    read_window=read_window_contract();read_window.manifest()
+    if sha(raw)==read_window.OWNERS['Bootstrap.CrateSession']['new']:
+        raw=read_window.project_owner(raw,'Bootstrap.CrateSession')
+    # The exact K parent continues through its fixed key-parts identity below;
+    # older source-proof replay remains in frozen diamond history, not the
+    # read-window live entry, which rejects every prior or partial owner.
+    key_parts=key_parts_contract();key_parts.manifest()
+    publication=publication_contract();publication.manifest()
     memo=memo_contract();memo.manifest()
     if sha(raw)==memo.OWNERS['Bootstrap.CrateSession']['new']:
+        raw=key_parts.project_owner(raw,'Bootstrap.CrateSession')
+        raw=publication.project_owner(raw,'Bootstrap.CrateSession')
         return memo.restore_previous_owner(raw)
     # Historical admission remains entirely in the frozen diamond contract.
     diamond_contract().storage_history(raw)
@@ -89,6 +133,13 @@ def with_rank_view(raw):
     return raw.replace(marker,marker+RANK_IMPORT).replace(b'IntMapTree Node',b'Rank.MapIndex Node').replace(OLD_INDEX,NEW_INDEX)
 
 def prepare(root,out):
+    # Preserve the public adapter's pure header failure before full source
+    # admission or any output. Positive inputs still pass the entire binary gate.
+    header_source=(root/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_text()
+    require(header_source.count('module Bootstrap.CrateSession (compileSpecFile) where {')==1
+            and 'module SessionUnderTest where {' not in header_source,'unique private header')
+    # Admit binary131 bytes; runtime test copies below remain entirely current.
+    binary_contract(root).live_registry(root)
     out.mkdir(parents=True,exist_ok=False)
     a=root/'tools/performance/a1-private-index/controls';c=root/'tools/performance/c4-local-transaction/controls'
     files={p.name:p for p in c.glob('*.hs') if p.name!='FileControls.hs'}

@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 22353,
+  "new_sha256": "9c2a66efae56f670bd9521cadc9b9a15d47d0107f1620bef7d5ca863cb4a8048",
+  "old_bytes": 22118,
+  "old_sha256": "9a36850ff04404b488316feb169b869b28acaf9c226b33c6810a0a3eecb95c47",
+  "path": "bootstrap/MLF/PreparedCompiler.hs",
+  "splices": [
+    {
+      "new": "LS0gUHJlc2VydmUgbWFuaWZlc3QvaWRlbnRpdHkgZGVtYW5kIGhlcmUuIEFjdHVhbCBvYmplY3QgYWRtaXNzaW9uIGJlbG9uZ3MKICAgIC0tIHRvIHRoZSBjb25zdW1lcnM6IG5hdGl2ZUxheW91dCB1c2VzIG5hdGl2ZUxpYnJhcnlEZWNsYXJhdGlvbnMsIGVtaXNzaW9uCiAgICAtLSB1c2VzIG5hdGl2ZUxpYnJhcnksIGFuZCByb290IGNvbXBpbGF0aW9uIHVzZXMgY29tcGlsZU5hdGl2ZVJvb3RVc2luZy4KICAgIA==",
+      "new_at": 2571,
+      "old": "",
+      "old_at": 2571
+    }
+  ]
+}

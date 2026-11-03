@@ -29,7 +29,7 @@ import qualified Data.ByteString as BS
 import Data.Char (ord, chr)
 import qualified Data.String as TextLiteral
 import qualified GHC.Stack as Stack
-import qualified Data.Array as Array
+import qualified Data.Array.Unboxed as Array
 import Data.Bits ((.&.))
 import qualified Data.Int as Fixed
 import qualified Data.Bits as Bits
@@ -56,11 +56,38 @@ type ST = S.ST
 data STArray s a = STArray !Int !(A.STArray s P.Int a)
 -- Text is strict UTF-8 in the supported text-2 toolchain. String indices and
 -- lengths below count Unicode scalars, never bytes or UTF-16 code units.
-data String = String !T.Text !P.Int (Array.Array P.Int Char)
+data String = String !T.Text !P.Int (Array.UArray P.Int P.Int)
 mkText :: T.Text -> String
 mkText text = mkSizedText (T.length text) text
 mkSizedText :: P.Int -> T.Text -> String
-mkSizedText count text = String text count (Array.listArray (0,count-1) (T.unpack text))
+mkSizedText count text = String text count (scalarOffsets count text)
+-- One byte offset per 256 Unicode scalars, rather than a boxed Char per
+-- scalar. Most blocks in compiler objects are ASCII even when the object
+-- contains Unicode literals; those blocks retain constant-time indexing.
+scalarOffsets :: P.Int -> T.Text -> Array.UArray P.Int P.Int
+scalarOffsets count (TI.Text bytes base _) =
+  Array.listArray (0,count `div` 256) (go 0 0)
+  where
+    go scalar offset = offset :
+      if count-scalar < 256 then []
+      else go (scalar+256) (advanceUTF8 bytes base offset 256)
+advanceUTF8 :: TA.Array -> P.Int -> P.Int -> P.Int -> P.Int
+advanceUTF8 bytes base = go
+  where
+    go offset remaining
+      | remaining == 0 = offset
+      | otherwise = let first=TA.unsafeIndex bytes (base+offset)
+                        width=if first<0x80 then 1 else if first<0xe0 then 2 else if first<0xf0 then 3 else 4
+                    in go (offset+width) (remaining-1)
+scalarOffset :: T.Text -> P.Int -> Array.UArray P.Int P.Int -> P.Int -> P.Int
+scalarOffset (TI.Text bytes base byteLength) size offsets index =
+  let block=index `div` 256
+      start=offsets Array.! block
+      following=if block<size `div` 256 then offsets Array.! (block+1) else byteLength
+      scalars=min 256 (size-block*256)
+      within=index-block*256
+  in if following-start==scalars then start+within
+     else advanceUTF8 bytes base start within
 -- Private compiler-managed evidence uses real GHC stack values on this host.
 -- These adapters do not redefine the public HasCallStack constraint.
 type MLFCallStack = Stack.CallStack
@@ -271,7 +298,8 @@ v_stringCodeAt text@(String t size characters) index = text `pseq` index `pseq`
   in case t of
     TI.Text bytes offset byteLength
       | byteLength == size -> i `pseq` fromIntegral (TA.unsafeIndex bytes (offset+i))
-      | otherwise -> fromIntegral (ord (characters Array.! i))
+      | otherwise -> let position=scalarOffset t size characters i
+                     in fromIntegral (ord (T.head (TI.text bytes (offset+position) (byteLength-position))))
 v_stringSlice :: String -> Int -> Int -> String
 v_stringSlice text@(String t size characters) start count = text `pseq` start `pseq` count `pseq`
   let i=bounded "string slice out of bounds" (fromIntegral size) start
@@ -279,7 +307,9 @@ v_stringSlice text@(String t size characters) start count = text `pseq` start `p
   in i `pseq` n `pseq` case t of
     TI.Text bytes offset byteLength
       | byteLength == size -> mkSizedText n (T.copy (TI.text bytes (offset+i) n))
-      | otherwise -> literal [characters Array.! j | j <- [i..i+n-1]]
+      | otherwise -> let begin=scalarOffset t size characters i
+                         end=scalarOffset t size characters (i+n)
+                     in mkSizedText n (T.copy (TI.text bytes (offset+begin) (end-begin)))
 v_stringFromCode :: Int -> String
 v_stringFromCode n = if n<0 || n>0x10ffff || (n>=0xd800 && n<=0xdfff) then failure "invalid Unicode scalar" else literal [chr (fromIntegral n)]
 v_ifThenElse :: Bool -> a -> a -> a

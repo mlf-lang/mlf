@@ -1,0 +1,344 @@
+{
+  "complete": true,
+  "date": "2026-11-02",
+  "parent_ref": "9dfcd6625775819568eaaa5065f8dd1431df52f8",
+  "scope": "GHC host String representation; unchanged shared compiler and C runtime",
+  "environment": {
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "cpu": "Apple M1 Max",
+    "ghc": "9.14.1",
+    "clang": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+    "rss_qualification": "100 ms process-tree samples; Darwin has no hard address-space enforcement"
+  },
+  "production_owner": {
+    "path": "host/ghc/MLF/Host/Base.hs",
+    "sha256": "50780c7183d62aa7568c0a799fdf5829b6ea60cbbc67cca7fd1a3f08bc4ba9c5"
+  },
+  "producer_receipt": {
+    "path": ".mlf-build/llvm-memory-20261102/candidate/producer/receipt.json",
+    "sha256": "9e5bc70344cabc61adfcd656100692c82b69705df5ec14782ae62bd3ff2570cf"
+  },
+  "candidate_binary": {
+    "path": ".mlf-build/llvm-memory-20261102/candidate/producer/bin/emlf",
+    "sha256": "e97acb3158d3264abddf46c9b77f53b701f6bf96bad556955a897f00d17fc280"
+  },
+  "workload": {
+    "path": ".mlf-build/full-compiler-20261101/projection-spine-02/integrated-workload.json",
+    "sha256": "c3c5a747a614408aaae8a5d103d5c280a222e7aa6c45fbebe22cabaa4fbc07da"
+  },
+  "diagnostics": [
+    {
+      "name": "string-probe",
+      "receipt": {
+        "path": ".mlf-build/llvm-memory-20261102/string-probe/run/command.json",
+        "sha256": "e554f05cd71d2294a8f2da6fb4fd4eb75a01916d536b89e8936b9fc003517c77"
+      },
+      "main": {
+        "path": ".mlf-build/llvm-memory-20261102/string-probe/Main.hs",
+        "sha256": "68f85f028275f57c53f890376ea2f913fee891ec49040b250132704f7e1d99a9"
+      },
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "START read\nREAD scalars=167988512\nINDEX first=55\n",
+      "complete": true,
+      "reason": null,
+      "wall_seconds": 12.527270792,
+      "sampled_process_tree_peak_rss_bytes": 1857601536
+    },
+    {
+      "name": "stage-probe",
+      "receipt": {
+        "path": ".mlf-build/llvm-memory-20261102/stage-probe/run/command.json",
+        "sha256": "c994efc4b611418007b192dce3773d6c0a0f1427948a94cd7ab9735ce92c982a"
+      },
+      "main": {
+        "path": ".mlf-build/llvm-memory-20261102/stage-probe/Main.hs",
+        "sha256": "a641d7f463575c5b8a08a16852017cfacfbb3e8ac0afbac51b55fb4bf68c305c"
+      },
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "INTERFACES\nREAD OBJECT /Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/setup/builtin.mlfci\nDECODED OBJECT\nREAD OBJECT /Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-checked-01/unit.mlfci\n",
+      "complete": false,
+      "reason": "process-tree RSS limit",
+      "wall_seconds": 17.713306208,
+      "sampled_process_tree_peak_rss_bytes": 5389058048
+    },
+    {
+      "name": "compact-stage-probe",
+      "receipt": {
+        "path": ".mlf-build/llvm-memory-20261102/compact-stage-probe/run/command.json",
+        "sha256": "eb8d4d63aee724c775ea78e5104f7175feb90fbf5e689031dd3e864e981a9107"
+      },
+      "main": {
+        "path": ".mlf-build/llvm-memory-20261102/compact-stage-probe/Main.hs",
+        "sha256": "a641d7f463575c5b8a08a16852017cfacfbb3e8ac0afbac51b55fb4bf68c305c"
+      },
+      "stdout_sha256": "03f1102793d9bf19a6e8a9dc337d3fcde8e7a937375880d16d23101d1f71e800",
+      "stderr": "INTERFACES\nREAD OBJECT /Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/setup/builtin.mlfci\nDECODED OBJECT\nREAD OBJECT /Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-checked-01/unit.mlfci\nDECODED OBJECT\nLINKED CHECKED\nLLVM GENERATED\n",
+      "complete": true,
+      "reason": null,
+      "wall_seconds": 74.85895225,
+      "sampled_process_tree_peak_rss_bytes": 2681716736
+    }
+  ],
+  "native_comparison": {
+    "plan": {
+      "path": ".mlf-build/llvm-memory-20261102/native-comparison/plan.json",
+      "sha256": "9065aed6c87e1429bb251fcb6c703912354f559854df9832cbfb8166eb3de231"
+    },
+    "receipt": {
+      "path": ".mlf-build/llvm-memory-20261102/native-comparison/receipt.json",
+      "sha256": "87d9dd453f11873ae16e0008195485669bfad262f7ff3b268da0fd07ca09c351"
+    },
+    "runs": [
+      {
+        "position": 0,
+        "lane": "mlf-native",
+        "wall_seconds": 419.945097,
+        "sampled_peak_rss_bytes": 2799648768,
+        "receipt": {
+          "path": ".mlf-build/llvm-memory-20261102/native-comparison/0-mlf-native/receipt.json",
+          "sha256": "2ddd3fc232800b6b3c568a96438975adf2d64d20fe0faf3d40cf2ffc0fc09347"
+        },
+        "program": {
+          "path": ".mlf-build/llvm-memory-20261102/native-comparison/0-mlf-native/program",
+          "sha256": "25d57952856ae51ffc4841caef3d6cdc36ed4337a5989d5ff90fe27dfa7e6605"
+        },
+        "stages": [
+          {
+            "name": "source-to-checked",
+            "wall_seconds": 300.29289575,
+            "exit_code": 0
+          },
+          {
+            "name": "checked-to-llvm",
+            "wall_seconds": 73.518777583,
+            "exit_code": 0
+          },
+          {
+            "name": "llvm-to-executable",
+            "wall_seconds": 46.060458375,
+            "exit_code": 0
+          }
+        ],
+        "fresh": 3711,
+        "reused": 0,
+        "raw_bytes_equal": true
+      },
+      {
+        "position": 1,
+        "lane": "ghc-native",
+        "wall_seconds": 59.66941375,
+        "sampled_peak_rss_bytes": 1236238336,
+        "receipt": {
+          "path": ".mlf-build/llvm-memory-20261102/native-comparison/1-ghc-native/receipt.json",
+          "sha256": "7906ee9a667f07598eb6f4cb06f87db572cc5c07f7f7059b5d5568e516393a90"
+        },
+        "program": {
+          "path": ".mlf-build/llvm-memory-20261102/native-comparison/1-ghc-native/program",
+          "sha256": "a71a933e1190e2f747c6198ba7261df1cc0fd31f7c29e4088fca7a338e8db861"
+        },
+        "stages": [
+          {
+            "name": "source-to-ghc-native",
+            "wall_seconds": 59.576804334,
+            "exit_code": 0
+          }
+        ],
+        "fresh_shared_modules": 81,
+        "fresh_host_wrapper": 1,
+        "reused": 0
+      },
+      {
+        "position": 2,
+        "lane": "ghc-native",
+        "wall_seconds": 59.51334875,
+        "sampled_peak_rss_bytes": 1297776640,
+        "receipt": {
+          "path": ".mlf-build/llvm-memory-20261102/native-comparison/2-ghc-native/receipt.json",
+          "sha256": "99645837b08793439316117717e429c0c2cbd973b1e95e1b319348a5a98440de"
+        },
+        "program": {
+          "path": ".mlf-build/llvm-memory-20261102/native-comparison/2-ghc-native/program",
+          "sha256": "a71a933e1190e2f747c6198ba7261df1cc0fd31f7c29e4088fca7a338e8db861"
+        },
+        "stages": [
+          {
+            "name": "source-to-ghc-native",
+            "wall_seconds": 59.408932458,
+            "exit_code": 0
+          }
+        ],
+        "fresh_shared_modules": 81,
+        "fresh_host_wrapper": 1,
+        "reused": 0
+      },
+      {
+        "position": 3,
+        "lane": "mlf-native",
+        "wall_seconds": 433.1556665,
+        "sampled_peak_rss_bytes": 2823798784,
+        "receipt": {
+          "path": ".mlf-build/llvm-memory-20261102/native-comparison/3-mlf-native/receipt.json",
+          "sha256": "a36abbe0b0ba4a4d04385fd39e73306c9e910c131d8d5ac0061d2a33473ac7ba"
+        },
+        "program": {
+          "path": ".mlf-build/llvm-memory-20261102/native-comparison/3-mlf-native/program",
+          "sha256": "25d57952856ae51ffc4841caef3d6cdc36ed4337a5989d5ff90fe27dfa7e6605"
+        },
+        "stages": [
+          {
+            "name": "source-to-checked",
+            "wall_seconds": 310.893611625,
+            "exit_code": 0
+          },
+          {
+            "name": "checked-to-llvm",
+            "wall_seconds": 74.421293292,
+            "exit_code": 0
+          },
+          {
+            "name": "llvm-to-executable",
+            "wall_seconds": 47.751986292,
+            "exit_code": 0
+          }
+        ],
+        "fresh": 3711,
+        "reused": 0,
+        "raw_bytes_equal": true
+      }
+    ],
+    "pair_ratios": [
+      7.037861956537155,
+      7.278294291917156
+    ],
+    "geometric_ratio": 7.157068569293246,
+    "geometric_seconds": {
+      "ghc-native": 59.591330159779076,
+      "mlf-native": 426.4992360889315
+    },
+    "inference": "Fixed four observations; descriptive native endpoint ratio, no interval or old/new percentage speedup claim"
+  },
+  "controls": [
+    {
+      "name": "controls-o0",
+      "receipt": {
+        "path": ".mlf-build/llvm-memory-20261102/controls-o0/receipt.json",
+        "sha256": "02b4b64fc9084d710c99f18bca1460991252ec75a69f5e73cd9e7208a27ef294"
+      },
+      "stdout": "PASS 94 Unicode fixtures: every scalar, block-boundary slices, exact bounds errors\n"
+    },
+    {
+      "name": "controls-o2",
+      "receipt": {
+        "path": ".mlf-build/llvm-memory-20261102/controls-o2/receipt.json",
+        "sha256": "c4b1ecddcc935a3ed3219824d67456c8141e37e12a25bba2a447da710ec3f7f8"
+      },
+      "stdout": "PASS 94 Unicode fixtures: every scalar, block-boundary slices, exact bounds errors\n"
+    }
+  ],
+  "integration": {
+    "receipt": {
+      "path": ".mlf-build/llvm-memory-20261102/gates.json",
+      "sha256": "3636dd166f8edbe61f92a46fb7b347dfdeefadde0f925e7a470d1b7c7079058c"
+    },
+    "steps": [
+      {
+        "name": "c3-delayed-index",
+        "exit_code": 0
+      },
+      {
+        "name": "c3-survivors",
+        "exit_code": 0
+      },
+      {
+        "name": "p123",
+        "exit_code": 0
+      },
+      {
+        "name": "graph",
+        "exit_code": 0
+      },
+      {
+        "name": "map-balance",
+        "exit_code": 0
+      },
+      {
+        "name": "validation",
+        "exit_code": 0
+      },
+      {
+        "name": "builtin",
+        "exit_code": 0
+      },
+      {
+        "name": "files",
+        "exit_code": 0
+      },
+      {
+        "name": "native-library",
+        "exit_code": 0
+      },
+      {
+        "name": "native-containers",
+        "exit_code": 0
+      },
+      {
+        "name": "fingerprint",
+        "exit_code": 0
+      },
+      {
+        "name": "direct",
+        "exit_code": 0
+      },
+      {
+        "name": "batch-optimizer",
+        "exit_code": 0
+      },
+      {
+        "name": "native-io",
+        "exit_code": 0
+      },
+      {
+        "name": "locked-plan",
+        "exit_code": 0
+      },
+      {
+        "name": "manifest",
+        "exit_code": 0
+      }
+    ]
+  },
+  "native_behavior": {
+    "path": ".mlf-build/llvm-memory-20261102/native-behavior/receipt.json",
+    "sha256": "9781a7d9f4c94de62b99c85ff0330c5969a5a5282d20ff91ac227145a84f1109"
+  },
+  "independent_checked_reference": {
+    "receipt": {
+      "path": ".mlf-build/full-compiler-20261101/projection-spine-02/integrated-current-checked/receipt.json",
+      "sha256": "00ef435848b7a3f181d547351289796f2d94ae004978909ef0711a2bcdb6dea6"
+    },
+    "artifact_sha256": {
+      "unit.mlfci": "8eb5b3a2fa8e32d1b8f57d05763b45ad452e9e5456aa99e07ce1d7dea0f9d300",
+      "unit.mlfco": "8308977d43c7965f9a0e7b476ba4ef93c62e0417be016f4b7c7dd73bb858265b"
+    },
+    "raw_bytes_rechecked_after_cohort": true
+  },
+  "pilot": {
+    "receipt": {
+      "path": ".mlf-build/llvm-memory-20261102/native-qualification-01/receipt.json",
+      "sha256": "93e51af5df3a9233b23b8721b3a9edd72830921e0565807efe8c834e3e1f8b42"
+    },
+    "wall_seconds": 397.183955625,
+    "sampled_peak_rss_bytes": 3091988480,
+    "fresh": 3711,
+    "reused": 0,
+    "outside_comparison_cohort": true
+  },
+  "metadata_checks": {
+    "host_contract_normal_and_python_O": 4,
+    "patricia_adapters_normal_and_python_O": 35,
+    "historical_metadata": 20,
+    "ci_policy": "passed 34 mutations and PR/main/release policies",
+    "a1_current": 34
+  }
+}

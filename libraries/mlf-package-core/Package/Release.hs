@@ -150,7 +150,7 @@ module Package.Release where {
         (S.all
            (\((,) _ iface) ->
               (S.not (S.elem eqString "Prelude" (Artifact.crateModules iface)) ||
-               eqString (Artifact.crateId iface) "mlf:builtin-prelude:1"))
+               eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity))
            interfaces)
         "release contains a noncanonical Prelude owner";
       S.traverseEither
@@ -240,7 +240,9 @@ module Package.Release where {
       iface <- relocateInterface locations (Artifact.objectInterface object);
       case object of {
         Artifact.CrateObject _ fragments -> Right (Artifact.CrateObject iface fragments);
-        Artifact.LegacyCrateObject _ fragments -> Right (Artifact.LegacyCrateObject iface fragments)
+        Artifact.LegacyCrateObject _ fragments -> Right (Artifact.LegacyCrateObject iface fragments);
+        Artifact.EnvelopeCrateObject legacy _ fragments ->
+          Right (Artifact.EnvelopeCrateObject legacy iface fragments)
       }
     };
   readObjects directory manifest interfaces =
@@ -265,7 +267,8 @@ module Package.Release where {
             temporary = (work ++ "/crates/pending")
           };
           O.mkdir temporary;
-          Artifact.writeObject (temporary ++ "/unit") portable;
+          written <- Artifact.writeObjectEither (temporary ++ "/unit") portable;
+          checked written;
           metadata <- fileDigest (temporary ++ "/unit.mlfci");
           body <- fileDigest (temporary ++ "/unit.mlfco");
           let {
@@ -352,7 +355,7 @@ module Package.Release where {
       releaseFileLock lock
     };
   localPrefix cache compiler row =
-    if eqString (rowIdentity row) "mlf:builtin-prelude:1"
+    if eqString (rowIdentity row) Artifact.builtinCrateIdentity
     then (cache ++ ("/.queries/builtin-prelude/" ++ (compiler ++ "/unit")))
     else (cache ++ ("/.releases/" ++ (compiler ++ ("/" ++ (rowKey row ++ "/unit")))));
   localPaths cache compiler manifest =
@@ -410,8 +413,16 @@ module Package.Release where {
            }
     };
   verifyPrelude object =
-    if S.not (eqString (Artifact.crateId (Artifact.objectInterface object)) "mlf:builtin-prelude:1")
+    if S.not (eqString (Artifact.crateId (Artifact.objectInterface object)) Artifact.builtinCrateIdentity)
     then ioReturn ()
+    -- The marker selects checking, not proof. Compare original full texts
+    -- only after fresh admission of both actual objects.
+    else if Artifact.envelopeMarked object
+    then do {
+      builtin <- checked Artifact.builtinPrelude;
+      same <- checked (Artifact.equalObjectEncodingsChecked builtin object);
+      O.require same "release contains a noncanonical builtin Prelude"
+    }
     else do {
            builtin <- checked Artifact.builtinPrelude;
            O.require
@@ -424,10 +435,9 @@ module Package.Release where {
     do {
       O.mkdir (O.parent prefix);
       lock <- acquireFileLock (prefix ++ ".lock");
-      O.writeAtomic (prefix ++ ".mlfco") (Artifact.encodeObject object);
-      O.writeAtomic (prefix ++ ".mlfci")
-        (Artifact.encodeInterface (Artifact.objectInterface object));
-      releaseFileLock lock
+      written <- Artifact.writeObjectAtomicEither prefix object;
+      releaseFileLock lock;
+      checked written
     };
   -- Decode only this private copy: hashing a producer's file and reopening it
   -- must not allow changed bytes to acquire a local validation receipt.

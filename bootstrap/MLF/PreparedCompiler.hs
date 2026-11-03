@@ -47,6 +47,9 @@ module MLF.PreparedCompiler
   nativeExportABI = "mlf-native-typed-tuple/2";
   fixedNativeLibrary :: Either String Libraries.RawLibrary;
   fixedNativeLibrary = case LibraryData.libraries of {
+    -- Preserve manifest/identity demand here. Actual object admission belongs
+    -- to the consumers: nativeLayout uses nativeLibraryDeclarations, emission
+    -- uses nativeLibrary, and root compilation uses compileNativeRootUsing.
     [raw] -> Right raw;
     _ -> Left "native installation requires exactly one fixed prepared library"
   };

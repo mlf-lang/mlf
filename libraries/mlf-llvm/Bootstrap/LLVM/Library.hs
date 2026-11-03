@@ -191,7 +191,7 @@ module Bootstrap.LLVM.Library
   header = ["; Generated from checked xMLF and an authenticated fixed native library boundary.",
     "source_filename = \"emlf-fixed-native\"", ""];
   abi :: [] String;
-  abi = ["declare void @mlf_require_haskell_boundary_v4_abi()"];
+  abi = ["declare void @mlf_require_haskell_boundary_v4_abi()", "declare void @mlf_require_byte_file_v2_abi()"];
   chunks :: [] String -> [] String;
   chunks = map (\line -> line ++ "\n");
   emitLibrary :: ExportLayout -> Checked.LinkedSpine -> Either String ([] String);
@@ -271,6 +271,7 @@ module Bootstrap.LLVM.Library
       "cycle:", "  call void @llvm.trap()", "  unreachable", "start:",
       "  store i32 1, ptr @" ++ prefix ++ "_state",
       "  call void @mlf_require_haskell_boundary_v4_abi()",
+      "  call void @mlf_require_byte_file_v2_abi()",
       "  %root = call ptr " ++ entry ++ "(ptr null, ptr null)",
       "  store ptr %root, ptr @" ++ prefix ++ "_root, align 8"]
       (append (concatMap (slotCode prefix count) paths)
@@ -297,6 +298,7 @@ module Bootstrap.LLVM.Library
     concat [abi,
       ["declare ptr @" ++ prefix ++ "_get(i64)", "define ptr @mlf_entry() {", "entry:",
        "  call void @mlf_require_haskell_boundary_v4_abi()",
+      "  call void @mlf_require_byte_file_v2_abi()",
        "  %wrapper = call ptr " ++ entry ++ "(ptr null, ptr null)"],
       concat (zipWith (\index slot ->
         ["  %import" ++ showInt index ++ " = call ptr @" ++ prefix ++ "_get(i64 " ++ showInt slot ++ ")",

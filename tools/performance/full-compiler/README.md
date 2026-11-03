@@ -1,5 +1,9 @@
 # Complete compiler endpoints and private projection views
 
+Follow-up: the [2026-11-02 UTF-8 host fix](../llvm-memory/README.md) resolves the
+LLVM-command memory failure and establishes a complete native MLF/GHC endpoint
+comparison. The observations below remain the original, separate cohort.
+
 Baseline is PR #25 at `5172c4ade3b3141da2e64593c383892575b36699`.
 This replaces the earlier 14-module/711-group **screen** with the complete
 recursive shared-source import closure of `MLF.Entry.Emlf`: 81 modules and

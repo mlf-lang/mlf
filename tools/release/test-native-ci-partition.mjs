@@ -101,10 +101,17 @@ const validate = text => {
     'python3 -B tools/performance/patricia/test_adapters.py',
     'python3 -O -B tools/performance/patricia/test_adapters.py',
     'tools/shared/test_source_context_cache.py',
+    'tools/shared/test_artifact_binary.py',
     'tools/shared/test_recursive_managed.py',
     'tools/shared/test_guest_framework.py',
     'tools/shared/test_guest_state_laws.py',
   ];
+  const binary = commandStep('tools/shared/test_artifact_binary.py');
+  assert.match(binary, /^        if: matrix.optimization == '2'$/m);
+  assert.match(binary, /set -euo pipefail/);
+  assert.match(binary, /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 \.mlf-build\/artifact-binary-guard python3 -B tools\/shared\/test_artifact_binary.py --source-root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --clang clang --gc-prefix "\$PWD\/\.mlf-build\/io-action-gc" --partial-write-sink \/dev\/full --output \.mlf-build\/artifact-binary-guard\/results\n/);
+  const gcPreparation = commandStep('cp "$archive" "$prefix/lib/libgc.a"');
+  assert.ok(steps.indexOf(gcPreparation) < steps.indexOf(binary), 'GC preparation precedes binary native build');
   const framework = commandStep('tools/shared/test_framework_direct.py');
   assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite '\$\{\{ matrix.suite \}\}' \$\{suite_args\[@\]\+"\$\{suite_args\[@\]\}"\}\n/);
   assert.doesNotMatch(native, /--frontend-timeout|--native-timeout/,
@@ -140,6 +147,12 @@ const validate = text => {
     'O0 shards must cover the complete prior O0 scope exactly once, with neither omissions nor duplicates');
   const upload = commandStep('uses: actions/upload-artifact@');
   assert.match(upload, /^        if: always\(\)$/m, 'Keep evidence for failed and timed-out shards');
+  for (const evidence of ['bounded-receipt.json', 'build.log', 'results/**/*.json',
+                          'results/**/*.stdout', 'results/**/*.stderr']) {
+    assert.ok(upload.includes('.mlf-build/artifact-binary-guard/' + evidence),
+      'Keep binary build, target, and independent-oracle evidence: ' + evidence);
+  }
+
   const artifact = upload.match(/^          name: (.+)$/m)?.[1];
   assert.ok(artifact);
   const artifactNames = legs.map(leg => artifact.replaceAll('${{ matrix.optimization }}', leg.optimization).replaceAll('${{ matrix.suite }}', leg.suite));
@@ -181,6 +194,15 @@ const controls = [
   ['O2 source context omitted',
     "      - name: Check shared source-query contexts and legacy cache compatibility\n        if: matrix.optimization == '2'\n",
     "      - name: Check shared source-query contexts and legacy cache compatibility\n        if: false\n"],
+  ['O2 artifact binary omitted',
+    "      - name: Check binary artifact codecs and real native storage\n        if: matrix.optimization == '2'\n",
+    "      - name: Check binary artifact codecs and real native storage\n        if: false\n"],
+  ['binary command omitted', 'tools/shared/test_artifact_binary.py', 'tools/shared/omitted_artifact_binary.py'],
+  ['binary producer receipt omitted', '--build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc"', '--clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc"'],
+  ['binary native sink omitted', '--partial-write-sink /dev/full', ''],
+  ['binary native dependencies omitted', '--gc-prefix "$PWD/.mlf-build/io-action-gc"', ''],
+  ['binary resource guard relaxed', '--rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--rss-mib 6144 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
+  ['binary evidence omitted', '            .mlf-build/artifact-binary-guard/results/**/*.json\n', ''],
   ['retained P123 omitted', 'run_integrated.py --suite p123', 'run_integrated.py --suite graph'],
   ['retained graph omitted', 'run_integrated.py --suite graph', 'run_integrated.py --suite builtin'],
   ['retained validation omitted', 'run_integrated.py --suite validation', 'run_integrated.py --suite builtin'],
@@ -197,7 +219,7 @@ const controls = [
 ];
 for (const [name, before, after] of controls) {
   assert.ok(workflow.includes(before), `Mutation ${name} must hit the actual workflow`);
-  if (name === 'O2 guest omitted' || name === 'O2 source context omitted') {
+  if (name === 'O2 guest omitted' || name === 'O2 source context omitted' || name === 'O2 artifact binary omitted') {
     assert.equal(workflow.split(before).length, 2, `Mutation ${name} must select exactly one named step`);
   }
   const mutated = workflow.replace(before, after);

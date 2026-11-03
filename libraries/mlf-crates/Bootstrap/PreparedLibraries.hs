@@ -111,7 +111,7 @@ module Bootstrap.PreparedLibraries
   data CheckedLibrary = CheckedLibrary Artifact.FragmentState (Either String Checked.LinkedSpine);
   libraryState (CheckedLibrary state _) = state;
   librarySpine (CheckedLibrary _ proof) = proof;
-  checkedLibrary raw = do {
+  checkedLibraryV1 raw = do {
     validateRegistry raw;
     let { ifaces = interfaces raw; byName = Artifact.interfaceMap ifaces;
           objects = M.fromList compareString (map (\entry -> let { object = libraryObject entry }
@@ -167,7 +167,7 @@ module Bootstrap.PreparedLibraries
   original mode sources names = mapEither (\compiled ->
     Compilation (Core.checkedTerm compiled) (Core.sourceType compiled) False names)
     (Compiler.compileLinked mode sources);
-  compileLoaded registry mode loaded = let {
+  compileLoadedV1 registry mode loaded = let {
     sources = Modules.loadedSources loaded;
     entries = Modules.loadedEntries loaded;
     candidates = sortBy (\a b -> compareInt (length (librarySources b)) (length (librarySources a)))
@@ -273,17 +273,17 @@ module Bootstrap.PreparedLibraries
   nativeInferredType (NativeRoot _ _ _ value _ _) = value;
   nativeDeclarations (NativeRoot _ _ _ _ value _) = value;
   nativeBuiltinCount (NativeRoot _ _ _ _ _ value) = value;
-  nativeLibraryDeclarations raw = foldEither Separate.mergeDeclaration []
+  nativeLibraryDeclarationsV1 raw = foldEither Separate.mergeDeclaration []
     (concatMap Artifact.crateLoweredData (interfaces raw));
   nativeExportSignatures raw = M.toList (M.fromList compareString
     (concatMap Artifact.crateBindings (interfaces raw)));
-  nativeLibrary raw = do {
+  nativeLibraryV1 raw = do {
     admitted <- checkedLibrary raw;
     proof <- librarySpine admitted;
     declarations <- nativeLibraryDeclarations raw;
     Right ((,,) proof (nativeExportSignatures raw) declarations)
   };
-  nativeHeaders raw = do {
+  nativeHeadersV1 raw = do {
     validateRegistry raw;
     let { ifaces = interfaces raw; byName = Artifact.interfaceMap ifaces };
     ordered <- Artifact.dependencyClosure byName [] [] (map Artifact.crateId ifaces);
@@ -340,7 +340,7 @@ module Bootstrap.PreparedLibraries
   } in length names == length (nubBy eqString names) && all
     (\source -> all (\entry -> let { name = Modules.importedModule entry } in
       Modules.isBuiltinModule name || elem eqString name names) (Modules.sourceImports source)) sources;
-  compileNativeRootUsing parseSource raw mode loaded = do {
+  compileNativeRootUsingV1 parseSource raw mode loaded = do {
     let { sources = Modules.loadedSources loaded;
       ordinary = Modules.resolveCrateWithAllocator mode M.empty Modules.freshNames sources };
     Core.atPhase Verification (ensure (nativeLoadedMatches raw mode loaded)
@@ -365,7 +365,7 @@ module Bootstrap.PreparedLibraries
   };
   -- Only the canonical builtin crate is eligible for local materialization.
   -- Ownership comes from validated crate metadata, never a spelling or hint.
-  nativeBuiltinState selected raw = case filter (\entry -> eqString
+  nativeBuiltinStateV1 selected raw = case filter (\entry -> eqString
       (Artifact.crateId (Artifact.objectInterface (libraryObject entry))) Artifact.builtinCrateIdentity)
       (libraryObjects raw) of {
     [entry] -> let { object = libraryObject entry; iface = Artifact.objectInterface object;
@@ -378,7 +378,7 @@ module Bootstrap.PreparedLibraries
     };
     _ -> Left "native library requires one canonical builtin implementation"
   };
-  compileNativeResolvedRoot raw resolution = do {
+  compileNativeResolvedRootV1 raw resolution = do {
     let { display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
           sourcePhase phase result = Core.atPhase phase (mapLeft display result);
           resolved = Modules.resolvedCrateModules resolution;
@@ -448,7 +448,7 @@ module Bootstrap.PreparedLibraries
     Right (NativeRoot (fst local) (snd local) (display (Imported.sourceType compiled))
       (Imported.inferredType compiled) declarations (length (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures))))
   };
-  compilePrepared raw admitted resolution = do {
+  compilePreparedV1 raw admitted resolution = do {
     let { linked = libraryState admitted;
           display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
           sourcePhase phase result = Core.atPhase phase (mapLeft display result);
@@ -507,5 +507,82 @@ module Bootstrap.PreparedLibraries
     sourcePhase Verification (ensure (T.alphaEq (Checked.typeOf checked) (Imported.inferredType compiled))
       "prepared library graft changed the user root type");
     Right (Compilation checked (display (Imported.sourceType compiled)) True (Modules.resolvedCrateNames resolution))
-  }
+  };
+  -- N7 object-known dispatch. A constructor selects policy, never admission.
+  -- Every marked operation enters Artifact through the ACTUAL object list.
+  knownLibraryObjects raw = map libraryObject (libraryObjects raw);
+  hasEnvelopeLibraryObjects raw = any Artifact.envelopeMarked (knownLibraryObjects raw);
+  -- Registry identity and witness errors precede object policy inspection.
+  -- The marker selects fresh actual-object admission, never a proof shortcut.
+  checkedLibrary raw = do {
+    validateRegistry raw;
+    if hasEnvelopeLibraryObjects raw then checkedKnownLibrary raw else checkedLibraryV1 raw
+  };
+  checkedKnownLibrary raw = do {
+    validateRegistry raw;
+    linked <- Artifact.linkKnownObjectsWithSpine (knownLibraryObjects raw)
+      (map Artifact.crateId (interfaces raw))
+      ((,) (Artifact.FragmentState 0 M.empty [] [] S.empty) (Right Checked.emptySpine));
+    Right (CheckedLibrary (fst linked) (snd linked))
+  };
+  -- Preserve the original left-to-right legacy merge, including an error
+  -- before a later object is demanded. Enter the known-object operation only
+  -- when an actual marked object is reached; it retains caller declaration order.
+  nativeLibraryDeclarations raw = nativeDeclarationsDispatch raw [] (libraryObjects raw);
+  nativeDeclarationsDispatch :: RawLibrary -> [] DataDecl -> [] LibraryObject -> Either String ([] DataDecl);
+  nativeDeclarationsDispatch raw declarations remaining = case remaining of {
+    [] -> Right declarations;
+    (:) entry rest -> let { object = libraryObject entry } in
+      if Artifact.envelopeMarked object then Artifact.knownObjectDeclarations (knownLibraryObjects raw)
+      else do {
+        merged <- foldEither Separate.mergeDeclaration declarations
+          (Artifact.crateLoweredData (Artifact.objectInterface object));
+        nativeDeclarationsDispatch raw merged rest
+      }
+  };
+  -- One admission context owns both linking and caller-order declarations.
+  -- Do not reset a second ledger by calling nativeLibraryDeclarations here.
+  nativeLibrary raw = do {
+    validateRegistry raw;
+    if hasEnvelopeLibraryObjects raw then nativeKnownLibrary raw else nativeLibraryV1 raw
+  };
+  nativeKnownLibrary raw = do {
+    validateRegistry raw;
+    linked <- Artifact.linkKnownObjectsWithSpineAndDeclarations (knownLibraryObjects raw)
+      (map Artifact.crateId (interfaces raw))
+      ((,) (Artifact.FragmentState 0 M.empty [] [] S.empty) (Right Checked.emptySpine));
+    proof <- snd (fst linked);
+    Right ((,,) proof (nativeExportSignatures raw) (snd linked))
+  };
+  nativeHeaders raw = do {
+    validateRegistry raw;
+    if hasEnvelopeLibraryObjects raw then
+      Artifact.validateKnownObjectHeaders (knownLibraryObjects raw)
+        (map Artifact.crateId (interfaces raw))
+    else nativeHeadersV1 raw
+  };
+  nativeBuiltinState selected raw = if hasEnvelopeLibraryObjects raw
+    then nativeKnownBuiltinState selected raw else nativeBuiltinStateV1 selected raw;
+  nativeKnownBuiltinState selected raw = case filter (\entry -> eqString
+      (Artifact.crateId (Artifact.objectInterface (libraryObject entry))) Artifact.builtinCrateIdentity)
+      (libraryObjects raw) of {
+    [entry] -> Artifact.linkKnownSelectedObjectWithSpine selected (libraryObject entry)
+      ((,) (Artifact.FragmentState 0 M.empty [] [] S.empty) (Right Checked.emptySpine));
+    _ -> Left "native library requires one canonical builtin implementation"
+  };
+  -- Keep the original compiler demand/error order. In particular, candidate
+  -- matching and ordinary namespace failures do not inspect library objects.
+  -- Selected objects still undergo fresh admission at checkedLibrary/nativeHeaders
+  -- in the original pipeline. Downstream inference, naming and wrapper work use
+  -- the existing compiler/process guards; these are not a whole-compilation
+  -- envelope render ledger or an aggregate dependency-closure memory bound.
+  compileLoaded :: [] RawLibrary -> PreludeMode -> Modules.LoadedModules -> Either CompileError Compilation;
+  compileLoaded registry mode loaded = compileLoadedV1 registry mode loaded;
+  compileNativeRootUsing :: (String -> String -> Either String SourceModule) -> RawLibrary ->
+    PreludeMode -> Modules.LoadedModules -> Either CompileError NativeRoot;
+  compileNativeRootUsing parseSource raw mode loaded = compileNativeRootUsingV1 parseSource raw mode loaded;
+  compileNativeResolvedRoot :: RawLibrary -> Modules.ResolvedCrate -> Either CompileError NativeRoot;
+  compileNativeResolvedRoot raw resolution = compileNativeResolvedRootV1 raw resolution;
+  compilePrepared :: RawLibrary -> CheckedLibrary -> Modules.ResolvedCrate -> Either CompileError Compilation;
+  compilePrepared raw admitted resolution = compilePreparedV1 raw admitted resolution;
 }

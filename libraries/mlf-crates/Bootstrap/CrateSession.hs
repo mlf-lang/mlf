@@ -198,12 +198,16 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                 ioReturn (Left (Modules.displayNames diagnostics message));
               Right ((,,) object payload report) ->
                 do {
-                  Artifact.writeObjectWithPayload prefix object payload;
-                  writeFile (prefix ++ ".queries")
-                    (Query.reportJSON (specIdentity spec)
-                       (Artifact.semanticFingerprint (Artifact.objectInterface object))
-                       report);
-                  ioReturn (Right ())
+                  written <- Artifact.writeObjectWithPayloadEither prefix object payload;
+                  case written of {
+                    Left message -> ioReturn (Left message);
+                    Right _ -> do {
+                      writeFile (prefix ++ ".queries")
+                        (Query.reportJSON (specIdentity spec)
+                           (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
+                      ioReturn (Right ())
+                    }
+                  }
                 }
             }
           }
@@ -262,9 +266,9 @@ module Bootstrap.CrateSession (compileSpecFile) where {
       groups contracts objects inferred reused results;
   runSourceGroupsWithOwnedContext encodings datatypeContext contractEncodings ownedContext crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results =
-      runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext Nothing
+      runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext []
         crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
-  runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext readContext crateId compilerHash cacheDir inventory plan groups contracts
+  runSourceGroupsWithReadContext encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (Query.QueryReport inferred reused (reverse results)) contracts));
@@ -299,19 +303,18 @@ module Bootstrap.CrateSession (compileSpecFile) where {
         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
         present <- fileExists destination;
         cachedRead <- if present then do {
-          input <- readFile destination;
-          observed <- Query.readSourceCachedWithContext readContext cacheDir key name
-            bindings datatypes names input;
+          observed <- Query.readSourceCacheFileWithWindow readWindow cacheDir key name
+            bindings datatypes names destination;
           ioReturn (case observed of {
             (,,) next _ decoded -> case (do {
               object <- decoded;
               Source.validatePreparedRaw prepared object
             }) of {
-              Left error -> (,) Nothing (Left error);
+              Left error -> (,) [] (Left error);
               Right object -> (,) next (Right object)
             }
           })
-        } else ioReturn ((,) Nothing (Left "cache miss"));
+        } else ioReturn ((,) [] (Left "cache miss"));
         let { cached = snd cachedRead };
         let { raw = case cached of {
           Right object -> Right ((,) True object);
@@ -342,7 +345,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                   }) (case ownedContext of {
                     Nothing -> Nothing;
                     Just owned -> Just (Source.extendOwnedSourceContext finalContracts owned)
-                  }) (if hit then fst cachedRead else Nothing)
+                  }) (if hit then fst cachedRead else [])
                     crateId compilerHash cacheDir inventory plan rest
                     (M.union compareString finalContracts contracts)
                     ((:) finalObject objects) (inferred + (if hit then 0 else 1))

@@ -568,8 +568,8 @@ module Bootstrap.Runtime where {
     let {
       n = P.primitiveCode primitive
     } in
-    ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
-     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94))))))));
+    (((n == 129) || (n == 131)) || ((n == 130) || ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
+     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94))))))))));
   isSTAction primitive =
     case primitive of {
       PSTReturn -> True;
@@ -1109,6 +1109,18 @@ module Bootstrap.Runtime where {
              case entry of {
                (,,) table key value -> finishIO (writeIntTable table key value)
              });
+      PReadByteFileOrError -> checkedIO
+        (do { file <- string a; limit <- integer b; Right ((,) file limit) })
+        (\entry -> case entry of { (,) file limit ->
+          wrapIO (readByteFileOrError file limit)
+            (\result -> case result of { (,) message bytes ->
+              RConstructor "(,)" [Right (RString message), Right (RByteArray bytes)] }) });
+      PWriteByteFileOrError -> checkedIO (string a)
+        (\file -> if hasNul file 0
+          then ioReturn (Right (Right (RString "file path contains NUL")))
+          else checkedIO (byteArray b)
+            (\bytes -> wrapIO (writeByteFileOrError file bytes) RString));
+      PByteArrayDigest -> checkedIO (byteArray a) (\bytes -> wrapIO (byteArrayDigest bytes) RString);
       PReadFile -> checkedIO (path a) (\file -> wrapIO (readFile file) RString);
       PWriteFile ->
         checkedIO

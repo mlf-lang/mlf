@@ -1,0 +1,33 @@
+{
+  "files": {
+    "a1-private-index/test_current.py": {
+      "bytes": 35158,
+      "sha256": "84a8c32c262f0d5f254dcef6818d896d8b37dbf1e1798c9103b073512caa3c4a"
+    },
+    "patricia/adapt_oracles.py": {
+      "bytes": 13197,
+      "sha256": "ab2e55b49aab5c25b4e5e560f40a78b436bde419485f84a466a1036fbfac9588"
+    },
+    "patricia/run_integrated.py": {
+      "bytes": 16123,
+      "sha256": "58f062de7bb7b676e0ada316f031f1c16fba0143bd382c76a1551aab1b39ac3d"
+    },
+    "patricia/source_migration.py": {
+      "bytes": 20182,
+      "sha256": "f6eda8bfdda1473e6a6a7cb60c929ad3bc75977019c7cb4779e0124c7814ce6f"
+    },
+    "patricia/test_adapters.py": {
+      "bytes": 107069,
+      "sha256": "5016cf9f5646139bc8a1f3dc3783b7e898ebc65f9a2600a5826ed059803cac5d"
+    },
+    "validation-reuse/test_contract.py": {
+      "bytes": 9710,
+      "sha256": "b74a0214bc521e0573bb9f61f9a34876652d9a602e15e293cef8f726ac94bc8b"
+    }
+  },
+  "format": "binary-maintenance-parent-inventory-v1",
+  "mutable_frozen_history": [
+    "patricia/source_migration.py",
+    "patricia/test_adapters.py"
+  ]
+}

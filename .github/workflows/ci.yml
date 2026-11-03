@@ -227,6 +227,12 @@ jobs:
         run: |
           python3 -B tools/performance/full-compiler/test_contract.py
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/full-compiler-guard python3 -B tools/performance/full-compiler/run_controls.py --producer .mlf-build/shared-ghc --producer-source "$PWD" --optimization 2 --output .mlf-build/full-compiler-20261101/ci-controls
+      - name: Check compact Unicode indexing against frozen host and independent scalar oracle
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/performance/llvm-memory/test_contract.py
+          python3 -O -B tools/performance/llvm-memory/test_contract.py
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 5120 .mlf-build/llvm-memory-guard python3 -B tools/performance/llvm-memory/run_controls.py --producer .mlf-build/shared-ghc --optimization 2 --output .mlf-build/llvm-memory-20261102/ci-controls
       - name: Check shared-value specialization admission and lazy semantics
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_common_calls.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/common-calls
@@ -247,6 +253,12 @@ jobs:
           cp "$archive" "$prefix/lib/libgc.a"
           dpkg-query -W libgc-dev > "$prefix/dependency-version.txt"
           python3 tools/shared/test_io_action_sharing.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/io-action-sharing --clang clang --gc-prefix "$prefix"
+      - name: Check binary artifact codecs and real native storage
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          test -f "$PWD/.mlf-build/io-action-gc/lib/libgc.a"
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/artifact-binary-guard python3 -B tools/shared/test_artifact_binary.py --source-root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc" --partial-write-sink /dev/full --output .mlf-build/artifact-binary-guard/results
       - name: Check fixed native library boundaries and lazy exports
         if: matrix.optimization == '2'
         run: python3 tools/shared/test_native_library.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/native-library --clang clang --gc-prefix .mlf-build/io-action-gc
@@ -276,6 +288,11 @@ jobs:
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt
+            .mlf-build/artifact-binary-guard/bounded-receipt.json
+            .mlf-build/artifact-binary-guard/build.log
+            .mlf-build/artifact-binary-guard/results/**/*.json
+            .mlf-build/artifact-binary-guard/results/**/*.stdout
+            .mlf-build/artifact-binary-guard/results/**/*.stderr
             .mlf-build/source-context-cache-guard/bounded-receipt.json
             .mlf-build/source-context-cache-guard/build.log
             .mlf-build/source-context-cache-guard/results/**/*.json
@@ -388,6 +405,11 @@ jobs:
             .mlf-build/full-compiler-20261101/ci-controls/**/stdout
             .mlf-build/full-compiler-20261101/ci-controls/**/stderr
             .mlf-build/full-compiler-20261101/ci-controls/**/*.hs
+            .mlf-build/llvm-memory-guard/
+            .mlf-build/llvm-memory-20261102/ci-controls/**/*.json
+            .mlf-build/llvm-memory-20261102/ci-controls/**/stdout
+            .mlf-build/llvm-memory-20261102/ci-controls/**/stderr
+            .mlf-build/llvm-memory-20261102/ci-controls/**/*.hs
             .mlf-build/common-calls/**/*.json
             .mlf-build/common-calls/**/*.stdout
             .mlf-build/common-calls/**/*.stderr

@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 26794,
+  "new_sha256": "698e89daa0362edabefaf6f765f6c0598389acc5c0e8d137d91dea45e0b8233f",
+  "old_bytes": 26644,
+  "old_sha256": "883469137d8f82f43a1912f7d6c92af69117d181ec9442c3d9da018b6e393109",
+  "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs",
+  "splices": [
+    {
+      "new": "OwogICAgUFJlYWRCeXRlRmlsZU9yRXJyb3IgLT4gIlBSZWFkQnl0ZUZpbGVPckVycm9yIjsKICAgIFBXcml0ZUJ5dGVGaWxlT3JFcnJvciAtPiAiUFdyaXRlQnl0ZUZpbGVPckVycm9yIjsKICAgIFBCeXRlQXJyYXlEaWdlc3QgLT4gIlBCeXRlQXJyYXlEaWdlc3Qi",
+      "new_at": 9297,
+      "old": "",
+      "old_at": 9297
+    }
+  ]
+}

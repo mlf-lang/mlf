@@ -18,6 +18,7 @@ module MLF.Primitive
   , newByteArray, readByteArray, writeByteArray, lengthByteArray, byteArrayFromString, putBytes, getByteLine
   , newIntTable, readIntTable, writeIntTable, andInt, stringLength, stringCodeAt, stringSlice
   , stringFromCode, compareString, readDouble, doubleToBits, doubleFromBits, seq, panic
+  , readByteFileOrError, writeByteFileOrError, byteArrayDigest
   , readFile, writeFile, fileExists, canonicalPath, getArgCount, getArg, putErr
   , exitWith, getExecutablePath, getContents, stReturn, stBind, runST, newSTArray
   , readSTArray, writeSTArray, lengthSTArray, getEnv, setEnv, unsetEnv, runProcess
@@ -242,6 +243,15 @@ seq = Base.v_seq
 
 panic :: String -> a
 panic = Base.v_panic
+
+-- Empty diagnostic denotes success; failures never return partial bytes.
+readByteFileOrError :: String -> Int -> IO (String, ByteArray)
+readByteFileOrError = IO.v_readByteFileOrError
+writeByteFileOrError :: String -> ByteArray -> IO String
+writeByteFileOrError = IO.v_writeByteFileOrError
+
+byteArrayDigest :: ByteArray -> IO String
+byteArrayDigest = IO.v_byteArrayDigest
 
 readFile :: String -> IO String
 readFile = IO.v_readFile
