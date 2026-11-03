@@ -4,11 +4,12 @@ module Main where
 import Prelude
 import Control.Monad (unless, forM_)
 import Control.Exception (bracket)
-import Data.List (sort, isInfixOf)
+import Data.List (sort, isInfixOf, nub)
 import System.IO (hFlush, stdout)
 import qualified Data.ByteString as BS
 import System.Directory (createDirectory, doesPathExist, listDirectory, renameFile, removeFile, getModificationTime)
 import System.Environment (getArgs)
+import qualified Bootstrap.Data as D
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Bitstream as Wire
 import qualified Bootstrap.ArtifactStructure as Structure
@@ -51,12 +52,12 @@ sameObject a b = U.encodeInterface (U.objectInterface a) == U.encodeInterface (U
               && U.encodeObject a == U.encodeObject b
 names = ["value"]
 members n = [("value", T.Nothing, T.SIntLit n)]
-keyFor context = U.pack ["MLF-SOURCE-CRATE-QUERY-6", "crate:α😀", "compiler",
+keyFor context = U.pack ["MLF-SOURCE-CRATE-QUERY-7", "crate:α😀", "compiler",
                         "member:opaque:😀", "bindings", context,
                         "source-group", "observed-contracts", "scope-table:α😀"]
 splitKey key = case Q.sourceCacheParts key of
   T.Just pair -> pure pair
-  T.Nothing -> error "source v6 not recognized"
+  T.Nothing -> error "source v7 not recognized"
 -- No textual view is ever fed to the new production reader. RecordInput keeps
 -- the actual typed binary graph separate from explicitly old compatibility text.
 data RecordInput = LegacyInput P.String | BinaryInput [Wire.Value]
@@ -124,7 +125,7 @@ readContext path = do
   case roots of
     [root] -> expect "typed datatype context" (Structure.fromDataContext root)
     _ -> error "default context is not binary"
-contextLogical path = Q.sourceContextContents . Q.encodeDatatypeContext <$> readContext path
+contextLogical path = Q.sourceContextContents . Q.encodeSourceDatatypes <$> readContext path
 readRecordWindow previous directory key name bindings ds wanted record = case record of
   LegacyInput text -> Q.readSourceCachedWithWindow previous directory key name bindings ds wanted text
   BinaryInput roots -> do
@@ -149,7 +150,7 @@ helper directory = do
   bracket (P.acquireFileLock (literal (directory </> ".lock"))) P.releaseFileLock (\_ -> helperLocked directory)
 helperLocked directory = do
   object <- expect "raw inference" (I.compileLoweredGroup "RawGroup" [] [] (members 41))
-  let context = Q.encodeDatatypeContext []
+  let context = Q.encodeSourceDatatypes []
       key = keyFor context
       path = directory </> "record.mlfq"
       old1 = Q.encodeCached key object
@@ -179,6 +180,36 @@ helperLocked directory = do
   need "context SHA filename" (digest == ref && Q.validSourceContextDigest ref)
   checked <- readNew directory key input >>= expect "source CACHE3 reader"
   need "source checked object preserved" (sameObject checked object)
+  -- Keep compiler, key pathname, context and well-typed payload fixed. Only
+  -- change the saved identity, including after a successful context read.
+  let builtins = D.builtinDeclarations
+      tag = "MLF-SOURCE-CRATE-QUERY-7"
+      changed = T.DataDecl "MLFLegacyUnit" [] [T.ConstructorDecl "MLFLegacyUnit" [T.Applied "Int" []]]
+      candidates = [drop 1 builtins, reverse builtins, changed:drop 1 builtins,
+                    T.DataDeclK "MLFLegacyUnit" [] [T.ConstructorDecl "MLFLegacyUnit" []]:drop 1 builtins]
+      identities = map Q.sourceFormatFor candidates
+  -- Independent MLFBIN tree_document(244, builtin_datatypes()) golden.
+  -- This pins even raw binder names if both the live and frozen lists change.
+  witness <- Storage.encode 1 [Structure.toDataContext Q.v7BuiltinDictionary] >>= expect "exact v7 dictionary"
+  witnessDigest <- P.byteArrayDigest witness
+  need "immutable v7 wire dictionary" (witnessDigest == "8769bc0f30eed0ef497f2b414239f9c8facc1dde749de6dcd7251da1a495224f")
+  need "v7 dictionary binds every actual declaration" (length builtins == 68 && Q.sourceQueryFormat == tag)
+  need "changed builtin order, constructor fields and declaration variants have distinct literal identities"
+    (all (/=tag) identities && length (nub identities) == length candidates)
+  compactFields <- fields compact
+  fullFields <- fields key
+  (window,_,_) <- readRecordWindow [] (literal directory) key "RawGroup" [] [] names input
+  need "real verified context for substituted-record controls" (not (null window))
+  forM_ (("pre-v7", "MLF-SOURCE-CRATE-QUERY-6") : zip (map show [1::Int ..]) identities) $ \(label,fmt) -> do
+    let forge xs = U.pack (fmt:drop 1 xs)
+        record = newRecord ref (forge compactFields) payload
+    need (label ++ " claimed builtin identity rejected even with matching supplied key")
+      (case Q.sourceCacheParts (forge fullFields) of T.Nothing -> True; _ -> False)
+    (_,_,result) <- readRecordWindow window (literal directory) key "RawGroup" [] [] names record
+    reject (label ++ " saved identity at current key with verified context") result
+  let differentCompiler = U.pack (take 2 compactFields ++ ["other compiler"] ++ drop 3 compactFields)
+  (_,_,foreignCompiler) <- readRecordWindow window (literal directory) key "RawGroup" [] [] names (newRecord ref differentCompiler payload)
+  reject "foreign compiler at current address" foreignCompiler
   stamp <- getModificationTime contextPath
   let pooledPath = directory </> "pooled.mlfq"
   Q.writeSourceCached (T.Just (Q.prepareSourceEncodings [])) (literal directory) (literal pooledPath) key object >>= expect "pooled source write"
@@ -240,7 +271,7 @@ helperLocked directory = do
   Q.writeSourceCached T.Nothing (literal directory) (literal (directory </> "second.mlfq")) secondKey object >>= expect "shared context second record"
   files <- sort <$> listDirectory directory
   need "one shared context file and no stage temporary" (length (filter (\x -> take 8 x == "context-") files) == 1 && not ("source-context.new" `elem` files))
-  -- A mismatched v6 context must retain the established self-contained format.
+  -- A mismatched v7 context must retain the established self-contained format.
   Q.writeSourceCached T.Nothing (literal directory) (literal (directory </> "fallback.mlfq")) (keyFor "wrong") object >>= expect "safe fallback write"
   fallback <- readRecord (directory </> "fallback.mlfq")
   need "ineligible source object uses checked binary inline format" (case fallback of BinaryInput [Wire.VNode 300 [Wire.VText saved,_]] -> saved == keyFor "wrong"; _ -> False)
@@ -255,10 +286,10 @@ helperLocked directory = do
       boxB = T.DataDecl "Box" ["b"] [T.ConstructorDecl "Box" [T.Parameter "b"]]
       changedBox = T.DataDecl "Box" ["b"] [T.ConstructorDecl "Box" [T.Parameter "b", T.Parameter "b"]]
       boxMembers = [("value",T.Nothing,T.SApp (T.SConstructor "Box") (T.SIntLit 7))]
-      boxKey = keyFor (Q.encodeDatatypeContext [boxA])
+      boxKey = keyFor (Q.encodeSourceDatatypes [boxA])
       boxPath = directory </> "box.mlfq"
   boxObject <- expect "nonempty datatype raw inference" (I.compileLoweredGroup "RawGroup" [] [boxA] boxMembers)
-  need "alpha test setup uses identical complete canonical contexts" (Q.encodeDatatypeContext [boxA] == Q.encodeDatatypeContext [boxB])
+  need "alpha test setup uses identical complete canonical contexts" (Q.encodeSourceDatatypes [boxA] == Q.encodeSourceDatatypes [boxB])
   let boxLegacyKey = Q.queryKey "legacy-box" "compiler" boxMembers [] [boxA]
   _ <- Q.readSourceCached (literal directory) boxKey "RawGroup" [] [boxB] names (Q.encodeCached boxKey boxObject) >>= expect "legacy CACHE1 alpha compatibility"
   _ <- Q.readSourceCached (literal directory) boxLegacyKey "RawGroup" [] [boxB] names (Q.encodeCached boxLegacyKey boxObject) >>= expect "legacy CACHE2 alpha compatibility"
@@ -267,7 +298,7 @@ helperLocked directory = do
   (boxRef,_,_) <- recordParts boxInput
   need "different complete datatype context has different identity" (boxRef /= ref)
   alpha <- readRecordChecked (literal directory) boxKey "RawGroup" [] [boxB] names boxInput >>= expect "alpha-equivalent datatype context remains admissible"
-  need "alpha-equivalent metadata preserves canonical layout" (Q.encodeDatatypeContext (U.unitData (U.objectInterface alpha)) == Q.encodeDatatypeContext [boxA])
+  need "alpha-equivalent metadata preserves canonical layout" (Q.encodeSourceDatatypes (U.unitData (U.objectInterface alpha)) == Q.encodeSourceDatatypes [boxA])
   readRecordChecked (literal directory) boxKey "RawGroup" [] [changedBox] names boxInput >>= reject "same datatype name different layout"
   let legacyContextPath = directory </> "legacy-context.new"
   save legacyContextPath (Q.sourceContextContents context)
@@ -312,9 +343,9 @@ legacyAccounting directory report = do
           (ref,compact,payload) <- recordParts input
           actualContext <- contextLogical (B.unpack (Q.sourceContextPath (literal directory) ref))
           actualDigest <- P.fileDigest (Q.sourceContextPath (literal directory) ref)
-          need "accounting empty datatype context" (actualContext == Q.sourceContextContents (Q.encodeDatatypeContext []))
+          need "accounting empty datatype context" (actualContext == Q.sourceContextContents (Q.encodeSourceDatatypes []))
           need "accounting context digest" (actualDigest == ref)
-          key <- expect "accounting full key" (Q.restoreSourceCacheKey (Q.encodeDatatypeContext []) compact)
+          key <- expect "accounting full key" (Q.restoreSourceCacheKey (Q.encodeSourceDatatypes []) compact)
           raw <- expect "accounting contextual raw" (decodePayload [] payload)
           pure (key,raw)
         LegacyInput text -> do
@@ -326,7 +357,7 @@ legacyAccounting directory report = do
               pure (key,raw)
             _ -> error "accounting unsupported legacy representation"
       (_,context) <- splitKey key
-      need "accounting full key empty context" (context == Q.encodeDatatypeContext [])
+      need "accounting full key empty context" (context == Q.encodeSourceDatatypes [])
       need "accounting raw interface empty context" (null (U.unitData (U.objectInterface raw)))
       let old = Q.encodeCached key raw
           parameters = [(X.nameHint n,t) | (n,t) <- fst (U.splitParameters (strip (U.objectTerm raw)))]
@@ -408,7 +439,48 @@ rawFinal directory = do
   (repaired,report,_) <- Q.compileSourceGroups "raw-final" (literal directory) [] M.empty plan >>= expect "legacy raw/final rejection and reinference"
   need "legacy final-as-raw only reinfers poisoned group" (Q.inferredCount report == 1 && Q.reusedCount report == fromIntegral (length objects - 1))
   need "legacy final artifact exact after repair" (map U.encodeObject repaired == map U.encodeObject objects)
+  -- Only the visible instance scope changes. Keep the caller's source and
+  -- the Int instance fixed. Observe the actual source driver's per-SCC hit.
+  broader <- expect "broader source scope" (SI.prepareSourcePlan M.empty [] [cls]
+    [("tagInt",instanceInt),("tagBool",instanceBool)] (M.fromList P.compareString [("sameDeps",IS.fromList [0,1])])
+    [IS.fromList [0,1],IS.fromList [0,1]] own)
+  expanded <- case broader of T.Just p -> pure p; _ -> error "broader scope unavailable"
+  (_,Q.QueryReport _ _ expandedRows,_) <- Q.compileSourceGroups "raw-final" (literal directory) [] M.empty expanded >>= expect "scope change"
+  need "visible candidate scope invalidates the actual root"
+    (case [(hit,k) | Q.GroupResult _ ns hit _ k <- expandedRows, ns == ["sameDeps"]] of
+       [(False,k)] -> k /= digest; _ -> False)
+  sourceInputChanges (directory ++ "-inputs")
   putStrLn "PASS final payload cannot masquerade as raw source cache"
+
+-- One isolated source crate. Change exactly one imported type, then one
+-- user layout, without changing any expression or the other two groups.
+sourceInputChanges directory = do
+  let own = [("boxed",T.Nothing,T.SConstructor "MakeBox"),
+             ("dependent",T.Nothing,T.SVar "external"),("plain",T.Nothing,T.SIntLit 3)]
+      scopes = M.fromList P.compareString [(n,IS.empty) | (n,_,_) <- own]
+      checkRun external constructors missed previous = do
+        let layout = T.DataDecl "Box" [] constructors
+            imported = U.UnitInterface "External" [] [] [] [] [] [("external",T.XCon external [])] "parameters"
+        planned <- expect "source input plan" (SI.prepareSourcePlan
+          (M.fromList P.compareString [("external",T.SCon external [])]) [layout] [] [] scopes [] own)
+        plan <- case planned of T.Just x -> pure x; _ -> error "source input plan unavailable"
+        (_,Q.QueryReport inferred reused rows,_) <- Q.compileParsedSourceGroups "inputs" (literal directory)
+          [imported] (M.fromList P.compareString [("external",False)]) plan >>= expect "compile changed source inputs"
+        let result = [(n,k) | Q.GroupResult _ [n] _ _ k <- rows]
+        need "exact cache hit/miss set" (length result == 3 && inferred == fromIntegral (length missed)
+          && reused == 3-inferred && sort [B.unpack n | Q.GroupResult _ [n] False _ _ <- rows] == sort (map B.unpack missed))
+        forM_ result $ \(n,k) -> case lookup n previous of
+          Nothing -> pure ()
+          Just old -> need "only changed semantic inputs replace their full keys" ((n `elem` missed) == (k /= old))
+        pure result
+      box = [T.ConstructorDecl "MakeBox" []]
+  first <- checkRun "Int" box ["boxed","dependent","plain"] []
+  warm <- checkRun "Int" box [] first
+  imported <- checkRun "Bool" box ["dependent"] warm
+  layout <- checkRun "Bool" (box ++ [T.ConstructorDecl "OtherBox" []]) ["boxed"] imported
+  _ <- checkRun "Bool" (box ++ [T.ConstructorDecl "OtherBox" []]) [] layout
+  pure ()
+
 
 -- Scratch lifecycle controls are additive to the original 18-call suite.
 cleanupDirectoryError = "cannot remove query key scratch: path is a directory"
@@ -510,8 +582,8 @@ memoEntry directory plan (Q.GroupResult groupId memberNames _ _ digest) = do
   input <- readRecord (directory </> (B.unpack digest ++ ".mlfq"))
   (ref,compact,payload) <- recordParts input
   blob <- contextLogical (B.unpack (Q.sourceContextPath (literal directory) ref))
-  need "helper real empty context" (blob == Q.sourceContextContents (Q.encodeDatatypeContext []))
-  key <- expect "helper complete key" (Q.restoreSourceCacheKey (Q.encodeDatatypeContext []) compact)
+  need "helper real empty context" (blob == Q.sourceContextContents (Q.encodeSourceDatatypes []))
+  key <- expect "helper complete key" (Q.restoreSourceCacheKey (Q.encodeSourceDatatypes []) compact)
   raw <- expect "helper actual raw" (decodePayload [] payload)
   prepared <- expect "helper actual prepared" (SI.prepareGroup plan M.empty memberNames)
   _ <- expect "helper original prepared validation" (SI.validatePreparedRaw prepared raw)
@@ -590,7 +662,7 @@ memoDatatypeControls directory previous = do
   plan <- case maybePlan of T.Just p -> pure p; _ -> error "box plan unavailable"
   prepared <- expect "box prepared" (SI.prepareGroup plan M.empty ["value"])
   raw <- expect "box raw" (I.compileLoweredGroup "RawGroup" [] [box] own)
-  let key = keyFor (Q.encodeDatatypeContext [box])
+  let key = keyFor (Q.encodeSourceDatatypes [box])
       path = directory </> "box-record.mlfq"
       readBox state ds input = readRecordMemo state (literal directory) key "RawGroup" [] ds ["value"] input
   Q.writeSourceCached T.Nothing (literal directory) (literal path) key raw >>= expect "box write"
@@ -626,8 +698,8 @@ memoCycle directory root invoke = do
   let contextPath = B.unpack (Q.sourceContextPath (literal directory) ref)
   contextBlob <- BS.readFile contextPath
   logicalContext <- contextLogical contextPath
-  need "memo public empty datatype fixture" (logicalContext == Q.sourceContextContents (Q.encodeDatatypeContext []))
-  key <- expect "memo public full key" (Q.restoreSourceCacheKey (Q.encodeDatatypeContext []) compact)
+  need "memo public empty datatype fixture" (logicalContext == Q.sourceContextContents (Q.encodeSourceDatatypes []))
+  key <- expect "memo public full key" (Q.restoreSourceCacheKey (Q.encodeSourceDatatypes []) compact)
   raw <- expect "memo public raw" (decodePayload [] payload)
   let legacy = Q.encodeCached key raw
   withMemoLock directory $ \_ -> save file legacy
@@ -731,7 +803,7 @@ contextDirectorySetup directory = do
   fresh directory
   withMemoLock directory $ \_ -> do
     object <- expect "directory setup raw inference" (I.compileLoweredGroup "RawGroup" [] [] (members 41))
-    let context = Q.encodeDatatypeContext []
+    let context = Q.encodeSourceDatatypes []
         key = keyFor context
         path = directory </> "existing.mlfq"
     Q.writeSourceCached T.Nothing (literal directory) (literal path) key object >>= expect "directory setup source write"
@@ -750,7 +822,7 @@ contextDirectoryReject directory = withMemoLock directory $ \_ -> do
   -- A different valid payload makes the existing-record preservation oracle
   -- meaningful even if an incorrect writer silently replaces that record.
   object <- expect "directory rejection raw inference" (I.compileLoweredGroup "RawGroup" [] [] (members 42))
-  let key = keyFor (Q.encodeDatatypeContext [])
+  let key = keyFor (Q.encodeSourceDatatypes [])
   forM_ ["new.mlfq", "existing.mlfq"] $ \leaf -> do
     result <- Q.writeSourceCached T.Nothing (literal directory) (literal (directory </> leaf)) key object
     case result of
@@ -820,7 +892,7 @@ data DecoderExpectation = DecoderRight U.UnitObject | DecoderLeft P.String
 -- Left matches a fixed diagnostic as well as the frozen P decoder verbatim.
 checkDecoderDifferential (label, expected, item) = do
   let ds = decoderDatatypes item
-      old = frozenPDecodeSourceCachedWithEncoding (Q.encodeDatatypeContext ds)
+      old = frozenPDecodeSourceCachedWithEncoding (Q.encodeSourceDatatypes ds)
               (decoderDigest item) (decoderKey item) (decoderName item)
               (decoderBindings item) ds (decoderNames item)
               (decoderContext item) (decoderRecord item)
@@ -847,7 +919,7 @@ decoderSeed directory leaf ds key raw = do
   (reference,compact,payload) <- recordParts input
   need "decoder seed reference is safe" (Q.validSourceContextDigest reference)
   let path = Q.sourceContextPath (literal directory) reference
-      context = Q.encodeDatatypeContext ds
+      context = Q.encodeSourceDatatypes ds
   blob <- contextLogical (B.unpack path)
   actual <- P.fileDigest path
   (expectedCompact,expectedContext) <- splitKey key
@@ -878,7 +950,7 @@ decoderDifferential directory = withMemoLock directory $ \_ -> do
   raw42 <- expect "decoder independent raw42 inference" (I.compileLoweredGroup "RawGroup" [] [] (members 42))
   need "decoder raw41 and raw42 have genuinely different complete object bytes"
     (U.encodeObject raw41 /= U.encodeObject raw42 && not (sameObject raw41 raw42))
-  let context = Q.encodeDatatypeContext []
+  let context = Q.encodeSourceDatatypes []
       key = keyFor context
   keyFields <- fields key
   need "decoder complete expected source key population" (length keyFields == 9)
@@ -889,7 +961,7 @@ decoderDifferential directory = withMemoLock directory $ \_ -> do
   boxRaw <- expect "decoder independent box inference" (I.compileLoweredGroup "RawGroup" [] [box] boxMembers)
   first <- decoderSeed directory "record.mlfq" [] key raw41
   second <- decoderSeed directory "second.mlfq" [] secondKey raw41
-  boxSeed <- decoderSeed directory "box.mlfq" [box] (keyFor (Q.encodeDatatypeContext [box])) boxRaw
+  boxSeed <- decoderSeed directory "box.mlfq" [box] (keyFor (Q.encodeSourceDatatypes [box])) boxRaw
   (reference,compact,payload) <- legacyRecordParts (decoderRecord first)
   (secondReference,secondCompact,_) <- legacyRecordParts (decoderRecord second)
   compactFields <- fields compact
@@ -1041,7 +1113,7 @@ windowHide (f:rest) action = do
     (\_ -> windowHide rest action)
 windowCreate directory label ds value = do
   raw <- expect "window independent raw inference" (I.compileLoweredGroup "RawGroup" [] ds (members value))
-  let key = keyFor (Q.encodeDatatypeContext ds)
+  let key = keyFor (Q.encodeSourceDatatypes ds)
       path = directory </> ("entry-" ++ label ++ ".mlfq")
   Q.writeSourceCached T.Nothing (literal directory) (literal path) key raw >>= expect "window real writer"
   input <- readRecord path
@@ -1093,7 +1165,7 @@ windowHelper directory = do
     alphaRaw <- expect "independent alpha-renamed raw" (I.compileLoweredGroup "RawGroup" [] [alphaBox] (members 41))
     (_,compact,payload) <- recordParts (windowInput a)
     let alpha = a { windowDatatypes = [alphaBox], windowObject = alphaRaw }
-        changedEncoded = a { windowKey = keyFor (Q.encodeDatatypeContext (windowDatatypes b)) }
+        changedEncoded = a { windowKey = keyFor (Q.encodeSourceDatatypes (windowDatatypes b)) }
         structural =
           [("kind",T.DataDeclK "Box" [("a",T.KArrow T.Star T.Star)] [T.ConstructorDecl "Box" [T.Parameter "a"]])
           ,("constructor",T.DataDecl "Box" ["a"] [T.ConstructorDecl "ChangedBox" [T.Parameter "a"]])
@@ -1102,7 +1174,7 @@ windowHelper directory = do
         dataMismatch = "cached source query datatype context mismatch"
         contextFiles = fixtures ++ [other]
     need "alpha spelling differs structurally but canonical context and raw payload agree"
-      (Q.encodeDatatypeContext [box] == Q.encodeDatatypeContext [alphaBox] && U.encodeContextualObject alphaRaw == U.encodeContextualObject (windowObject a))
+      (Q.encodeSourceDatatypes [box] == Q.encodeSourceDatatypes [alphaBox] && U.encodeContextualObject alphaRaw == U.encodeContextualObject (windowObject a))
     windowHandshake ("WINDOW-BEFORE " ++ unwords (map B.unpack references)) "WINDOW-BEFORE-ACK"
     windowHide contextFiles $ do
       windowHandshake "WINDOW-HIDDEN" "WINDOW-HIDDEN-ACK"
@@ -1252,7 +1324,7 @@ sessionWindowRawFinal directory root = do
   need "actual Session warm final bytes exact" (warm == cold)
   let ds = U.unitData (U.objectInterface finalObject)
       gid = U.unitName (U.objectInterface finalObject)
-      wantedContext = Q.encodeDatatypeContext ds
+      wantedContext = Q.encodeSourceDatatypes ds
   (leaf,original,reference,compact,payload,key,raw) <- withMemoLock directory $ \_ -> do
     files <- sort . filter (\name -> reverse (take 5 (reverse name)) == ".mlfq") <$> listDirectory directory
     need "same exact Session record population before poisoning" (files == coldFiles)

@@ -22,6 +22,8 @@ import qualified MLF.Primitive as Prim
 import System.IO
 import System.Environment(getArgs)
 import qualified Bootstrap.CrateQuery as Q
+import qualified Bootstrap.ArtifactStorage as Storage
+import qualified Bootstrap.ArtifactStructure as Structure
 import qualified Bootstrap.SourceEquality as E
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.X.Pretty as Pretty
@@ -69,24 +71,26 @@ closed ds values parameters rhs=
      step(serial,bindings)(n,_)=let(next,term)=U.freshObject serial(strip(vb(lookupValue values(X.nameHint n))))in(next,bindings++[(n,term)])
      (_,bindings)=foldl step(start,[])parameters
  in T.XWithData ds(foldr(\(n,term)b->T.XLet n term b)rhs bindings)
--- Representation-only adapter: all original law and raw/final assertions below stay intact.
-decodeRawSourceCache cache datatypes fields=case fields of
- ["MLF-QUERY-CACHE-1",key,metadata,payload]->do
-   iface<-expect "raw cache interface"(U.decodeInterface metadata)
-   object<-expect "raw cache object"(U.decodeObject iface payload)
-   pure(key,object)
- ["MLF-QUERY-CACHE-3",reference,compactKey,payload]->do
-   assert "source context reference is a safe SHA"(Q.validSourceContextDigest reference)
-   let contextPath=Q.sourceContextPath(B.literal cache)reference
-       expectedContext=Q.encodeDatatypeContext datatypes
-   contextText<-B.literal <$> readFile(B.unpack contextPath)
-   digest<-Prim.fileDigest contextPath
-   assert "source context retains full expected bytes and identity"
-     (digest==reference&&contextText==Q.sourceContextContents expectedContext)
-   key<-expect "restore complete source key"(Q.restoreSourceCacheKey expectedContext compactKey)
-   object<-expect "raw contextual cache object"(U.decodeContextualObject datatypes datatypes payload)
-   pure(key,object)
- _->error "unsupported raw source cache representation"
+-- Read the actual default binary raw record. The compact key has no user
+-- context field. Verify its carrier, then use normal checked-record admission.
+decodeRawSourceCache cache digest final=do
+ let iface=U.objectInterface final; ds=U.unitData iface; name=U.unitName iface
+     file=B.literal(cache++"/"++B.unpack digest++".mlfq")
+ input<-Storage.read 2 file >>= expect "raw record wire"
+ graph<-case input of Storage.BinaryInput g->pure g; _->error "expected binary source record"
+ query<-expect "shared source record"(Q.binaryQuery graph)
+ case query of
+  Q.BinaryShared ref fields _ bodyIndex->do
+   assert "source context reference is a safe SHA"(Q.validSourceContextDigest ref)
+   actual<-Prim.fileDigest(Q.sourceContextPath(B.literal cache)ref)
+   assert "actual source context SHA"(actual==ref)
+   key<-expect "restore complete source key"(Q.restoreSourceCacheKey(Q.encodeSourceDatatypes ds)(U.pack fields))
+   body<-expect "raw parameter spine"(Structure.fromGraphXTerm graph bodyIndex)
+   let parameters=[(X.nameHint n,ty)|(n,ty)<-fst(U.splitParameters body)]
+   (_,_,decoded)<-Q.readBinarySourceGraph [] (B.literal cache) key name parameters ds (map fst(U.unitBindings iface)) graph
+   raw<-expect "checked raw record and complete datatype context" decoded
+   pure(key,raw)
+  _->error "expected a shared source context"
 
 main=do
  hSetBuffering stdout LineBuffering
@@ -111,14 +115,12 @@ main=do
      [(groupId,digest)]=[(gid,digest)|Q.GroupResult gid names _ _ digest<-reports,names==["sameDeps"]]
      [compact]=[obj|obj<-objects,U.unitName(U.objectInterface obj)==groupId]
      cacheFile=cache++"/"++B.unpack digest++".mlfq"
- rawText<-B.literal <$> readFile cacheFile
- fields<-expect "read raw cached payload"(U.unpack rawText)
- (exactKey,rawObject)<-decodeRawSourceCache cache (U.unitData(U.objectInterface compact)) fields
+ (exactKey,rawObject)<-decodeRawSourceCache cache digest compact
  let rawIface=U.objectInterface rawObject
  let rawParameters=map(\(n,t)->(X.nameHint n,t))(fst(U.splitParameters(strip(U.objectTerm rawObject))))
  _<-expect "counterexample generic validator accepts compact with same dependency context"(Q.decodeCached exactKey groupId rawParameters (U.unitData rawIface) ["sameDeps"] (Q.encodeCached exactKey compact))
  keyFields<-expect "source query framing"(U.unpack exactKey)
- assert "raw cache uses exact new source namespace"(head keyFields=="MLF-SOURCE-CRATE-QUERY-6")
+ assert "raw cache uses exact new source namespace"(head keyFields=="MLF-SOURCE-CRATE-QUERY-7")
  assert "raw provisional is not compact final object"(Q.encodeCached exactKey compact/=Q.encodeCached exactKey rawObject)
  writeFile cacheFile(B.unpack(Q.encodeCached exactKey compact))
  (repairedObjects,repaired,_)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "reject normalized-as-raw cache"
@@ -214,9 +216,7 @@ supportProtectionChecks cache=do
  let Q.QueryReport _ _ rows=report
      [(gid,digest)]=[(gid,digest)|Q.GroupResult gid ns _ _ digest<-rows,ns==["guarded"]]
      [final]=[o|o<-objects,U.unitName(U.objectInterface o)==gid]
- cacheText<-B.literal <$> readFile(cache++"/"++B.unpack digest++".mlfq")
- fs<-expect "managed raw cache"(U.unpack cacheText)
- (_,raw)<-decodeRawSourceCache cache (U.unitData(U.objectInterface final)) fs
+ (_,raw)<-decodeRawSourceCache cache digest final
  assert "selected managed proof veto preserves exact original object"(U.encodeObject raw==U.encodeObject final)
  values<-foldM collect [] objects
  evaluate(vb(lookupValue values "safeBool"))>>=assert "safe proof runtime".(==42)

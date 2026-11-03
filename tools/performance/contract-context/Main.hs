@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
+import FrozenSourceKey (upgradeV6)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless)
@@ -54,8 +55,8 @@ main = do
       base = delta (head variants)
       empty = Q.prepareSourceContractEncodings M.empty
       datum = F.encodeDatatypeContext []
-      key pool env group = Q.sourceQueryKeyWithContractEncodings pool "crate" "compiler" group env datum
-      old env group = F.sourceQueryKeyWithContext "crate" "compiler" group env datum
+      key pool env group = Q.sourceQueryKeyWithContractEncodings pool "crate" "compiler" group env (Q.encodeSourceDatatypes [])
+      old env group = upgradeV6 datum (F.sourceQueryKeyWithContext "crate" "compiler" group env datum)
   forM_ variants $ \v -> do
     let env=delta v
         pool=Q.extendSourceContractEncodings env (Q.prepareSourceContractEncodings base)

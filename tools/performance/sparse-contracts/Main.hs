@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
+import FrozenSourceKey (upgradeV6)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless, foldM)
@@ -68,10 +69,12 @@ main = do
       direct=S.selectedContractBindings (members (T.SVar "a")) lazyEnv
       synthetic=S.PreparedGroup (members (T.SVar "a")) (members (T.SVar "a")) [("a",boolean)]
         M.empty [("root",[],False)] T.Nothing [("a",False)]
-      context=FQ.encodeDatatypeContext []
+      builtin=FQ.encodeDatatypeContext []
+      context=Q.encodeSourceDatatypes []
+      oldKey group current=upgradeV6 builtin (FQ.sourceQueryKeyWithContext "crate" "compiler" group current builtin)
       fullPool=Q.prepareSourceContractEncodings lazyEnv
       missingPool=Q.prepareSourceContractEncodings M.empty
-      expectedKey=FQ.sourceQueryKeyWithContext "crate" "compiler" synthetic lazyEnv context
+      expectedKey=oldKey synthetic lazyEnv
   check "unused bottom direct selection" (enc direct==enc [("a",boolean)])
   check "unused bottom owned full key" (Q.sourceQueryKeyWithContractEncodings fullPool "crate" "compiler" synthetic lazyEnv context==expectedKey)
   check "missing cache falls back for full key" (Q.sourceQueryKeyWithContractEncodings missingPool "crate" "compiler" synthetic lazyEnv context==expectedKey)
@@ -90,7 +93,7 @@ main = do
           let previous=oldPrepared old
               pool=Q.prepareSourceContractEncodings current
               a=Q.sourceQueryKeyWithContractEncodings pool "crate" "compiler" new current context
-              b=FQ.sourceQueryKeyWithContext "crate" "compiler" previous current context
+              b=oldKey previous current
           check "actual prepared group full exact key" (a==b)
           check "actual prepared group exact selected bindings" (enc (S.groupBindings new)==enc (FS.groupBindings old))
         _ -> fail "new and frozen prepareGroup disagree on success"
@@ -111,7 +114,7 @@ main = do
         group=S.PreparedGroup traceMembers traceMembers selected M.empty [("root",[],False)]
           T.Nothing (S.parameterProtection next selected)
         actual=Q.sourceQueryKeyWithContractEncodings nextCache "crate" "compiler" group next context
-        reference=FQ.sourceQueryKeyWithContext "crate" "compiler" group next context
+        reference=oldKey group next
     check "synchronized contract delta exact key" (actual==reference)
     check "synchronized contract delta selected bindings" (enc selected==enc oldSelected)
     pure (next,nextCache)) (M.empty,Q.prepareSourceContractEncodings M.empty) trace
@@ -175,7 +178,7 @@ main = do
           (textMembers (S.groupMembers new)==textMembers (S.groupMembers previous))
         check (label++" complete prepared key")
           (Q.sourceQueryKeyWithContext "crate" "compiler" new current context==
-           FQ.sourceQueryKeyWithContext "crate" "compiler" previous current context)
+           oldKey previous current)
       compareOwned label expectSuccess owned newPlan oldPlan current names =
         case (S.prepareGroupOwned owned newPlan current names,
               FS.prepareGroup oldPlan (oldContracts current) names) of

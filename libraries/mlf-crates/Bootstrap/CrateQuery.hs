@@ -342,6 +342,43 @@ module Bootstrap.CrateQuery where {
                   node "parameter" ((:) (canonicalReference scope n) ((:) (encodeKind k) [])))
                parameters)
             ((:) (list encodeConstructor constructors) [])));
+  -- Wire dictionary for the short v7 tag. Its meaning is fixed independently
+  -- of the running compiler's declarations. Do not use D's builtin builders
+  -- here: changing a builder must not also change the meaning of stored keys.
+  v7BuiltinDictionary :: [] DataDecl;
+  v7BuiltinDictionary = let {
+    product = \name parameters fields -> DataDecl name parameters [ConstructorDecl name fields];
+    tuple = \arity -> let {
+      name = "(" ++ concatStringList (replicate (arity - 1) ",") ++ ")";
+      parameters = map (\i -> "a" ++ showInt i) (range 1 arity)
+    } in product name parameters (map Parameter parameters);
+    listData = DataDecl "[]" ["a"] [ConstructorDecl "[]" [],
+      ConstructorDecl ":" [Parameter "a", Applied "[]" [Parameter "a"]]];
+    frame = product "MLFStackFrame" []
+      (append (replicate 4 (Applied "String" [])) (replicate 4 (Applied "Int" [])));
+    evidence = product "MLFStackEvidence" [] [Applied "MLFCallStack" []]
+  } in append [product "MLFLegacyUnit" [] [], product "()" [] [], listData]
+    (append (map tuple (range 2 4)) (append [frame, evidence] (map tuple (range 5 64))));
+  -- The escape preserves even binder spellings, the declaration variant and
+  -- constructor order. It has disjoint framing from the fixed dictionary tag.
+  literalBuiltin :: DataDecl -> String;
+  literalBuiltin declaration = case declaration of {
+    DataDecl name parameters constructors ->
+      node "data" [name, Separate.pack parameters, list encodeConstructor constructors];
+    DataDeclK name parameters constructors -> node "kinded-data"
+      [name, list (\((,) n k) -> Separate.pack [n, encodeKind k]) parameters,
+       list encodeConstructor constructors]
+  };
+  sourceFormatFor :: [] DataDecl -> String;
+  sourceFormatFor builtins = let { tag = "MLF-SOURCE-CRATE-QUERY-7" } in
+    if eqList SourceEquality.eqDataDecl builtins v7BuiltinDictionary then tag
+    else node tag [list literalBuiltin builtins];
+  sourceQueryFormat :: String;
+  sourceQueryFormat = sourceFormatFor D.builtinDeclarations;
+  -- In v7 only user declarations are projected into the shared carrier. The
+  -- builtin identity stays in the record's format field beside compilerHash.
+  encodeSourceDatatypes :: [] DataDecl -> String;
+  encodeSourceDatatypes = list encodeDatatype;
   data QueryDatatypeEncoding = QueryDatatypeEncoding DataDecl String;
   data SourceEncodings = SourceEncodings Separate.DatatypeEncodings
     (Map String ([] QueryDatatypeEncoding));
@@ -350,7 +387,7 @@ module Bootstrap.CrateQuery where {
     SourceEncodings (Separate.prepareDatatypeEncodings declarations)
       (M.fromListWith compareString append
         (map (\d -> (,) (D.datatypeName d) ((:) (QueryDatatypeEncoding d (encodeDatatype d)) []))
-          (append D.builtinDeclarations declarations)));
+          declarations));
   findQueryDatatypeEncoding :: DataDecl -> [] QueryDatatypeEncoding -> String;
   findQueryDatatypeEncoding declaration entries = case entries of {
     [] -> encodeDatatype declaration;
@@ -358,22 +395,26 @@ module Bootstrap.CrateQuery where {
       if SourceEquality.eqDataDecl declaration original then text
       else findQueryDatatypeEncoding declaration rest
   };
-  encodeDatatypeContextWithPool :: SourceEncodings -> [] DataDecl -> String;
-  encodeDatatypeContextWithPool (SourceEncodings _ entries) declarations =
+  encodeSourceDatatypesWithPool :: SourceEncodings -> [] DataDecl -> String;
+  encodeSourceDatatypesWithPool (SourceEncodings _ entries) declarations =
     list (\d -> findQueryDatatypeEncoding d
       (M.findWithDefault compareString [] (D.datatypeName d) entries))
-      (append D.builtinDeclarations declarations);
+      declarations;
+  -- Preserve the complete legacy encoder for callers outside the v7 source path.
+  encodeDatatypeContextWithPool :: SourceEncodings -> [] DataDecl -> String;
+  encodeDatatypeContextWithPool pool declarations =
+    encodeSourceDatatypesWithPool pool (append D.builtinDeclarations declarations);
   -- File-owned, finite declarations only. Keep one complete context; a miss
   -- uses the original encoder, including its duplicate-name/layout fallback.
   data DatatypeContextEncoding = DatatypeContextEncoding ([] DataDecl) String;
   emptyDatatypeContextEncoding :: SourceEncodings -> DatatypeContextEncoding;
   emptyDatatypeContextEncoding pool = DatatypeContextEncoding []
-    (encodeDatatypeContextWithPool pool []);
+    (encodeSourceDatatypesWithPool pool []);
   reuseDatatypeContext :: SourceEncodings -> DatatypeContextEncoding -> [] DataDecl ->
     (,) String DatatypeContextEncoding;
   reuseDatatypeContext pool (DatatypeContextEncoding original encoded) declarations =
     let { text = if eqList SourceEquality.eqDataDecl original declarations then encoded
-          else encodeDatatypeContextWithPool pool declarations }
+          else encodeSourceDatatypesWithPool pool declarations }
     in (,) text (DatatypeContextEncoding declarations text);
   encodeXType :: XType -> String;
   encodeXType ty =
@@ -950,13 +991,13 @@ module Bootstrap.CrateQuery where {
         ((:) key ((:) (fst encoded) ((:) (snd encoded) []))));
   -- Source cache format3 shares the exact finite datatype-key context on disk.
   -- It is deliberately separate from format2's legacy QUERY-4 contract. The
-  -- complete source-query-v6 key is reconstructed before any object admission.
+  -- complete source-query-v7 key is reconstructed before any object admission.
   sourceCacheParts :: String -> Maybe ((,) String String);
   sourceCacheParts key = case Separate.unpack key of {
     Right fields -> case fields of {
       (:) format ((:) crateId ((:) compilerHash ((:) members ((:) bindings
         ((:) context ((:) prepared ((:) contracts ((:) scopes [])))))))) ->
-        if eqString format "MLF-SOURCE-CRATE-QUERY-6"
+        if eqString format sourceQueryFormat
           && eqString key (Separate.pack fields)
         then Just ((,) (Separate.pack
           [format, crateId, compilerHash, members, bindings, prepared, contracts, scopes]) context)
@@ -971,7 +1012,7 @@ module Bootstrap.CrateQuery where {
     case fields of {
       (:) format ((:) crateId ((:) compilerHash ((:) members ((:) bindings
         ((:) prepared ((:) contracts ((:) scopes []))))))) -> do {
-        ensure (eqString format "MLF-SOURCE-CRATE-QUERY-6"
+        ensure (eqString format sourceQueryFormat
           && eqString compact (Separate.pack fields)) "unsupported source query key";
         Right (Separate.pack
           [format, crateId, compilerHash, members, bindings, context, prepared, contracts, scopes])
@@ -1013,7 +1054,7 @@ module Bootstrap.CrateQuery where {
     [] ((,) String XType) -> [] DataDecl -> [] String -> String -> String ->
     Either String Separate.UnitObject;
   decodeSourceCached actualDigest key name bindings datatypes names contextInput input =
-    decodeSourceCachedWithEncoding (encodeDatatypeContext datatypes) actualDigest key name
+    decodeSourceCachedWithEncoding (encodeSourceDatatypes datatypes) actualDigest key name
       bindings datatypes names contextInput input;
   -- Only an encoding verified against structurally identical datatypes may be
   -- reused here. The public stateless decoder still computes the original encoding.
@@ -1149,7 +1190,7 @@ module Bootstrap.CrateQuery where {
               case loaded of {
                 Left error -> ioReturn ((,,) [] False (Left error));
                 Right ((,) blob actualDigest) -> do {
-                  let { decoded = decodeSourceCachedWithKeyParts (encodeDatatypeContext datatypes)
+                  let { decoded = decodeSourceCachedWithKeyParts (encodeSourceDatatypes datatypes)
                         actualDigest (Just ((,) expectedCompact expectedContext)) name
                         bindings datatypes names blob input };
                   ioReturn (case decoded of {
@@ -1220,8 +1261,8 @@ module Bootstrap.CrateQuery where {
     Separate.UnitObject -> IO (Either String ());
   writeSourceCached encodings cacheDir destination key object =
     let { contextEncoding = case encodings of {
-      Nothing -> encodeDatatypeContext;
-      Just pool -> encodeDatatypeContextWithPool pool
+      Nothing -> encodeSourceDatatypes;
+      Just pool -> encodeSourceDatatypesWithPool pool
     }; declarations = Separate.unitData (Separate.objectInterface object) } in
     case sourceCacheParts key of {
       Just ((,) compact context) ->
@@ -1322,7 +1363,7 @@ module Bootstrap.CrateQuery where {
       Right bytes -> do {
         actual <- byteArrayDigest bytes;
         if not (eqString actual digest) then ioReturn (Left "invalid source query context reference")
-        else if not (eqString (encodeDatatypeContext datatypes) expectedContext)
+        else if not (eqString (encodeSourceDatatypes datatypes) expectedContext)
         then ioReturn (Left "cached source query datatype context mismatch")
         else do {
           decoded <- W.decodeGraph W.defaultLimits 1 bytes;
@@ -1332,7 +1373,7 @@ module Bootstrap.CrateQuery where {
               [value] -> Structure.fromGraphDataContext graph value;
               _ -> Left "malformed binary source context roots"
             };
-            let { encoded = encodeDatatypeContext declarations };
+            let { encoded = encodeSourceDatatypes declarations };
             ensure (eqString encoded expectedContext) "cached source query context mismatch";
             Right encoded
           })
@@ -1348,7 +1389,7 @@ module Bootstrap.CrateQuery where {
     ensure (eqString saved key) "cached query key mismatch";
     -- Disk acquisition precedes this guard, retaining the old missing-context
     -- diagnostic order. Memo hits still bind the caller's full canonical data.
-    ensure (eqString (encodeDatatypeContext datatypes) context)
+    ensure (eqString (encodeSourceDatatypes datatypes) context)
       "cached source query datatype context mismatch";
     header <- Structure.fromGraphUnitInterface graph metadata;
     ensure (null (Separate.unitData header)) "contextual fragment contains an inline datatype header";
@@ -1706,7 +1747,7 @@ module Bootstrap.CrateQuery where {
     ((:) (keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupOriginal prepared))
       (map KeyText (sourceGroupMetadataUsing candidateEncoding prepared)));
   sourceQueryKey crateId compilerHash prepared contracts datatypes =
-    sourceQueryKeyWithContext crateId compilerHash prepared contracts (encodeDatatypeContext datatypes);
+    sourceQueryKeyWithContext crateId compilerHash prepared contracts (encodeSourceDatatypes datatypes);
   sourceQueryKeyWithContext :: String -> String -> Source.PreparedGroup ->
     Map String Source.SourceContract -> String -> String;
   sourceQueryKeyWithContext = sourceQueryKeyUsing encodeBinding encodeTypedCandidate encodeSourceContract;
@@ -1733,7 +1774,7 @@ module Bootstrap.CrateQuery where {
           (concatMap (\member -> Dependency.valueNames (Dependency.observeDeclaration member))
             (Source.groupOriginal prepared)))) } in
     pooledSourceKey
-      [KeyText "MLF-SOURCE-CRATE-QUERY-6", KeyText crateId, KeyText compilerHash,
+      [KeyText sourceQueryFormat, KeyText crateId, KeyText compilerHash,
        keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupMembers prepared),
        KeyText (list bindingEncoding (Source.groupBindings prepared)), KeyText datatypeContext,
        sourceGroupKeyUsing candidateEncoding prepared, KeyText (observedContractEncoding observed contracts)];
@@ -1789,9 +1830,9 @@ module Bootstrap.CrateQuery where {
           (append bindings (Source.groupCandidateBindings prepared)) };
         let { name = groupName crateId names };
         let { context = case encodings of {
-          Nothing -> (,) (encodeDatatypeContext datatypes) Nothing;
+          Nothing -> (,) (encodeSourceDatatypes datatypes) Nothing;
           Just pool -> case datatypeContext of {
-            Nothing -> (,) (encodeDatatypeContextWithPool pool datatypes) Nothing;
+            Nothing -> (,) (encodeSourceDatatypesWithPool pool datatypes) Nothing;
             Just previous -> case reuseDatatypeContext pool previous datatypes of {
               (,) text next -> (,) text (Just next)
             }

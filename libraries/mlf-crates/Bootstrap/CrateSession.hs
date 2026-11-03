@@ -287,9 +287,9 @@ module Bootstrap.CrateSession (compileSpecFile) where {
           (append bindings (Source.groupCandidateBindings prepared)) };
         let { name = Query.groupName crateId names };
         let { context = case encodings of {
-          Nothing -> (,) (Query.encodeDatatypeContext datatypes) Nothing;
+          Nothing -> (,) (Query.encodeSourceDatatypes datatypes) Nothing;
           Just pool -> case datatypeContext of {
-            Nothing -> (,) (Query.encodeDatatypeContextWithPool pool datatypes) Nothing;
+            Nothing -> (,) (Query.encodeSourceDatatypesWithPool pool datatypes) Nothing;
             Just previous -> case Query.reuseDatatypeContext pool previous datatypes of {
               (,) text next -> (,) text (Just next)
             }
