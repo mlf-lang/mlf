@@ -38,7 +38,8 @@ entrypoint. It is not yet a general shared-polymorphic source bridge.
    driver. It does not use dummy callbacks or an older runtime fallback.
 
 The supported fragment is deliberately narrow: Int, Bool and arrows; complete
-closed Int/Bool vectors at shared rank-1 callable uses; supported scalar
+closed Int/Bool or exact registered parameter-free DATA/SUM atom vectors at
+shared rank-1 callable uses; supported scalar
 primitives and an Int conditional. Pending shared RHSs, captured callable views,
 dead type parameters and curried callable values have separate regression
 cases. Bare, partial or open shared uses, recursive/nested generic definitions,
@@ -60,10 +61,17 @@ their full Reference and support without field projection or eager demand.
 [Stage20](../resource_ir_v8/README_STAGE20.md) additionally accepts ordinary
 captured closed arrows with exact already-published DATA/SUM nominal leaves.
 Their complete Reference, occurrence inventory and support remain unchanged;
-nominal leaves do not add owners or permit new family selection. Bare Schemes,
-nominal generic arguments and generic or mutual recursion remain outside this
-slice. DATA field-arrow and Int-result SUM-case restrictions are unchanged.
-Historical stage sections retain their earlier scope below.
+nominal leaves do not add owners or permit new family selection.
+[Stage21](../resource_ir_v8/README_STAGE21.md) admits complete shared type vectors
+of Int/Bool or exact registered parameter-free DATA/SUM atoms, including dead
+coordinates. A producer-local nominal beta step selects normalization `/2` only
+when actually applied; otherwise `/1` remains exact. Independent replay must
+match that derived dialect and every step. Both fresh inferred sources and the
+finite native/guard/fault matrix pass locally; exact-commit CI remains separate.
+Bare/partial Schemes, arrow/open/parameterized type arguments,
+nominal generic principals/operations and generic or mutual recursion remain
+outside this slice. DATA field-arrow and Int-result SUM-case restrictions are
+unchanged. Historical stage sections retain their earlier scope below.
 
 ## Stage08: closed DATA and callable fields
 
@@ -337,6 +345,12 @@ python3 -B tools/experimental/resource-native/tests/test_planner_v8_nominal_capt
 
 python3 -B tools/experimental/resource-native/tests/test_planner_v8_nominal_callable_captures.py
 
+python3 -B tools/experimental/resource-native/tests/test_ir8_nominal_arguments.py
+
+python3 -B tools/experimental/resource-native/tests/test_module_shared_nominal_arguments.py
+
+python3 -B tools/experimental/resource-native/tests/test_planner_v8_shared_nominal_arguments.py
+
 CC=gcc IR8_PLANNER_NATIVE=1 \
 IR8_PLANNER_NATIVE_OUTPUT=/tmp/ir8-planner-native-fresh \
 python3 -B tools/experimental/resource-native/tests/test_planner_v8.py
@@ -362,6 +376,14 @@ three use `IR8_NOMINAL_CALLABLE_CAPTURES_ROOT` for current captures,
 `IR8_CALLABLE_CAPTURES_ROOT` for Stage16 goldens and `IR8_NOMINAL_CAPTURES_ROOT`
 for Stage18 goldens. Its fresh two-case source runner and validation status are
 in the [Stage20 guide](../resource_ir_v8/README_STAGE20.md).
+The separate Stage21 suites have 12 metadata, 16 nominal-vector/beta replay and
+10 nominal-shared planner tests. All pass when retained artifacts are supplied;
+the CI-form run has 12 metadata passes, 13 replay passes plus three optional
+skips, and eight planner passes plus two optional skips. Retained controls use
+`IR8_NOMINAL_SHARED_ARGUMENTS_ROOT`; prior Stage20 planner goldens also use
+`IR8_NOMINAL_CALLABLE_CAPTURES_ROOT`. The inferred curried source, not its annotated
+diagnostic control, is required by the new fresh suite. See the
+[Stage21 status and CI plan](../resource_ir_v8/README_STAGE21.md).
 Note the distinct transport and planner environment-variable names. These
 optional host checks do not build a new compiler or source target.
 The original planner suite has 20 unittest

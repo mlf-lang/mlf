@@ -170,8 +170,10 @@ class Planner:
         for path, u in self.uses.items():
             d = self.definitions[u['definition']]
             vector = tuple(self.logical(t, None) for t in u['arguments'])
-            require(len(vector) == len(d['prefix']) and all(t[0] == 'scalar' for t in vector),
-                    'complete closed Int/Bool vector required')
+            require(len(vector) == len(d['prefix']) and
+                    (all(t[0] == 'scalar' for t in vector) or
+                     all(self.closed_argument(t) for t in vector)),
+                    'complete closed intrinsic/admitted nominal vector required')
             pair = (d['binding']['id'], vector)
             self.use_pairs[path] = pair
             typ = self.substitute(self.definition_types[d['id']], 'S' + str(d['id']), vector)
@@ -212,6 +214,10 @@ class Planner:
             return self.scopes[scope][raw['id']]
         require(raw['tag'] == 'arrow', 'rank1 monotype required')
         return arrow(self.logical(raw['from'], scope, depth+1), self.logical(raw['to'], scope, depth+1))
+
+    def closed_argument(self, typ):
+        self.tick()
+        return typ in SCALARS.values() or (typ[0] == 'nominal' and typ in self.nominal_layouts)
 
     def substitute(self, typ, scope, vector):
         self.tick()
@@ -657,7 +663,9 @@ class Planner:
         keys = []
         for row in captures['views']:
             vector = tuple(self.logical(t,None) for t in row['arguments'])
-            require(all(t in SCALARS.values() for t in vector), 'recursive view vector must be closed Int/Bool')
+            require(all(t in SCALARS.values() for t in vector) or
+                    all(self.closed_argument(t) for t in vector),
+                    'recursive view vector must be closed intrinsic/admitted nominal atoms')
             pair = (row['binding']['id'],vector); keys.append(pair)
             definition = self.def_by_binder.get(pair[0])
             require(definition is not None and row['definition'] == definition['id'] and

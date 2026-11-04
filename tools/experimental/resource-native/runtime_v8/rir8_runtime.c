@@ -520,6 +520,43 @@ Rt8Handle *rt8_generic_seal(Rt8Context *c,Rt8GenericScope *scope,Rt8Handle *h,co
  if(rt8_private_event_commit(c,"generic_seal",event)){rt8_private_num(c,"frame",frame);rt8_private_num(c,"intro",intro.id);rt8_private_num(c,"capsule",capsule);rt8_private_num(c,"owner",owner);rt8_private_num(c,"node",node);rt8_private_num(c,"old_access",old);rt8_private_num(c,"new_access",next_id);rt8_private_end_event(c);}
  return h;
 }
+/* The borrowed packet was fully admitted and remains immutable. Its pool and
+ * LEGACY bindings have the same unsigned-byte lexical order, so exact registered
+ * string offsets permit a bounded search without reinterpreting a nominal name.
+ * No result, Handle or metadata cache is published by this preflight. */
+static int nominal_argument(Rt8Context *c,const Ir8PacketType *t,const char *atom) {
+ uint32_t lo=0,hi;Ir8PacketShapeBinding s;Ir8PacketShapeTyping st;
+ Ir8PacketShapeSpec spec;Ir8PacketRepresentation rep;
+ rt8_private_charge(c,1);hi=c->program.typed_header.table[6].count;
+ while(lo<hi){uint32_t m=lo+(hi-lo)/2;rt8_private_table(c,7,m,&s,sizeof(s));
+  rt8_private_charge(c,5);
+  if(s.source_tag==IR8_PACKET_SHAPE_SOURCE_LEGACY&&s.source_reference<t->atom)lo=m+1;else hi=m;}
+ G(c,15,TYPE,MISSING,1,t->id,2,lo<c->program.typed_header.table[6].count);
+ rt8_private_table(c,7,lo,&s,sizeof(s));rt8_private_table(c,8,lo,&st,sizeof(st));
+ rt8_private_table(c,9,lo,&rep,sizeof(rep));rt8_private_descriptor(c,1,lo,&spec,sizeof(spec));
+ G(c,15,TYPE,EQUATION,1,t->id,2,t->tag==IR8_PACKET_TYPE_TAG_CLOSED&&
+  s.source_tag==IR8_PACKET_SHAPE_SOURCE_LEGACY&&s.source_reference==t->atom&&
+  s.source_type==N&&s.source_scheme==N&&
+  (s.kind==IR8_PACKET_SHAPE_KIND_DATA||s.kind==IR8_PACKET_SHAPE_KIND_SUM));
+ G(c,15,TYPE,EQUATION,8,st.id,2,st.shape==s.id&&st.type==t->id&&st.scope==N&&st.contract==N&&
+  rep.shape==s.id&&rep.typing==st.id&&
+  rep.ready_kind==(s.kind==IR8_PACKET_SHAPE_KIND_DATA?IR8_PACKET_READY_KIND_DATA:IR8_PACKET_READY_KIND_SUM));
+ G(c,15,TYPE,EQUATION,7,s.id,5,spec.shape==s.id&&spec.typing==st.id&&spec.representation==rep.id&&
+  spec.kind==s.kind&&s.argument_rep==N&&s.result_rep==N&&spec.argument_rep==N&&spec.result_rep==N);
+ if(s.kind==IR8_PACKET_SHAPE_KIND_DATA){
+  G(c,15,TYPE,EQUATION,1,t->id,2,atom[0]!='#'&&atom[0]!='%'&&atom[0]!='@'&&atom[0]!='^');return 1;}
+ G(c,15,TYPE,EQUATION,1,t->id,2,atom[0]=='%');
+ rt8_private_charge(c,2);lo=0;hi=c->program.typed_header.table[10].count;
+ while(lo<hi){Ir8PacketFamilyTyping f;uint32_t m=lo+(hi-lo)/2;
+  rt8_private_table(c,11,m,&f,sizeof(f));rt8_private_charge(c,3);if(f.shape<s.id)lo=m+1;else hi=m;}
+ G(c,15,TYPE,MISSING,7,s.id,5,lo<c->program.typed_header.table[10].count);
+ Ir8PacketFamilyTyping f;Ir8PacketFamilySpec fs;
+ rt8_private_table(c,11,lo,&f,sizeof(f));rt8_private_descriptor(c,3,lo,&fs,sizeof(fs));
+ G(c,15,TYPE,EQUATION,11,f.id,2,f.shape==s.id&&fs.family==f.id&&fs.shape==s.id&&
+  fs.variants.count==f.variants.count&&f.variants.count>=1&&f.variants.count<=RT8_MAX_VARIANTS);
+ const char *name=rt8_private_string(c,f.name);
+ G(c,15,TYPE,EQUATION,11,f.id,1,literal_equal(c,atom+1,name));return 1;
+}
 Rt8Handle *rt8_instantiate(Rt8Context *c,Rt8Handle *h,const Rt8Instantiation *ref,const char *out,const char *source) {
  Rt8ValueFacts v;Ir8PacketUse use;Ir8PacketScheme scheme;Ir8PacketEnv env;
  rt8_private_enter(c,RT8_OP_INSTANTIATE,1);rt8_private_label(c,out);rt8_private_label(c,source);
@@ -532,7 +569,7 @@ Rt8Handle *rt8_instantiate(Rt8Context *c,Rt8Handle *h,const Rt8Instantiation *re
   rt8_private_vector(c,use.arguments.object,IR8_PACKET_ELEMENT_TYPE_REF,i,&a,sizeof(a));rt8_private_vector(c,env.arguments.object,IR8_PACKET_ELEMENT_TYPE_REF,i,&b,sizeof(b));
   G(c,15,TYPE,EQUATION,19,uid,3,a.row==b.row);rt8_private_table(c,1,a.row,&t,sizeof(t));
   G(c,15,TYPE,EQUATION,1,t.id,1,t.tag==IR8_PACKET_TYPE_TAG_CLOSED);const char *atom=rt8_private_string(c,t.atom);
-  G(c,15,TYPE,EQUATION,1,t.id,2,literal_equal(c,atom,"#i64")||literal_equal(c,atom,"#bool"));}
+  G(c,15,TYPE,EQUATION,1,t.id,2,literal_equal(c,atom,"#i64")||literal_equal(c,atom,"#bool")||nominal_argument(c,&t,atom));}
  G(c,25,STATE,STATE,14,v.site.id,5,v.node->state!=RT8_NS_HOLE);
  const Rt8Access *next=rt8_private_access(c,v.site.id,v.row.origin_env,IR8_PACKET_ACCESS_MODE_MONO,use.env,N);uint32_t nextid=rt8_private_table_auth(c,17,next);Ir8PacketAccess access;
  rt8_private_table(c,17,nextid,&access,sizeof(access));G(c,15,TYPE,EQUATION,19,uid,5,access.type==use.result_type);

@@ -638,9 +638,9 @@ class NominalReplayTests(unittest.TestCase):
         rhs = tabs(100, lam(10, tv(100), let(11, lam(12, nominal_type(), var(12)), var(10))))
         self.reject(with_data(let(1, rhs, app(use(1, I), lit()))), 'NOMINAL_SCOPE')
 
-    def test_nominal_scheme_instantiation_and_direct_vector_rejected(self):
-        self.reject(with_data(shared(app(use(1, nominal_type()), ctor('Pack', lit())))), 'USE')
-        self.reject(with_data(tapp(tabs(100, lam(10, tv(100), var(10))), inst(nominal_type()))), 'DIRECT')
+    def test_closed_published_nominal_scheme_and_direct_vectors_admitted(self):
+        self.assertEqual(m.derive_shared_fragment(with_data(shared(app(use(1, nominal_type()), ctor('Pack', lit())))))['policy'], m.POLICY)
+        self.assertEqual(m.derive_shared_fragment(with_data(tapp(tabs(100, lam(10, tv(100), var(10))), inst(nominal_type()))))['policy'], m.NOMINAL_BETA_POLICY)
 
     def test_zero_and_32_field_boundaries(self):
         zero = m.derive_shared_fragment(with_data(case(ctor(), binders=(), body=lit()), data_decl(fields=())))
@@ -872,11 +872,11 @@ class SumReplayTests(unittest.TestCase):
         d = sum_decl(); d['parameters'] = [{'name': 'a', 'kind': {'tag': 'star'}}]
         self.reject(with_data(ctor('Empty'), d), 'NOMINAL')
 
-    def test_nominal_generic_bodies_and_instantiation_vectors_remain_excluded(self):
+    def test_nominal_generic_bodies_excluded_but_closed_vectors_admitted(self):
         rhs = tabs(100, lam(2, tv(100), let(10, ctor('Empty'), var(2))))
         self.reject(with_data(let(1, rhs, app(use(1, I), lit())), sum_decl()), 'NOMINAL_SCOPE')
-        self.reject(with_data(shared(app(use(1, nominal_type('Choice')), ctor('Empty'))), sum_decl()), 'USE')
-        self.reject(with_data(tapp(tabs(100, lam(10, tv(100), var(10))), inst(nominal_type('Choice'))), sum_decl()), 'DIRECT')
+        self.assertEqual(m.derive_shared_fragment(with_data(shared(app(use(1, nominal_type('Choice')), ctor('Empty'))), sum_decl()))['policy'], m.POLICY)
+        self.assertEqual(m.derive_shared_fragment(with_data(tapp(tabs(100, lam(10, tv(100), var(10))), inst(nominal_type('Choice'))), sum_decl()))['policy'], m.NOMINAL_BETA_POLICY)
 
     def test_unreferenced_unsupported_context_and_mixed_data_sum(self):
         unused = data_decl('Unused', 'U', (nominal_type('Unused'),))
@@ -1149,14 +1149,14 @@ class SelfRecursiveSumReplayTests(unittest.TestCase):
             'type':nominal_type('Chain'), 'value':ctor('Cons',lit(),var(10))}], 'body':lit()}, d), 'RECURSION')
         self.reject(with_data(let(10, ctor('Cons',lit(),var(10)),lit()),d), 'SCHEMA')
 
-    def test_generic_nominal_result_or_argument_and_nominal_use_still_rejected(self):
+    def test_generic_nominal_principals_excluded_but_closed_self_vectors_admitted(self):
         d = recursive_decl()
         rhs = tabs(100, lam(2, tv(100), ctor('Nil')))
         self.reject(with_data(let(1,rhs,app(use(1,I),lit())),d), 'NOMINAL_SCOPE')
         rhs = tabs(100, lam(2, nominal_type('Chain'), lam(3, tv(100), var(3))))
         self.reject(with_data(let(1,rhs,app(app(use(1,I),ctor('Nil')),lit())),d), 'NOMINAL_SCOPE')
-        self.reject(with_data(shared(app(use(1,nominal_type('Chain')),ctor('Nil'))),d), 'USE')
-        self.reject(with_data(tapp(tabs(100,lam(2,tv(100),var(2))),inst(nominal_type('Chain'))),d), 'DIRECT')
+        self.assertEqual(m.derive_shared_fragment(with_data(shared(app(use(1,nominal_type('Chain')),ctor('Nil'))),d))['policy'], m.POLICY)
+        self.assertEqual(m.derive_shared_fragment(with_data(tapp(tabs(100,lam(2,tv(100),var(2))),inst(nominal_type('Chain'))),d))['policy'], m.NOMINAL_BETA_POLICY)
 
     def test_constructor_saturation_and_exact_tail_type(self):
         for value,code in [(ctor('Cons'), 'CONSTRUCTOR'), (ctor('Cons',lit()),'CONSTRUCTOR'),
@@ -2175,7 +2175,7 @@ class RecursiveNominalCaptureReplayTests(unittest.TestCase):
         declaration=data_decl();declaration['parameters']=[{'name':'a','kind':{'tag':'star'}}]
         self.reject(with_data(lam(20,nominal_type('Box'),rec_binding(10,arr(I,I),lam(11,I,lit()),lit())),declaration))
 
-    def test_nominal_arrows_need_new_policy_but_generic_recursion_and_scheme_arguments_stay_out(self):
+    def test_nominal_arrows_need_new_policy_and_generic_recursion_stays_out(self):
         raw=with_data(let(20,lam(21,nominal_type('Box'),lit()),
             rec_binding(10,arr(I,I),lam(11,I,app(var(20),ctor('Pack',lit()))),lit())))
         self.assertEqual(m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']['policy'],
@@ -2183,7 +2183,7 @@ class RecursiveNominalCaptureReplayTests(unittest.TestCase):
         raw=with_data(tapp(tabs(100,lam(20,nominal_type('Box'),
             rec_binding(10,arr(I,I),lam(11,I,lit()),lit()))),inst(I)))
         self.reject(raw,'RECURSION')
-        self.reject(with_data(shared(app(use(1,nominal_type('Box')),ctor('Pack',lit())))),'USE')
+        self.assertEqual(m.derive_shared_fragment(with_data(shared(app(use(1,nominal_type('Box')),ctor('Pack',lit())))))['policy'], m.POLICY)
 
     def test_wrong_family_pattern_and_same_shape_argument_do_not_match(self):
         raw=with_data(let(20,ctor('A',lit()),rec_binding(10,arr(I,I),
@@ -2454,10 +2454,10 @@ class AdmittedCallableCaptureReplayTests(unittest.TestCase):
             data_decl('First','A'),data_decl('Second','B'))
         self.reject(raw,'TYPE')
 
-    def test_generic_recursion_bare_scheme_and_nominal_type_arguments_stay_rejected(self):
+    def test_generic_recursion_and_bare_scheme_stay_rejected(self):
         tree=admitted_callable_capture();body=tree['body']
         tree['body']=tapp(tabs(500,body),inst(I));self.reject(tree,'RECURSION')
-        self.reject(with_data(shared(app(use(1,nominal_type('Box')),ctor('Pack',lit())))),'USE')
+        self.assertEqual(m.derive_shared_fragment(with_data(shared(app(use(1,nominal_type('Box')),ctor('Pack',lit())))))['policy'], m.POLICY)
         self.reject(shared(rec_binding(10,arr(I,I),lam(11,I,let(20,var(1),lit())),lit())))
 
     def test_forged_policy_arrays_complete_type_owner_or_occurrences_reject(self):

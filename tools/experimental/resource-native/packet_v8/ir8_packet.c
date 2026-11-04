@@ -689,6 +689,47 @@ static int generic_body(Check *c,uint32_t root,uint32_t scheme) {
     return 1;
 }
 
+/* Env arguments may name a published nominal atom, not an arbitrary CLOSED
+ * Type. This runs before semantic Shape validation: every read remains bounded,
+ * and the later complete Shape/field/descriptor checks are still mandatory. */
+static int shape_find(Check *c,uint32_t tag,uint32_t first,uint32_t second,uint32_t *id);
+static int nominal_argument(Check *c,const Ir8PacketType *t) {
+    uint32_t id,lo=0,hi;unsigned char first;
+    Ir8PacketShapeBinding s;Ir8PacketShapeTyping st;
+    Ir8PacketShapeSpec spec;Ir8PacketRepresentation rep;
+    TRY(shape_find(c,IR8_PACKET_SHAPE_SOURCE_LEGACY,t->atom,N,&id));
+    TRY(row(c,7,id,&s));TRY(row(c,8,id,&st));TRY(row(c,9,id,&rep));
+    TRY(descriptor(c,1,id,&spec));
+    REQUIRE_N(t->tag==IR8_PACKET_TYPE_TAG_CLOSED&&s.source_tag==IR8_PACKET_SHAPE_SOURCE_LEGACY&&
+        s.source_reference==t->atom&&s.source_type==N&&s.source_scheme==N&&
+        (s.kind==IR8_PACKET_SHAPE_KIND_DATA||s.kind==IR8_PACKET_SHAPE_KIND_SUM),TYPE_EQUATION,EQUATION,7);
+    REQUIRE_N(st.shape==id&&st.type==t->id&&st.scope==N&&st.contract==N&&
+        rep.shape==id&&rep.typing==id&&
+        rep.ready_kind==(s.kind==IR8_PACKET_SHAPE_KIND_DATA?IR8_PACKET_READY_KIND_DATA:IR8_PACKET_READY_KIND_SUM),REPRESENTATION_EQUATION,EQUATION,7);
+    REQUIRE_N(spec.shape==id&&spec.typing==id&&spec.representation==id&&spec.kind==s.kind&&
+        s.argument_rep==N&&s.result_rep==N&&spec.argument_rep==N&&spec.result_rep==N,REPRESENTATION_EQUATION,EQUATION,8);
+    TRY(pool_byte(c,t->atom,&first));
+    if(s.kind==IR8_PACKET_SHAPE_KIND_DATA){
+        REQUIRE_N(first!='#'&&first!='%'&&first!='@'&&first!='^',TYPE_EQUATION,EQUATION,4);
+        return 1;
+    }
+    EQ(first,'%',TYPE_EQUATION);
+    TRY(charge(c,1));hi=c->t.table[10].count;
+    while(lo<hi){Ir8PacketFamilyTyping f;uint32_t m=lo+(hi-lo)/2;
+        TRY(row(c,11,m,&f));TRY(charge(c,3));if(f.shape<id){lo=m+1;}else{hi=m;}}
+    {Ir8PacketFamilyTyping f;Ir8PacketFamilySpec fs;
+        REQUIRE(lo<c->t.table[10].count,TYPE_EQUATION,MISSING);
+        TRY(row(c,11,lo,&f));TRY(descriptor(c,3,lo,&fs));
+        REQUIRE_N(f.shape==id&&fs.family==f.id&&fs.shape==id&&
+            fs.variants.count==f.variants.count&&f.variants.count>=1&&f.variants.count<=64,TYPE_EQUATION,EQUATION,6);
+        /* The suffix is not a separate registered pool start. Read bytes only. */
+        uint32_t a=t->atom+1,b=f.name;
+        for(;;){unsigned char x,y;TRY(pool_byte(c,a++,&x));TRY(pool_byte(c,b++,&y));
+            EQ(x,y,TYPE_EQUATION);if(!x){break;}}
+    }
+    return 1;
+}
+
 static int check_environments(Check *c) {
     uint32_t i,eid=1,j;int cmp;
     for(i=0;i<c->t.table[2].count;++i){Ir8PacketScheme s;Ir8PacketEnv e;Ir8PacketType b;
@@ -704,7 +745,9 @@ static int check_environments(Check *c) {
             REQUIRE_N(cur.mode==3&&cur.arguments.count==s.parameters,TYPE_EQUATION,EQUATION,2);TRY(row(c,4,eid-1,&prev));
             for(j=0;j<s.parameters;++j){Ir8PacketTypeRef r,p;Ir8PacketType t;int b1,b2;
                 TRY(vector_read(c,cur.arguments,23,j,&r));TRY(row(c,1,r.row,&t));REQUIRE(t.tag==1,TYPE_EQUATION,EQUATION);
-                TRY(string_is(c,t.atom,"#bool",&b1));TRY(string_is(c,t.atom,"#i64",&b2));REQUIRE(b1||b2,TYPE_EQUATION,EQUATION);
+                TRY(string_is(c,t.atom,"#bool",&b1));TRY(string_is(c,t.atom,"#i64",&b2));
+                if(b1||b2){REQUIRE(1,TYPE_EQUATION,EQUATION);}
+                else {TRY(charge(c,1));TRY(nominal_argument(c,&t));}
                 if(prev.mode==3&&!order){TRY(vector_read(c,prev.arguments,23,j,&p));TRY(charge(c,1));order=p.row<r.row?-1:p.row>r.row?1:0;}}
             if(prev.mode==3){ REQUIRE(order<0,TYPE_EQUATION,ORDER); }++eid;
         }

@@ -12,8 +12,8 @@ parameter-free, single-constructor DATA. Its fields are Int/Bool or closed
 arrows recursively over those scalars. Multi-constructor SUM families permit
 Int/Bool fields and exact zero-argument self-family atoms, with exhaustive
 Int-result cases. The optional self_recursive marker records that extension;
-nominal types are never unfolded. This does not admit nominal Scheme arguments,
-nominal atoms in generic code, callable SUM fields, cross-family recursion,
+nominal types are never unfolded. Complete shared-use vectors may additionally
+contain these exact published nominal atoms. This does not admit nominal atoms in generic code, callable SUM fields, cross-family recursion,
 or parameterized/higher-rank data. At most one retained recursive group globally
 is admitted, containing one concrete closed monomorphic function. Its optional
 capture policies permit closed Int/Bool owners, exact full-vector lexical
@@ -41,6 +41,7 @@ import transport as fragment
 
 FORMAT = 'mlf-shared-fragment-replay/1'
 POLICY = 'shared-rank1-callable/1'
+NOMINAL_BETA_POLICY = 'shared-rank1-callable/2'
 MAX_CELLS = 10_000
 MAX_DEPTH = 100
 MAX_BYTES = 32 * 1024 * 1024
@@ -693,8 +694,43 @@ def _prefix(node, path):
     return node, path, prefix
 
 
-def _normalize(root, budget):
+def _selected_argument(typ, registry, budget, code, path):
+    """A closed nominal coordinate must already have passed raw inference.
+
+    No select/type_row call is allowed here: normalization and use inventory
+    cannot enlarge the original checked declaration selection.
+    """
+    budget.tick()
+    if (type(typ) is not dict or set(typ) != {'tag', 'name', 'arguments'}
+            or typ['tag'] != 'constructor' or typ['arguments']):
+        _fail(code, 'complete vector requires intrinsic or admitted closed nominal atoms', path)
+    index = registry.by_name.get(typ['name'])
+    owner = registry.selected.get(index)
+    if owner is None or not _same(owner['type'], typ):
+        _fail(code, 'nominal coordinate lacks its already checked declaration', path)
+    return owner
+
+
+def _reconcile_arguments(obligations, registry, published, budget):
+    """Bind nominal coordinate obligations to the exact published row objects."""
+    for typ, owner, path in obligations:
+        budget.tick()
+        if _selected_argument(typ, registry, budget, 'USE', path) is not owner:
+            _fail('USE', 'nominal coordinate changed declaration identity', path)
+        found = False
+        for table in published:
+            if table is not None:
+                for row in table['declarations']:
+                    budget.tick()
+                    if row is owner:
+                        found = True
+        if not found:
+            _fail('USE', 'nominal coordinate declaration is not published', path)
+
+
+def _normalize(root, budget, registry):
     current = root
+    dialect = POLICY
     origins = {path: path for path, _ in _walk(root)}
     steps = []
     removed = {}
@@ -714,7 +750,10 @@ def _normalize(root, budget):
                 if len(prefix) > MAX_PARAMETERS or len(arguments) != len(prefix):
                     _fail('DIRECT', 'immediate type spine requires the entire prefix', path)
                 if not all(_scalar(arg) for arg in arguments):
-                    _fail('DIRECT', 'immediate type spine is not closed Int/Bool', path)
+                    for arg in arguments:
+                        if not _scalar(arg):
+                            _selected_argument(arg, registry, budget, 'DIRECT', path)
+                    dialect = NOMINAL_BETA_POLICY
                 after = cursor
                 for (_, formal), arg in zip(prefix, arguments):
                     after = fragment.substitute_closed_term(after, formal['id'], arg)
@@ -730,7 +769,7 @@ def _normalize(root, budget):
                           {'rule': 'erase_refl', 'witness': node['witness']})
                 break
         if choice is None:
-            return current, steps, origins, removed, touched
+            return current, steps, origins, removed, touched, dialect
         path, before, retained_path, after, detail = choice
         index = len(steps)
         if index >= MAX_PROOFS:
@@ -818,7 +857,7 @@ def _nominal_atom(typ, budget):
     return False
 
 
-def _inventory(original, normalized, original_infer, normalized_infer, origins, removed, touched, budget):
+def _inventory(original, normalized, original_infer, normalized_infer, origins, removed, touched, budget, obligations, dialect):
     original_paths = [p for p, n in _walk(original) if n['tag'] == 'type_application']
     if len(original_paths) > MAX_PROOFS:
         _fail('LIMIT', 'type-application evidence bound')
@@ -887,7 +926,11 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
             if len(arguments) != len(definition['prefix']):
                 _fail('USE', 'bare, partial, or extra Scheme elimination', path)
             if not all(_scalar(arg) for arg in arguments):
-                _fail('USE', 'shared use must have a complete closed Int/Bool vector', path)
+                for arg in arguments:
+                    if not _scalar(arg):
+                        owner = _selected_argument(arg, original_infer.nominals, budget, 'USE', path)
+                        budget.tick()
+                        obligations.append((arg, owner, path))
             expected = definition['body_type']
             for formal, argument in zip(definition['prefix'], arguments):
                 expected = fragment.substitute_closed_type(expected, formal['id'], argument)
@@ -943,7 +986,7 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
     scopes = original_infer.scopes + normalized_infer.scopes
     for row in scopes:
         budget.record(row)
-    return {'policy': POLICY, 'definitions': definitions, 'type_scopes': scopes,
+    return {'policy': dialect, 'definitions': definitions, 'type_scopes': scopes,
             'type_applications': proofs, 'uses': uses}
 
 
@@ -1264,7 +1307,7 @@ def derive_shared_fragment(projected_annotated):
         budget = _Budget()
         nominals = _Nominals(root, budget)
         raw = _Inference(root, 'projected', budget, nominals=nominals)
-        normal, steps, origins, removed, touched = _normalize(root, budget)
+        normal, steps, origins, removed, touched, dialect = _normalize(root, budget, nominals)
         projection.validate_raw_term(normal, require_closed=True)
         normalized = _Inference(normal, 'normalized', budget, scope_start=len(raw.scopes),
                                 origins=origins, nominals=nominals)
@@ -1287,11 +1330,13 @@ def derive_shared_fragment(projected_annotated):
                    'erased_path': list(erased), 'tag': tag}
             budget.record(row)
             correspondence.append(row)
-        inventory = _inventory(root, normal, raw, normalized, origins, removed, touched, budget)
+        obligations = []
+        inventory = _inventory(root, normal, raw, normalized, origins, removed, touched, budget, obligations, dialect)
         nominal_inventory, sum_inventory = _nominal_inventory(normal, normalized, nominals, budget)
+        _reconcile_arguments(obligations, nominals, (nominal_inventory, sum_inventory), budget)
         recursion_inventory = _recursion_inventory(normal, normalized, inventory,
                                                    (nominal_inventory, sum_inventory), budget)
-        result = {'format': FORMAT, 'status': 'independent-fragment-replay-only', 'policy': POLICY,
+        result = {'format': FORMAT, 'status': 'independent-fragment-replay-only', 'policy': dialect,
                   'input_checked_type': raw.type, 'checked_type': normalized.type,
                   'input_annotated': root, 'input_erased': before_erased,
                   'raw_normalized': normal, 'steps': steps, 'term_correspondence': correspondence,

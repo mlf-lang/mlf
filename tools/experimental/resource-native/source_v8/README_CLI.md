@@ -35,7 +35,8 @@ sharedId x = x
 
 The current fragment admits Int, Bool and arrows, supported scalar primitives,
 Int conditionals and bounded rank-1 shared callable uses with complete closed
-Int/Bool vectors, plus referenced closed, parameter-free DATA and scalar/self-field SUMs.
+Int/Bool or exact registered parameter-free DATA/SUM atom vectors, plus
+referenced closed DATA and scalar/self-field SUMs.
 DATA fields are Int, Bool or recursively closed arrows over those scalars; exact
 nominal identities are not merged by equal field layouts. It preserves the
 shared RHS, ordinary pending applications,
@@ -45,8 +46,9 @@ parameterized types, mutual/cross-family recursion, nested DATA fields, callable
 SUM fields and recursive generic definitions reject before native execution.
 A SUM field may refer only to its own exact zero-argument family, besides Int/Bool. Ordinary function
 types and DATA case results may mention admitted nominal types; SUM cases require
-Int results. Retained generic scopes and Scheme vectors may not contain nominal
-types. All declarations remain evidence, without automatically
+Int results. Retained generic principal code still cannot contain nominal atoms
+or operations; complete closed use vectors may contain admitted nominal atoms.
+All declarations remain evidence, without automatically
 admitting unrelated compiler dictionaries.
 [Stage13](../resource_ir_v8/README_STAGE13.md) also accepts one closed,
 explicitly annotated monomorphic recursive function without outside term
@@ -67,9 +69,14 @@ it does not reconstruct fields or views. [Stage20](../resource_ir_v8/README_STAG
 also permits ordinary recursive captures of full closed arrows containing exact
 already-published DATA/SUM nominal leaves. It preserves each pending owner,
 complete type, support and occurrence path without selecting another family.
-Nominal generic arguments and recursive generic definitions remain rejected;
-DATA field arrows still have only Int/Bool leaves and SUM cases still return Int.
-No CLI flag or default changes.
+[Stage21](../resource_ir_v8/README_STAGE21.md) extends complete shared type
+arguments to exact registered parameter-free DATA/SUM atoms, preserving every
+coordinate and the actual owner/view identity. It adds nominal beta only to the
+shared diagnostic producer and independently derives `/2` only for a real nominal
+beta step. Generic nominal principal code, arrow/open/parameterized arguments
+and recursive generic definitions remain rejected. DATA field arrows still have
+only Int/Bool leaves and SUM cases still return Int. No CLI flag or default changes.
+The finite Stage21 local source/native checks pass; exact-commit CI is separate.
 See the [fragment contract](README.md) for its limits.
 
 For example, a closed callable field can use the same `SharedPoly.emlf` above:
@@ -328,6 +335,26 @@ Int42 with seven balanced empty terminal ledgers, and complete native reports
 match the original coarse-O0 reports including every work field. Its 50 report
 and 12 structure controls reject; no additional fault pair was run. Exact-head
 CI remains separate. See the [Stage20 scope and validation status](../resource_ir_v8/README_STAGE20.md).
+
+The Stage21 inferred nominal shared-argument suite is:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal_shared_arguments.py \
+  --ghc /absolute/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /absolute/new-nominal-shared-suite-directory
+```
+
+It freshly builds identity and inferred curried-constant cases and retains
+`nominal-shared-observations.json`. The earlier explicitly annotated curried
+control is diagnostic only, not a replacement source. Both fresh cases pass,
+with 16 clean process records and full native reports byte-for-byte equal to the
+initial coarse/O0 reports, including every work field. The suite rejects
+40 copied-report and 15 copied-structure controls. The eight-condition native
+matrix, four ASan/UBSan conditions, nominal guards and fixed fuel-146
+retain/terminal pair also pass locally. These nonrecursive fixtures exercise
+26 applicable guards, not the Fill guard. See the
+[Stage21 results and limits](../resource_ir_v8/README_STAGE21.md) for the retained
+observer correction and exact scope. Exact-commit CI remains separate.
 
 This remains a bounded opt-in experiment. It does not establish arbitrary MLF
 source support, general nominal or callable-SUM coverage, all runtime guards,

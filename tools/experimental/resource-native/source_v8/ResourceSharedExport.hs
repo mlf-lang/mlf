@@ -6,6 +6,7 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Compiler as Compiler;
   import qualified Bootstrap.X.Checked as K;
   import qualified Bootstrap.X.Syntax as X;
@@ -29,18 +30,44 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
   substitutionNode ((,) ((,) binder _) argument) = J.Object [
     ("binder", J.num (T.tyVarId binder)), ("argument", Modules.rawType argument)];
 
+  -- Diagnostic eligibility uses only the immutable outer declarations of the
+  -- freshly K-checked input. Python independently enforces backend field rules.
+  nominalArgument declarations argument = case argument of {
+    XCon name [] -> case L.filter (\d -> eqString name (D.datatypeName d)) declarations of {
+      [declaration] -> L.null (D.datatypeBinders declaration) && L.not (E.closedArgument argument);
+      _ -> False
+    };
+    _ -> False
+  };
+  sharedArgument declarations argument = E.closedArgument argument || nominalArgument declarations argument;
+  applyNominalPrefix declarations term arguments = case arguments of {
+    [] -> do { L.ensure (L.null (E.closedPrefix term)) "partial shared nominal forall elimination"; Right term };
+    (:) argument rest -> case term of {
+      XTypeAbs binder bound body -> do {
+        L.ensure (E.bottomStar bound && sharedArgument declarations argument)
+          "shared nominal substitution requires a checked closed atom and bottom Star";
+        substituted <- E.closedSubstituteTerm binder argument body;
+        applyNominalPrefix declarations substituted rest
+      };
+      _ -> Left "extra shared nominal forall elimination"
+    }
+  };
+
   -- A single leftmost outermost rewrite, with exact pre/post subtrees. The
   -- enclosing traversal rebuilds only the path to this one occurrence.
-  direct state path term = case term of {
+  direct nominals state path term = case term of {
     XTypeApp value witness -> case E.closedSpine term of { (,) base proofs -> do {
       actions <- E.closedActions proofs;
-      let { arguments = E.closedActionArguments actions; prefix = E.closedPrefix base };
-      if L.not (L.null prefix) && L.not (L.null arguments) && L.all E.closedArgument arguments
+      let { arguments = E.closedActionArguments actions; prefix = E.closedPrefix base;
+        scalar = L.all E.closedArgument arguments;
+        nominal = L.not scalar && L.all (sharedArgument nominals) arguments };
+      if L.not (L.null prefix) && L.not (L.null arguments) && (scalar || nominal)
       then do {
         E.closedValidatePrefix prefix;
         L.ensure (L.length prefix == L.length arguments)
           "shared diagnostic: partial or extra immediate closed vector";
-        output <- E.closedApplyPrefix base arguments;
+        output <- if scalar then E.closedApplyPrefix base arguments
+          else applyNominalPrefix nominals base arguments;
         let { step = J.Object [
           ("rule", J.String "instantiate_direct_closed"),
           ("input", stateNode state path term),
@@ -49,13 +76,13 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
           ("witnesses", J.Array (L.map E.computationNode proofs)),
           ("substitutions", J.Array (L.map substitutionNode (L.zip prefix arguments))),
           ("output", stateNode (state + 1) path output)] };
-        Right (Just ((,) output step))
+        Right (Just ((,) output ((,) step nominal)))
       } else do {
         outer <- E.closedProofActions witness;
-        if L.all identity outer then Right (Just ((,) value (J.Object [
+        if L.all identity outer then Right (Just ((,) value ((,) (J.Object [
           ("rule", J.String "erase_refl"), ("input", stateNode state path term),
           ("witness", E.computationNode witness),
-          ("output", stateNode (state + 1) path value)])))
+          ("output", stateNode (state + 1) path value)]) False)))
         else Right Nothing
       }
     } };
@@ -65,60 +92,60 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
     Nothing -> Nothing;
     Just ((,) value step) -> Just ((,) (constructor value) step)
   };
-  visit state path term = do {
-    here <- direct state path term;
+  visit nominals state path term = do {
+    here <- direct nominals state path term;
     case here of {
       Just _ -> Right here;
       Nothing -> case term of {
         XAbs binder annotation body -> do {
-          next <- visit state (child path "body") body;
+          next <- visit nominals state (child path "body") body;
           Right (lift (XAbs binder annotation) next)
         };
         XApp function argument -> do {
-          first <- visit state (child path "function") function;
+          first <- visit nominals state (child path "function") function;
           case first of {
             Just _ -> Right (lift (\value -> XApp value argument) first);
             Nothing -> do {
-              second <- visit state (child path "argument") argument;
+              second <- visit nominals state (child path "argument") argument;
               Right (lift (XApp function) second)
             }
           }
         };
         XTypeAbs binder bound body -> do {
-          next <- visit state (child path "body") body;
+          next <- visit nominals state (child path "body") body;
           Right (lift (XTypeAbs binder bound) next)
         };
         XTypeApp value witness -> do {
           -- Unlike ResourceExport.closedVisit, the wrapper remains in the path.
-          next <- visit state (child path "value") value;
+          next <- visit nominals state (child path "value") value;
           Right (lift (\inner -> XTypeApp inner witness) next)
         };
         XLet binder value body -> do {
-          first <- visit state (child path "value") value;
+          first <- visit nominals state (child path "value") value;
           case first of {
             Just _ -> Right (lift (\rhs -> XLet binder rhs body) first);
             Nothing -> do {
-              second <- visit state (child path "body") body;
+              second <- visit nominals state (child path "body") body;
               Right (lift (XLet binder value) second)
             }
           }
         };
         XLetRec bindings body -> do {
-          first <- visitBindings state path 0 bindings;
+          first <- visitBindings nominals state path 0 bindings;
           case first of {
             Just ((,) values step) -> Right (Just ((,) (XLetRec values body) step));
             Nothing -> do {
-              second <- visit state (child path "body") body;
+              second <- visit nominals state (child path "body") body;
               Right (lift (XLetRec bindings) second)
             }
           }
         };
         XCase subject result alternatives -> do {
-          first <- visit state (child path "scrutinee") subject;
+          first <- visit nominals state (child path "scrutinee") subject;
           case first of {
             Just _ -> Right (lift (\value -> XCase value result alternatives) first);
             Nothing -> do {
-              second <- visitAlternatives state path 0 alternatives;
+              second <- visitAlternatives nominals state path 0 alternatives;
               case second of {
                 Nothing -> Right Nothing;
                 Just ((,) values step) -> Right (Just ((,) (XCase subject result values) step))
@@ -127,7 +154,7 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
           }
         };
         XWithData declarations body -> do {
-          next <- visit state (child path "body") body;
+          next <- visit nominals state (child path "body") body;
           Right (lift (XWithData declarations) next)
         };
         XVarTerm _ -> Right Nothing;
@@ -140,14 +167,14 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
       }
     }
   };
-  visitBindings state path index bindings = case bindings of {
+  visitBindings nominals state path index bindings = case bindings of {
     [] -> Right Nothing;
     (:) ((,,) binder annotation value) rest -> do {
-      first <- visit state (L.append path ["bindings", showInt index, "value"]) value;
+      first <- visit nominals state (L.append path ["bindings", showInt index, "value"]) value;
       case first of {
         Just ((,) rhs step) -> Right (Just ((,) ((:) ((,,) binder annotation rhs) rest) step));
         Nothing -> do {
-          second <- visitBindings state path (index + 1) rest;
+          second <- visitBindings nominals state path (index + 1) rest;
           case second of {
             Nothing -> Right Nothing;
             Just ((,) values step) -> Right (Just ((,) ((:) ((,,) binder annotation value) values) step))
@@ -156,14 +183,14 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
       }
     }
   };
-  visitAlternatives state path index alternatives = case alternatives of {
+  visitAlternatives nominals state path index alternatives = case alternatives of {
     [] -> Right Nothing;
     (:) (XAlternative pattern body) rest -> do {
-      first <- visit state (L.append path ["alternatives", showInt index, "body"]) body;
+      first <- visit nominals state (L.append path ["alternatives", showInt index, "body"]) body;
       case first of {
         Just ((,) value step) -> Right (Just ((,) ((:) (XAlternative pattern value) rest) step));
         Nothing -> do {
-          second <- visitAlternatives state path (index + 1) rest;
+          second <- visitAlternatives nominals state path (index + 1) rest;
           case second of {
             Nothing -> Right Nothing;
             Just ((,) values step) -> Right (Just ((,) ((:) (XAlternative pattern body) values) step))
@@ -214,12 +241,16 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
     _ -> []
   };
   normalizeSharedChecked supplied = do {
+    result <- normalizeSharedDialect supplied;
+    case result of { (,,,) original checked steps _ -> Right ((,,) original checked steps) }
+  };
+  normalizeSharedDialect supplied = do {
     boundRetained (Modules.rawTerm (K.term supplied));
     original <- K.check (K.term supplied);
     L.ensure (T.alphaEq (K.typeOf supplied) (K.typeOf original))
       "shared diagnostic: supplied checked root changed";
-    result <- loop 0 (K.term original) [] 2;
-    case result of { (,) term steps -> do {
+    result <- loop (E.closedDeclarations (K.term original)) 0 (K.term original) [] 2 False;
+    case result of { (,,) term steps nominal -> do {
       checked <- K.check term;
       L.ensure (T.alphaEq (K.typeOf original) (K.typeOf checked))
         "shared diagnostic: normalized root type changed";
@@ -227,32 +258,32 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
         "shared diagnostic: ordinary erasure/sharing changed";
       L.ensure (J.equal (J.Array (declarations (K.term original))) (J.Array (declarations term)))
         "shared diagnostic: declaration syntax changed";
-      Right ((,,) original checked steps)
+      Right ((,,,) original checked steps nominal)
     } }
   };
-  loop state term reversedSteps stepBytes = do {
-    next <- visit state [] term;
+  loop nominals state term reversedSteps stepBytes usedNominal = do {
+    next <- visit nominals state [] term;
     case next of {
-      Nothing -> Right ((,) term (L.reverse reversedSteps));
-      Just ((,) output step) -> do {
+      Nothing -> Right ((,,) term (L.reverse reversedSteps) usedNominal);
+      Just ((,) output ((,) step nominal)) -> do {
         L.ensure (state < 2048) "shared diagnostic: normalization exceeds2048 rewrites";
         boundRetained (Modules.rawTerm output);
         L.ensure (X.equalErased (X.erase term) (X.erase output))
           "shared diagnostic: a type rewrite changed ordinary erasure";
         let { separator = if state == 0 then 0 else 1 };
         width <- boundedUTF8 (4194304 - stepBytes - separator) (J.render step);
-        loop (state + 1) output ((:) step reversedSteps) (stepBytes + separator + width)
+        loop nominals (state + 1) output ((:) step reversedSteps) (stepBytes + separator + width) (usedNominal || nominal)
       }
     }
   };
 
   exportCaptured captured = do {
     projected <- Projection.projectChecked (Modules.checkedTerm captured);
-    normalized <- normalizeSharedChecked (Projection.projected projected);
-    case normalized of { (,,) before after steps -> do {
+    normalized <- normalizeSharedDialect (Projection.projected projected);
+    case normalized of { (,,,) before after steps nominal -> do {
       let { original = Projection.original projected;
         normalization = J.Object [
-          ("policy", J.String "shared-rank1-callable/1"),
+          ("policy", J.String (if nominal then "shared-rank1-callable/2" else "shared-rank1-callable/1")),
           ("input_checked_type", Modules.rawType (K.typeOf before)),
           ("input_annotated", Modules.rawTerm (K.term before)),
           ("input_erased", Modules.rawErased (X.erase (K.term before))),

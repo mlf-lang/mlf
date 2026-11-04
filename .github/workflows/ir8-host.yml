@@ -23,12 +23,20 @@ jobs:
         run: |
           python3 -B -S tools/experimental/resource-native/tests/run_ir8_host.py \
             --output "$RUNNER_TEMP/ir8-host"
+      - name: Check registered nominal type arguments and metadata
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$RUNNER_TEMP/ir8-nominal-arguments-host"
+          python3 -B -S tools/experimental/resource-native/tests/test_ir8_nominal_arguments.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-nominal-arguments-host/checks.log"
       - name: Retain host-only evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ir8-host-evidence-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ir8-host
+          path: |
+            ${{ runner.temp }}/ir8-host
+            ${{ runner.temp }}/ir8-nominal-arguments-host
           if-no-files-found: warn
           retention-days: 14
   ir8-runtime-host:
@@ -161,6 +169,16 @@ jobs:
           set -euo pipefail
           python3 -B tools/experimental/resource-native/tests/test_planner_v8_nominal_callable_captures.py \
             2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/nominal-callable-captures-planner.log"
+      - name: Replay complete nominal vectors and nominal beta proofs
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_module_shared_nominal_arguments.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/nominal-shared-replay.log"
+      - name: Check nominal shared-view planning and prior-plan preservation
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_planner_v8_shared_nominal_arguments.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/nominal-shared-planner.log"
       - name: Retain fragment evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -316,5 +334,71 @@ jobs:
             ${{ runner.temp }}/ir8-nominal-captures-setup
             ${{ runner.temp }}/ir8-source-nominal-captures
             ${{ runner.temp }}/ir8-source-nominal-callable-captures
+          if-no-files-found: warn
+          retention-days: 14
+  ir8-nominal-shared-source:
+    name: IR8 complete nominal shared arguments from fresh source
+    runs-on: ubuntu-24.04
+    # Two inferred sources; separate from the unchanged 26-case and four-case jobs.
+    # Reuse these actual generated SUM files plus one synthetic DATA pair for guards.
+    # Keep the hard job ceiling and every existing helper/process limit unchanged.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned direct-host GHC 9.14.1
+        run: |
+          set -euo pipefail
+          setup="$RUNNER_TEMP/ir8-nominal-shared-setup"
+          mkdir -m 700 "$setup"
+          sudo apt-get update 2>&1 | tee "$setup/apt-update.log"
+          sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils \
+            2>&1 | tee "$setup/apt-install.log"
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          curl --fail --location --connect-timeout 30 --max-time 600 \
+            https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz \
+            -o "$archive" 2>&1 | tee "$setup/download.log"
+          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" \
+            | sha256sum -c - | tee "$setup/checksum.log"
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && \
+            ./configure --prefix="$RUNNER_TEMP/ghc" && make -j1 install) \
+            2>&1 | tee "$setup/install.log"
+          "$RUNNER_TEMP/ghc/bin/ghc" --numeric-version | tee "$setup/version.log"
+          test "$(cat "$setup/version.log")" = 9.14.1
+      - name: Run fresh inferred nominal identity and curried constant
+        run: |
+          python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal_shared_arguments.py \
+            --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
+            --output "$RUNNER_TEMP/ir8-source-nominal-shared"
+      - name: Check nominal SUM packet and real-instantiation guards
+        run: |
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 -B tools/experimental/resource-native/tests/test_nominal_argument_guards.py \
+              --generated "$RUNNER_TEMP/ir8-source-nominal-shared/curried-const/native" \
+              --cc gcc --output "$RUNNER_TEMP/ir8-nominal-sum-guards"
+      - name: Prepare a host-checked synthetic DATA guard pair
+        run: |
+          timeout --signal=TERM --kill-after=5s 180s \
+            python3 -B tools/experimental/resource-native/tests/prepare_nominal_argument_guard_fixture.py \
+              --output "$RUNNER_TEMP/ir8-nominal-data-guard-fixture"
+      - name: Check nominal DATA packet and real-instantiation guards
+        run: |
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 -B tools/experimental/resource-native/tests/test_nominal_argument_guards.py \
+              --generated "$RUNNER_TEMP/ir8-nominal-data-guard-fixture" \
+              --cc gcc --output "$RUNNER_TEMP/ir8-nominal-data-guards"
+      - name: Retain nominal shared-source and guard evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-nominal-shared-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ir8-nominal-shared-setup
+            ${{ runner.temp }}/ir8-source-nominal-shared
+            ${{ runner.temp }}/ir8-nominal-sum-guards
+            ${{ runner.temp }}/ir8-nominal-data-guard-fixture
+            ${{ runner.temp }}/ir8-nominal-data-guards
           if-no-files-found: warn
           retention-days: 14

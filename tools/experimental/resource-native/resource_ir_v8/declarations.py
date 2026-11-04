@@ -541,8 +541,15 @@ class _Builder:
         for use, spec in d["instantiations"].items():
             path = "instantiations." + use
             vector = tuple(self.normalized[("type", name)] for name in spec["arguments"])
-            if any(self.nodes[row][0] != "closed" or self.nodes[row][1] not in _INTRINSICS for row in vector):
-                _fail(path + ".arguments", "USE_ARGUMENT", "every complete vector entry must name a closed Int/Bool type ID")
+            # A closed tag alone is not an admission rule. Nominal atoms must
+            # name these exact checked physical declarations, never an arrow,
+            # a structural-layout equivalent, or an unregistered family name.
+            if any(self.nodes[row][0] != "closed" or
+                   (self.nodes[row][1] not in _INTRINSICS and
+                    self.nodes[row][1] not in d["layouts"] and
+                    not (self.nodes[row][1].startswith("%") and
+                         self.nodes[row][1][1:] in d["families"])) for row in vector):
+                _fail(path + ".arguments", "USE_ARGUMENT", "every complete vector entry must name a registered closed intrinsic, DATA or SUM atom")
             key = (spec["scheme"], vector)
             environments.add(key)
             if 1 + len(d["schemes"]) + len(environments) > MAX_ENVIRONMENTS:

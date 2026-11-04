@@ -37,6 +37,12 @@ ordinary recursive captures to arrows with exact already-published nominal
 leaves, preserving pending helpers, full types and shared origins. This changes
 neither runtime nor DATA/SUM field restrictions; fresh-suite status is recorded
 separately in the stage guide.
+[Complete nominal shared type arguments](resource_ir_v8/README_STAGE21.md)
+add exact registered DATA/SUM atoms to complete shared-use vectors, including
+dead coordinates, with independently replayed nominal beta and bounded packet/
+instantiation authentication. Its finite local source/native checks pass;
+exact-commit CI remains separate. This does not broaden generic principal code
+or field policies.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general

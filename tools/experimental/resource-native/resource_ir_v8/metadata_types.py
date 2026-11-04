@@ -34,6 +34,23 @@ def _exact(row, keys, path):
         _error(path, 'SCHEMA', 'record differs from the exact type schema')
 
 
+def _registered_nominal_atom(raw, atom, budget):
+    """Exact checked physical identity, only after the unchanged scalar path.
+
+    Parameter-free source admission belongs to the source declaration proof.
+    These raw IR maps already describe closed DATA/SUM descriptors; neither an
+    arbitrary CLOSED tag nor a similarly shaped descriptor is sufficient.
+    """
+    budget.work()
+    if type(atom) is not str:
+        return False
+    budget.work(len(atom))
+    if atom.startswith('%'):
+        budget.creation()  # suffix used for the exact family-map lookup
+        return atom[1:] in raw['families']
+    return atom in raw['layouts']
+
+
 def _node(row, scheme_names, path):
     _exact(row, TYPE_FIELDS, path)
     tag = row['tag']
@@ -243,6 +260,7 @@ def _environment_rows(raw, derived, bank, references, scheme_map, budget):
         budget.put(remap, 'E' + str(env), env)
         budget.creation()
         vectors = set()
+        nominal_vectors = False
         for use in derived['uses']:
             budget.work()
             if use['scheme'] == name:
@@ -255,13 +273,35 @@ def _environment_rows(raw, derived, bank, references, scheme_map, budget):
                     _error('metadata.uses', 'VECTOR', 'fresh use lost its complete ordered vector')
                 for value in exact:
                     budget.work()
-                    if bank.nodes[value][0] != 'closed' or bank.nodes[value][1] not in ('#bool', '#i64'):
-                        _error('metadata.uses', 'VECTOR', 'closed vectors contain only exact intrinsic atoms')
+                    node = bank.nodes[value]
+                    if node[0] != 'closed':
+                        _error('metadata.uses', 'VECTOR', 'closed vectors require registered intrinsic, DATA or SUM atoms')
+                    if node[1] not in ('#bool', '#i64'):
+                        if not _registered_nominal_atom(raw, node[1], budget):
+                            _error('metadata.uses', 'VECTOR', 'closed vector atom has no exact physical declaration')
+                        nominal_vectors = True
                 budget.add(vectors, exact)
-        # Intrinsic atoms have canonical bool/i64 order; numeric old IDs are NOT
-        # used as a structural general type ordering shortcut.
-        ordered = budget.ordered(vectors, key=lambda vector: tuple(bank.nodes[x][1] for x in vector),
-                                 key_units=lambda vector: 1 + len(vector))
+        if nominal_vectors:
+            # Every admitted coordinate is an atomic depth-one closed Type.
+            # Canonical Type order compares JSON-encoded atom strings, not raw
+            # strings (which disagree for escaped/control names). Cache only
+            # scalar encodings, never an expanded type tree or inferred Env.
+            budget.creation()
+            atom_keys = {}
+            for vector in vectors:
+                for value in vector:
+                    budget.work()
+                    if value not in atom_keys:
+                        atom = bank.nodes[value][1]
+                        budget.reserve(creation=1, work=len(atom))
+                        encoded = json.dumps(atom, ensure_ascii=False, separators=(',', ':'))
+                        budget.put(atom_keys, value, encoded)
+            ordered = budget.ordered(vectors, key=lambda vector: tuple(atom_keys[x] for x in vector),
+                                     key_units=lambda vector: 1 + len(vector))
+        else:
+            # Preserve the scalar-only encoding, comparator and work path.
+            ordered = budget.ordered(vectors, key=lambda vector: tuple(bank.nodes[x][1] for x in vector),
+                                     key_units=lambda vector: 1 + len(vector))
         for vector in ordered:
             if len(rows) >= ENVIRONMENT_LIMIT:
                 fail('metadata.environments', 'metadata-bounds', 'ENVIRONMENT_COUNT', 'complete environment count exceeds 1024')
@@ -1001,8 +1041,10 @@ def _verify_domains(raw, derived, closure, budget):
             if env['mode'] == 'NEUTRAL':
                 if node['tag'] != 'rigid' or type(node['scheme']) is not int or node['scheme'] != sid or type(node['index']) is not int or node['index'] != position:
                     _error('metadata.environments', 'VECTOR', 'neutral vector is not the exact ordered own-rigid prefix')
-            elif node['tag'] != 'closed' or node['atom'] not in ('#bool', '#i64'):
-                _error('metadata.environments', 'VECTOR', 'closed vector contains a non-intrinsic type')
+            elif (node['tag'] != 'closed' or
+                  (node['atom'] not in ('#bool', '#i64') and
+                   not _registered_nominal_atom(raw, node['atom'], budget))):
+                _error('metadata.environments', 'VECTOR', 'closed vector requires an exact registered intrinsic, DATA or SUM atom')
     if len(tables['environment_remap']) != len(tables['environments']):
         _error('metadata.environment_remap', 'REMAP', 'environment remap is not total')
     for index, row in enumerate(tables['environment_remap']):
