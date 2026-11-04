@@ -170,18 +170,27 @@ static uint32_t directory(const Rt8ProgramView *v,uint32_t id,
     }
     TRY(rt8_work_reserve(s,sizeof(d))); *out=d; return S(OK);
 }
-static uint32_t object_location(const Rt8ProgramView *v,uint32_t object,uint32_t element,
+/* d is the call-local result of directory(), still covered by the borrowed
+ * immutable-root precondition. No entry is retained between reader calls. */
+static uint32_t object_location_checked(const Rt8ProgramView *v,
+                               const Ir8PacketObjectDirectoryEntry *d,uint32_t element,
                                uint32_t row,size_t wanted,uint32_t *off,Rt8ReadState *s) {
-    Ir8PacketObjectDirectoryEntry d; uint32_t delta,result; size_t bytes,align;
-    TRY(directory(v,object,&d,s)); TRY(layout(s,element,&bytes,&align));
-    REQUIRE(s,1,d.element_type==element,REFERENCE,DOMAIN);
+    uint32_t delta,result; size_t bytes,align;
+    TRY(layout(s,element,&bytes,&align));
+    REQUIRE(s,1,d->element_type==element,REFERENCE,DOMAIN);
     REQUIRE(s,1,wanted==bytes,ARGUMENT,LENGTH);
-    REQUIRE(s,1,row<d.count,REFERENCE,UNREGISTERED);
-    TRY(mul32(s,row,d.element_bytes,&delta));
-    TRY(extent(s,d.object_bytes,delta,bytes)); TRY(add32(s,d.offset,delta,&result));
+    REQUIRE(s,1,row<d->count,REFERENCE,UNREGISTERED);
+    TRY(mul32(s,row,d->element_bytes,&delta));
+    TRY(extent(s,d->object_bytes,delta,bytes)); TRY(add32(s,d->offset,delta,&result));
     TRY(extent(s,v->program.packet_bytes,result,bytes));
     TRY(absolute_alignment(s,v->program.packet,v->program.packet_bytes,result,align));
     *off=result; return S(OK);
+}
+static uint32_t object_location(const Rt8ProgramView *v,uint32_t object,uint32_t element,
+                               uint32_t row,size_t wanted,uint32_t *off,Rt8ReadState *s) {
+    Ir8PacketObjectDirectoryEntry d;
+    TRY(directory(v,object,&d,s));
+    return object_location_checked(v,&d,element,row,wanted,off,s);
 }
 uint32_t rt8_view_object_read(const Rt8ProgramView *v,uint32_t object,uint32_t element,
                              uint32_t row,void *out,size_t n,Rt8ReadState *s) {
@@ -233,7 +242,7 @@ static uint32_t domain_location(const Rt8ProgramView *v,uint32_t kind,uint32_t d
     REQUIRE(s,1,d.owner==N,REFERENCE,APPLICABILITY);
     REQUIRE(s,1,d.secondary_owner==N,REFERENCE,APPLICABILITY);
     REQUIRE(s,1,d.count==span.count,REFERENCE,COUNT);
-    TRY(object_location(v,span.object,element,row,wanted,&offset,s));
+    TRY(object_location_checked(v,&d,element,row,wanted,&offset,s));
     TRY(rt8_work_reserve(s,1));
     if (kind==RT8_DOMAIN_KIND_PACKET_TABLE) {
         /* All twenty table row types begin with their checked uint32_t id. */

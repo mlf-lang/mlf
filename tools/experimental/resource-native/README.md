@@ -2,7 +2,10 @@
 
 The opt-in IR8 route now includes [static checks and metadata packets](resource_ir_v8/README_STAGE04.md)
 and a [real C body emitter and experimental native runtime](resource_ir_v8/README_STAGE05.md).
-The Stage05 guide gives reproducible host and native test commands. A separate
+The Stage05 guide gives reproducible host and native test commands.
+[Stage12 directory-reader reuse](resource_ir_v8/README_STAGE12.md) removes one
+same-call duplicate validation while preserving the remaining checked readers,
+with portable O0/O2 reader regressions. A separate
 [controlled shared-source fragment experiment](source_v8/README.md) connects a
 fresh ordinary compiler capture to independent replay, IR8 planning and the real
 runtime for a bounded scalar/callable fragment, now extended with closed
