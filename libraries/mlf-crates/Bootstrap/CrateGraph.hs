@@ -26,7 +26,7 @@ module Bootstrap.CrateGraph where {
   import qualified Bootstrap.IndexVec as V;
 
   data State = State G.Session Source.CheckedContracts
-    (Map String Open.Environment) ([] ((,) String Open.Fragment)) Int Int ([] Q.GroupResult) (Maybe IntArray);
+    (Map String Open.Environment) ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray);
   bindingKey scope i = G.key "Binding" (Source.declStable scope i);
   requireBindings scope ids = requireNodes (map (bindingKey scope) ids);
   -- In-memory SCC queries use the full ordered member list. Packing its
@@ -219,7 +219,7 @@ module Bootstrap.CrateGraph where {
                                     ensure (eqString actual digest) "source query ICH verification failed";
                                     if audit then do {
                                       checked <- Open.audit fragment;
-                                      Source.validatePreparedOpen prepared checked;
+                                      Source.validatePreparedOpen slots prepared checked;
                                       Right checked
                                     } else Right fragment
                                   })
@@ -237,7 +237,7 @@ module Bootstrap.CrateGraph where {
                               fragment <- Inference.compileOpenGroup group
                                 [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared);
                               canonical <- Source.canonicalOpen fragment;
-                              Source.validatePreparedOpen prepared canonical;
+                              Source.validatePreparedOpen slots prepared canonical;
                               Right canonical
                             }
                           } };
@@ -249,41 +249,35 @@ module Bootstrap.CrateGraph where {
                           G.elapsed statistics 2 inferStarted;
                           finishStarted <- G.clock statistics;
                           case recorded of { Left e -> ioReturn (Left e); Right ((,) rawNode fourth) ->
-                            case Source.prepareOpenFinish prepared fragment of {
+                            case Source.prepareOpenFinish slots contracts prepared fragment of {
                               Left e -> ioReturn (Left e);
                               Right finish -> do {
                                 evidence <- resolveRequests env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
                                   (Source.openFinishRequests finish) fourth;
                                 case evidence of { Left e -> ioReturn (Left e); Right ((,,) answers evidenceReads afterEvidence) ->
-                                case Source.completeOpenFinish finish answers of {
+                                case Source.completeOpenFinish contracts finish answers of {
                                 Left e -> ioReturn (Left e);
                                 Right (Source.OpenFinalGroup body delta) -> do {
                                 let { final = Source.openFinalObject fragment body };
-                                case do {
-                                  finalIds <- traverseEither (compose (Source.requireDecl scope) (compose X.nameHint fst))
-                                    (Open.parameters final);
-                                  entries <- traverseEither (\((,) n c) -> mapEither (\i -> (,) i c)
-                                    (Source.requireDecl scope n)) (M.toList delta);
-                                  nodes <- requireBindings scope finalIds afterEvidence;
-                                  Right ((,) entries nodes)
-                                } of {
+                                case bindEither (Source.finalParameterIds slots contracts final)
+                                  (\ids -> requireBindings scope ids afterEvidence) of {
                                 Left e -> ioReturn (Left e);
-                                Right ((,) entries finalBindings) -> do {
+                                Right finalBindings -> do {
                                 let { bindingEdges = map G.edge finalBindings;
                                   finalRefs = append bindingEdges (map G.edge dataNodes);
                                   reads = append [G.edge rawNode,G.edge sourceNode,G.edge scopeNode]
                                     (append evidenceReads bindingEdges) };
                                 content <- finishContentHash (verify || audit) group body final rawNode references finalRefs;
                                 supplied <- case content of { Left e -> ioReturn (Left e); Right hash ->
-                                  recordFinish slots group hash entries reads afterEvidence };
+                                  recordFinish slots group hash delta reads afterEvidence };
                                 case supplied of { Left e -> ioReturn (Left e); Right next -> do {
                                     G.elapsed statistics 3 finishStarted;
                                     runGroups verify audit crateId inventory rest
-                                      (State next (Source.publishContracts contracts entries) currentContexts
-                                        ((:) ((,) group final) objects)
+                                      (State next (Source.publishContracts contracts delta) currentContexts
+                                        ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)
                                         ((:) (Q.GroupResult group names hit
-                                          (Separate.fingerprint (Q.list Q.encodeSourceContract (M.toList delta)))
+                                          (Separate.fingerprint (Q.list Q.encodeSourceContract (map (\((,) i c) -> (,) (Source.declName scope i) c) (sortedDelta slots delta))))
                                           (G.nodeHash rawNode)) reports) statistics)
                                   } }
                                 }
@@ -322,11 +316,13 @@ module Bootstrap.CrateGraph where {
   -- value. Reconstruct it from current checked results, so neither a swapped
   -- receipt nor a stale index row can supply a result hash. Exported contracts
   -- share the very bytes subsequently published by their Binding nodes.
+  sortedDelta slots = sortBy (\a b -> compareString (Source.declName (Source.slotScope slots) (fst a))
+    (Source.declName (Source.slotScope slots) (fst b)));
   recordFinish slots group fragmentHash delta reads session = do {
     encoded <- mapM (\((,) i contract) -> do {
       result <- G.encodeHashed (contractValue contract);
       ioReturn (mapEither (\((,) digest bytes) -> (,,) i digest bytes) result)
-    }) delta;
+    }) (sortedDelta slots delta);
     case sequenceEither encoded of { Left e -> ioReturn (Left e); Right entries -> do {
       let { scope = Source.slotScope slots; contracts = map (\((,,) i digest _) -> (,) (Source.declName scope i) digest) entries;
         receipt = W.VNode 427 [W.VText group,W.VText fragmentHash,A.toList (A.toPair A.toText A.toText) contracts];
@@ -336,8 +332,11 @@ module Bootstrap.CrateGraph where {
       ioReturn (mapEither (\((,) finish next) -> foldlStrict (binding (G.edge finish)) next entries) recorded)
     } }
   };
-  result (State session contracts _ objects inferred reused reports _) =
-    (,,,) (reverse objects) (Q.QueryReport inferred reused (reverse reports)) (Source.checkedNamed contracts) session;
+  checkedResult (State session contracts _ objects inferred reused reports _) =
+    (,,,) (reverse objects) (Q.QueryReport inferred reused (reverse reports)) contracts session;
+  result state = case checkedResult state of { (,,,) fragments report contracts session ->
+    (,,,) (map (\((,,) n f _) -> (,) n f) fragments) report (Source.checkedNamed contracts) session
+  };
   statistics (State _ _ _ _ _ _ _ stats) = stats;
   data EvidenceQuery = EvidenceQuery Source.GroupSlots Int XType;
   evidenceKey (EvidenceQuery slots site goal) = G.key "Evidence"

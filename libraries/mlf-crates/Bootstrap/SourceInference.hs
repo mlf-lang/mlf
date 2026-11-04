@@ -1490,7 +1490,7 @@ module Bootstrap.SourceInference where {
 
   -- Only the checked adapter path can supply a replacement fragment.
   data FinalBody = KeepRawBody | AdaptedBody Open.Fragment;
-  data OpenFinalGroup = OpenFinalGroup FinalBody (Map String SourceContract);
+  data OpenFinalGroup = OpenFinalGroup FinalBody ([] ((,) (V.Index Declaration) SourceContract));
   openFinalObject raw KeepRawBody = raw;
   openFinalObject _ (AdaptedBody checked) = checked;
   openRootParts object = case (,) (Open.body object) (Open.bindings object) of {
@@ -1500,10 +1500,33 @@ module Bootstrap.SourceInference where {
     };
     _ -> Left "source root did not retain a single nonrecursive checked binding"
   };
-  validatePreparedOpen prepared object = do {
-    ensure (eqList eqString (sortBy compareString (map sourceName (groupMembers prepared)))
-      (sortBy compareString (map (compose X.nameHint fst) (Open.bindings object))))
-      "raw group changed source ownership";
+  -- xMLF binder IDs are local to their checked fragment. Admit its external
+  -- hints at the fragment boundary and carry declaration IDs across finish.
+  ownedFragmentBindings slots object = do {
+    let { scope = slotScope slots; expected = memberIds slots;
+      names = M.fromList compareString (map (\i -> (,) (declName scope i) i) expected) };
+    rows <- traverseEither (\((,) binder ty) -> case M.lookup compareString (X.nameHint binder) names of {
+      Nothing -> Left "raw group changed source ownership";
+      Just i -> Right ((,) i ty)
+    }) (Open.bindings object);
+    ensure (eqList (\a b -> compareDecl a b == 0) (sortBy compareDecl expected)
+      (sortBy compareDecl (map fst rows))) "raw group changed source ownership";
+    Right rows
+  };
+  finalParameterIds slots checked object = let {
+    scope = slotScope slots;
+    admitted = M.fromList compareString (map (\i -> (,) (declName scope i) i)
+      (append (parameterIds slots) (candidateIds slots)))
+  } in traverseEither (\((,) binder ty) -> do {
+    i <- case M.lookup compareString (X.nameHint binder) admitted of {
+      Just i -> Right i; Nothing -> Left "final fragment reads an unauthorized predecessor"
+    };
+    c <- checkedBinding checked i;
+    ensure (Type.alphaEq ty (contractType c)) "final fragment predecessor type mismatch";
+    Right i
+  }) (Open.parameters object);
+  validatePreparedOpen slots prepared object = do {
+    _ <- ownedFragmentBindings slots object;
     case groupAuthority prepared of {
       Nothing -> Right ();
       Just (RootAuthority name labels _ _ _) -> do {
@@ -1524,27 +1547,40 @@ module Bootstrap.SourceInference where {
     result <- finalSyntaxTerm normalized;
     if finalSyntaxUnchanged identity normalized then Right object else Open.normalize object result
   };
-  prepareOpenFinish prepared object = do {
-    usedFlags <- traverseEither (\name -> case find
-      (\((,) n _) -> eqString n (X.nameHint name)) (groupParameterProtection prepared) of {
-        Just ((,) _ protected) -> Right protected;
-        Nothing -> Left "used checked predecessor lacks protection authority"
-      }) (Open.usedParameters object);
+  prepareOpenFinish group checked prepared object = do {
+    owners <- ownedFragmentBindings group object;
+    let { parameters = Open.parameters object; ids = parameterIds group; scope = slotScope group };
+    ensure (length parameters == length ids) "raw fragment predecessor count changed";
+    aliases <- traverseEither (\((,) i ((,) n t)) -> do {
+      c <- checkedBinding checked i;
+      ensure (eqString (X.nameHint n) (declName scope i) && Type.alphaEq t (contractType c))
+        "raw fragment predecessor identity or type changed";
+      Right ((,) n i)
+    }) (zip ids parameters);
+    let { byBinder = M.fromList X.compareName aliases };
+    usedFlags <- traverseEither (\n -> case M.lookup X.compareName n byBinder of {
+      Just i -> mapEither contractProtected (checkedBinding checked i);
+      Nothing -> Left "used checked predecessor lacks protection authority"
+    }) (Open.usedParameters object);
     let { usedProtected = any (\flag -> flag) usedFlags };
     case groupAuthority prepared of {
       Nothing -> do {
-        contracts <- traverseEither (\((,) binder ty) ->
-          case find (\((,,) n _ _) -> eqString n (X.nameHint binder)) (groupContracts prepared) of {
+        specs <- traverseEither (\((,,) n classes protected) -> mapEither
+          (\i -> (,) i ((,) classes protected)) (requireDecl scope n)) (groupContracts prepared);
+        let { byOwner = M.fromList compareDecl specs };
+        contracts <- traverseEither (\((,) i ty) -> case M.lookup compareDecl i byOwner of {
             Nothing -> Left "final source group lacks calling-convention metadata";
-            Just ((,,) name classes protected) -> Right ((,) name (SourceContract ty classes (protected || usedProtected)))
-          }) (Open.bindings object);
-        Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody (M.fromList compareString contracts)))
+            Just ((,) classes protected) -> Right ((,) i (SourceContract ty classes (protected || usedProtected)))
+          }) owners;
+        Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody contracts))
       };
-      Just (RootAuthority name labels protected candidates protectedCandidates) -> do {
+      Just (RootAuthority name labels protected candidates _) -> do {
+        owner <- case owners of { [(,) i _] -> Right i; _ -> Left "raw source identity mismatch" };
+        ensure (eqString name (declName scope owner)) "raw source identity mismatch";
         parts <- openRootParts object;
         case parts of { (,,) binder ty rhs -> let {
           unchanged = \flag -> Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody
-            (M.fromList compareString [(,) name (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)])));
+            [(,) owner (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)]));
           isProtected = protected || usedProtected
         } in if isProtected || null labels then unchanged isProtected else do {
           slots <- targetSlots labels rhs;
@@ -1560,7 +1596,10 @@ module Bootstrap.SourceInference where {
                   (zip (range 0 (length mapped - 1)) mapped) };
               plan <- Boundary.checkedPlan (groupRegistry prepared) boundary obligations (Open.parameters object)
                 [Boundary.EvidenceScope 0 authorized] ty rhs;
-              Right (PendingOpenFinish object name binder ty labels isProtected protectedCandidates plan)
+              ensure (length authorized == length (candidateIds group)) "evidence candidate inventory changed";
+              let { aliases = M.fromList X.compareName
+                    (zip (map Boundary.candidateName authorized) (candidateIds group)) };
+              Right (PendingOpenFinish object owner binder ty labels isProtected aliases plan)
             }
           }
         } }
@@ -1568,29 +1607,33 @@ module Bootstrap.SourceInference where {
     }
   };
 
-  data OpenFinish = ReadyOpenFinish OpenFinalGroup | PendingOpenFinish Open.Fragment String XName XType
-    ([] ((,,) String String String)) Bool ([] String) Boundary.CheckedPlan;
+  data OpenFinish = ReadyOpenFinish OpenFinalGroup | PendingOpenFinish Open.Fragment (V.Index Declaration) XName XType
+    ([] ((,,) String String String)) Bool (Map XName (V.Index Declaration)) Boundary.CheckedPlan;
   openFinishRequests finish = case finish of {
     ReadyOpenFinish _ -> [];
     PendingOpenFinish _ _ _ _ _ _ _ plan -> Boundary.checkedRequests plan
   };
-  completeOpenFinish finish answers = case finish of {
+  completeOpenFinish checked finish answers = case finish of {
     ReadyOpenFinish group -> Right group;
-    PendingOpenFinish object name binder ty labels protected protectedCandidates plan -> do {
+    PendingOpenFinish object owner binder ty labels protected candidates plan -> do {
       recipe <- Boundary.finishCheckedPlan plan answers;
-      let { unchanged = \flag -> Right (OpenFinalGroup KeepRawBody (M.fromList compareString
-        [(,) name (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)])) };
+      let { unchanged = \flag -> Right (OpenFinalGroup KeepRawBody
+        [(,) owner (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)]) };
       case recipe of {
         Boundary.KeepRecipe -> unchanged protected;
-        Boundary.ChangeRecipe result body required supports ->
-          if any (\n -> elem eqString (X.nameHint n) protectedCandidates) supports then unchanged True else do {
+        Boundary.ChangeRecipe result body required supports -> do {
+          flags <- traverseEither (\n -> case M.lookup X.compareName n candidates of {
+            Nothing -> Left "proof support lacks a declaration";
+            Just i -> mapEither contractProtected (checkedBinding checked i)
+          }) supports;
+          if any (\flag -> flag) flags then unchanged True else do {
             final <- Open.check (Open.context object) required (XLet binder body (XConstructor "()" []));
             ensure (case Open.bindings final of {
               [(,) actual actualType] -> X.equalName actual binder && Type.alphaEq actualType result;
               _ -> False }) "checked evidence adapter type mismatch";
             canonical <- canonicalOpen final;
-            Right (OpenFinalGroup (AdaptedBody canonical) (M.fromList compareString [(,) name (SourceContract result [] False)]))
-          }
+            Right (OpenFinalGroup (AdaptedBody canonical) [(,) owner (SourceContract result [] False)])
+          } }
       }
     }
   }
