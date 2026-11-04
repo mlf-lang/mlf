@@ -2,11 +2,15 @@
 
 The opt-in IR8 route now includes [static checks and metadata packets](resource_ir_v8/README_STAGE04.md)
 and a [real C body emitter and experimental native runtime](resource_ir_v8/README_STAGE05.md).
-The Stage05 guide gives reproducible host and native test commands and separates
-the finite runtime results from the remaining source-bridge, guard-coverage, GC
-and performance work. This does not enable mixed-type shared-term execution in
-the maintained v7 source route below or change default behavior. Earlier
-integration records below retain their historical scope.
+The Stage05 guide gives reproducible host and native test commands. A separate
+[controlled shared-source fragment experiment](source_v8/README.md) connects a
+fresh ordinary compiler capture to independent replay, IR8 planning and the real
+runtime for a narrow Int/Bool fragment. Its diagnostic capture is not a general
+source-admission format. The full source bridge, comprehensive guard coverage,
+GC replacement and performance remain unqualified. This does not enable
+mixed-type shared-term execution in the maintained v7 source route below or
+change default behavior. Earlier integration records retain their historical
+scope.
 
 ---
 

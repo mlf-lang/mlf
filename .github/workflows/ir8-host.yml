@@ -86,3 +86,79 @@ jobs:
           path: ${{ runner.temp }}/ir8-native-runtime-${{ matrix.optimization }}
           if-no-files-found: warn
           retention-days: 14
+  ir8-source-fragments:
+    name: IR8 shared fragment and planner checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CC: gcc
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Replay bounded source fragments
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$RUNNER_TEMP/ir8-source-fragments"
+          python3 -B tools/experimental/resource-native/tests/test_module_shared_transport.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/replay.log"
+      - name: Check planner units and five real native fragments
+        env:
+          IR8_PLANNER_NATIVE: '1'
+          IR8_PLANNER_NATIVE_OUTPUT: ${{ runner.temp }}/ir8-source-fragments/native
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_planner_v8.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/planner.log"
+      - name: Retain fragment evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-source-fragments-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ir8-source-fragments
+          if-no-files-found: warn
+          retention-days: 14
+  ir8-controlled-source:
+    name: Controlled IR8 shared-source integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      # Same official bindist and checksum as ci.yml/compiler-shapes.yml.
+      - name: Install pinned direct-host GHC 9.14.1
+        run: |
+          set -euo pipefail
+          setup="$RUNNER_TEMP/ir8-shared-source-setup"
+          mkdir -m 700 "$setup"
+          sudo apt-get update 2>&1 | tee "$setup/apt-update.log"
+          sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils \
+            2>&1 | tee "$setup/apt-install.log"
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          curl --fail --location --connect-timeout 30 --max-time 600 \
+            https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz \
+            -o "$archive" 2>&1 | tee "$setup/download.log"
+          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" \
+            | sha256sum -c - | tee "$setup/checksum.log"
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && \
+            ./configure --prefix="$RUNNER_TEMP/ghc" && make -j1 install) \
+            2>&1 | tee "$setup/install.log"
+          "$RUNNER_TEMP/ghc/bin/ghc" --numeric-version | tee "$setup/version.log"
+          test "$(cat "$setup/version.log")" = 9.14.1
+      - name: Build, capture, replay and run controlled sources
+        run: |
+          python3 -B tools/experimental/resource-native/tests/test_shared_source_native.py \
+            --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
+            --output "$RUNNER_TEMP/ir8-shared-source"
+      - name: Retain source evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-shared-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ir8-shared-source
+            ${{ runner.temp }}/ir8-shared-source-setup
+          if-no-files-found: warn
+          retention-days: 14
