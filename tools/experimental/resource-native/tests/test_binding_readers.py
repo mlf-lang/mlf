@@ -2,7 +2,7 @@
 """Explicit low-level reader differential tests, not runtime/packet admission.
 
 Run with a fresh --output directory for portable current-only O0/O2 checks.
-Optionally supply --baseline-root pointing to the unchanged Stage11 repository
+Optionally supply --baseline-root pointing to the unchanged Stage11 or Stage14 repository
 for exact differential diagnostics/data/work checks. Both modes use the same
 bounded storage driver and real binding/packet sources. No callback, runtime,
 source compiler or evaluator is mocked or invoked. This is a correctness/work-
@@ -21,6 +21,10 @@ sys.path.insert(0, str(BASE))
 from source_build_v8 import MIB, executable, require, run, save
 
 BASELINE_BINDING_SHA = '4bbbf9eb9f9638dccd12e46d51fce0b0ae16b05f7ce6d8e2cd8e460f66e27f4f'
+STAGE14_BINDING_SHA = 'd06bcb313748642e69b3bf511d6bda95a7d3673c12f65f80fc7c02aca16132ba'
+BASELINES = {BASELINE_BINDING_SHA: 'stage11', STAGE14_BINDING_SHA: 'stage14'}
+AUTH_SUCCESS_CASES = ('freshness-prime', 'freshness-restored', 'short-one', 'short-two',
+                      'after-target-id', 'budget-auth-first-middle')
 
 
 def digest(path):
@@ -47,7 +51,7 @@ def removed_directory_calls(row):
     if row['op'] == 3:
         return 0
     name = row['case']
-    if name in ('valid', 'budget-exact-and-all-below'):
+    if name in ('valid', 'budget-exact-and-all-below') + AUTH_SUCCESS_CASES:
         return row['row'] + 1 if row['op'] == 2 else 1
     if name in ('foreign-ref', 'interior-ref', 'one-past-ref'):
         return 5
@@ -57,18 +61,40 @@ def removed_directory_calls(row):
         return 3
     if name == 'target-id':
         return 5
+    if name in ('short-one-miss', 'short-two-miss'):
+        return 1 if name == 'short-one-miss' else 2
     # All other malformed controls fail before the former duplicate read.
     return 0
 
 
-def compare(old, new, directory_work):
+def reused_auth_directory_calls(row):
+    # Count directory-reached visits, including an ID failure, not just rows
+    # whose IDs passed. The first visit always performs full directory checks.
+    if row['op'] != 2:
+        return 0
+    name = row['case']
+    if name in ('valid', 'budget-exact-and-all-below') + AUTH_SUCCESS_CASES:
+        return row['row']
+    if name in ('foreign-ref', 'interior-ref', 'one-past-ref', 'target-id'):
+        return 4
+    if name == 'preceding-id-middle':
+        return 2
+    if name == 'short-two-miss':
+        return 1
+    return 0
+
+
+def compare(old, new, directory_work, baseline):
     require(len(old) == len(new), 'differential case count differs')
     saved = 0
     for a, b in zip(old, new):
         require({k: v for k, v in a.items() if k not in ('used', 'total')} ==
                 {k: v for k, v in b.items() if k not in ('used', 'total')},
                 'reader status/coordinates/bytes/sentinel differ: ' + str(a))
-        delta = removed_directory_calls(a) * directory_work
+        removed = reused_auth_directory_calls(a)
+        if baseline == 'stage11':
+            removed += removed_directory_calls(a)
+        delta = removed * directory_work
         require(a['used'] - b['used'] == delta and a['total'] - b['total'] == delta,
                 'work changed beyond removed directory checks: ' + str((a, b, delta)))
         require(a['total'] - a['used'] == 17 and b['total'] - b['used'] == 17,
@@ -80,15 +106,17 @@ def compare(old, new, directory_work):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline-root', type=Path,
-                        help='optional unchanged Stage11 repository for exact differential checks')
+                        help='optional unchanged Stage11 or Stage14 repository for exact differential checks')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
     args = parser.parse_args(argv)
     sources = [('optimized', BASE)]
+    baseline_sha = baseline = None
     if args.baseline_root is not None:
         old = args.baseline_root.resolve() / 'tools/experimental/resource-native'
-        require(digest(old / 'runtime_v8/rir8_binding.c') == BASELINE_BINDING_SHA,
-                'expected unchanged Stage11 binding source')
+        baseline_sha = digest(old / 'runtime_v8/rir8_binding.c')
+        require(baseline_sha in BASELINES, 'expected exact Stage11 or Stage14 binding source')
+        baseline = BASELINES[baseline_sha]
         # Differential mode cannot silently compare different contracts.
         for relative in ('runtime_v8/rir8_binding.h', 'runtime_v8/rir8_binding_internal.h',
                          'packet_v8/ir8_packet.h', 'packet_v8/ir8_packet.c'):
@@ -120,7 +148,7 @@ def main(argv=None):
         if args.baseline_root is not None:
             a, sa = results[('baseline', optimization)]
             require(sa == sb, 'independent C census/expectations differ')
-            saved = compare(a, b, sa['directory_work'])
+            saved = compare(a, b, sa['directory_work'], baseline)
             print(optimization, len(a), 'reader comparisons PASS;', saved, 'redundant charged units removed', flush=True)
         else:
             print(optimization, len(b), 'current reader expectation/sentinel/budget checks PASS', flush=True)
@@ -131,11 +159,13 @@ def main(argv=None):
                'mode': 'differential' if args.baseline_root is not None else 'current-only',
                'status': 'pass', 'cases_per_build': len(results[('optimized', '-O0')][0]),
                'builds': 2*len(sources), 'native_runs': 2*len(sources),
-               'baseline_binding_sha256': BASELINE_BINDING_SHA if args.baseline_root is not None else None,
+               'baseline': baseline, 'baseline_binding_sha256': baseline_sha,
                'optimized_binding_sha256': digest(BASE / 'runtime_v8/rir8_binding.c'),
                'driver_sha256': digest(HERE / 'binding_reader_driver.c'),
-               'all_work_budgets_below_success': 'each operation, each20table/6descriptor, finalrow',
+               'all_work_budgets_below_success': 'all operations final row; auth first/middle/final; all20table/6descriptor',
                'notes': ['No authentication scan shortcut.', 'No output changes on failure.',
+                         'First row validates directory; later auth rows reuse it only within that call.',
+                         'Independent calls, short spans, and post-match ID corruption are checked.',
                          'Exact baseline diagnostics/work deltas require optional differential mode.']}
     save(output / 'results.json', summary)
     return 0

@@ -252,6 +252,80 @@ static void domain_cases(uint32_t kind,uint32_t domain) {
     }
 }
 
+/* Mutations happen only between completed calls. This checks that no local
+ * authentication descriptor accidentally becomes a persistent credential. */
+static void authentication_cases(uint32_t kind,uint32_t domain) {
+    Rt8ProgramView v; setup(&v);
+    uint32_t object=kind==RT8_DOMAIN_KIND_PACKET_TABLE?domain-1u:19u+domain;
+    Ir8PacketObjectDirectoryEntry original=root.directory[object];
+    Ir8PacketSpan *span=kind==RT8_DOMAIN_KIND_PACKET_TABLE?
+        &v.typed_header.table[domain-1u]:&v.typed_header.descriptor[domain-1u];
+    const unsigned char *base=(const unsigned char *)&root+original.offset;
+    const void *last=base+4u*original.element_bytes;
+    Result r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
+    if(r.status!=RT8_STATUS_OK) ++failures;
+    emit("freshness-prime",kind,domain,4,AUTH,&r);
+    root.directory[object].owner=0;
+    r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
+    if(r.status!=RT8_STATUS_REFERENCE || r.diagnostic.detail!=RT8_DETAIL_APPLICABILITY ||
+       r.diagnostic.row!=0 || r.diagnostic.object!=object) ++failures;
+    emit("freshness-owner",kind,domain,4,AUTH,&r);
+    root.directory[object]=original;
+    r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
+    if(r.status!=RT8_STATUS_OK) ++failures;
+    emit("freshness-restored",kind,domain,4,AUTH,&r);
+    ++root.directory[object].element_alignment;
+    r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
+    if(r.status!=RT8_STATUS_ALIGNMENT || r.diagnostic.detail!=RT8_DETAIL_ALIGNMENT ||
+       r.diagnostic.row!=0 || r.diagnostic.object!=object) ++failures;
+    emit("freshness-alignment",kind,domain,4,AUTH,&r);
+    for(uint32_t count=1;count<=2;++count) {
+        root.directory[object]=original;
+        root.directory[object].count=count;
+        root.directory[object].object_bytes=count*original.element_bytes;
+        span->count=count;
+        const void *ref=base+(count-1u)*original.element_bytes;
+        r=invoke(&v,kind,domain,count-1u,AUTH,&original,ref,original.element_bytes,RT8_MAX_GUARD_WORK);
+        if(r.status!=RT8_STATUS_OK) ++failures;
+        emit(count==1?"short-one":"short-two",kind,domain,count-1u,AUTH,&r);
+        r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
+        if(r.status!=RT8_STATUS_REFERENCE || r.diagnostic.detail!=RT8_DETAIL_UNREGISTERED ||
+           r.diagnostic.row!=RT8_NULL || r.diagnostic.object!=object) ++failures;
+        emit(count==1?"short-one-miss":"short-two-miss",kind,domain,4,AUTH,&r);
+    }
+    setup(&v);
+    if(kind==RT8_DOMAIN_KIND_PACKET_TABLE) {
+        uint32_t wrong=UINT32_MAX;
+        memcpy((unsigned char *)&root+original.offset+4u*original.element_bytes,&wrong,sizeof(wrong));
+        r=invoke(&v,kind,domain,2,AUTH,&original,base+2u*original.element_bytes,original.element_bytes,RT8_MAX_GUARD_WORK);
+        if(r.status!=RT8_STATUS_OK) ++failures;
+        emit("after-target-id",kind,domain,2,AUTH,&r);
+    }
+    setup(&v); v.packet_header.directory_count=0;
+    r=invoke(&v,kind,domain,4,AUTH,&original,NULL,original.element_bytes,RT8_MAX_GUARD_WORK);
+    if(r.status!=RT8_STATUS_REFERENCE || r.diagnostic.detail!=RT8_DETAIL_UNREGISTERED ||
+       r.used!=0 || r.diagnostic.object!=RT8_NULL || r.diagnostic.row!=RT8_NULL) ++failures;
+    emit("null-before-directory",kind,domain,4,AUTH,&r);
+    span->count=0; span->object=RT8_NULL;
+    r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
+    if(r.status!=RT8_STATUS_REFERENCE || r.diagnostic.detail!=RT8_DETAIL_UNREGISTERED ||
+       r.diagnostic.object!=RT8_NULL || r.diagnostic.row!=RT8_NULL) ++failures;
+    emit("empty-before-directory",kind,domain,4,AUTH,&r);
+    setup(&v);
+    for(uint32_t row=0;row<=2;row+=2) {
+        const void *ref=base+row*original.element_bytes;
+        Result full=invoke(&v,kind,domain,row,AUTH,&original,ref,original.element_bytes,RT8_MAX_GUARD_WORK);
+        if(full.status!=RT8_STATUS_OK || full.used>10000u) {++failures;continue;}
+        for(uint64_t limit=1;limit<full.used;++limit) {
+            r=invoke(&v,kind,domain,row,AUTH,&original,ref,original.element_bytes,limit);
+            if(r.status!=RT8_STATUS_WORK_LIMIT || r.diagnostic.detail!=RT8_DETAIL_WORK_EXHAUSTED) ++failures;
+        }
+        r=invoke(&v,kind,domain,row,AUTH,&original,ref,original.element_bytes,full.used);
+        if(r.status!=RT8_STATUS_OK || r.used!=full.used) ++failures;
+        emit("budget-auth-first-middle",kind,domain,row,AUTH,&r);
+    }
+}
+
 static void argument_cases(void) {
     Rt8ProgramView v; setup(&v);
     Ir8PacketObjectDirectoryEntry original=root.directory[0];
@@ -293,6 +367,8 @@ static void argument_cases(void) {
 int main(void) {
     for(uint32_t domain=1;domain<=20;++domain) domain_cases(RT8_DOMAIN_KIND_PACKET_TABLE,domain);
     for(uint32_t domain=1;domain<=6;++domain) domain_cases(RT8_DOMAIN_KIND_PACKET_DESCRIPTOR,domain);
+    for(uint32_t domain=1;domain<=20;++domain) authentication_cases(RT8_DOMAIN_KIND_PACKET_TABLE,domain);
+    for(uint32_t domain=1;domain<=6;++domain) authentication_cases(RT8_DOMAIN_KIND_PACKET_DESCRIPTOR,domain);
     argument_cases();
     /* Independently sum the fixed nonempty directory predicate/copy charges:
      * 97 predicate/range/dispatch units plus two complete directory copies. */

@@ -228,21 +228,27 @@ static uint32_t domain_span(const Rt8ProgramView *v,uint32_t kind,uint32_t domai
     else REQUIRE(s,1,span->object!=N,REFERENCE,MISSING);
     return S(OK);
 }
-static uint32_t domain_location(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
-                               uint32_t row,size_t wanted,uint32_t *off,Rt8ReadState *s) {
-    Ir8PacketSpan span; Ir8PacketObjectDirectoryEntry d;
-    uint32_t element,offset,id,expected_kind;
-    TRY(domain_span(v,kind,domain,&span,&element,s));
-    location(s,RT8_REGION_PACKET,kind,domain,span.object,row,N);
-    REQUIRE(s,1,row<span.count,REFERENCE,UNREGISTERED);
-    TRY(directory(v,span.object,&d,s));
+static uint32_t domain_location_begin(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
+                               uint32_t row,Ir8PacketSpan *span,uint32_t *element,Rt8ReadState *s) {
+    TRY(domain_span(v,kind,domain,span,element,s));
+    location(s,RT8_REGION_PACKET,kind,domain,span->object,row,N);
+    REQUIRE(s,1,row<span->count,REFERENCE,UNREGISTERED);
+    return S(OK);
+}
+/* Only directory() is omitted here. Domain membership and every row check
+ * still run, including the IDs of all rows visited by authentication. */
+static uint32_t domain_location_checked(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
+                               uint32_t row,size_t wanted,const Ir8PacketSpan *span,
+                               uint32_t element,const Ir8PacketObjectDirectoryEntry *d,
+                               uint32_t *off,Rt8ReadState *s) {
+    uint32_t offset,id,expected_kind;
     TRY(rt8_work_reserve(s,1)); expected_kind=kind==RT8_DOMAIN_KIND_PACKET_TABLE?1:3;
-    REQUIRE(s,1,d.kind==expected_kind,REFERENCE,DOMAIN);
-    REQUIRE(s,1,d.domain_or_subkind==domain,REFERENCE,DOMAIN);
-    REQUIRE(s,1,d.owner==N,REFERENCE,APPLICABILITY);
-    REQUIRE(s,1,d.secondary_owner==N,REFERENCE,APPLICABILITY);
-    REQUIRE(s,1,d.count==span.count,REFERENCE,COUNT);
-    TRY(object_location_checked(v,&d,element,row,wanted,&offset,s));
+    REQUIRE(s,1,d->kind==expected_kind,REFERENCE,DOMAIN);
+    REQUIRE(s,1,d->domain_or_subkind==domain,REFERENCE,DOMAIN);
+    REQUIRE(s,1,d->owner==N,REFERENCE,APPLICABILITY);
+    REQUIRE(s,1,d->secondary_owner==N,REFERENCE,APPLICABILITY);
+    REQUIRE(s,1,d->count==span->count,REFERENCE,COUNT);
+    TRY(object_location_checked(v,d,element,row,wanted,&offset,s));
     TRY(rt8_work_reserve(s,1));
     if (kind==RT8_DOMAIN_KIND_PACKET_TABLE) {
         /* All twenty table row types begin with their checked uint32_t id. */
@@ -250,6 +256,13 @@ static uint32_t domain_location(const Rt8ProgramView *v,uint32_t kind,uint32_t d
         REQUIRE(s,1,id==row,REFERENCE,UNREGISTERED);
     }
     *off=offset; return S(OK);
+}
+static uint32_t domain_location(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
+                               uint32_t row,size_t wanted,uint32_t *off,Rt8ReadState *s) {
+    Ir8PacketSpan span; Ir8PacketObjectDirectoryEntry d; uint32_t element;
+    TRY(domain_location_begin(v,kind,domain,row,&span,&element,s));
+    TRY(directory(v,span.object,&d,s));
+    return domain_location_checked(v,kind,domain,row,wanted,&span,element,&d,off,s);
 }
 static uint32_t domain_read(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
                             uint32_t row,void *out,size_t n,Rt8ReadState *s) {
@@ -266,14 +279,42 @@ uint32_t rt8_view_descriptor_read(const Rt8ProgramView *v,uint32_t d,uint32_t ro
                                  void *out,size_t n,Rt8ReadState *s) {
     return domain_read(v,RT8_DOMAIN_KIND_PACKET_DESCRIPTOR,d,row,out,n,s);
 }
-static uint32_t domain_ref(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
-                           uint32_t row,const void **out,Rt8ReadState *s) {
-    uint32_t element,off; size_t bytes,align; Ir8PacketSpan span;
+static uint32_t domain_ref_begin(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
+                           uint32_t row,const void **out,Ir8PacketSpan *span,
+                           uint32_t *element,size_t *bytes,Rt8ReadState *s) {
+    size_t align;
     TRY(reader_begin(v,s,out)); location(s,RT8_REGION_PACKET,kind,domain,N,row,N);
-    TRY(domain_span(v,kind,domain,&span,&element,s)); TRY(layout(s,element,&bytes,&align));
-    TRY(domain_location(v,kind,domain,row,bytes,&off,s));
+    TRY(domain_span(v,kind,domain,span,element,s)); TRY(layout(s,*element,bytes,&align));
+    return domain_location_begin(v,kind,domain,row,span,element,s);
+}
+static uint32_t domain_ref_finish(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
+                           uint32_t row,const void **out,const Ir8PacketSpan *span,
+                           uint32_t element,size_t bytes,const Ir8PacketObjectDirectoryEntry *d,
+                           Rt8ReadState *s) {
+    uint32_t off;
+    TRY(domain_location_checked(v,kind,domain,row,bytes,span,element,d,&off,s));
     TRY(rt8_work_reserve(s,sizeof(*out)+1));
     *out=(const unsigned char *)v->program.packet+(size_t)off; return S(OK);
+}
+static uint32_t domain_ref_first(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
+                           uint32_t row,const void **out,Ir8PacketObjectDirectoryEntry *d,
+                           Rt8ReadState *s) {
+    Ir8PacketSpan span; uint32_t element; size_t bytes;
+    TRY(domain_ref_begin(v,kind,domain,row,out,&span,&element,&bytes,s));
+    TRY(directory(v,span.object,d,s));
+    return domain_ref_finish(v,kind,domain,row,out,&span,element,bytes,d,s);
+}
+static uint32_t domain_ref_next(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
+                           uint32_t row,const void **out,const Ir8PacketObjectDirectoryEntry *d,
+                           Rt8ReadState *s) {
+    Ir8PacketSpan span; uint32_t element; size_t bytes;
+    TRY(domain_ref_begin(v,kind,domain,row,out,&span,&element,&bytes,s));
+    return domain_ref_finish(v,kind,domain,row,out,&span,element,bytes,d,s);
+}
+static uint32_t domain_ref(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
+                           uint32_t row,const void **out,Rt8ReadState *s) {
+    Ir8PacketObjectDirectoryEntry d;
+    return domain_ref_first(v,kind,domain,row,out,&d,s);
 }
 uint32_t rt8_view_table_ref(const Rt8ProgramView *v,uint32_t d,uint32_t row,
                            const void **out,Rt8ReadState *s) {
@@ -285,22 +326,31 @@ uint32_t rt8_view_descriptor_ref(const Rt8ProgramView *v,uint32_t d,uint32_t row
 }
 static uint32_t domain_auth(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
                             const void *reference,uint32_t *out,Rt8ReadState *s) {
-    uint32_t i,element; Ir8PacketSpan span;
+    uint32_t i=0,element; Ir8PacketSpan span; Ir8PacketObjectDirectoryEntry d;
+    const void *candidate;
     TRY(reader_begin(v,s,out)); location(s,RT8_REGION_PACKET,kind,domain,N,N,N);
     if (!reference) return fail(s,S(REFERENCE),D(UNREGISTERED));
     TRY(domain_span(v,kind,domain,&span,&element,s));
-    for(i=0;;++i) {
-        const void *candidate;
+    /* Peel the first visit: empty domains never read a directory. The local d
+     * belongs to this immutable view and this call only. No callback or root
+     * mutation occurs during the scan; public reads/refs still start fresh. */
+    TRY(rt8_work_reserve(s,1)); if (i>=span.count) goto missing;
+    TRY(rt8_work_reserve(s,1));
+    TRY(domain_ref_first(v,kind,domain,i,&candidate,&d,s));
+    TRY(rt8_work_reserve(s,1));
+    if (reference==candidate) goto found;
+    for(i=1;;++i) {
         TRY(rt8_work_reserve(s,1)); if (i>=span.count) break;
         TRY(rt8_work_reserve(s,1));
-        TRY(domain_ref(v,kind,domain,i,&candidate,s));
+        TRY(domain_ref_next(v,kind,domain,i,&candidate,&d,s));
         TRY(rt8_work_reserve(s,1));
-        if (reference==candidate) {
-            TRY(rt8_work_reserve(s,sizeof(*out))); *out=i; return S(OK);
-        }
+        if (reference==candidate) goto found;
     }
+missing:
     location(s,RT8_REGION_PACKET,kind,domain,span.object,N,N);
     return fail(s,S(REFERENCE),D(UNREGISTERED));
+found:
+    TRY(rt8_work_reserve(s,sizeof(*out))); *out=i; return S(OK);
 }
 uint32_t rt8_view_table_auth(const Rt8ProgramView *v,uint32_t d,const void *ref,
                             uint32_t *out,Rt8ReadState *s) {

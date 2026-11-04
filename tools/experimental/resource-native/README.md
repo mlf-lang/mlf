@@ -5,7 +5,10 @@ and a [real C body emitter and experimental native runtime](resource_ir_v8/READM
 The Stage05 guide gives reproducible host and native test commands.
 [Stage12 directory-reader reuse](resource_ir_v8/README_STAGE12.md) removes one
 same-call duplicate validation while preserving the remaining checked readers,
-with portable O0/O2 reader regressions. A separate
+with portable O0/O2 reader regressions. [Stage15 auth-scan reuse](resource_ir_v8/README_STAGE15.md)
+reuses that directory only within one authentication call while preserving every
+preceding-row check. Its finite same-program timing and limits are documented
+separately. A separate
 [controlled shared-source fragment experiment](source_v8/README.md) connects a
 fresh ordinary compiler capture to independent replay, IR8 planning and the real
 runtime for a bounded scalar/callable fragment, now extended with closed
