@@ -14,6 +14,7 @@ module Bootstrap.Classes where {
   import qualified Bootstrap.ClassDemand as Q;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Kinding as K;
   import qualified Bootstrap.Desugar as Desugar;
@@ -958,7 +959,9 @@ module Bootstrap.Classes where {
   inventoryProtection :: ClassInventory -> Map String Bool ->
     [] ((,) String SInstanceDecl) -> [] ((,,) String (Maybe SAnnotation) SExpr) ->
     Either String (Map String Bool);
-  inventoryProtection (ClassInventory _ ds infos _ _ methods (ClassSupports supports _ _) _ externals)
+  inventoryProtection = inventoryProtectionWith Nothing;
+  inventoryProtectionWith resolvedRefs (ClassInventory _ ds infos _ _ methods
+    (ClassSupports supports assigned _) _ externals)
     importedProtection instances members = do {
       ensure (all (\name -> M.member compareString name importedProtection) (M.keys externals))
         "imported source protection inventory is incomplete";
@@ -999,35 +1002,78 @@ module Bootstrap.Classes where {
         length recorded == S.size (S.fromList compareString recorded) &&
         all (\name -> elem eqString name recorded) supportNames)
         "generated support protection inventory mismatch";
-      let { nodes = append sourceNodes supportNodes };
-      let { environment = withExternalOverloads externals methods };
-      let { uses current body = protectedSourceBody environment current body ||
-        any (\reference -> case M.lookup compareString reference environment of {
-          Nothing -> False;
-          Just ((,) target _) -> M.findWithDefault compareString False target current
-        }) (Surface.freeNames body) };
-      let { seeds = M.union compareString
-        (M.fromList compareString (map (\((,,) name direct _) -> (,) name direct) nodes))
-        (M.mapWithKey (\name ty -> managedType ty ||
-          M.findWithDefault compareString False name importedProtection) externals) };
       let {
-        advance :: Int -> Map String Bool -> Map String Bool;
-        advance remaining current =
-          if remaining == 0 then current else
-            let { next = foldl
-              (\result ((,,) name direct bodies) -> M.insert compareString name
-                (direct || any (uses current) bodies) result)
-              current nodes }
-            in if eqList
-                 (\((,) name flag) ((,) other oldFlag) ->
-                   eqString name other && (if flag then oldFlag else not oldFlag))
-                 (M.toList next) (M.toList current)
-               then next else advance (remaining - 1) next
+        nodes = append sourceNodes supportNodes;
+        -- Raw named callers enter through a private declaration domain.
+        -- Their free names were already resolved in this named scope.
+        generation = case assigned of {
+          Just table -> table;
+          Nothing -> let {
+            keys = append (map (\name -> (,) name False) names)
+              (map (\name -> (,) name True) (M.keys methods));
+            symbols = Dependency.symbols keys;
+            sourceIds = map V.fromInt (range 0 (length names - 1))
+          } in Dependency.generatedTable symbols sourceIds supportNames (M.keys externals) methods
+        };
+        symbols = Dependency.generatedSymbols generation;
+        refsIn i reference = let {
+          original = case resolvedRefs of {
+            Nothing -> [];
+            Just resolve -> filter (\r -> eqString reference (Dependency.symbolName symbols r)) (resolve i)
+          }
+        } in if null original then case Dependency.generatedNameId generation reference of {
+          Nothing -> []; Just r -> [r]
+        } else original;
+        redirected r = case Dependency.selectorId generation r of {
+          Just selector -> [r, selector]; Nothing -> [r]
+        };
+        references body = Dependency.valueNames (Dependency.observeExpression body);
+        required name = case Dependency.generatedNameId generation name of {
+          Just i -> Right i; Nothing -> Left ("missing protection declaration: " ++ name)
+        };
+        -- Direct references in a generated RHS can name a selector or hidden
+        -- dictionary. A SWanted candidate list describes possible evidence,
+        -- before the solver selects any of those implementations.
+        supportBodies = M.fromList compareString (map (\((,,) name _ body) -> (,) name body) supports)
       };
-      let { complete = advance (length nodes) seeds };
-      Right (M.filterWithKey (\name _ ->
-        elem eqString name names || elem eqString name supportNames) complete)
+      rows <- traverseEither (\((,,) name direct bodies) -> do {
+        i <- required name;
+        let { supportRefs = case M.lookup compareString name supportBodies of {
+                Nothing -> []; Just rhs -> filter (\n -> elem eqString n supportNames) (Surface.freeNames rhs)
+              };
+              namesRead = append (concatMap references bodies) supportRefs;
+              refs = concatMap (refsIn i) namesRead;
+              hasProtectedMethod r = case Dependency.selectorId generation r of {
+                Nothing -> False;
+                Just _ -> case M.lookup compareString (Dependency.symbolName symbols r) methods of {
+                  Nothing -> False; Just ((,) _ predicates) -> elem eqString callStackPredicate predicates
+                }
+              }
+        };
+        Right ((,,) i (direct || any managedExpression bodies || any hasProtectedMethod refs)
+          (concatMap redirected refs))
+      }) nodes;
+      imported <- traverseEither (\((,) name ty) -> case Dependency.generatedImportId generation name of {
+        Nothing -> Left ("missing imported protection declaration: " ++ name);
+        Just i -> Right ((,,) i (managedType ty || M.findWithDefault compareString False name importedProtection) [])
+      }) (M.toList externals);
+      let { flags = propagateProtection (V.count (Dependency.symbolNodes symbols)) (append imported rows) };
+      Right (M.fromList compareString (map (\((,,) i _ _) ->
+        (,) (Dependency.symbolName symbols i) (V.at flags i)) rows))
     };
+  propagateProtection count rows = runST (stBind (V.filled count []) (\users ->
+    stBind (ST.map_ (\((,,) i _ refs) -> ST.map_ (\r ->
+      stBind (V.get users r) (\old -> V.set users r ((:) i old))) refs) rows) (\_ ->
+    stBind (V.filled count False) (\flags ->
+      let { seeds = mapMaybe (\((,,) i direct _) -> if direct then Just i else Nothing) rows } in
+      stBind (spreadProtection users flags seeds) (\_ -> V.freeze flags)))));
+  spreadProtection users flags pending = case pending of {
+    [] -> stReturn ();
+    (:) i rest -> stBind (V.get flags i) (\marked ->
+      if marked then spreadProtection users flags rest else
+        stBind (V.set flags i True) (\_ -> stBind (V.get users i) (\next ->
+          spreadProtection users flags (append next rest))))
+  };
   inventoryOrdinaryRegistry :: ClassInventory -> Map String String;
   inventoryOrdinaryRegistry (ClassInventory _ _ infos _ _ _ _ _ _) =
     M.map (\(Info _ dictionaryIdentity _ _ _) -> dictionaryIdentity) infos;

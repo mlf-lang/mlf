@@ -1066,7 +1066,13 @@ module Bootstrap.SourceInference where {
   };
   initializeProtection :: SourcePlan -> Map String Bool -> Either String SourcePlan;
   initializeProtection plan@(SourcePlan inventory graph count used externals legacy instances _) imported = do {
-    flags <- Classes.inventoryProtection inventory imported instances (planSources plan);
+    let { sourceRefs = case graph of {
+      NamedPlan _ _ _ -> Nothing;
+      IndexedPlan _ rows _ _ _ -> Just (\i -> case V.at rows i of {
+        PlannedSource _ _ rhs -> R.references rhs; PlannedSupport _ _ _ -> []
+      })
+    } };
+    flags <- Classes.inventoryProtectionWith sourceRefs inventory imported instances (planSources plan);
     Right (SourcePlan inventory graph count used externals legacy instances flags)
   };
   initialContracts :: SourcePlan -> Map String XType -> Map String Bool ->

@@ -75,7 +75,7 @@
       "path": "libraries/mlf-inference",
       "sources": {
         "Bootstrap/ClassDemand.hs": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
-        "Bootstrap/Classes.hs": "e88687240fabdc5478e0a54ae71d85773a8af5f7f9157f0b25eac4103c41749c",
+        "Bootstrap/Classes.hs": "c45c21077ce3a84be83fd36af174595f0a9a8a9d77be368406afa321d7c086ce",
         "Bootstrap/Compiler.hs": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e",
         "Bootstrap/CompilerCore.hs": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
         "Bootstrap/Constraint.hs": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852",
@@ -134,7 +134,7 @@
         "Bootstrap/QueryGraph.hs": "070676a9de797d00322e4b5cb31b7ba153d8b152d6f1e6d458050aafb0241f42",
         "Bootstrap/Separate.hs": "167d3e42ef9b8aa3b8955cfe93210e84528ca7b4768d571f60e27603b669e5ae",
         "Bootstrap/SourceEquality.hs": "031ca10290b4b6bce9526c65fc6cbcea096def8df17fd6e9333710480d52077a",
-        "Bootstrap/SourceInference.hs": "ae3af5e7c180929e1bf2d0147bc62191a236c4a2982f1038c4962493a70cf583",
+        "Bootstrap/SourceInference.hs": "5ce631ed6b9b32688e781f0846f4f5fc983cc86457ffaf6f7f53157c7c65c21a",
         "Bootstrap/SourceUnit.hs": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f"
       },
       "version": "0.3.0"
@@ -202,7 +202,7 @@
       "name": "mlf-compiler",
       "path": ".",
       "sources": {
-        "bootstrap/MLF/BuiltinPreludeData.hs": "6a8c80b5b7fef0a4256b29b706d2ba2420056a6626556f94b9e001a6135b6734",
+        "bootstrap/MLF/BuiltinPreludeData.hs": "68c33bcb69c014b5e6dec4c8d263c13466bf6e10726154f2ec149254e40732f0",
         "bootstrap/MLF/Entry/BuiltinPrelude.hs": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
         "bootstrap/MLF/Entry/Emlf.hs": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
         "bootstrap/MLF/NativeBuild.hs": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",

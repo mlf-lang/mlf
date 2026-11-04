@@ -7,6 +7,7 @@ import Data.List (nub, sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Bootstrap.Bitstream as W
+import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.CrateQuery as CQ
@@ -405,6 +406,20 @@ resolverChecks = do
         [(ordinal,H.unpack n) | (ordinal,(n,_,_)) <- rows]
     _ -> error "resolved query plan lost its indexed rows"
 
+-- The reference propagates named flags to convergence, independently of
+-- reverse edges and the candidate's work queue.
+protectionChecks = do
+  let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
+      diamond = [("join",["left","right"]),("left",["import"]),("right",["import"]),
+                 ("import",[]),("cycleA",["cycleB","join"]),("cycleB",["cycleA"]),("unrelated",[])]
+  forM_ [(chain,["127"]),(chain,[]),(diamond,["import"]),(diamond,[])] $ \(edges,seeds) -> do
+    let keys = map fst edges
+        slots = Map.fromList (zip keys (map V.fromInt [0..]))
+        rows = [(slots Map.! n,n `elem` seeds,[slots Map.! ref | ref <- deps]) | (n,deps) <- edges]
+        spread flags = [n | (n,deps) <- edges, n `elem` seeds || any (`elem` flags) deps]
+        settle flags = let next = spread flags in if next == flags then next else settle next
+        flags = Classes.propagateProtection (fromIntegral (length keys)) rows
+    check "protection equals independent named fixed point" (settle []) [n | n <- keys,V.at flags (slots Map.! n)]
 main = do
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
       wide = [("top",map fst chain)] ++ chain
@@ -423,4 +438,5 @@ main = do
   queryChecks
   datatypeChecks
   resolverChecks
+  protectionChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"
