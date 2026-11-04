@@ -2,6 +2,7 @@
 module Main where
 
 import Control.Monad (unless)
+import qualified Bootstrap.CrateGraph as CG
 import qualified Bootstrap.Dependency as D
 import qualified Bootstrap.IndexVec as V
 import qualified Bootstrap.Map as M
@@ -38,4 +39,12 @@ main = do
   check "protection follows checked slot" (all snd (Source.groupParameterProtection prepared))
   xc <- expect (Source.checkedBinding next x)
   check "the slot retains predicate and protection" (Source.contractClasses xc == ["C"] && Source.contractProtected xc)
+  let pair = Source.GroupSlots scope [x,y] [] []
+      reversePair = Source.GroupSlots scope [y,x] [] []
+      singleton = Source.GroupSlots scope [x] [] []
+      keys = [CG.groupKey CG.PreparedQuery pair, CG.groupKey CG.ScopeInventoryQuery pair,
+              CG.groupKey CG.ScopeQuery pair, CG.groupKey CG.InferQuery pair, CG.groupKey CG.FinishQuery pair,
+              CG.groupKey CG.FinishQuery reversePair, CG.groupKey CG.FinishQuery singleton]
+  check "distinct query kinds, membership and order" (and [k /= j | (i,k) <- zip [0..] keys, j <- drop (i+1) keys])
+  putStrLn "PASS typed SCC query kinds, ordered members and split identities"
   putStrLn "PASS declaration readers, sparse publication, local shadowing, ABI order and contract fields"

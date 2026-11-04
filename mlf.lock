@@ -122,7 +122,7 @@
         "Bootstrap/Crate.hs": "9354b06192e5a93b38c923d5ae16455f2c1a27b82f746b9d390b36d916deeb3d",
         "Bootstrap/CrateArtifact.hs": "dfdc0393f76662dad1eb802cfd5269d3c145daa83862979047a2241a4bc5be32",
         "Bootstrap/CrateCodegen.hs": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
-        "Bootstrap/CrateGraph.hs": "a7643a2834c9e71eaf8ff5d1a0a835565b7f23e4d896e4ac08172c93daad90be",
+        "Bootstrap/CrateGraph.hs": "480b8d12e7a92498f870438553971f1123d5e8d249dce50a2c30e8a454cf64a0",
         "Bootstrap/CrateQuery.hs": "c4936e3ab928c6d5aa496f92c649d608e5de4c70506e81a1b4a780464b864e51",
         "Bootstrap/CrateSession.hs": "d147f1597e01f7c578d70f087eb5c6f5e41066065021edb53fb94b4cb1f6617e",
         "Bootstrap/ImportParameters.hs": "16efe338a956ef66deda14c67251b999dc7934cbe5bd7dfffebbec8b03a2fbcf",

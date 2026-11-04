@@ -29,6 +29,16 @@ module Bootstrap.CrateGraph where {
     (Map String Open.Environment) ([] ((,) String Open.Fragment)) Int Int ([] Q.GroupResult) (Maybe IntArray);
   bindingKey scope i = G.key "Binding" (Source.declName scope i);
   requireBindings scope ids = requireNodes (map (bindingKey scope) ids);
+  -- In-memory SCC queries use the full ordered member list. Packing its
+  -- stable definitions is the boundary to the generation and receipt formats.
+  data GroupQuery = PreparedQuery | ScopeInventoryQuery | ScopeQuery | InferQuery | FinishQuery;
+  groupQueryKind :: GroupQuery -> String;
+  groupQueryKind kind = case kind of {
+    PreparedQuery -> "Prepared"; ScopeInventoryQuery -> "ScopeInventory";
+    ScopeQuery -> "Scope"; InferQuery -> "InferScc"; FinishQuery -> "FinishScc"
+  };
+  groupIdentity slots = Separate.pack (map (Source.declName (Source.slotScope slots)) (Source.memberIds slots));
+  groupKey kind slots = G.key (groupQueryKind kind) (groupIdentity slots);
   datatypeKey name = G.key "Datatype" name;
   contractValue contract = W.VNode 420
     [A.toXType (Separate.normalType (Source.contractType contract)),
@@ -158,13 +168,12 @@ module Bootstrap.CrateGraph where {
           Right ((,) slots prepared) -> do {
             let { declarations = Q.requiredDataIn inventory (Source.groupMembers prepared)
                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
-              group = Q.groupName crateId (sortBy compareString names);
-              identity = Separate.pack (sortBy compareString names);
-              rawKey = G.key "InferScc" identity };
+              group = Q.groupName crateId names;
+              rawKey = groupKey InferQuery slots };
             graphStarted <- G.clock statistics;
-            source <- input (G.key "Prepared" identity) (preparedValue prepared) session;
+            source <- input (groupKey PreparedQuery slots) (preparedValue prepared) session;
             case source of { Left e -> ioReturn (Left e); Right ((,) sourceNode first) -> do {
-              scopeInput <- input (G.key "ScopeInventory" identity) (scopeInventory prepared) first;
+              scopeInput <- input (groupKey ScopeInventoryQuery slots) (scopeInventory prepared) first;
               case scopeInput of { Left e -> ioReturn (Left e); Right ((,) scopeLeaf second) ->
                 case do {
                   candidateNodes <- requireBindings scope (Source.candidateIds slots) second;
@@ -174,7 +183,7 @@ module Bootstrap.CrateGraph where {
                 } of {
                   Left e -> ioReturn (Left e);
                   Right ((,,) candidateNodes bindingNodes dataNodes) -> do {
-                    scoped <- G.record (G.key "Scope" identity)
+                    scoped <- G.record (groupKey ScopeQuery slots)
                       ((:) (G.edge scopeLeaf) (map G.edge candidateNodes)) True
                       (scopeValue prepared candidateNodes) second;
                     case scoped of { Left e -> ioReturn (Left e); Right ((,) scopeNode third) -> do {
@@ -239,7 +248,7 @@ module Bootstrap.CrateGraph where {
                             case Source.prepareOpenFinish prepared fragment of {
                               Left e -> ioReturn (Left e);
                               Right finish -> do {
-                                evidence <- resolveRequests env identity ((:) (G.edge scopeNode) (map G.edge dataNodes))
+                                evidence <- resolveRequests env (groupIdentity slots) ((:) (G.edge scopeNode) (map G.edge dataNodes))
                                   (Source.openFinishRequests finish) fourth;
                                 case evidence of { Left e -> ioReturn (Left e); Right ((,,) answers evidenceReads afterEvidence) ->
                                 case Source.completeOpenFinish finish answers of {
@@ -262,7 +271,7 @@ module Bootstrap.CrateGraph where {
                                     (append evidenceReads bindingEdges) };
                                 content <- finishContentHash (verify || audit) group body final rawNode references finalRefs;
                                 supplied <- case content of { Left e -> ioReturn (Left e); Right hash ->
-                                  recordFinish scope group identity hash entries reads afterEvidence };
+                                  recordFinish slots group hash entries reads afterEvidence };
                                 case supplied of { Left e -> ioReturn (Left e); Right next -> do {
                                     G.elapsed statistics 3 finishStarted;
                                     runGroups verify audit crateId inventory rest
@@ -309,17 +318,17 @@ module Bootstrap.CrateGraph where {
   -- value. Reconstruct it from current checked results, so neither a swapped
   -- receipt nor a stale index row can supply a result hash. Exported contracts
   -- share the very bytes subsequently published by their Binding nodes.
-  recordFinish scope group identity fragmentHash delta reads session = do {
+  recordFinish slots group fragmentHash delta reads session = do {
     encoded <- mapM (\((,) i contract) -> do {
       result <- G.encodeHashed (contractValue contract);
       ioReturn (mapEither (\((,) digest bytes) -> (,,) i digest bytes) result)
     }) delta;
     case sequenceEither encoded of { Left e -> ioReturn (Left e); Right entries -> do {
-      let { contracts = map (\((,,) i digest _) -> (,) (Source.declName scope i) digest) entries;
+      let { scope = Source.slotScope slots; contracts = map (\((,,) i digest _) -> (,) (Source.declName scope i) digest) entries;
         receipt = W.VNode 427 [W.VText group,W.VText fragmentHash,A.toList (A.toPair A.toText A.toText) contracts];
         binding dependency current ((,,) i digest bytes) = snd (G.recordDigest (bindingKey scope i)
           [dependency] (Just digest) digest (Just bytes) current) };
-      recorded <- G.record (G.key "FinishScc" identity) reads True receipt session;
+      recorded <- G.record (groupKey FinishQuery slots) reads True receipt session;
       ioReturn (mapEither (\((,) finish next) -> foldlStrict (binding (G.edge finish)) next entries) recorded)
     } }
   };
