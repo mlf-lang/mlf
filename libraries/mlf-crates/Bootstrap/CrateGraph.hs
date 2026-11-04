@@ -23,10 +23,12 @@ module Bootstrap.CrateGraph where {
   import qualified Bootstrap.Evidence as Evidence;
   import qualified Bootstrap.EvidenceBoundary as Boundary;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.IndexVec as V;
 
-  data State = State G.Session (Map String Source.SourceContract)
+  data State = State G.Session Source.CheckedContracts
     (Map String Open.Environment) ([] ((,) String Open.Fragment)) Int Int ([] Q.GroupResult) (Maybe IntArray);
-  bindingKey name = G.key "Binding" name;
+  bindingKey scope i = G.key "Binding" (Source.declName scope i);
+  requireBindings scope ids = requireNodes (map (bindingKey scope) ids);
   datatypeKey name = G.key "Datatype" name;
   contractValue contract = W.VNode 420
     [A.toXType (Separate.normalType (Source.contractType contract)),
@@ -34,13 +36,13 @@ module Bootstrap.CrateGraph where {
   -- Each input is refreshed once from current source/checked metadata. Derived
   -- nodes have explicit edges back to that authority, including empty scopes.
   input identity value session = G.record (G.inputKey identity) [] False value session;
-  recordInitialBindings values session = case values of {
+  recordInitialBindings scope values session = case values of {
     [] -> ioReturn (Right session);
-    (:) ((,) name contract) rest -> do {
-      observed <- input (bindingKey name) (contractValue contract) session;
+    (:) ((,) i contract) rest -> do {
+      observed <- input (bindingKey scope i) (contractValue contract) session;
       case observed of { Left e -> ioReturn (Left e); Right ((,) leaf next) -> do {
-        recorded <- G.record (bindingKey name) [G.edge leaf] True (contractValue contract) next;
-        case recorded of { Left e -> ioReturn (Left e); Right ((,) _ final) -> recordInitialBindings rest final }
+        recorded <- G.record (bindingKey scope i) [G.edge leaf] True (contractValue contract) next;
+        case recorded of { Left e -> ioReturn (Left e); Right ((,) _ final) -> recordInitialBindings scope rest final }
       } }
     }
   };
@@ -80,29 +82,43 @@ module Bootstrap.CrateGraph where {
       inventory <- Q.prepareData (Source.planData plan);
       types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
       contracts <- Source.initialContracts plan types protected;
-      Right ((,,) plan inventory contracts)
+      let { scope = Source.planScope plan (M.keys contracts) };
+      checked <- Source.installContracts scope contracts;
+      steps <- Source.querySteps plan scope;
+      Right ((,,,) plan inventory checked steps)
     } of {
       Left e -> ioReturn (Left e);
-      Right ((,,) plan inventory contracts) -> start verify crateId compilerHash cacheDir
-        "source" inventory (Source.planData plan) contracts (Source.planSteps plan)
+      Right ((,,,) plan inventory checked steps) -> start verify crateId compilerHash cacheDir
+        "source" inventory (Source.planData plan) checked steps
     };
   -- The already-lowered fallback has no unsigned-root evidence finalization.
   -- It still uses the same open bodies, dependency graph and crate transaction.
   -- Preserve its existing conservative (protected, no source-class slots)
   -- calling contract, including mixed source/dictionary recursive groups.
   compileLowered verify crateId compilerHash cacheDir imports datatypes members =
+    compileLoweredIn (Dependency.BoundValues (Dependency.symbols []) [])
+      verify crateId compilerHash cacheDir imports datatypes members;
+  compileLoweredIn (Dependency.BoundValues base source) verify crateId compilerHash cacheDir imports datatypes members =
     case do {
       groups <- Dependency.declarationGroups members;
       inventory <- Q.prepareData datatypes;
       types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
       let { contracts = M.map (\ty -> Source.SourceContract ty [] True) types;
         values = M.fromList compareString (map (\m@((,,) name _ _) -> (,) name m) members) };
-      Right ((,,,) groups inventory contracts values)
+      let { sourceIds = map Dependency.boundId source;
+        locals = S.fromList compareString (map (Dependency.symbolName base) sourceIds);
+        extra = filter (\n -> not (S.member compareString n locals)) (map Source.sourceName members);
+        all = Dependency.extendSymbols base extra;
+        generated = map V.fromInt (range (V.count (Dependency.symbolNodes base)) (V.count (Dependency.symbolNodes all) - 1));
+        scope = Source.declarationScope all (append sourceIds generated) [] (M.keys contracts) };
+      checked <- Source.installContracts scope contracts;
+      steps <- traverseEither (\names -> mapEither (\ids -> (,) ids (\current -> prepareLowered values current names))
+        (traverseEither (Source.requireDecl scope) names)) groups;
+      Right ((,,) steps inventory checked)
     } of {
       Left e -> ioReturn (Left e);
-      Right ((,,,) groups inventory contracts values) -> start verify crateId compilerHash cacheDir
-        "lowered" inventory datatypes contracts
-        (map (\names -> (,) names (\current -> prepareLowered values current names)) groups)
+      Right ((,,) steps inventory checked) -> start verify crateId compilerHash cacheDir
+        "lowered" inventory datatypes checked steps
     };
   prepareLowered :: Map String ((,,) String (Maybe SAnnotation) SExpr) ->
     Map String Source.SourceContract -> [] String -> Either String Source.PreparedGroup;
@@ -110,10 +126,8 @@ module Bootstrap.CrateGraph where {
     members <- traverseEither (\name -> case M.lookup compareString name values of {
       Just member -> Right member; Nothing -> Left "lowered query member disappeared"
     }) names;
-    let { bindings = Source.selectedContractBindings members contracts };
-    Right (Source.PreparedGroup members members bindings M.empty
-      (map (\name -> (,,) name [] True) names) Nothing
-      (map (\((,) name _) -> (,) name True) bindings))
+    Right (Source.PreparedGroup members members [] M.empty
+      (map (\name -> (,,) name [] True) names) Nothing [])
   };
   start verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
         statistics <- G.profile;
@@ -122,7 +136,8 @@ module Bootstrap.CrateGraph where {
         started <- G.begin (cacheDir ++ "/query-graph-v1")
           (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1/finish-receipt-1",flavor]);
         case started of { Left e -> ioReturn (Left e); Right session -> do {
-          initial <- recordInitialBindings (M.toList contracts) session;
+          initial <- case contracts of { Source.CheckedContracts scope indexed _ ->
+            recordInitialBindings scope (M.toList indexed) session };
           case initial of { Left e -> ioReturn (Left e); Right first -> do {
             loaded <- recordDatatypes datatypes first;
             case loaded of { Left e -> ioReturn (Left e); Right ready -> do {
@@ -135,11 +150,12 @@ module Bootstrap.CrateGraph where {
     };
   runGroups verify audit crateId inventory groups state = case groups of {
     [] -> ioReturn (Right state);
-    (:) ((,) names prepare) rest -> case state of {
+    (:) ((,) owners prepare) rest -> case state of {
       State session contracts contexts objects inferred reused reports statistics ->
-        case prepare contracts of {
+        let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in
+        case bindEither (prepare (Source.checkedNamed contracts)) (Source.slotPrepared contracts owners) of {
           Left e -> ioReturn (Left e);
-          Right prepared -> do {
+          Right ((,) slots prepared) -> do {
             let { declarations = Q.requiredDataIn inventory (Source.groupMembers prepared)
                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
               group = Q.groupName crateId (sortBy compareString names);
@@ -151,8 +167,8 @@ module Bootstrap.CrateGraph where {
               scopeInput <- input (G.key "ScopeInventory" identity) (scopeInventory prepared) first;
               case scopeInput of { Left e -> ioReturn (Left e); Right ((,) scopeLeaf second) ->
                 case do {
-                  candidateNodes <- requireNodes (map (compose bindingKey fst) (Source.groupCandidateBindings prepared)) second;
-                  bindingNodes <- requireNodes (map (compose bindingKey fst) (Source.groupBindings prepared)) second;
+                  candidateNodes <- requireBindings scope (Source.candidateIds slots) second;
+                  bindingNodes <- requireBindings scope (Source.parameterIds slots) second;
                   dataNodes <- requireNodes (map (compose datatypeKey D.datatypeName) declarations) second;
                   Right ((,,) candidateNodes bindingNodes dataNodes)
                 } of {
@@ -230,21 +246,27 @@ module Bootstrap.CrateGraph where {
                                 Left e -> ioReturn (Left e);
                                 Right (Source.OpenFinalGroup body delta) -> do {
                                 let { final = Source.openFinalObject fragment body };
-                                case requireNodes (map (compose bindingKey (compose X.nameHint fst))
-                                  (Open.parameters final)) afterEvidence of {
+                                case do {
+                                  finalIds <- traverseEither (compose (Source.requireDecl scope) (compose X.nameHint fst))
+                                    (Open.parameters final);
+                                  entries <- traverseEither (\((,) n c) -> mapEither (\i -> (,) i c)
+                                    (Source.requireDecl scope n)) (M.toList delta);
+                                  nodes <- requireBindings scope finalIds afterEvidence;
+                                  Right ((,) entries nodes)
+                                } of {
                                 Left e -> ioReturn (Left e);
-                                Right finalBindings -> do {
+                                Right ((,) entries finalBindings) -> do {
                                 let { bindingEdges = map G.edge finalBindings;
                                   finalRefs = append bindingEdges (map G.edge dataNodes);
                                   reads = append [G.edge rawNode,G.edge sourceNode,G.edge scopeNode]
                                     (append evidenceReads bindingEdges) };
                                 content <- finishContentHash (verify || audit) group body final rawNode references finalRefs;
                                 supplied <- case content of { Left e -> ioReturn (Left e); Right hash ->
-                                  recordFinish group identity hash delta reads afterEvidence };
+                                  recordFinish scope group identity hash entries reads afterEvidence };
                                 case supplied of { Left e -> ioReturn (Left e); Right next -> do {
                                     G.elapsed statistics 3 finishStarted;
                                     runGroups verify audit crateId inventory rest
-                                      (State next (M.union compareString delta contracts) currentContexts
+                                      (State next (Source.publishContracts contracts entries) currentContexts
                                         ((:) ((,) group final) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)
                                         ((:) (Q.GroupResult group names hit
@@ -287,22 +309,22 @@ module Bootstrap.CrateGraph where {
   -- value. Reconstruct it from current checked results, so neither a swapped
   -- receipt nor a stale index row can supply a result hash. Exported contracts
   -- share the very bytes subsequently published by their Binding nodes.
-  recordFinish group identity fragmentHash delta reads session = do {
-    encoded <- mapM (\((,) name contract) -> do {
+  recordFinish scope group identity fragmentHash delta reads session = do {
+    encoded <- mapM (\((,) i contract) -> do {
       result <- G.encodeHashed (contractValue contract);
-      ioReturn (mapEither (\((,) digest bytes) -> (,,) name digest bytes) result)
-    }) (M.toList delta);
+      ioReturn (mapEither (\((,) digest bytes) -> (,,) i digest bytes) result)
+    }) delta;
     case sequenceEither encoded of { Left e -> ioReturn (Left e); Right entries -> do {
-      let { contracts = map (\((,,) name digest _) -> (,) name digest) entries;
+      let { contracts = map (\((,,) i digest _) -> (,) (Source.declName scope i) digest) entries;
         receipt = W.VNode 427 [W.VText group,W.VText fragmentHash,A.toList (A.toPair A.toText A.toText) contracts];
-        binding dependency current ((,,) name digest bytes) = snd (G.recordDigest (bindingKey name)
+        binding dependency current ((,,) i digest bytes) = snd (G.recordDigest (bindingKey scope i)
           [dependency] (Just digest) digest (Just bytes) current) };
       recorded <- G.record (G.key "FinishScc" identity) reads True receipt session;
       ioReturn (mapEither (\((,) finish next) -> foldlStrict (binding (G.edge finish)) next entries) recorded)
     } }
   };
   result (State session contracts _ objects inferred reused reports _) =
-    (,,,) (reverse objects) (Q.QueryReport inferred reused (reverse reports)) contracts session;
+    (,,,) (reverse objects) (Q.QueryReport inferred reused (reverse reports)) (Source.checkedNamed contracts) session;
   statistics (State _ _ _ _ _ _ _ stats) = stats;
   evidenceNames candidates = zip (map Boundary.candidateName candidates)
     (map (\((,) index candidate) -> XName (0 - index - 1) (X.nameHint (Boundary.candidateName candidate)))

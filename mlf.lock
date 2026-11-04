@@ -122,9 +122,9 @@
         "Bootstrap/Crate.hs": "9354b06192e5a93b38c923d5ae16455f2c1a27b82f746b9d390b36d916deeb3d",
         "Bootstrap/CrateArtifact.hs": "dfdc0393f76662dad1eb802cfd5269d3c145daa83862979047a2241a4bc5be32",
         "Bootstrap/CrateCodegen.hs": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
-        "Bootstrap/CrateGraph.hs": "2ea486d572f3081c66345298510dfe4b21909241c8c3b790c4fbff8ac63e9568",
-        "Bootstrap/CrateQuery.hs": "1422a7c63e8435a3ae13c5fce2dba5e99b3a1ebd6d7add2e33af53a9fb1105c5",
-        "Bootstrap/CrateSession.hs": "782cad069cc2bcdaf9d6543e9137101bae118288e7358f4f3385dfb0e54f8fb8",
+        "Bootstrap/CrateGraph.hs": "a7643a2834c9e71eaf8ff5d1a0a835565b7f23e4d896e4ac08172c93daad90be",
+        "Bootstrap/CrateQuery.hs": "c4936e3ab928c6d5aa496f92c649d608e5de4c70506e81a1b4a780464b864e51",
+        "Bootstrap/CrateSession.hs": "d147f1597e01f7c578d70f087eb5c6f5e41066065021edb53fb94b4cb1f6617e",
         "Bootstrap/ImportParameters.hs": "16efe338a956ef66deda14c67251b999dc7934cbe5bd7dfffebbec8b03a2fbcf",
         "Bootstrap/ImportedRoot.hs": "345418996f5ceaea45afdca54b614d506803bf583f3113ce6e5042727f48d7dc",
         "Bootstrap/InferenceUnit.hs": "f5747ef383457875204ea9fa1f144d487bd770a20894c7f5ac8f990ad147fda1",
@@ -134,7 +134,7 @@
         "Bootstrap/QueryGraph.hs": "070676a9de797d00322e4b5cb31b7ba153d8b152d6f1e6d458050aafb0241f42",
         "Bootstrap/Separate.hs": "167d3e42ef9b8aa3b8955cfe93210e84528ca7b4768d571f60e27603b669e5ae",
         "Bootstrap/SourceEquality.hs": "031ca10290b4b6bce9526c65fc6cbcea096def8df17fd6e9333710480d52077a",
-        "Bootstrap/SourceInference.hs": "5ce631ed6b9b32688e781f0846f4f5fc983cc86457ffaf6f7f53157c7c65c21a",
+        "Bootstrap/SourceInference.hs": "d017b9674c73cbd63c3cb26a635f4570a0875024868bce4f08e39f433242bc7b",
         "Bootstrap/SourceUnit.hs": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f"
       },
       "version": "0.3.0"
@@ -202,7 +202,7 @@
       "name": "mlf-compiler",
       "path": ".",
       "sources": {
-        "bootstrap/MLF/BuiltinPreludeData.hs": "68c33bcb69c014b5e6dec4c8d263c13466bf6e10726154f2ec149254e40732f0",
+        "bootstrap/MLF/BuiltinPreludeData.hs": "0ee130074085e4d25c002a85370e338d2d89167bd4fa0a24b087ff0fa3a39396",
         "bootstrap/MLF/Entry/BuiltinPrelude.hs": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
         "bootstrap/MLF/Entry/Emlf.hs": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
         "bootstrap/MLF/NativeBuild.hs": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",

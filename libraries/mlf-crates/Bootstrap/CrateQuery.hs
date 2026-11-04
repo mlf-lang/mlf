@@ -2349,7 +2349,7 @@ module Bootstrap.CrateQuery where {
                   Nothing -> Nothing;
                   Just pool -> Just (emptyDatatypeContextEncoding pool)
                 }) (if shareEncoding then Just (prepareSourceContractEncodings contracts) else Nothing)
-                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing) []
+                  (if shareEncoding then Just (Source.fileSourceContext plan contracts) else Nothing) []
                   crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 []);
                 cleaned <- cleanupQueryKey cacheDir result;
                 releaseFileLock lock;

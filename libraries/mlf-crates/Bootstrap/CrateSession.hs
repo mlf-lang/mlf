@@ -18,7 +18,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate,
     withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
     specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
-    preparedResolution, preparedNames, preparedLayouts, preparedReach,
+    preparedResolution, preparedNames, preparedLayouts, preparedReach, entryBindings,
     preparedData, preparedClasses, preparedInstances, preparedEntry);
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.CrateGraph as CrateGraph;
@@ -227,9 +227,11 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     compiled <- if Query.validSourceContextDigest compiler
       then case plan of {
         Just source -> CrateGraph.compile verify (specIdentity spec) compiler directory imported protected source;
-        Nothing -> let { lowered = preparedLowered prepared } in
-          CrateGraph.compileLowered verify (specIdentity spec) compiler directory imported
+        Nothing -> let { lowered = preparedLowered prepared } in case entryBindings spec (preparedResolution prepared) of {
+          Left e -> ioReturn (Left e);
+          Right ((,) _ bindings) -> CrateGraph.compileLoweredIn bindings verify (specIdentity spec) compiler directory imported
             (Inference.loweredData lowered) (Inference.loweredValues lowered)
+        }
       }
       else ioReturn (Left "cannot fingerprint query graph compiler");
     case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.result state of {
@@ -476,7 +478,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                   Nothing -> Nothing;
                   Just pool -> Just (Query.emptyDatatypeContextEncoding pool)
                 }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)
-                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing) []
+                  (if shareEncoding then Just (Source.fileSourceContext plan contracts) else Nothing) []
                   crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 []);
                 cleaned <- Query.cleanupQueryKey cacheDir result;
                 releaseFileLock lock;
