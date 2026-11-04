@@ -15,8 +15,10 @@ Int-result cases. The optional self_recursive marker records that extension;
 nominal types are never unfolded. This does not admit nominal Scheme arguments,
 nominal atoms in generic code, callable SUM fields, cross-family recursion,
 or parameterized/higher-rank data. At most one retained recursive group globally
-is admitted, containing one concrete closed monomorphic function and no external
-term captures. Its introduction spine has at most eight exact typed passthrough
+is admitted, containing one concrete closed monomorphic function. Its optional
+capture policy permits closed Int/Bool owners and exact full-vector lexical
+shared views, not ordinary callable/nominal owners or bare Schemes. Its
+introduction spine has at most eight exact typed passthrough
 wrappers. This is not a termination proof or generic/value-recursion permission.
 The complete RHS, including ordinary annotation applications, remains unchanged.
 
@@ -50,9 +52,11 @@ MAX_NOMINALS = 32
 MAX_FIELDS = 32
 MAX_VARIANTS = 64
 MAX_RECURSIVE_WRAPPERS = 8
+MAX_RECURSIVE_CAPTURES = 64  # Includes the self owner when it is actually used.
 SUM_POLICY = 'closed-scalar-sum/1'
 SUM_SELF_POLICY = 'closed-self-atom/1'
 RECURSION_POLICY = 'closed-single-function-recursion/1'
+RECURSIVE_CAPTURE_POLICY = 'closed-scalar-shared-view-captures/1'
 NOMINAL_POLICY = 'closed-single-constructor-data/1'
 INT = {'tag': 'constructor', 'name': 'Int', 'arguments': []}
 BOOL = {'tag': 'constructor', 'name': 'Bool', 'arguments': []}
@@ -1021,7 +1025,62 @@ def _nominal_inventory(root, inferred, registry, budget):
     return data, sums
 
 
-def _recursion_inventory(root, inferred, budget):
+def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, budget):
+    """Partition all external raw variables using checked lexical use evidence.
+
+    A Scheme's raw free binder ID is not a physical capture. Each occurrence
+    must be the base of an already replayed, complete shared-use spine; its key
+    retains the actual definition binder and EVERY ordered argument, including
+    unused coordinates. This data conveys no origin/Access or E0 inference.
+    """
+    free = set(free)
+    definitions = {row['id']: row for row in inventory['definitions']}
+    uses = {}
+    for use in inventory['uses']:
+        budget.tick()
+        path = tuple(use['variable']['path'])
+        definition = definitions[use['definition']]
+        if (path[:len(rhs_path)] == rhs_path and definition['binding']['id'] in free):
+            if path in uses:
+                _fail('RECURSION', 'shared view occurrence is not unique', path)
+            uses[path] = use
+    scalars, views, accounted = {}, {}, set()
+    for relative, node in _walk(rhs):
+        budget.tick()
+        if node['tag'] != 'var' or node['name']['id'] not in free:
+            continue
+        path = rhs_path + relative
+        ident, typ = node['name']['id'], inferred.types[path]
+        accounted.add(ident)
+        if _scalar(typ):
+            row = scalars.setdefault(ident, {'binding': node['name'], 'type': typ, 'occurrences': []})
+            if not _same(row['type'], typ):
+                _fail('RECURSION', 'scalar capture has inconsistent lexical types', path)
+            row['occurrences'].append(_address('normalized', path))
+        else:
+            use = uses.pop(path, None)
+            if use is None:
+                _fail('RECURSION', 'external capture is not a closed scalar or exact shared view', path)
+            definition = definitions[use['definition']]
+            if definition['binding']['id'] != ident:
+                _fail('RECURSION', 'shared capture binder differs from its lexical definition', path)
+            key = (ident, tuple(t['name'] for t in use['arguments']))
+            row = views.setdefault(key, {'definition': use['definition'], 'binding': definition['binding'],
+                'arguments': use['arguments'], 'instantiated_type': use['instantiated_type'], 'uses': []})
+            if (row['definition'] != use['definition'] or not _same(row['arguments'], use['arguments'])
+                    or not _same(row['instantiated_type'], use['instantiated_type'])):
+                _fail('RECURSION', 'shared capture full-vector type differs', path)
+            row['uses'].append(use['id'])
+        if len(scalars) + len(views) + bool(self_uses) > MAX_RECURSIVE_CAPTURES:
+            _fail('LIMIT', 'recursive carrier exceeds 64 captures including self', path)
+    if accounted != free or uses:
+        _fail('RECURSION', 'recursive free-term inventory is not completely classified', rhs_path)
+    return {'policy': RECURSIVE_CAPTURE_POLICY,
+            'scalars': [scalars[key] for key in sorted(scalars)],
+            'views': [views[key] for key in sorted(views)]}
+
+
+def _recursion_inventory(root, inferred, inventory, budget):
     """Return admission evidence only; NEVER a replacement term or RHS.
 
     A concrete function introduction may have the compiler's ordinary typed
@@ -1040,8 +1099,6 @@ def _recursion_inventory(root, inferred, budget):
     annotation, ident = binding['type'], binding['name']['id']
     rhs = binding['value']
     free = sorted(_free_terms(rhs) - {ident})
-    if free:
-        _fail('RECURSION', 'recursive function cannot capture external term bindings', rhs_path)
     cursor, cursor_path, wrappers = rhs, rhs_path, []
     while cursor['tag'] == 'application':
         budget.tick()
@@ -1074,6 +1131,8 @@ def _recursion_inventory(root, inferred, budget):
            'body': _address('normalized', path + ('body',)),
            'function_source': _address('normalized', cursor_path), 'wrappers': wrappers,
            'self_uses': self_uses, 'free_term_bindings': free}
+    if free:
+        row['captures'] = _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, budget)
     result = {'policy': RECURSION_POLICY, 'bindings': [row]}
     budget.record(result)
     return result
@@ -1119,7 +1178,7 @@ def derive_shared_fragment(projected_annotated):
             correspondence.append(row)
         inventory = _inventory(root, normal, raw, normalized, origins, removed, touched, budget)
         nominal_inventory, sum_inventory = _nominal_inventory(normal, normalized, nominals, budget)
-        recursion_inventory = _recursion_inventory(normal, normalized, budget)
+        recursion_inventory = _recursion_inventory(normal, normalized, inventory, budget)
         result = {'format': FORMAT, 'status': 'independent-fragment-replay-only', 'policy': POLICY,
                   'input_checked_type': raw.type, 'checked_type': normalized.type,
                   'input_annotated': root, 'input_erased': before_erased,

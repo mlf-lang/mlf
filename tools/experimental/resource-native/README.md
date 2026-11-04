@@ -16,6 +16,8 @@ SUM cases check every arm but allocate only the selected arm's lazy factory.
 [One closed monomorphic recursive function](resource_ir_v8/README_STAGE13.md)
 can traverse such a family using the existing checked hole/fill and ordinary
 Force machinery, with its original annotation applications preserved.
+[Scalar and complete shared-view captures](resource_ir_v8/README_STAGE14.md)
+retain their own Access/origin through that concrete recursive closure.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general

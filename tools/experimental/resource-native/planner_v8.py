@@ -12,6 +12,8 @@ all arms checked and their exact declaration/source identities retained. A self
 field is the same finite nominal identity, never a recursively expanded type.
 One concrete monomorphic recursive function can use an owned, coarse typed
 hole. Its complete checked RHS graph remains lazy; no wrapper is contracted.
+Closed scalar owners and complete shared-view pairs may be captured without
+changing their existing group support, capsule origin or target Access.
 """
 from __future__ import annotations
 
@@ -525,16 +527,18 @@ class Planner:
         require(evidence is not None and evidence['source'] == address(path) and
                 evidence['binding_source'] == address(path+('bindings','0')) and
                 evidence['binding'] == binding['name'] and evidence['type'] == binding['type'] and
-                evidence['rhs'] == address(rhs_path) and evidence['body'] == address(path+('body',)) and
-                evidence['free_term_bindings'] == [], 'recursive source evidence differs')
+                evidence['rhs'] == address(rhs_path) and evidence['body'] == address(path+('body',)),
+                'recursive source evidence differs')
         mono,pairs = self.needed(binding['value'],rhs_path,frozenset((ident,)))
-        require(not mono and not pairs, 'recursive RHS has external captures')
+        inner,saved = self.recursive_captures(evidence,mono,pairs,env,views)
         row = {'source':address(path), 'binding_source':address(path+('bindings','0')),
                'binder':binding['name'], 'logical_type':self.type_name(typ),
                'rhs':address(rhs_path), 'body':address(path+('body',)),
                'function_source':evidence['function_source'], 'wrappers':evidence['wrappers'],
                'self_uses':evidence['self_uses'],
                'home':home, 'type_scope':None}
+        if mono or pairs:
+            row['captures'] = evidence['captures']
         self.knot_map.append(row)
         hole = self.fresh('hole'); self_owner = self.fresh('self')
         row['hole'] = self.add(block,path,typ,op='hole',out=hole,**{'in':home},layout=self.layout(typ))
@@ -542,10 +546,10 @@ class Planner:
         row['hole_owner'] = hole; row['self_owner'] = self_owner
         # The retained owner carries no fill ticket. The original remains local
         # until exactly one Fill, before any letrec-body demand can be emitted.
+        inner[ident] = Reference(self_owner,typ)
         self.knot_depth += 1
         try:
-            rhs = self.emit(binding['value'],rhs_path,
-                            {ident:Reference(self_owner,typ)}, {},home,block,None)
+            rhs = self.emit(binding['value'],rhs_path,inner,saved,home,block,None)
         finally:
             self.knot_depth -= 1
         require(rhs.logical == typ, 'recursive RHS differs from its full annotation')
@@ -558,6 +562,58 @@ class Planner:
         row['body_result'] = result.variable
         row['drop_hole'] = self.add(block,op='drop',value=hole)
         return result
+
+    def recursive_captures(self, evidence, mono, pairs, env, views):
+        """Carry existing scalar owners and saved full-vector views, unchanged.
+
+        The knot retains its current home. Incoming strict support facts remain
+        valid; capture/Instantiate publication uses the ordinary machinery and
+        never relabels a shared target as a concrete/E0 allocation.
+        """
+        inner = {}; saved = {}
+        if not mono and not pairs:
+            require(evidence['free_term_bindings'] == [] and 'captures' not in evidence,
+                    'spurious recursive capture evidence')
+            return inner,saved
+        self.tick(len(mono)+len(pairs))
+        require(evidence['free_term_bindings'] == sorted(mono|{pair[0] for pair in pairs}),
+                'recursive free binding inventory differs')
+        require(len(mono)+len(pairs)+bool(evidence['self_uses']) <= MAX_CAPTURES,
+                'recursive carrier capture count exceeds 64')
+        captures = evidence.get('captures')
+        require(captures is not None and captures['policy'] == 'closed-scalar-shared-view-captures/1',
+                'recursive capture policy differs')
+        require([row['binding']['id'] for row in captures['scalars']] == sorted(mono),
+                'recursive scalar capture inventory differs')
+        for row in captures['scalars']:
+            ident = row['binding']['id']; typ = self.logical(row['type'],None)
+            source = env.get(ident)
+            require(typ in SCALARS.values() and isinstance(source,Reference) and source.logical == typ,
+                    'recursive ordinary capture must be an available closed scalar owner')
+            inner[ident] = source
+        keys = []
+        for row in captures['views']:
+            vector = tuple(self.logical(t,None) for t in row['arguments'])
+            require(all(t in SCALARS.values() for t in vector), 'recursive view vector must be closed Int/Bool')
+            pair = (row['binding']['id'],vector); keys.append(pair)
+            definition = self.def_by_binder.get(pair[0])
+            require(definition is not None and row['definition'] == definition['id'] and
+                    row['binding'] == definition['binding'] and len(vector) == len(definition['prefix']) and
+                    pair in pairs and row['uses'] == pairs[pair], 'recursive shared-view inventory differs')
+            typ = self.substitute(self.definition_types[definition['id']], 'S'+str(definition['id']),vector)
+            require(self.logical(row['instantiated_type'],None) == typ, 'recursive shared-view full type differs')
+            source = views.get(pair)
+            if source is not None:
+                require(isinstance(source,Reference) and source.logical == typ and source.carrier is not None,
+                        'recursive saved view is unavailable or has a different type')
+                saved[pair] = source
+            else:
+                source = env.get(pair[0])
+                require(isinstance(source,SchemeReference) and source.definition == definition['id'],
+                        'recursive shared view lacks its lexical Scheme owner')
+                inner[pair[0]] = source
+        require(keys == sorted(pairs), 'recursive complete-vector capture inventory differs')
+        return inner,saved
 
     def constructor(self, node, path, env, views, home, block, scope):
         require(scope is None, 'generic DATA construction unsupported')

@@ -53,6 +53,10 @@ explicitly annotated monomorphic recursive function without outside term
 captures. The exact annotation applications remain in the graph; generic,
 mutual, value/alias and second-group recursion stay rejected. The CLI arguments,
 default placement and fault policy are unchanged.
+[Stage14](../resource_ir_v8/README_STAGE14.md) permits that recursive function
+to capture closed Int/Bool owners and complete lexical shared views, retaining
+their actual Access/origin. It does not admit arbitrary ordinary callable or
+nominal captures, bare Schemes, partial vectors or additional recursive groups.
 See the [fragment contract](README.md) for its limits.
 
 For example, a closed callable field can use the same `SharedPoly.emlf` above:

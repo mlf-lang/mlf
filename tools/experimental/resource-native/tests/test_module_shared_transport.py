@@ -1430,9 +1430,12 @@ class MonomorphicRecursionReplayTests(unittest.TestCase):
         typ=arr(I,I);rhs=let(12,app(var(10),lit()),lam(11,I,var(11)))
         self.reject(rec_binding(10,typ,rhs,lit()),'RECURSION')
 
-    def test_external_lexical_capture_rejected(self):
+    def test_external_scalar_requires_explicit_capture_policy(self):
         raw=let(20,lit(),rec_binding(10,arr(I,I),lam(11,I,add(var(11),var(20))),lit()))
-        self.reject(raw,'RECURSION')
+        row=m.derive_shared_fragment(raw)['recursion']['bindings'][0]
+        self.assertEqual(row['free_term_bindings'],[20])
+        self.assertEqual(row['captures']['policy'],'closed-scalar-shared-view-captures/1')
+        self.assertEqual(row['captures']['scalars'][0]['binding'],name(20))
 
     def test_external_function_alias_cannot_be_a_wrapper(self):
         typ=arr(I,I)
@@ -1557,6 +1560,223 @@ class RetainedMonomorphicRecursionCaptureTests(unittest.TestCase):
         self.assertEqual(old_path.read_bytes(),old_bytes)
         old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
         self.assertEqual(old['fragment_error']['code'],'FRAGMENT')
+
+
+def captured_recursion():
+    """Synthetic Stage14 shape, not original source or runtime evidence."""
+    tree=monomorphic_recursion()
+    rec=tree['body']['body']
+    target=rec['bindings'][0]['value']['argument']
+    target['body']['alternatives'][1]['body']=add(app(use(1,I),var(60)),app(var(30),var(33)))
+    rec['body']=choose(app(use(1,B),boolean()),
+        add(app(var(30),ctor('Nil')),app(var(30),ctor('Cons',lit(0),ctor('Cons',lit(0),ctor('Nil'))))),lit(0))
+    tree['body']['body']=let(60,add(lit(20),lit(1)),rec)
+    return tree
+
+
+class RecursiveCaptureReplayTests(unittest.TestCase):
+    reject = ReplayTests.reject
+
+    def test_scalar_and_lexical_shared_view_are_distinct_capture_kinds(self):
+        tree=captured_recursion();out=m.derive_shared_fragment(tree)
+        self.assertEqual(out['raw_normalized'],tree)
+        row,=out['recursion']['bindings'];caps=row['captures']
+        self.assertEqual(row['free_term_bindings'],[1,60])
+        self.assertEqual(caps['policy'],'closed-scalar-shared-view-captures/1')
+        scalar,=caps['scalars'];view,=caps['views']
+        self.assertEqual(scalar['binding'],name(60));self.assertEqual(scalar['type'],I)
+        self.assertEqual([m._get(tree,a['path']) for a in scalar['occurrences']],[var(60)])
+        self.assertEqual(view,{'definition':0,'binding':name(1),'arguments':[I],
+                               'instantiated_type':arr(I,I),'uses':[0]})
+        self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I],[B]])
+        self.assertEqual(len(out['term_correspondence']),len(m._ordinary(tree)))
+        self.assertEqual(m.validate_shared_fragment(tree,out),out)
+
+    def test_capture_evidence_never_claims_access_origin_readiness_or_E0(self):
+        caps=m.derive_shared_fragment(captured_recursion())['recursion']['bindings'][0]['captures']
+        self.assertEqual(set(caps),{'policy','scalars','views'})
+        self.assertTrue(all(set(row)=={'binding','type','occurrences'} for row in caps['scalars']))
+        self.assertTrue(all(set(row)=={'definition','binding','arguments','instantiated_type','uses'}
+                            for row in caps['views']))
+
+    def test_closed_scalar_parameter_not_only_local_constant_is_admitted(self):
+        rhs=lam(11,I,choose(var(21),add(var(11),var(20)),app(var(10),var(11))))
+        raw=lam(20,I,lam(21,B,rec_binding(10,arr(I,I),rhs,lit())))
+        caps=m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']
+        self.assertEqual([(r['binding']['id'],r['type']) for r in caps['scalars']],[(20,I),(21,B)])
+        self.assertEqual(caps['views'],[])
+
+    def test_repeated_occurrences_share_one_scalar_and_one_full_pair(self):
+        tree=captured_recursion();rec=tree['body']['body']['body']
+        arm=rec['bindings'][0]['value']['argument']['body']['alternatives'][1]
+        arm['body']=add(app(use(1,I),var(60)),add(app(use(1,I),var(60)),app(var(30),var(33))))
+        caps=m.derive_shared_fragment(tree)['recursion']['bindings'][0]['captures']
+        self.assertEqual(len(caps['scalars']),1);self.assertEqual(len(caps['scalars'][0]['occurrences']),2)
+        self.assertEqual(len(caps['views']),1);self.assertEqual(caps['views'][0]['uses'],[0,1])
+
+    def test_full_unused_type_coordinates_not_collapsed_by_equal_arrow_type(self):
+        generic=tabs(100,tabs(101,lam(2,tv(100),var(2))))
+        rhs=lam(11,I,add(app(use(1,I,B),var(20)),add(app(use(1,I,I),var(20)),app(var(10),var(11)))))
+        raw=let(1,generic,let(20,lit(),rec_binding(10,arr(I,I),rhs,lit())))
+        views=m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']['views']
+        self.assertEqual([v['arguments'] for v in views],[[I,B],[I,I]])
+        self.assertEqual([v['instantiated_type'] for v in views],[arr(I,I),arr(I,I)])
+        self.assertEqual([v['uses'] for v in views],[[0],[1]])
+
+    def test_distinct_same_typed_definitions_remain_distinct(self):
+        first=tabs(100,lam(2,tv(100),var(2)));second=tabs(101,lam(4,tv(101),var(4)))
+        rhs=lam(11,I,add(app(use(1,I),var(11)),app(use(3,I),app(var(10),var(11)))))
+        raw=let(1,first,let(3,second,rec_binding(10,arr(I,I),rhs,lit())))
+        views=m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']['views']
+        self.assertEqual([(v['definition'],v['binding']['id'],v['arguments']) for v in views],
+                         [(0,1,[I]),(1,3,[I])])
+
+    def test_transitive_nested_carrier_and_unselected_arm_captures_count(self):
+        tree=captured_recursion();rec=tree['body']['body']['body']
+        arms=rec['bindings'][0]['value']['argument']['body']['alternatives']
+        arms[0]['body']=app(lam(70,I,app(use(1,I),var(60))),lit())
+        arms[1]['body']=app(var(30),var(33))
+        out=m.derive_shared_fragment(tree);caps=out['recursion']['bindings'][0]['captures']
+        self.assertEqual(caps['views'][0]['uses'],[0])
+        self.assertEqual(len(caps['scalars'][0]['occurrences']),1)
+        self.assertIn('alternatives',caps['scalars'][0]['occurrences'][0]['path'])
+        self.assertEqual(out['raw_normalized'],tree)
+
+    def test_local_binding_and_shared_definition_are_not_external_captures(self):
+        local=let(1,tabs(100,lam(2,tv(100),var(2))),app(use(1,I),app(var(10),var(11))))
+        raw=rec_binding(10,arr(I,I),lam(11,I,local),lit())
+        row=m.derive_shared_fragment(raw)['recursion']['bindings'][0]
+        self.assertEqual(row['free_term_bindings'],[]);self.assertNotIn('captures',row)
+
+    def test_ordinary_closed_callable_and_view_alias_are_still_rejected(self):
+        rhs=lam(11,I,app(var(20),app(var(10),var(11))))
+        self.reject(let(20,lam(21,I,var(21)),rec_binding(10,arr(I,I),rhs,lit())),'RECURSION')
+        self.reject(shared(let(20,use(1,I),rec_binding(10,arr(I,I),rhs,lit()))),'RECURSION')
+
+    def test_nominal_owner_is_not_an_admitted_external_capture(self):
+        rhs=lam(11,I,sum_case(var(20),[sum_arm('Nil',(),lit()),sum_arm('Cons',(21,22),var(21))]))
+        self.reject(with_data(let(20,ctor('Nil'),rec_binding(10,arr(I,I),rhs,lit())),recursive_decl()),
+                    'RECURSION')
+
+    def test_bare_partial_extra_and_open_shared_uses_remain_rejected(self):
+        generic=tabs(100,tabs(101,lam(2,tv(100),var(2))))
+        for value in (var(1),use(1,I),use(1,I,B,I)):
+            raw=let(1,generic,rec_binding(10,arr(I,I),lam(11,I,let(20,value,lit())),lit()))
+            self.reject(raw)
+        raw=let(1,generic,rec_binding(10,arr(I,I),lam(11,I,app(use(1,I,tv(500)),lit())),lit()))
+        self.reject(raw,'TYPE_SCOPE')
+
+    def test_rejected_wrapper_remains_rejected_even_with_legal_capture(self):
+        rhs=app(lam(12,I,lam(11,I,add(var(11),var(20)))),lit())
+        self.reject(let(20,lit(),rec_binding(10,arr(I,I),rhs,lit())),'RECURSION')
+
+    def test_complete_capture_metadata_and_paths_are_recomputed(self):
+        tree=captured_recursion();out=m.derive_shared_fragment(tree)
+        mutations=[lambda c:c.pop('policy'),lambda c:c.update(policy='capture-free'),
+                   lambda c:c['scalars'].clear(),lambda c:c['views'].clear(),
+                   lambda c:c['scalars'][0].update(type=B),
+                   lambda c:c['scalars'][0].update(binding=name(999)),
+                   lambda c:c['scalars'][0]['occurrences'].clear(),
+                   lambda c:c['views'][0].update(arguments=[B]),
+                   lambda c:c['views'][0].update(definition=1),
+                   lambda c:c['views'][0].update(instantiated_type=arr(B,B)),
+                   lambda c:c['views'][0].update(uses=[1])]
+        for index,mutate in enumerate(mutations):
+            forged=copy.deepcopy(out);mutate(forged['recursion']['bindings'][0]['captures'])
+            with self.subTest(index=index),self.assertRaises(m.SharedTransportError) as caught:
+                m.validate_shared_fragment(tree,forged)
+            self.assertEqual(caught.exception.code,'EVIDENCE')
+        forged=copy.deepcopy(out);forged['recursion']['bindings'][0]['free_term_bindings']=[60]
+        with self.assertRaises(m.SharedTransportError) as caught:m.validate_shared_fragment(tree,forged)
+        self.assertEqual(caught.exception.code,'EVIDENCE')
+
+    def test_64_capture_boundary_counts_the_used_self_owner(self):
+        def tree(count,self_use):
+            terms=[var(1000+i) for i in range(count)]
+            if self_use:terms.append(app(var(10),var(11)))
+            while len(terms)>1:
+                terms=[add(terms[i],terms[i+1]) if i+1<len(terms) else terms[i]
+                       for i in range(0,len(terms),2)]
+            raw=rec_binding(10,arr(I,I),lam(11,I,terms[0]),lit())
+            for i in reversed(range(count)):raw=let(1000+i,lit(i),raw)
+            return raw
+        for count,self_use in ((63,True),(64,False)):
+            with self.subTest(count=count,self_use=self_use):
+                row=m.derive_shared_fragment(tree(count,self_use))['recursion']['bindings'][0]
+                self.assertEqual(len(row['captures']['scalars']),count)
+                self.assertEqual(bool(row['self_uses']),self_use)
+        self.reject(tree(64,True),'LIMIT')
+
+    def test_capture_budget_counts_full_pairs_not_only_raw_binder_ids(self):
+        generic=tabs(100,tabs(101,lam(2,tv(100),var(2))))
+        rhs=lam(11,I,add(app(use(1,I,B),var(20)),add(app(use(1,I,I),var(20)),app(var(10),var(11)))))
+        raw=let(1,generic,let(20,lit(),rec_binding(10,arr(I,I),rhs,lit())))
+        with mock.patch.object(m,'MAX_RECURSIVE_CAPTURES',4):
+            row=m.derive_shared_fragment(raw)['recursion']['bindings'][0]
+            self.assertEqual(row['free_term_bindings'],[1,20])
+            self.assertEqual(len(row['captures']['views']),2)
+        with mock.patch.object(m,'MAX_RECURSIVE_CAPTURES',3):self.reject(raw,'LIMIT')
+
+    def test_existing_stage13_complete_replay_goldens_unchanged(self):
+        hashes={0:'da32812f57716ed8199d802e635c5634d5449520dab21b543fccb56818a18f57',
+                1:'63c908e0c7573a6a2f77554b5bbdd3e2f2f4971965fb4e87a411dcc81f66bf91',
+                8:'5b38fe3ce4b83106627557f8ccd87fb65a518ff47799d023d1f4901ce66d5a0b'}
+        for wrappers,expected in hashes.items():
+            with self.subTest(wrappers=wrappers):
+                out=m.derive_shared_fragment(monomorphic_recursion(wrappers))
+                self.assertNotIn('captures',out['recursion']['bindings'][0])
+                self.assertEqual(hashlib.sha256(m._json(out).encode()).hexdigest(),expected)
+
+
+RECURSIVE_CAPTURE_ROOT=os.environ.get('IR8_RECURSIVE_CAPTURE_ROOT')
+
+
+@unittest.skipUnless(RECURSIVE_CAPTURE_ROOT,'set IR8_RECURSIVE_CAPTURE_ROOT for completed captured-recursion source')
+class RetainedRecursiveCaptureTests(unittest.TestCase):
+    def test_genuine_custody_raw_proofs_and_exact_free_scalar_view_partition(self):
+        from source_capture_v8 import verify_capture
+        root=Path(RECURSIVE_CAPTURE_ROOT).resolve();path=root/'capture-captured-sum01'/'capture.stdout'
+        old_path=path.parent/'verification.json';old_bytes=old_path.read_bytes()
+        report=verify_capture(path,fixture_root=root/'inputs'/'captured-sum',entry='main.emlf',
+            expected_source_hashes={
+                'main.emlf':'628d6a3d5f6f4dae9b6f64a9fa0a9e8ccc5ccc6bf06d9b8188cd31c1e5d5029c',
+                'SharedPoly.emlf':'50fd7fa662c9290a61b0a69012cd2e886a44075de9827dff4edd3f0c839573a7'},
+            expected_capture_sha256='fc0f27b7e2841aa98e3219defc3df75a159595093463949c2942cbdeac2e28fb')
+        self.assertTrue(report['fragment_admitted'])
+        self.assertFalse(report['source_admitted']);self.assertFalse(report['native_admitted'])
+        capture=json.loads(path.read_bytes());out=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+        self.assertEqual(out['steps'],capture['normalization']['steps'])
+        self.assertEqual(out['raw_normalized'],capture['normalization']['raw_normalized'])
+        self.assertEqual(out['checked_type'],I);self.assertEqual(len(out['steps']),2)
+        self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I],[B]])
+        definition,=out['polymorphism']['definitions'];join,=report['retained_prefix_binding_joins']
+        self.assertEqual(definition['binding'],join['binding'])
+        self.assertEqual(join['resolver_allocation']['entity'],
+            {'namespace':'terms','owner':'SharedPoly','role':{'tag':'value'},'spelling':'sharedId'})
+        row,=out['recursion']['bindings'];caps=row['captures'];scalar,=caps['scalars'];view,=caps['views']
+        raw=out['raw_normalized'];shared_let=m._get(raw,definition['binding_source']['path'])
+        bonus=shared_let['body'];self.assertEqual(bonus['tag'],'let')
+        self.assertEqual(bonus['value']['tag'],'application')
+        self.assertEqual(scalar['binding'],bonus['name']);self.assertEqual(scalar['type'],I)
+        self.assertEqual(view['binding'],definition['binding']);self.assertEqual(view['definition'],definition['id'])
+        self.assertEqual(view['arguments'],[I]);self.assertEqual(view['instantiated_type'],arr(I,I))
+        self.assertEqual(view['uses'],[out['polymorphism']['uses'][0]['id']])
+        self.assertEqual(row['free_term_bindings'],sorted([bonus['name']['id'],definition['binding']['id']]))
+        rhs=m._get(raw,row['rhs']['path']);target=m._get(raw,row['function_source']['path'])
+        self.assertEqual(rhs['tag'],'application');self.assertEqual(target,rhs['argument'])
+        self.assertEqual(rhs['function']['body'],{'tag':'var','name':rhs['function']['parameter']})
+        self.assertEqual(target['body']['tag'],'let');self.assertEqual(target['body']['value']['tag'],'application')
+        case_row,=out['nominal_sum']['cases'];nil,cons=case_row['arms']
+        self.assertEqual(m._get(raw,nil['body']['path']),lit(0))
+        cons_path=cons['body']['path'];occ=scalar['occurrences'][0]['path']
+        self.assertEqual(occ[:len(cons_path)],cons_path)
+        self.assertEqual(m._get(raw,occ),{'tag':'var','name':bonus['name']})
+        self.assertEqual(len(row['self_uses']),1)
+        self.assertEqual(m._get(raw,row['self_uses'][0]['path']),{'tag':'var','name':row['binding']})
+        # Static absence from Nil is not a claim about actual runtime demand.
+        self.assertEqual(old_path.read_bytes(),old_bytes)
+        old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
+        self.assertEqual(old['fragment_error']['code'],'RECURSION')
 
 
 if __name__ == '__main__':

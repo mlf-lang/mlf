@@ -48,7 +48,11 @@ preserved declaration automatically.
 [Stage13](../resource_ir_v8/README_STAGE13.md) adds one explicitly annotated,
 closed monomorphic recursive function with no outside term captures, using the
 existing typed hole/fill protocol. Generic, mutual and recursive value bindings
-remain rejected. Historical stage sections retain their earlier scope below.
+remain rejected. [Stage14](../resource_ir_v8/README_STAGE14.md) extends that
+single concrete recursive function to closed scalar owners and complete lexical
+shared views, preserving each capture's own Access/origin. Ordinary callable and
+nominal captures remain outside this slice. Historical stage sections retain
+their earlier scope below.
 
 ## Stage08: closed DATA and callable fields
 
@@ -314,17 +318,22 @@ python3 -B tools/experimental/resource-native/tests/test_planner_v8_recursive_su
 
 python3 -B tools/experimental/resource-native/tests/test_planner_v8_monomorphic_recursion.py
 
+python3 -B tools/experimental/resource-native/tests/test_planner_v8_recursive_captures.py
+
 CC=gcc IR8_PLANNER_NATIVE=1 \
 IR8_PLANNER_NATIVE_OUTPUT=/tmp/ir8-planner-native-fresh \
 python3 -B tools/experimental/resource-native/tests/test_planner_v8.py
 ```
 
-The fragment suite now has 140 unittest cases, including three optional retained
+The fragment suite now has 157 unittest cases, including four optional retained
 capture tests. They require `IR8_SUM_CAPTURE_ROOT`,
-`IR8_RECURSIVE_SUM_CAPTURE_ROOT` and `IR8_MONOMORPHIC_RECURSION_CAPTURE_ROOT`
-respectively; all three are skipped in CI, which separately runs the fresh
-source suites. The monomorphic-recursion planner suite has eight checks,
-including one optional retained-capture check using the same third variable.
+`IR8_RECURSIVE_SUM_CAPTURE_ROOT`, `IR8_MONOMORPHIC_RECURSION_CAPTURE_ROOT` and
+`IR8_RECURSIVE_CAPTURES_ROOT` respectively; all four are skipped in CI, which
+separately runs the fresh source suites. The monomorphic-recursion planner suite
+has eight checks, including one optional retained-capture check using the third
+variable. The recursive-captures planner suite has 11 checks, with two optional
+checks using the third/fourth variables for prior-plan preservation and the new
+capture. These optional host checks do not build a new compiler or source target.
 The original planner suite has 20 unittest
 cases;
 its final test runs five native fragment subcases: pending shared RHS, nested
