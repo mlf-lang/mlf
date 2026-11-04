@@ -942,7 +942,7 @@ module Bootstrap.SourceInference where {
   data PlanGraph = NamedPlan ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,,) String (Maybe SAnnotation) SExpr)) ([] ([] String)) |
     IndexedPlan Dependency.Symbols (V.IndexVec Declaration PlannedBinding)
-      ([] (V.Index Declaration)) ([] (V.Index Declaration)) ([] ([] (V.Index Declaration)));
+      ([] (V.Index Declaration)) ([] (V.Index Declaration)) ([] ([] ((,) (V.Index Declaration) Bool)));
   data SourcePlan = SourcePlan Classes.ClassInventory PlanGraph
     Int (Set String) (Map String SType) (Either String Inference.LoweredDeclarations)
     ([] ((,) String SInstanceDecl)) (Map String Bool);
@@ -964,7 +964,7 @@ module Bootstrap.SourceInference where {
   };
   planGroups plan = case planGraph plan of {
     NamedPlan _ _ groups -> groups;
-    IndexedPlan symbols _ _ _ groups -> map (map (Dependency.symbolName symbols)) groups
+    IndexedPlan symbols _ _ _ groups -> map (map (compose (Dependency.symbolName symbols) fst)) groups
   };
   planData plan = case planInventory plan of {
     Classes.ClassInventory ds _ _ _ _ _ _ _ _ -> ds
@@ -1036,8 +1036,7 @@ module Bootstrap.SourceInference where {
           source i = V.toInt i < baseCount;
           -- Groups are in lexical SCC order. Each input's ordinal recovers
           -- its original declaration order when preparing a multi-member SCC.
-          ids = map (map fst) groups;
-          mixed group = any source group && any (compose not source) group;
+          mixed group = any (compose source fst) group && any (compose (compose not source) fst) group;
           sourceRow ordinal (Dependency.Bound i annotation rhs) = (,) i (PlannedSource ordinal annotation rhs);
           supportRow i ((,,) _ annotation rhs) = (,) i (PlannedSupport (V.toInt i - baseCount) annotation rhs);
           entries = append (mapIndexed sourceRow members) (zipWith supportRow generated supports);
@@ -1045,7 +1044,7 @@ module Bootstrap.SourceInference where {
             stBind (ST.map_ (\((,) i row) -> V.set table i row) entries) (\_ -> V.freeze table)));
           copied (Dependency.Bound _ _ rhs) = copiedSource rhs
     };
-    Right (if any mixed ids || any copied members then Nothing else Just (IndexedPlan symbols rows sources generated ids))
+    Right (if any mixed groups || any copied members then Nothing else Just (IndexedPlan symbols rows sources generated groups))
   };
   copiedSource term = case term of {
     R.SourceDefinition _ -> True; R.CallSite _ _ b -> copiedSource b;
@@ -1109,9 +1108,13 @@ module Bootstrap.SourceInference where {
     PreparedGroup original lowered bindings registry specs authority
       (parameterProtection contracts bindings);
   eligibleSource :: [] ((,,) String (Maybe SAnnotation) SExpr) -> Bool;
-  eligibleSource members = case members of {
+  eligibleSource members = eligibleSourceWith (case members of {
+    [(,,) name _ rhs] -> elem eqString name (Surface.freeNames rhs);
+    _ -> False
+  }) members;
+  eligibleSourceWith selfReference members = case members of {
     (:) ((,,) name Nothing rhs) [] ->
-      not (isCopied rhs) && not (elem eqString name (Surface.freeNames rhs)) &&
+      not (isCopied rhs) && not selfReference &&
       null (Classes.sourceDeclaredClasses Nothing rhs);
     _ -> False
   };
@@ -1126,12 +1129,14 @@ module Bootstrap.SourceInference where {
   planSteps plan = case planGraph plan of {
     NamedPlan _ _ groups -> map (\names -> (,) names (\contracts -> prepareGroupSparse plan contracts names)) groups;
     IndexedPlan symbols rows _ _ groups -> let {
-      step ids = let {
+      step group = let {
+        ids = map fst group;
         names = map (Dependency.symbolName symbols) ids;
         entries = sortBy (\a b -> compareInt (fst a) (fst b)) (map (namedBinding symbols rows) ids);
         members = map snd entries;
         support = case ids of { (:) i _ -> case V.at rows i of { PlannedSupport _ _ _ -> True; _ -> False }; [] -> False };
-        prepare contracts = prepareGroupWithViews selectedContractBindings plan contracts names
+        prepare contracts = prepareGroupWithReservation selectedContractBindings Nothing
+          (eligibleSourceWith (any snd group)) plan contracts names
           (if support then [] else members) (if support then members else [])
           (contractOverloads contracts) (M.map contractProtected contracts)
       } in (,) names prepare
@@ -1176,7 +1181,7 @@ module Bootstrap.SourceInference where {
   prepareGroupOwned :: OwnedSourceContext -> SourcePlan -> Map String SourceContract ->
     [] String -> Either String PreparedGroup;
   prepareGroupOwned (OwnedSourceContext sources supports overloads protected used) plan contracts names =
-    prepareGroupWithReservation selectedContractBindings (Just used) plan contracts names
+    prepareGroupWithReservation selectedContractBindings (Just used) eligibleSource plan contracts names
       (indexedSourceDeclarations sources names) (indexedSourceDeclarations supports names)
       overloads protected;
   prepareGroupUsing selectBindings plan contracts names =
@@ -1184,8 +1189,8 @@ module Bootstrap.SourceInference where {
       (filter (\member -> elem eqString (sourceName member) names) (planSources plan))
       (filter (\member -> elem eqString (sourceName member) names) (planSupports plan))
       (contractOverloads contracts) (M.map contractProtected contracts);
-  prepareGroupWithViews selectBindings = prepareGroupWithReservation selectBindings Nothing;
-  prepareGroupWithReservation selectBindings reserved (SourcePlan inventory _ count used _ _ _ supportProtection)
+  prepareGroupWithViews selectBindings = prepareGroupWithReservation selectBindings Nothing eligibleSource;
+  prepareGroupWithReservation selectBindings reserved eligible (SourcePlan inventory _ count used _ _ _ supportProtection)
     contracts names original support overloads protected = do {
     ensure (length original + length support == length names) "source SCC ownership mismatch";
     traverseEither (\name -> ensure (not (M.member compareString name contracts))
@@ -1201,7 +1206,7 @@ module Bootstrap.SourceInference where {
       Right (makePreparedUsing selectBindings support support registry specs Nothing contracts)
     } else do {
       outcome <- runFreshState
-        (if eligibleSource original then case original of {
+        (if eligible original then case original of {
           (:) ((,,) name Nothing rhs) [] -> do {
             lowered <- (case reserved of {
               Nothing -> Classes.lowerUnsignedSourceRootProtected;

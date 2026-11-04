@@ -134,7 +134,7 @@
         "Bootstrap/QueryGraph.hs": "070676a9de797d00322e4b5cb31b7ba153d8b152d6f1e6d458050aafb0241f42",
         "Bootstrap/Separate.hs": "167d3e42ef9b8aa3b8955cfe93210e84528ca7b4768d571f60e27603b669e5ae",
         "Bootstrap/SourceEquality.hs": "031ca10290b4b6bce9526c65fc6cbcea096def8df17fd6e9333710480d52077a",
-        "Bootstrap/SourceInference.hs": "c1615aaf191a4e498a3d0dfe9dc5ebd45df84cd186e27073d841e245165f2957",
+        "Bootstrap/SourceInference.hs": "d6c5df08746318f8a98940cbdac1ff464b208de5345e5b2c311e633f88f24da7",
         "Bootstrap/SourceUnit.hs": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f"
       },
       "version": "0.3.0"
@@ -202,7 +202,7 @@
       "name": "mlf-compiler",
       "path": ".",
       "sources": {
-        "bootstrap/MLF/BuiltinPreludeData.hs": "8ea7517ecaf4726badce308ec7e5b4e3234b289b4a569f3aa863085813155b55",
+        "bootstrap/MLF/BuiltinPreludeData.hs": "395fa64222ab90dcaed0340fff6c46b35805bab5d4f0cc9f61e6c4351e39b2bd",
         "bootstrap/MLF/Entry/BuiltinPrelude.hs": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
         "bootstrap/MLF/Entry/Emlf.hs": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
         "bootstrap/MLF/NativeBuild.hs": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",

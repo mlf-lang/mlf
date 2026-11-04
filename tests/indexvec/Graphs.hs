@@ -247,6 +247,15 @@ resolverChecks = do
     _ -> error ("missing colliding-name fixture edge " ++ show [(V.toInt i,map V.toInt (R.references rhs)) | D.Bound i _ rhs <- entries])
   (_,active) <- right (D.resolvedGroups matching [] M.empty M.empty)
   check "external reference cannot induce self recursion" [[False]] (map (map snd) active)
+  -- The external reference prints as the local declaration. Its distinct
+  -- slot still selects the nonrecursive unsigned source path.
+  collisionPlan <- right (Source.indexedPlan matching [] M.empty M.empty)
+  case collisionPlan of
+    T.Just (Source.IndexedPlan table rows _ _ [[(slot,recursive)]]) -> do
+      let declaration = snd (Source.namedBinding table rows slot)
+      check "projected name alone would misclassify the external" False (Source.eligibleSource [declaration])
+      check "resolved edge is authoritative for source eligibility" True (Source.eligibleSourceWith recursive [declaration])
+    _ -> error "collision did not produce a singleton source plan"
   lib <- parsed ("ZLib","module ZLib (value) where\nvalue = 41\n")
   client <- parsed ("Client","module Client where\nimport qualified ZLib as L\nanswer = L.value\n")
   let entity = Modules.Entity "ZLib" "value" Modules.Value
@@ -347,8 +356,8 @@ resolverChecks = do
   case plan of
     T.Just (Source.IndexedPlan symbols table ids [] [members]) -> do
       check "plan source order" ["Z","B"] (map (H.unpack . D.symbolName symbols) ids)
-      check "plan SCC lexical order" ["B","Z"] (map (H.unpack . D.symbolName symbols) members)
-      let rows = map (Source.namedBinding symbols table) members
+      check "plan SCC lexical order" ["B","Z"] (map (H.unpack . D.symbolName symbols . fst) members)
+      let rows = map (Source.namedBinding symbols table . fst) members
       check "selected rows retain original ordinals" [(1,"B"),(0,"Z")]
         [(ordinal,H.unpack n) | (ordinal,(n,_,_)) <- rows]
     _ -> error "resolved query plan lost its indexed rows"
