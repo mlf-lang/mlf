@@ -10,6 +10,8 @@ constructor payloads and whole cases remain lazy ordinary term graphs.
 Closed scalar/self-atom SUM uses selected-only Int-result arm factories, with
 all arms checked and their exact declaration/source identities retained. A self
 field is the same finite nominal identity, never a recursively expanded type.
+One concrete monomorphic recursive function can use an owned, coarse typed
+hole. Its complete checked RHS graph remains lazy; no wrapper is contracted.
 """
 from __future__ import annotations
 
@@ -82,8 +84,17 @@ class Planner:
         require(type(data_groups) is bool, 'data_groups must be a boolean')
         self.data_groups = data_groups
         self.group_map = []
+        self.knot_map = []
+        self.knot_depth = 0
         self.fragment = fragment
         self.root = fragment['raw_normalized']
+        recursion = fragment.get('recursion')
+        self.recursion_rows = {}
+        if recursion is not None:
+            require(recursion['policy'] == 'closed-single-function-recursion/1' and
+                    len(recursion['bindings']) == 1, 'recursive function evidence differs')
+            row = recursion['bindings'][0]
+            self.recursion_rows[tuple(row['source']['path'])] = row
         self.work = self.instructions = self.variables = self.code_count = 0
         self.types = {}; self.type_names = {}; self.signatures = {}; self.signature_names = {}
         self.functions = {}; self.codes = {}; self.schemes = {}; self.instantiations = {}
@@ -238,7 +249,7 @@ class Planner:
         self.tick(); require(self.instructions < MAX_INSTRUCTIONS, 'instruction limit')
         path = block.path(len(block.body)); self.instructions += 1; block.body.append(instruction)
         if instruction['op'] in ('scalar', 'closure', 'application', 'thunk', 'prim2', 'alloc',
-                                  'construct_nullary', 'construct_sum'):
+                                  'construct_nullary', 'construct_sum', 'hole'):
             require(source is not None and logical is not None, 'allocation correspondence missing')
             require(len(self.allocation_map) + self.code_count < MAX_CODES, 'combined Site/Code limit')
             self.allocation_map.append({'source': address(source), 'instruction': path,
@@ -260,10 +271,11 @@ class Planner:
         if not self.data_groups:
             return home, False, None
         self.tick(1 + len(support))
-        split = scope is None and eligible and all(r.strict for r in support)
+        split = not self.knot_depth and scope is None and eligible and all(r.strict for r in support)
         row = {'source': address(path), 'kind': kind, 'home': home,
                'strategy': 'fresh-below' if split else 'same-home',
-               'reason': ('all-support-strict' if split else 'generic-body-coarse' if scope is not None
+               'reason': ('all-support-strict' if split else 'recursive-knot-coarse' if self.knot_depth
+                          else 'generic-body-coarse' if scope is not None
                           else 'captured-closure-coarse' if not eligible else 'support-only-down'),
                'support': [{'reference': r.variable, 'strict': r.strict} for r in support]}
         key = home
@@ -334,6 +346,12 @@ class Planner:
             if tag == 'let':
                 if p not in self.def_by_path: visit(n['value'], p+('value',), local)
                 visit(n['body'], p+('body',), local | {n['name']['id']}); return
+            if tag == 'letrec':
+                require(len(n['bindings']) == 1, 'recursive group must be singleton')
+                binding = n['bindings'][0]
+                inside = local | {binding['name']['id']}
+                visit(binding['value'], p+('bindings','0','value'), inside)
+                visit(n['body'], p+('body',), inside); return
             if tag == 'application':
                 visit(n['function'], p+('function',), local); visit(n['argument'], p+('argument',), local); return
             if tag == 'case':
@@ -433,6 +451,8 @@ class Planner:
             ref = env.get(node['name']['id']); require(isinstance(ref,Reference), 'ordinary variable cannot be Scheme')
             out=self.fresh(); self.add(block,op='retain',out=out,value=ref.variable)
             return Reference(out,ref.logical,strict=ref.strict)
+        if tag == 'letrec':
+            return self.recursive(node, path, env, views, home, block, scope)
         if tag == 'let':
             d = self.def_by_path.get(path)
             if d is not None:
@@ -485,6 +505,59 @@ class Planner:
             self.close_builder(key,split,placement,block)
             return Reference(out,typ,strict=split)
         raise PlanningError('unsupported planning constructor: '+tag)
+
+    def recursive(self, node, path, env, views, home, block, scope):
+        """Construct one concrete function knot without demand or code shortcuts.
+
+        Transport independently checks the admitted RHS function spine. Its
+        ordinary wrapper applications must still be constructed and filled as
+        the actual RHS root, not replaced by the lambda at the spine's end.
+        """
+        require(scope is None and not self.knot_map and len(node['bindings']) == 1,
+                'only one concrete singleton recursive function is supported')
+        binding = node['bindings'][0]; ident = binding['name']['id']
+        require(ident not in env, 'recursive binder already in lexical scope')
+        typ = self.logical(binding['type'], None)
+        require(typ[0] == 'arrow' and typ[3:] == ('repeat','unknown'),
+                'recursive binding requires a closed Repeat/unknown arrow')
+        rhs_path = path+('bindings','0','value')
+        evidence = self.recursion_rows.get(path)
+        require(evidence is not None and evidence['source'] == address(path) and
+                evidence['binding_source'] == address(path+('bindings','0')) and
+                evidence['binding'] == binding['name'] and evidence['type'] == binding['type'] and
+                evidence['rhs'] == address(rhs_path) and evidence['body'] == address(path+('body',)) and
+                evidence['free_term_bindings'] == [], 'recursive source evidence differs')
+        mono,pairs = self.needed(binding['value'],rhs_path,frozenset((ident,)))
+        require(not mono and not pairs, 'recursive RHS has external captures')
+        row = {'source':address(path), 'binding_source':address(path+('bindings','0')),
+               'binder':binding['name'], 'logical_type':self.type_name(typ),
+               'rhs':address(rhs_path), 'body':address(path+('body',)),
+               'function_source':evidence['function_source'], 'wrappers':evidence['wrappers'],
+               'self_uses':evidence['self_uses'],
+               'home':home, 'type_scope':None}
+        self.knot_map.append(row)
+        hole = self.fresh('hole'); self_owner = self.fresh('self')
+        row['hole'] = self.add(block,path,typ,op='hole',out=hole,**{'in':home},layout=self.layout(typ))
+        row['retain_self'] = self.add(block,op='retain',out=self_owner,value=hole)
+        row['hole_owner'] = hole; row['self_owner'] = self_owner
+        # The retained owner carries no fill ticket. The original remains local
+        # until exactly one Fill, before any letrec-body demand can be emitted.
+        self.knot_depth += 1
+        try:
+            rhs = self.emit(binding['value'],rhs_path,
+                            {ident:Reference(self_owner,typ)}, {},home,block,None)
+        finally:
+            self.knot_depth -= 1
+        require(rhs.logical == typ, 'recursive RHS differs from its full annotation')
+        row['rhs_owner'] = rhs.variable
+        row['fill'] = self.add(block,op='fill',hole=hole,value=rhs.variable)
+        row['drop_rhs'] = self.add(block,op='drop',value=rhs.variable)
+        row['drop_self'] = self.add(block,op='drop',value=self_owner)
+        result = self.emit(node['body'],path+('body',),
+                           env|{ident:Reference(hole,typ)},views,home,block,None)
+        row['body_result'] = result.variable
+        row['drop_hole'] = self.add(block,op='drop',value=hole)
+        return result
 
     def constructor(self, node, path, env, views, home, block, scope):
         require(scope is None, 'generic DATA construction unsupported')
@@ -750,6 +823,7 @@ class Planner:
         expected={tuple(r['normalized']['path']):r['tag'] for r in self.fragment['term_correspondence']}
         require({p:r['tag'] for p,r in self.term_map.items()}==expected, 'ordinary node coverage differs from independent correspondence')
         require(sorted(r['use'] for r in self.use_map)==list(range(len(self.uses))), 'missing/repeated lowered shared occurrence')
+        require(len(self.knot_map) == len(self.recursion_rows), 'missing/repeated recursive source occurrence')
         program={'version':8,'layouts':self.layouts,'families':self.families,'signatures':self.signatures,'types':self.types,
                  'schemes':self.schemes,'instantiations':self.instantiations,'functions':self.functions,
                  'codes':self.codes,'entry':block.body}
@@ -766,6 +840,8 @@ class Planner:
                               sum_case_map=self.sum_case_map)
         if self.data_groups:
             source_map['group_map'] = self.group_map
+        if self.knot_map:
+            source_map['knot_map'] = self.knot_map
         encoded=json.dumps(program,sort_keys=True,separators=(',',':'),ensure_ascii=False)
         result={'program':program,'binding':{'status':'candidate-not-resource-checked','fragment_only':True,
                 'source_admitted':False,'ordinary_K_checked':False,

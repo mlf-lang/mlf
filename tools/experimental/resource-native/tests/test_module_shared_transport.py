@@ -314,7 +314,7 @@ class ReplayTests(unittest.TestCase):
 
     def test_recursive_generic_rejected(self):
         tree = {'tag': 'letrec', 'bindings': [{'name': name(1), 'type': forall(100, arr(tv(100), tv(100))), 'value': identity()}], 'body': lit()}
-        self.reject(tree, 'FRAGMENT')
+        self.reject(tree, 'RECURSION')
 
     def test_generic_scalar_primitive_rejected(self):
         rhs = tabs(100, lam(2, tv(100), add(lit(20), lit(22))))
@@ -1146,7 +1146,7 @@ class SelfRecursiveSumReplayTests(unittest.TestCase):
     def test_finite_type_atom_does_not_authorize_letrec_or_forward_self_use(self):
         d = recursive_decl()
         self.reject(with_data({'tag':'letrec', 'bindings':[{'name':name(10),
-            'type':nominal_type('Chain'), 'value':ctor('Cons',lit(),var(10))}], 'body':lit()}, d), 'FRAGMENT')
+            'type':nominal_type('Chain'), 'value':ctor('Cons',lit(),var(10))}], 'body':lit()}, d), 'RECURSION')
         self.reject(with_data(let(10, ctor('Cons',lit(),var(10)),lit()),d), 'SCHEMA')
 
     def test_generic_nominal_result_or_argument_and_nominal_use_still_rejected(self):
@@ -1302,6 +1302,261 @@ class GenuineSelfRecursiveSumCaptureTests(unittest.TestCase):
                 # Original rejection files are historical and remain untouched.
                 old=json.loads((path.parent/'verification.json').read_bytes())
                 self.assertFalse(old['fragment_admitted']);self.assertEqual(old['fragment_error']['code'],'NOMINAL')
+
+
+# Scope/path helpers are tested independently of recursive-function admission.
+def rec_binding(i, typ, value, body):
+    return {'tag':'letrec','bindings':[{'name':name(i),'type':typ,'value':value}],'body':body}
+
+
+class RecursiveTraversalTests(unittest.TestCase):
+    def test_recursive_rhs_then_body_paths_are_canonical_strings(self):
+        raw=rec_binding(10,arr(I,I),lam(11,I,app(var(10),var(11))),app(var(10),lit()))
+        children=m._children(raw)
+        self.assertEqual([path for path,_ in children],[('bindings','0','value'),('body',)])
+        self.assertEqual([path for path,_ in m._walk(raw)][:4],
+                         [(),('bindings','0','value'),('bindings','0','value','body'),
+                          ('bindings','0','value','body','function')])
+        self.assertEqual(m._get(raw,['bindings','0','value']),raw['bindings'][0]['value'])
+
+    def test_recursive_binder_scopes_rhs_and_body_but_not_external_names(self):
+        raw=rec_binding(10,arr(I,I),lam(11,I,add(app(var(10),var(11)),var(20))),var(10))
+        self.assertEqual(m._free_terms(raw),{20})
+        self.assertEqual(m._free_terms(raw['bindings'][0]['value']),{10,20})
+        self.assertEqual(m._free_terms(let(10,var(10),var(10))),{10})
+
+    def test_ordinary_recursion_paths_preserve_all_wrapper_nodes(self):
+        typ=arr(I,I);wrapped=app(lam(12,typ,var(12)),lam(11,I,app(var(10),var(11))))
+        raw=rec_binding(10,typ,tapp(wrapped,R),app(var(10),lit()))
+        rows=m._ordinary(raw)
+        self.assertEqual(rows[0],((),(),'letrec'))
+        self.assertIn((('bindings','0','value','value'),('bindings','0','value'),'application'),rows)
+        self.assertIn((('bindings','0','value','value','function'),
+                       ('bindings','0','value','function'),'lambda'),rows)
+        self.assertEqual(len(rows),len(m._ordinary(p.erase_total(raw))))
+
+    def test_existing_type_substitution_covers_recursive_annotation_and_rhs_proof(self):
+        typ=arr(tv(100),tv(100))
+        proof=inst(tv(100));raw=rec_binding(10,typ,lam(11,tv(100),
+            app(var(10),tapp(tabs(101,var(11)),proof))),app(var(10),var(20)))
+        out=m.fragment.substitute_closed_term(raw,100,I)
+        self.assertEqual(out['bindings'][0]['type'],arr(I,I))
+        self.assertEqual(out['bindings'][0]['value']['parameter_type'],I)
+        self.assertEqual(out['bindings'][0]['value']['body']['argument']['witness'],inst(I))
+        self.assertEqual(out['body'],raw['body'])
+
+
+def monomorphic_recursion(wrappers=1):
+    """Synthetic finite input graph; never evaluated by these host tests."""
+    typ=arr(nominal_type('Chain'),I)
+    body=sum_case(var(31),[sum_arm('Nil',(),lit(0)),
+        sum_arm('Cons',(32,33),add(var(32),app(var(30),var(33))))])
+    rhs=lam(31,nominal_type('Chain'),body)
+    for index in range(wrappers):
+        rhs=app(lam(40+index,typ,var(40+index)),rhs)
+    answer=app(var(30),ctor('Cons',var(50),ctor('Cons',var(50),ctor('Nil'))))
+    continuation=let(50,add(lit(20),lit(1)),
+        choose(app(use(1,B),boolean()),app(use(1,I),answer),lit(0)))
+    return with_data(shared(rec_binding(30,typ,rhs,continuation)),recursive_decl())
+
+
+class MonomorphicRecursionReplayTests(unittest.TestCase):
+    reject = ReplayTests.reject
+
+    def test_actual_function_introduction_and_wrappers_remain_full_graph(self):
+        tree=monomorphic_recursion();out=m.derive_shared_fragment(tree)
+        self.assertEqual(out['raw_normalized'],tree)
+        self.assertEqual(out['input_erased'],p.erase_total(tree))
+        self.assertEqual(out['recursion']['policy'],'closed-single-function-recursion/1')
+        row,=out['recursion']['bindings'];self.assertEqual(row['binding'],name(30))
+        self.assertEqual(row['source']['path'],['body','body'])
+        self.assertEqual(row['binding_source']['path'],['body','body','bindings','0'])
+        rhs=m._get(tree,row['rhs']['path']);fn=m._get(tree,row['function_source']['path'])
+        self.assertEqual(rhs['tag'],'application');self.assertEqual(fn['tag'],'lambda')
+        self.assertEqual(len(row['wrappers']),1);self.assertEqual(row['free_term_bindings'],[])
+        self.assertEqual(len(row['self_uses']),1)
+        self.assertEqual(m._get(tree,row['self_uses'][0]['path']),var(30))
+        self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[B],[I]])
+        self.assertEqual(len(out['polymorphism']['definitions']),1)
+        self.assertEqual(len(out['term_correspondence']),len(m._ordinary(tree)))
+        self.assertEqual(m.validate_shared_fragment(tree,out),out)
+
+    def test_bare_lambda_and_eight_wrappers_admitted_nine_rejected(self):
+        for count in (0,8):
+            with self.subTest(count=count):
+                tree=monomorphic_recursion(count);out=m.derive_shared_fragment(tree)
+                self.assertEqual(out['raw_normalized'],tree)
+                self.assertEqual(len(out['recursion']['bindings'][0]['wrappers']),count)
+        self.reject(monomorphic_recursion(9),'LIMIT')
+
+    def test_ids_and_hints_do_not_select_the_admission_rule(self):
+        tree=monomorphic_recursion()
+        for _,node in m._walk(tree):
+            for key in ('name','parameter'):
+                if type(node.get(key)) is dict and 'id' in node[key]:
+                    node[key]={'id':node[key]['id']+10000,'hint':'unrelated'}
+            if node['tag']=='letrec':
+                for binding in node['bindings']:
+                    binding['name']={'id':binding['name']['id']+10000,'hint':'unrelated'}
+            if node['tag']=='case':
+                for arm in node['alternatives']:
+                    arm['pattern']['fields']=[None if b is None else
+                        {'id':b['id']+10000,'hint':'unrelated'} for b in arm['pattern']['fields']]
+        out=m.derive_shared_fragment(tree)
+        self.assertEqual(out['recursion']['bindings'][0]['binding'],{'id':10030,'hint':'unrelated'})
+        self.assertEqual(out['raw_normalized'],tree)
+
+    def test_scalar_function_is_structural_not_hardcoded_nominal_family(self):
+        raw=rec_binding(10,arr(I,I),lam(11,I,app(var(10),var(11))),app(var(10),lit()))
+        out=m.derive_shared_fragment(raw)
+        self.assertEqual(out['recursion']['bindings'][0]['type'],arr(I,I))
+        self.assertNotIn('nominal_sum',out)
+        # This is not a termination proof; the synthetic term is not evaluated.
+
+    def test_alias_and_passthrough_applied_to_alias_rejected(self):
+        typ=arr(I,I)
+        for rhs in (var(10),app(lam(12,typ,var(12)),var(10))):
+            with self.subTest(rhs=rhs):
+                self.reject(rec_binding(10,typ,rhs,lit()),'RECURSION')
+
+    def test_arbitrary_wrapper_containing_lambda_is_not_an_introduction_spine(self):
+        typ=arr(I,I)
+        rhs=app(lam(12,typ,lam(13,I,app(var(12),var(13)))),lam(11,I,var(11)))
+        self.reject(rec_binding(10,typ,rhs,lit()),'RECURSION')
+        rhs=app(lam(12,I,lam(13,I,var(13))),lit())
+        self.reject(rec_binding(10,typ,rhs,lit()),'RECURSION')
+
+    def test_eager_let_wrapper_rejected_even_when_it_contains_a_lambda(self):
+        typ=arr(I,I);rhs=let(12,app(var(10),lit()),lam(11,I,var(11)))
+        self.reject(rec_binding(10,typ,rhs,lit()),'RECURSION')
+
+    def test_external_lexical_capture_rejected(self):
+        raw=let(20,lit(),rec_binding(10,arr(I,I),lam(11,I,add(var(11),var(20))),lit()))
+        self.reject(raw,'RECURSION')
+
+    def test_external_function_alias_cannot_be_a_wrapper(self):
+        typ=arr(I,I)
+        raw=let(20,lam(21,typ,var(21)),
+            rec_binding(10,typ,app(var(20),lam(11,I,var(11))),lit()))
+        self.reject(raw,'RECURSION')
+
+    def test_one_retained_group_globally_including_independent_and_nested(self):
+        typ=arr(I,I);second=rec_binding(20,typ,lam(21,I,var(21)),lit())
+        first=rec_binding(10,typ,lam(11,I,var(11)),second)
+        self.reject(first,'RECURSION')
+        nested=rec_binding(10,typ,lam(11,I,second),lit())
+        self.reject(nested,'RECURSION')
+
+    def test_mutual_scalar_value_and_polymorphic_knots_rejected(self):
+        typ=arr(I,I);raw=rec_binding(10,typ,lam(11,I,app(var(20),var(11))),lit())
+        raw['bindings'].append({'name':name(20),'type':typ,'value':lam(21,I,app(var(10),var(21)))})
+        self.reject(raw,'RECURSION')
+        self.reject(rec_binding(10,I,var(10),lit()),'RECURSION')
+        self.reject(rec_binding(10,forall(100,arr(tv(100),tv(100))),tabs(100,lam(11,tv(100),var(11))),lit()),'RECURSION')
+
+    def test_closed_recursion_under_generic_scope_still_rejected(self):
+        raw=let(1,tabs(100,rec_binding(10,arr(I,I),lam(11,I,var(11)),
+            lam(12,tv(100),var(12)))),app(use(1,I),lit()))
+        self.reject(raw,'RECURSION')
+        # Immediate closed type application does not authorize generic allocation.
+        self.reject(tapp(tabs(100,rec_binding(10,arr(I,I),lam(11,I,var(11)),lit())),inst(I)),
+                    'RECURSION')
+
+    def test_open_annotation_is_not_closed_by_an_unrelated_context(self):
+        raw=rec_binding(10,arr(tv(100),I),lam(11,tv(100),lit()),lit())
+        self.reject(raw,'TYPE_SCOPE')
+
+    def test_wrong_full_rhs_type_rejected_before_eligibility(self):
+        self.reject(rec_binding(10,arr(I,I),lam(11,B,lit()),lit()),'TYPE')
+
+    def test_rhs_proof_checked_then_normalized_without_ordinary_rewrite(self):
+        tree=monomorphic_recursion();binding=tree['body']['body']['bindings'][0]
+        binding['value']=tapp(binding['value'],then(R,R))
+        out=m.derive_shared_fragment(tree)
+        self.assertEqual(len(out['steps']),1)
+        self.assertEqual(out['input_erased'],p.erase_total(out['raw_normalized']))
+        self.assertEqual(m._get(out['raw_normalized'],out['recursion']['bindings'][0]['rhs']['path'])['tag'],
+                         'application')
+        binding['value']['witness']={'tag':'elim'}
+        self.reject(tree,'PROOF')
+
+    def test_nonselected_recursive_arm_type_and_proof_still_checked(self):
+        for bad in (boolean(),tapp(lit(),{'tag':'elim'})):
+            tree=monomorphic_recursion(0)
+            tree['body']['body']['bindings'][0]['value']['body']['alternatives'][0]['body']=bad
+            self.reject(tree,'TYPE' if bad['tag']=='bool' else 'PROOF')
+
+    def test_recursion_evidence_is_recomputed_and_never_authority(self):
+        tree=monomorphic_recursion();out=m.derive_shared_fragment(tree)
+        for field in ('source','binding','rhs','function_source','wrappers','self_uses','free_term_bindings'):
+            forged=copy.deepcopy(out);forged['recursion']['bindings'][0][field]=None
+            with self.subTest(field=field),self.assertRaises(m.SharedTransportError) as caught:
+                m.validate_shared_fragment(tree,forged)
+            self.assertEqual(caught.exception.code,'EVIDENCE')
+        forged=copy.deepcopy(out);del forged['recursion']
+        with self.assertRaises(m.SharedTransportError) as caught:m.validate_shared_fragment(tree,forged)
+        self.assertEqual(caught.exception.code,'EVIDENCE')
+
+    def test_nonrecursive_old_outputs_do_not_gain_recursion_metadata(self):
+        for tree in (shared(),shared_sum(),recursive_sum(),with_data(ctor('Pack',lit()),data_decl())):
+            self.assertNotIn('recursion',m.derive_shared_fragment(tree))
+
+
+MONOMORPHIC_RECURSION_CAPTURE_ROOT=os.environ.get('IR8_MONOMORPHIC_RECURSION_CAPTURE_ROOT')
+
+
+@unittest.skipUnless(MONOMORPHIC_RECURSION_CAPTURE_ROOT,
+                    'set IR8_MONOMORPHIC_RECURSION_CAPTURE_ROOT for completed recursive function capture')
+class RetainedMonomorphicRecursionCaptureTests(unittest.TestCase):
+    def test_original_custody_proofs_and_unchanged_wrapped_function(self):
+        from source_capture_v8 import verify_capture
+        root=Path(MONOMORPHIC_RECURSION_CAPTURE_ROOT).resolve()
+        path=root/'capture-sum-list01'/'capture.stdout'
+        old_path=path.parent/'verification.json';old_bytes=old_path.read_bytes()
+        report=verify_capture(path,fixture_root=root/'inputs'/'sum-list',entry='main.emlf',
+            expected_source_hashes={
+                'main.emlf':'dc591096eb609920208a4d1875047e4e054393ecd11c660a90fceb6cebc39775',
+                'SharedPoly.emlf':'50fd7fa662c9290a61b0a69012cd2e886a44075de9827dff4edd3f0c839573a7'},
+            expected_capture_sha256='b49db8a0433d827325af18f112098eba3bcda21aa06f147d085b97ce9be922e5')
+        self.assertTrue(report['fragment_admitted'])
+        self.assertFalse(report['source_admitted']);self.assertFalse(report['native_admitted'])
+        capture=json.loads(path.read_bytes())
+        out=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+        self.assertEqual(out['steps'],capture['normalization']['steps'])
+        self.assertEqual(out['raw_normalized'],capture['normalization']['raw_normalized'])
+        self.assertEqual(out['checked_type'],I);self.assertEqual(len(out['steps']),2)
+        self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[B],[I]])
+        row,=out['recursion']['bindings'];raw=out['raw_normalized']
+        binding=m._get(raw,row['binding_source']['path']);rhs=m._get(raw,row['rhs']['path'])
+        self.assertEqual(row['binding'],binding['name']);self.assertEqual(row['type'],binding['type'])
+        self.assertEqual(rhs['tag'],'application');self.assertEqual(rhs['function']['tag'],'lambda')
+        self.assertEqual(rhs['function']['body'],{'tag':'var','name':rhs['function']['parameter']})
+        self.assertEqual(rhs['function']['parameter_type'],row['type'])
+        actual=m._get(raw,row['function_source']['path'])
+        self.assertEqual(actual,rhs['argument']);self.assertEqual(actual['tag'],'lambda')
+        self.assertEqual(actual['body']['tag'],'let')
+        self.assertEqual(actual['body']['value']['tag'],'application')
+        self.assertEqual(actual['body']['value']['function']['tag'],'lambda')
+        self.assertEqual(len(row['wrappers']),1);self.assertEqual(len(row['self_uses']),1)
+        self.assertEqual(m._get(raw,row['self_uses'][0]['path']),{'tag':'var','name':binding['name']})
+        self.assertEqual(row['free_term_bindings'],[])
+        shared_def,=out['polymorphism']['definitions'];join,=report['retained_prefix_binding_joins']
+        self.assertEqual(join['binding'],shared_def['binding'])
+        self.assertNotEqual(binding['name']['id'],shared_def['binding']['id'])
+        self.assertEqual(join['resolver_allocation']['entity'],
+            {'namespace':'terms','owner':'SharedPoly','role':{'tag':'value'},'spelling':'sharedId'})
+        self.assertEqual(len(raw['declarations']),7)
+        decl,=out['nominal_sum']['declarations']
+        self.assertEqual(row['type'],arr(decl['type'],I))
+        self.assertEqual(decl['variants'][1]['field_types'],[I,decl['type']])
+        self.assertEqual(len(out['nominal_sum']['cases']),1)
+        # Both physical Cons sources retain the very same pending payload binder.
+        continuation=m._get(raw,row['body']['path']);self.assertEqual(continuation['tag'],'let')
+        heads=[m._get(raw,c['arguments'][0]['path']) for c in out['nominal_sum']['constructors'] if c['variant']==1]
+        self.assertEqual(heads,[{'tag':'var','name':continuation['name']}]*2)
+        self.assertEqual(old_path.read_bytes(),old_bytes)
+        old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
+        self.assertEqual(old['fragment_error']['code'],'FRAGMENT')
 
 
 if __name__ == '__main__':

@@ -14,7 +14,11 @@ Int/Bool fields and exact zero-argument self-family atoms, with exhaustive
 Int-result cases. The optional self_recursive marker records that extension;
 nominal types are never unfolded. This does not admit nominal Scheme arguments,
 nominal atoms in generic code, callable SUM fields, cross-family recursion,
-parameterized/higher-rank data, or recursive term bindings.
+or parameterized/higher-rank data. At most one retained recursive group globally
+is admitted, containing one concrete closed monomorphic function and no external
+term captures. Its introduction spine has at most eight exact typed passthrough
+wrappers. This is not a termination proof or generic/value-recursion permission.
+The complete RHS, including ordinary annotation applications, remains unchanged.
 
 Public results are JSON data, never opaque proof authority. Definition rows omit
 resolver_binding; correspondence rows omit original. Those missing fields MUST
@@ -45,8 +49,10 @@ MAX_ROWS = 10_000
 MAX_NOMINALS = 32
 MAX_FIELDS = 32
 MAX_VARIANTS = 64
+MAX_RECURSIVE_WRAPPERS = 8
 SUM_POLICY = 'closed-scalar-sum/1'
 SUM_SELF_POLICY = 'closed-self-atom/1'
+RECURSION_POLICY = 'closed-single-function-recursion/1'
 NOMINAL_POLICY = 'closed-single-constructor-data/1'
 INT = {'tag': 'constructor', 'name': 'Int', 'arguments': []}
 BOOL = {'tag': 'constructor', 'name': 'Bool', 'arguments': []}
@@ -170,6 +176,9 @@ def _children(node):
         return [(('function',), node['function']), (('argument',), node['argument'])]
     if tag == 'let':
         return [(('value',), node['value']), (('body',), node['body'])]
+    if tag == 'letrec':
+        return [(('bindings', str(i), 'value'), binding['value'])
+                for i, binding in enumerate(node['bindings'])] + [(('body',), node['body'])]
     if tag == 'case':
         return [(('scrutinee',), node['scrutinee'])] + [
             (('alternatives', str(i), 'body'), arm['body'])
@@ -493,6 +502,7 @@ class _Inference:
         self.scope_at = {}
         self.scope_start = scope_start
         self.origins = origins
+        self.recursive_paths = []
         self.nominals = _Nominals(root, budget) if nominals is None else nominals
         self.type = self.infer(root, (), {}, {}, None)
 
@@ -525,6 +535,25 @@ class _Inference:
             value = self.infer(node['value'], path + ('value',), terms, types, scope_ref)
             typ = self.infer(node['body'], path + ('body',),
                              terms | {node['name']['id']: value}, types, scope_ref)
+        elif tag == 'letrec':
+            if scope_ref is not None or len(node['bindings']) != 1 or self.recursive_paths:
+                _fail('RECURSION', 'only one concrete singleton recursive function is admitted', path)
+            self.recursive_paths.append(path)
+            binding = node['bindings'][0]
+            bp = path + ('bindings', '0')
+            annotation = binding['type']
+            if annotation['tag'] != 'arrow':
+                _fail('RECURSION', 'recursive binding requires a closed monomorphic arrow annotation', bp)
+            # Deliberately empty type scope: an ambient rigid cannot silently
+            # turn a concrete recursive knot into a generic allocation.
+            _wf(annotation, {}, self.budget, mono=True, nominals=self.nominals)
+            if binding['name']['id'] in terms:
+                _fail('TERM_SCOPE', 'recursive binder already in scope', bp)
+            inner = terms | {binding['name']['id']: annotation}
+            actual = self.infer(binding['value'], bp + ('value',), inner, types, scope_ref)
+            if not fragment.alpha_type_equal(actual, annotation):
+                _fail('TYPE', 'recursive RHS differs from its complete annotation', bp + ('value',))
+            typ = self.infer(node['body'], path + ('body',), inner, types, scope_ref)
         elif tag == 'type_lambda':
             _wf(node['bound'], types, self.budget, nominals=self.nominals)
             if node['id'] in types:
@@ -743,6 +772,12 @@ def _free_terms(root):
             return go(node['body'], bound | {node['parameter']['id']})
         if tag == 'let':
             return go(node['value'], bound) | go(node['body'], bound | {node['name']['id']})
+        if tag == 'letrec':
+            inner = bound | {binding['name']['id'] for binding in node['bindings']}
+            result = go(node['body'], inner)
+            for binding in node['bindings']:
+                result |= go(binding['value'], inner)
+            return result
         if tag == 'case':
             result = go(node['scrutinee'], bound)
             for arm in node['alternatives']:
@@ -986,6 +1021,64 @@ def _nominal_inventory(root, inferred, registry, budget):
     return data, sums
 
 
+def _recursion_inventory(root, inferred, budget):
+    """Return admission evidence only; NEVER a replacement term or RHS.
+
+    A concrete function introduction may have the compiler's ordinary typed
+    annotation applications around it. Each permitted wrapper is an exact
+    syntactic, capture-free passthrough at the checked annotation. This narrow
+    eligibility test does not beta-reduce, skip evaluation, or recognize names.
+    The planner must emit the full RHS and fill its knot with that pending root.
+    """
+    if not inferred.recursive_paths:
+        return None
+    path, = inferred.recursive_paths
+    node = _get(root, path)
+    binding = node['bindings'][0]
+    bp = path + ('bindings', '0')
+    rhs_path = bp + ('value',)
+    annotation, ident = binding['type'], binding['name']['id']
+    rhs = binding['value']
+    free = sorted(_free_terms(rhs) - {ident})
+    if free:
+        _fail('RECURSION', 'recursive function cannot capture external term bindings', rhs_path)
+    cursor, cursor_path, wrappers = rhs, rhs_path, []
+    while cursor['tag'] == 'application':
+        budget.tick()
+        if len(wrappers) >= MAX_RECURSIVE_WRAPPERS:
+            _fail('LIMIT', 'recursive function wrapper spine exceeds eight applications', cursor_path)
+        fn, fp = cursor['function'], cursor_path + ('function',)
+        if (fn['tag'] != 'lambda' or not _same(fn['parameter_type'], annotation)
+                or fn['body']['tag'] != 'var'
+                or fn['body']['name']['id'] != fn['parameter']['id']
+                or _free_terms(fn)
+                or not _same(inferred.types[fp], {'tag': 'arrow', 'from': annotation, 'to': annotation})):
+            _fail('RECURSION', 'recursive RHS wrapper is not an exact closed typed passthrough', fp)
+        wrappers.append({'application': _address('normalized', cursor_path),
+                         'function': _address('normalized', fp), 'parameter': fn['parameter']})
+        cursor, cursor_path = cursor['argument'], cursor_path + ('argument',)
+    if (cursor['tag'] != 'lambda' or not _same(cursor['parameter_type'], annotation['from'])
+            or not _same(inferred.types[cursor_path], annotation)):
+        _fail('RECURSION', 'recursive RHS must introduce the exactly annotated function', cursor_path)
+    self_uses = []
+    guarded = cursor_path + ('body',)
+    for relative, term in _walk(rhs):
+        budget.tick()
+        if term['tag'] == 'var' and term['name']['id'] == ident:
+            occurrence = rhs_path + relative
+            if occurrence[:len(guarded)] != guarded:
+                _fail('RECURSION', 'recursive self use is outside the introduced function body', occurrence)
+            self_uses.append(_address('normalized', occurrence))
+    row = {'source': _address('normalized', path), 'binding_source': _address('normalized', bp),
+           'binding': binding['name'], 'type': annotation, 'rhs': _address('normalized', rhs_path),
+           'body': _address('normalized', path + ('body',)),
+           'function_source': _address('normalized', cursor_path), 'wrappers': wrappers,
+           'self_uses': self_uses, 'free_term_bindings': free}
+    result = {'policy': RECURSION_POLICY, 'bindings': [row]}
+    budget.record(result)
+    return result
+
+
 def derive_shared_fragment(projected_annotated):
     """Derive independently replayed fragment evidence without source authority.
 
@@ -1026,6 +1119,7 @@ def derive_shared_fragment(projected_annotated):
             correspondence.append(row)
         inventory = _inventory(root, normal, raw, normalized, origins, removed, touched, budget)
         nominal_inventory, sum_inventory = _nominal_inventory(normal, normalized, nominals, budget)
+        recursion_inventory = _recursion_inventory(normal, normalized, budget)
         result = {'format': FORMAT, 'status': 'independent-fragment-replay-only', 'policy': POLICY,
                   'input_checked_type': raw.type, 'checked_type': normalized.type,
                   'input_annotated': root, 'input_erased': before_erased,
@@ -1035,6 +1129,8 @@ def derive_shared_fragment(projected_annotated):
             result['nominal_data'] = nominal_inventory
         if sum_inventory is not None:
             result['nominal_sum'] = sum_inventory
+        if recursion_inventory is not None:
+            result['recursion'] = recursion_inventory
         _bounded(result, cells=500_000, depth=MAX_DEPTH + 20, byte_limit=MAX_BYTES)
         return result
     except SharedTransportError:

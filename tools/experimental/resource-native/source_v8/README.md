@@ -45,6 +45,10 @@ cases. Bare, partial or open shared uses, recursive/nested generic definitions,
 unsupported proofs and higher-rank uses reject. Stage08 adds closed nominal
 DATA, Stage10 adds scalar-field SUMs, and Stage11 adds exact self-family fields; none admits every
 preserved declaration automatically.
+[Stage13](../resource_ir_v8/README_STAGE13.md) adds one explicitly annotated,
+closed monomorphic recursive function with no outside term captures, using the
+existing typed hole/fill protocol. Generic, mutual and recursive value bindings
+remain rejected. Historical stage sections retain their earlier scope below.
 
 ## Stage08: closed DATA and callable fields
 
@@ -308,15 +312,19 @@ python3 -B tools/experimental/resource-native/tests/test_planner_v8_sum.py
 
 python3 -B tools/experimental/resource-native/tests/test_planner_v8_recursive_sum.py
 
+python3 -B tools/experimental/resource-native/tests/test_planner_v8_monomorphic_recursion.py
+
 CC=gcc IR8_PLANNER_NATIVE=1 \
 IR8_PLANNER_NATIVE_OUTPUT=/tmp/ir8-planner-native-fresh \
 python3 -B tools/experimental/resource-native/tests/test_planner_v8.py
 ```
 
-The fragment suite now has 117 unittest cases, including two optional retained
-SUM capture tests. They require `IR8_SUM_CAPTURE_ROOT` and
-`IR8_RECURSIVE_SUM_CAPTURE_ROOT` respectively; both are skipped in CI, which
-separately runs the fresh source suites.
+The fragment suite now has 140 unittest cases, including three optional retained
+capture tests. They require `IR8_SUM_CAPTURE_ROOT`,
+`IR8_RECURSIVE_SUM_CAPTURE_ROOT` and `IR8_MONOMORPHIC_RECURSION_CAPTURE_ROOT`
+respectively; all three are skipped in CI, which separately runs the fresh
+source suites. The monomorphic-recursion planner suite has eight checks,
+including one optional retained-capture check using the same third variable.
 The original planner suite has 20 unittest
 cases;
 its final test runs five native fragment subcases: pending shared RHS, nested
