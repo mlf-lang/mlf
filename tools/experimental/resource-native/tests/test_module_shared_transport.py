@@ -4,6 +4,7 @@ No original compiler is invoked. The extracted fixture preserves exact raw
 subtrees; synthetic lexical surroundings close them for this bounded seam.
 """
 import copy
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -437,6 +438,272 @@ class ReplayTests(unittest.TestCase):
     def test_nominal_and_higher_rank_not_smuggled_through_refl(self):
         with self.assertRaises(m.SharedTransportError):
             m.replay_type_computation(R, arr(forall(100, arr(tv(100), tv(100))), I))
+
+
+def nominal_type(n='Box'):
+    return {'tag': 'constructor', 'name': n, 'arguments': []}
+
+
+def field_type(typ):
+    if typ['tag'] == 'constructor':
+        return {'tag': 'applied', 'name': typ['name'], 'arguments': []}
+    return {'tag': 'function', 'from': field_type(typ['from']), 'to': field_type(typ['to'])}
+
+
+def data_decl(n='Box', constructor='Pack', fields=(I,)):
+    return {'tag': 'data_kind', 'name': n, 'parameters': [],
+            'constructors': [{'name': constructor, 'fields': [field_type(t) for t in fields]}]}
+
+
+def ctor(n='Pack', *arguments):
+    node = {'tag': 'constructor', 'name': n, 'arguments': []}
+    for argument in arguments:
+        node = app(node, argument)
+    return node
+
+
+def case(subject, constructor='Pack', binders=(20,), body=None, result=I):
+    if body is None:
+        body = var(20)
+    return {'tag': 'case', 'scrutinee': subject, 'result_type': result,
+            'alternatives': [{'pattern': {'tag': 'constructor', 'constructor': constructor,
+                                         'fields': [None if x is None else name(x) for x in binders]},
+                              'body': body}]}
+
+
+def with_data(body, *declarations):
+    return {'tag': 'with_data', 'declarations': list(declarations) or [data_decl()], 'body': body}
+
+
+class NominalReplayTests(unittest.TestCase):
+    def reject(self, tree, code=None):
+        with self.assertRaises(m.SharedTransportError) as caught:
+            m.derive_shared_fragment(tree)
+        if code:
+            self.assertEqual(caught.exception.code, code, str(caught.exception))
+        return caught.exception
+
+    def test_scalar_data_full_association_and_graph(self):
+        tree = with_data(let(10, ctor('Pack', lit()), case(var(10))))
+        result = m.derive_shared_fragment(tree)
+        data = result['nominal_data']
+        self.assertEqual(result['raw_normalized'], tree)
+        self.assertEqual(data['policy'], m.NOMINAL_POLICY)
+        declaration, = data['declarations']
+        self.assertEqual(declaration['source'], {'stage': 'projected', 'path': ['declarations', '0']})
+        self.assertEqual((declaration['name'], declaration['constructor'], declaration['field_types']),
+                         ('Box', 'Pack', [I]))
+        self.assertEqual(data['constructors'][0]['application_spine'],
+                         [{'stage': 'normalized', 'path': ['body', 'value']}])
+        self.assertEqual(data['cases'][0]['fields'], [{'index': 0, 'binding': name(20), 'type': I}])
+        rows = result['term_correspondence']
+        self.assertEqual(len(rows), 7)
+        self.assertIn(['body', 'body', 'alternatives', '0', 'body'], [r['normalized']['path'] for r in rows])
+        self.assertEqual(p.erase_total(tree), result['input_erased'])
+
+    def test_same_field_shape_does_not_merge_nominals(self):
+        tree = with_data(let(10, ctor('PackA', lit()),
+                             let(11, ctor('PackB', lit()), add(case(var(10), 'PackA', (20,)),
+                                                              case(var(11), 'PackB', (21,), var(21))))),
+                         data_decl('A', 'PackA'), data_decl('B', 'PackB'))
+        result = m.derive_shared_fragment(tree)
+        self.assertEqual([r['index'] for r in result['nominal_data']['declarations']], [0, 1])
+        self.assertEqual([r['result_type'] for r in result['nominal_data']['constructors']],
+                         [nominal_type('A'), nominal_type('B')])
+        bad = with_data(app(lam(10, nominal_type('A'), lit()), ctor('PackB', lit())),
+                        data_decl('A', 'PackA'), data_decl('B', 'PackB'))
+        self.reject(bad, 'TYPE')
+
+    def test_arrow_field_preserves_pending_argument_and_shared_views(self):
+        pending = app(lam(30, arr(I, I), var(30)), use(1, I))
+        boxed = let(10, ctor('Pack', pending),
+                    let(11, case(var(10), body=var(20), result=arr(I, I)),
+                        choose(app(use(1, B), boolean()), app(var(11), lit()), lit(0))))
+        tree = with_data(shared(boxed), data_decl(fields=(arr(I, I),)))
+        result = m.derive_shared_fragment(tree)
+        self.assertEqual(result['raw_normalized'], tree)
+        self.assertEqual([u['arguments'] for u in result['polymorphism']['uses']], [[I], [B]])
+        argument = result['nominal_data']['constructors'][0]['arguments'][0]['path']
+        self.assertEqual(m._get(result['raw_normalized'], argument), pending)
+        self.assertEqual(result['nominal_data']['cases'][0]['result_type'], arr(I, I))
+
+    def test_nested_closed_arrow_field(self):
+        typ = arr(arr(I, B), arr(B, I))
+        value = lam(10, arr(I, B), lam(11, B, lit()))
+        tree = with_data(case(ctor('Pack', value), binders=(None,), body=lit()), data_decl(fields=(typ,)))
+        result = m.derive_shared_fragment(tree)
+        self.assertEqual(result['nominal_data']['declarations'][0]['field_types'], [typ])
+
+    def test_case_pattern_binding_scope_and_wildcard_position(self):
+        declaration = data_decl(fields=(I, B))
+        tree = with_data(case(ctor('Pack', lit(), boolean()), binders=(None, 20), body=var(20), result=B), declaration)
+        result = m.derive_shared_fragment(tree)
+        self.assertEqual(result['nominal_data']['cases'][0]['fields'],
+                         [{'index': 0, 'binding': None, 'type': I}, {'index': 1, 'binding': name(20), 'type': B}])
+        self.assertEqual(m._free_terms(tree), set())
+        self.reject(with_data(let(10, case(ctor('Pack', lit())), var(20))))
+
+    def test_case_body_outer_first_normalization_and_exact_paths(self):
+        redex = tapp(tabs(100, tapp(tabs(101, lam(10, tv(101), var(10))), inst(tv(100)))), inst(I))
+        tree = with_data(case(ctor('Pack', lit()), body=app(redex, var(20))))
+        result = m.derive_shared_fragment(tree)
+        root = ['body', 'alternatives', '0', 'body', 'function']
+        self.assertEqual([s['input']['path'] for s in result['steps']], [root, root])
+        self.assertEqual(result['steps'][0]['arguments'], [I])
+        self.assertEqual(result['steps'][1]['arguments'], [I])
+        self.assertEqual(p.erase_total(tree), p.erase_total(result['raw_normalized']))
+        self.assertTrue(all(type(x) is str for r in result['term_correspondence'] for x in r['erased_path']))
+
+    def test_full_two_coordinate_use_inside_case(self):
+        rhs = tabs(100, tabs(101, lam(2, tv(100), var(2))))
+        body = case(ctor('Pack', lit()), body=add(app(use(1, I, B), var(20)), app(use(1, I, I), lit(0))))
+        result = m.derive_shared_fragment(with_data(let(1, rhs, body)))
+        self.assertEqual([u['arguments'] for u in result['polymorphism']['uses']], [[I, B], [I, I]])
+        self.assertEqual(len(result['polymorphism']['definitions']), 1)
+
+    def test_unreferenced_unsupported_declaration_is_preserved_not_admitted(self):
+        unused = data_decl('Unused', 'U', (nominal_type('Unused'),))
+        unused['parameters'] = [{'name': 'a', 'kind': {'tag': 'star'}}]
+        tree = with_data(case(ctor('Pack', lit())), unused, data_decl())
+        result = m.derive_shared_fragment(tree)
+        self.assertEqual(result['raw_normalized']['declarations'], tree['declarations'])
+        self.assertEqual([d['index'] for d in result['nominal_data']['declarations']], [1])
+
+    def test_parameterized_multiple_or_missing_constructor_rejected(self):
+        for alteration in ('parameter', 'multiple', 'none'):
+            with self.subTest(alteration=alteration):
+                declaration = data_decl()
+                if alteration == 'parameter':
+                    declaration['parameters'] = [{'name': 'a', 'kind': {'tag': 'star'}}]
+                elif alteration == 'multiple':
+                    declaration['constructors'].append({'name': 'Other', 'fields': []})
+                else:
+                    declaration['constructors'] = []
+                self.reject(with_data(lam(10, nominal_type(), lit()), declaration), 'NOMINAL')
+
+    def test_open_recursive_nominal_and_higher_rank_fields_rejected(self):
+        fields = [
+            {'tag': 'parameter', 'name': 'a'},
+            {'tag': 'applied', 'name': 'Box', 'arguments': []},
+            {'tag': 'function', 'from': field_type(I), 'to': {'tag': 'applied', 'name': 'Box', 'arguments': []}},
+            {'tag': 'quantified', 'name': 'a', 'kind': {'tag': 'star'}, 'body': field_type(I)},
+            {'tag': 'application', 'function': field_type(I), 'argument': field_type(I)},
+            {'tag': 'applied', 'name': 'Int', 'arguments': [field_type(I)]},
+        ]
+        for field in fields:
+            with self.subTest(field=field):
+                declaration = data_decl(); declaration['constructors'][0]['fields'] = [field]
+                self.reject(with_data(lam(10, nominal_type(), lit()), declaration), 'NOMINAL')
+
+    def test_duplicate_nominal_or_constructor_identity_rejected(self):
+        for other in (data_decl('Box', 'Other'), data_decl('Other', 'Pack')):
+            self.reject(with_data(lit(), data_decl(), other), 'DECLARATION')
+
+    def test_constructor_bare_partial_extra_and_type_arguments_rejected(self):
+        self.reject(with_data(ctor()), 'CONSTRUCTOR')
+        self.reject(with_data(ctor('Pack', lit()), data_decl(fields=(I, B))), 'CONSTRUCTOR')
+        self.reject(with_data(ctor('Pack', lit(), boolean())), 'TYPE')
+        value = ctor(); value['arguments'] = [I]
+        self.reject(with_data(value), 'NOMINAL')
+
+    def test_constructor_wrong_field_and_unknown_identity_rejected(self):
+        self.reject(with_data(ctor('Pack', boolean())), 'TYPE')
+        self.reject(with_data(ctor('Counterfeit', lit())), 'FRAGMENT')
+
+    def test_constructor_alias_is_not_reinterpreted_as_saturated(self):
+        self.reject(with_data(let(10, ctor(), app(var(10), lit()))), 'CONSTRUCTOR')
+
+    def test_case_owner_arity_result_and_coverage_rejected(self):
+        base = with_data(case(ctor('Pack', lit())))
+        mutations = []
+        x = copy.deepcopy(base); x['body']['alternatives'][0]['pattern']['constructor'] = 'Other'; mutations.append(x)
+        x = copy.deepcopy(base); x['body']['alternatives'][0]['pattern']['fields'] = []; mutations.append(x)
+        x = copy.deepcopy(base); x['body']['alternatives'] = []; mutations.append(x)
+        x = copy.deepcopy(base); x['body']['alternatives'] *= 2; mutations.append(x)
+        x = copy.deepcopy(base); x['body']['alternatives'][0]['pattern'] = {'tag': 'default', 'binder': None}; mutations.append(x)
+        for x in mutations:
+            self.reject(x)
+        x = copy.deepcopy(base); x['body']['result_type'] = B; self.reject(x, 'TYPE')
+        self.reject(with_data(case(lit())), 'CASE')
+
+    def test_nominal_type_arguments_and_nested_declaration_scope_rejected(self):
+        typ = nominal_type(); typ['arguments'] = [I]
+        self.reject(with_data(lam(10, typ, lit())), 'NOMINAL')
+        self.reject(with_data(with_data(lit())), 'FRAGMENT')
+
+    def test_generic_signature_and_hidden_generic_nominal_atoms_rejected(self):
+        rhs = tabs(100, lam(10, nominal_type(), var(10)))
+        self.reject(with_data(let(1, rhs, lit())), 'NOMINAL_SCOPE')
+        rhs = tabs(100, lam(10, tv(100), let(11, ctor('Pack', lit()), var(10))))
+        self.reject(with_data(let(1, rhs, app(use(1, I), lit()))), 'NOMINAL_SCOPE')
+        rhs = tabs(100, lam(10, tv(100), let(11, lam(12, nominal_type(), var(12)), var(10))))
+        self.reject(with_data(let(1, rhs, app(use(1, I), lit()))), 'NOMINAL_SCOPE')
+
+    def test_nominal_scheme_instantiation_and_direct_vector_rejected(self):
+        self.reject(with_data(shared(app(use(1, nominal_type()), ctor('Pack', lit())))), 'USE')
+        self.reject(with_data(tapp(tabs(100, lam(10, tv(100), var(10))), inst(nominal_type()))), 'DIRECT')
+
+    def test_zero_and_32_field_boundaries(self):
+        zero = m.derive_shared_fragment(with_data(case(ctor(), binders=(), body=lit()), data_decl(fields=())))
+        self.assertEqual(zero['nominal_data']['constructors'][0]['application_spine'], [])
+        full = with_data(case(ctor('Pack', *[lit(i) for i in range(32)]), binders=(None,) * 32, body=lit()),
+                         data_decl(fields=(I,) * 32))
+        self.assertEqual(len(m.derive_shared_fragment(full)['nominal_data']['declarations'][0]['field_types']), 32)
+        over = data_decl(fields=(I,) * 33)
+        self.reject(with_data(lam(10, nominal_type(), lit()), over), 'LIMIT')
+
+    def test_32_referenced_nominal_boundary(self):
+        def tree(count):
+            body = lit()
+            declarations = [data_decl('D' + str(i), 'C' + str(i), ()) for i in range(count)]
+            for i in reversed(range(count)):
+                body = let(1000 + i, ctor('C' + str(i)), body)
+            return with_data(body, *declarations)
+        self.assertEqual(len(m.derive_shared_fragment(tree(32))['nominal_data']['declarations']), 32)
+        self.reject(tree(33), 'LIMIT')
+
+    def test_nominal_rows_are_recomputed_not_trusted(self):
+        tree = with_data(case(ctor('Pack', lit())))
+        result = m.derive_shared_fragment(tree)
+        for section in ('declarations', 'constructors', 'cases'):
+            bad = copy.deepcopy(result); bad['nominal_data'][section][0]['unexpected'] = True
+            with self.assertRaisesRegex(m.SharedTransportError, 'EVIDENCE'):
+                m.validate_shared_fragment(tree, bad)
+        bad = copy.deepcopy(result); del bad['nominal_data']
+        with self.assertRaisesRegex(m.SharedTransportError, 'EVIDENCE'):
+            m.validate_shared_fragment(tree, bad)
+
+    def test_nominal_metadata_and_work_limits_remain_fail_closed(self):
+        tree = with_data(case(ctor('Pack', lit())))
+        for name_, limit in [('MAX_METADATA_BYTES', 1), ('MAX_WORK', 1), ('MAX_ROWS', 1)]:
+            with mock.patch.object(m, name_, limit):
+                self.reject(tree, 'LIMIT')
+
+    def test_list_paths_reject_noncanonical_indices(self):
+        for key in ('00', '-1', '+0', '١', '1'):
+            with self.assertRaises(m.SharedTransportError):
+                m._get([lit()], (key,))
+
+    def test_extracted_real_box_and_fnbox_producer_normalization(self):
+        fixture = json.loads((BASE / 'tests/shared_nominal_raw_extract.json').read_text())
+        self.assertEqual(fixture['format'], 'shared-nominal-raw-extract/1')
+        def digest(value):
+            return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
+        for row in fixture['cases']:
+            with self.subTest(capture=row['name']):
+                result = m.derive_shared_fragment(row['raw'])
+                self.assertEqual(result['steps'], row['expected_steps'])
+                self.assertEqual(result['checked_type'], row['expected_checked_type'])
+                self.assertEqual(digest(result['raw_normalized']), row['expected_normalized_sha256'])
+                self.assertEqual(digest(result['input_erased']), row['expected_erased_sha256'])
+                self.assertEqual(len(result['nominal_data']['declarations']), 1)
+                self.assertEqual(len(result['nominal_data']['constructors']), 1)
+                self.assertEqual(len(result['nominal_data']['cases']), 1)
+                self.assertEqual(result['raw_normalized']['declarations'], row['raw']['declarations'])
+                if row['name'] == 'fnbox01':
+                    self.assertEqual([u['arguments'] for u in result['polymorphism']['uses']], [[I], [B]])
+                    argument = result['nominal_data']['constructors'][0]['arguments'][0]['path']
+                    self.assertEqual(m._get(result['raw_normalized'], argument)['tag'], 'application')
 
 
 if __name__ == '__main__':

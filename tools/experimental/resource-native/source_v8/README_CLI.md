@@ -35,11 +35,33 @@ sharedId x = x
 
 The current fragment admits Int, Bool and arrows, supported scalar primitives,
 Int conditionals and bounded rank-1 shared callable uses with complete closed
-Int/Bool vectors. It preserves the shared RHS, ordinary pending applications,
+Int/Bool vectors, plus referenced closed, parameter-free single-constructor DATA.
+DATA fields are Int, Bool or recursively closed arrows over those scalars; exact
+nominal identities are not merged by equal field layouts. It preserves the
+shared RHS, ordinary pending applications,
 actual checked type-computation witnesses and curried captures. Unsupported
-proofs, open/partial shared uses, higher-rank or impredicative arguments, nominal
-operations and recursive generic definitions reject before native execution.
+proofs, open/partial shared uses, higher-rank or impredicative arguments,
+parameterized/recursive/multi-constructor DATA, nominal-valued fields and
+recursive generic definitions reject before native execution. Ordinary function
+and case types may mention admitted DATA, but retained generic scopes and Scheme
+vectors may not. All declarations remain evidence, without automatically
+admitting unrelated compiler dictionaries.
 See the [fragment contract](README.md) for its limits.
+
+For example, a closed callable field can use the same `SharedPoly.emlf` above:
+
+```text
+import SharedPoly
+data FnBox = FnBox (Int -> Int);
+let boxed = FnBox (sharedId : Int -> Int) in
+let extracted = case boxed of { FnBox field -> field } in
+if sharedId true then extracted 42 else 0
+```
+
+The field payload and whole case remain lazy. The case releases its container
+handle after retaining the projected field and ending the loan. The owning group
+may remain alive until after the field is called; this is not early physical node
+deallocation or a peak-memory improvement claim.
 
 ## Source and toolchain custody
 
@@ -110,8 +132,8 @@ It covers an ordinary unused type error, a later unsupported-fragment rejection,
 both Int/Bool demand orders, curried `sharedConst`, a renamed nested module with
 an unused invalid source file, and the same admitted source with low fuel under
 both fault policies. Both rejection cases must stop before native compilation.
-The full CLI suite passed locally on 2026-11-04: all eight cases and 42 host
-checks. All four healthy programs returned 42 with balanced empty ledgers; the
+Before Stage08, the full CLI suite passed locally on 2026-11-04: all eight cases
+and 42 host checks. All four healthy programs returned 42 with balanced empty ledgers; the
 two fault policies preserved identical evaluation data, and both rejected
 programs stopped before native compilation. The nested-module case copied three
 source files but loaded only two, leaving its invalid unused file explicitly
@@ -125,6 +147,24 @@ its targeted probe and host regressions are checked separately. The full eight
 cases are not claimed rerun with that probe-only change. Exact-commit CI remains
 a separate result.
 
+Stage08 adds a separate three-case source suite:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal.py \
+  --ghc /absolute/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /absolute/new-nominal-suite-directory
+```
+
+It covers scalar Box, FnBox holding a sharedId view and FnBox holding a curried
+sharedConst `Bool -> Int` view with both complete two-coordinate vectors.
+All three calls use fresh builds/snapshots, the existing CLI and unchanged real
+runtime. The complete three-case suite passed locally on 2026-11-04 without
+retries: every CLI, producer and native process returned zero, each result was
+Int 42, and all seven ledger categories were balanced and empty. This does not
+claim exact-commit CI success or physical container deallocation before a field
+call. The Box/FnBox observations and exact ownership/event distinctions are documented in
+the [Stage08 fragment section](README.md#stage08-closed-data-and-callable-fields).
+
 This remains a bounded opt-in experiment. It does not establish arbitrary MLF
-source support, nominal/callable-SUM coverage, all runtime guards, full GC
-replacement or a performance improvement.
+source support, general nominal or callable-SUM coverage, all runtime guards,
+full GC replacement or a performance improvement.

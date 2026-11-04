@@ -7,8 +7,10 @@ module_custody and module_projection. Nothing here changes export/2 or defaults.
 
 The fragment seam implements SOURCE_WIRE_CONTRACT_DRAFT.md f73198a9, sections
 3--5, for Int/Bool/arrows and the existing scalar primitives/Int conditional.
-Full declarations may be carried by one outer with_data, but nominal operations,
-recursion and higher-rank/open shared uses are deliberately not admitted.
+One outer with_data can additionally supply referenced, closed, nonrecursive,
+parameter-free, single-constructor DATA. Its fields are Int/Bool or closed
+arrows recursively over those scalars. This does not admit nominal Scheme
+arguments, nominal atoms in generic code, SUM, or recursive/higher-rank data.
 
 Public results are JSON data, never opaque proof authority. Definition rows omit
 resolver_binding; correspondence rows omit original. Those missing fields MUST
@@ -36,6 +38,9 @@ MAX_USES = 256
 MAX_PROOFS = 2048
 MAX_PROOF_ATOMS = 64
 MAX_ROWS = 10_000
+MAX_NOMINALS = 32
+MAX_FIELDS = 32
+NOMINAL_POLICY = 'closed-single-constructor-data/1'
 INT = {'tag': 'constructor', 'name': 'Int', 'arguments': []}
 BOOL = {'tag': 'constructor', 'name': 'Bool', 'arguments': []}
 
@@ -151,13 +156,17 @@ def _address(stage, path):
 def _children(node):
     tag = node['tag']
     if tag in ('lambda', 'type_lambda', 'with_data'):
-        return [('body', node['body'])]
+        return [(('body',), node['body'])]
     if tag == 'type_application':
-        return [('value', node['value'])]
+        return [(('value',), node['value'])]
     if tag == 'application':
-        return [('function', node['function']), ('argument', node['argument'])]
+        return [(('function',), node['function']), (('argument',), node['argument'])]
     if tag == 'let':
-        return [('value', node['value']), ('body', node['body'])]
+        return [(('value',), node['value']), (('body',), node['body'])]
+    if tag == 'case':
+        return [(('scrutinee',), node['scrutinee'])] + [
+            (('alternatives', str(i), 'body'), arm['body'])
+            for i, arm in enumerate(node['alternatives'])]
     return []
 
 
@@ -166,12 +175,21 @@ def _walk(root):
     while work:
         path, node = work.pop()
         yield path, node
-        work.extend((path + (key,), child) for key, child in reversed(_children(node)))
+        work.extend((path + suffix, child) for suffix, child in reversed(_children(node)))
+
+
+def _index(key, length):
+    if type(key) is not str or not key.isascii() or not key.isdigit() or str(int(key)) != key:
+        _fail('SCHEMA', 'noncanonical list path index')
+    index = int(key)
+    if not 0 <= index < length:
+        _fail('SCHEMA', 'list path index out of range')
+    return index
 
 
 def _get(root, path):
     for key in path:
-        root = root[key]
+        root = root[_index(key, len(root))] if type(root) is list else root[key]
     return root
 
 
@@ -179,6 +197,11 @@ def _replace(root, path, value):
     if not path:
         return value
     key = path[0]
+    if type(root) is list:
+        index = _index(key, len(root))
+        changed = list(root)
+        changed[index] = _replace(root[index], path[1:], value)
+        return changed
     return root | {key: _replace(root[key], path[1:], value)}
 
 
@@ -190,8 +213,82 @@ def _scalar(typ):
     return typ == INT or typ == BOOL
 
 
-def _wf(typ, scope, budget, *, mono=False):
-    """Star-kinded scalar/arrow/forall types, with real lexical identity."""
+class _Nominals:
+    """Exact declaration identities, never a structural-layout equivalence.
+
+    The whole declaration list remains raw evidence. Only referenced rows are
+    subjected to the narrower runtime subset, so unrelated compiler dictionary
+    declarations are not silently admitted or deleted.
+    """
+
+    def __init__(self, root, budget):
+        self.budget = budget
+        self.declarations = root['declarations'] if root['tag'] == 'with_data' else []
+        self.by_name, self.by_constructor, self.selected = {}, {}, {}
+        for index, declaration in enumerate(self.declarations):
+            budget.tick()
+            name = declaration['name']
+            if name in self.by_name or name in ('Int', 'Bool'):
+                _fail('DECLARATION', 'duplicate or intrinsic nominal declaration', ('declarations', str(index)))
+            self.by_name[name] = index
+            for constructor in declaration['constructors']:
+                budget.tick()
+                if constructor['name'] in self.by_constructor:
+                    _fail('DECLARATION', 'ambiguous constructor identity', ('declarations', str(index)))
+                self.by_constructor[constructor['name']] = index
+
+    def field_type(self, field, path):
+        self.budget.tick()
+        if field['tag'] == 'applied' and not field['arguments'] and field['name'] in ('Int', 'Bool'):
+            return INT if field['name'] == 'Int' else BOOL
+        if field['tag'] == 'function':
+            return {'tag': 'arrow', 'from': self.field_type(field['from'], path + ('from',)),
+                    'to': self.field_type(field['to'], path + ('to',))}
+        _fail('NOMINAL', 'DATA fields require only Int/Bool and recursively closed scalar arrows', path)
+
+    def select(self, name, path=()):
+        self.budget.tick()
+        if name not in self.by_name:
+            _fail('TYPE', 'nominal type lacks an exact declaration', path)
+        index = self.by_name[name]
+        if index in self.selected:
+            return self.selected[index]
+        if len(self.selected) >= MAX_NOMINALS:
+            _fail('LIMIT', 'referenced nominal declaration bound', path)
+        declaration = self.declarations[index]
+        source = ('declarations', str(index))
+        if declaration['parameters'] or len(declaration['constructors']) != 1:
+            _fail('NOMINAL', 'referenced DATA must have no parameters and exactly one constructor', source)
+        constructor = declaration['constructors'][0]
+        if len(constructor['fields']) > MAX_FIELDS:
+            _fail('LIMIT', 'DATA field count exceeds 32', source + ('constructors', '0', 'fields'))
+        field_types = [self.field_type(field, source + ('constructors', '0', 'fields', str(i)))
+                       for i, field in enumerate(constructor['fields'])]
+        row = {'index': index, 'name': name, 'source': _address('projected', source),
+               'constructor': constructor['name'],
+               'constructor_source': _address('projected', source + ('constructors', '0')),
+               'field_types': field_types,
+               'type': {'tag': 'constructor', 'name': name, 'arguments': []}}
+        self.budget.record(row)
+        self.selected[index] = row
+        return row
+
+    def type_row(self, typ, path=()):
+        if typ['tag'] != 'constructor' or typ['arguments']:
+            _fail('NOMINAL', 'nominal type must be closed and parameter-free', path)
+        return self.select(typ['name'], path)
+
+    def constructor_row(self, name, arguments, path=()):
+        if name not in self.by_constructor:
+            _fail('FRAGMENT', 'constructor lacks an exact declaration', path)
+        if arguments:
+            _fail('NOMINAL', 'nominal constructor type instantiation is not admitted', path)
+        declaration = self.declarations[self.by_constructor[name]]
+        return self.select(declaration['name'], path)
+
+
+def _wf(typ, scope, budget, *, mono=False, nominals=None):
+    """Star-kinded types with lexical rigids and exact optional nominal scope."""
     budget.tick()
     tag = typ['tag']
     if tag == 'var':
@@ -199,16 +296,18 @@ def _wf(typ, scope, budget, *, mono=False):
             _fail('TYPE_SCOPE', 'unbound type variable')
     elif tag == 'constructor':
         if not _scalar(typ):
-            _fail('TYPE', 'only intrinsic Int/Bool are in this fragment')
+            if nominals is None:
+                _fail('TYPE', 'only intrinsic Int/Bool are in this fragment')
+            nominals.type_row(typ)
     elif tag == 'arrow':
-        _wf(typ['from'], scope, budget, mono=True)
-        _wf(typ['to'], scope, budget, mono=True)
+        _wf(typ['from'], scope, budget, mono=True, nominals=nominals)
+        _wf(typ['to'], scope, budget, mono=True, nominals=nominals)
     elif tag == 'forall' and not mono:
         # The binder is NOT in scope over its own bound.
-        _wf(typ['bound'], scope, budget)
+        _wf(typ['bound'], scope, budget, nominals=nominals)
         if typ['id'] in scope:
             _fail('TYPE_SCOPE', 'repeated active type binder')
-        _wf(typ['body'], scope | {typ['id']: typ['bound']}, budget)
+        _wf(typ['body'], scope | {typ['id']: typ['bound']}, budget, nominals=nominals)
     elif _bottom(typ) and not mono:
         pass
     else:
@@ -259,13 +358,13 @@ def _actions(proof, budget):
     return arguments
 
 
-def _compute(proof, source, scope, scope_ref, budget):
+def _compute(proof, source, scope, scope_ref, budget, *, nominals=None):
     _actions(proof, budget)
     rows = []
 
     def go(p, typ, path):
         budget.tick()
-        _wf(typ, scope, budget)
+        _wf(typ, scope, budget, nominals=nominals)
         row = {'proof_path': list(path), 'scope': scope_ref,
                'source_type': typ, 'result_type': None}
         rows.append(row)  # Preorder inventory; computation itself is sequential.
@@ -278,7 +377,7 @@ def _compute(proof, source, scope, scope_ref, budget):
         elif tag == 'bottom':
             if not _bottom(typ):
                 _fail('PROOF', 'bottom computation requires exact bottom-Star input')
-            _wf(p['type'], scope, budget, mono=True)
+            _wf(p['type'], scope, budget, mono=True, nominals=nominals)
             result = p['type']
         elif tag == 'inner':
             if typ['tag'] != 'forall':
@@ -294,7 +393,7 @@ def _compute(proof, source, scope, scope_ref, budget):
             _bounded(result)
         else:
             _fail('PROOF', 'unsupported computation')
-        _wf(result, scope, budget)
+        _wf(result, scope, budget, nominals=nominals)
         row['result_type'] = result
         return result
 
@@ -332,7 +431,7 @@ def replay_type_computation(witness, source_type, *, scope=()):
 
 
 class _Inference:
-    def __init__(self, root, stage, budget, *, scope_start=0, origins=None):
+    def __init__(self, root, stage, budget, *, scope_start=0, origins=None, nominals=None):
         self.root = root
         self.stage = stage
         self.budget = budget
@@ -342,6 +441,7 @@ class _Inference:
         self.scope_at = {}
         self.scope_start = scope_start
         self.origins = origins
+        self.nominals = _Nominals(root, budget) if nominals is None else nominals
         self.type = self.infer(root, (), {}, {}, None)
 
     def infer(self, node, path, terms, types, scope_ref):
@@ -356,12 +456,12 @@ class _Inference:
             if node['name']['id'] not in terms:
                 _fail('TERM_SCOPE', 'unbound term variable', path)
             typ = terms[node['name']['id']]
-            _wf(typ, types, self.budget)
+            _wf(typ, types, self.budget, nominals=self.nominals)
         elif tag == 'lambda':
-            _wf(node['parameter_type'], types, self.budget, mono=True)
+            _wf(node['parameter_type'], types, self.budget, mono=True, nominals=self.nominals)
             body = self.infer(node['body'], path + ('body',),
                               terms | {node['parameter']['id']: node['parameter_type']}, types, scope_ref)
-            _wf(body, types, self.budget, mono=True)
+            _wf(body, types, self.budget, mono=True, nominals=self.nominals)
             typ = {'tag': 'arrow', 'from': node['parameter_type'], 'to': body}
         elif tag == 'application':
             fn = self.infer(node['function'], path + ('function',), terms, types, scope_ref)
@@ -374,7 +474,7 @@ class _Inference:
             typ = self.infer(node['body'], path + ('body',),
                              terms | {node['name']['id']: value}, types, scope_ref)
         elif tag == 'type_lambda':
-            _wf(node['bound'], types, self.budget)
+            _wf(node['bound'], types, self.budget, nominals=self.nominals)
             if node['id'] in types:
                 _fail('TYPE_SCOPE', 'repeated active type abstraction', path)
             if not _bottom(node['bound']):
@@ -389,7 +489,8 @@ class _Inference:
             typ = {'tag': 'forall', 'id': node['id'], 'bound': node['bound'], 'body': body}
         elif tag == 'type_application':
             operand = self.infer(node['value'], path + ('value',), terms, types, scope_ref)
-            typ, trace = _compute(node['witness'], operand, types, scope_ref, self.budget)
+            typ, trace = _compute(node['witness'], operand, types, scope_ref, self.budget,
+                                  nominals=self.nominals)
             self.proofs[path] = {'input_type': operand, 'proof_intermediates': trace,
                                  'result_type': typ, 'scope': scope_ref}
         elif tag == 'primitive':
@@ -399,12 +500,44 @@ class _Inference:
                 _fail('PRIMITIVE', str(exc), path)
             if node['id'] == 13:
                 arg = node['arguments'][0]
-                _wf(arg, types, self.budget, mono=True)
+                _wf(arg, types, self.budget, mono=True, nominals=self.nominals)
                 typ = {'tag': 'arrow', 'from': BOOL, 'to': {'tag': 'arrow', 'from': arg,
                        'to': {'tag': 'arrow', 'from': arg, 'to': arg}}}
             else:
                 result = BOOL if node['id'] in (10, 11) else INT
                 typ = {'tag': 'arrow', 'from': INT, 'to': {'tag': 'arrow', 'from': INT, 'to': result}}
+        elif tag == 'constructor':
+            row = self.nominals.constructor_row(node['name'], node['arguments'], path)
+            typ = row['type']
+            for field in reversed(row['field_types']):
+                typ = {'tag': 'arrow', 'from': field, 'to': typ}
+        elif tag == 'case':
+            subject = self.infer(node['scrutinee'], path + ('scrutinee',), terms, types, scope_ref)
+            if subject['tag'] != 'constructor' or _scalar(subject) or subject['arguments']:
+                _fail('CASE', 'case scrutinee must be an exact closed DATA nominal', path)
+            owner = self.nominals.type_row(subject, path + ('scrutinee',))
+            if len(node['alternatives']) != 1:
+                _fail('CASE', 'single-constructor DATA requires exactly one matching constructor arm', path)
+            alternative = node['alternatives'][0]
+            pattern = alternative['pattern']
+            pattern_path = path + ('alternatives', '0', 'pattern')
+            if pattern['tag'] != 'constructor' or pattern['constructor'] != owner['constructor']:
+                _fail('CASE', 'case pattern must name the exact scrutinee constructor', pattern_path)
+            if len(pattern['fields']) != len(owner['field_types']):
+                _fail('CASE', 'case pattern field arity differs', pattern_path)
+            bindings = {}
+            for binder, field in zip(pattern['fields'], owner['field_types']):
+                self.budget.tick()
+                if binder is not None:
+                    if binder['id'] in terms or binder['id'] in bindings:
+                        _fail('TERM_SCOPE', 'case pattern repeats an active term binder', pattern_path)
+                    bindings[binder['id']] = field
+            _wf(node['result_type'], types, self.budget, mono=True, nominals=self.nominals)
+            body = self.infer(alternative['body'], path + ('alternatives', '0', 'body'),
+                              terms | bindings, types, scope_ref)
+            if not fragment.alpha_type_equal(body, node['result_type']):
+                _fail('TYPE', 'case body differs from its annotated result type', path)
+            typ = node['result_type']
         elif tag == 'with_data' and not path:
             typ = self.infer(node['body'], path + ('body',), terms, types, scope_ref)
         else:
@@ -506,8 +639,8 @@ def _ordinary(root):
             work.append((path + (key,), erased, node[key]))
         else:
             rows.append((path, erased, tag))
-            work.extend((path + (key,), erased + (key,), child)
-                        for key, child in reversed(_children(node)))
+            work.extend((path + suffix, erased + suffix, child)
+                        for suffix, child in reversed(_children(node)))
     return rows
 
 
@@ -521,11 +654,33 @@ def _free_terms(root):
             return go(node['body'], bound | {node['parameter']['id']})
         if tag == 'let':
             return go(node['value'], bound) | go(node['body'], bound | {node['name']['id']})
+        if tag == 'case':
+            result = go(node['scrutinee'], bound)
+            for arm in node['alternatives']:
+                pattern = arm['pattern']
+                names = pattern['fields'] if pattern['tag'] == 'constructor' else [pattern['binder']]
+                result |= go(arm['body'], bound | {n['id'] for n in names if n is not None})
+            return result
         result = set()
         for _, child in _children(node):
             result |= go(child, bound)
         return result
     return go(root, set())
+
+
+def _nominal_atom(typ, budget):
+    work = [typ]
+    while work:
+        item = work.pop()
+        budget.tick()
+        if item['tag'] == 'constructor':
+            if not _scalar(item):
+                return True
+        elif item['tag'] == 'arrow':
+            work.extend((item['from'], item['to']))
+        elif item['tag'] == 'forall':
+            work.extend((item['bound'], item['body']))
+    return False
 
 
 def _inventory(original, normalized, original_infer, normalized_infer, origins, removed, touched, budget):
@@ -543,6 +698,8 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
     def go(node, path, schemes, generic=False):
         budget.tick()
         tag = node['tag']
+        if generic and _nominal_atom(normalized_infer.types[path], budget):
+            _fail('NOMINAL_SCOPE', 'retained generic scope cannot contain nominal DATA atoms', path)
         if tag == 'let':
             value_path = path + ('value',)
             cursor, cursor_path, prefix = _prefix(node['value'], value_path)
@@ -558,6 +715,8 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
                 body_type = normalized_infer.types[cursor_path]
                 if body_type['tag'] != 'arrow':
                     _fail('SCHEME', 'generalized RHS must have a monomorphic arrow body', path)
+                if _nominal_atom(body_type, budget):
+                    _fail('NOMINAL_SCOPE', 'Scheme body cannot contain nominal DATA atoms', path)
                 ident = len(definitions)
                 row = {'id': ident, 'binding': node['name'],
                        'binding_source': _address('normalized', path),
@@ -630,8 +789,8 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
             _fail('FRAGMENT', 'generic construction opcode outside exact allowlist', path)
         if tag == 'primitive' and node['id'] == 13 and node['arguments'] != [INT]:
             _fail('PRIMITIVE', 'retained conditional must be instantiated at Int', path)
-        for key, child in _children(node):
-            go(child, path + (key,), schemes, generic)
+        for suffix, child in _children(node):
+            go(child, path + suffix, schemes, generic)
 
     go(normalized, (), {})
     proofs = []
@@ -653,6 +812,61 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
             'type_applications': proofs, 'uses': uses}
 
 
+def _nominal_inventory(root, inferred, registry, budget):
+    """Associate exact normalized occurrences without reducing ordinary terms."""
+    constructors, cases, consumed = [], [], set()
+    for path, node in _walk(root):
+        budget.tick()
+        tag = node['tag']
+        if tag in ('application', 'constructor') and path not in consumed:
+            head, head_path, arguments, applications = node, path, [], []
+            while head['tag'] == 'application':
+                budget.tick()
+                applications.append(head_path)
+                arguments.append((head_path + ('argument',), head['argument']))
+                head_path += ('function',)
+                head = head['function']
+            if head['tag'] == 'constructor':
+                owner = registry.constructor_row(head['name'], head['arguments'], head_path)
+                arguments.reverse()
+                applications.reverse()
+                if len(arguments) != len(owner['field_types']):
+                    _fail('CONSTRUCTOR', 'DATA constructor requires its complete field application spine', path)
+                for (argument_path, _), field_type in zip(arguments, owner['field_types']):
+                    budget.tick()
+                    if not fragment.alpha_type_equal(inferred.types[argument_path], field_type):
+                        _fail('TYPE', 'DATA constructor field type differs', argument_path)
+                if not fragment.alpha_type_equal(inferred.types[path], owner['type']):
+                    _fail('TYPE', 'DATA constructor result differs from its nominal owner', path)
+                consumed.update(applications)
+                consumed.add(head_path)
+                row = {'source': _address('normalized', path), 'head': _address('normalized', head_path),
+                       'declaration': owner['index'],
+                       'arguments': [_address('normalized', p) for p, _ in arguments],
+                       'application_spine': [_address('normalized', p) for p in applications],
+                       'result_type': owner['type']}
+                budget.record(row)
+                constructors.append(row)
+        if tag == 'case':
+            owner = registry.type_row(inferred.types[path + ('scrutinee',)], path)
+            pattern = node['alternatives'][0]['pattern']
+            row = {'source': _address('normalized', path), 'declaration': owner['index'],
+                   'scrutinee': _address('normalized', path + ('scrutinee',)),
+                   'constructor': owner['constructor'],
+                   'pattern_source': _address('normalized', path + ('alternatives', '0', 'pattern')),
+                   'fields': [{'index': i, 'binding': binder, 'type': typ}
+                              for i, (binder, typ) in enumerate(zip(pattern['fields'], owner['field_types']))],
+                   'body': _address('normalized', path + ('alternatives', '0', 'body')),
+                   'result_type': node['result_type']}
+            budget.record(row)
+            cases.append(row)
+    if not registry.selected:
+        return None
+    return {'policy': NOMINAL_POLICY,
+            'declarations': [registry.selected[i] for i in sorted(registry.selected)],
+            'constructors': constructors, 'cases': cases}
+
+
 def derive_shared_fragment(projected_annotated):
     """Derive independently replayed fragment evidence without source authority.
 
@@ -666,13 +880,15 @@ def derive_shared_fragment(projected_annotated):
         root = json.loads(_json(projected_annotated))
         projection.validate_raw_term(root, require_closed=True)
         budget = _Budget()
-        raw = _Inference(root, 'projected', budget)
+        nominals = _Nominals(root, budget)
+        raw = _Inference(root, 'projected', budget, nominals=nominals)
         normal, steps, origins, removed, touched = _normalize(root, budget)
         projection.validate_raw_term(normal, require_closed=True)
-        normalized = _Inference(normal, 'normalized', budget, scope_start=len(raw.scopes), origins=origins)
+        normalized = _Inference(normal, 'normalized', budget, scope_start=len(raw.scopes),
+                                origins=origins, nominals=nominals)
         if not fragment.alpha_type_equal(raw.type, normalized.type):
             _fail('TYPE', 'normalization changed replayed root type')
-        _wf(normalized.type, {}, budget, mono=True)
+        _wf(normalized.type, {}, budget, mono=True, nominals=nominals)
         before_erased = projection.erase_total(root)
         after_erased = projection.erase_total(normal)
         if not _same(before_erased, after_erased):
@@ -690,11 +906,14 @@ def derive_shared_fragment(projected_annotated):
             budget.record(row)
             correspondence.append(row)
         inventory = _inventory(root, normal, raw, normalized, origins, removed, touched, budget)
+        nominal_inventory = _nominal_inventory(normal, normalized, nominals, budget)
         result = {'format': FORMAT, 'status': 'independent-fragment-replay-only', 'policy': POLICY,
                   'input_checked_type': raw.type, 'checked_type': normalized.type,
                   'input_annotated': root, 'input_erased': before_erased,
                   'raw_normalized': normal, 'steps': steps, 'term_correspondence': correspondence,
                   'polymorphism': inventory}
+        if nominal_inventory is not None:
+            result['nominal_data'] = nominal_inventory
         _bounded(result, cells=500_000, depth=MAX_DEPTH + 20, byte_limit=MAX_BYTES)
         return result
     except SharedTransportError:

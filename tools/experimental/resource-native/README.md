@@ -5,12 +5,15 @@ and a [real C body emitter and experimental native runtime](resource_ir_v8/READM
 The Stage05 guide gives reproducible host and native test commands. A separate
 [controlled shared-source fragment experiment](source_v8/README.md) connects a
 fresh ordinary compiler capture to independent replay, IR8 planning and the real
-runtime for a narrow Int/Bool fragment. The [source-only CLI](source_v8/README_CLI.md)
+runtime for a bounded scalar/callable fragment, now extended with closed
+single-constructor DATA and closed callable fields. The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general
 source-admission format. The full source bridge, comprehensive guard coverage,
-GC replacement and performance remain unqualified. This does not enable
-mixed-type shared-term execution in the maintained v7 source route below or
+general nominal support, GC replacement and performance remain unqualified.
+Container-handle release is not a claim of early physical deallocation or lower
+peak memory. This does not enable mixed-type shared-term execution in the
+maintained v7 source route below or
 change default behavior. Earlier integration records retain their historical
 scope.
 

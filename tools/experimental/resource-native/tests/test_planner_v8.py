@@ -81,6 +81,45 @@ def unselected_arithmetic():
                choose(boolean(),app(use(1,I),lit()),add(lit(123),lit(456))))
 
 
+def nominal(name_): return {'tag':'constructor','name':name_,'arguments':[]}
+def field_type(t):
+    if t['tag']=='arrow': return {'tag':'function','from':field_type(t['from']),'to':field_type(t['to'])}
+    return {'tag':'applied','name':t['name'],'arguments':[]}
+def declaration(type_name,ctor,*fields):
+    return {'tag':'data_kind','name':type_name,'parameters':[],
+            'constructors':[{'name':ctor,'fields':[field_type(t) for t in fields]}]}
+def with_data(declarations,body): return {'tag':'with_data','declarations':declarations,'body':body}
+def construct(ctor,*args):
+    node={'tag':'constructor','name':ctor,'arguments':[]}
+    for arg in args: node=app(node,arg)
+    return node
+def data_case(value,ctor,binders,body,result=I):
+    return {'tag':'case','scrutinee':value,'result_type':result,
+            'alternatives':[{'pattern':{'tag':'constructor','constructor':ctor,
+                                        'fields':[None if n is None else name(n) for n in binders]},'body':body}]}
+def scalar_box():
+    return with_data([declaration('Box','BoxValue',I)],
+                     let(1,construct('BoxValue',lit()),data_case(var(1),'BoxValue',[2],var(2))))
+def callable_box():
+    pending=app(lam(3,arr(I,I),var(3)),use(1,I))
+    return with_data([declaration('FnBox','FnBoxValue',arr(I,I))],
+        let(1,prefix([100],lam(2,ty(100),var(2))),
+            let(4,construct('FnBoxValue',pending),
+                let(5,data_case(var(4),'FnBoxValue',[6],var(6),arr(I,I)),
+                    choose(app(use(1,B),boolean()),app(var(5),lit()),lit(0))))))
+def curried_box():
+    return with_data([declaration('FnBox','FnBoxValue',arr(B,I))],
+        let(1,prefix([100,101],lam(2,ty(100),lam(3,ty(101),var(2)))),
+            let(4,construct('FnBoxValue',app(use(1,I,B),lit())),
+                let(5,data_case(var(4),'FnBoxValue',[6],var(6),arr(B,I)),
+                    choose(app(app(use(1,B,I),boolean()),lit(7)),app(var(5),boolean(False)),lit(0))))))
+def wildcard_box():
+    return with_data([declaration('PairBox','PairValue',I,I)],
+        let(1,prefix([100],lam(2,ty(100),var(2))),
+            data_case(construct('PairValue',app(use(1,I),lit()),app(use(1,I),lit(999))),
+                      'PairValue',[3,None],var(3))))
+
+
 def instructions(program):
     out=[]
     def walk(body):
@@ -224,6 +263,101 @@ class PlannerTests(unittest.TestCase):
             p.MAX_WORK=1
             with self.assertRaises(p.PlanningError):p.plan_fragment(raw)
         finally:p.MAX_WORK=old
+
+    def test_scalar_data_whole_case_is_delayed_with_exact_loan_order(self):
+        r=self.checked(scalar_box()); program=r['program']; maps=r['binding']['source_map']
+        self.assertEqual(len(program['layouts']),1)
+        self.assertEqual(len(maps['constructor_map']),1)
+        self.assertEqual(sum(x['role']=='constructor-spine' for x in maps['term_map']),1)
+        self.assertFalse(any(x['role']=='application' for x in maps['allocation_map']))
+        case=maps['case_map'][0]; body=program['codes'][case['code']]['body']
+        ops=[x['op'] for x in body]
+        self.assertEqual(ops[:6],['retain','force','field','retain','end_borrow','drop'])
+        self.assertEqual(ops.count('force'),1)
+        self.assertFalse(any(x['op']=='field' for x in program['entry']))
+        self.assertIn(['body','body','alternatives','0','body'],[x['source']['path'] for x in maps['term_map']])
+
+    def test_data_arrow_case_preserves_pending_payload_and_both_views(self):
+        r=self.checked(callable_box()); program=r['program']; maps=r['binding']['source_map']
+        self.assertEqual(len(program['schemes']),1);self.assertEqual(len(program['functions']),2)
+        self.assertEqual(len(program['instantiations']),2)
+        alloc=next(x for x in program['entry'] if x['op']=='alloc')
+        pending=next(x for x in program['entry'] if x['op']=='application')
+        self.assertEqual(alloc['fields'],{'f0':pending['out']})
+        self.assertFalse(any(x['op']=='force' for x in program['entry'][:program['entry'].index(alloc)]))
+        typ=program['types'][maps['case_map'][0]['result_type']]
+        self.assertEqual((typ['tag'],typ['protocol'],typ['result_identity']),('arrow','repeat','unknown'))
+        case=program['codes'][maps['case_map'][0]['code']]
+        self.assertFalse(any(x['op']=='application' for x in case['body']))
+        self.assertEqual(case['result'],'^'+maps['case_map'][0]['result_type'])
+
+    def test_data_curried_field_keeps_full_vector_and_real_capture(self):
+        r=self.checked(curried_box()); program=r['program']
+        self.assertEqual(next(iter(program['schemes'].values()))['parameters'],2)
+        self.assertEqual({tuple(x['arguments']) for x in program['instantiations'].values()},
+                         {tuple(reversed(x['arguments'])) for x in program['instantiations'].values()})
+        scoped=[f for f in program['functions'].values() if f['type_scope'] is not None]
+        self.assertEqual(len(scoped),2);self.assertEqual(sum(len(f['captures']) for f in scoped),1)
+        self.assertEqual(sum(x['op']=='alloc' for x in instructions(program)),1)
+
+    def test_data_wildcard_keeps_both_pending_payload_graphs_without_demand(self):
+        r=self.checked(wildcard_box()); program=r['program']; maps=r['binding']['source_map']
+        case=program['codes'][maps['case_map'][0]['code']]['body']
+        self.assertEqual(sum(x['op']=='application' for x in case),2)
+        self.assertEqual(sum(x['op']=='force' for x in case),1)
+        self.assertEqual(sum(x['op']=='field' for x in case),1)
+        alloc=next(x for x in case if x['op']=='alloc')
+        self.assertEqual(set(alloc['fields']),{'f0','f1'})
+        self.assertEqual(len(maps['use_map']),2)
+        self.assertTrue(all(x['op']!='force' for x in case[:case.index(alloc)]))
+
+    def test_data_brands_do_not_merge_equal_fields(self):
+        declarations=[declaration('A','MkA',I),declaration('B','MkB',I)]
+        raw=with_data(declarations,let(1,construct('MkA',lit()),
+                let(2,construct('MkB',lit(7)),data_case(var(1),'MkA',[3],var(3)))))
+        r=self.checked(raw); layouts=r['program']['layouts']
+        self.assertEqual(len(layouts),2);self.assertEqual(layouts['D0'],layouts['D1'])
+        self.assertEqual([x['declaration'] for x in r['binding']['source_map']['nominal_map']],[0,1])
+        bad=with_data(declarations,app(lam(1,nominal('A'),lit()),construct('MkB',lit())))
+        with self.assertRaises(transport.SharedTransportError):p.plan_fragment(bad)
+
+    def test_data_case_arm_capture_keeps_view_pairs_and_local_pattern_scope(self):
+        raw=with_data([declaration('Box','MkBox',I)],
+            let(1,prefix([100],lam(2,ty(100),var(2))),
+                app(data_case(construct('MkBox',lit(41)),'MkBox',[3],
+                              lam(4,B,add(var(3),app(use(1,I),lit(1)))),arr(B,I)),boolean())))
+        r=self.checked(raw); carriers=r['binding']['source_map']['carrier_map']
+        case=next(c for c in carriers if c['kind']=='data-case')
+        self.assertEqual(case['mono_captures'],[])
+        self.assertEqual(len(case['view_captures']),1)
+        inner=next(c for c in carriers if c['kind']=='lambda' and c['type_scope'] is None)
+        self.assertEqual(inner['mono_captures'][0]['binder'],3)
+        self.assertEqual(inner['view_captures'][0]['source_view']['kind'],'captured')
+
+    def test_data_source_emitter_uses_real_existing_helpers(self):
+        for raw in (scalar_box(),callable_box(),curried_box(),wildcard_box()):
+            emission=emit_runtime(self.checked(raw)['program'])
+            self.assertIn('rt8_alloc(',emission.runtime_source)
+            self.assertIn('rt8_field(',emission.runtime_source)
+            self.assertIn('rt8_end_borrow(',emission.runtime_source)
+            self.assertNotIn('rt8_case_fields_i64(',emission.runtime_source)
+
+    def test_data_unsupported_shapes_and_patterns_reject(self):
+        good=scalar_box(); bad=[]
+        partial=copy.deepcopy(good);partial['body']['value']=partial['body']['value']['function'];bad.append(partial)
+        wrong=copy.deepcopy(good);wrong['body']['value']['argument']=boolean();bad.append(wrong)
+        pattern=copy.deepcopy(good);pattern['body']['body']['alternatives'][0]['pattern']['constructor']='Absent';bad.append(pattern)
+        arity=copy.deepcopy(good);arity['body']['body']['alternatives'][0]['pattern']['fields']=[];bad.append(arity)
+        params=copy.deepcopy(good);params['declarations'][0]['parameters']=[{'name':'a','kind':{'tag':'star'}}];bad.append(params)
+        recursive=copy.deepcopy(good);recursive['declarations'][0]['constructors'][0]['fields']=[field_type(nominal('Box'))];bad.append(recursive)
+        many=copy.deepcopy(good);many['declarations'][0]['constructors'].append({'name':'Other','fields':[]});bad.append(many)
+        opened=copy.deepcopy(good);opened['declarations'][0]['constructors'][0]['fields']=[{'tag':'parameter','name':'a'}];bad.append(opened)
+        generic=with_data([declaration('Box','MkBox',I)],let(1,prefix([100],lam(2,ty(100),
+            let(3,construct('MkBox',lit()),var(2)))),app(use(1,I),lit())))
+        bad.append(generic)
+        for raw in bad:
+            with self.subTest(raw=raw),self.assertRaises((transport.SharedTransportError,p.PlanningError)):
+                p.plan_fragment(raw)
 
     @unittest.skipUnless(os.environ.get('IR8_PLANNER_NATIVE')=='1',
                          'opt-in genuine C/native fragment tests')

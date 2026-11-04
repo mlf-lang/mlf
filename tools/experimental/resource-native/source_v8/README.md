@@ -42,8 +42,44 @@ closed Int/Bool vectors at shared rank-1 callable uses; supported scalar
 primitives and an Int conditional. Pending shared RHSs, captured callable views,
 dead type parameters and curried callable values have separate regression
 cases. Bare, partial or open shared uses, recursive/nested generic definitions,
-unsupported proofs, higher-rank uses and nominal operations reject. Preserving
-declaration syntax does not admit nominal carriers or their runtime operations.
+unsupported proofs and higher-rank uses reject. Stage08 adds the closed nominal
+DATA subset below; it does not admit every preserved declaration.
+
+## Stage08: closed DATA and callable fields
+
+Only referenced declarations with no type parameters and exactly one constructor
+are admitted. Each field is Int, Bool or an arrow built recursively from those
+scalars. This permits closed curried/higher-order arrow fields, but no open types,
+forall fields, nested nominal fields or recursive DATA. The bounds are 32
+referenced nominal declarations and 32 fields per constructor. Zero-field DATA
+is allowed. Exact nominal identities stay distinct even when all field types
+are equal.
+
+Ordinary function parameter/result types and case result types may mention an
+admitted DATA type. Retained generic scopes and Scheme bodies may not contain
+DATA atoms; Scheme instantiation vectors remain complete closed Int/Bool
+vectors. A monomorphic DATA field can therefore carry a closed view of a shared
+callable without making that DATA type a generic parameter.
+
+The full declaration list remains in the source evidence. Unrelated compiler
+dictionary declarations are neither deleted nor automatically admitted. Used
+constructors must have their exact, saturated source application spine; case
+analysis must match the exact owner, sole constructor, field arity and result
+type. Unsaturated constructors with fields, extra constructor application and
+wrong nominal identities reject rather than falling back to structural field
+equality. A bare zero-field constructor is already saturated.
+
+The planner keeps field payloads pending and delays the whole case. Projection
+borrows a field, retains its owner, ends the loan and releases the container
+handle. The full callable contract and actual Access/Env are preserved. This
+ownership sequence is checked in IR and generated C. Runtime field/case/return,
+memo and invocation events plus balanced owner/loan counters provide separate
+observations; there is no individual event trace for every retain/end-borrow/drop.
+
+Physical reclamation is still coarse and group-based. In the observed callable
+case the same-home group closes **after** the extracted callable is invoked.
+Releasing a container handle does not prove that its node was freed earlier,
+nor does this stage establish lower peak memory or a performance gain.
 
 ## Fragment and planner tests
 
@@ -58,7 +94,8 @@ IR8_PLANNER_NATIVE_OUTPUT=/tmp/ir8-planner-native-fresh \
 python3 -B tools/experimental/resource-native/tests/test_planner_v8.py
 ```
 
-The fragment suite has 54 unittest cases. The planner suite has 12 unittest cases;
+The fragment suite now has 78 unittest cases. The planner suite has 20 unittest
+cases;
 its final test runs five native fragment subcases: pending shared RHS, nested
 view capture, a distinct dead-parameter vector, curried sharing and an unselected
 arithmetic branch. Without `IR8_PLANNER_NATIVE=1`, that final test is skipped.
@@ -111,13 +148,43 @@ checking, exact custody/projection and independent normalization replay. Each
 then returned 42 through the real runtime with zero live ledger after completion,
 retaining one shared node while observing opposite actual first-use orders.
 Those are finite diagnostic integration results, not general source admission.
-Separately, the portable full runner passed locally on 2026-11-04: a fresh
-GHC 9.14.1 producer build, all three positive sources including curried
+Before the Stage08 extension, the portable full runner passed locally on
+2026-11-04: a fresh GHC 9.14.1 producer build, all three positive sources including curried
 `sharedConst`, and the unused Bool/Int type-error negative control. Each positive
 returned 42 with all seven ledger categories balanced and empty, preserving the
 shared pending RHS, complete type vectors and the asserted demand/capture order.
 The run took about 350 seconds without retries. This is a local test result;
 subsequent CI results must be checked on their exact commit.
+
+For Stage08, the focused 78 host checks passed. The broader module regression
+ran 233 tests with 230 passes and three existing skips; the planner ran 20 with
+19 passes and its native opt-in test skipped. Separate genuine scalar Box and
+FnBox captures then compiled/linked with the real runtime and returned 42,
+fault zero and an empty balanced ledger in all seven categories. FnBox events
+showed the pending field application returning from the lazy case before its
+coercion ran, one shared generic RHS/callable across Bool and Int, and memo reuse.
+These observations do not substitute for the fresh three-case suite below.
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal.py \
+  --ghc /absolute/path/to/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /tmp/ir8-source-nominal-fresh
+```
+
+The three cases are `scalar-box`, `shared-field` and `curried-field`. Each makes
+a fresh public source CLI call and producer build. The curried case stores a
+`Bool -> Int` field from sharedConst while preserving the full ordered
+`[Bool, Int]` and `[Int, Bool]` use vectors. Results include actual source,
+capture/replay, planned IR, generated C, native reports and
+`nominal-observations.json` for each case, plus `results.json` or failure output.
+The full three-case suite passed locally on 2026-11-04 without retries. Every
+CLI, producer and native process returned zero; each case returned Int 42 with
+all seven ledger categories balanced and empty. In the curried case, the lazy
+case returned the pending field before it was memoized to the real curried
+closure and invoked. The group closed later, after that call. The two complete
+vectors used the same shared node and body. These are local observations, not
+an exact-commit CI result or proof of earlier physical container reclamation.
+CI appends this suite after the existing source suites and reuses their GHC install.
 
 The initial explicit-`coerce` fixtures passed ordinary source inference and
 `K.check`. The independent restricted fragment replay then rejected their
@@ -129,8 +196,9 @@ Still unqualified:
 
 - A complete public source-admission/export/3 interface and the full
   polymorphism/representation/runtime-inventory correspondence join.
-- Nominal data carriers, callable-valued SUM storage, recursive generic source
-  programs, arbitrary imported libraries, higher-rank use and broader MLF.
+- Parameterized, recursive or multi-constructor DATA, nominal-valued fields,
+  callable-valued SUM storage, recursive generic source programs, arbitrary
+  imported libraries, higher-rank use and broader MLF.
 - Complete independent observation of every Access/Env/Transport transition and
   positive/negative coverage of all 27 runtime guard families.
 - Whole-program source/model/runtime equivalence, complete GC replacement,

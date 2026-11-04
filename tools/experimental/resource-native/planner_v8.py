@@ -4,7 +4,9 @@ This is not K/source admission. Raw proof/normalization evidence is freshly
 replayed at this boundary; the returned IR candidate still requires the unchanged
 independent IR8 resource checker and emitter. Old planner/default paths are not
 imported or changed. No ordinary lambda cloning, beta reduction, identity-name
-recognition, nominal fallback, or per-type RHS expansion is performed.
+recognition, nominal fallback, or per-type RHS expansion is performed. Referenced
+closed single-constructor DATA uses exact independently replayed declarations;
+constructor payloads and whole cases remain lazy ordinary term graphs.
 """
 from __future__ import annotations
 
@@ -78,11 +80,28 @@ class Planner:
         self.types = {}; self.type_names = {}; self.signatures = {}; self.signature_names = {}
         self.functions = {}; self.codes = {}; self.schemes = {}; self.instantiations = {}
         self.instantiation_names = {}
+        self.scopes = {}
+        nominal = fragment.get('nominal_data', {})
+        self.nominal_rows = {r['index']: r for r in nominal.get('declarations', [])}
+        self.nominal_by_name = {r['name']: r for r in self.nominal_rows.values()}
+        self.constructor_rows = {tuple(r['source']['path']): r for r in nominal.get('constructors', [])}
+        self.case_rows = {tuple(r['source']['path']): r for r in nominal.get('cases', [])}
+        self.layouts = {}; self.nominal_layouts = {}; self.nominal_map = []
+        self.constructor_map = []; self.case_map = []
+        for r in self.nominal_rows.values():
+            typ = self.logical(r['type'], None); layout = 'D' + str(r['index'])
+            self.nominal_layouts[typ] = layout
+            fields = [self.logical(t, None) for t in r['field_types']]
+            self.layouts[layout] = {'f'+str(i): self.layout(t) for i,t in enumerate(fields)}
+            self.nominal_map.append({'declaration': r['index'], 'name': r['name'],
+                                     'source': r['source'], 'layout': layout,
+                                     'fields': [{'index': i, 'field': 'f'+str(i), 'type': self.type_name(t)}
+                                                for i,t in enumerate(fields)]})
         self.definitions = fragment['polymorphism']['definitions']
         self.def_by_path = {tuple(d['binding_source']['path']): d for d in self.definitions}
         self.def_by_binder = {d['binding']['id']: d for d in self.definitions}
         self.uses = {tuple(u['source']['path']): u for u in fragment['polymorphism']['uses']}
-        self.scopes = {}; self.definition_types = {}; self.use_pairs = {}; self.use_types = {}
+        self.definition_types = {}; self.use_pairs = {}; self.use_types = {}
         self.term_map = {}; self.scheme_map = []; self.use_map = []; self.carrier_map = []; self.allocation_map = []
         for d in self.definitions:
             scope = 'S' + str(d['id'])
@@ -110,11 +129,27 @@ class Planner:
         self.tick(); self.variables += 1
         return prefix + str(self.variables)
 
+    def node_at(self, path):
+        node = self.root
+        for key in path:
+            self.tick()
+            if type(node) is list:
+                require(type(key) is str and key.isascii() and key.isdecimal() and
+                        str(int(key)) == key and int(key) < len(node), 'invalid source list address')
+                node = node[int(key)]
+            else:
+                node = node[key]
+        return node
+
     def logical(self, raw, scope, depth=0):
         self.tick(); require(depth < 32, 'logical type depth limit')
         if raw['tag'] == 'constructor':
-            require(raw['name'] in SCALARS and raw['arguments'] == [], 'nominal or non-scalar type unsupported')
-            return SCALARS[raw['name']]
+            require(raw['arguments'] == [], 'parameterized nominal type unsupported')
+            if raw['name'] in SCALARS:
+                return SCALARS[raw['name']]
+            row = self.nominal_by_name.get(raw['name'])
+            require(scope is None and row is not None, 'unregistered or generic nominal type')
+            return ('nominal', row['index'], row['name'], tuple(row['source']['path']))
         if raw['tag'] == 'var':
             require(scope in self.scopes and raw['id'] in self.scopes[scope], 'foreign/open logical type')
             return self.scopes[scope][raw['id']]
@@ -135,6 +170,7 @@ class Planner:
         if typ in self.type_names:
             return self.type_names[typ]
         if typ[0] == 'scalar': row = {'tag': 'closed', 'layout': typ[1]}
+        elif typ[0] == 'nominal': row = {'tag': 'closed', 'layout': self.nominal_layouts[typ]}
         elif typ[0] == 'rigid': row = {'tag': 'rigid', 'scheme': typ[1], 'index': typ[2]}
         else:
             require(typ[0] == 'arrow' and typ[3:] == ('repeat', 'unknown'), 'unsupported callable contract')
@@ -158,7 +194,7 @@ class Planner:
     def add(self, block, source=None, logical=None, **instruction):
         self.tick(); require(self.instructions < MAX_INSTRUCTIONS, 'instruction limit')
         path = block.path(len(block.body)); self.instructions += 1; block.body.append(instruction)
-        if instruction['op'] in ('scalar', 'closure', 'application', 'thunk', 'prim2'):
+        if instruction['op'] in ('scalar', 'closure', 'application', 'thunk', 'prim2', 'alloc'):
             require(source is not None and logical is not None, 'allocation correspondence missing')
             require(len(self.allocation_map) + self.code_count < MAX_CODES, 'combined Site/Code limit')
             self.allocation_map.append({'source': address(source), 'instruction': path,
@@ -226,8 +262,15 @@ class Planner:
                 visit(n['body'], p+('body',), local | {n['name']['id']}); return
             if tag == 'application':
                 visit(n['function'], p+('function',), local); visit(n['argument'], p+('argument',), local); return
+            if tag == 'case':
+                require(p in self.case_rows, 'unmapped DATA case')
+                row = self.case_rows[p]
+                visit(n['scrutinee'], p+('scrutinee',), local)
+                bound_fields = {f['binding']['id'] for f in row['fields'] if f['binding'] is not None}
+                visit(self.node_at(row['body']['path']), tuple(row['body']['path']), local | bound_fields)
+                return
             if tag == 'with_data': visit(n['body'], p+('body',), local); return
-            require(tag in ('int64', 'bool', 'primitive'), 'unsupported carrier syntax')
+            require(tag in ('int64', 'bool', 'primitive', 'constructor'), 'unsupported carrier syntax')
         visit(node, path, bound)
         require(len(mono)+len(pairs) <= MAX_CAPTURES, 'carrier capture count exceeds 64')
         return mono, pairs
@@ -267,8 +310,7 @@ class Planner:
         if tag == 'type_application':
             require(path in self.uses, 'unmapped shared use')
             u = self.uses[path]; basepath = tuple(u['variable']['path'])
-            base = self.root
-            for part in basepath: base = base[part]
+            base = self.node_at(basepath)
             self.term(base, basepath, 'shared-use')
             ref, creation, source = self.acquire_view(self.use_pairs[path], env, views, block)
             self.use_map.append({'use': u['id'], 'source': address(path), 'definition': u['definition'],
@@ -276,6 +318,8 @@ class Planner:
                                  'creation': creation, 'source_view': source})
             require(ref.logical == self.use_types[path], 'captured full-vector view mismatch')
             return ref
+        if path in self.constructor_rows:
+            return self.constructor(node, path, env, views, home, block, scope)
         # Saturated builtin scalar operations remain delayed complete operand
         # graphs. This is checked primitive-ID lowering, never user-code inlining.
         if tag == 'application':
@@ -289,6 +333,8 @@ class Planner:
                 self.term(head,hp,'primitive')
                 return self.primitive(node,path,head,list(reversed(args)),env,views,home,block)
         self.term(node,path)
+        if tag == 'case':
+            return self.data_case(node, path, env, views, home, block, scope)
         if tag in ('int64','bool'):
             typ = SCALARS['Int' if tag=='int64' else 'Bool']; out = self.fresh()
             self.add(block,path,typ,op='scalar',out=out,**{'in':home},kind='i64' if tag=='int64' else 'bool',value=node['value'])
@@ -303,8 +349,7 @@ class Planner:
                 require(scope is None and d['free_term_bindings']==[], 'nested/external generic definition')
                 scheme='S'+str(d['id']); out=self.fresh('shared')
                 child=Block(block.root,block.name,[],block.prefix+(len(block.body),'body'),scheme)
-                cursor=self.root
-                for part in d['rhs_cursor']['path']: cursor=cursor[part]
+                cursor=self.node_at(d['rhs_cursor']['path'])
                 result=self.emit(cursor,tuple(d['rhs_cursor']['path']),{}, {}, '$home',child,scheme)
                 require(result.logical==self.definition_types[d['id']], 'generic RHS actual result type differs')
                 seal=self.add(child,op='seal',value=result.variable)
@@ -343,6 +388,75 @@ class Planner:
             self.add(block,path,typ,op='application',out=out,**{'in':home},function=fn.variable,argument=arg.variable)
             self.release(fn,block); self.release(arg,block); return Reference(out,typ)
         raise PlanningError('unsupported planning constructor: '+tag)
+
+    def constructor(self, node, path, env, views, home, block, scope):
+        require(scope is None, 'generic DATA construction unsupported')
+        row = self.constructor_rows[path]; declaration = self.nominal_rows[row['declaration']]
+        head_path = tuple(row['head']['path']); head = self.node_at(head_path)
+        require(head['tag'] == 'constructor' and head['name'] == declaration['constructor'] and
+                head['arguments'] == [], 'constructor declaration differs')
+        for source in row['application_spine']:
+            sp = tuple(source['path']); term = self.node_at(sp)
+            require(term['tag'] == 'application', 'constructor spine differs')
+            self.term(term, sp, 'constructor-spine')
+        self.term(head, head_path, 'constructor')
+        expected = [self.logical(t, None) for t in declaration['field_types']]
+        require(len(row['arguments']) == len(expected), 'constructor must be saturated')
+        fields = []
+        for source,typ in zip(row['arguments'], expected):
+            ap = tuple(source['path']); ref = self.emit(self.node_at(ap), ap, env, views, home, block, None)
+            require(ref.logical == typ, 'exact constructor field type differs')
+            fields.append(ref)
+        typ = self.logical(row['result_type'], None); out = self.fresh('data')
+        require(typ == self.logical(declaration['type'], None), 'constructor nominal identity differs')
+        publication = self.add(block, path, typ, op='alloc', out=out, **{'in':home},
+                               layout=self.nominal_layouts[typ],
+                               fields={'f'+str(i): ref.variable for i,ref in enumerate(fields)})
+        for ref in fields: self.release(ref, block)
+        self.constructor_map.append({'source': address(path), 'declaration': row['declaration'],
+                                     'head': row['head'], 'arguments': row['arguments'],
+                                     'allocation': publication})
+        return Reference(out, typ)
+
+    def data_case(self, node, path, env, views, home, block, scope):
+        require(scope is None and path in self.case_rows, 'unmapped or generic DATA case')
+        row = self.case_rows[path]; declaration = self.nominal_rows[row['declaration']]
+        typ = self.logical(row['result_type'], None); name = self.code_name('C')
+        actual,contracts,inner,saved,temps,carrier = self.captures(
+            node,path,env,views,block,None,'data-case',name)
+        cb = Block('thunk',name,[])
+        sp = tuple(row['scrutinee']['path'])
+        raw = self.emit(self.node_at(sp),sp,inner,saved,'$home',cb,None)
+        require(raw.logical == self.logical(declaration['type'],None), 'case nominal identity differs')
+        ready = self.fresh('container'); self.add(cb,op='force',out=ready,value=raw.variable)
+        fields = {}; projections = []
+        for f in row['fields']:
+            self.tick()
+            if f['binding'] is None: continue
+            loan = self.fresh('fieldloan'); owned = self.fresh('field')
+            acquire = self.add(cb,op='field',out=loan,value=ready,field='f'+str(f['index']))
+            retain = self.add(cb,op='retain',out=owned,value=loan)
+            end = self.add(cb,op='end_borrow',value=loan)
+            fields[f['binding']['id']] = Reference(owned,self.logical(f['type'],None))
+            projections.append({'index':f['index'],'binder':f['binding']['id'],
+                                'loan':acquire,'retain':retain,'end_borrow':end})
+        drop_container = self.add(cb,op='drop',value=ready)
+        bp = tuple(row['body']['path'])
+        result = self.emit(self.node_at(bp),bp,inner|fields,saved,'$home',cb,None)
+        require(result.logical == typ, 'case result full type differs')
+        for ref in list(inner.values())+list(saved.values())+list(fields.values()): self.release(ref,cb)
+        self.add(cb,op='return',value=result.variable)
+        self.codes[name] = {'result':self.layout(typ),'captures':contracts,'body':cb.body,'type_scope':None}
+        out = self.fresh('case')
+        publication = self.add(block,path,typ,op='thunk',out=out,**{'in':home},code=name,captures=actual)
+        for capture,ref in zip(carrier['view_captures'],temps):
+            capture['creation'].append(publication)
+            capture['creation'].append(self.add(block,op='drop',value=ref.variable))
+        self.case_map.append({'source':address(path),'declaration':row['declaration'],
+                              'code':name,'result_type':self.type_name(typ),
+                              'projections':projections,'drop_container':drop_container,
+                              'allocation':publication})
+        return Reference(out,typ)
 
     def delayed(self,node,path,env,views,home,block,kind):
         name=self.code_name('C')
@@ -398,11 +512,15 @@ class Planner:
         expected={tuple(r['normalized']['path']):r['tag'] for r in self.fragment['term_correspondence']}
         require({p:r['tag'] for p,r in self.term_map.items()}==expected, 'ordinary node coverage differs from independent correspondence')
         require(sorted(r['use'] for r in self.use_map)==list(range(len(self.uses))), 'missing/repeated lowered shared occurrence')
-        program={'version':8,'layouts':{},'families':{},'signatures':self.signatures,'types':self.types,
+        program={'version':8,'layouts':self.layouts,'families':{},'signatures':self.signatures,'types':self.types,
                  'schemes':self.schemes,'instantiations':self.instantiations,'functions':self.functions,
                  'codes':self.codes,'entry':block.body}
         source_map={'scheme_map':self.scheme_map,'use_map':self.use_map,'carrier_map':self.carrier_map,
                     'allocation_map':self.allocation_map,'term_map':list(self.term_map.values())}
+        if self.nominal_rows:
+            require(len(self.constructor_map)==len(self.constructor_rows) and len(self.case_map)==len(self.case_rows),
+                    'missing/repeated nominal source occurrence')
+            source_map.update(nominal_map=self.nominal_map, constructor_map=self.constructor_map, case_map=self.case_map)
         encoded=json.dumps(program,sort_keys=True,separators=(',',':'),ensure_ascii=False)
         result={'program':program,'binding':{'status':'candidate-not-resource-checked','fragment_only':True,
                 'source_admitted':False,'ordinary_K_checked':False,'mode':'coarse-owned',

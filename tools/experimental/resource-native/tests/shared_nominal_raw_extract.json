@@ -1,0 +1,2403 @@
+{
+  "cases": [
+    {
+      "expected_checked_type": {
+        "arguments": [],
+        "name": "Int",
+        "tag": "constructor"
+      },
+      "expected_erased_sha256": "a6349daa131c41666262f22a18cf440bad4564bbd87c5ff156d19352377b8dd1",
+      "expected_normalized_sha256": "df84524af1a9082d29c9505e9d2bab51aa6aa3cef363c2c1383096f036ae4cc9",
+      "expected_steps": [],
+      "extraction": "projection.projected_annotated",
+      "name": "box02",
+      "raw": {
+        "body": {
+          "body": {
+            "alternatives": [
+              {
+                "body": {
+                  "name": {
+                    "hint": "value",
+                    "id": 39201
+                  },
+                  "tag": "var"
+                },
+                "pattern": {
+                  "constructor": "ModuleEntity1",
+                  "fields": [
+                    {
+                      "hint": "value",
+                      "id": 39201
+                    }
+                  ],
+                  "tag": "constructor"
+                }
+              }
+            ],
+            "result_type": {
+              "arguments": [],
+              "name": "Int",
+              "tag": "constructor"
+            },
+            "scrutinee": {
+              "name": {
+                "hint": "boxed",
+                "id": 39182
+              },
+              "tag": "var"
+            },
+            "tag": "case"
+          },
+          "name": {
+            "hint": "boxed",
+            "id": 39182
+          },
+          "tag": "let",
+          "value": {
+            "argument": {
+              "tag": "int64",
+              "value": 42
+            },
+            "function": {
+              "arguments": [],
+              "name": "ModuleEntity1",
+              "tag": "constructor"
+            },
+            "tag": "application"
+          }
+        },
+        "declarations": [
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "arguments": [],
+                    "name": "Int",
+                    "tag": "applied"
+                  }
+                ],
+                "name": "ModuleEntity1"
+              }
+            ],
+            "name": "ModuleEntity0",
+            "parameters": [],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "from": {
+                      "name": "a",
+                      "tag": "parameter"
+                    },
+                    "tag": "function",
+                    "to": {
+                      "from": {
+                        "name": "a",
+                        "tag": "parameter"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "arguments": [],
+                        "name": "Bool",
+                        "tag": "applied"
+                      }
+                    }
+                  },
+                  {
+                    "from": {
+                      "name": "a",
+                      "tag": "parameter"
+                    },
+                    "tag": "function",
+                    "to": {
+                      "from": {
+                        "name": "a",
+                        "tag": "parameter"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "arguments": [],
+                        "name": "Bool",
+                        "tag": "applied"
+                      }
+                    }
+                  }
+                ],
+                "name": "MakeModuleEntity221"
+              }
+            ],
+            "name": "DictModuleEntity220",
+            "parameters": [
+              {
+                "kind": {
+                  "tag": "star"
+                },
+                "name": "a"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "from": {
+                      "arguments": [
+                        {
+                          "arguments": [],
+                          "name": "Char",
+                          "tag": "applied"
+                        }
+                      ],
+                      "name": "[]",
+                      "tag": "applied"
+                    },
+                    "tag": "function",
+                    "to": {
+                      "name": "a",
+                      "tag": "parameter"
+                    }
+                  }
+                ],
+                "name": "MakeModuleEntity245"
+              }
+            ],
+            "name": "DictModuleEntity244",
+            "parameters": [
+              {
+                "kind": {
+                  "tag": "star"
+                },
+                "name": "a"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "arguments": [
+                      {
+                        "name": "m",
+                        "tag": "parameter"
+                      }
+                    ],
+                    "name": "DictModuleEntity2523",
+                    "tag": "applied"
+                  },
+                  {
+                    "body": {
+                      "from": {
+                        "arguments": [],
+                        "name": "MLFStackEvidence",
+                        "tag": "applied"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "from": {
+                          "arguments": [
+                            {
+                              "arguments": [],
+                              "name": "Char",
+                              "tag": "applied"
+                            }
+                          ],
+                          "name": "[]",
+                          "tag": "applied"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "m",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        }
+                      }
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  }
+                ],
+                "name": "MakeModuleEntity268"
+              }
+            ],
+            "name": "DictModuleEntity267",
+            "parameters": [
+              {
+                "kind": {
+                  "from": {
+                    "tag": "star"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "tag": "star"
+                  }
+                },
+                "name": "m"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "from": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "name": "b",
+                            "tag": "parameter"
+                          }
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "name": "a",
+                          "tag": "parameter"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  }
+                ],
+                "name": "MakeModuleEntity2312"
+              }
+            ],
+            "name": "DictModuleEntity2311",
+            "parameters": [
+              {
+                "kind": {
+                  "from": {
+                    "tag": "star"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "tag": "star"
+                  }
+                },
+                "name": "f"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "arguments": [
+                      {
+                        "name": "f",
+                        "tag": "parameter"
+                      }
+                    ],
+                    "name": "DictModuleEntity2311",
+                    "tag": "applied"
+                  },
+                  {
+                    "body": {
+                      "from": {
+                        "name": "a",
+                        "tag": "parameter"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "argument": {
+                          "name": "a",
+                          "tag": "parameter"
+                        },
+                        "function": {
+                          "name": "f",
+                          "tag": "parameter"
+                        },
+                        "tag": "application"
+                      }
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "from": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "tag": "function",
+                            "to": {
+                              "name": "b",
+                              "tag": "parameter"
+                            }
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "body": {
+                          "from": {
+                            "from": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "tag": "function",
+                            "to": {
+                              "from": {
+                                "name": "b",
+                                "tag": "parameter"
+                              },
+                              "tag": "function",
+                              "to": {
+                                "name": "c",
+                                "tag": "parameter"
+                              }
+                            }
+                          },
+                          "tag": "function",
+                          "to": {
+                            "from": {
+                              "argument": {
+                                "name": "a",
+                                "tag": "parameter"
+                              },
+                              "function": {
+                                "name": "f",
+                                "tag": "parameter"
+                              },
+                              "tag": "application"
+                            },
+                            "tag": "function",
+                            "to": {
+                              "from": {
+                                "argument": {
+                                  "name": "b",
+                                  "tag": "parameter"
+                                },
+                                "function": {
+                                  "name": "f",
+                                  "tag": "parameter"
+                                },
+                                "tag": "application"
+                              },
+                              "tag": "function",
+                              "to": {
+                                "argument": {
+                                  "name": "c",
+                                  "tag": "parameter"
+                                },
+                                "function": {
+                                  "name": "f",
+                                  "tag": "parameter"
+                                },
+                                "tag": "application"
+                              }
+                            }
+                          }
+                        },
+                        "kind": {
+                          "tag": "star"
+                        },
+                        "name": "c",
+                        "tag": "quantified"
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  }
+                ],
+                "name": "MakeModuleEntity2116"
+              }
+            ],
+            "name": "DictModuleEntity2115",
+            "parameters": [
+              {
+                "kind": {
+                  "from": {
+                    "tag": "star"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "tag": "star"
+                  }
+                },
+                "name": "f"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "arguments": [
+                      {
+                        "name": "f",
+                        "tag": "parameter"
+                      }
+                    ],
+                    "name": "DictModuleEntity2115",
+                    "tag": "applied"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "from": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "tag": "function",
+                            "to": {
+                              "argument": {
+                                "name": "b",
+                                "tag": "parameter"
+                              },
+                              "function": {
+                                "name": "f",
+                                "tag": "parameter"
+                              },
+                              "tag": "application"
+                            }
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "from": {
+                        "name": "a",
+                        "tag": "parameter"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "argument": {
+                          "name": "a",
+                          "tag": "parameter"
+                        },
+                        "function": {
+                          "name": "f",
+                          "tag": "parameter"
+                        },
+                        "tag": "application"
+                      }
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  }
+                ],
+                "name": "MakeModuleEntity2524"
+              }
+            ],
+            "name": "DictModuleEntity2523",
+            "parameters": [
+              {
+                "kind": {
+                  "from": {
+                    "tag": "star"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "tag": "star"
+                  }
+                },
+                "name": "f"
+              }
+            ],
+            "tag": "data_kind"
+          }
+        ],
+        "tag": "with_data"
+      },
+      "source_capture": {
+        "bytes": 8800037,
+        "relative_path": "capture-box02/capture.stdout",
+        "sha256": "5b6ac8023e72915006ec8358b57085413345cc79170f021e372dd03ab0f9330c"
+      }
+    },
+    {
+      "expected_checked_type": {
+        "arguments": [],
+        "name": "Int",
+        "tag": "constructor"
+      },
+      "expected_erased_sha256": "f7fd59181ccd43b6704454447cdd6666f9726e8648002f6d57eb3d8777d0aacc",
+      "expected_normalized_sha256": "965c82bdf64a367be0a9640c6149bf48b052a8f64c87f9cdc67231badcd2715f",
+      "expected_steps": [
+        {
+          "arguments": [
+            {
+              "arguments": [],
+              "name": "Int",
+              "tag": "constructor"
+            }
+          ],
+          "input": {
+            "path": [
+              "body",
+              "body",
+              "body",
+              "body",
+              "function",
+              "function"
+            ],
+            "state": 0,
+            "subtree": {
+              "tag": "type_application",
+              "value": {
+                "body": {
+                  "argument": {
+                    "argument": {
+                      "tag": "bool",
+                      "value": true
+                    },
+                    "function": {
+                      "tag": "type_application",
+                      "value": {
+                        "name": {
+                          "hint": "moduleEntity171",
+                          "id": 38887
+                        },
+                        "tag": "var"
+                      },
+                      "witness": {
+                        "first": {
+                          "tag": "inner",
+                          "witness": {
+                            "tag": "bottom",
+                            "type": {
+                              "arguments": [],
+                              "name": "Bool",
+                              "tag": "constructor"
+                            }
+                          }
+                        },
+                        "second": {
+                          "tag": "elim"
+                        },
+                        "tag": "then"
+                      }
+                    },
+                    "tag": "application"
+                  },
+                  "function": {
+                    "tag": "type_application",
+                    "value": {
+                      "body": {
+                        "arguments": [
+                          {
+                            "id": 39269,
+                            "tag": "var"
+                          }
+                        ],
+                        "id": 13,
+                        "name": "ifThenElse",
+                        "tag": "primitive"
+                      },
+                      "bound": {
+                        "tag": "bottom"
+                      },
+                      "id": 39269,
+                      "tag": "type_lambda"
+                    },
+                    "witness": {
+                      "first": {
+                        "tag": "inner",
+                        "witness": {
+                          "tag": "bottom",
+                          "type": {
+                            "id": 87403,
+                            "tag": "var"
+                          }
+                        }
+                      },
+                      "second": {
+                        "tag": "elim"
+                      },
+                      "tag": "then"
+                    }
+                  },
+                  "tag": "application"
+                },
+                "bound": {
+                  "tag": "bottom"
+                },
+                "id": 87403,
+                "tag": "type_lambda"
+              },
+              "witness": {
+                "first": {
+                  "tag": "inner",
+                  "witness": {
+                    "tag": "bottom",
+                    "type": {
+                      "arguments": [],
+                      "name": "Int",
+                      "tag": "constructor"
+                    }
+                  }
+                },
+                "second": {
+                  "tag": "elim"
+                },
+                "tag": "then"
+              }
+            }
+          },
+          "output": {
+            "path": [
+              "body",
+              "body",
+              "body",
+              "body",
+              "function",
+              "function"
+            ],
+            "state": 1,
+            "subtree": {
+              "argument": {
+                "argument": {
+                  "tag": "bool",
+                  "value": true
+                },
+                "function": {
+                  "tag": "type_application",
+                  "value": {
+                    "name": {
+                      "hint": "moduleEntity171",
+                      "id": 38887
+                    },
+                    "tag": "var"
+                  },
+                  "witness": {
+                    "first": {
+                      "tag": "inner",
+                      "witness": {
+                        "tag": "bottom",
+                        "type": {
+                          "arguments": [],
+                          "name": "Bool",
+                          "tag": "constructor"
+                        }
+                      }
+                    },
+                    "second": {
+                      "tag": "elim"
+                    },
+                    "tag": "then"
+                  }
+                },
+                "tag": "application"
+              },
+              "function": {
+                "tag": "type_application",
+                "value": {
+                  "body": {
+                    "arguments": [
+                      {
+                        "id": 39269,
+                        "tag": "var"
+                      }
+                    ],
+                    "id": 13,
+                    "name": "ifThenElse",
+                    "tag": "primitive"
+                  },
+                  "bound": {
+                    "tag": "bottom"
+                  },
+                  "id": 39269,
+                  "tag": "type_lambda"
+                },
+                "witness": {
+                  "first": {
+                    "tag": "inner",
+                    "witness": {
+                      "tag": "bottom",
+                      "type": {
+                        "arguments": [],
+                        "name": "Int",
+                        "tag": "constructor"
+                      }
+                    }
+                  },
+                  "second": {
+                    "tag": "elim"
+                  },
+                  "tag": "then"
+                }
+              },
+              "tag": "application"
+            }
+          },
+          "rule": "instantiate_direct_closed",
+          "substitutions": [
+            {
+              "argument": {
+                "arguments": [],
+                "name": "Int",
+                "tag": "constructor"
+              },
+              "binder": 87403
+            }
+          ],
+          "type_binders": [
+            {
+              "bound": {
+                "tag": "bottom"
+              },
+              "id": 87403
+            }
+          ],
+          "witnesses": [
+            {
+              "first": {
+                "tag": "inner",
+                "witness": {
+                  "tag": "bottom",
+                  "type": {
+                    "arguments": [],
+                    "name": "Int",
+                    "tag": "constructor"
+                  }
+                }
+              },
+              "second": {
+                "tag": "elim"
+              },
+              "tag": "then"
+            }
+          ]
+        },
+        {
+          "arguments": [
+            {
+              "arguments": [],
+              "name": "Int",
+              "tag": "constructor"
+            }
+          ],
+          "input": {
+            "path": [
+              "body",
+              "body",
+              "body",
+              "body",
+              "function",
+              "function",
+              "function"
+            ],
+            "state": 1,
+            "subtree": {
+              "tag": "type_application",
+              "value": {
+                "body": {
+                  "arguments": [
+                    {
+                      "id": 39269,
+                      "tag": "var"
+                    }
+                  ],
+                  "id": 13,
+                  "name": "ifThenElse",
+                  "tag": "primitive"
+                },
+                "bound": {
+                  "tag": "bottom"
+                },
+                "id": 39269,
+                "tag": "type_lambda"
+              },
+              "witness": {
+                "first": {
+                  "tag": "inner",
+                  "witness": {
+                    "tag": "bottom",
+                    "type": {
+                      "arguments": [],
+                      "name": "Int",
+                      "tag": "constructor"
+                    }
+                  }
+                },
+                "second": {
+                  "tag": "elim"
+                },
+                "tag": "then"
+              }
+            }
+          },
+          "output": {
+            "path": [
+              "body",
+              "body",
+              "body",
+              "body",
+              "function",
+              "function",
+              "function"
+            ],
+            "state": 2,
+            "subtree": {
+              "arguments": [
+                {
+                  "arguments": [],
+                  "name": "Int",
+                  "tag": "constructor"
+                }
+              ],
+              "id": 13,
+              "name": "ifThenElse",
+              "tag": "primitive"
+            }
+          },
+          "rule": "instantiate_direct_closed",
+          "substitutions": [
+            {
+              "argument": {
+                "arguments": [],
+                "name": "Int",
+                "tag": "constructor"
+              },
+              "binder": 39269
+            }
+          ],
+          "type_binders": [
+            {
+              "bound": {
+                "tag": "bottom"
+              },
+              "id": 39269
+            }
+          ],
+          "witnesses": [
+            {
+              "first": {
+                "tag": "inner",
+                "witness": {
+                  "tag": "bottom",
+                  "type": {
+                    "arguments": [],
+                    "name": "Int",
+                    "tag": "constructor"
+                  }
+                }
+              },
+              "second": {
+                "tag": "elim"
+              },
+              "tag": "then"
+            }
+          ]
+        }
+      ],
+      "extraction": "projection.projected_annotated",
+      "name": "fnbox01",
+      "raw": {
+        "body": {
+          "body": {
+            "body": {
+              "body": {
+                "argument": {
+                  "tag": "int64",
+                  "value": 0
+                },
+                "function": {
+                  "argument": {
+                    "argument": {
+                      "tag": "int64",
+                      "value": 42
+                    },
+                    "function": {
+                      "name": {
+                        "hint": "extracted",
+                        "id": 39248
+                      },
+                      "tag": "var"
+                    },
+                    "tag": "application"
+                  },
+                  "function": {
+                    "tag": "type_application",
+                    "value": {
+                      "body": {
+                        "argument": {
+                          "argument": {
+                            "tag": "bool",
+                            "value": true
+                          },
+                          "function": {
+                            "tag": "type_application",
+                            "value": {
+                              "name": {
+                                "hint": "moduleEntity171",
+                                "id": 38887
+                              },
+                              "tag": "var"
+                            },
+                            "witness": {
+                              "first": {
+                                "tag": "inner",
+                                "witness": {
+                                  "tag": "bottom",
+                                  "type": {
+                                    "arguments": [],
+                                    "name": "Bool",
+                                    "tag": "constructor"
+                                  }
+                                }
+                              },
+                              "second": {
+                                "tag": "elim"
+                              },
+                              "tag": "then"
+                            }
+                          },
+                          "tag": "application"
+                        },
+                        "function": {
+                          "tag": "type_application",
+                          "value": {
+                            "body": {
+                              "arguments": [
+                                {
+                                  "id": 39269,
+                                  "tag": "var"
+                                }
+                              ],
+                              "id": 13,
+                              "name": "ifThenElse",
+                              "tag": "primitive"
+                            },
+                            "bound": {
+                              "tag": "bottom"
+                            },
+                            "id": 39269,
+                            "tag": "type_lambda"
+                          },
+                          "witness": {
+                            "first": {
+                              "tag": "inner",
+                              "witness": {
+                                "tag": "bottom",
+                                "type": {
+                                  "id": 87403,
+                                  "tag": "var"
+                                }
+                              }
+                            },
+                            "second": {
+                              "tag": "elim"
+                            },
+                            "tag": "then"
+                          }
+                        },
+                        "tag": "application"
+                      },
+                      "bound": {
+                        "tag": "bottom"
+                      },
+                      "id": 87403,
+                      "tag": "type_lambda"
+                    },
+                    "witness": {
+                      "first": {
+                        "tag": "inner",
+                        "witness": {
+                          "tag": "bottom",
+                          "type": {
+                            "arguments": [],
+                            "name": "Int",
+                            "tag": "constructor"
+                          }
+                        }
+                      },
+                      "second": {
+                        "tag": "elim"
+                      },
+                      "tag": "then"
+                    }
+                  },
+                  "tag": "application"
+                },
+                "tag": "application"
+              },
+              "name": {
+                "hint": "extracted",
+                "id": 39248
+              },
+              "tag": "let",
+              "value": {
+                "alternatives": [
+                  {
+                    "body": {
+                      "name": {
+                        "hint": "field",
+                        "id": 39258
+                      },
+                      "tag": "var"
+                    },
+                    "pattern": {
+                      "constructor": "ModuleEntity39",
+                      "fields": [
+                        {
+                          "hint": "field",
+                          "id": 39258
+                        }
+                      ],
+                      "tag": "constructor"
+                    }
+                  }
+                ],
+                "result_type": {
+                  "from": {
+                    "arguments": [],
+                    "name": "Int",
+                    "tag": "constructor"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "arguments": [],
+                    "name": "Int",
+                    "tag": "constructor"
+                  }
+                },
+                "scrutinee": {
+                  "name": {
+                    "hint": "boxed",
+                    "id": 39219
+                  },
+                  "tag": "var"
+                },
+                "tag": "case"
+              }
+            },
+            "name": {
+              "hint": "boxed",
+              "id": 39219
+            },
+            "tag": "let",
+            "value": {
+              "argument": {
+                "argument": {
+                  "tag": "type_application",
+                  "value": {
+                    "name": {
+                      "hint": "moduleEntity171",
+                      "id": 38887
+                    },
+                    "tag": "var"
+                  },
+                  "witness": {
+                    "first": {
+                      "tag": "inner",
+                      "witness": {
+                        "tag": "bottom",
+                        "type": {
+                          "arguments": [],
+                          "name": "Int",
+                          "tag": "constructor"
+                        }
+                      }
+                    },
+                    "second": {
+                      "tag": "elim"
+                    },
+                    "tag": "then"
+                  }
+                },
+                "function": {
+                  "body": {
+                    "name": {
+                      "hint": "coerce",
+                      "id": 39239
+                    },
+                    "tag": "var"
+                  },
+                  "parameter": {
+                    "hint": "coerce",
+                    "id": 39239
+                  },
+                  "parameter_type": {
+                    "from": {
+                      "arguments": [],
+                      "name": "Int",
+                      "tag": "constructor"
+                    },
+                    "tag": "arrow",
+                    "to": {
+                      "arguments": [],
+                      "name": "Int",
+                      "tag": "constructor"
+                    }
+                  },
+                  "tag": "lambda"
+                },
+                "tag": "application"
+              },
+              "function": {
+                "arguments": [],
+                "name": "ModuleEntity39",
+                "tag": "constructor"
+              },
+              "tag": "application"
+            }
+          },
+          "name": {
+            "hint": "moduleEntity171",
+            "id": 38887
+          },
+          "tag": "let",
+          "value": {
+            "body": {
+              "argument": {
+                "body": {
+                  "body": {
+                    "name": {
+                      "hint": "x",
+                      "id": 38908
+                    },
+                    "tag": "var"
+                  },
+                  "name": {
+                    "hint": "x",
+                    "id": 38908
+                  },
+                  "tag": "let",
+                  "value": {
+                    "argument": {
+                      "name": {
+                        "hint": "x",
+                        "id": 38903
+                      },
+                      "tag": "var"
+                    },
+                    "function": {
+                      "body": {
+                        "name": {
+                          "hint": "coerce",
+                          "id": 38913
+                        },
+                        "tag": "var"
+                      },
+                      "parameter": {
+                        "hint": "coerce",
+                        "id": 38913
+                      },
+                      "parameter_type": {
+                        "id": 38892,
+                        "tag": "var"
+                      },
+                      "tag": "lambda"
+                    },
+                    "tag": "application"
+                  }
+                },
+                "parameter": {
+                  "hint": "x",
+                  "id": 38903
+                },
+                "parameter_type": {
+                  "id": 38892,
+                  "tag": "var"
+                },
+                "tag": "lambda"
+              },
+              "function": {
+                "body": {
+                  "name": {
+                    "hint": "coerce",
+                    "id": 38900
+                  },
+                  "tag": "var"
+                },
+                "parameter": {
+                  "hint": "coerce",
+                  "id": 38900
+                },
+                "parameter_type": {
+                  "from": {
+                    "id": 38892,
+                    "tag": "var"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "id": 38892,
+                    "tag": "var"
+                  }
+                },
+                "tag": "lambda"
+              },
+              "tag": "application"
+            },
+            "bound": {
+              "tag": "bottom"
+            },
+            "id": 38892,
+            "tag": "type_lambda"
+          }
+        },
+        "declarations": [
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "from": {
+                      "arguments": [],
+                      "name": "Int",
+                      "tag": "applied"
+                    },
+                    "tag": "function",
+                    "to": {
+                      "arguments": [],
+                      "name": "Int",
+                      "tag": "applied"
+                    }
+                  }
+                ],
+                "name": "ModuleEntity39"
+              }
+            ],
+            "name": "ModuleEntity38",
+            "parameters": [],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "from": {
+                      "name": "a",
+                      "tag": "parameter"
+                    },
+                    "tag": "function",
+                    "to": {
+                      "from": {
+                        "name": "a",
+                        "tag": "parameter"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "arguments": [],
+                        "name": "Bool",
+                        "tag": "applied"
+                      }
+                    }
+                  },
+                  {
+                    "from": {
+                      "name": "a",
+                      "tag": "parameter"
+                    },
+                    "tag": "function",
+                    "to": {
+                      "from": {
+                        "name": "a",
+                        "tag": "parameter"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "arguments": [],
+                        "name": "Bool",
+                        "tag": "applied"
+                      }
+                    }
+                  }
+                ],
+                "name": "MakeModuleEntity201"
+              }
+            ],
+            "name": "DictModuleEntity200",
+            "parameters": [
+              {
+                "kind": {
+                  "tag": "star"
+                },
+                "name": "a"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "from": {
+                      "arguments": [
+                        {
+                          "arguments": [],
+                          "name": "Char",
+                          "tag": "applied"
+                        }
+                      ],
+                      "name": "[]",
+                      "tag": "applied"
+                    },
+                    "tag": "function",
+                    "to": {
+                      "name": "a",
+                      "tag": "parameter"
+                    }
+                  }
+                ],
+                "name": "MakeModuleEntity225"
+              }
+            ],
+            "name": "DictModuleEntity224",
+            "parameters": [
+              {
+                "kind": {
+                  "tag": "star"
+                },
+                "name": "a"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "arguments": [
+                      {
+                        "name": "m",
+                        "tag": "parameter"
+                      }
+                    ],
+                    "name": "DictModuleEntity2323",
+                    "tag": "applied"
+                  },
+                  {
+                    "body": {
+                      "from": {
+                        "arguments": [],
+                        "name": "MLFStackEvidence",
+                        "tag": "applied"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "from": {
+                          "arguments": [
+                            {
+                              "arguments": [],
+                              "name": "Char",
+                              "tag": "applied"
+                            }
+                          ],
+                          "name": "[]",
+                          "tag": "applied"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "m",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        }
+                      }
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  }
+                ],
+                "name": "MakeModuleEntity248"
+              }
+            ],
+            "name": "DictModuleEntity247",
+            "parameters": [
+              {
+                "kind": {
+                  "from": {
+                    "tag": "star"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "tag": "star"
+                  }
+                },
+                "name": "m"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "from": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "name": "b",
+                            "tag": "parameter"
+                          }
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "name": "a",
+                          "tag": "parameter"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  }
+                ],
+                "name": "MakeModuleEntity2112"
+              }
+            ],
+            "name": "DictModuleEntity2111",
+            "parameters": [
+              {
+                "kind": {
+                  "from": {
+                    "tag": "star"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "tag": "star"
+                  }
+                },
+                "name": "f"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "arguments": [
+                      {
+                        "name": "f",
+                        "tag": "parameter"
+                      }
+                    ],
+                    "name": "DictModuleEntity2111",
+                    "tag": "applied"
+                  },
+                  {
+                    "body": {
+                      "from": {
+                        "name": "a",
+                        "tag": "parameter"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "argument": {
+                          "name": "a",
+                          "tag": "parameter"
+                        },
+                        "function": {
+                          "name": "f",
+                          "tag": "parameter"
+                        },
+                        "tag": "application"
+                      }
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "from": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "tag": "function",
+                            "to": {
+                              "name": "b",
+                              "tag": "parameter"
+                            }
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "body": {
+                          "from": {
+                            "from": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "tag": "function",
+                            "to": {
+                              "from": {
+                                "name": "b",
+                                "tag": "parameter"
+                              },
+                              "tag": "function",
+                              "to": {
+                                "name": "c",
+                                "tag": "parameter"
+                              }
+                            }
+                          },
+                          "tag": "function",
+                          "to": {
+                            "from": {
+                              "argument": {
+                                "name": "a",
+                                "tag": "parameter"
+                              },
+                              "function": {
+                                "name": "f",
+                                "tag": "parameter"
+                              },
+                              "tag": "application"
+                            },
+                            "tag": "function",
+                            "to": {
+                              "from": {
+                                "argument": {
+                                  "name": "b",
+                                  "tag": "parameter"
+                                },
+                                "function": {
+                                  "name": "f",
+                                  "tag": "parameter"
+                                },
+                                "tag": "application"
+                              },
+                              "tag": "function",
+                              "to": {
+                                "argument": {
+                                  "name": "c",
+                                  "tag": "parameter"
+                                },
+                                "function": {
+                                  "name": "f",
+                                  "tag": "parameter"
+                                },
+                                "tag": "application"
+                              }
+                            }
+                          }
+                        },
+                        "kind": {
+                          "tag": "star"
+                        },
+                        "name": "c",
+                        "tag": "quantified"
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  }
+                ],
+                "name": "MakeModuleEntity1916"
+              }
+            ],
+            "name": "DictModuleEntity1915",
+            "parameters": [
+              {
+                "kind": {
+                  "from": {
+                    "tag": "star"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "tag": "star"
+                  }
+                },
+                "name": "f"
+              }
+            ],
+            "tag": "data_kind"
+          },
+          {
+            "constructors": [
+              {
+                "fields": [
+                  {
+                    "arguments": [
+                      {
+                        "name": "f",
+                        "tag": "parameter"
+                      }
+                    ],
+                    "name": "DictModuleEntity1915",
+                    "tag": "applied"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "from": {
+                              "name": "a",
+                              "tag": "parameter"
+                            },
+                            "tag": "function",
+                            "to": {
+                              "argument": {
+                                "name": "b",
+                                "tag": "parameter"
+                              },
+                              "function": {
+                                "name": "f",
+                                "tag": "parameter"
+                              },
+                              "tag": "application"
+                            }
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "body": {
+                        "from": {
+                          "argument": {
+                            "name": "a",
+                            "tag": "parameter"
+                          },
+                          "function": {
+                            "name": "f",
+                            "tag": "parameter"
+                          },
+                          "tag": "application"
+                        },
+                        "tag": "function",
+                        "to": {
+                          "from": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          },
+                          "tag": "function",
+                          "to": {
+                            "argument": {
+                              "name": "b",
+                              "tag": "parameter"
+                            },
+                            "function": {
+                              "name": "f",
+                              "tag": "parameter"
+                            },
+                            "tag": "application"
+                          }
+                        }
+                      },
+                      "kind": {
+                        "tag": "star"
+                      },
+                      "name": "b",
+                      "tag": "quantified"
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  },
+                  {
+                    "body": {
+                      "from": {
+                        "name": "a",
+                        "tag": "parameter"
+                      },
+                      "tag": "function",
+                      "to": {
+                        "argument": {
+                          "name": "a",
+                          "tag": "parameter"
+                        },
+                        "function": {
+                          "name": "f",
+                          "tag": "parameter"
+                        },
+                        "tag": "application"
+                      }
+                    },
+                    "kind": {
+                      "tag": "star"
+                    },
+                    "name": "a",
+                    "tag": "quantified"
+                  }
+                ],
+                "name": "MakeModuleEntity2324"
+              }
+            ],
+            "name": "DictModuleEntity2323",
+            "parameters": [
+              {
+                "kind": {
+                  "from": {
+                    "tag": "star"
+                  },
+                  "tag": "arrow",
+                  "to": {
+                    "tag": "star"
+                  }
+                },
+                "name": "f"
+              }
+            ],
+            "tag": "data_kind"
+          }
+        ],
+        "tag": "with_data"
+      },
+      "source_capture": {
+        "bytes": 8837204,
+        "relative_path": "capture-fnbox01/capture.stdout",
+        "sha256": "a323c70d884385ad42568d928b8ca3c77bdebd4109a640d6059cc107cb875603"
+      }
+    }
+  ],
+  "format": "shared-nominal-raw-extract/1",
+  "status": "raw-extracted host fixture, not independent producer authentication"
+}
