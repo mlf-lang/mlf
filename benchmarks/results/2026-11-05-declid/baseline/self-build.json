@@ -1,0 +1,142 @@
+{
+  "source_commit": "726cd256aa90d3e8cf596842fbb29515c1bc5249",
+  "manager_exit_code": 1,
+  "runner_exit_code": 1,
+  "completed": false,
+  "invocation_id": "cea4454bb1580c4f5a3dbb16adbcb227c7355952f0f639a231c39d2b6948b407",
+  "maximum_parallel_jobs": 1,
+  "self_build_argv": [
+    "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/emlf",
+    "--compile-crate",
+    "/Users/ares/.codex/worktrees/declid-task-00-evidence/mlf-crates-cache/5387acc3a3e4b8e118371ced8c7b0fd5a8868b16bb5db1dfd0f000a6b5d4810e.work-edxcIZSD/crate.spec",
+    "-o",
+    "/Users/ares/.codex/worktrees/declid-task-00-evidence/mlf-crates-cache/5387acc3a3e4b8e118371ced8c7b0fd5a8868b16bb5db1dfd0f000a6b5d4810e.work-edxcIZSD/unit"
+  ],
+  "toolchain": {
+    "clang": {
+      "path": "/opt/homebrew/Cellar/llvm/23.1.3_2/bin/clang-23",
+      "sha256": "e8917b0b0d9b09c60444ed50cf58a84d0be81a5b04f79062898aa5fe5e0a3ca1"
+    },
+    "compiler": {
+      "path": "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/emlf",
+      "sha256": "86dcabe8df31cf67ae62192314fb2709524482e0a0b26556cde0920467889b16"
+    },
+    "compiler-query-report": true,
+    "gmp": {
+      "flags": [
+        "-I/opt/homebrew/Cellar/gmp/6.3.0/include",
+        "-L/opt/homebrew/Cellar/gmp/6.3.0/lib",
+        "-lgmp"
+      ],
+      "headers": {
+        "/opt/homebrew/Cellar/gmp/6.3.0/include/gmp.h": "920496a9867a23dec3410e19da39ac446743694d539651bd78015240b0704e4b",
+        "/opt/homebrew/Cellar/gmp/6.3.0/include/gmpxx.h": "b287e1197a745582acb9c4aa0d2f2ffa16fabaeeabd0dee836553771556a00ea"
+      },
+      "libraries": {
+        "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib": "9220cca5e94b5077a99a068b0d1b9dd39da1d8febb3f518e6a8ce7aadc0d140b"
+      }
+    },
+    "implementation-identity": "MLF/shared-haskell-v1 GHC",
+    "ir-flags": [],
+    "machine": "arm64",
+    "manager": {
+      "path": "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/mlfpkg",
+      "sha256": "fa7a9a16673dff822c17452a044338743ba76d85bc082d08885775e3ace82ef2"
+    },
+    "native_environment": {
+      "CPATH": "",
+      "C_INCLUDE_PATH": "",
+      "LIBRARY_PATH": "",
+      "MACOSX_DEPLOYMENT_TARGET": "",
+      "SDKROOT": ""
+    },
+    "pkg-config": {
+      "path": "/opt/homebrew/Cellar/pkgconf/3.0.10/bin/pkgconf",
+      "sha256": "c267ae31983226de9e9e075a152de091f42828d7446ffad2d363d9cb10649c98"
+    },
+    "runtime": {
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/khash.h": "4582c7fd4b98f61339ce677bb1daa7a45a53075b112a494a335525c4bda72074",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_build_runner.c": "4b57c44190fde9de2df685af40177f4f6339d13ca8f0fc28e5bd92aa214cd74b",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_build_runner_hash.h": "cbbdfd06eb43324dceef594e42b21621559df3e3d4e91d62f2b73e2b04d9e778",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_build_runner_posix.h": "bc35cc65f2002b2f455a524c2a1c3bc12ea8637fc63bb88e3d49185e91448e27",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_byte_file.h": "04e5b38198c49bd7aa3795de5f450011343cce1fd54ecdb116eda422ae210d98",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_completion.h": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_integer64.h": "ea826b120a1a866b912fe8df15542b638a3637dcaef000fe13ba90984b0b9608",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_process_binding.h": "c9ef41739a3a388ec40701c5a9c778032618c9b8bf5c3d48e213840c0d242afa",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_process_supervisor.c": "b24d362a891e966bf1a456f1983221eaf848fe6da80379850beb5067c63944e9",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_process_supervisor.h": "808e2b68f101b03f6250d448b2e1100e1bdde2e060c669d783a0513b21d8fc05",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_process_supervisor_posix.h": "fd0d199345e9d6310aaabe3dbab858a121a03c5cfafd28de50042d78ae0438ac",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_runtime.c": "0459f63d55211cfc5dfc1f8a10700891a1e7e335e91b564b4403383668a7df1c",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_runtime.h": "b778f6afeba571f38bf6ca0456352b231d830f805ee45c729d02e95b6d0fb6da",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_system.h": "cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_system_windows.h": "31b4de3c8a5bd6051f7c8916624a250f8b4b305b40b4cc7923aa648894d654f3",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_windows.h": "618fb88b0c854fcbe8dffee5b961a74025d79b89c00d7158dc540b15066e4b56",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_windows_host.c": "df466813e6c91129734fd2fa3e9aaa7cfa53611af44c156045609fa5f1f33be3",
+      "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_windows_path.h": "e52b718c63e0603cb653a3874ae1a6130cd5a184121dde7868c4d03376c84e05"
+    },
+    "runtime-path": "/Users/ares/.codex/worktrees/declid-task-00-base/runtime/mlf_runtime.c",
+    "system": "Darwin"
+  },
+  "runner": {
+    "path": "/Users/ares/.codex/worktrees/declid-task-00-evidence/runner/mlf-build-runner",
+    "sha256": "6e892af2662ebb05687600228e9a246d16702bac3aff2a6eecc3d2acccb42cea"
+  },
+  "completed_dependencies": [
+    {
+      "cached": false,
+      "job_id": "library-prelude-mlf-foundation",
+      "key": "c689317b380254791ddd7f30ba8984b6a5c16427e6ec577ee030a598dbe3f6e9",
+      "kind": "crate mlf-foundation/0.3.0/library"
+    },
+    {
+      "cached": false,
+      "job_id": "library-prelude-mlf-language-core",
+      "key": "67231d0ff1276e039b0dada37eaba32f51a805b374ceead80bc771b19ed47365",
+      "kind": "crate mlf-language-core/0.3.0/library"
+    },
+    {
+      "cached": false,
+      "job_id": "library-prelude-mlf-frontend",
+      "key": "ac5bfc6067a98ac5fa05e9e9a237a1cf7bdc5d664c4064803874f7844478f8c2",
+      "kind": "crate mlf-frontend/0.3.0/library"
+    },
+    {
+      "cached": false,
+      "job_id": "library-prelude-mlf-xmlf",
+      "key": "105815b634a8c52c5f4e4e45859c3b2424beb8769d17495d77833d258584dcf6",
+      "kind": "crate mlf-xmlf/0.3.0/library"
+    },
+    {
+      "cached": false,
+      "job_id": "library-prelude-mlf-inference",
+      "key": "cf2e9738a9eaa1bee5911ab1fc053523e26672cab8304bf1228786788e1f8736",
+      "kind": "crate mlf-inference/0.3.0/library"
+    },
+    {
+      "cached": false,
+      "job_id": "library-prelude-mlf-llvm",
+      "key": "c43250d9221306fa20cdb310792b1fc804d77b0aae4fd0fe84bb08dff698358a",
+      "kind": "crate mlf-llvm/0.3.0/library"
+    }
+  ],
+  "diagnostic": "binary expanded-work limit exceeded",
+  "inferred_groups": 1715,
+  "reused_groups": 0,
+  "target_query_generation_published": false,
+  "emitted_products": {
+    "unit.queries": {
+      "bytes": 2404607,
+      "sha256": "7744ab282aeeba4fb388763f0cc9316fdabc27aa5ef7737d910f019ecb39d91a"
+    },
+    "unit.mlfci": {
+      "bytes": 819007,
+      "sha256": "e599db303b8667d17a21922b3deac998893311e4bc1724ce3101dcad11dcf44b"
+    },
+    "unit.mlfco": {
+      "bytes": 5773915,
+      "sha256": "7710a28ae12cd012c0e09b55db2d0aeea615363f16a2615f653c76032c1c4e21"
+    }
+  },
+  "build_report_sha256": "ca14e23e434c802657cc367d2e9eb88759148ee3e80883b5a934e0c51bc1cc1b",
+  "build_log_sha256": "feb9f1a401a7f878a35898219fc926078002242d0624fea1985c0cb49f3d3dc6"
+}
