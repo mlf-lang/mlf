@@ -32,6 +32,11 @@ value becomes a concrete closure or a complete shared callable view.
 [Exact nominal owner captures](resource_ir_v8/README_STAGE18.md) add already
 admitted DATA/SUM owners without flattening their fields or changing runtime
 representation, capture support or default behavior.
+[Closed nominal-arrow helper captures](resource_ir_v8/README_STAGE20.md) extend
+ordinary recursive captures to arrows with exact already-published nominal
+leaves, preserving pending helpers, full types and shared origins. This changes
+neither runtime nor DATA/SUM field restrictions; fresh-suite status is recorded
+separately in the stage guide.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general

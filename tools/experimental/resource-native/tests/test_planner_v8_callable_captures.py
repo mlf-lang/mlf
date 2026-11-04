@@ -134,8 +134,15 @@ class CallableCapturePlannerTests(unittest.TestCase):
         self.assertEqual(a['layout'],b['layout'])
         self.assertNotEqual(closure['captures'][a['capture']],closure['captures'][b['capture']])
 
-    def test_nominal_callable_owner_still_rejected(self):
-        with self.assertRaises(transport.SharedTransportError):planner.plan_fragment(fixture('nominal'))
+    def test_foreign_nominal_callable_owner_still_rejected(self):
+        # Published closed nominal arrows are admitted by the newer policy;
+        # an undeclared nominal atom is still not an ordinary callable type.
+        raw=fixture('nominal');step=raw['body']['body']['body']['value']
+        foreign=f.nominal('Foreign')
+        step['function']['parameter_type']=f.arr(foreign,f.I)
+        step['argument']['parameter_type']=foreign
+        with self.assertRaises(transport.SharedTransportError) as caught:planner.plan_fragment(raw)
+        self.assertEqual(caught.exception.code,'TYPE')
 
     def test_callable_inventory_and_full_type_forgeries_rejected(self):
         raw=fixture();fragment=transport.derive_shared_fragment(raw)

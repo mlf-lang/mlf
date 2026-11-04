@@ -18,9 +18,10 @@ or parameterized/higher-rank data. At most one retained recursive group globally
 is admitted, containing one concrete closed monomorphic function. Its optional
 capture policies permit closed Int/Bool owners, exact full-vector lexical
 shared views, and ordinary owners of recursively closed scalar-arrow types.
-Already admitted closed DATA/SUM nominal owners have a separate capture policy;
-arrows containing nominal leaves, open/higher-rank callables and bare Schemes
-remain excluded. Its
+Already admitted closed DATA/SUM nominal owners have a separate capture policy.
+A further explicit policy permits ordinary captured arrows with exact published
+nominal leaves; those leaves are type obligations, not additional owners. Open
+or higher-rank callables and bare Schemes remain excluded. Its
 introduction spine has at most eight exact typed passthrough
 wrappers. This is not a termination proof or generic/value-recursion permission.
 The complete RHS, including ordinary annotation applications, remains unchanged.
@@ -62,6 +63,7 @@ RECURSION_POLICY = 'closed-single-function-recursion/1'
 RECURSIVE_CAPTURE_POLICY = 'closed-scalar-shared-view-captures/1'
 RECURSIVE_CALLABLE_CAPTURE_POLICY = 'closed-scalar-callable-shared-view-captures/1'
 RECURSIVE_NOMINAL_CAPTURE_POLICY = 'closed-scalar-callable-nominal-shared-view-captures/1'
+RECURSIVE_ADMITTED_CALLABLE_CAPTURE_POLICY = 'closed-admitted-callable-shared-view-captures/1'
 NOMINAL_POLICY = 'closed-single-constructor-data/1'
 INT = {'tag': 'constructor', 'name': 'Int', 'arguments': []}
 BOOL = {'tag': 'constructor', 'name': 'Bool', 'arguments': []}
@@ -1071,6 +1073,35 @@ def _published_nominal_capture(typ, path, registry, published, budget):
     _fail('RECURSION', 'nominal capture declaration is absent from published DATA/SUM evidence', path)
 
 
+def _closed_admitted_callable(typ, path, registry, published, budget):
+    """An exact root arrow with at least one already published nominal leaf.
+
+    Called only after the unchanged scalar-arrow check. The snapshotted type
+    has existing depth/cell bounds; charge every visited node and declaration
+    lookup. Never select a new family, unfold a nominal, or infer a target Code,
+    origin, readiness, support relation or extra physical capture from its type.
+    """
+    if type(typ) is not dict or typ.get('tag') != 'arrow':
+        return False
+    work, nominal = [typ], False
+    while work:
+        budget.tick()
+        node = work.pop()
+        if _scalar(node):
+            continue
+        if type(node) is not dict:
+            return False
+        if set(node) == {'tag', 'from', 'to'} and node['tag'] == 'arrow':
+            work.extend((node['to'], node['from']))
+        elif (set(node) == {'tag', 'name', 'arguments'} and node['tag'] == 'constructor'
+              and type(node['name']) is str and node['arguments'] == []):
+            _published_nominal_capture(node, path, registry, published, budget)
+            nominal = True
+        else:
+            return False
+    return nominal
+
+
 def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, published, budget):
     """Partition all external raw variables using checked lexical use evidence.
 
@@ -1091,6 +1122,7 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, pub
                 _fail('RECURSION', 'shared view occurrence is not unique', path)
             uses[path] = use
     scalars, callables, nominals, views, accounted = {}, {}, {}, {}, set()
+    admitted_callable = False
     for relative, node in _walk(rhs):
         budget.tick()
         if node['tag'] != 'var' or node['name']['id'] not in free:
@@ -1106,6 +1138,15 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, pub
         elif _closed_scalar_callable(typ, budget):
             # This is the lexical ordinary owner, possibly still pending. Its
             # eventual target/Code/Access cannot be deduced from an arrow type.
+            row = callables.setdefault(ident, {'binding': node['name'], 'type': typ, 'occurrences': []})
+            if not _same(row['type'], typ):
+                _fail('RECURSION', 'callable capture has inconsistent complete lexical types', path)
+            row['occurrences'].append(_address('normalized', path))
+        elif (typ['tag'] == 'arrow' and
+              _closed_admitted_callable(typ, path, inferred.nominals, published, budget)):
+            # The owner remains an ordinary pending-capable callable. Nominal
+            # leaves are checked against published declarations, not captured.
+            admitted_callable = True
             row = callables.setdefault(ident, {'binding': node['name'], 'type': typ, 'occurrences': []})
             if not _same(row['type'], typ):
                 _fail('RECURSION', 'callable capture has inconsistent complete lexical types', path)
@@ -1143,6 +1184,9 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, pub
         result['policy'] = RECURSIVE_NOMINAL_CAPTURE_POLICY if nominals else RECURSIVE_CALLABLE_CAPTURE_POLICY
         result['callables'] = [callables[key] for key in sorted(callables)]
     if nominals:
+        result['nominals'] = [nominals[key] for key in sorted(nominals)]
+    if admitted_callable:
+        result['policy'] = RECURSIVE_ADMITTED_CALLABLE_CAPTURE_POLICY
         result['nominals'] = [nominals[key] for key in sorted(nominals)]
     return result
 

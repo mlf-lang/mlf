@@ -156,6 +156,11 @@ jobs:
           set -euo pipefail
           python3 -B tools/experimental/resource-native/tests/test_planner_v8_nominal_captures.py \
             2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/nominal-captures-planner.log"
+      - name: Check nominal-arrow callable captures and prior-plan preservation
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_planner_v8_nominal_callable_captures.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/nominal-callable-captures-planner.log"
       - name: Retain fragment evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -262,9 +267,11 @@ jobs:
   ir8-nominal-captures-source:
     name: IR8 nominal recursive captures from fresh source
     runs-on: ubuntu-24.04
-    # Keep the existing 26-case/60-minute job unchanged. These two new cases
-    # build their own pinned toolchain on a separate runner, with existing
-    # per-process limits and no reuse of compiler captures.
+    # Keep the 26-case/60-minute job unchanged. This job runs the existing two
+    # nominal-owner cases plus two nominal-arrow helper cases with one GHC setup.
+    # Keep 20 minutes and all per-process caps. Stage19 took 6m56s for setup and
+    # two cases; that observation is not a guarantee for four cases on every runner.
+    # No preserved compiler capture substitutes for a fresh source invocation.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -295,6 +302,11 @@ jobs:
           python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal_captures.py \
             --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
             --output "$RUNNER_TEMP/ir8-source-nominal-captures"
+      - name: Run fresh nominal-argument and nominal-result helper captures
+        run: |
+          python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal_callable_captures.py \
+            --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
+            --output "$RUNNER_TEMP/ir8-source-nominal-callable-captures"
       - name: Retain nominal capture source evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -303,5 +315,6 @@ jobs:
           path: |
             ${{ runner.temp }}/ir8-nominal-captures-setup
             ${{ runner.temp }}/ir8-source-nominal-captures
+            ${{ runner.temp }}/ir8-source-nominal-callable-captures
           if-no-files-found: warn
           retention-days: 14

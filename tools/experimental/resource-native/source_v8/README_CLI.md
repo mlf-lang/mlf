@@ -63,9 +63,13 @@ may remain pending and resolve to a concrete closure or a full shared callable
 view without a new CLI option. [Stage18](../resource_ir_v8/README_STAGE18.md)
 also admits ordinary owners of exact already-supported closed DATA/SUM types.
 It preserves their pending annotations, complete Reference and capture support;
-it does not reconstruct fields or views. Nominal generic arguments, arrows with
-nominal leaves, recursive generic definitions and other existing family
-restrictions remain rejected. No CLI flag or default changes.
+it does not reconstruct fields or views. [Stage20](../resource_ir_v8/README_STAGE20.md)
+also permits ordinary recursive captures of full closed arrows containing exact
+already-published DATA/SUM nominal leaves. It preserves each pending owner,
+complete type, support and occurrence path without selecting another family.
+Nominal generic arguments and recursive generic definitions remain rejected;
+DATA field arrows still have only Int/Bool leaves and SUM cases still return Int.
+No CLI flag or default changes.
 See the [fragment contract](README.md) for its limits.
 
 For example, a closed callable field can use the same `SharedPoly.emlf` above:
@@ -307,6 +311,23 @@ locally on 2026-11-04: all 16 process records returned zero, both native reports
 exactly match their earlier coarse-O0 baselines, and both return Int 42 with
 seven balanced empty ledgers. The new CI step uses default coarse placement and
 retains earlier suites and limits; exact-commit CI is still pending.
+
+Stage20 adds a separate two-case fresh-source suite for nominal-argument and
+nominal-result callable captures:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal_callable_captures.py \
+  --ghc /absolute/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /absolute/new-nominal-callable-suite-directory
+```
+
+It uses default coarse placement and the unchanged CLI, retaining
+`nominal-callable-observations.json` per case. The fresh two-case suite passed:
+all 16 process records exited zero without cleanup errors, both results are
+Int42 with seven balanced empty terminal ledgers, and complete native reports
+match the original coarse-O0 reports including every work field. Its 50 report
+and 12 structure controls reject; no additional fault pair was run. Exact-head
+CI remains separate. See the [Stage20 scope and validation status](../resource_ir_v8/README_STAGE20.md).
 
 This remains a bounded opt-in experiment. It does not establish arbitrary MLF
 source support, general nominal or callable-SUM coverage, all runtime guards,

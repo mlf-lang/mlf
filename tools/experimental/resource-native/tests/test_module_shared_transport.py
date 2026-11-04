@@ -1904,14 +1904,16 @@ class RecursiveCallableCaptureReplayTests(unittest.TestCase):
             m._closed_scalar_callable(arr(I,I),m._Budget())
         self.assertEqual(caught.exception.code,'LIMIT')
 
-    def test_nominal_domain_or_result_callable_owners_are_rejected(self):
+    def test_nominal_domain_or_result_requires_new_explicit_policy(self):
         domain=let(20,lam(21,nominal_type('Chain'),lit()),
             rec_binding(10,arr(I,I),lam(11,I,app(var(20),ctor('Nil'))),lit()))
         result=let(20,lam(21,I,ctor('Nil')),
             rec_binding(10,arr(I,I),lam(11,I,sum_case(app(var(20),var(11)),
                 [sum_arm('Nil',(),lit()),sum_arm('Cons',(22,23),var(22))])),lit()))
-        self.reject(with_data(domain,recursive_decl()),'RECURSION')
-        self.reject(with_data(result,recursive_decl()),'RECURSION')
+        for raw in (domain,result):
+            caps=m.derive_shared_fragment(with_data(raw,recursive_decl()))['recursion']['bindings'][0]['captures']
+            self.assertEqual(caps['policy'],m.RECURSIVE_ADMITTED_CALLABLE_CAPTURE_POLICY)
+            self.assertEqual(caps['nominals'],[])
 
     def test_open_higher_rank_and_bare_scheme_are_not_ordinary_callables(self):
         raw=lam(20,arr(tv(500),I),rec_binding(10,arr(I,I),lam(11,I,lit()),lit()))
@@ -2173,10 +2175,11 @@ class RecursiveNominalCaptureReplayTests(unittest.TestCase):
         declaration=data_decl();declaration['parameters']=[{'name':'a','kind':{'tag':'star'}}]
         self.reject(with_data(lam(20,nominal_type('Box'),rec_binding(10,arr(I,I),lam(11,I,lit()),lit())),declaration))
 
-    def test_nominal_arrows_generic_recursion_and_nominal_scheme_arguments_stay_out(self):
+    def test_nominal_arrows_need_new_policy_but_generic_recursion_and_scheme_arguments_stay_out(self):
         raw=with_data(let(20,lam(21,nominal_type('Box'),lit()),
             rec_binding(10,arr(I,I),lam(11,I,app(var(20),ctor('Pack',lit()))),lit())))
-        self.reject(raw,'RECURSION')
+        self.assertEqual(m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']['policy'],
+                         m.RECURSIVE_ADMITTED_CALLABLE_CAPTURE_POLICY)
         raw=with_data(tapp(tabs(100,lam(20,nominal_type('Box'),
             rec_binding(10,arr(I,I),lam(11,I,lit()),lit()))),inst(I)))
         self.reject(raw,'RECURSION')
@@ -2240,6 +2243,9 @@ class RetainedRecursiveNominalCaptureTests(unittest.TestCase):
                 self.assertTrue(report['fragment_admitted']);self.assertFalse(report['source_admitted'])
                 self.assertFalse(report['native_admitted'])
                 capture=json.loads(path.read_bytes());out=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+                self.assertEqual(hashlib.sha256(m._json(out).encode()).hexdigest(),{
+                    'data-owner':'967c268896ec123ea0438714978c59227dc0a1e330d93d1c841b27876df77e26',
+                    'sum-owner':'fdf180e94fb796670610fb5f02e4af6db9b5f85da1b1a7cc848064af08a5e93b'}[label])
                 self.assertEqual(out['steps'],capture['normalization']['steps'])
                 self.assertEqual(out['raw_normalized'],capture['normalization']['raw_normalized'])
                 self.assertEqual(out['checked_type'],I);self.assertEqual(len(out['steps']),2)
@@ -2285,6 +2291,279 @@ class RetainedRecursiveNominalCaptureTests(unittest.TestCase):
                     seed_case=next(c for c in out['nominal_sum']['cases']
                                    if m._get(raw,c['scrutinee']['path'])=={'tag':'var','name':binding['name']})
                     self.assertIsNone(seed_case['arms'][1]['fields'][1]['binding'])
+                self.assertEqual(old_path.read_bytes(),old_bytes)
+                old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
+                self.assertEqual(old['fragment_error']['code'],'RECURSION')
+
+
+def admitted_callable_capture(domain=True):
+    """Synthetic nominal-arrow owner; preserves pending annotation applications."""
+    tree=monomorphic_recursion();rec=tree['body']['body']
+    if domain:
+        typ=arr(nominal_type('Chain'),I)
+        helper=lam(72,nominal_type('Chain'),sum_case(var(72),
+            [sum_arm('Nil',(),lit(0)),sum_arm('Cons',(73,None),app(use(1,I),var(73)))]))
+        demand=app(var(70),var(31))
+    else:
+        typ=arr(I,nominal_type('Box'))
+        tree['declarations'].append(data_decl())
+        helper=lam(72,I,ctor('Pack',app(use(1,I),var(72))))
+        demand=case(app(var(70),var(32)),'Pack',(73,),var(73))
+    second=copy.deepcopy(demand)
+    if not domain:
+        second=case(app(var(70),var(32)),'Pack',(74,),var(74))
+    rec['bindings'][0]['value']['argument']['body']['alternatives'][1]['body']=add(
+        add(demand,second),app(var(30),var(33)))
+    rec['body']=let(50,add(lit(20),lit(1)),choose(app(use(1,B),boolean()),
+        add(app(var(30),ctor('Nil')),app(var(30),ctor('Cons',var(50),ctor('Nil')))),lit(0)))
+    tree['body']['body']=let(70,app(lam(71,typ,var(71)),helper),rec)
+    return tree
+
+
+class AdmittedCallableCaptureReplayTests(unittest.TestCase):
+    reject=ReplayTests.reject
+
+    def test_domain_and_result_keep_exact_graph_type_and_both_occurrences(self):
+        for domain in (True,False):
+            with self.subTest(domain=domain):
+                tree=admitted_callable_capture(domain);out=m.derive_shared_fragment(tree)
+                self.assertEqual(out['raw_normalized'],tree);self.assertEqual(out['input_erased'],p.erase_total(tree))
+                self.assertEqual(len(out['term_correspondence']),len(m._ordinary(tree)))
+                row,=out['recursion']['bindings'];caps=row['captures'];owner,=caps['callables']
+                self.assertEqual(set(caps),{'policy','scalars','callables','nominals','views'})
+                self.assertEqual(caps['policy'],m.RECURSIVE_ADMITTED_CALLABLE_CAPTURE_POLICY)
+                self.assertEqual(caps['scalars'],[]);self.assertEqual(caps['nominals'],[]);self.assertEqual(caps['views'],[])
+                self.assertEqual(set(owner),{'binding','type','occurrences'})
+                self.assertEqual(owner['binding'],name(70));self.assertEqual(row['free_term_bindings'],[70])
+                self.assertEqual(owner['type'],arr(nominal_type('Chain'),I) if domain else arr(I,nominal_type('Box')))
+                self.assertEqual([m._get(tree,a['path']) for a in owner['occurrences']],[var(70)]*2)
+                self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I],[B]])
+                self.assertEqual(m.validate_shared_fragment(tree,out),out)
+
+    def test_nested_higher_order_types_are_exact_without_unfolding_or_extra_owners(self):
+        typ=arr(arr(nominal_type('Box'),I),arr(B,nominal_type('Chain')))
+        tree=with_data(lam(20,typ,rec_binding(10,arr(I,I),lam(11,I,let(21,var(20),lit())),lit())),
+                       data_decl(),recursive_decl())
+        out=m.derive_shared_fragment(tree);caps=out['recursion']['bindings'][0]['captures']
+        self.assertEqual(caps['callables'][0]['type'],typ);self.assertEqual(caps['nominals'],[])
+        self.assertEqual(out['nominal_data']['constructors'],[]);self.assertEqual(out['nominal_sum']['constructors'],[])
+        self.assertEqual(len(caps['callables']),1)
+
+    def test_same_shape_families_and_same_type_distinct_owners_remain_distinct(self):
+        raw=with_data(let(40,lam(41,nominal_type('First'),lit()),
+            let(20,lam(21,nominal_type('Second'),lit()),let(30,var(20),
+            rec_binding(10,arr(I,I),lam(11,I,add(app(var(40),ctor('A',lit())),
+                add(app(var(20),ctor('B',lit())),app(var(30),ctor('B',lit()))))),lit())))),
+            data_decl('First','A'),data_decl('Second','B'))
+        rows=m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']['callables']
+        self.assertEqual([r['binding']['id'] for r in rows],[20,30,40])
+        self.assertEqual([r['type']['from']['name'] for r in rows],['Second','Second','First'])
+
+    def test_nested_unselected_arm_occurrences_remain_complete(self):
+        tree=admitted_callable_capture();rec=tree['body']['body']['body']
+        arms=rec['bindings'][0]['value']['argument']['body']['alternatives']
+        arms[0]['body']=app(lam(80,I,app(var(70),ctor('Nil'))),lit())
+        row=m.derive_shared_fragment(tree)['recursion']['bindings'][0]['captures']['callables'][0]
+        self.assertEqual(len(row['occurrences']),3)
+        self.assertEqual(len({tuple(a['path']) for a in row['occurrences']}),3)
+        self.assertEqual([m._get(tree,a['path']) for a in row['occurrences']],[var(70)]*3)
+
+    def test_scalar_callable_nominal_owner_scalar_and_shared_view_stay_separate(self):
+        tree=admitted_callable_capture();rec=tree['body']['body']['body']
+        arm=rec['bindings'][0]['value']['argument']['body']['alternatives'][1]
+        arm['body']=add(arm['body'],add(app(var(81),var(80)),
+            add(app(use(1,I),var(80)),case(var(82),'Pack',(83,),var(83)))))
+        tree['declarations'].append(data_decl())
+        tree['body']['body']['body']=let(80,lit(),let(81,lam(84,I,var(84)),let(82,ctor('Pack',lit()),rec)))
+        row=m.derive_shared_fragment(tree)['recursion']['bindings'][0];caps=row['captures']
+        self.assertEqual([r['binding']['id'] for r in caps['callables']],[70,81])
+        self.assertEqual([r['binding']['id'] for r in caps['scalars']],[80])
+        self.assertEqual([r['binding']['id'] for r in caps['nominals']],[82])
+        self.assertEqual([r['arguments'] for r in caps['views']],[[I]])
+        self.assertEqual(row['free_term_bindings'],[1,70,80,81,82])
+        with mock.patch.object(m,'MAX_RECURSIVE_CAPTURES',5):self.reject(tree,'LIMIT')
+
+    def test_64_owner_boundary_with_and_without_self_not_nominal_leaf_count(self):
+        def tree(count,self_use):
+            terms=[app(var(1000+i),ctor('Pack',lit(0))) for i in range(count)]
+            if self_use:terms.append(app(var(10),var(11)))
+            while len(terms)>1:
+                terms=[add(terms[i],terms[i+1]) if i+1<len(terms) else terms[i]
+                       for i in range(0,len(terms),2)]
+            raw=rec_binding(10,arr(I,I),lam(11,I,terms[0]),lit())
+            for i in reversed(range(count)):raw=let(1000+i,var(20),raw)
+            return with_data(let(20,lam(21,nominal_type('Box'),lit()),raw))
+        for count,self_use in ((63,True),(64,False)):
+            row=m.derive_shared_fragment(tree(count,self_use))['recursion']['bindings'][0]
+            self.assertEqual(len(row['captures']['callables']),count)
+            self.assertEqual(bool(row['self_uses']),self_use);self.assertEqual(row['captures']['nominals'],[])
+        self.reject(tree(64,True),'LIMIT')
+
+    def test_missing_publication_rejects_even_if_nominal_is_in_arrow_only(self):
+        original=m._nominal_inventory
+        def omit(*args):
+            data,sums=original(*args);return None,sums
+        with mock.patch.object(m,'_nominal_inventory',side_effect=omit):
+            self.reject(admitted_callable_capture(False),'RECURSION')
+
+    def test_no_late_family_selection_or_equal_copied_registry_authority(self):
+        original=m._nominal_inventory
+        for copy_row in (False,True):
+            def change(*args):
+                data,sums=original(*args)
+                if copy_row:data=copy.deepcopy(data)
+                else:args[2].selected.pop(1)
+                return data,sums
+            with self.subTest(copy_row=copy_row),mock.patch.object(m,'_nominal_inventory',side_effect=change):
+                self.reject(admitted_callable_capture(False),'RECURSION')
+
+    def test_bounded_leaf_walk_exact_shapes_and_charged_work(self):
+        budget=m._Budget();registry=m._Nominals(with_data(lit()),budget)
+        row=registry.select('Box');published=({'declarations':[row]},None)
+        before=budget.work
+        self.assertTrue(m._closed_admitted_callable(arr(nominal_type('Box'),I),(),registry,published,budget))
+        self.assertEqual(budget.work-before,5)
+        bad=[I,nominal_type('Box'),arr(I,I),arr(tv(100),I),arr(I,BOT),
+             arr(I,forall(100,arr(tv(100),tv(100)))),
+             arr(I,{'tag':'constructor','name':'Box','arguments':[I]}),
+             {'tag':'arrow','from':nominal_type('Box'),'to':I,'extra':True}]
+        for typ in bad:
+            with self.subTest(typ=typ):
+                self.assertFalse(m._closed_admitted_callable(typ,(),registry,published,m._Budget()))
+        with mock.patch.object(m,'MAX_WORK',2),self.assertRaises(m.SharedTransportError) as caught:
+            m._closed_admitted_callable(arr(nominal_type('Box'),I),(),registry,published,m._Budget())
+        self.assertEqual(caught.exception.code,'LIMIT')
+
+    def test_foreign_open_parameterized_higher_rank_and_bad_families_still_reject(self):
+        bad=[arr(nominal_type('Unknown'),I),arr(I,tv(500)),arr(forall(500,arr(tv(500),tv(500))),I)]
+        applied=nominal_type('Box');applied['arguments']=[I];bad.append(arr(I,applied))
+        for typ in bad:
+            with self.subTest(typ=typ):
+                self.reject(with_data(lam(20,typ,rec_binding(10,arr(I,I),lam(11,I,let(21,var(20),lit())),lit()))))
+        invalid=[data_decl('Box','Pack',(nominal_type('Box'),)),
+                 sum_decl('Box',(('Empty',()),('Pack',(arr(I,I),)))),
+                 sum_decl('Box',(('Empty',()),('Pack',(nominal_type('Other'),))))]
+        param=data_decl();param['parameters']=[{'name':'a','kind':{'tag':'star'}}];invalid.append(param)
+        for declaration in invalid:
+            self.reject(with_data(lam(20,arr(nominal_type('Box'),I),
+                rec_binding(10,arr(I,I),lam(11,I,let(21,var(20),lit())),lit())),declaration))
+
+    def test_full_nominal_arrow_mismatch_is_not_structural_field_equality(self):
+        raw=with_data(let(20,lam(21,nominal_type('First'),lit()),
+            rec_binding(10,arr(I,I),lam(11,I,app(var(20),ctor('B',lit()))),lit())),
+            data_decl('First','A'),data_decl('Second','B'))
+        self.reject(raw,'TYPE')
+
+    def test_generic_recursion_bare_scheme_and_nominal_type_arguments_stay_rejected(self):
+        tree=admitted_callable_capture();body=tree['body']
+        tree['body']=tapp(tabs(500,body),inst(I));self.reject(tree,'RECURSION')
+        self.reject(with_data(shared(app(use(1,nominal_type('Box')),ctor('Pack',lit())))),'USE')
+        self.reject(shared(rec_binding(10,arr(I,I),lam(11,I,let(20,var(1),lit())),lit())))
+
+    def test_forged_policy_arrays_complete_type_owner_or_occurrences_reject(self):
+        tree=admitted_callable_capture(False);out=m.derive_shared_fragment(tree)
+        mutations=[lambda c:c.update(policy=m.RECURSIVE_CALLABLE_CAPTURE_POLICY),
+            lambda c:c.update(policy=m.RECURSIVE_NOMINAL_CAPTURE_POLICY),lambda c:c.pop('nominals'),
+            lambda c:c.pop('scalars'),lambda c:c.pop('views'),lambda c:c.pop('callables'),
+            lambda c:c['callables'][0].update(binding=name(999)),
+            lambda c:c['callables'][0].update(type=arr(I,nominal_type('Chain'))),
+            lambda c:c['callables'][0]['occurrences'].pop(),
+            lambda c:c['callables'][0]['occurrences'].append(copy.deepcopy(c['callables'][0]['occurrences'][0])),
+            lambda c:c['callables'][0]['occurrences'].reverse(),
+            lambda c:c['callables'][0].update(origin='E0'),
+            lambda c:c['callables'][0].update(declaration=1),
+            lambda c:c['nominals'].append({'binding':name(70),'type':nominal_type('Box'),'declaration':1,'occurrences':[]})]
+        for index,mutate in enumerate(mutations):
+            forged=copy.deepcopy(out);mutate(forged['recursion']['bindings'][0]['captures'])
+            with self.subTest(index=index),self.assertRaises(m.SharedTransportError) as caught:
+                m.validate_shared_fragment(tree,forged)
+            self.assertEqual(caught.exception.code,'EVIDENCE')
+
+    def test_forged_published_name_index_or_source_path_reject(self):
+        tree=admitted_callable_capture(False);out=m.derive_shared_fragment(tree)
+        for key,value in (('index',0),('name','Chain'),('source',{'stage':'projected','path':['declarations','0']})):
+            forged=copy.deepcopy(out);forged['nominal_data']['declarations'][0][key]=value
+            with self.subTest(key=key),self.assertRaises(m.SharedTransportError) as caught:
+                m.validate_shared_fragment(tree,forged)
+            self.assertEqual(caught.exception.code,'EVIDENCE')
+
+    def test_old_direct_nominal_full_evidence_goldens_are_unchanged(self):
+        expected={True:'7ed59c4d5e5cbee3012d14ceb8673f428e837907d1ff4d33758c83f3257a4957',
+                  False:'825e8944cdbde88d7f2a1f638b2dfa9d9d96eb2f5832596fe95c567516c6285b'}
+        for data,pin in expected.items():
+            out=m.derive_shared_fragment(nominal_capture(data))
+            self.assertEqual(hashlib.sha256(m._json(out).encode()).hexdigest(),pin)
+            self.assertEqual(out['recursion']['bindings'][0]['captures']['policy'],m.RECURSIVE_NOMINAL_CAPTURE_POLICY)
+
+
+ADMITTED_CALLABLE_CAPTURE_ROOT=os.environ.get('IR8_ADMITTED_CALLABLE_CAPTURE_ROOT')
+
+
+@unittest.skipUnless(ADMITTED_CALLABLE_CAPTURE_ROOT,
+                    'set IR8_ADMITTED_CALLABLE_CAPTURE_ROOT for completed nominal-arrow captures')
+class RetainedAdmittedCallableCaptureTests(unittest.TestCase):
+    def test_both_original_captures_replay_exact_pending_owners_and_published_types(self):
+        from source_capture_v8 import verify_capture
+        root=Path(ADMITTED_CALLABLE_CAPTURE_ROOT).resolve()
+        pins={
+            'nominal-argument':('1e500631c99a661697fc81ae8750d189cf753810ceefbb6442248109b554952d',
+                                '1fff1b8e7f79c577f1d478a17b36ae20b5b3aaad1155fd476b5cf561e5e47257'),
+            'nominal-result':('4d9b7064b15c5c782236590cdd64c1a8dd55faf4a3d6f5cc94ae275d1276492d',
+                              '171e0704fb583f3c05c02a9cfd225c7f66567365e491de2e04a334875bca1b58')}
+        for label,(capture_hash,source_hash) in pins.items():
+            with self.subTest(label=label):
+                path=root/('capture-'+label+'01')/'capture.stdout';old_path=path.parent/'verification.json'
+                old_bytes=old_path.read_bytes()
+                report=verify_capture(path,fixture_root=root/'inputs'/label,entry='main.emlf',
+                    expected_source_hashes={'main.emlf':source_hash,
+                        'SharedPoly.emlf':'50fd7fa662c9290a61b0a69012cd2e886a44075de9827dff4edd3f0c839573a7'},
+                    expected_capture_sha256=capture_hash)
+                self.assertTrue(report['fragment_admitted']);self.assertFalse(report['source_admitted'])
+                self.assertFalse(report['native_admitted'])
+                capture=json.loads(path.read_bytes());out=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+                normal=capture['normalization']
+                for key in ('original_rechecked','normalized_rechecked','root_type_alpha_equal','erasure_equal','declarations_equal'):
+                    self.assertIs(normal[key],True)
+                for key in ('ordinary_whole_check_passed','root_type_alpha_equal','source_erasure_equal'):
+                    self.assertIs(capture['original'][key],True)
+                self.assertEqual(out['steps'],normal['steps']);self.assertEqual(len(out['steps']),2)
+                self.assertEqual(out['raw_normalized'],normal['raw_normalized']);self.assertEqual(out['checked_type'],I)
+                self.assertEqual(out['input_erased'],normal['input_erased'])
+                self.assertEqual(out['input_annotated'],normal['input_annotated'])
+                definition,=out['polymorphism']['definitions'];join,=report['retained_prefix_binding_joins']
+                self.assertEqual(definition['binding'],join['binding'])
+                self.assertEqual(join['resolver_allocation']['entity'],
+                    {'namespace':'terms','owner':'SharedPoly','role':{'tag':'value'},'spelling':'sharedId'})
+                self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I],[B]])
+                raw=out['raw_normalized'];shared_let=m._get(raw,definition['binding_source']['path'])
+                helper=shared_let['body'];rec=helper['body'];row,=out['recursion']['bindings'];caps=row['captures']
+                self.assertEqual(row['binding'],rec['bindings'][0]['name'])
+                owner,=caps['callables'];self.assertEqual(owner['binding'],helper['name'])
+                self.assertEqual(row['free_term_bindings'],[helper['name']['id']])
+                self.assertEqual(caps['policy'],m.RECURSIVE_ADMITTED_CALLABLE_CAPTURE_POLICY)
+                self.assertEqual(caps['scalars'],[]);self.assertEqual(caps['nominals'],[]);self.assertEqual(caps['views'],[])
+                self.assertEqual([m._get(raw,a['path']) for a in owner['occurrences']],
+                                 [{'tag':'var','name':helper['name']}]*2)
+                pending=helper['value'];self.assertEqual(pending['tag'],'application')
+                self.assertEqual(pending['function']['parameter_type'],owner['type'])
+                self.assertEqual(pending['function']['body'],{'tag':'var','name':pending['function']['parameter']})
+                self.assertEqual(pending['argument']['tag'],'lambda')
+                self.assertEqual(pending['argument']['body']['tag'],'let')
+                self.assertEqual(pending['argument']['body']['value']['tag'],'application')
+                self.assertEqual(m._free_terms(pending),{definition['binding']['id']})
+                domain=label=='nominal-argument';table=out['nominal_sum' if domain else 'nominal_data']
+                declaration=table['declarations'][0]
+                self.assertEqual(owner['type'],arr(declaration['type'],I) if domain else arr(I,declaration['type']))
+                self.assertEqual(declaration['source'],{'stage':'projected','path':['declarations',str(declaration['index'])]})
+                entities={e['allocated']:e['entity'] for e in capture['module_custody']['resolution']['entities']}
+                self.assertEqual(entities[declaration['name']],{'namespace':'types','owner':'Main',
+                    'role':{'tag':'datatype'},'spelling':'IntList' if domain else 'Box'})
+                rec_case=next(c for c in out['nominal_sum']['cases']
+                    if c['source']['path'][:len(row['rhs']['path'])]==row['rhs']['path'])
+                nil,cons=rec_case['arms'];self.assertEqual(m._get(raw,nil['body']['path']),lit(0))
+                for occurrence in owner['occurrences']:
+                    self.assertEqual(occurrence['path'][:len(cons['body']['path'])],cons['body']['path'])
+                # Host replay verifies structure and proofs, not invocation order or runtime liveness.
                 self.assertEqual(old_path.read_bytes(),old_bytes)
                 old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
                 self.assertEqual(old['fragment_error']['code'],'RECURSION')

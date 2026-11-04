@@ -187,7 +187,13 @@ class NominalCapturePlannerTests(unittest.TestCase):
                     {'tag':'forall','id':99,'bound':{'tag':'bottom'},'body':PAYLOAD}):
             bad=copy.deepcopy(fragment);bad['recursion']['bindings'][0]['captures']['nominals'][0]['type']=typ
             with self.assertRaises(planner.PlanningError):planner.Planner(bad).finish()
-        with self.assertRaises(transport.SharedTransportError):planner.plan_fragment(a.fixture('nominal'))
+        # Nominal-bearing arrows are now admitted only for published families.
+        raw=a.fixture('nominal');step=raw['body']['body']['body']['value']
+        foreign=f.nominal('Foreign')
+        step['function']['parameter_type']=f.arr(foreign,f.I)
+        step['argument']['parameter_type']=foreign
+        with self.assertRaises(transport.SharedTransportError) as caught:planner.plan_fragment(raw)
+        self.assertEqual(caught.exception.code,'TYPE')
 
     def test_original_owner_identity_and_capture_limit(self):
         fragment=transport.derive_shared_fragment(fixture());original=fragment['recursion']['bindings'][0]

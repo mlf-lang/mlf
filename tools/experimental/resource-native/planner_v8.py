@@ -585,6 +585,7 @@ class Planner:
         require(captures is not None, 'recursive capture evidence missing')
         callables = captures.get('callables', [])
         nominals = captures.get('nominals', [])
+        admitted_callables = captures['policy'] == 'closed-admitted-callable-shared-view-captures/1'
         if captures['policy'] == 'closed-scalar-shared-view-captures/1':
             require('callables' not in captures and 'nominals' not in captures and
                     [row['binding']['id'] for row in captures['scalars']] == sorted(mono),
@@ -599,8 +600,11 @@ class Planner:
                     not set(scalar_ids).intersection(callable_ids) and
                     set(scalar_ids)|set(callable_ids) == mono, 'recursive ordinary capture partition differs')
         else:
-            require(captures['policy'] == 'closed-scalar-callable-nominal-shared-view-captures/1' and
-                    nominals and 'callables' in captures, 'recursive capture policy differs')
+            require((captures['policy'] == 'closed-scalar-callable-nominal-shared-view-captures/1' and
+                     nominals and 'callables' in captures) or
+                    (admitted_callables and callables and
+                     set(captures) == {'policy','scalars','callables','nominals','views'}),
+                    'recursive capture policy differs')
             self.tick(len(captures['scalars'])+len(callables)+len(nominals))
             categories = [[row['binding']['id'] for row in rows]
                           for rows in (captures['scalars'],callables,nominals)]
@@ -614,6 +618,7 @@ class Planner:
             require(typ in SCALARS.values() and isinstance(source,Reference) and source.logical == typ,
                     'recursive ordinary capture must be an available closed scalar owner')
             inner[ident] = source
+        nominal_callable = False
         for row in callables:
             ident = row['binding']['id']; typ = self.logical(row['type'],None)
             require(typ[0] == 'arrow', 'recursive callable capture must have an arrow root')
@@ -621,6 +626,11 @@ class Planner:
             while work:
                 self.tick(); part = work.pop()
                 if part in SCALARS.values():
+                    continue
+                if admitted_callables and part[0] == 'nominal':
+                    require(part in self.nominal_layouts,
+                            'recursive callable nominal leaf lacks a published declaration')
+                    nominal_callable = True
                     continue
                 require(part[0] == 'arrow' and part[3:] == ('repeat','unknown'),
                         'recursive callable capture requires exact closed scalar-arrow structure')
@@ -631,6 +641,8 @@ class Planner:
             # In particular, do not acquire a Scheme view or inspect readiness
             # here. A pending owner may eventually resolve to a shared Instance.
             inner[ident] = source
+        require(not admitted_callables or nominal_callable,
+                'admitted-callable policy requires a captured arrow with a nominal leaf')
         for row in nominals:
             ident = row['binding']['id']; typ = self.logical(row['type'],None)
             require(typ[0] == 'nominal' and type(row['declaration']) is int and
