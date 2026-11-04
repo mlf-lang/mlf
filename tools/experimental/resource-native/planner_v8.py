@@ -7,6 +7,8 @@ imported or changed. No ordinary lambda cloning, beta reduction, identity-name
 recognition, nominal fallback, or per-type RHS expansion is performed. Referenced
 closed single-constructor DATA uses exact independently replayed declarations;
 constructor payloads and whole cases remain lazy ordinary term graphs.
+Closed scalar-field SUM uses selected-only Int-result arm factories, with all
+arms checked and their exact declaration/source identities retained.
 """
 from __future__ import annotations
 
@@ -89,6 +91,13 @@ class Planner:
         nominal = fragment.get('nominal_data', {})
         self.nominal_rows = {r['index']: r for r in nominal.get('declarations', [])}
         self.nominal_by_name = {r['name']: r for r in self.nominal_rows.values()}
+        sums = fragment.get('nominal_sum', {})
+        self.sum_rows = {r['index']: r for r in sums.get('declarations', [])}
+        self.nominal_by_name.update((r['name'], r) for r in self.sum_rows.values())
+        self.sum_constructor_rows = {tuple(r['source']['path']): r for r in sums.get('constructors', [])}
+        self.sum_case_rows = {tuple(r['source']['path']): r for r in sums.get('cases', [])}
+        self.families = {}; self.sum_families = {}; self.sum_map = []
+        self.sum_constructor_map = []; self.sum_case_map = []
         self.constructor_rows = {tuple(r['source']['path']): r for r in nominal.get('constructors', [])}
         self.case_rows = {tuple(r['source']['path']): r for r in nominal.get('cases', [])}
         self.layouts = {}; self.nominal_layouts = {}; self.nominal_map = []
@@ -102,6 +111,25 @@ class Planner:
                                      'source': r['source'], 'layout': layout,
                                      'fields': [{'index': i, 'field': 'f'+str(i), 'type': self.type_name(t)}
                                                 for i,t in enumerate(fields)]})
+        for r in self.sum_rows.values():
+            typ = self.logical(r['type'], None); family = 'F' + str(r['index'])
+            self.sum_families[r['index']] = family
+            self.nominal_layouts[typ] = '%' + family
+            variants = []; fields = {}; variant_map = []
+            require(2 <= len(r['variants']) <= 64, 'SUM variant count outside admitted bound')
+            for i,v in enumerate(r['variants']):
+                self.tick(); require(v['index'] == i, 'SUM declaration variant order differs')
+                name = 'V' + str(i); variants.append(name)
+                types = [self.logical(t, None) for t in v['field_types']]
+                require(len(types) <= 32 and all(t in SCALARS.values() for t in types),
+                        'SUM fields require complete intrinsic scalar vector')
+                fields[name] = [t[1] for t in types]
+                variant_map.append({'index':i, 'variant':name, 'constructor':v['constructor'],
+                                    'constructor_source':v['constructor_source'],
+                                    'fields':[self.type_name(t) for t in types]})
+            self.families[family] = {'variants':variants, 'fields':fields}
+            self.sum_map.append({'declaration':r['index'], 'name':r['name'], 'source':r['source'],
+                                 'family':family, 'variants':variant_map})
         self.definitions = fragment['polymorphism']['definitions']
         self.def_by_path = {tuple(d['binding_source']['path']): d for d in self.definitions}
         self.def_by_binder = {d['binding']['id']: d for d in self.definitions}
@@ -199,7 +227,8 @@ class Planner:
     def add(self, block, source=None, logical=None, **instruction):
         self.tick(); require(self.instructions < MAX_INSTRUCTIONS, 'instruction limit')
         path = block.path(len(block.body)); self.instructions += 1; block.body.append(instruction)
-        if instruction['op'] in ('scalar', 'closure', 'application', 'thunk', 'prim2', 'alloc'):
+        if instruction['op'] in ('scalar', 'closure', 'application', 'thunk', 'prim2', 'alloc',
+                                  'construct_nullary', 'construct_sum'):
             require(source is not None and logical is not None, 'allocation correspondence missing')
             require(len(self.allocation_map) + self.code_count < MAX_CODES, 'combined Site/Code limit')
             self.allocation_map.append({'source': address(source), 'instruction': path,
@@ -298,6 +327,14 @@ class Planner:
             if tag == 'application':
                 visit(n['function'], p+('function',), local); visit(n['argument'], p+('argument',), local); return
             if tag == 'case':
+                if p in self.sum_case_rows:
+                    row = self.sum_case_rows[p]
+                    visit(n['scrutinee'], p+('scrutinee',), local)
+                    for arm in row['arms']:
+                        self.tick()
+                        bound_fields = {f['binding']['id'] for f in arm['fields'] if f['binding'] is not None}
+                        visit(self.node_at(arm['body']['path']), tuple(arm['body']['path']), local | bound_fields)
+                    return
                 require(p in self.case_rows, 'unmapped DATA case')
                 row = self.case_rows[p]
                 visit(n['scrutinee'], p+('scrutinee',), local)
@@ -357,6 +394,8 @@ class Planner:
             return ref
         if path in self.constructor_rows:
             return self.constructor(node, path, env, views, home, block, scope)
+        if path in self.sum_constructor_rows:
+            return self.sum_constructor(node, path, env, views, home, block, scope)
         # Saturated builtin scalar operations remain delayed complete operand
         # graphs. This is checked primitive-ID lowering, never user-code inlining.
         if tag == 'application':
@@ -371,6 +410,8 @@ class Planner:
                 return self.primitive(node,path,head,list(reversed(args)),env,views,home,block)
         self.term(node,path)
         if tag == 'case':
+            if path in self.sum_case_rows:
+                return self.sum_case(node, path, env, views, home, block, scope)
             return self.data_case(node, path, env, views, home, block, scope)
         if tag in ('int64','bool'):
             typ = SCALARS['Int' if tag=='int64' else 'Bool']; out = self.fresh()
@@ -465,6 +506,124 @@ class Planner:
                                      'head': row['head'], 'arguments': row['arguments'],
                                      'allocation': publication})
         return Reference(out, typ, strict=split)
+
+    def sum_constructor(self, node, path, env, views, home, block, scope):
+        require(scope is None, 'generic SUM construction unsupported')
+        row = self.sum_constructor_rows[path]; declaration = self.sum_rows[row['declaration']]
+        variant = declaration['variants'][row['variant']]
+        hp = tuple(row['head']['path']); head = self.node_at(hp)
+        require(head['tag'] == 'constructor' and head['name'] == variant['constructor'] and
+                head['arguments'] == [], 'SUM constructor declaration differs')
+        for source in row['application_spine']:
+            sp = tuple(source['path']); term = self.node_at(sp)
+            require(term['tag'] == 'application', 'SUM constructor spine differs')
+            self.term(term, sp, 'constructor-spine')
+        self.term(head, hp, 'constructor')
+        expected = [self.logical(t, None) for t in variant['field_types']]
+        require(len(row['arguments']) == len(expected), 'SUM constructor must be saturated')
+        fields = []
+        for source,typ in zip(row['arguments'], expected):
+            ap = tuple(source['path']); ref = self.emit(self.node_at(ap), ap, env, views, home, block, None)
+            require(ref.logical == typ and typ in SCALARS.values(), 'SUM field exact scalar type differs')
+            fields.append(ref)
+        typ = self.logical(row['result_type'], None)
+        require(typ == self.logical(declaration['type'], None), 'SUM nominal identity differs')
+        out = self.fresh('sum'); family = self.sum_families[row['declaration']]
+        instruction = {'op':'construct_sum' if fields else 'construct_nullary', 'out':out,
+                       'in':home, 'family':family, 'variant':'V'+str(row['variant'])}
+        if fields: instruction['fields'] = [r.variable for r in fields]
+        publication = self.add(block, path, typ, **instruction)
+        for ref in fields: self.release(ref, block)
+        self.sum_constructor_map.append({'source':address(path), 'declaration':row['declaration'],
+                                         'variant':row['variant'], 'head':row['head'],
+                                         'arguments':row['arguments'], 'allocation':publication})
+        # SUM placement is intentionally coarse, independently of data_groups.
+        return Reference(out, typ)
+
+    def sum_case(self, node, path, env, views, home, block, scope):
+        require(scope is None, 'generic SUM case unsupported')
+        row = self.sum_case_rows[path]; declaration = self.sum_rows[row['declaration']]
+        typ = self.logical(row['result_type'], None)
+        require(typ == SCALARS['Int'], 'SUM factory case requires exact Int result')
+        name = self.code_name('C')
+        actual,contracts,inner,saved,temps,carrier = self.captures(
+            node,path,env,views,block,None,'sum-case',name)
+        cb = Block('thunk',name,[])
+        sp = tuple(row['scrutinee']['path'])
+        raw = self.emit(self.node_at(sp),sp,inner,saved,'$home',cb,None)
+        require(raw.logical == self.logical(declaration['type'],None), 'SUM case nominal identity differs')
+        ready = self.fresh('sumready'); self.add(cb,op='force',out=ready,value=raw.variable)
+        factory = {}; arm_maps = []; arm_temps = []
+        require(len(row['arms']) == len(declaration['variants']), 'SUM case must be exhaustive')
+        # Compile actual source arms once, retaining their order/identity. The
+        # factory table below is joined separately to declaration variant order.
+        for arm in row['arms']:
+            self.tick(); variant = arm['variant']; v = declaration['variants'][variant]
+            key = 'V' + str(variant)
+            require(key not in factory and arm['constructor'] == v['constructor'],
+                    'SUM arm duplicate or constructor identity differs')
+            bp = tuple(arm['body']['path']); body = self.node_at(bp)
+            bound = frozenset(f['binding']['id'] for f in arm['fields'] if f['binding'] is not None)
+            code = self.code_name('C')
+            external,captures,arm_env,arm_views,views_owned,arm_carrier = self.captures(
+                body,bp,inner,saved,cb,None,'sum-arm',code,bound)
+            require(len(external) <= 32, 'SUM factory external capture count exceeds32')
+            bindings = {n:{'kind':'external','value':value} for n,value in external.items()}
+            field_map = []
+            for f in arm['fields']:
+                self.tick()
+                if f['binding'] is None: continue
+                capture = self.fresh('sumfield'); ft = self.logical(f['type'],None)
+                require(ft in SCALARS.values() and ft == self.logical(v['field_types'][f['index']],None),
+                        'SUM pattern field exact scalar type differs')
+                captures[capture] = {'layout':self.layout(ft),'relation':'down'}
+                bindings[capture] = {'kind':'field','index':f['index']}
+                arm_env[f['binding']['id']] = Reference(capture,ft)
+                field_map.append({'index':f['index'],'binder':f['binding']['id'],'capture':capture,
+                                  'type':self.type_name(ft),'relation':'down'})
+            require(len(field_map) <= 32 and len(captures) <= MAX_CAPTURES,
+                    'SUM factory capture count exceeds field/total bounds')
+            arm_carrier['field_captures'] = field_map
+            ab = Block('thunk',code,[])
+            result = self.emit(body,bp,arm_env,arm_views,'$home',ab,None)
+            require(result.logical == typ, 'SUM arm result exact Int type differs')
+            for ref in list(arm_env.values())+list(arm_views.values()): self.release(ref,ab)
+            self.add(ab,op='return',value=result.variable)
+            self.codes[code] = {'result':self.layout(typ),'captures':captures,'body':ab.body,'type_scope':None}
+            factory[key] = {'code':code,'captures':bindings}
+            arm_maps.append({'index':arm['index'],'variant':variant,'constructor':arm['constructor'],
+                             'pattern_source':arm['pattern_source'],'source':arm['body'],
+                             'code':code,'captures':bindings,'field_captures':field_map})
+            arm_temps.append((arm_carrier,views_owned))
+        family = self.sum_families[row['declaration']]
+        require(set(factory) == set(self.families[family]['variants']), 'SUM factory variant coverage differs')
+        selected = self.fresh('selected')
+        selection = self.add(cb,op='case_fields_i64',out=selected,**{'in':'$home'},family=family,
+                             scrutinee=ready,arms={v:factory[v] for v in self.families[family]['variants']})
+        for arm in arm_maps:
+            self.tick(); require(len(self.allocation_map)+self.code_count < MAX_CODES, 'combined Site/Code limit')
+            self.allocation_map.append({'source':arm['source'],'instruction':selection,'arm':arm['variant'],
+                                        'role':'case_fields_i64','type_scope':None,
+                                        'logical_type':self.type_name(typ)})
+        # No unselected body was constructed. Temporary views were only retained
+        # from already existing full-vector captures, never forced or cloned.
+        for arm_carrier,owned in arm_temps:
+            for view,ref in zip(arm_carrier['view_captures'],owned):
+                view['creation'].append(selection)
+                view['creation'].append(self.add(cb,op='drop',value=ref.variable))
+        drop_scrutinee = self.add(cb,op='drop',value=ready)
+        for ref in list(inner.values())+list(saved.values()): self.release(ref,cb)
+        self.add(cb,op='return',value=selected)
+        self.codes[name] = {'result':self.layout(typ),'captures':contracts,'body':cb.body,'type_scope':None}
+        out = self.fresh('case')
+        publication = self.add(block,path,typ,op='thunk',out=out,**{'in':home},code=name,captures=actual)
+        for view,ref in zip(carrier['view_captures'],temps):
+            view['creation'].append(publication)
+            view['creation'].append(self.add(block,op='drop',value=ref.variable))
+        self.sum_case_map.append({'source':address(path),'declaration':row['declaration'],'family':family,
+                                  'code':name,'result_type':self.type_name(typ),'arms':arm_maps,
+                                  'factory':selection,'drop_scrutinee':drop_scrutinee,'allocation':publication})
+        return Reference(out,typ)
 
     def data_case(self, node, path, env, views, home, block, scope):
         require(scope is None and path in self.case_rows, 'unmapped or generic DATA case')
@@ -578,7 +737,7 @@ class Planner:
         expected={tuple(r['normalized']['path']):r['tag'] for r in self.fragment['term_correspondence']}
         require({p:r['tag'] for p,r in self.term_map.items()}==expected, 'ordinary node coverage differs from independent correspondence')
         require(sorted(r['use'] for r in self.use_map)==list(range(len(self.uses))), 'missing/repeated lowered shared occurrence')
-        program={'version':8,'layouts':self.layouts,'families':{},'signatures':self.signatures,'types':self.types,
+        program={'version':8,'layouts':self.layouts,'families':self.families,'signatures':self.signatures,'types':self.types,
                  'schemes':self.schemes,'instantiations':self.instantiations,'functions':self.functions,
                  'codes':self.codes,'entry':block.body}
         source_map={'scheme_map':self.scheme_map,'use_map':self.use_map,'carrier_map':self.carrier_map,
@@ -587,6 +746,11 @@ class Planner:
             require(len(self.constructor_map)==len(self.constructor_rows) and len(self.case_map)==len(self.case_rows),
                     'missing/repeated nominal source occurrence')
             source_map.update(nominal_map=self.nominal_map, constructor_map=self.constructor_map, case_map=self.case_map)
+        if self.sum_rows:
+            require(len(self.sum_constructor_map)==len(self.sum_constructor_rows) and
+                    len(self.sum_case_map)==len(self.sum_case_rows), 'missing/repeated SUM source occurrence')
+            source_map.update(sum_map=self.sum_map, sum_constructor_map=self.sum_constructor_map,
+                              sum_case_map=self.sum_case_map)
         if self.data_groups:
             source_map['group_map'] = self.group_map
         encoded=json.dumps(program,sort_keys=True,separators=(',',':'),ensure_ascii=False)

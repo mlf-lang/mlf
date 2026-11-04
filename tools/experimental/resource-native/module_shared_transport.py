@@ -9,8 +9,10 @@ The fragment seam implements SOURCE_WIRE_CONTRACT_DRAFT.md f73198a9, sections
 3--5, for Int/Bool/arrows and the existing scalar primitives/Int conditional.
 One outer with_data can additionally supply referenced, closed, nonrecursive,
 parameter-free, single-constructor DATA. Its fields are Int/Bool or closed
-arrows recursively over those scalars. This does not admit nominal Scheme
-arguments, nominal atoms in generic code, SUM, or recursive/higher-rank data.
+arrows recursively over those scalars. Multi-constructor SUM families instead
+require only Int/Bool fields and exhaustive Int-result cases. This does not
+admit nominal Scheme arguments, nominal atoms in generic code, callable SUM
+fields, or recursive/higher-rank data.
 
 Public results are JSON data, never opaque proof authority. Definition rows omit
 resolver_binding; correspondence rows omit original. Those missing fields MUST
@@ -40,6 +42,8 @@ MAX_PROOF_ATOMS = 64
 MAX_ROWS = 10_000
 MAX_NOMINALS = 32
 MAX_FIELDS = 32
+MAX_VARIANTS = 64
+SUM_POLICY = 'closed-scalar-sum/1'
 NOMINAL_POLICY = 'closed-single-constructor-data/1'
 INT = {'tag': 'constructor', 'name': 'Int', 'arguments': []}
 BOOL = {'tag': 'constructor', 'name': 'Bool', 'arguments': []}
@@ -257,8 +261,30 @@ class _Nominals:
             _fail('LIMIT', 'referenced nominal declaration bound', path)
         declaration = self.declarations[index]
         source = ('declarations', str(index))
-        if declaration['parameters'] or len(declaration['constructors']) != 1:
-            _fail('NOMINAL', 'referenced DATA must have no parameters and exactly one constructor', source)
+        if declaration['parameters'] or not declaration['constructors']:
+            _fail('NOMINAL', 'referenced nominal requires no parameters and at least one constructor', source)
+        if len(declaration['constructors']) > MAX_VARIANTS:
+            _fail('LIMIT', 'SUM variant count exceeds 64', source + ('constructors',))
+        if len(declaration['constructors']) > 1:
+            variants = []
+            for variant_index, constructor in enumerate(declaration['constructors']):
+                self.budget.tick()
+                cp = source + ('constructors', str(variant_index))
+                if len(constructor['fields']) > MAX_FIELDS:
+                    _fail('LIMIT', 'SUM field count exceeds 32', cp + ('fields',))
+                fields = []
+                for field_index, field in enumerate(constructor['fields']):
+                    self.budget.tick()
+                    if field['tag'] != 'applied' or field['arguments'] or field['name'] not in ('Int', 'Bool'):
+                        _fail('NOMINAL', 'SUM fields require closed Int/Bool only', cp + ('fields', str(field_index)))
+                    fields.append(INT if field['name'] == 'Int' else BOOL)
+                variants.append({'index': variant_index, 'constructor': constructor['name'],
+                                 'constructor_source': _address('projected', cp), 'field_types': fields})
+            row = {'index': index, 'name': name, 'source': _address('projected', source),
+                   'type': {'tag': 'constructor', 'name': name, 'arguments': []}, 'variants': variants}
+            self.budget.record(row)
+            self.selected[index] = row
+            return row
         constructor = declaration['constructors'][0]
         if len(constructor['fields']) > MAX_FIELDS:
             _fail('LIMIT', 'DATA field count exceeds 32', source + ('constructors', '0', 'fields'))
@@ -272,6 +298,17 @@ class _Nominals:
         self.budget.record(row)
         self.selected[index] = row
         return row
+
+    def variant_row(self, owner, constructor, path=()):
+        if 'variants' not in owner:
+            if constructor != owner['constructor']:
+                _fail('CASE', 'constructor is not a member of the exact nominal family', path)
+            return owner
+        for variant in owner['variants']:
+            self.budget.tick()
+            if variant['constructor'] == constructor:
+                return variant
+        _fail('CASE', 'constructor is not a member of the exact nominal family', path)
 
     def type_row(self, typ, path=()):
         if typ['tag'] != 'constructor' or typ['arguments']:
@@ -509,34 +546,38 @@ class _Inference:
         elif tag == 'constructor':
             row = self.nominals.constructor_row(node['name'], node['arguments'], path)
             typ = row['type']
-            for field in reversed(row['field_types']):
+            variant = self.nominals.variant_row(row, node['name'], path)
+            for field in reversed(variant['field_types']):
                 typ = {'tag': 'arrow', 'from': field, 'to': typ}
         elif tag == 'case':
             subject = self.infer(node['scrutinee'], path + ('scrutinee',), terms, types, scope_ref)
             if subject['tag'] != 'constructor' or _scalar(subject) or subject['arguments']:
                 _fail('CASE', 'case scrutinee must be an exact closed DATA nominal', path)
             owner = self.nominals.type_row(subject, path + ('scrutinee',))
-            if len(node['alternatives']) != 1:
-                _fail('CASE', 'single-constructor DATA requires exactly one matching constructor arm', path)
-            alternative = node['alternatives'][0]
-            pattern = alternative['pattern']
-            pattern_path = path + ('alternatives', '0', 'pattern')
-            if pattern['tag'] != 'constructor' or pattern['constructor'] != owner['constructor']:
-                _fail('CASE', 'case pattern must name the exact scrutinee constructor', pattern_path)
-            if len(pattern['fields']) != len(owner['field_types']):
-                _fail('CASE', 'case pattern field arity differs', pattern_path)
-            bindings = {}
-            for binder, field in zip(pattern['fields'], owner['field_types']):
-                self.budget.tick()
-                if binder is not None:
-                    if binder['id'] in terms or binder['id'] in bindings:
-                        _fail('TERM_SCOPE', 'case pattern repeats an active term binder', pattern_path)
-                    bindings[binder['id']] = field
-            _wf(node['result_type'], types, self.budget, mono=True, nominals=self.nominals)
-            body = self.infer(alternative['body'], path + ('alternatives', '0', 'body'),
-                              terms | bindings, types, scope_ref)
-            if not fragment.alpha_type_equal(body, node['result_type']):
-                _fail('TYPE', 'case body differs from its annotated result type', path)
+            if 'variants' in owner:
+                self.sum_case(node, path, owner, terms, types, scope_ref)
+            else:
+                if len(node['alternatives']) != 1:
+                    _fail('CASE', 'single-constructor DATA requires exactly one matching constructor arm', path)
+                alternative = node['alternatives'][0]
+                pattern = alternative['pattern']
+                pattern_path = path + ('alternatives', '0', 'pattern')
+                if pattern['tag'] != 'constructor' or pattern['constructor'] != owner['constructor']:
+                    _fail('CASE', 'case pattern must name the exact scrutinee constructor', pattern_path)
+                if len(pattern['fields']) != len(owner['field_types']):
+                    _fail('CASE', 'case pattern field arity differs', pattern_path)
+                bindings = {}
+                for binder, field in zip(pattern['fields'], owner['field_types']):
+                    self.budget.tick()
+                    if binder is not None:
+                        if binder['id'] in terms or binder['id'] in bindings:
+                            _fail('TERM_SCOPE', 'case pattern repeats an active term binder', pattern_path)
+                        bindings[binder['id']] = field
+                _wf(node['result_type'], types, self.budget, mono=True, nominals=self.nominals)
+                body = self.infer(alternative['body'], path + ('alternatives', '0', 'body'),
+                                  terms | bindings, types, scope_ref)
+                if not fragment.alpha_type_equal(body, node['result_type']):
+                    _fail('TYPE', 'case body differs from its annotated result type', path)
             typ = node['result_type']
         elif tag == 'with_data' and not path:
             typ = self.infer(node['body'], path + ('body',), terms, types, scope_ref)
@@ -544,6 +585,39 @@ class _Inference:
             _fail('FRAGMENT', 'unsupported retained term constructor: ' + tag, path)
         self.types[path] = typ
         return typ
+
+
+    def sum_case(self, node, path, owner, terms, types, scope_ref):
+        if not _same(node['result_type'], INT):
+            _fail('CASE', 'SUM case result must be exactly Int', path)
+        if len(node['alternatives']) != len(owner['variants']):
+            _fail('CASE', 'SUM case requires complete constructor coverage', path)
+        seen = set()
+        for index, alternative in enumerate(node['alternatives']):
+            self.budget.tick()
+            pattern = alternative['pattern']
+            pp = path + ('alternatives', str(index), 'pattern')
+            if pattern['tag'] != 'constructor':
+                _fail('CASE', 'SUM case requires explicit constructor arms', pp)
+            variant = self.nominals.variant_row(owner, pattern['constructor'], pp)
+            if variant['index'] in seen:
+                _fail('CASE', 'SUM case repeats a constructor arm', pp)
+            seen.add(variant['index'])
+            if len(pattern['fields']) != len(variant['field_types']):
+                _fail('CASE', 'SUM case pattern field arity differs', pp)
+            bindings = {}
+            for binder, field in zip(pattern['fields'], variant['field_types']):
+                self.budget.tick()
+                if binder is not None:
+                    if binder['id'] in terms or binder['id'] in bindings:
+                        _fail('TERM_SCOPE', 'case pattern repeats an active term binder', pp)
+                    bindings[binder['id']] = field
+            body = self.infer(alternative['body'], path + ('alternatives', str(index), 'body'),
+                              terms | bindings, types, scope_ref)
+            if not fragment.alpha_type_equal(body, INT):
+                _fail('TYPE', 'SUM case body differs from its annotated Int result', path + ('alternatives', str(index), 'body'))
+        # Equal count, family membership and distinct indices imply full coverage.
+
 
 
 def _spine(node, path):
@@ -814,7 +888,7 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
 
 def _nominal_inventory(root, inferred, registry, budget):
     """Associate exact normalized occurrences without reducing ordinary terms."""
-    constructors, cases, consumed = [], [], set()
+    constructors, cases, sum_constructors, sum_cases, consumed = [], [], [], [], set()
     for path, node in _walk(root):
         budget.tick()
         tag = node['tag']
@@ -828,11 +902,12 @@ def _nominal_inventory(root, inferred, registry, budget):
                 head = head['function']
             if head['tag'] == 'constructor':
                 owner = registry.constructor_row(head['name'], head['arguments'], head_path)
+                variant = registry.variant_row(owner, head['name'], head_path)
                 arguments.reverse()
                 applications.reverse()
-                if len(arguments) != len(owner['field_types']):
+                if len(arguments) != len(variant['field_types']):
                     _fail('CONSTRUCTOR', 'DATA constructor requires its complete field application spine', path)
-                for (argument_path, _), field_type in zip(arguments, owner['field_types']):
+                for (argument_path, _), field_type in zip(arguments, variant['field_types']):
                     budget.tick()
                     if not fragment.alpha_type_equal(inferred.types[argument_path], field_type):
                         _fail('TYPE', 'DATA constructor field type differs', argument_path)
@@ -845,10 +920,31 @@ def _nominal_inventory(root, inferred, registry, budget):
                        'arguments': [_address('normalized', p) for p, _ in arguments],
                        'application_spine': [_address('normalized', p) for p in applications],
                        'result_type': owner['type']}
+                if 'variants' in owner:
+                    row['variant'] = variant['index']
                 budget.record(row)
-                constructors.append(row)
+                (sum_constructors if 'variants' in owner else constructors).append(row)
         if tag == 'case':
             owner = registry.type_row(inferred.types[path + ('scrutinee',)], path)
+            if 'variants' in owner:
+                arms = []
+                for index, alternative in enumerate(node['alternatives']):
+                    budget.tick()
+                    pattern = alternative['pattern']
+                    variant = registry.variant_row(owner, pattern['constructor'], path)
+                    ap = path + ('alternatives', str(index))
+                    arms.append({'index': index, 'variant': variant['index'],
+                                 'constructor': variant['constructor'],
+                                 'pattern_source': _address('normalized', ap + ('pattern',)),
+                                 'fields': [{'index': i, 'binding': binder, 'type': typ}
+                                            for i, (binder, typ) in enumerate(zip(pattern['fields'], variant['field_types']))],
+                                 'body': _address('normalized', ap + ('body',))})
+                row = {'source': _address('normalized', path), 'declaration': owner['index'],
+                       'scrutinee': _address('normalized', path + ('scrutinee',)),
+                       'result_type': node['result_type'], 'arms': arms}
+                budget.record(row)
+                sum_cases.append(row)
+                continue
             pattern = node['alternatives'][0]['pattern']
             row = {'source': _address('normalized', path), 'declaration': owner['index'],
                    'scrutinee': _address('normalized', path + ('scrutinee',)),
@@ -860,11 +956,15 @@ def _nominal_inventory(root, inferred, registry, budget):
                    'result_type': node['result_type']}
             budget.record(row)
             cases.append(row)
-    if not registry.selected:
-        return None
-    return {'policy': NOMINAL_POLICY,
-            'declarations': [registry.selected[i] for i in sorted(registry.selected)],
-            'constructors': constructors, 'cases': cases}
+    data_rows, sum_rows = [], []
+    for index in sorted(registry.selected):
+        row = registry.selected[index]
+        (sum_rows if 'variants' in row else data_rows).append(row)
+    data = ({'policy': NOMINAL_POLICY, 'declarations': data_rows,
+             'constructors': constructors, 'cases': cases} if data_rows else None)
+    sums = ({'policy': SUM_POLICY, 'declarations': sum_rows,
+             'constructors': sum_constructors, 'cases': sum_cases} if sum_rows else None)
+    return data, sums
 
 
 def derive_shared_fragment(projected_annotated):
@@ -906,7 +1006,7 @@ def derive_shared_fragment(projected_annotated):
             budget.record(row)
             correspondence.append(row)
         inventory = _inventory(root, normal, raw, normalized, origins, removed, touched, budget)
-        nominal_inventory = _nominal_inventory(normal, normalized, nominals, budget)
+        nominal_inventory, sum_inventory = _nominal_inventory(normal, normalized, nominals, budget)
         result = {'format': FORMAT, 'status': 'independent-fragment-replay-only', 'policy': POLICY,
                   'input_checked_type': raw.type, 'checked_type': normalized.type,
                   'input_annotated': root, 'input_erased': before_erased,
@@ -914,6 +1014,8 @@ def derive_shared_fragment(projected_annotated):
                   'polymorphism': inventory}
         if nominal_inventory is not None:
             result['nominal_data'] = nominal_inventory
+        if sum_inventory is not None:
+            result['nominal_sum'] = sum_inventory
         _bounded(result, cells=500_000, depth=MAX_DEPTH + 20, byte_limit=MAX_BYTES)
         return result
     except SharedTransportError:

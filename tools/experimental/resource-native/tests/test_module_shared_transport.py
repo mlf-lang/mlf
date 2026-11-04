@@ -6,6 +6,7 @@ subtrees; synthetic lexical surroundings close them for this bounded seam.
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import unittest
@@ -569,14 +570,12 @@ class NominalReplayTests(unittest.TestCase):
         self.assertEqual(result['raw_normalized']['declarations'], tree['declarations'])
         self.assertEqual([d['index'] for d in result['nominal_data']['declarations']], [1])
 
-    def test_parameterized_multiple_or_missing_constructor_rejected(self):
-        for alteration in ('parameter', 'multiple', 'none'):
+    def test_parameterized_or_missing_constructor_rejected(self):
+        for alteration in ('parameter', 'none'):
             with self.subTest(alteration=alteration):
                 declaration = data_decl()
                 if alteration == 'parameter':
                     declaration['parameters'] = [{'name': 'a', 'kind': {'tag': 'star'}}]
-                elif alteration == 'multiple':
-                    declaration['constructors'].append({'name': 'Other', 'fields': []})
                 else:
                     declaration['constructors'] = []
                 self.reject(with_data(lam(10, nominal_type(), lit()), declaration), 'NOMINAL')
@@ -704,6 +703,321 @@ class NominalReplayTests(unittest.TestCase):
                     self.assertEqual([u['arguments'] for u in result['polymorphism']['uses']], [[I], [B]])
                     argument = result['nominal_data']['constructors'][0]['arguments'][0]['path']
                     self.assertEqual(m._get(result['raw_normalized'], argument)['tag'], 'application')
+
+
+
+# Synthetic SUM terms below exercise independent replay, never source/K/native
+# acceptance. The optional full-capture test separately pins genuine input bytes.
+def sum_decl(n='Choice', variants=(('Empty', ()), ('Number', (I,)))):
+    return {'tag': 'data_kind', 'name': n, 'parameters': [],
+            'constructors': [{'name': c, 'fields': [field_type(t) for t in fields]}
+                             for c, fields in variants]}
+
+
+def sum_arm(c, binders, body):
+    return {'pattern': {'tag': 'constructor', 'constructor': c,
+                        'fields': [None if n is None else name(n) for n in binders]}, 'body': body}
+
+
+def sum_case(value, arms=None, result=I):
+    return {'tag': 'case', 'scrutinee': value, 'result_type': result,
+            'alternatives': arms if arms is not None else
+            [sum_arm('Empty', (), lit()), sum_arm('Number', (20,), var(20))]}
+
+
+def shared_sum(empty=False):
+    arms = [sum_arm('Empty', (), choose(app(use(1, B), boolean()), app(use(1, I), lit()), lit(0))),
+            sum_arm('Number', (20,), choose(app(use(1, B), boolean()),
+                     app(use(1, I), add(var(20), var(10))), lit(0)))]
+    return with_data(shared(let(10, add(lit(20), lit(1)),
+        let(11, ctor('Empty') if empty else ctor('Number', var(10)), sum_case(var(11), arms)))), sum_decl())
+
+
+class SumReplayTests(unittest.TestCase):
+    def reject(self, tree, code=None):
+        with self.assertRaises(m.SharedTransportError) as caught:
+            m.derive_shared_fragment(tree)
+        if code:
+            self.assertEqual(caught.exception.code, code, str(caught.exception))
+        return caught.exception
+
+    def test_number_and_empty_exact_variant_spines(self):
+        for empty in (False, True):
+            tree = shared_sum(empty); before = copy.deepcopy(tree)
+            result = m.derive_shared_fragment(tree); sums = result['nominal_sum']
+            self.assertEqual(tree, before)
+            self.assertEqual(result['raw_normalized'], tree)
+            self.assertEqual(result['input_erased'], p.erase_total(tree))
+            self.assertNotIn('nominal_data', result)
+            self.assertEqual(sums['policy'], m.SUM_POLICY)
+            declaration, = sums['declarations']
+            self.assertEqual((declaration['index'], declaration['name']), (0, 'Choice'))
+            self.assertEqual([v['constructor'] for v in declaration['variants']], ['Empty', 'Number'])
+            self.assertEqual([v['field_types'] for v in declaration['variants']], [[], [I]])
+            self.assertEqual([v['constructor_source']['path'] for v in declaration['variants']],
+                             [['declarations', '0', 'constructors', str(i)] for i in (0, 1)])
+            construction, = sums['constructors']
+            self.assertEqual(construction['variant'], 0 if empty else 1)
+            self.assertEqual(len(construction['arguments']), 0 if empty else 1)
+            self.assertEqual(len(construction['application_spine']), 0 if empty else 1)
+            case_row, = sums['cases']
+            self.assertEqual([a['variant'] for a in case_row['arms']], [0, 1])
+            self.assertEqual(case_row['arms'][1]['fields'], [{'index': 0, 'binding': name(20), 'type': I}])
+            self.assertEqual([u['arguments'] for u in result['polymorphism']['uses']], [[B], [I], [B], [I]])
+            self.assertEqual(len(result['polymorphism']['definitions']), 1)
+            self.assertEqual(result['raw_normalized']['body']['body']['value']['tag'], 'application')
+            self.assertEqual(len(result['term_correspondence']), len(m._ordinary(tree)))
+
+    def test_source_arm_order_independent_from_declaration_variant_order(self):
+        tree = with_data(sum_case(ctor('Number', lit())), sum_decl())
+        tree['body']['alternatives'].reverse()
+        result = m.derive_shared_fragment(tree)
+        arms = result['nominal_sum']['cases'][0]['arms']
+        self.assertEqual([a['index'] for a in arms], [0, 1])
+        self.assertEqual([a['variant'] for a in arms], [1, 0])
+        self.assertEqual([a['body']['path'] for a in arms],
+                         [['body', 'alternatives', str(i), 'body'] for i in (0, 1)])
+        self.assertEqual([v['index'] for v in result['nominal_sum']['declarations'][0]['variants']], [0, 1])
+
+    def test_all_arms_receive_outer_first_proof_replay(self):
+        def redex(a, b, term):
+            return app(tapp(tabs(a, tapp(tabs(b, lam(term, tv(b), var(term))), inst(tv(a)))), inst(I)), lit())
+        tree = with_data(sum_case(ctor('Empty'),
+                         [sum_arm('Empty', (), redex(100, 101, 10)),
+                          sum_arm('Number', (20,), redex(102, 103, 11))]), sum_decl())
+        result = m.derive_shared_fragment(tree)
+        paths = [x['input']['path'] for x in result['steps']]
+        self.assertEqual(paths, [['body', 'alternatives', '0', 'body', 'function']] * 2 +
+                                [['body', 'alternatives', '1', 'body', 'function']] * 2)
+        self.assertEqual(p.erase_total(tree), p.erase_total(result['raw_normalized']))
+
+    def test_unselected_bad_body_or_proof_is_rejected(self):
+        good = with_data(sum_case(ctor('Empty')), sum_decl())
+        bad = copy.deepcopy(good); bad['body']['alternatives'][1]['body'] = boolean()
+        self.reject(bad, 'TYPE')
+        bad = copy.deepcopy(good)
+        bad['body']['alternatives'][1]['body'] = tapp(lit(), inst(I))
+        self.reject(bad, 'PROOF')
+
+    def test_complete_distinct_coverage_required(self):
+        base = with_data(sum_case(ctor('Empty')), sum_decl())
+        missing = copy.deepcopy(base); missing['body']['alternatives'].pop(); self.reject(missing, 'CASE')
+        duplicate = copy.deepcopy(base); duplicate['body']['alternatives'][1] = copy.deepcopy(duplicate['body']['alternatives'][0])
+        self.reject(duplicate, 'CASE')
+        unknown = copy.deepcopy(base); unknown['body']['alternatives'][0]['pattern']['constructor'] = 'NotDeclared'
+        self.reject(unknown, 'CASE')
+        extra = copy.deepcopy(base); extra['body']['alternatives'].append(sum_arm('Empty', (), lit()))
+        self.reject(extra, 'CASE')
+
+    def test_equal_shapes_never_merge_nominal_or_variant_identity(self):
+        left = sum_decl('A', (('A0', ()), ('A1', (I,))))
+        right = sum_decl('B', (('B0', ()), ('B1', (I,))))
+        body = sum_case(ctor('A1', lit()), [sum_arm('A0', (), lit()), sum_arm('B1', (20,), var(20))])
+        self.reject(with_data(body, left, right), 'CASE')
+        self.reject(with_data(app(lam(10, nominal_type('A'), lit()), ctor('B0')), left, right), 'TYPE')
+        same_fields = sum_decl('S', (('First', (I,)), ('Second', (I,))))
+        result = m.derive_shared_fragment(with_data(sum_case(ctor('Second', lit()),
+            [sum_arm('First', (20,), var(20)), sum_arm('Second', (21,), var(21))]), same_fields))
+        self.assertEqual(result['nominal_sum']['constructors'][0]['variant'], 1)
+        self.assertEqual([a['variant'] for a in result['nominal_sum']['cases'][0]['arms']], [0, 1])
+
+    def test_scalar_bool_fields_and_wildcard_positions(self):
+        d = sum_decl('Choice', (('Empty', ()), ('Number', (I, B))))
+        result = m.derive_shared_fragment(with_data(sum_case(ctor('Number', lit(), boolean()),
+            [sum_arm('Empty', (), lit()), sum_arm('Number', (20, None), var(20))]), d))
+        self.assertEqual(result['nominal_sum']['cases'][0]['arms'][1]['fields'],
+                         [{'index': 0, 'binding': name(20), 'type': I},
+                          {'index': 1, 'binding': None, 'type': B}])
+        self.assertEqual(m._free_terms(result['raw_normalized']), set())
+
+    def test_catch_all_wrong_pattern_arity_and_escaped_binder_rejected(self):
+        base = with_data(sum_case(ctor('Empty')), sum_decl())
+        bad = copy.deepcopy(base); bad['body']['alternatives'][0]['pattern'] = {'tag': 'default', 'binder': None}
+        self.reject(bad, 'CASE')
+        bad = copy.deepcopy(base); bad['body']['alternatives'][1]['pattern']['fields'] = []
+        bad['body']['alternatives'][1]['body'] = lit()  # isolate arity, not an escaped field use
+        self.reject(bad, 'CASE')
+        bad = copy.deepcopy(base); bad['body']['alternatives'][0]['body'] = var(20); self.reject(bad)
+        bad = copy.deepcopy(base); bad['body'] = let(20, lit(), bad['body']); self.reject(bad, 'SCHEMA')
+        d = sum_decl('Choice', (('Empty', ()), ('Number', (I, I))))
+        self.reject(with_data(sum_case(ctor('Empty'), [sum_arm('Empty', (), lit()),
+                       sum_arm('Number', (20, 20), var(20))]), d), 'SCHEMA')
+
+    def test_only_int_case_result_not_bool_arrow_or_nominal(self):
+        for result_type, body in ((B, boolean()), (arr(I, I), lam(10, I, var(10))),
+                                  (nominal_type('Choice'), ctor('Empty'))):
+            tree = with_data(sum_case(ctor('Empty'), [sum_arm('Empty', (), body),
+                        sum_arm('Number', (20,), copy.deepcopy(body))], result_type), sum_decl())
+            # Arrow body copies need globally fresh ordinary binder identities.
+            if result_type['tag'] == 'arrow': tree['body']['alternatives'][1]['body'] = lam(11, I, var(11))
+            self.reject(tree, 'CASE')
+
+    def test_constructor_saturation_payload_type_and_type_arguments(self):
+        for value, code in ((ctor('Number'), 'CONSTRUCTOR'),
+                            (ctor('Number', boolean()), 'TYPE'),
+                            (ctor('Number', lit(), lit()), 'TYPE'),
+                            (ctor('Empty', lit()), 'TYPE')):
+            self.reject(with_data(value, sum_decl()), code)
+        value = ctor('Empty'); value['arguments'] = [I]
+        self.reject(with_data(value, sum_decl()), 'NOMINAL')
+        self.reject(with_data(let(10, ctor('Number'), app(var(10), lit())), sum_decl()), 'CONSTRUCTOR')
+
+    def test_callable_recursive_cross_nominal_and_open_fields_rejected_even_unselected(self):
+        fields = [field_type(arr(I, I)), field_type(nominal_type('Choice')),
+                  field_type(nominal_type('Other')), {'tag': 'parameter', 'name': 'a'},
+                  {'tag': 'applied', 'name': 'Int', 'arguments': [field_type(I)]}]
+        for field in fields:
+            with self.subTest(field=field):
+                d = sum_decl(); d['constructors'][1]['fields'] = [field]
+                self.reject(with_data(ctor('Empty'), d), 'NOMINAL')
+        d = sum_decl(); d['parameters'] = [{'name': 'a', 'kind': {'tag': 'star'}}]
+        self.reject(with_data(ctor('Empty'), d), 'NOMINAL')
+
+    def test_nominal_generic_bodies_and_instantiation_vectors_remain_excluded(self):
+        rhs = tabs(100, lam(2, tv(100), let(10, ctor('Empty'), var(2))))
+        self.reject(with_data(let(1, rhs, app(use(1, I), lit())), sum_decl()), 'NOMINAL_SCOPE')
+        self.reject(with_data(shared(app(use(1, nominal_type('Choice')), ctor('Empty'))), sum_decl()), 'USE')
+        self.reject(with_data(tapp(tabs(100, lam(10, tv(100), var(10))), inst(nominal_type('Choice'))), sum_decl()), 'DIRECT')
+
+    def test_unreferenced_unsupported_context_and_mixed_data_sum(self):
+        unused = data_decl('Unused', 'U', (nominal_type('Unused'),))
+        unused['parameters'] = [{'name': 'a', 'kind': {'tag': 'star'}}]
+        tree = with_data(let(10, ctor('Pack', lit()),
+                    sum_case(ctor('Empty'), [sum_arm('Empty', (), case(var(10))), sum_arm('Number', (21,), var(21))])),
+                         unused, sum_decl(), data_decl())
+        result = m.derive_shared_fragment(tree)
+        self.assertEqual(result['raw_normalized']['declarations'], tree['declarations'])
+        self.assertEqual([d['index'] for d in result['nominal_sum']['declarations']], [1])
+        self.assertEqual([d['index'] for d in result['nominal_data']['declarations']], [2])
+
+    def test_64_variants_and_32_fields_are_bounded(self):
+        d = sum_decl('S', tuple(('C'+str(i), ()) for i in range(64)))
+        body = sum_case(ctor('C63'), [sum_arm('C'+str(i), (), lit(i)) for i in range(64)])
+        result = m.derive_shared_fragment(with_data(body, d))
+        self.assertEqual(len(result['nominal_sum']['declarations'][0]['variants']), 64)
+        self.assertEqual(result['nominal_sum']['constructors'][0]['variant'], 63)
+        d['constructors'].append({'name': 'C64', 'fields': []})
+        self.reject(with_data(ctor('C0'), d), 'LIMIT')
+        d = sum_decl('S', (('Empty', ()), ('Full', (I,) * 32)))
+        body = sum_case(ctor('Full', *[lit(i) for i in range(32)]),
+                        [sum_arm('Empty', (), lit()), sum_arm('Full', (None,) * 32, lit())])
+        self.assertEqual(len(m.derive_shared_fragment(with_data(body, d))['nominal_sum']['constructors'][0]['arguments']), 32)
+        d['constructors'][1]['fields'].append(field_type(I)); self.reject(with_data(ctor('Empty'), d), 'LIMIT')
+
+    def test_combined_data_sum_nominal_limit_not_two_separate_quotas(self):
+        def tree(count):
+            declarations, body = [], lit()
+            for i in range(count):
+                declarations.append(data_decl('D'+str(i), 'C'+str(i), ()) if i%2 == 0 else
+                                    sum_decl('D'+str(i), (('C'+str(i), ()), ('X'+str(i), ()))))
+            for i in reversed(range(count)): body = let(1000+i, ctor('C'+str(i)), body)
+            return with_data(body, *declarations)
+        result = m.derive_shared_fragment(tree(32))
+        self.assertEqual(len(result['nominal_data']['declarations']) + len(result['nominal_sum']['declarations']), 32)
+        self.reject(tree(33), 'LIMIT')
+
+    def test_sum_evidence_recomputed_including_paths_variant_and_coverage(self):
+        raw = shared_sum(); result = m.derive_shared_fragment(raw)
+        mutations = []
+        bad = copy.deepcopy(result); bad['nominal_sum']['constructors'][0]['variant'] = 0; mutations.append(bad)
+        bad = copy.deepcopy(result); bad['nominal_sum']['declarations'][0]['index'] = 1; mutations.append(bad)
+        bad = copy.deepcopy(result); bad['nominal_sum']['declarations'][0]['variants'].reverse(); mutations.append(bad)
+        bad = copy.deepcopy(result); bad['nominal_sum']['cases'][0]['arms'][0]['body']['path'][-2] = '1'; mutations.append(bad)
+        bad = copy.deepcopy(result); bad['nominal_sum']['cases'][0]['arms'].pop(); mutations.append(bad)
+        bad = copy.deepcopy(result); del bad['nominal_sum']; mutations.append(bad)
+        for bad in mutations:
+            with self.assertRaises(m.SharedTransportError) as caught: m.validate_shared_fragment(raw, bad)
+            self.assertEqual(caught.exception.code, 'EVIDENCE')
+
+    def test_full_two_coordinate_vectors_survive_across_all_arms(self):
+        rhs = tabs(100, tabs(101, lam(2, tv(100), var(2))))
+        arms = [sum_arm('Empty', (), app(use(1, I, B), lit())),
+                sum_arm('Number', (20,), app(use(1, I, I), var(20)))]
+        result = m.derive_shared_fragment(with_data(let(1, rhs, sum_case(ctor('Empty'), arms)), sum_decl()))
+        uses = result['polymorphism']['uses']
+        self.assertEqual([u['arguments'] for u in uses], [[I, B], [I, I]])
+        self.assertEqual(uses[0]['instantiated_type'], uses[1]['instantiated_type'])
+        self.assertEqual(len(result['polymorphism']['definitions'][0]['prefix']), 2)
+
+    def test_duplicate_sum_declaration_or_variant_name_rejected(self):
+        declaration = sum_decl()
+        declaration['constructors'][1]['name'] = declaration['constructors'][0]['name']
+        self.reject(with_data(ctor('Empty'), declaration), 'SCHEMA')  # raw declaration ingress checks first
+        self.reject(with_data(ctor('Empty'), sum_decl(), sum_decl('Other')), 'DECLARATION')
+
+    def test_sum_metadata_work_and_row_limits_fail_closed(self):
+        for key in ('MAX_WORK', 'MAX_METADATA_BYTES', 'MAX_ROWS'):
+            with mock.patch.object(m, key, 1): self.reject(shared_sum(), 'LIMIT')
+
+    def test_all_old_data_evidence_bytes_unchanged(self):
+        goldens = {'box02': '08081c90576987e6a4d7082a6c712415db418ce6b5e6f67d2384550a1b99f9ed',
+                   'fnbox01': 'e3a77d8edc612234a81ece8a8fe5135319714c1b81cefb26b4002133133579bf'}
+        fixture = json.loads((BASE/'tests/shared_nominal_raw_extract.json').read_bytes())
+        for row in fixture['cases']:
+            result = m.derive_shared_fragment(row['raw'])
+            self.assertNotIn('nominal_sum', result)
+            digest = hashlib.sha256(json.dumps(result, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
+            self.assertEqual(digest, goldens[row['name']])
+
+
+SUM_CAPTURE_ROOT = os.environ.get('IR8_SUM_CAPTURE_ROOT')
+
+
+@unittest.skipUnless(SUM_CAPTURE_ROOT, 'set IR8_SUM_CAPTURE_ROOT for completed original SUM captures')
+class GenuineSumCaptureTests(unittest.TestCase):
+    def test_both_completed_captures_full_custody_projection_normalization_and_resolver(self):
+        from source_capture_v8 import verify_capture
+        root = Path(SUM_CAPTURE_ROOT)
+        pins = {
+            'number': ('9acc00b4f3bd9142268522fd5f263cfac74ab117533578abc65010d17b45cd9e',
+                       'cf3c414ac40d158bcaa150250e76c59dc1ef7517cbd12c49b723d3b0b00d0919', 1),
+            'empty': ('5eb7eba9a32608a47066dc4774727a49b72d930948d9fe7e47e4df2702077998',
+                      '7b3ae9a30a0e436eb01d91cd159d2a5e29fec6b2af633b350f144d1ce86f606d', 0),
+        }
+        bindings = []
+        for label, (capture_sha, root_sha, variant) in pins.items():
+            with self.subTest(capture=label):
+                capture_path = root/('capture-'+label+'01')/'capture.stdout'
+                verified = verify_capture(capture_path, fixture_root=root/'inputs'/label, entry='main.emlf',
+                    expected_source_hashes={'main.emlf': root_sha,
+                       'SharedPoly.emlf': '50fd7fa662c9290a61b0a69012cd2e886a44075de9827dff4edd3f0c839573a7'},
+                    expected_capture_sha256=capture_sha)
+                self.assertTrue(verified['fragment_admitted'])
+                self.assertFalse(verified['source_admitted']); self.assertFalse(verified['native_admitted'])
+                capture = json.loads(capture_path.read_bytes())
+                result = m.derive_shared_fragment(capture['projection']['projected_annotated'])
+                self.assertEqual(result['steps'], capture['normalization']['steps'])
+                self.assertEqual(result['raw_normalized'], capture['normalization']['raw_normalized'])
+                self.assertEqual(len(result['steps']), 4)
+                self.assertEqual([u['arguments'] for u in result['polymorphism']['uses']], [[B], [I], [B], [I]])
+                definition, = result['polymorphism']['definitions']
+                join, = verified['retained_prefix_binding_joins']
+                self.assertEqual(join['binding'], definition['binding'])
+                sums = result['nominal_sum']; declaration, = sums['declarations']
+                self.assertEqual(sums['constructors'][0]['variant'], variant)
+                self.assertEqual(len(result['raw_normalized']['declarations']), 7)
+                entities = {row['allocated']: row['entity'] for row in capture['module_custody']['resolution']['entities']}
+                self.assertEqual(entities[declaration['name']]['owner'], 'Main')
+                self.assertEqual(entities[declaration['name']]['spelling'], 'Choice')
+                self.assertEqual(entities[declaration['name']]['namespace'], 'types')
+                self.assertEqual(entities[declaration['name']]['role'], {'tag': 'datatype'})
+                self.assertEqual([entities[v['constructor']]['spelling'] for v in declaration['variants']], ['Empty', 'Number'])
+                self.assertTrue(all(entities[v['constructor']]['owner'] == 'Main' for v in declaration['variants']))
+                self.assertTrue(all(entities[v['constructor']]['namespace'] == 'terms' and
+                                    entities[v['constructor']]['role'] == {'tag': 'constructor', 'datatype': 'Choice'}
+                                    for v in declaration['variants']))
+                field = sums['cases'][0]['arms'][1]['fields'][0]
+                bindings.append(field['binding']['id'])
+                # Actual retained payload let: follows the shared definition,
+                # remains an ordinary application and is referenced by Number's
+                # arm in both captures. No display-hint lookup is needed.
+                shared_let = m._get(result['raw_normalized'], definition['binding_source']['path'])
+                payload_let = shared_let['body']
+                self.assertEqual(payload_let['tag'], 'let')
+                self.assertEqual(payload_let['value']['tag'], 'application')
+                number_arm = m._get(result['raw_normalized'], sums['cases'][0]['arms'][1]['body']['path'])
+                self.assertIn(payload_let['name']['id'], m._free_terms(number_arm))
+        self.assertNotEqual(bindings[0], bindings[1])  # observed IDs, never hardcoded to either capture
 
 
 if __name__ == '__main__':

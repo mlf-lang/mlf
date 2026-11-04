@@ -42,8 +42,9 @@ closed Int/Bool vectors at shared rank-1 callable uses; supported scalar
 primitives and an Int conditional. Pending shared RHSs, captured callable views,
 dead type parameters and curried callable values have separate regression
 cases. Bare, partial or open shared uses, recursive/nested generic definitions,
-unsupported proofs and higher-rank uses reject. Stage08 adds the closed nominal
-DATA subset below; it does not admit every preserved declaration.
+unsupported proofs and higher-rank uses reject. Stage08 adds closed nominal
+DATA and Stage10 adds the scalar-field SUM subset below; neither admits every
+preserved declaration automatically.
 
 ## Stage08: closed DATA and callable fields
 
@@ -139,6 +140,85 @@ field use. This is separate from the twelve comparisons; exact-commit CI is
 still pending. CI retains both coarse and opt-in fresh source suites
 separately, reuses the same GHC install and keeps the 60-minute job ceiling.
 
+## Stage10: closed scalar-field SUMs
+
+Referenced closed, parameter-free nominal declarations with 2 through 64
+constructors are admitted as SUMs. Each variant has at most 32 fields, each
+exactly Int or Bool. Nullary variants are valid. The combined referenced DATA
+and SUM declaration limit remains 32. Recursive types, nested nominal fields,
+callable SUM fields, parameters and generic nominal scopes remain unsupported.
+All declarations stay in the source evidence; unrelated compiler dictionaries
+are not silently admitted or deleted. Exact nominal identity is preserved.
+
+A SUM constructor must be saturated. Cases must be exhaustive, with one arm for
+each exact declaration variant and an Int result. Source arm order may differ
+from declaration order: both identities are retained, and each factory has its
+own checked allocation Site. Every arm and its proof, type and captures are
+checked, including unselected arms. A factory permits at most 32 external
+captures and 32 field captures, 64 total; the enclosing case's capture union
+also remains bounded by 64. Wildcards preserve the constructor payload but do
+not invent a field binding or demand it.
+
+The whole case is lazy. When selected, it creates only the chosen arm's thunk;
+unselected factory code exists but its thunk is neither allocated nor entered.
+Fields refer to the original pending payload. In particular, `sharedId` may
+receive an Int-valued thunk before that argument is demanded. The observer
+follows its later memo to the scalar result rather than assuming every argument
+already has a scalar event.
+
+SUM constructors and case thunks stay coarse even with `--data-groups`.
+Eligible surrounding supports may use the Stage09 strategy; this does not
+provide separate SUM-container reclamation. Existing DATA coarse/opt-in plans
+and non-SUM defaults remain exact. There is no runtime, ABI, producer or CLI
+change for this extension, and no new GC or performance claim.
+
+The focused replay suite passed all 99 tests locally with its optional retained
+SUM capture check enabled; the broader module run passed 251 of 254 tests with
+three existing external-artifact skips. These capture replays are not fresh
+source executions. Seventeen synthetic SUM planner tests pass, including variant/arm/Site joins,
+selected-only factory structure, wildcard and numeric field positions,
+32-external/32-field limits, complete shared-view pairs, invalid unselected
+factory metadata and old complete-output goldens. They are not source-inference
+evidence. Eight real-C conditions from genuine checked captures, Number/Empty
+under coarse/groups and O0/O2, pass the SUM-specific observer with Int 42 and
+seven balanced empty ledger categories. Number's field and external alias share
+one original payload evaluation/memo; Empty allocates that payload but never
+forces it. Only the selected factory is allocated/entered, and the shared RHS
+is evaluated once with both complete Bool and Int views.
+
+The first native pair succeeded but an older post-run observer assumed a ready
+scalar Int argument and failed. Its actual output was retained and rechecked
+with the lazy-aware observer; only the other seven pairs were newly executed.
+The portable observer also accepts all eight reports and rejects 64 copied-report
+negative controls. No runtime/source workaround was used.
+
+The separate fresh two-source CLI suite passed locally on 2026-11-04. All
+16 process records returned zero without cleanup errors; both complete native
+reports equal their earlier coarse-O0 baselines. Number preserves the one
+payload memo and deferred Int argument; Empty leaves the external payload
+undemanded. Both return Int 42 with seven balanced empty ledger categories.
+
+Two representative ASan/UBSan runs also passed with identical native reports:
+Number/groups-O0 and Empty/coarse-O0. LeakSanitizer was disabled in this local
+environment; this is not an all-combinations sanitizer or leak-detection claim.
+
+To reproduce the fresh source suite:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_sum.py \
+  --ghc /absolute/path/to/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /tmp/ir8-source-sum-fresh
+```
+
+It builds a fresh producer for each `number` and `empty` case, retaining the
+source snapshot, capture/replay, plan, generated C, process records, native
+report and `sum-observations.json`, plus top-level results or failure output.
+Optional `--data-groups` selects the existing supporting-group strategy and
+still requires coarse SUM placement. CI runs the two default-coarse source
+cases separately from the earlier suites, preserving all earlier steps and
+the 60-minute job ceiling. The retained-capture comparisons and fresh source
+builds are separate evidence; exact-commit CI is still pending.
+
 ## Fragment and planner tests
 
 From the repository root, with POSIX, Python 3.12 or newer and an existing C11
@@ -149,12 +229,16 @@ python3 -B tools/experimental/resource-native/tests/test_module_shared_transport
 
 python3 -B tools/experimental/resource-native/tests/test_planner_v8_placement.py
 
+python3 -B tools/experimental/resource-native/tests/test_planner_v8_sum.py
+
 CC=gcc IR8_PLANNER_NATIVE=1 \
 IR8_PLANNER_NATIVE_OUTPUT=/tmp/ir8-planner-native-fresh \
 python3 -B tools/experimental/resource-native/tests/test_planner_v8.py
 ```
 
-The fragment suite now has 78 unittest cases. The planner suite has 20 unittest
+The fragment suite now has 99 unittest cases, including one optional retained
+SUM capture test. Without `IR8_SUM_CAPTURE_ROOT`, that test is skipped, as in CI.
+The original planner suite has 20 unittest
 cases;
 its final test runs five native fragment subcases: pending shared RHS, nested
 view capture, a distinct dead-parameter vector, curried sharing and an unselected
@@ -259,7 +343,7 @@ Still unqualified:
 
 - A complete public source-admission/export/3 interface and the full
   polymorphism/representation/runtime-inventory correspondence join.
-- Parameterized, recursive or multi-constructor DATA, nominal-valued fields,
+- Parameterized or recursive nominal types, nominal-valued fields,
   callable-valued SUM storage, recursive generic source programs, arbitrary
   imported libraries, higher-rank use and broader MLF.
 - Complete independent observation of every Access/Env/Transport transition and

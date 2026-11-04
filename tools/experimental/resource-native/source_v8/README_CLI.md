@@ -35,16 +35,17 @@ sharedId x = x
 
 The current fragment admits Int, Bool and arrows, supported scalar primitives,
 Int conditionals and bounded rank-1 shared callable uses with complete closed
-Int/Bool vectors, plus referenced closed, parameter-free single-constructor DATA.
+Int/Bool vectors, plus referenced closed, parameter-free DATA and scalar-field SUMs.
 DATA fields are Int, Bool or recursively closed arrows over those scalars; exact
 nominal identities are not merged by equal field layouts. It preserves the
 shared RHS, ordinary pending applications,
 actual checked type-computation witnesses and curried captures. Unsupported
 proofs, open/partial shared uses, higher-rank or impredicative arguments,
-parameterized/recursive/multi-constructor DATA, nominal-valued fields and
+parameterized/recursive nominal types, nominal-valued fields, callable SUM fields and
 recursive generic definitions reject before native execution. Ordinary function
-and case types may mention admitted DATA, but retained generic scopes and Scheme
-vectors may not. All declarations remain evidence, without automatically
+types and DATA case results may mention admitted nominal types; SUM cases require
+Int results. Retained generic scopes and Scheme vectors may not contain nominal
+types. All declarations remain evidence, without automatically
 admitting unrelated compiler dictionaries.
 See the [fragment contract](README.md) for its limits.
 
@@ -92,6 +93,36 @@ for a shared callable field and from 9,512 to 8,544 for a curried field, but ros
 from 4,088 to 4,248 for scalar Box. Total allocation and reference-count work
 increased. These are ledger measurements, not RSS or elapsed-time improvements.
 See the [Stage09 tradeoff and evidence](README.md#stage09-opt-in-data-group-placement).
+
+## Scalar-field SUMs
+
+Stage10 accepts 2–64 constructors with 0–32 Int/Bool fields each, no type
+parameters or recursion, and exhaustive Int-result cases. The combined limit
+is 32 referenced DATA/SUM declarations. Exact constructor/family identity and
+source arm order are checked separately from declaration variant order. Every
+arm is checked, but only the selected arm's lazy factory thunk is allocated and
+entered. External and field capture limits are 32 each, 64 total per factory.
+
+For example, beside the same `SharedPoly.emlf`:
+
+```text
+import SharedPoly
+data Choice = Empty | Number Int;
+let payload = addInt 20 1 in
+let choice = Number payload in
+case choice of {
+  Empty -> if sharedId true then sharedId 42 else 0;
+  Number n -> if sharedId true then sharedId (addInt n payload) else 0
+}
+```
+
+The Number field and external `payload` alias must retain the same pending
+computation, not an eager scalar or a cloned expression. Changing only
+`Number payload` to `Empty` keeps the external payload allocation but leaves it
+undemanded. SUM constructors and case thunks remain coarse under either CLI
+placement mode; `--data-groups` may separate other eligible supports. This adds
+no callable/recursive SUM support, runtime/ABI change or automatic strategy.
+See the [bounded SUM contract and evidence](README.md#stage10-closed-scalar-field-sums).
 
 ## Source and toolchain custody
 
@@ -208,6 +239,23 @@ Int 42 with fault zero, seven balanced empty ledger categories and DATA
 retirement before later field use. All 24 recorded subprocesses returned zero.
 The earlier O0/O2 comparisons are separate evidence, and exact-head CI remains
 pending; these complete-build runs are not a performance benchmark.
+
+Stage10's separate two-case fresh source suite is:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_sum.py \
+  --ghc /absolute/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /absolute/new-sum-suite-directory
+```
+
+It retains per-case `sum-observations.json` alongside the normal CLI evidence;
+`--data-groups` is optional. The fresh default two-case suite passed locally on
+2026-11-04: all 16 process records returned zero without cleanup errors, both
+native reports exactly matched the earlier coarse-O0 reports, and both returned
+Int 42 with seven balanced empty ledger categories. Number shares one payload
+memo and a deferred Int argument; Empty never demands the external payload.
+The eight retained-capture native conditions are separate evidence, and
+exact-head CI remains pending.
 
 This remains a bounded opt-in experiment. It does not establish arbitrary MLF
 source support, general nominal or callable-SUM coverage, all runtime guards,
