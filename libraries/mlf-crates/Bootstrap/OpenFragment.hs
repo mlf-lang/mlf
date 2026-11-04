@@ -463,6 +463,8 @@ module Bootstrap.OpenFragment
       }
     };
 
+  restoreFinals8 :: [] PackageFinalFields8 -> [] XTerm ->
+    Either String ([] ((,) String Fragment));
   restoreFinals8 prepared bodies = case prepared of {
     [] -> case bodies of {
       [] -> Right [];

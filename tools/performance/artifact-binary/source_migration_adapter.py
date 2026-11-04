@@ -1,4 +1,4 @@
-"""Reviewed query-index source loader; graph135 and frozen132 evidence are unchanged.
+"""Reviewed ci-integration source loader; graph135 and frozen132 evidence are unchanged.
 
 Install beside source_contract.py and the future frozen metadata bundle at
  tools/performance/artifact-binary/. The historical source chain is unchanged.
@@ -10,8 +10,8 @@ import types
 import os
 import stat
 
-FINAL_MANIFEST_SHA256 = "5289d668b8aae86409fca78e80e56f31e3a000c5f3a060f4dcf44a97a658b954"
-CONTRACT_SOURCE_SHA256 = "7e5dc443d3f8f0305122576fc58ae5dd87c4fdaa931630fdfb37e27164d23462"
+FINAL_MANIFEST_SHA256 = '8335183e3341de4e023362330e4e1eaa153110d20b7f101172e7f1ff8c219a8c'
+CONTRACT_SOURCE_SHA256 = '97c6887065e459d655256f6d94807c88bcc4760f78ee842abd641d9df9bba868'
 
 
 def read_implementation(path):
@@ -40,10 +40,10 @@ def live_contract(history_root, source_root=None):
     if FINAL_MANIFEST_SHA256 is None:
         raise ValueError('binary source migration is not frozen; live135 admission is unavailable')
     directory = Path(__file__).resolve().parent
-    path = directory / 'query_index_contract.py'
+    path = directory / 'ci_integration_contract.py'
     raw = read_implementation(path)
     if hashlib.sha256(raw).hexdigest() != CONTRACT_SOURCE_SHA256:
-        raise ValueError('fixed query-index source contract implementation SHA')
+        raise ValueError('fixed ci-integration source contract implementation SHA')
     module = types.ModuleType('fixed_binary_source_contract')
     module.__file__ = str(path)
     # Execute only this separately author-pinned maintenance implementation;

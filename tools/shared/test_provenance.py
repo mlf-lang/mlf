@@ -247,8 +247,26 @@ class InferredSchemeEvidence(unittest.TestCase):
             build.audit_inferred_interfaces(self.log('Example', ''), {'Example': {}})
 
     def test_literal_polymorphism_rejected(self):
+        for constraint in ['Num', 'Fractional', 'IsString']:
+            with self.subTest(constraint=constraint):
+                with self.assertRaisesRegex(RuntimeError, 'unresolved host literal'):
+                    build.audit_inferred_interfaces(self.log('Example',
+                        'TYPE SIGNATURES\n  value :: ' + constraint + ' a => a\n'), {'Example': {}})
+
+    def test_private_overloaded_error_rejected(self):
+        name = 'Bootstrap.OpenFragment'
+        scheme = ('  restoreFinals8 :: forall {e}. IsString e => [PackageFinalFields8] -> '
+                  '[XTerm] -> Either e [(String, Fragment)]\n')
         with self.assertRaisesRegex(RuntimeError, 'unresolved host literal'):
-            build.audit_inferred_interfaces(self.log('Example', 'TYPE SIGNATURES\n  value :: Num a => a\n'), {'Example': {}})
+            build.audit_inferred_interfaces(self.log(name, 'TYPE SIGNATURES\n' + scheme), {name: {}})
+
+    def test_concrete_private_error_accepted(self):
+        name = 'Bootstrap.OpenFragment'
+        scheme = ('  restoreFinals8 :: [PackageFinalFields8] -> [XTerm] -> '
+                  'Either String [(String, Fragment)]\n')
+        result = build.audit_inferred_interfaces(self.log(name, 'TYPE SIGNATURES\n' + scheme), {name: {}})
+        self.assertEqual(result[name]['signatures'], scheme)
+        self.assertIs(result[name]['unresolved_literal_constraints'], False)
 
     def test_actual_monomorphic_scheme_accepted(self):
         result = build.audit_inferred_interfaces(self.log('Example', 'TYPE SIGNATURES\n  value :: Int\n'), {'Example': {}})
