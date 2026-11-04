@@ -246,11 +246,11 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(head['tag'],'primitive');head['id']=9999
         with self.assertRaises(transport.SharedTransportError):p.plan_fragment(bad)
 
-    def test_unsupported_bare_partial_open_external_and_recursive_reject(self):
+    def test_unsupported_bare_partial_open_callable_capture_and_recursive_reject(self):
         cases=[let(1,prefix([100],lam(2,ty(100),var(2))),var(1)),
                let(1,prefix([100,101],lam(2,ty(100),var(2))),use(1,I)),
                let(1,prefix([100],lam(2,ty(100),var(2))),use(1,ty(999))),
-               let(9,lit(),let(1,prefix([100],lam(2,ty(100),var(9))),app(use(1,I),lit()))),
+               let(9,lam(10,I,var(10)),let(1,prefix([100],lam(2,ty(100),app(var(9),lit()))),app(use(1,I),lit()))),
                {'tag':'letrec','bindings':[{'name':name(1),'type':I,'value':var(1)}],'body':var(1)},
                {'tag':'constructor','name':'()','arguments':[]}]
         for raw in cases:

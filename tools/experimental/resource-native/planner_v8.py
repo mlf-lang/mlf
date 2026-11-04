@@ -15,6 +15,8 @@ hole. Its complete checked RHS graph remains lazy; no wrapper is contracted.
 Closed scalar owners, closed scalar-arrow owners and complete shared-view pairs
 may be captured without changing existing support, origin or target Access.
 An ordinary callable owner may remain pending; its type predicts no Code.
+Top-level direct-lambda generalizations may explicitly import scalar owners;
+the independent resource checker must still prove their origin and support.
 """
 from __future__ import annotations
 
@@ -462,9 +464,9 @@ class Planner:
     def needed(self, node, path, bound=frozenset()):
         """Transitive free lexical binders AND complete-vector shared views.
 
-        A Scheme introduced inside this carrier is local, not a capture. Stop
-        at its closed generic RHS; the fragment checker already rejects external
-        captures there. Never erase type applications with the old free_vars.
+        A Scheme introduced inside this carrier is local, not a capture. Closed
+        generic RHSs need no traversal; an explicitly imported scalar remains a
+        real dependency. Never erase type applications with the old free_vars.
         """
         mono = set(); pairs = {}
         def visit(n, p, local):
@@ -483,6 +485,9 @@ class Planner:
                 visit(n['body'], p+('body',), local | {n['parameter']['id']}); return
             if tag == 'let':
                 if p not in self.def_by_path: visit(n['value'], p+('value',), local)
+                elif self.def_by_path[p]['free_term_bindings']:
+                    rhs = tuple(self.def_by_path[p]['rhs_cursor']['path'])
+                    visit(self.node_at(rhs), rhs, local)
                 visit(n['body'], p+('body',), local | {n['name']['id']}); return
             if tag == 'letrec':
                 require(len(n['bindings']) == 1, 'recursive group must be singleton')
@@ -543,6 +548,54 @@ class Planner:
         self.tick(); require(self.code_count + len(self.allocation_map) < MAX_CODES, 'combined Site/Code limit')
         self.code_count += 1; return prefix + str(self.code_count)
 
+    def generalized_imports(self, definition, env, block, scope):
+        """Declare imports; the checked emitter acquires aliases after begin."""
+        free = definition['free_term_bindings']
+        if not free:
+            require('captures' not in definition, 'spurious generic capture evidence')
+            return {}, {}, [], []
+        require(scope is None and block.root == 'entry' and not block.prefix and not self.knot_depth,
+                'captured generalization requires the concrete top-level spine')
+        evidence = definition.get('captures', {})
+        require(set(evidence) == {'policy', 'scalars'} and
+                evidence['policy'] == transport.GENERIC_CAPTURE_POLICY,
+                'generic scalar capture policy differs')
+        rows = evidence['scalars']
+        require(type(rows) is list and 1 <= len(rows) <= MAX_CAPTURES and
+                all(type(r) is dict and set(r) == {'binding', 'type', 'occurrences'} and
+                    type(r['binding']) is int for r in rows), 'generic scalar import rows differ')
+        require(
+                [r['binding'] for r in rows] == free == sorted(set(free)),
+                'generic scalar import binding inventory differs')
+        cursor_path = tuple(definition['rhs_cursor']['path'])
+        cursor = self.node_at(cursor_path)
+        require(cursor['tag'] == 'lambda', 'captured generic RHS must remain a direct lambda')
+        mono, pairs = self.needed(cursor, cursor_path)
+        require(not pairs and sorted(mono) == free, 'generic scalar free binding partition differs')
+        occurrences = {ident: [] for ident in free}
+        for suffix, node in transport._walk(cursor):
+            self.tick()
+            if node['tag'] == 'var' and node['name']['id'] in occurrences:
+                occurrences[node['name']['id']].append(address(cursor_path + suffix))
+        imports = {}; inner = {}; support = []; mapping = []
+        for row in rows:
+            self.tick()
+            require(set(row) == {'binding', 'type', 'occurrences'}, 'generic scalar capture fields differ')
+            ident = row['binding']; ref = env.get(ident)
+            typ = self.logical(row['type'], None)
+            require(typ in SCALARS.values() and isinstance(ref, Reference) and
+                    self.same_type(ref.logical, typ), 'generic import requires an exact available scalar Reference')
+            require(row['occurrences'] == occurrences[ident] and occurrences[ident],
+                    'generic scalar capture occurrences differ')
+            name = self.fresh('import')
+            contract = {'value': ref.variable, 'layout': self.layout(typ), 'relation': 'down'}
+            imports[name] = contract
+            inner[ident] = Reference(name, typ, strict=ref.strict)
+            support.append(ref)
+            mapping.append({'binding': ident, 'import': name, **contract,
+                            'occurrences': row['occurrences']})
+        return dict(sorted(imports.items())), inner, support, mapping
+
     def emit(self, node, path, env, views, home, block, scope):
         self.tick(); tag = node['tag']
         if tag == 'with_data':
@@ -595,19 +648,24 @@ class Planner:
         if tag == 'let':
             d = self.def_by_path.get(path)
             if d is not None:
-                require(scope is None and d['free_term_bindings']==[], 'nested/external generic definition')
+                require(scope is None, 'nested generic definition')
+                imports, inner, support, import_map = self.generalized_imports(d,env,block,scope)
                 scheme='S'+str(d['id']); out=self.fresh('shared')
-                key,split,placement = self.allocation(home,[],block,path,'shared-rhs',scope)
+                key,split,placement = self.allocation(home,support,block,path,'shared-rhs',scope)
                 child=Block(block.root,block.name,[],block.prefix+(len(block.body),'body'),scheme)
                 cursor=self.node_at(d['rhs_cursor']['path'])
-                result=self.emit(cursor,tuple(d['rhs_cursor']['path']),{}, {}, '$home',child,scheme)
+                result=self.emit(cursor,tuple(d['rhs_cursor']['path']),inner, {}, '$home',child,scheme)
                 require(self.same_type(result.logical, self.definition_types[d['id']]), 'generic RHS actual result type differs')
+                for ref in inner.values(): self.release(ref,child)
                 seal=self.add(child,op='seal',value=result.variable)
-                intro=self.add(block,op='generalize',out=out,**{'in':key},scheme=scheme,body=child.body)
+                extra = {'imports': imports} if imports else {}
+                intro=self.add(block,op='generalize',out=out,**{'in':key},scheme=scheme,body=child.body,**extra)
                 self.close_builder(key,split,placement,block)
                 ref=SchemeReference(out,d['id'],strict=split)
                 self.scheme_map.append({'definition':d['id'],'binder':d['binding']['id'],'scheme':scheme,
                     'generalize':intro,'seal':seal,'rhs_cursor':d['rhs_cursor'],'result_owner':result.variable})
+                if imports:
+                    self.scheme_map[-1]['imports'] = import_map
             else:
                 ref=self.emit(node['value'],path+('value',),env,views,home,block,scope)
             result=self.emit(node['body'],path+('body',),env|{node['name']['id']:ref},views,home,block,scope)

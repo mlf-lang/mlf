@@ -7,10 +7,11 @@ from __future__ import annotations
 from .program_schema import fail
 
 FORMAT = 'resource-ir-v8-resource-analysis/1'
+CAPTURE_ORIGIN_CASES = ('same-neutral-capsule/project', 'concrete-E0-intrinsic-scalar/identity')
 RULES = ('exact_mono_type', 'down_support', 'same_group', 'strict_below',
          'argument_identity', 'no_once_copy', 'live_exact_anchor',
          'neutral_same_capsule', 'closed_preserve_target_access', 'principal_force_result')
-KINDS = ('publish', 'application_argument', 'callback_return', 'fill', 'field_acquire', 'force_result')
+KINDS = ('publish', 'application_argument', 'callback_return', 'fill', 'field_acquire', 'force_result', 'generic_import')
 COUNTS = ('functions', 'thunks', 'instructions', 'checked_factory_arms', 'allocations',
           'introductions', 'instantiate_occurrences', 'declared_uses', 'types', 'environments')
 PENDING_GATES = ('runtime-table-closure', 'physical-representation-and-Access',
@@ -94,7 +95,7 @@ class Analysis:
         target.append(self._fact(value, role, authority))
         return index
 
-    def obligation(self, instruction, role, kind, host_site, references, expected, scope, rules):
+    def obligation(self, instruction, role, kind, host_site, references, expected, scope, rules, *, origin_cases=None):
         rule_count = sum(rule in rules for rule in RULES)
         if not rule_count:
             raise ValueError('empty obligation rules')
@@ -109,6 +110,8 @@ class Analysis:
         self.obligations.append(dict(path=self.instructions[instruction]['path'],
             role=list(role), kind=kind, host_site=host_site, operands=operands,
             expected_type=expected, scope=scope, rules=rule_rows))
+        if origin_cases is not None:
+            self.budget.put(self.obligations[-1], 'origin_cases', self.budget.listing(origin_cases))
 
     def check_graph(self, program):
         # Scope equality is checked while adding each allocation. Per-root DFS
@@ -162,7 +165,7 @@ class Analysis:
         self.edges = self.budget.ordered(self.edges, key=lambda row:
             (row['from_code'] is None, -1 if row['from_code'] is None else row['from_code'], row['to_code'], row['site']))
         # Rows are already instruction-local ordered except nested generalize,
-        # whose enclosing instruction has no obligation. Sort for explicit closure.
+        # including conditional initial-import acquisitions. Sort for explicit closure.
         instruction_lookup = {}
         for index, row in enumerate(self.instructions):
             self.budget.put(instruction_lookup, id(row['path']), index)

@@ -408,6 +408,57 @@ void rt8_private_publish_check(Rt8Context *c,const Rt8Origin *host,uint32_t expe
  }
  rt8_private_guard_seen(c,9);
 }
+static int capture_atom_equal(Rt8Context *c,const char *actual,const char *fixed) {
+ for(size_t i=0;;++i){rt8_private_charge(c,4);
+  unsigned a=(unsigned char)actual[i],b=(unsigned char)fixed[i];
+  if(a!=b)return 0;
+  if(!a)return 1;}
+}
+/* A registered capture may retain a concrete intrinsic scalar without changing
+ * its principal Access. This is a native safety rule, not a source-import
+ * whitelist: exact source owners and Down proofs remain checked-Code authority.
+ * In particular, SCALAR describes the representation, not the node's readiness.
+ * All other edges, and generic-owned scalar captures, keep the old rule. */
+void rt8_private_capture_publish(Rt8Context *c,const Rt8Origin *host,
+ const Rt8SlotFacts *slot,const Rt8ValueFacts *target) {
+ if(host->kind!=IR8_PACKET_ORIGIN_KIND_GENERIC||
+    target->node->origin.kind!=IR8_PACKET_ORIGIN_KIND_CONCRETE){
+  rt8_private_publish_check(c,host,slot->resolved_type,target);return;
+ }
+ Ir8PacketEnv env;Ir8PacketType type;Ir8PacketShapeBinding shape;
+ Ir8PacketShapeTyping typing;Ir8PacketRepresentation rep;
+ uint32_t eid=rt8_private_table_auth(c,4,host->env);
+ rt8_private_table(c,4,eid,&env,sizeof(env));
+ G(c,10,ORIGIN,EQUATION,16,slot->row.id,2,slot->row.role_tag==IR8_PACKET_SLOT_ROLE_CAPTURE);
+ G(c,5,ORIGIN,EQUATION,4,eid,1,env.mode==IR8_PACKET_ENV_MODE_NEUTRAL&&env.scheme!=N&&
+  host->capsule_id!=0&&host->capsule_id<=c->next_capsule&&host->creation_activation==0);
+ G(c,12,TYPE,APPLICABILITY,17,target->row.id,3,target->row.mode==IR8_PACKET_ACCESS_MODE_MONO);
+ G(c,6,ORIGIN,EQUATION,17,target->row.id,2,target->row.origin_env==0&&target->row.use_env==0&&
+  target->row.scheme==N&&target->site.scope==N&&target->node->origin.capsule_id==0&&
+  target->node->origin.creation_activation==0);
+ G(c,3,TYPE,EQUATION,16,slot->row.id,6,slot->row.type==slot->resolved_type&&
+  target->row.type==slot->resolved_type&&target->execution.principal_type==slot->resolved_type);
+ rt8_private_table(c,1,slot->resolved_type,&type,sizeof(type));
+ G(c,3,TYPE,EQUATION,1,type.id,1,type.tag==IR8_PACKET_TYPE_TAG_CLOSED&&type.scheme==N&&
+  type.index==N&&type.argument==N&&type.result==N&&type.protocol==N&&type.result_identity==N);
+ const char *atom=rt8_private_string(c,type.atom);
+ int is_bool=capture_atom_equal(c,atom,"#bool"),is_i64=capture_atom_equal(c,atom,"#i64");
+ G(c,3,TYPE,EQUATION,1,type.id,2,is_bool||is_i64);
+ rt8_private_table(c,9,target->execution.representation,&rep,sizeof(rep));
+ rt8_private_table(c,7,rep.shape,&shape,sizeof(shape));
+ rt8_private_table(c,8,rep.typing,&typing,sizeof(typing));
+ G(c,2,TYPE,EQUATION,7,shape.id,1,shape.source_tag==IR8_PACKET_SHAPE_SOURCE_LEGACY&&
+  shape.source_reference==type.atom&&shape.source_type==N&&shape.source_scheme==N&&
+  shape.kind==(is_bool?IR8_PACKET_SHAPE_KIND_BOOL:IR8_PACKET_SHAPE_KIND_I64)&&
+  shape.argument_rep==N&&shape.result_rep==N);
+ G(c,2,TYPE,EQUATION,8,typing.id,2,typing.shape==shape.id&&typing.type==type.id&&
+  typing.scope==N&&typing.contract==N&&rep.shape==shape.id&&rep.ready_kind==IR8_PACKET_READY_KIND_SCALAR);
+ G(c,2,STATE,EQUATION,14,target->site.id,7,target->shape.shape==shape.id&&
+  target->shape.typing==typing.id&&target->shape.representation==rep.id&&target->shape.kind==shape.kind&&
+  target->shape.argument_rep==N&&target->shape.result_rep==N&&target->shape.fields_object==N&&
+  target->shape.field_first==0&&target->shape.field_count==0);
+ rt8_private_guard_seen(c,9);
+}
 void rt8_private_slot_spec(Rt8Context *c,const Rt8Site *site,const Rt8Env *env,
  uint32_t role,size_t index,Rt8SlotFacts *out) {
  uint32_t sid=rt8_private_table_auth(c,14,site);Ir8PacketSite host;
@@ -459,7 +510,8 @@ void rt8_private_slot_check(Rt8Context *c,Rt8Node *host,uint32_t role,size_t ind
  rt8_private_charge(c,sizeof(actual));memcpy(&actual,slot,sizeof(actual));
  G(c,25,STATE,EQUATION,16,spec->row.id,2,actual.name==spec->name&&actual.target!=NULL&&actual.access!=NULL);
  rt8_private_node_access(c,actual.target,actual.access,1,value);
- rt8_private_publish_check(c,&host->origin,spec->resolved_type,value);
+ if(role==IR8_PACKET_SLOT_ROLE_CAPTURE)rt8_private_capture_publish(c,&host->origin,spec,value);
+ else rt8_private_publish_check(c,&host->origin,spec->resolved_type,value);
  if(spec->row.relation==IR8_PACKET_RELATION_SAME)
   G(c,9,OWNERSHIP,EQUATION,16,spec->row.id,7,host->group==value->node->group);
  /* DOWN/BELOW proof remains checked-source authority; distinct group IDs alone
@@ -491,6 +543,30 @@ const Rt8Access *rt8_private_transport(Rt8Context *c,Rt8Node *host,uint32_t expe
   return result;
  }
  rt8_private_guard_fault(c,RT8_STATUS_ORIGIN,RT8_DETAIL_MISSING,4,17,v.row.id,4);
+}
+/* Only capture_plan's already observed concrete-target branch enters here.
+ * Reauthenticate the actual registered slot and closed host request before
+ * selecting its existing null-projection identity row. No Access is rewritten. */
+const Rt8Access *rt8_private_capture_transport(Rt8Context *c,Rt8Node *host,
+ const Rt8Access *request,size_t index) {
+ Rt8ValueFacts h,v;Rt8SlotFacts slot;Ir8PacketEnv env;
+ rt8_private_node_access(c,host,request,1,&h);
+ G(c,10,ORIGIN,COUNT,14,h.site.id,5,index<host->used&&index<host->capacity);
+ rt8_private_slot_check(c,host,IR8_PACKET_SLOT_ROLE_CAPTURE,index,&host->slots[index],&v,&slot);
+ G(c,6,ORIGIN,EQUATION,17,v.row.id,2,host->origin.kind==IR8_PACKET_ORIGIN_KIND_GENERIC&&
+  v.node->origin.kind==IR8_PACKET_ORIGIN_KIND_CONCRETE);
+ rt8_private_table(c,4,h.row.use_env,&env,sizeof(env));
+ G(c,15,TYPE,EQUATION,4,env.id,1,h.row.use_env!=h.row.origin_env&&
+  env.mode==IR8_PACKET_ENV_MODE_CLOSED&&env.scheme==h.site.scope);
+ uint32_t resolved=rt8_private_resolve(c,slot.row.type,rt8_private_table_ref(c,4,env.id));
+ G(c,3,TYPE,EQUATION,16,slot.row.id,6,resolved==v.row.type&&resolved==slot.resolved_type);
+ for(uint32_t i=0,n=table_count(c,20);i<n;++i){Ir8PacketTransport t;rt8_private_charge(c,3);
+  rt8_private_table(c,20,i,&t,sizeof(t));
+  if(t.source_access!=v.row.id||t.projection_env!=N)continue;
+  G(c,6,ORIGIN,EQUATION,20,i,3,t.kind==IR8_PACKET_TRANSPORT_KIND_IDENTITY&&t.result_access==v.row.id);
+  return v.access;
+ }
+ rt8_private_guard_fault(c,RT8_STATUS_ORIGIN,RT8_DETAIL_MISSING,6,17,v.row.id,4);
 }
 void rt8_private_result_check(Rt8Context *c,const Rt8Frame *f,const Rt8ValueFacts *v) {
  G(c,23,OWNERSHIP,EQUATION,N,N,N,f&&c->frame==f&&f->kind!=RT8_FRAME_ENTRY&&!f->returned&&f->home&&!f->active_intro);

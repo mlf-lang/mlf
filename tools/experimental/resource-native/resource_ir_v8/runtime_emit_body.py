@@ -107,7 +107,10 @@ def expected_roles(inst, codes, raw, b):
             b.creation(3); b.append(roles, b.listing(('imports', index)))
     elif op in _ALLOCATIONS or op in ('select_i64', 'case_i64', 'case_fields_i64', 'generalize'):
         b.append(roles, b.listing(('in',)))
-        if op == 'alloc':
+        if op == 'generalize' and 'imports' in inst:
+            for name in b.ordered(inst['imports']):
+                b.creation(4); b.append(roles, b.listing(('imports', name, 'value')))
+        elif op == 'alloc':
             for name in b.ordered(inst['fields']):
                 b.creation(3); b.append(roles, b.listing(('fields', name)))
         elif op in ('closure', 'thunk'):
@@ -275,8 +278,40 @@ class Planner:
                     b.append(names, operand_name(inst, role, b))
                 outputs = derived['outputs']
                 if 'out' in inst:
-                    if len(outputs) != 1: fail('OPERAND', 'output census differs')
+                    extra = len(inst['imports']) if inst['op'] == 'generalize' and 'imports' in inst else 0
+                    if len(outputs) != 1 + extra: fail('OPERAND', 'output census differs')
                     b.creation(2); same(outputs[0]['role'], ['out'], b, 'OPERAND')
+                    if extra:
+                        for pos, child in enumerate(b.ordered(inst['imports']), 1):
+                            old, alias = derived['inputs'][pos], outputs[pos]
+                            contract = b.get(inst['imports'], child, 'OPERAND')
+                            exact(contract, ('value', 'layout', 'relation'), b, 'OPERAND')
+                            reference = contract['layout']
+                            if type(reference) is not str or not reference.startswith('^') or len(reference) < 2 or contract['relation'] != 'down':
+                                fail('OPERAND', 'import needs an explicit Type and down relation')
+                            b.key_work(reference); b.creation()
+                            declared = b.get(self.raw['types'], reference[1:], 'OPERAND')
+                            exact(declared, ('tag', 'layout'), b, 'OPERAND')
+                            actual = self.resource['types'][plain_index(old['type'], len(self.resource['types']), 'OPERAND')]
+                            if declared['tag'] != 'closed' or declared['layout'] not in ('#i64', '#bool') or actual['tag'] != 'closed':
+                                fail('OPERAND', 'import Type must be an intrinsic scalar')
+                            text_equal(declared['layout'], actual['atom'], b, 'OPERAND')
+                            exact(alias, _FACT_KEYS, b, 'OPERAND')
+                            b.creation(3); same(alias['role'], ['imports', child], b, 'OPERAND')
+                            for field in _FACT_KEYS:
+                                if field not in ('role', 'capability', 'storage'):
+                                    same(old[field], alias[field], b, 'OPERAND')
+                            if old['kind'] != 'value' or old['mode'] != 'own' or old['view'] != 'MONO' or old['ticket'] is not False or old['anchor'] is not None:
+                                fail('OPERAND', 'import source is not a ticket-free MONO owner')
+                            for field in ('capability', 'storage'):
+                                if type(alias[field]) is not int or alias[field] < 0 or alias[field] == old[field]:
+                                    fail('OPERAND', 'import acquisition needs fresh capability/storage')
+                                for prior in derived['inputs']:
+                                    b.work()
+                                    if alias[field] == prior[field]: fail('OPERAND', 'import alias identity is not fresh')
+                                for earlier in range(1, pos):
+                                    b.work()
+                                    if alias[field] == outputs[earlier][field]: fail('OPERAND', 'import alias identity is not fresh')
                 elif inst['op'] == 'fill':
                     if len(outputs) != 1: fail('OPERAND', 'fill update census differs')
                     b.creation(2); same(outputs[0]['role'], ['hole'], b, 'OPERAND')
@@ -573,6 +608,14 @@ class Planner:
                     b.creation(); address = '&' + token
                     self.call(frame, outmap['helper'], b.listing((address, intro_ref, values[0])))
                     env = b.mapping(); self.binding(env, '$home', values[0])
+                    if 'imports' in inst:
+                        imports = b.listing()
+                        for pos, child in enumerate(b.ordered(inst['imports']), 1):
+                            alias = self.handle(frame)
+                            self.call(frame, 'rt8_retain', b.listing((values[pos],)), target=alias)
+                            self.binding(env, child, alias, derived['outputs'][pos])
+                            b.append(imports, b.row(raw_name=child, c_expression=alias, input_index=pos, output_index=pos))
+                        b.put(outmap, 'imports', imports)
                     continue
                 if op == 'seal':
                     if not nested: fail('INTRO', 'seal has no active introduction')

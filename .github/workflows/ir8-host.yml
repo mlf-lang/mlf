@@ -35,6 +35,12 @@ jobs:
           mkdir -m 700 "$RUNNER_TEMP/ir8-arrow-arguments-host"
           python3 -B -S tools/experimental/resource-native/tests/test_ir8_arrow_arguments.py \
             2>&1 | tee "$RUNNER_TEMP/ir8-arrow-arguments-host/checks.log"
+      - name: Check explicit scalar generic imports and copy equations
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$RUNNER_TEMP/ir8-generic-imports-host"
+          python3 -B -S tools/experimental/resource-native/tests/test_ir8_generic_imports.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-generic-imports-host/checks.log"
       - name: Retain host-only evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -44,6 +50,7 @@ jobs:
             ${{ runner.temp }}/ir8-host
             ${{ runner.temp }}/ir8-nominal-arguments-host
             ${{ runner.temp }}/ir8-arrow-arguments-host
+            ${{ runner.temp }}/ir8-generic-imports-host
           if-no-files-found: warn
           retention-days: 14
   ir8-runtime-host:
@@ -81,6 +88,22 @@ jobs:
             python3 -B tools/experimental/resource-native/tests/test_arrow_argument_guards.py \
               --generated "$RUNNER_TEMP/ir8-nested-arrow-fixture" \
               --cc cc --output "$RUNNER_TEMP/ir8-nested-arrow-guards"
+      - name: Prepare explicit scalar import and alias guard fixtures
+        run: |
+          timeout --signal=TERM --kill-after=5s 180s env PYTHONHASHSEED=0 \
+            python3 -B tools/experimental/resource-native/tests/prepare_generic_capture_guard_fixtures.py \
+              --output "$RUNNER_TEMP/ir8-generic-capture-fixtures"
+      - name: Check pending APPLICATION and ready Bool capture guards
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 -B tools/experimental/resource-native/tests/test_generic_capture_guards.py \
+              --generated "$RUNNER_TEMP/ir8-generic-capture-fixtures/pending-int-application-aliases/generated" \
+              --output "$RUNNER_TEMP/ir8-generic-pending-guards" --cc cc --expected-scalar 42 --require-pending
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 -B tools/experimental/resource-native/tests/test_generic_capture_guards.py \
+              --generated "$RUNNER_TEMP/ir8-generic-capture-fixtures/ready-bool-aliases/generated" \
+              --output "$RUNNER_TEMP/ir8-generic-ready-guards" --cc cc --expected-scalar 42
       - name: Retain emitter and reader evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -91,6 +114,9 @@ jobs:
             ${{ runner.temp }}/ir8-binding-readers
             ${{ runner.temp }}/ir8-nested-arrow-fixture
             ${{ runner.temp }}/ir8-nested-arrow-guards
+            ${{ runner.temp }}/ir8-generic-capture-fixtures
+            ${{ runner.temp }}/ir8-generic-pending-guards
+            ${{ runner.temp }}/ir8-generic-ready-guards
           if-no-files-found: warn
           retention-days: 14
   ir8-native-runtime:
@@ -136,6 +162,13 @@ jobs:
           mkdir -m 700 "$RUNNER_TEMP/ir8-source-fragments"
           python3 -B tools/experimental/resource-native/tests/test_module_shared_transport.py \
             2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/replay.log"
+      - name: Check exact generic scalar capture inventory and placement
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_module_shared_generic_captures.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/generic-capture-replay.log"
+          python3 -B tools/experimental/resource-native/tests/test_planner_v8_generic_captures.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/generic-capture-planner.log"
       - name: Check planner units and five real native fragments
         env:
           IR8_PLANNER_NATIVE: '1'
@@ -527,5 +560,64 @@ jobs:
             ${{ runner.temp }}/ir8-arrow-arguments-setup
             ${{ runner.temp }}/ir8-source-arrow-arguments
             ${{ runner.temp }}/ir8-source-arrow-guards
+          if-no-files-found: warn
+          retention-days: 14
+
+  ir8-generic-captures-source:
+    name: IR8 closed scalar generic captures from fresh source
+    runs-on: ubuntu-24.04
+    # Two inferred positives and two exact refusals, separate from prior jobs.
+    # Preserve the 20-minute job ceiling and every existing process limit.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned direct-host GHC 9.14.1
+        run: |
+          set -euo pipefail
+          setup="$RUNNER_TEMP/ir8-generic-captures-setup"
+          mkdir -m 700 "$setup"
+          sudo apt-get update 2>&1 | tee "$setup/apt-update.log"
+          sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils \
+            2>&1 | tee "$setup/apt-install.log"
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          curl --fail --location --connect-timeout 30 --max-time 600 \
+            https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz \
+            -o "$archive" 2>&1 | tee "$setup/download.log"
+          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" \
+            | sha256sum -c - | tee "$setup/checksum.log"
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && \
+            ./configure --prefix="$RUNNER_TEMP/ghc" && make -j1 install) \
+            2>&1 | tee "$setup/install.log"
+          "$RUNNER_TEMP/ghc/bin/ghc" --numeric-version | tee "$setup/version.log"
+          test "$(cat "$setup/version.log")" = 9.14.1
+      - name: Run two fresh scalar captures and two exact generic-primitive refusals
+        run: |
+          python3 -B tools/experimental/resource-native/tests/test_source_v8_generic_captures.py \
+            --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
+            --output "$RUNNER_TEMP/ir8-source-generic-captures"
+      - name: Check genuine pending Int and Bool capture guards
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 -B tools/experimental/resource-native/tests/test_generic_capture_guards.py \
+              --generated "$RUNNER_TEMP/ir8-source-generic-captures/generic-closed-scalar/generic-closed-scalar/native" \
+              --cc gcc --output "$RUNNER_TEMP/ir8-source-generic-int-guards" --expected-scalar 42 --require-pending
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 -B tools/experimental/resource-native/tests/test_generic_capture_guards.py \
+              --generated "$RUNNER_TEMP/ir8-source-generic-captures/bool-scalar/bool-scalar/native" \
+              --cc gcc --output "$RUNNER_TEMP/ir8-source-generic-bool-guards" --expected-scalar 42 --require-pending
+      - name: Retain generic capture source and guard evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-generic-captures-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ir8-generic-captures-setup
+            ${{ runner.temp }}/ir8-source-generic-captures
+            ${{ runner.temp }}/ir8-source-generic-int-guards
+            ${{ runner.temp }}/ir8-source-generic-bool-guards
           if-no-files-found: warn
           retention-days: 14

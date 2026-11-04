@@ -54,6 +54,11 @@ complete vectors and original returned callable identities. Four unannotated
 sources pass the finite native matrix, sanitizers and fresh four-case suite;
 focused arrow guards and a fixed C fault pair also pass. Exact-commit CI remains
 pending; these results do not establish general GC replacement or a speedup.
+[Closed scalar generic captures](resource_ir_v8/README_STAGE24.md) extend a
+top-level generalized direct lambda with explicit authenticated ordinary Int/Bool
+imports, preserving pending owners, Access and shared memo identity. Finite native,
+sanitizer and fresh-source checks pass; generic primitive bodies and broader
+captures remain excluded, and exact-commit CI remains separate.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general

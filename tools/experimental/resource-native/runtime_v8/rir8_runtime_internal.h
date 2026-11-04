@@ -239,10 +239,14 @@ void rt8_private_slot_spec(Rt8Context *, const Rt8Site *, const Rt8Env *,
  uint32_t role, size_t index, Rt8SlotFacts *);
 void rt8_private_publish_check(Rt8Context *, const Rt8Origin *, uint32_t expected_type,
  const Rt8ValueFacts *);
+void rt8_private_capture_publish(Rt8Context *, const Rt8Origin *,
+ const Rt8SlotFacts *, const Rt8ValueFacts *);
 void rt8_private_slot_check(Rt8Context *, Rt8Node *host, uint32_t role, size_t index,
  const Rt8Slot *, Rt8ValueFacts *, Rt8SlotFacts *);
 const Rt8Access *rt8_private_transport(Rt8Context *, Rt8Node *host, uint32_t expected_type,
  const Rt8Access *request, Rt8Node *target, const Rt8Access *actual);
+const Rt8Access *rt8_private_capture_transport(Rt8Context *, Rt8Node *host,
+ const Rt8Access *request, size_t index);
 const Ir8PacketCodeExecution *rt8_private_code_execution(Rt8Context *, const Rt8Code *,
  const Rt8Env *, Ir8PacketCodeTyping *, Ir8PacketCodeExecution *);
 void rt8_private_result_check(Rt8Context *, const Rt8Frame *, const Rt8ValueFacts *);

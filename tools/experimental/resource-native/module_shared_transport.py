@@ -15,7 +15,10 @@ Int-result cases. The optional self_recursive marker records that extension;
 nominal types are never unfolded. Complete shared-use vectors may additionally
 contain these exact published nominal atoms or finite closed arrows over them.
 Every lowered arrow remains Repeat/unknown. This does not admit nominal atoms in generic code, callable SUM fields, cross-family recursion,
-or parameterized/higher-rank data. At most one retained recursive group globally
+or parameterized/higher-rank data. A separate conditional inventory permits
+closed ordinary Int/Bool imports into a top-level direct-lambda generalization.
+It establishes lexical types/occurrences only, not runtime provenance or Access.
+At most one retained recursive group globally
 is admitted, containing one concrete closed monomorphic function. Its optional
 capture policies permit closed Int/Bool owners, exact full-vector lexical
 shared views, and ordinary owners of recursively closed scalar-arrow types.
@@ -61,6 +64,8 @@ MAX_FIELDS = 32
 MAX_VARIANTS = 64
 MAX_RECURSIVE_WRAPPERS = 8
 MAX_RECURSIVE_CAPTURES = 64  # Includes the self owner when it is actually used.
+MAX_GENERIC_CAPTURES = 64  # Explicit lexical bindings, even when owners alias.
+GENERIC_CAPTURE_POLICY = 'closed-scalar-generalization-captures/1'
 SUM_POLICY = 'closed-scalar-sum/1'
 SUM_SELF_POLICY = 'closed-self-atom/1'
 RECURSION_POLICY = 'closed-single-function-recursion/1'
@@ -983,6 +988,38 @@ def _nominal_atom(typ, budget):
     return False
 
 
+def _generic_captures(cursor, cursor_path, free, inferred, schemes, top_level, budget, path):
+    """Exact closed scalar imports, never a claim about physical provenance."""
+    if not top_level or cursor['tag'] != 'lambda':
+        _fail('CAPTURE', 'captured generalization requires a top-level direct lambda', path)
+    if len(free) > MAX_GENERIC_CAPTURES:
+        _fail('LIMIT', 'generalized scalar imports exceed 64 bindings', path)
+    occurrences = {ident: [] for ident in free}
+    types = {}
+    for suffix, node in _walk(cursor):
+        budget.tick()
+        if node['tag'] != 'var' or node['name']['id'] not in occurrences:
+            continue
+        ident = node['name']['id']
+        address = cursor_path + suffix
+        typ = inferred.types[address]
+        if ident in schemes or not _scalar(typ):
+            _fail('CAPTURE', 'generic imports require ordinary closed Int/Bool bindings', address)
+        if ident in types and not _same(types[ident], typ):
+            _fail('CAPTURE', 'generic import occurrence types disagree', address)
+        types[ident] = typ
+        occurrences[ident].append(_address('normalized', address))
+    rows = []
+    for ident in free:
+        budget.tick()
+        if not occurrences[ident]:
+            _fail('CAPTURE', 'generic import has no exact free occurrence', path)
+        row = {'binding': ident, 'type': types[ident], 'occurrences': occurrences[ident]}
+        budget.record(row)
+        rows.append(row)
+    return {'policy': GENERIC_CAPTURE_POLICY, 'scalars': rows}
+
+
 def _inventory(original, normalized, original_infer, normalized_infer, origins, removed, touched, budget, obligations, dialect):
     original_paths = [p for p, n in _walk(original) if n['tag'] == 'type_application']
     if len(original_paths) > MAX_PROOFS:
@@ -995,7 +1032,7 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
     used_proofs = set()
     use_counts = {}
 
-    def go(node, path, schemes, generic=False):
+    def go(node, path, schemes, generic=False, top_level=True):
         budget.tick()
         tag = node['tag']
         if generic and _nominal_atom(normalized_infer.types[path], budget):
@@ -1009,8 +1046,8 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
                 if len(definitions) >= MAX_DEFINITIONS or len(prefix) > MAX_PARAMETERS:
                     _fail('LIMIT', 'definition/formal bound', path)
                 free = sorted(_free_terms(node['value']))
-                if free:
-                    _fail('CAPTURE', 'generalized RHS has external term captures', path)
+                captures = (_generic_captures(cursor, cursor_path, free, normalized_infer,
+                            schemes, top_level, budget, path) if free else None)
                 typ = normalized_infer.types[value_path]
                 body_type = normalized_infer.types[cursor_path]
                 if body_type['tag'] != 'arrow':
@@ -1029,16 +1066,18 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
                        'ordinary_nodes': [term_ids[p] for p, _, _ in _ordinary(node['value'])
                                           for p in [value_path + p]],
                        'free_term_bindings': free}
+                if captures is not None:
+                    row['captures'] = captures
                 budget.record(row)
                 definitions.append(row)
                 use_counts[ident] = 0
-                go(cursor, cursor_path, {}, True)
-                go(node['body'], path + ('body',), schemes | {node['name']['id']: row}, generic)
+                go(cursor, cursor_path, {}, True, False)
+                go(node['body'], path + ('body',), schemes | {node['name']['id']: row}, generic, top_level)
             else:
                 if normalized_infer.types[value_path]['tag'] == 'forall':
                     _fail('SCHEME', 'a Scheme alias is not a generalization', value_path)
-                go(node['value'], value_path, schemes, generic)
-                go(node['body'], path + ('body',), schemes, generic)
+                go(node['value'], value_path, schemes, generic, False)
+                go(node['body'], path + ('body',), schemes, generic, top_level)
             return
         if tag == 'type_application':
             base, base_path, wrappers = _spine(node, path)
@@ -1098,7 +1137,7 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
         if tag == 'primitive' and node['id'] == 13 and node['arguments'] != [INT]:
             _fail('PRIMITIVE', 'retained conditional must be instantiated at Int', path)
         for suffix, child in _children(node):
-            go(child, path + suffix, schemes, generic)
+            go(child, path + suffix, schemes, generic, top_level and tag == 'with_data')
 
     go(normalized, (), {})
     proofs = []

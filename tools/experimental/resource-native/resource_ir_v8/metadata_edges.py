@@ -2,10 +2,15 @@
 
 Guard rows are derived predicates, never observations of executed native checks.
 Opaque values keep their actual Access; no null provenance becomes E0.
+Boundary/Coverage closes static premises for this checked program, including
+unused callbacks and lawful execution cases, not the native API acceptance set.
+The native CAPTURE union is not conditioned on a source imports whitelist.
+Unchanged no-import generated graphs retain their stronger neutral premises.
 """
 from __future__ import annotations
 
 from .metadata_budget import fail
+from .provenance import CAPTURE_ORIGIN_CASES
 from .metadata_representations import fact_at, instruction_at, path_key, key2, key3, access_key
 
 GUARDS = ('registered-membership', 'exact-site-origin', 'physical-origin',
@@ -48,7 +53,7 @@ TABLES = ('slots', 'accesses', 'transports', 'boundaries', 'coverage')
 class EdgeClosure:
     __slots__ = ('r', 't', 'b', 'raw', 'd', 'tables', 'slots_by_site', 'slot_lookup',
                  'access_lookup', 'accesses_by_origin', 'obligation_slots', 'obligation_boundaries',
-                 'instruction_boundaries', 'code_boundaries', 'site_boundaries')
+                 'instruction_boundaries', 'code_boundaries', 'site_boundaries', 'imported_scopes')
 
     def __init__(self, representations):
         self.r = representations
@@ -61,6 +66,7 @@ class EdgeClosure:
         self.slots_by_site, self.slot_lookup, self.access_lookup = {}, {}, {}
         self.accesses_by_origin, self.obligation_slots, self.obligation_boundaries = {}, {}, {}
         self.instruction_boundaries, self.code_boundaries, self.site_boundaries = {}, {}, {}
+        self.imported_scopes = None  # no extra old-path allocation or work
 
     def add(self, table, **fields):
         rows = self.tables[table]
@@ -193,6 +199,13 @@ class EdgeClosure:
             return C
         fail('metadata.boundaries', 'metadata-origin', 'ENVIRONMENT', 'unknown execution-origin mode')
 
+    def imported_capture(self, scope, ty):
+        if self.imported_scopes is None or scope not in self.imported_scopes:
+            return False
+        self.b.work()
+        row = self.t.tables['types'][ty]
+        return row['tag'] == 'closed' and row['atom'] in ('#i64', '#bool')
+
     def identity_guards(self, code):
         self.b.work()
         return _mask(('return-identity',)) if code['kind'] == 'function' and code['expected_identity_flag'] == 1 else 0
@@ -252,6 +265,18 @@ class EdgeClosure:
                 if ref['instruction'] != instruction_index or ref['side'] not in ('inputs', 'outputs') or type(ref['index']) is not int or not 0 <= ref['index'] < len(checked[ref['side']]):
                     fail('metadata.boundaries', 'metadata-closure', 'FACT', 'obligation references a different checked operand')
             ty = t.old(obligation['expected_type'])
+            capture_union = 'origin_cases' in obligation
+            if capture_union:
+                b.work(len(CAPTURE_ORIGIN_CASES))
+                cases = obligation['origin_cases']
+                row = t.tables['types'][ty]
+                if (type(cases) is not list or len(cases) != 2
+                        or any(cases[i] != CAPTURE_ORIGIN_CASES[i] for i in range(2))
+                        or obligation['kind'] != 'publish' or obligation['scope'] is None
+                        or obligation['role'][0] != 'captures'
+                        or row['tag'] != 'closed' or row['atom'] not in ('#i64', '#bool')
+                        or 'neutral_same_capsule' in obligation['rules']):
+                    fail('metadata.boundaries', 'metadata-closure', 'CAPTURE_ORIGIN', 'invalid conditional capture-origin premises')
             slots = self.associated_slots(obligation)
             b.put(self.obligation_slots, index, slots)
             b.creation()
@@ -262,6 +287,10 @@ class EdgeClosure:
                 if kind == 'publish':
                     rule, guards = 'publish-by-host-origin', M | self.origin_guards(env) | L | Q
                     site = r.tables['sites'][obligation['host_site']]
+                    if capture_union and t.tables['environments'][env]['mode'] == 'NEUTRAL':
+                        # N and C are mutually exclusive actual-origin cases.
+                        rule = 'capture-neutral-or-concrete-scalar'
+                        guards |= N | C
                     if env not in t.lawful_envs(site['path']):
                         fail('metadata.boundaries', 'metadata-origin', 'CONTEXT', 'publication environment cannot allocate its host')
                 elif kind == 'application_argument':
@@ -285,11 +314,23 @@ class EdgeClosure:
                     rule, guards = 'copy-actual', M | C | L | Q
                 elif kind == 'force_result':
                     rule, guards = 'principal-dispatch', M | L | _mask(('state-category',))
+                elif kind == 'generic_import':
+                    # Acquisition copies actual Access. Expected scalar/origin/Down
+                    # are static premises, not extra arguments to rt8_retain.
+                    rule, guards = 'copy-actual', A | _mask(('live-exact-anchor', 'acquire-before-release'))
                 else:
                     fail('metadata.boundaries', 'metadata-closure', 'OBLIGATION', 'unknown checked obligation kind')
                 key = b.row(kind='obligation', index=index, execution_env=env)
                 b.append(ids, self.boundary(key, ty, env, rule, guards))
             b.put(self.obligation_boundaries, index, ids)
+            if obligation['kind'] == 'generic_import':
+                if self.imported_scopes is None:
+                    b.creation(); self.imported_scopes = {}
+                scope = t._scheme(obligation['scope'])
+                if scope not in self.imported_scopes:
+                    b.put(self.imported_scopes, scope, b.listing(()))
+                for boundary in ids:
+                    b.append(self.imported_scopes[scope], boundary)
 
     def instruction_rows(self):
         b, r, t = self.b, self.r, self.t
@@ -345,8 +386,12 @@ class EdgeClosure:
                 b.work()
                 execution = r.tables['site_executions'][execution_id]
                 env = execution['env']
+                rule, guards = 'publish-by-host-origin', M | self.origin_guards(env) | L | Q
+                site = r.tables['sites'][slot['site']]
+                if slot['role']['kind'] == 'capture' and self.imported_capture(site['scope'], slot['type']) and self.t.tables['environments'][env]['mode'] == 'NEUTRAL':
+                    rule, guards = 'capture-neutral-or-concrete-scalar', guards | N | C
                 boundary = self.boundary(b.row(kind='slot', slot=slot['id'], site_execution=execution_id),
-                    slot['type'], env, 'publish-by-host-origin', M | self.origin_guards(env) | L | Q)
+                    slot['type'], env, rule, guards)
                 b.append(self.site_boundaries[slot['site']], boundary)
 
     def entry_return_rows(self):
@@ -374,6 +419,9 @@ class EdgeClosure:
                     if origin == 'GENERIC_PROJECTED':
                         guards |= _mask(('complete-vector',))
                         rule = 'transport-by-request'
+                    if origin in ('GENERIC_NEUTRAL', 'GENERIC_PROJECTED') and self.imported_capture(code['scope'], capture['type']):
+                        guards |= N | C
+                        rule = 'capture-project-or-identity' if origin == 'GENERIC_PROJECTED' else 'capture-neutral-or-concrete-scalar'
                     key = b.row(kind='entry', code_execution=execution['id'], origin_case=origin, role='capture', name=capture['name'])
                     boundary = self.boundary(key, capture['type'], env, rule, guards)
                     b.append(self.code_boundaries[code['id']], boundary)
@@ -514,6 +562,9 @@ class EdgeClosure:
                 b.work(); self.dependency(dependencies, ty, env)
             for index in r.intro_instructions[intro['id']]:
                 b.append(boundaries, self.instruction_boundaries[index])
+            if self.imported_scopes is not None and intro['scheme'] in self.imported_scopes:
+                for boundary in self.imported_scopes[intro['scheme']]:
+                    b.append(boundaries, boundary)
             for access in self.tables['accesses']:
                 b.work()
                 if access['site'] in intro['result_sites']:

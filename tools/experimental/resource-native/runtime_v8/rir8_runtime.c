@@ -61,7 +61,9 @@ static void operand(Rt8Context *c,Rt8Group *group,const Rt8SiteFacts *site,
  uint32_t role,size_t index,Rt8Handle *value,int loans,Rt8SlotFacts *slot) {
  Rt8ValueFacts v;rt8_private_value(c,value,RT8_VALUE_MONO|(loans?0:RT8_VALUE_OWN),&v);
  rt8_private_slot_spec(c,site->site_ref,site->origin.env,role,index,slot);
- rt8_private_publish_check(c,&site->origin,slot->resolved_type,&v);relation(c,group,slot,&v);
+ if(role==IR8_PACKET_SLOT_ROLE_CAPTURE)rt8_private_capture_publish(c,&site->origin,slot,&v);
+ else rt8_private_publish_check(c,&site->origin,slot->resolved_type,&v);
+ relation(c,group,slot,&v);
 }
 /* Each descriptor identity, pool string boundary, Slot equation and capability
  * is authenticated in this first pass. No retained per-field heap/stack cache.

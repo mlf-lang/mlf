@@ -63,7 +63,11 @@ static void capture_plan(Rt8Context *c,Rt8Node *n,const Rt8Access *request,
  for(size_t i=0;i<n->used;++i){Rt8ValueFacts value;Rt8SlotFacts slot;Ir8PacketResolvedCapture resolved;
   rt8_private_slot_check(c,n,IR8_PACKET_SLOT_ROLE_CAPTURE,i,&n->slots[i],&value,&slot);
   const Rt8Access *view=value.access;
-  if(projected)view=rt8_private_transport(c,n,slot.resolved_type,request,value.node,value.access);
+  if(projected){
+   if(n->origin.kind==IR8_PACKET_ORIGIN_KIND_GENERIC&&value.node->origin.kind==IR8_PACKET_ORIGIN_KIND_CONCRETE)
+    view=rt8_private_capture_transport(c,n,request,i);
+   else view=rt8_private_transport(c,n,slot.resolved_type,request,value.node,value.access);
+  }
   rt8_private_vector(c,execution->captures.object,IR8_PACKET_ELEMENT_RESOLVED_CAPTURE,(uint32_t)i,&resolved,sizeof(resolved));
   Ir8PacketAccess access;uint32_t aid=rt8_private_table_auth(c,17,view);rt8_private_table(c,17,aid,&access,sizeof(access));
   G(c,3,TYPE,EQUATION,6,execution->id,5,resolved.code==execution->code&&resolved.position==i&&resolved.type==access.type);

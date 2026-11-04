@@ -8,6 +8,69 @@ This contract implements neither code nor source recognizers. Its exact-hash ACK
 settle the bounded design only; the base-adoption, source-evidence and preregistration
 gates below remain mandatory before their corresponding semantic edits or probes.
 
+## Stage24 amendment: explicit closed scalar imports
+
+The original contract below records the initial no-external-capture boundary.
+Stage24 narrowly supersedes that boundary for the opt-in IR8 route as specified
+here. This amendment is a contract, not evidence that all validation or CI passed;
+see `README_STAGE24.md` for actual execution status. Old no-import programs retain
+their prior construction, metadata and accounting. No default route is enabled.
+
+A concrete top-level generalized source let may capture ordinary closed intrinsic
+Int/Bool values when its actual checked body, after its type prefix, is a direct
+lambda. Independent replay and planning must agree on every lexical free binder,
+checked type and occurrence. At most64 explicit bindings are admitted; aliases
+count separately. Open/rigid/higher-rank, Scheme/view, callable and nominal captures,
+nested or recursive generalization, and generic primitive operations remain outside
+this source slice. Full proof witnesses, ordinary checking, outer-first substitution,
+erasure and the actual lambda/application/let graph remain required.
+
+`generalize` may have a nonempty canonical `imports` map. Every child name maps to
+exactly `{value: parentName, layout: '^T', relation: 'down'}`. Fresh checking requires
+an owned MONO parent with no tickets, exact intrinsic scalar type, allocated
+unscoped concrete Site provenance, no projection and proven Down to the introduction
+authority. Forced/UNKNOWN/foreign callback or INSTANCE provenance is insufficient.
+After `generic_begin`, existing retain acquires a distinct child capability/storage
+for every entry, preserving the actual node, group, readiness, type and Access.
+The parent remains live. The child sees only `$home` and its explicit imports.
+Imported aliases are discharged before seal; the result is still a fresh local
+generic allocation, never an imported owner. Existing post-begin handle watermarks
+check discharge. No support relation is invented: full imported References enter
+placement support and can require coarse fallback in `--data-groups` mode.
+
+The sealed result remains `generalize.outputs[0]`. Additional outputs are acquisition
+facts at roles `['imports', child]`, joined to parent inputs at
+`['imports', child, 'value']`; they are not allocation Sites. The emitter checks
+these exact associations, fresh capabilities/storage, unchanged copy equations and
+intrinsic type before using the existing retain/drop machinery.
+
+Only the registered CAPTURE construction, stored-slot validation, read and transport
+paths gain an alternative to the existing same-neutral-capsule/PROJECT rule. This
+alternative authenticates exact Code, capture name/position and intrinsic Type,
+then requires actual CONCRETE origin, E0, capsule/activation0, MONO Access and exact
+Type/ShapeTyping/ShapeSpec/Representation. SCALAR denotes the intrinsic result
+descriptor, not READY state: a pending THUNK or APPLICATION remains pending. Capture
+adaptation retains the original Reference and uses the existing null-projection
+identity Transport. A generic-owned closed scalar still follows the old same-neutral
+capsule/PROJECT path. This is not a global concrete-to-generic publication rule.
+Neutral arguments, return, application operands, memo and Fill retain their existing
+restrictions. Global publication/transport and public ABI/packet tables are unchanged.
+
+Boundary/Coverage records the complete static premise closure of the freshly checked
+program, including unused callbacks. It is not a runtime whitelist or a list of
+observed executions. Imported-Scheme capture obligations include both the existing
+same-neutral-capsule/project and concrete-E0-intrinsic-scalar/identity cases. Native
+capture safety does not depend on an extra per-introduction import table. Exact
+source import correspondence is proved by fresh static checking and registered
+generated Code. Old no-import programs cannot construct these external concrete
+captures and retain their stronger neutral-only static premises byte-for-byte.
+
+For the old clauses below, read "no external captures" as "no external captures
+except this explicit scalar-import slice", and "neutral captures" as allowing
+this capture-only alternative. All noncapture rules, complete-vector checks,
+curried views, original Env/capsule/memo identity and allocator-ledger obligations
+remain in force. Whole-Scheme capture and open `g = f` remain rejected.
+
 ## 0. Base and phase gates
 
 Phase A is independently owned by the source owner and main source auditor. It

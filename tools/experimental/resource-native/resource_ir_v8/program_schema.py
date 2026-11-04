@@ -64,6 +64,26 @@ def exact(value, keys, path):
     return value
 
 
+def instruction_schema(instruction, op, path):
+    """Only nonempty generalize imports extend the old exact opcode schema."""
+    keys = ('op',) + SCHEMAS[op]
+    if op == 'generalize' and 'imports' in instruction:
+        exact(instruction, keys + ('imports',), path)
+        imports = mapping(instruction['imports'], path + '.imports')
+        if not 1 <= len(imports) <= CAPTURE_LIMIT:
+            fail(path + '.imports', 'schema', 'IMPORT_COUNT', 'generic imports require 1..64 explicit bindings')
+        for child, row in imports.items():
+            cp = path + '.imports.' + name(child, path + '.imports', binder=True)
+            exact(row, ('value', 'layout', 'relation'), cp)
+            name(row['value'], cp + '.value')
+            if type(row['layout']) is not str or not row['layout'].startswith('^') or len(row['layout']) == 1:
+                fail(cp + '.layout', 'schema', 'SCHEMA', 'generic import requires an explicit ^Type reference')
+            if row['relation'] != 'down':
+                fail(cp + '.relation', 'schema', 'SCHEMA', 'generic import relation is exactly down')
+    else:
+        exact(instruction, keys, path)
+
+
 def mapping(value, path):
     if type(value) is not dict:
         fail(path, 'schema', 'SCHEMA', 'expected a plain object')
@@ -269,7 +289,7 @@ def preflight(program, budget):
             op = instruction['op']
             if op not in SCHEMAS:
                 fail(p, 'schema', 'OPCODE', 'unknown Stage02 opcode')
-            exact(instruction, ('op',) + SCHEMAS[op], p)
+            instruction_schema(instruction, op, p)
             if introduction:
                 permitted, terminal = op in GENERIC_OPS or op == 'seal', op == 'seal'
             elif generic:

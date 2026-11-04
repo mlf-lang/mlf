@@ -7,9 +7,9 @@ identity, and Scheme VALUE admission is separate from group authority.
 from __future__ import annotations
 
 from .program_schema import (fail, exact, mapping, sequence, name, diagnostic_path,
-    SCHEMAS, GENERIC_OPS, PRIMITIVES, INSTRUCTION_LIMIT, SITE_CODE_LIMIT, CAPTURE_LIMIT)
+    SCHEMAS, GENERIC_OPS, PRIMITIVES, INSTRUCTION_LIMIT, SITE_CODE_LIMIT, CAPTURE_LIMIT, instruction_schema)
 from .ownership import Symbols, State
-from .provenance import Analysis
+from .provenance import Analysis, CAPTURE_ORIGIN_CASES
 
 CATEGORIES = {'alloc': 'DATA', 'closure': 'CLOSURE', 'thunk': 'THUNK', 'hole': 'HOLE',
               'application': 'APPLICATION', 'application_borrow': 'APPLICATION',
@@ -25,6 +25,7 @@ class BodyChecker:
         self.instruction_meta, self.intro_lookup, self.use_lookup = [], {}, {}
         self.int_type, self.bool_type = self.resolve('#i64', None, 'program'), self.resolve('#bool', None, 'program')
         self.concrete_context = budget.row(kind='concrete')
+        self.imported_scopes = None  # allocated/charged only on the new import path
 
     def resolve(self, reference, scope, path):
         # The adapter performs unchanged lexical declaration checks, including
@@ -174,7 +175,7 @@ class BodyChecker:
             op = instruction['op']
             if op not in SCHEMAS:
                 fail(p, 'schema', 'OPCODE', 'operation is outside Stage02 public vocabulary')
-            exact(instruction, ('op',) + SCHEMAS[op], p)
+            instruction_schema(instruction, op, p)
             if intro is not None:
                 allowed = op in GENERIC_OPS or op == 'seal'
                 terminal = op == 'seal'
@@ -209,6 +210,15 @@ class BodyChecker:
             self.a.counts['instructions'] += 1
             if op == 'generalize':
                 scheme = name(instruction['scheme'], p + '.scheme')
+                if 'imports' in instruction:
+                    if self.imported_scopes is None:
+                        self.b.charge(); self.imported_scopes = {}
+                    self.b.put(self.imported_scopes, scheme, True)
+                    for child in self.b.ordered(instruction['imports']):
+                        cp = p + '.imports.' + child
+                        ty = self.resolve(instruction['imports'][child]['layout'], None, cp + '.layout')
+                        if ty not in (self.int_type, self.bool_type):
+                            fail(cp + '.layout', 'type', 'GENERIC_IMPORT', 'generic imports admit only exact intrinsic scalar Types')
                 _, body_type, _ = self.d.scheme(scheme)
                 intro_id = len(self.a.intros)
                 row = self.b.record_append(self.a.intros, id=intro_id, scheme=scheme, container=container, generalize_path=path_record,
@@ -342,10 +352,36 @@ class BodyChecker:
             self.b.append(rules, 'principal_force_result')
         return rules
 
+    def concrete_scalar_origin(self, value):
+        if value.view != 'MONO' or value.projection is not None:
+            return False
+        site = self.a.exact_site(value.provenance)
+        if site is None or self.a.sites[site]['type_scope'] is not None:
+            return False
+        return self.a.provenance[value.provenance]['value']['context']['kind'] == 'concrete'
+
+    def neutral_publication(self, value, scope, path):
+        # Known concrete aliases may cross only CAPTURE edges. Unknown callback
+        # facts retain the old dynamic neutral-origin checks; never label them E0.
+        if scope is not None and self.concrete_scalar_origin(value):
+            fail(path, 'resource', 'GENERIC_PUBLICATION', 'concrete imports cannot enter a neutral noncapture value edge')
+
     def publication(self, ir_index, role, site, source_index, expected, scope, *, relation='down', no_once=True, anchor=False):
+        fact = self.a.instructions[ir_index]['inputs'][source_index]
+        capture_union = (scope is not None and self.imported_scopes is not None
+                         and scope in self.imported_scopes and role[0] == 'captures'
+                         and expected in (self.int_type, self.bool_type))
+        if scope is not None and role[0] != 'captures':
+            source_site = self.a.exact_site(fact['provenance'])
+            if source_site is not None and self.a.sites[source_site]['type_scope'] is None:
+                fail(diagnostic_path(self.a.instructions[ir_index]['path']), 'resource', 'GENERIC_PUBLICATION',
+                     'concrete imports cannot enter a neutral noncapture value edge')
+        # Conditional capture union is expressed explicitly by metadata. Do not
+        # assert the stronger neutral-only premise for an imported scalar edge.
+        rules = self.rules(None if capture_union else scope, relation=relation, no_once=no_once, anchor=anchor)
         self.a.obligation(ir_index, role, 'publish', site,
-                          (('inputs', 0), ('inputs', source_index)), expected, scope,
-                          self.rules(scope, relation=relation, no_once=no_once, anchor=anchor))
+                          (('inputs', 0), ('inputs', source_index)), expected, scope, rules,
+                          origin_cases=CAPTURE_ORIGIN_CASES if capture_union else None)
 
     def allocated(self, site, context, group, type_id, *, ready=False, ticket=False):
         self.a.sites[site]['principal_type'] = type_id
@@ -551,10 +587,29 @@ class BodyChecker:
                 child = State(self.b, order=state.order.copy(), home=authority.group)
                 source = self.b.row(kind='parent', generalize_path=record['path'], binding=i['in'])
                 child.bind('$home', self.symbols.alias(authority.group, source), p, internal=True)
+                imported = None
+                if 'imports' in i:
+                    imported = self.b.listing(())
+                    for child_name in self.b.ordered(i['imports']):
+                        row = i['imports'][child_name]
+                        cp = p + '.imports.' + child_name
+                        ty = self.resolve(row['layout'], None, cp + '.layout')
+                        value, index = self.value(state, ir_index, row['value'], ('imports', child_name, 'value'), cp + '.value', expected=ty)
+                        if value.ticket or not self.concrete_scalar_origin(value):
+                            fail(cp, 'resource', 'GENERIC_IMPORT', 'import requires ticket-free allocated concrete unprojected MONO scalar owner')
+                        self.down(state, value, authority.group, cp)
+                        alias = self.symbols.copied_handle(value)
+                        child.bind(child_name, alias, cp)
+                        self.b.append(imported, (child_name, alias, index))
                 child_context = self.b.row(kind='introduction', intro=intro_id)
                 sealed = self.check_block(i['body'], child, child_context, code=code, intro=intro_id)
                 state.order.merge(child.order)
                 self.output(state, ir_index, i['out'], sealed, p, reserved=True)
+                if imported is not None:
+                    for child_name, alias, index in imported:
+                        output = self.a.operand(ir_index, alias, ('imports', child_name), side='outputs')
+                        self.a.obligation(ir_index, ('imports', child_name), 'generic_import', None,
+                            (('inputs', 0), ('inputs', index), ('outputs', output)), alias.type, i['scheme'], self.rules(None))
             elif op == 'seal':
                 row = self.a.intros[intro]
                 result, _ = self.value(state, ir_index, i['value'], ('value',), p + '.value', expected=row['body_type'])
@@ -586,6 +641,7 @@ class BodyChecker:
             elif op == 'return':
                 result, vi = self.value(state, ir_index, i['value'], ('value',), p + '.value', expected=state.result_type)
                 self.require_type(result, state.result_type, p + '.value')
+                self.neutral_publication(result, scope, p + '.value')
                 self.down(state, result, state.home, p, code='UPWARD_RETURN')
                 if state.require_ready and not result.ready:
                     fail(p, 'resource', 'DEMAND', 'callback result requires ready Once cursor')
