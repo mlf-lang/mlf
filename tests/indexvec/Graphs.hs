@@ -367,6 +367,27 @@ resolverChecks = do
       methods = M.singleton "method" ("0selector",[] :: [H.String])
       scopes = M.singleton "B" ["Cdict"]
       oracle = reference [("Z",["B","0selector"]),("B",["B","Cdict"]),("0selector",["Z"]),("Cdict",["B"])]
+  let generatedView = D.generatedTable scope (map D.boundId [bound "Z" [],bound "B" []])
+        (map fst generated) ["external","imported_dict"] methods
+      slotNumber key = case D.generatedNameId generatedView key of
+        T.Just i -> V.toInt i; _ -> error "missing generated table entry"
+  check "selector, dictionary and imported support extend source slots" [4,5,6]
+    (map slotNumber ["0selector","Cdict","imported_dict"])
+  check "method redirects to the generated selector slot" (Just 4)
+    (case D.selectorId generatedView (ix "method") of { T.Just i -> Just (V.toInt i); _ -> Nothing })
+  check "ordinary declaration has no selector redirection" True
+    (case D.selectorId generatedView (ix "Z") of { T.Nothing -> True; _ -> False })
+  let hiddenImport = D.generatedTable scope [ix "Z"] [] ["Z"] M.empty
+  check "local spelling and independent imported contract have separate slots" (Just 4,Just 0)
+    (case D.generatedImportId hiddenImport "Z" of T.Just i -> Just (V.toInt i); _ -> Nothing,
+     case D.generatedNameId hiddenImport "Z" of T.Just i -> Just (V.toInt i); _ -> Nothing)
+  let collisions = D.symbols [("method",False),("method",True)]
+      [local,importedMethod] = V.indices (D.symbolNodes collisions)
+      redirects = D.generatedTable collisions [local] ["selector"] [] (M.singleton "method" ("selector",[] :: [H.String]))
+  check "same-spelling local does not redirect to imported selector" True
+    (case D.selectorId redirects local of { T.Nothing -> True; _ -> False })
+  check "imported method retains its own selector edge" (Just 2)
+    (case D.selectorId redirects importedMethod of { T.Just i -> Just (V.toInt i); _ -> Nothing })
   groups <- right (D.resolvedGroups values generated methods scopes)
   check "late selector and dictionary retain lexical DFS order" oracle (map (map H.unpack) (D.groupSpellings groups))
   let support = [("0selector",T.Nothing,T.SVar "Z"),("Cdict",T.Nothing,T.SVar "B")]

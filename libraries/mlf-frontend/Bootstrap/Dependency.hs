@@ -378,6 +378,44 @@ module Bootstrap.Dependency where {
       (,) table [i] -> BoundValues table (append rows [Bound i Nothing rhs]);
       _ -> panic "missing appended declaration slot"
     };
+  -- Class generation owns the slots of its local outputs. Interface-only
+  -- selectors and dictionaries join the same table as imported bindings.
+  data GeneratedTable = GeneratedTable Symbols ([] (V.Index Declaration))
+    (Map String (V.Index Declaration)) (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe (V.Index Declaration)));
+  generatedSymbols (GeneratedTable symbols _ _ _ _) = symbols;
+  generatedSlots (GeneratedTable _ slots _ _ _) = slots;
+  generatedNameId (GeneratedTable _ _ names _ _) name = M.lookup compareString name names;
+  generatedImportId (GeneratedTable _ _ _ imports _) name = M.lookup compareString name imports;
+  selectorId (GeneratedTable _ _ _ _ selectors) i = V.at selectors i;
+  generatedTable base sources supportNames imports methods =
+    let {
+      nodes = symbolNodes base; start = V.count nodes;
+      byId i = (,) (symbolName base i) i;
+      active = M.fromList compareString (map byId sources);
+      owners = IS.fromList (map V.toInt sources);
+      inactive = filter (\i -> not (IS.member (V.toInt i) owners)) (V.indices nodes);
+      available = M.fromList compareString (map (\i -> (,) (symbolKey base i) i) inactive);
+      missing = filter (\n -> not (M.member compareString n available)) imports;
+      symbols = extendSymbols base (append supportNames missing);
+      support = map V.fromInt (range start (start + length supportNames - 1));
+      extra = map V.fromInt (range (start + length supportNames) (V.count (symbolNodes symbols) - 1));
+      assigned ids = M.fromList compareString (map (\i -> (,) (symbolName symbols i) i) ids);
+      external = M.union compareString (assigned extra) available;
+      names = M.union compareString active (M.union compareString (assigned support)
+        (M.union compareString external (M.fromList compareString (map byId inactive))));
+      choose i = case M.lookup compareString (symbolName base i) methods of {
+        Nothing -> Nothing;
+        Just ((,) name _) -> M.lookup compareString name names
+      };
+      selectors = case base of { Symbols _ _ methodIds _ -> runST
+        (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
+          stBind (ST.map_ (\n -> let { i = V.fromInt n } in V.set rows i (choose i))
+            (IS.toAscList methodIds)) (\_ -> V.freeze rows))) }
+    } in GeneratedTable symbols support names external selectors;
+  scopeOwnerId scopes name = case scopes of {
+    IndexedScopes _ _ names _ -> M.lookup compareString name names;
+    NamedScopes _ -> Nothing
+  };
   -- Only later-generated syntax arrives by spelling. Source edges use the
   -- Global leaf of the resolved expression directly.
   namedRank :: V.IndexVec Declaration String -> V.IndexVec DeclOrder (V.Index Declaration) ->
@@ -397,9 +435,17 @@ module Bootstrap.Dependency where {
   resolvedGroups :: BoundValues -> [] ((,) String ([] String)) -> Map String ((,) String ([] String)) ->
     Map String ([] String) -> Either String ((,) Symbols ([] ([] ((,) (V.Index Declaration) Bool))));
   resolvedGroups bindings generated methods scopes = resolvedGroupsInScopes bindings generated methods (NamedScopes scopes);
-  resolvedGroupsInScopes (BoundValues base bound) generated methods scopes = do {
-    let { extended = appendSymbols base (map fst generated); symbols = fst extended;
-          nodes = symbolNodes symbols; generatedIds = snd extended;
+  resolvedGroupsInScopes bindings@(BoundValues base bound) generated methods scopes =
+    let { generation = generatedTable base (map boundId bound) (map fst generated) [] methods;
+          targets i = mapMaybe (generatedNameId generation) (fromMaybe []
+            (case scopes of {
+              NamedScopes values -> M.lookup compareString (symbolName base i) values;
+              IndexedScopes _ _ _ _ -> scopeAt scopes i
+            }))
+    } in resolvedGroupsWith bindings generation generated targets;
+  resolvedGroupsWith (BoundValues base bound) generation generated targets = do {
+    let { symbols = generatedSymbols generation; nodes = symbolNodes symbols;
+          generatedIds = generatedSlots generation;
           present = append (map boundId bound) generatedIds;
           active = IS.fromList (map V.toInt present);
           presentId i = IS.member (V.toInt i) active;
@@ -411,22 +457,15 @@ module Bootstrap.Dependency where {
     ensure (all referencesInRange bound) "declaration slot out of bounds";
     ensure (IS.size active == length present && uniqueSlots nodes orderedIds) duplicate;
     let { order = V.fromList orderedIds;
-          ranks edits = runST (stBind (V.filled (V.count nodes) Nothing) (\slots ->
-            stBind (ST.map_ (\r -> V.set slots (V.at order r) (Just r)) (V.indices order)) (\_ ->
-            stBind (ST.map_ (\((,) i target) -> V.set slots i target) edits) (\_ -> V.freeze slots))));
-          direct = ranks [];
-          byName = namedRank nodes order;
-          redirect n = let { i = V.fromInt n } in case M.lookup compareString (V.at nodes i) methods of {
-            Nothing -> Nothing; Just ((,) target _) -> Just ((,) i (byName target))
-          };
-          sourceRanks = if M.null methods then direct else case symbols of {
-            Symbols _ _ methodIds _ -> ranks (mapMaybe redirect (IS.toAscList methodIds))
-          };
+          direct = runST (stBind (V.filled (V.count nodes) Nothing) (\slots ->
+            stBind (ST.map_ (\r -> V.set slots (V.at order r) (Just r)) (V.indices order)) (\_ -> V.freeze slots)));
+          rank i = V.at direct i;
+          sourceRank i = rank (fromMaybe i (selectorId generation i));
           edgeRow targets = V.fromList (map (\r -> V.at order (V.fromInt r))
             (IS.toAscList (IS.fromList (map V.toInt targets))));
-          sourceRow (Bound i _ rhs) = (,) i (edgeRow (append (mapMaybe (V.at sourceRanks) (R.references rhs))
-            (mapMaybe byName (fromMaybe [] (case scopes of { NamedScopes values -> M.lookup compareString (V.at nodes i) values; IndexedScopes _ _ _ _ -> scopeAt scopes i })))));
-          generatedRow i entry = (,) i (edgeRow (mapMaybe byName (snd entry)));
+          sourceRow (Bound i _ rhs) = (,) i (edgeRow (append (mapMaybe sourceRank (R.references rhs))
+            (mapMaybe rank (targets i))));
+          generatedRow i entry = (,) i (edgeRow (mapMaybe rank (mapMaybe (generatedNameId generation) (snd entry))));
           rows = runST (stBind (V.filled (V.count nodes) (V.fromList [])) (\slots ->
             stBind (ST.map_ (\((,) i row) -> V.set slots i row)
               (append (map sourceRow bound) (zipWith generatedRow generatedIds generated))) (\_ ->

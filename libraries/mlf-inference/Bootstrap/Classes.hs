@@ -13,6 +13,7 @@ module Bootstrap.Classes where {
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.ClassDemand as Q;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Kinding as K;
   import qualified Bootstrap.Desugar as Desugar;
@@ -590,7 +591,13 @@ module Bootstrap.Classes where {
     (Dependency.ValueScopes ([] ((,) EvidenceRole String)))
     ([] ((,) EvidenceRole String))
     (Map String ((,) String ([] String)))
-    ([] ((,,) String SAnnotation SExpr)) (Map String String) (Map String SType);
+    ClassSupports (Map String String) (Map String SType);
+  data ClassSupports = ClassSupports ([] ((,,) String SAnnotation SExpr)) (Maybe Dependency.GeneratedTable)
+    (Dependency.ValueScopes ([] ((,) EvidenceRole (V.Index Declaration))));
+  supportDefinitions (ClassSupports defs _ _) = defs;
+  inventoryDeclarations (ClassInventory _ _ _ _ _ _ (ClassSupports _ table _) _ _) = table;
+  inventoryCandidateIds (ClassInventory _ _ _ _ _ _ (ClassSupports _ _ scopes) _ _) i =
+    fromMaybe [] (Dependency.scopeAt scopes i);
   prepareClassesBody :: Maybe ((,) (Map String SType) ([] String)) ->
                         Set String -> Map String IntSet -> Maybe ([] IntSet) ->
                         [] DataDecl -> [] SInstanceDecl -> DataEnv -> [] SClassDecl ->
@@ -706,8 +713,26 @@ module Bootstrap.Classes where {
           (M.fromList compareString
             (map (\((,) name (Info _ dict _ _ _)) -> (,) dict name) entries))
       };
+      let {
+        generation = case valueIndices of {
+          Dependency.NamedScopes _ -> Nothing;
+          Dependency.IndexedScopes _ symbols members _ -> Just (Dependency.generatedTable symbols (M.elems members)
+            (map (\((,,) n _ _) -> n) localBindings) (M.keys externalSchemes) baseMethodEnv)
+        }
+      };
+      candidateIds <- case generation of {
+        Nothing -> freshPure (Dependency.NamedScopes M.empty);
+        Just table -> do {
+          pairs <- freshLift (traverseEither (\((,) role name) -> case Dependency.generatedNameId table name of {
+            Nothing -> Left ("unbound class candidate: " ++ name);
+            Just i -> Right ((,) name ((,) role i))
+          }) globalCandidates);
+          let { ids = M.fromList compareString pairs };
+          freshPure (Dependency.mapScopes (map (\((,) _ name) -> M.get compareString name ids)) valueScopes)
+        }
+      };
       freshPure (ClassInventory (append datatypes dictionaries) ds infos valueScopes
-        globalCandidates baseMethodEnv localBindings display externalSchemes)
+        globalCandidates baseMethodEnv (ClassSupports localBindings generation candidateIds) display externalSchemes)
     };
   lowerClassesBody :: Maybe ((,) (Map String SType) ([] String)) ->
                       Set String ->
@@ -726,7 +751,7 @@ module Bootstrap.Classes where {
   finishClassesBody :: ClassInventory -> SExpr ->
                        Fresh ((,) SProgram (Map String String));
   finishClassesBody (ClassInventory datatypes ds infos valueScopes globalCandidates
-                     baseMethodEnv localBindings display externalSchemes) body =
+                     baseMethodEnv (ClassSupports localBindings _ _) display externalSchemes) body =
     do {
       let { methodEnv = withExternalOverloads externalSchemes baseMethodEnv };
       boundValueShared3 <- lowerExpr valueScopes ds infos methodEnv globalCandidates body;
@@ -933,7 +958,7 @@ module Bootstrap.Classes where {
   inventoryProtection :: ClassInventory -> Map String Bool ->
     [] ((,) String SInstanceDecl) -> [] ((,,) String (Maybe SAnnotation) SExpr) ->
     Either String (Map String Bool);
-  inventoryProtection (ClassInventory _ ds infos _ _ methods supports _ externals)
+  inventoryProtection (ClassInventory _ ds infos _ _ methods (ClassSupports supports _ _) _ externals)
     importedProtection instances members = do {
       ensure (all (\name -> M.member compareString name importedProtection) (M.keys externals))
         "imported source protection inventory is incomplete";

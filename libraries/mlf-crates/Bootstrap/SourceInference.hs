@@ -1002,11 +1002,15 @@ module Bootstrap.SourceInference where {
     case prepared of { (,,) inventory count used -> do {
       let { legacy = Inference.lowerBoundInScopes externals datatypes classes closedInstances valueScopes instanceScopes body };
       graph <- case inventory of { Classes.ClassInventory _ _ _ scopes _ methods definitions _ _ ->
-        let { supports = map (\((,,) name annotation rhs) -> (,,) name (Just annotation) rhs) definitions;
+        let { supports = map (\((,,) name annotation rhs) -> (,,) name (Just annotation) rhs) (Classes.supportDefinitions definitions);
               targets = Dependency.mapScopes (map snd) scopes
         } in case input of {
           NamedInput members -> namedPlan members supports methods (Dependency.namedScopes targets);
-          ResolvedInput bindings -> indexedPlanInScopes bindings supports methods targets
+          ResolvedInput bindings -> case Classes.inventoryDeclarations inventory of {
+            Nothing -> Left "resolved source inventory lacks generated declaration slots";
+            Just generation -> indexedPlanWith bindings generation supports
+              (\i -> map snd (Classes.inventoryCandidateIds inventory i))
+          }
         }
       };
       Right ((,) (mapOptional (\g -> SourcePlan inventory g count used externals legacy instances M.empty) graph) legacy)
@@ -1030,10 +1034,19 @@ module Bootstrap.SourceInference where {
       Just (NamedPlan members supports groups))
   };
   indexedPlan bindings supports methods scopes = indexedPlanInScopes bindings supports methods (Dependency.NamedScopes scopes);
-  indexedPlanInScopes bindings@(Dependency.BoundValues base members) supports methods scopes = do {
-    (,) symbols groups <- Dependency.resolvedGroupsInScopes bindings (Dependency.declarationEdges supports) methods scopes;
+  indexedPlanInScopes bindings@(Dependency.BoundValues base members) supports methods scopes =
+    let { generation = Dependency.generatedTable base (map Dependency.boundId members)
+            (map sourceName supports) [] methods;
+          targets i = mapMaybe (Dependency.generatedNameId generation) (fromMaybe []
+            (case scopes of {
+              Dependency.NamedScopes values -> M.lookup compareString (Dependency.symbolName base i) values;
+              Dependency.IndexedScopes _ _ _ _ -> Dependency.scopeAt scopes i
+            }))
+    } in indexedPlanWith bindings generation supports targets;
+  indexedPlanWith bindings@(Dependency.BoundValues base members) generation supports targets = do {
+    (,) symbols groups <- Dependency.resolvedGroupsWith bindings generation (Dependency.declarationEdges supports) targets;
     let { baseCount = V.count (Dependency.symbolNodes base); count = V.count (Dependency.symbolNodes symbols);
-          sources = map Dependency.boundId members; generated = map V.fromInt (range baseCount (count - 1));
+          sources = map Dependency.boundId members; generated = Dependency.generatedSlots generation;
           source i = V.toInt i < baseCount;
           -- Groups are in lexical SCC order. Each input's ordinal recovers
           -- its original declaration order when preparing a multi-member SCC.
