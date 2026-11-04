@@ -71,11 +71,19 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
     closed_pair=((seed/'closed.mlfci').read_bytes(),(seed/'closed.mlfco').read_bytes())
     dependency_interfaces=[(seed/'builtin.mlfci').read_bytes()]
     opened.inspect_pair(binary_pair,dependency_interfaces)
+    current_schema, _, old_fields = opened.open_document(binary_pair[1])
+    require(current_schema == 8, 'current Session writer emits schema8')
+    old_fields = list(old_fields)
+    old_fields[0] = opened.string(opened.OPEN_FORMATS[7])
+    schema7_pair = opened.repinned(binary_pair, opened.open_bytes(7, old_fields))
+    opened.inspect_pair(schema7_pair, dependency_interfaces)
+    for suffix, data in zip(('.mlfci', '.mlfco'), schema7_pair):
+        (seed / ('schema7' + suffix)).write_bytes(data)
     for schema,data in zip((3,4),closed_pair):typed.inspect_artifact(data,schema)
     require(not any(raw.startswith(ref.MAGIC) for raw in legacy_pair),'explicit old formal serialization really text')
     require(typed.unpack(legacy_pair[1].decode('utf-8'))[0]=='MLFCO-2',
             'legacy companion contains a complete ordinary payload, not an open summary')
-    for variant in ('seed','closed','legacy'):
+    for variant in ('seed','schema7','closed','legacy'):
         require(invoke('formal-'+variant,'formal-check',seed/variant,'accept')==b'PASS formal-accept\n','actual formal reader '+variant)
     # The real Session pair remains primary. Separate closed and text inputs
     # retain old-format coverage without replacing current production artifacts.
@@ -84,23 +92,24 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         backend_rows={}
         legacy_rebuilt_pair=None
         # Bind genuine text to complete binary bytes before checksum comparison.
-        for variant,expected_pair in (('closed',closed_pair),('legacy',closed_pair),('seed',binary_pair)):
+        for variant,expected_pair in (('closed',closed_pair),('legacy',closed_pair),
+                                      ('schema7',schema7_pair),('seed',binary_pair)):
             label=backend+'-public-pair'+('' if variant=='seed' else '-'+variant)
             destination=output/label;destination.mkdir();prefix=destination/'unit'
             result=run(label,[shared_fixtures[backend]],
                        ('formal\n'+str(seed/variant)+'\n'+str(prefix)+'\n').encode())
             require(result==b'PASS shared-public-binary-pair\n','public pair exact completion')
             expected_files={'unit.mlfci','unit.mlfco'}
-            if variant=='seed':expected_files|={'unit-audited.mlfci','unit-audited.mlfco'}
+            if variant in ('seed','schema7'):expected_files|={'unit-audited.mlfci','unit-audited.mlfco'}
             require({p.name for p in destination.iterdir()}==expected_files,'public exact publication inventory/no staging')
             actual_pair=tuple(prefix.with_suffix(suffix).read_bytes() for suffix in ('.mlfci','.mlfco'))
             require(actual_pair==expected_pair,'cross-backend full pair exact bytes')
             if variant=='legacy':legacy_rebuilt_pair=actual_pair
-            if variant=='seed':
+            if variant in ('seed','schema7'):
                 audited_pair=tuple((destination/('unit-audited'+suffix)).read_bytes() for suffix in ('.mlfci','.mlfco'))
-                comparison=opened.compare_companion(closed_pair,binary_pair,dependency_interfaces,audited_pair,
+                comparison=opened.compare_companion(closed_pair,expected_pair,dependency_interfaces,audited_pair,
                                                     legacy_pair,legacy_rebuilt_pair)
-                controls=opened.independent_controls(binary_pair,closed_pair,dependency_interfaces,audited_pair,
+                controls=opened.independent_controls(expected_pair,closed_pair,dependency_interfaces,audited_pair,
                                                      legacy_pair,legacy_rebuilt_pair)
                 backend_rows[variant]={'comparison':comparison,'independent_controls':controls}
             else:
@@ -120,7 +129,9 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         family='interface' if schema==3 else 'object'
         require(invoke('formal-corrupt-'+str(schema),'formal-check',bad/'unit','reject-'+family+'-version')==('PASS formal-'+family+'-version-reject\n').encode(),'formal exact binary-version diagnostic; no legacy fallback')
     open_negatives=[]
-    for label,pair,diagnostic in opened.mutation_cases(binary_pair):
+    resource_cases, resource_witnesses = opened.resource_mutation_cases(
+        binary_pair, dependency_interfaces)
+    for label,pair,diagnostic in [*opened.mutation_cases(binary_pair), *resource_cases]:
         bad=output/label;bad.mkdir();prefix=bad/'unit'
         for suffix,data in zip(('.mlfci','.mlfco'),pair):prefix.with_suffix(suffix).write_bytes(data)
         require(invoke('formal-'+label,'formal-error',prefix,diagnostic)==b'PASS formal-open-reject\n',
@@ -130,7 +141,8 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
                        ('reject\n'+str(prefix)+'\n'+diagnostic+'\n').encode())
             require(result==b'PASS shared-public-reject\n','both hosts exact open-family rejection')
         open_negatives.append({'name':label,'expected_diagnostic':diagnostic,
-                               'pair_sha256':[sha(data) for data in pair]})
+                               'pair_sha256':[sha(data) for data in pair],
+                               'resource_witness':resource_witnesses.get(label)})
     record['open_public_negatives']=open_negatives
     audit_negatives=[]
     for label,pair,diagnostic in opened.audit_mutation_cases(binary_pair):
@@ -155,7 +167,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         if metadata.startswith(ref.MAGIC):
             fields=typed.value_node(typed.inspect_artifact(metadata,3).values()[0],242,13)
             schema=int.from_bytes(body[16:20],'little')
-            if schema==7:
+            if schema in (7,8):
                 return opened.inspect_pair(pair,list(dependencies))['summary']
             require(schema==4,'explicit ordinary closed or current open object family')
             object_fields=typed.value_node(typed.inspect_artifact(body,4).values()[0],243,3)

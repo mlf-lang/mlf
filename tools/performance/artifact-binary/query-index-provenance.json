@@ -1,0 +1,2226 @@
+{
+  "format": "query-index-generation-provenance-v1",
+  "collector": {
+    "generation_only": true,
+    "generation_body_complete": true,
+    "wrapper_complete": true,
+    "full_compiler_build": false,
+    "optimization": "2",
+    "fresh_compilation_count": 6,
+    "reused_compilation_count": 53,
+    "total_compilation_closure": 59,
+    "nongenerated_module_count": 54
+  },
+  "source": {
+    "base_head": "9ef905033caa654ca07507d8b5ac2363f3207269",
+    "base_tree": "5688ecefcfce0eaa9f79a4ddf39d122f35d8195a",
+    "parent_value_sha256": "60817957fd858410f766b45a23271d3e99f4410cab2e9a46e1d28433531c9bf5",
+    "generation_snapshot_sha256": "62eef95d451d08a0bc283a3ecb354a65d6a2543a02de84a66da394a7a738c015",
+    "generation_snapshot_file_count": 571,
+    "identity": "builtin-source-v1:0516e68cb23805681ee62d0aab4cc2f4ae6395b69acc68c0a5c1d558526cba58",
+    "identity_inputs": {
+      "builtin_interface": "mlf-primitive/shared-haskell-v1/11",
+      "format": "builtin-source-v1",
+      "frontend_semantics": "mlf-frontend/shared-haskell-v1/8",
+      "modules": {
+        "Bootstrap.ArtifactStorage": {
+          "path": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+          "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7"
+        },
+        "Bootstrap.ArtifactStructure": {
+          "path": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
+          "sha256": "cfaa0baf223769438241ebc1cd08ea7d91e9fae0eaef6135d513f62564a965d8"
+        },
+        "Bootstrap.Bitstream": {
+          "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+          "sha256": "124dc2e6abcf69f8ae12ae77fca348882c711f3cb930a24b571b01aa1262430f"
+        },
+        "Bootstrap.BuiltinPreludeContext": {
+          "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
+          "sha256": "1961cf629b1d6e4cc1956489d0f1f028907b3584b4c3ae0fec1fc34626f856ee"
+        },
+        "Bootstrap.BuiltinPreludeLiteral": {
+          "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs",
+          "sha256": "e5fe5a811b461dd4fe76b9975692ea675fca0e61b98d4d9b7ff7b96e30ad0540"
+        },
+        "Bootstrap.ClassDemand": {
+          "path": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+          "sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379"
+        },
+        "Bootstrap.Classes": {
+          "path": "libraries/mlf-inference/Bootstrap/Classes.hs",
+          "sha256": "28b098e1a881b25a289f79a33252c7a1842664ea6cdc3633169231aad85cbdbc"
+        },
+        "Bootstrap.CompilerCore": {
+          "path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+          "sha256": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2"
+        },
+        "Bootstrap.Constraint": {
+          "path": "libraries/mlf-inference/Bootstrap/Constraint.hs",
+          "sha256": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852"
+        },
+        "Bootstrap.CrateArtifact": {
+          "path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+          "sha256": "c9d33e20985b3a9b6ec34733f024e5378388799d5cf5f68bbbce13242e886453"
+        },
+        "Bootstrap.Data": {
+          "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+          "sha256": "a5dd15a451fa0d4123501d45ec17f9930abffc85dd571ab0ac50650733f6bcb7"
+        },
+        "Bootstrap.Dependency": {
+          "path": "libraries/mlf-frontend/Bootstrap/Dependency.hs",
+          "sha256": "5d0082ace3184c213c53f34d9259437506fa3db368d646b3599162018f7db27d"
+        },
+        "Bootstrap.Desugar": {
+          "path": "libraries/mlf-frontend/Bootstrap/Desugar.hs",
+          "sha256": "087d3e310dbd218800d56a77bce8f861981542089f5cd260c04264bf3c33c388"
+        },
+        "Bootstrap.Elaborate": {
+          "path": "libraries/mlf-inference/Bootstrap/Elaborate.hs",
+          "sha256": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58"
+        },
+        "Bootstrap.Evidence": {
+          "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+          "sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd"
+        },
+        "Bootstrap.EvidenceBoundary": {
+          "path": "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs",
+          "sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2"
+        },
+        "Bootstrap.Fresh": {
+          "path": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+          "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+        },
+        "Bootstrap.Graph": {
+          "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+          "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f"
+        },
+        "Bootstrap.Graph.Solver": {
+          "path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+          "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612"
+        },
+        "Bootstrap.Host": {
+          "path": "libraries/mlf-foundation/Bootstrap/Host.hs",
+          "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+        },
+        "Bootstrap.InferenceUnit": {
+          "path": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+          "sha256": "9ee3f1de8ea9b3deed3cf36db2344fec04b919d43e95d328ff35556b77e82d4e"
+        },
+        "Bootstrap.IntMap": {
+          "path": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+          "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+        },
+        "Bootstrap.IntRank": {
+          "path": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+          "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+        },
+        "Bootstrap.IntSet": {
+          "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+          "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+        },
+        "Bootstrap.IntTree": {
+          "path": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+          "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+        },
+        "Bootstrap.Kind": {
+          "path": "libraries/mlf-language-core/Bootstrap/Kind.hs",
+          "sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b"
+        },
+        "Bootstrap.Kinding": {
+          "path": "libraries/mlf-language-core/Bootstrap/Kinding.hs",
+          "sha256": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c"
+        },
+        "Bootstrap.Layout": {
+          "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+          "sha256": "9d602c1743537623ae64a34dc6d34ee79c367ee57cb4214dc7e2e8509a9de411"
+        },
+        "Bootstrap.Lexer": {
+          "path": "libraries/mlf-frontend/Bootstrap/Lexer.hs",
+          "sha256": "5089cd7c59afff73e0f89660a84259d1f5dcf18fbfec07a7e5ad0ae1d22b4f08"
+        },
+        "Bootstrap.Map": {
+          "path": "libraries/mlf-foundation/Bootstrap/Map.hs",
+          "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+        },
+        "Bootstrap.Module": {
+          "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+          "sha256": "ec373435f9cc73abe56bfd68649172d106619488cce906846b8a6bc5b291853e"
+        },
+        "Bootstrap.OpenFragment": {
+          "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+          "sha256": "b3d43f1a3a46b62107b0301e6278225c97dac4477c7c8bb21e981fc887933f4b"
+        },
+        "Bootstrap.Parsec": {
+          "path": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
+          "sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90"
+        },
+        "Bootstrap.Parser": {
+          "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+          "sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c"
+        },
+        "Bootstrap.Prelude": {
+          "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+          "sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2"
+        },
+        "Bootstrap.Primitive": {
+          "path": "libraries/mlf-language-core/Bootstrap/Primitive.hs",
+          "sha256": "924cd0a7ac6a3a8b1790ab28e4c2124e608a6519e1746d38fe3044595d2a34a5"
+        },
+        "Bootstrap.QueryGraph": {
+          "path": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+          "sha256": "0a872320d3e59ce85db09fa5c04e3d168b4c172560396a8875e0a83ba47ff040"
+        },
+        "Bootstrap.ST": {
+          "path": "libraries/mlf-foundation/Bootstrap/ST.hs",
+          "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+        },
+        "Bootstrap.Separate": {
+          "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+          "sha256": "167d3e42ef9b8aa3b8955cfe93210e84528ca7b4768d571f60e27603b669e5ae"
+        },
+        "Bootstrap.Set": {
+          "path": "libraries/mlf-foundation/Bootstrap/Set.hs",
+          "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+        },
+        "Bootstrap.SourceEquality": {
+          "path": "libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+          "sha256": "031ca10290b4b6bce9526c65fc6cbcea096def8df17fd6e9333710480d52077a"
+        },
+        "Bootstrap.SourceInference": {
+          "path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
+          "sha256": "08448b68fb8f44a0dad0cc977ac6b77b0afbffb4b03fc1d189cc8b65a08009d0"
+        },
+        "Bootstrap.SourceUnit": {
+          "path": "libraries/mlf-crates/Bootstrap/SourceUnit.hs",
+          "sha256": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f"
+        },
+        "Bootstrap.Std": {
+          "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+          "sha256": "d8ac87643ba3c81b1a87a46f59386f4a8f27eaad3515100b5374737f9747ca17"
+        },
+        "Bootstrap.Surface": {
+          "path": "libraries/mlf-frontend/Bootstrap/Surface.hs",
+          "sha256": "6722b465232d5e88692bea0fdddfa07c02eb1c5fa65476c7fdb922042a194ff8"
+        },
+        "Bootstrap.Types": {
+          "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+          "sha256": "699b031d3b623b06db1bcbee5b8e0b7e68da04ae94407d62d1c7400eec2abdcd"
+        },
+        "Bootstrap.Unicode": {
+          "path": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+          "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+        },
+        "Bootstrap.X.Check": {
+          "path": "libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+          "sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c"
+        },
+        "Bootstrap.X.Checked": {
+          "path": "libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+          "sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a"
+        },
+        "Bootstrap.X.Parser": {
+          "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+          "sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209"
+        },
+        "Bootstrap.X.Pretty": {
+          "path": "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+          "sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f"
+        },
+        "Bootstrap.X.Syntax": {
+          "path": "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+          "sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d"
+        },
+        "Bootstrap.X.Type": {
+          "path": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+          "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d"
+        },
+        "MLF.Entry.BuiltinPrelude": {
+          "path": "bootstrap/MLF/Entry/BuiltinPrelude.hs",
+          "sha256": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a"
+        }
+      },
+      "primitive_abi": "mlf-primitive-132-v7",
+      "source_syntax": "shared-haskell-v1"
+    },
+    "compiled_sources": {
+      "Bootstrap.ArtifactStorage": {
+        "path": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+        "bytes": 55963,
+        "mode": 420,
+        "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7"
+      },
+      "Bootstrap.ArtifactStructure": {
+        "path": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
+        "bytes": 141296,
+        "mode": 420,
+        "sha256": "cfaa0baf223769438241ebc1cd08ea7d91e9fae0eaef6135d513f62564a965d8"
+      },
+      "Bootstrap.Bitstream": {
+        "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+        "bytes": 71125,
+        "mode": 420,
+        "sha256": "124dc2e6abcf69f8ae12ae77fca348882c711f3cb930a24b571b01aa1262430f"
+      },
+      "Bootstrap.BuiltinPreludeContext": {
+        "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
+        "bytes": 15757,
+        "mode": 420,
+        "sha256": "1961cf629b1d6e4cc1956489d0f1f028907b3584b4c3ae0fec1fc34626f856ee"
+      },
+      "Bootstrap.BuiltinPreludeLiteral": {
+        "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs",
+        "bytes": 29168,
+        "mode": 420,
+        "sha256": "e5fe5a811b461dd4fe76b9975692ea675fca0e61b98d4d9b7ff7b96e30ad0540"
+      },
+      "Bootstrap.ClassDemand": {
+        "path": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+        "bytes": 17441,
+        "mode": 420,
+        "sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379"
+      },
+      "Bootstrap.Classes": {
+        "path": "libraries/mlf-inference/Bootstrap/Classes.hs",
+        "bytes": 104743,
+        "mode": 420,
+        "sha256": "28b098e1a881b25a289f79a33252c7a1842664ea6cdc3633169231aad85cbdbc"
+      },
+      "Bootstrap.CompilerCore": {
+        "path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+        "bytes": 3354,
+        "mode": 420,
+        "sha256": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2"
+      },
+      "Bootstrap.Constraint": {
+        "path": "libraries/mlf-inference/Bootstrap/Constraint.hs",
+        "bytes": 50258,
+        "mode": 420,
+        "sha256": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852"
+      },
+      "Bootstrap.CrateArtifact": {
+        "path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+        "bytes": 212401,
+        "mode": 420,
+        "sha256": "c9d33e20985b3a9b6ec34733f024e5378388799d5cf5f68bbbce13242e886453"
+      },
+      "Bootstrap.Data": {
+        "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+        "bytes": 18807,
+        "mode": 420,
+        "sha256": "a5dd15a451fa0d4123501d45ec17f9930abffc85dd571ab0ac50650733f6bcb7"
+      },
+      "Bootstrap.Dependency": {
+        "path": "libraries/mlf-frontend/Bootstrap/Dependency.hs",
+        "bytes": 10893,
+        "mode": 420,
+        "sha256": "5d0082ace3184c213c53f34d9259437506fa3db368d646b3599162018f7db27d"
+      },
+      "Bootstrap.Desugar": {
+        "path": "libraries/mlf-frontend/Bootstrap/Desugar.hs",
+        "bytes": 10312,
+        "mode": 420,
+        "sha256": "087d3e310dbd218800d56a77bce8f861981542089f5cd260c04264bf3c33c388"
+      },
+      "Bootstrap.Elaborate": {
+        "path": "libraries/mlf-inference/Bootstrap/Elaborate.hs",
+        "bytes": 31616,
+        "mode": 420,
+        "sha256": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58"
+      },
+      "Bootstrap.Evidence": {
+        "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+        "bytes": 14164,
+        "mode": 420,
+        "sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd"
+      },
+      "Bootstrap.EvidenceBoundary": {
+        "path": "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs",
+        "bytes": 20210,
+        "mode": 420,
+        "sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2"
+      },
+      "Bootstrap.Fresh": {
+        "path": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+        "bytes": 2592,
+        "mode": 420,
+        "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+      },
+      "Bootstrap.Graph": {
+        "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+        "bytes": 137874,
+        "mode": 420,
+        "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f"
+      },
+      "Bootstrap.Graph.Solver": {
+        "path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+        "bytes": 99201,
+        "mode": 420,
+        "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612"
+      },
+      "Bootstrap.Host": {
+        "path": "libraries/mlf-foundation/Bootstrap/Host.hs",
+        "bytes": 3246,
+        "mode": 420,
+        "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+      },
+      "Bootstrap.InferenceUnit": {
+        "path": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+        "bytes": 16228,
+        "mode": 420,
+        "sha256": "9ee3f1de8ea9b3deed3cf36db2344fec04b919d43e95d328ff35556b77e82d4e"
+      },
+      "Bootstrap.IntMap": {
+        "path": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+        "bytes": 21811,
+        "mode": 420,
+        "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+      },
+      "Bootstrap.IntRank": {
+        "path": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+        "bytes": 6684,
+        "mode": 420,
+        "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+      },
+      "Bootstrap.IntSet": {
+        "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+        "bytes": 17405,
+        "mode": 420,
+        "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+      },
+      "Bootstrap.IntTree": {
+        "path": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+        "bytes": 3727,
+        "mode": 420,
+        "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+      },
+      "Bootstrap.Kind": {
+        "path": "libraries/mlf-language-core/Bootstrap/Kind.hs",
+        "bytes": 1161,
+        "mode": 420,
+        "sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b"
+      },
+      "Bootstrap.Kinding": {
+        "path": "libraries/mlf-language-core/Bootstrap/Kinding.hs",
+        "bytes": 1950,
+        "mode": 420,
+        "sha256": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c"
+      },
+      "Bootstrap.Layout": {
+        "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+        "bytes": 19626,
+        "mode": 420,
+        "sha256": "9d602c1743537623ae64a34dc6d34ee79c367ee57cb4214dc7e2e8509a9de411"
+      },
+      "Bootstrap.Lexer": {
+        "path": "libraries/mlf-frontend/Bootstrap/Lexer.hs",
+        "bytes": 44635,
+        "mode": 420,
+        "sha256": "5089cd7c59afff73e0f89660a84259d1f5dcf18fbfec07a7e5ad0ae1d22b4f08"
+      },
+      "Bootstrap.Map": {
+        "path": "libraries/mlf-foundation/Bootstrap/Map.hs",
+        "bytes": 17218,
+        "mode": 420,
+        "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+      },
+      "Bootstrap.Module": {
+        "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+        "bytes": 79271,
+        "mode": 420,
+        "sha256": "ec373435f9cc73abe56bfd68649172d106619488cce906846b8a6bc5b291853e"
+      },
+      "Bootstrap.OpenFragment": {
+        "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+        "bytes": 31834,
+        "mode": 420,
+        "sha256": "b3d43f1a3a46b62107b0301e6278225c97dac4477c7c8bb21e981fc887933f4b"
+      },
+      "Bootstrap.Parsec": {
+        "path": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
+        "bytes": 11604,
+        "mode": 420,
+        "sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90"
+      },
+      "Bootstrap.Parser": {
+        "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+        "bytes": 70221,
+        "mode": 420,
+        "sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c"
+      },
+      "Bootstrap.Prelude": {
+        "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+        "bytes": 29247,
+        "mode": 420,
+        "sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2"
+      },
+      "Bootstrap.Primitive": {
+        "path": "libraries/mlf-language-core/Bootstrap/Primitive.hs",
+        "bytes": 63945,
+        "mode": 420,
+        "sha256": "924cd0a7ac6a3a8b1790ab28e4c2124e608a6519e1746d38fe3044595d2a34a5"
+      },
+      "Bootstrap.QueryGraph": {
+        "path": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+        "bytes": 28745,
+        "mode": 420,
+        "sha256": "0a872320d3e59ce85db09fa5c04e3d168b4c172560396a8875e0a83ba47ff040"
+      },
+      "Bootstrap.ST": {
+        "path": "libraries/mlf-foundation/Bootstrap/ST.hs",
+        "bytes": 2539,
+        "mode": 420,
+        "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+      },
+      "Bootstrap.Separate": {
+        "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+        "bytes": 66287,
+        "mode": 420,
+        "sha256": "167d3e42ef9b8aa3b8955cfe93210e84528ca7b4768d571f60e27603b669e5ae"
+      },
+      "Bootstrap.Set": {
+        "path": "libraries/mlf-foundation/Bootstrap/Set.hs",
+        "bytes": 4093,
+        "mode": 420,
+        "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+      },
+      "Bootstrap.SourceEquality": {
+        "path": "libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+        "bytes": 15801,
+        "mode": 420,
+        "sha256": "031ca10290b4b6bce9526c65fc6cbcea096def8df17fd6e9333710480d52077a"
+      },
+      "Bootstrap.SourceInference": {
+        "path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
+        "bytes": 72895,
+        "mode": 420,
+        "sha256": "08448b68fb8f44a0dad0cc977ac6b77b0afbffb4b03fc1d189cc8b65a08009d0"
+      },
+      "Bootstrap.SourceUnit": {
+        "path": "libraries/mlf-crates/Bootstrap/SourceUnit.hs",
+        "bytes": 2690,
+        "mode": 420,
+        "sha256": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f"
+      },
+      "Bootstrap.Std": {
+        "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+        "bytes": 19628,
+        "mode": 420,
+        "sha256": "d8ac87643ba3c81b1a87a46f59386f4a8f27eaad3515100b5374737f9747ca17"
+      },
+      "Bootstrap.Surface": {
+        "path": "libraries/mlf-frontend/Bootstrap/Surface.hs",
+        "bytes": 31199,
+        "mode": 420,
+        "sha256": "6722b465232d5e88692bea0fdddfa07c02eb1c5fa65476c7fdb922042a194ff8"
+      },
+      "Bootstrap.Types": {
+        "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+        "bytes": 12134,
+        "mode": 420,
+        "sha256": "699b031d3b623b06db1bcbee5b8e0b7e68da04ae94407d62d1c7400eec2abdcd"
+      },
+      "Bootstrap.Unicode": {
+        "path": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+        "bytes": 55534,
+        "mode": 420,
+        "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+      },
+      "Bootstrap.X.Check": {
+        "path": "libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+        "bytes": 17179,
+        "mode": 420,
+        "sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c"
+      },
+      "Bootstrap.X.Checked": {
+        "path": "libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+        "bytes": 26092,
+        "mode": 420,
+        "sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a"
+      },
+      "Bootstrap.X.Parser": {
+        "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+        "bytes": 16487,
+        "mode": 420,
+        "sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209"
+      },
+      "Bootstrap.X.Pretty": {
+        "path": "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+        "bytes": 12549,
+        "mode": 420,
+        "sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f"
+      },
+      "Bootstrap.X.Syntax": {
+        "path": "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+        "bytes": 4813,
+        "mode": 420,
+        "sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d"
+      },
+      "Bootstrap.X.Type": {
+        "path": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+        "bytes": 9309,
+        "mode": 420,
+        "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d"
+      },
+      "MLF.Entry.BuiltinPrelude": {
+        "path": "bootstrap/MLF/Entry/BuiltinPrelude.hs",
+        "bytes": 2797,
+        "mode": 420,
+        "sha256": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a"
+      },
+      "MLF.Host.Async": {
+        "path": "host/ghc/MLF/Host/Async.hs",
+        "bytes": 8881,
+        "mode": 420,
+        "sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5"
+      },
+      "MLF.Host.Base": {
+        "path": "host/ghc/MLF/Host/Base.hs",
+        "bytes": 19024,
+        "mode": 420,
+        "sha256": "5152a27b849cfcabfd4830c90bdba8f08bb885c16b4aa6525c4ee778cde96a8c"
+      },
+      "MLF.Host.IO": {
+        "path": "host/ghc/MLF/Host/IO.hs",
+        "bytes": 15420,
+        "mode": 420,
+        "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a"
+      },
+      "MLF.Primitive": {
+        "path": "host/ghc/MLF/Primitive.hs",
+        "bytes": 14028,
+        "mode": 420,
+        "sha256": "9b8e52b51dfaf0c5a31c18b0e08c5a704d10f8dc44fe2db0995bf3c8a22f2f43"
+      },
+      "Main": {
+        "path": "host/ghc/app/builtin-prelude/Main.hs",
+        "bytes": 140,
+        "mode": 420,
+        "sha256": "c913ad11f0d2a945b33b924e346fa2afdcad157faf6e3e9424b6c5194915d496"
+      }
+    },
+    "overlay": {
+      "bootstrap/MLF/BuiltinPreludeData.hs": {
+        "bytes": 2219103,
+        "mode": 420,
+        "sha256": "0e04f145d180c5b3b54f29bc4cb288ab59249be62ac58f346647df8c848f9679"
+      },
+      "libraries/mlf-crates/Bootstrap/QueryGraph.hs": {
+        "bytes": 28745,
+        "mode": 420,
+        "sha256": "0a872320d3e59ce85db09fa5c04e3d168b4c172560396a8875e0a83ba47ff040"
+      },
+      "mlf.lock": {
+        "bytes": 15858,
+        "mode": 420,
+        "sha256": "79cb056a1456d4b3e94ef86d3dda7379b9614db2dbe8fae90965f8cdea77996e"
+      }
+    },
+    "production_changed_paths": [
+      "bootstrap/MLF/BuiltinPreludeData.hs",
+      "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "mlf.lock"
+    ],
+    "test_only_changed_paths": [
+      "tools/shared/fixtures/item4/QueryIndex.hs",
+      "tools/shared/run_artifact_binary_controls.py",
+      "tools/shared/test_artifact_binary.py",
+      "tools/shared/test_query_index.py"
+    ]
+  },
+  "receipt": {
+    "bytes": 1652047,
+    "mode": 420,
+    "sha256": "d6fd1fab0becc825c2752bf30a13205ee65f71e8589e6aefade2195cf1129de2"
+  },
+  "preparation": {
+    "bytes": 2129901,
+    "mode": 420,
+    "sha256": "49f637513c319b4382a1a9e22de3da8e3abf41f48966e9d61c909d122c584a64"
+  },
+  "terminal": {
+    "receipt": {
+      "bytes": 141400,
+      "mode": 420,
+      "sha256": "e692ed27b3c3a5470ea1d443624ef98020304d153428f12fb94a6a2f5a0d304a"
+    },
+    "complete": true,
+    "original_three_locks_reacquired": true,
+    "authenticated_inputs_unchanged": true,
+    "frozen_source_unchanged": true,
+    "all_prior_history_unchanged": true,
+    "actual_command_exits": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "comparison": {
+    "comparison_is_evidence_not_generation_substitute": true,
+    "generated": {
+      "bytes": 2219103,
+      "mode": 420,
+      "sha256": "0e04f145d180c5b3b54f29bc4cb288ab59249be62ac58f346647df8c848f9679"
+    },
+    "identity_only": true,
+    "new_identity": "builtin-source-v1:0516e68cb23805681ee62d0aab4cc2f4ae6395b69acc68c0a5c1d558526cba58",
+    "old": {
+      "bytes": 2219103,
+      "mode": 420,
+      "sha256": "cec037c459cd0ef0eb057c1593268adf115492feb14d69f4dddcf0be3d860a36"
+    },
+    "old_identity": "990dd1e310cc42b2a8a5f2aedb64725b6df9c2c00f904e47368a8b03c130faaf"
+  },
+  "generator": {
+    "bytes": 10936432,
+    "mode": 493,
+    "sha256": "68e9ae43260bd4910bfa09b8fbe97b133f3e7085c61ad04728ad0aeab9488e98"
+  },
+  "fresh_modules": [
+    "Bootstrap.QueryGraph",
+    "Bootstrap.CrateArtifact",
+    "Bootstrap.BuiltinPreludeContext",
+    "Bootstrap.BuiltinPreludeLiteral",
+    "MLF.Entry.BuiltinPrelude",
+    "Main"
+  ],
+  "reused_modules": [
+    "Bootstrap.ArtifactStorage",
+    "Bootstrap.ArtifactStructure",
+    "Bootstrap.Bitstream",
+    "Bootstrap.ClassDemand",
+    "Bootstrap.Classes",
+    "Bootstrap.CompilerCore",
+    "Bootstrap.Constraint",
+    "Bootstrap.Data",
+    "Bootstrap.Dependency",
+    "Bootstrap.Desugar",
+    "Bootstrap.Elaborate",
+    "Bootstrap.Evidence",
+    "Bootstrap.EvidenceBoundary",
+    "Bootstrap.Fresh",
+    "Bootstrap.Graph",
+    "Bootstrap.Graph.Solver",
+    "Bootstrap.Host",
+    "Bootstrap.InferenceUnit",
+    "Bootstrap.IntMap",
+    "Bootstrap.IntRank",
+    "Bootstrap.IntSet",
+    "Bootstrap.IntTree",
+    "Bootstrap.Kind",
+    "Bootstrap.Kinding",
+    "Bootstrap.Layout",
+    "Bootstrap.Lexer",
+    "Bootstrap.Map",
+    "Bootstrap.Module",
+    "Bootstrap.OpenFragment",
+    "Bootstrap.Parsec",
+    "Bootstrap.Parser",
+    "Bootstrap.Prelude",
+    "Bootstrap.Primitive",
+    "Bootstrap.ST",
+    "Bootstrap.Separate",
+    "Bootstrap.Set",
+    "Bootstrap.SourceEquality",
+    "Bootstrap.SourceInference",
+    "Bootstrap.SourceUnit",
+    "Bootstrap.Std",
+    "Bootstrap.Surface",
+    "Bootstrap.Types",
+    "Bootstrap.Unicode",
+    "Bootstrap.X.Check",
+    "Bootstrap.X.Checked",
+    "Bootstrap.X.Parser",
+    "Bootstrap.X.Pretty",
+    "Bootstrap.X.Syntax",
+    "Bootstrap.X.Type",
+    "MLF.Host.Async",
+    "MLF.Host.Base",
+    "MLF.Host.IO",
+    "MLF.Primitive"
+  ],
+  "object_inputs": {
+    "Bootstrap.ArtifactStorage": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 604960,
+        "mode": 420,
+        "sha256": "c8f12cf382e1c2b667b5405fe0a4b8a3b9dc21e1406c9119e91fd2acf166a4a0"
+      },
+      "interface": {
+        "bytes": 99147,
+        "mode": 420,
+        "sha256": "6e0a9f3c595db4a9511a06543e9bc3a817aa6dea2c7ebd3aabf5c94bad925c4a"
+      }
+    },
+    "Bootstrap.ArtifactStructure": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 1444096,
+        "mode": 420,
+        "sha256": "68dd0535c5fc08025232ebc123183e712769d3206f9e57bdcb6ee0553171e880"
+      },
+      "interface": {
+        "bytes": 137593,
+        "mode": 420,
+        "sha256": "3142a91e1a91060d2e90fbae9d0dbe8b32ec51971584ac97a26a2bc4551a5852"
+      }
+    },
+    "Bootstrap.Bitstream": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 630048,
+        "mode": 420,
+        "sha256": "20b676deca0f087283a7eb62ec595e5a4ba6500f3bfda15deb9b9138b60195f5"
+      },
+      "interface": {
+        "bytes": 98770,
+        "mode": 420,
+        "sha256": "a5776be5a4a2c650eeef600111861d5c9a00f2ccb93de0a6fed6be007b1c248c"
+      }
+    },
+    "Bootstrap.BuiltinPreludeContext": {
+      "origin": "fresh",
+      "object": {
+        "bytes": 129576,
+        "mode": 420,
+        "sha256": "3d96710c489e52643754e450da41c903014b2a475857ddd6bea3667a6984b434"
+      },
+      "interface": {
+        "bytes": 14712,
+        "mode": 420,
+        "sha256": "169b282d8842334f8914378540c0ba1fe3977c3b645732ad5a33493db343af33"
+      }
+    },
+    "Bootstrap.BuiltinPreludeLiteral": {
+      "origin": "fresh",
+      "object": {
+        "bytes": 524416,
+        "mode": 420,
+        "sha256": "9fa42d5c015552ceacd3d9c0892f8c8ce908beca3182431cc425cb584f0384b7"
+      },
+      "interface": {
+        "bytes": 63073,
+        "mode": 420,
+        "sha256": "62fb6547c37d78ca1f48ad6081cca3618f3d1433fa13592dc8aae5c15993201d"
+      }
+    },
+    "Bootstrap.ClassDemand": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 167568,
+        "mode": 420,
+        "sha256": "4f563972126435839dd3b86383076da55b8606dabc87ee58858f3043c420acf0"
+      },
+      "interface": {
+        "bytes": 36216,
+        "mode": 420,
+        "sha256": "cc7fa84096cb955f130e4355108f2e5434e07a7c4259db7fa13ab29005ee20be"
+      }
+    },
+    "Bootstrap.Classes": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 723272,
+        "mode": 420,
+        "sha256": "f863c7eb29c9d4b19ada72feddf261b66e2d0b7d64c47a8efb0325f5d31d23d7"
+      },
+      "interface": {
+        "bytes": 77533,
+        "mode": 420,
+        "sha256": "4288d7cda7ebf28a88cfbfec88935525adb6e745893ffef2ebb7afcdf8200032"
+      }
+    },
+    "Bootstrap.CompilerCore": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 33384,
+        "mode": 420,
+        "sha256": "15bde59d526047c02cd65abf60726b7a69219f627d8cd76108ba9a8bbe33689c"
+      },
+      "interface": {
+        "bytes": 9841,
+        "mode": 420,
+        "sha256": "23465d9be854a6333f08ceb940c6d83638887d6cd53b5a93465a41e34d7d42ae"
+      }
+    },
+    "Bootstrap.Constraint": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 377888,
+        "mode": 420,
+        "sha256": "cecf3af980dfd53e3e099ca8d562f4593027d252455e939475adb356cf684cc0"
+      },
+      "interface": {
+        "bytes": 47001,
+        "mode": 420,
+        "sha256": "ad28032d1e2c9b15a38419f50f8ab1ecb5bc767f871a14ca95a0ff5c9f972af4"
+      }
+    },
+    "Bootstrap.CrateArtifact": {
+      "origin": "fresh",
+      "object": {
+        "bytes": 1660176,
+        "mode": 420,
+        "sha256": "093195a86bf06f8b2c324a3f04a5fa4363df5a00c3396e311dc9ca2e642dfb91"
+      },
+      "interface": {
+        "bytes": 204409,
+        "mode": 420,
+        "sha256": "43a07b401b491ac3aaec9c064dfb37d930efa11fa5e24d8dd0028c1b3cc15402"
+      }
+    },
+    "Bootstrap.Data": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 236504,
+        "mode": 420,
+        "sha256": "80aac8f92c8a3d89422509b20bd23b848abba4c27b7f3b3276fbfa0a1fb03096"
+      },
+      "interface": {
+        "bytes": 45834,
+        "mode": 420,
+        "sha256": "a0a81732b286b29b590d68fc670113dc604388254f701a631f6184d3819c35b0"
+      }
+    },
+    "Bootstrap.Dependency": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 100960,
+        "mode": 420,
+        "sha256": "269fadd6a84946c868ee481a809a9c2cccd95f1a5790b243a0a49e35b51be915"
+      },
+      "interface": {
+        "bytes": 20782,
+        "mode": 420,
+        "sha256": "1a19dc60930b8646d0a67165afce6fedd9852a71310facc8a815764b77fa59ed"
+      }
+    },
+    "Bootstrap.Desugar": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 86216,
+        "mode": 420,
+        "sha256": "c93c8bc846920c246406602580542bfce4cd9d52838ef004b2b64df5e0579be7"
+      },
+      "interface": {
+        "bytes": 10069,
+        "mode": 420,
+        "sha256": "fc07ff42ff8aa5e2208be86e02052214fb38103a54602397d9f00cc9ddb83722"
+      }
+    },
+    "Bootstrap.Elaborate": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 199928,
+        "mode": 420,
+        "sha256": "7646618edb83cd974fdb3977d2d614a255a6e470b2accfedde3ce059b605ba60"
+      },
+      "interface": {
+        "bytes": 31337,
+        "mode": 420,
+        "sha256": "eae3c13ea26190cac01aa98961a8e9598ebb0297b2f968622f2bec92b858b1c9"
+      }
+    },
+    "Bootstrap.Evidence": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 71560,
+        "mode": 420,
+        "sha256": "4876ebdf20ea2ace6024303f46dc3aca58b7be33e31f4cff09b3685de48ab03f"
+      },
+      "interface": {
+        "bytes": 17168,
+        "mode": 420,
+        "sha256": "fc1f80f08e4e248ff2b27b68de03afd48e4d072b92a19867288ddfeab2af5222"
+      }
+    },
+    "Bootstrap.EvidenceBoundary": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 165344,
+        "mode": 420,
+        "sha256": "1ce70418ea277672f12abb0fa3bc31caa65c3ad50649703afd2817736a56f358"
+      },
+      "interface": {
+        "bytes": 29868,
+        "mode": 420,
+        "sha256": "a0118db6d5443db9534be70215b64825a8a1555071330c94b137883039ae2f16"
+      }
+    },
+    "Bootstrap.Fresh": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 26728,
+        "mode": 420,
+        "sha256": "bdba3cc3da09b19b59e31880019dcf3d3057abcc7c84eae563d3824f212c50b6"
+      },
+      "interface": {
+        "bytes": 9496,
+        "mode": 420,
+        "sha256": "f21584042d959de83640942126cc7ffa6260db45ed0acaae3a2c55fbeedf806f"
+      }
+    },
+    "Bootstrap.Graph": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 781024,
+        "mode": 420,
+        "sha256": "ebe745b5d50f8dfc113e252bff8dc726716e45125ae75857d6965e181c050e20"
+      },
+      "interface": {
+        "bytes": 121146,
+        "mode": 420,
+        "sha256": "f143e93db816eee76189a0646210bbf6b1a7f4cc5adb6dddefd5683f93c1ff43"
+      }
+    },
+    "Bootstrap.Graph.Solver": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 612720,
+        "mode": 420,
+        "sha256": "3b93cfa801b5fda98db94f11eb82ddf4d4397260d6446034f2ceab0724e5f0ec"
+      },
+      "interface": {
+        "bytes": 79323,
+        "mode": 420,
+        "sha256": "99d813aed63d7ae735df00bb00206684238ba1bbade92a5da8c8df11e02bfa6b"
+      }
+    },
+    "Bootstrap.Host": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 45712,
+        "mode": 420,
+        "sha256": "9337e97fea3418c5bbfa4261ceaa9f43763fb492eaffea0aad837dcc891e5792"
+      },
+      "interface": {
+        "bytes": 15880,
+        "mode": 420,
+        "sha256": "cf96b8825484f10452a495992db929f985aba32844243777c5d9899ed015f997"
+      }
+    },
+    "Bootstrap.InferenceUnit": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 73648,
+        "mode": 420,
+        "sha256": "de14e1bf013e634a8a05df964e5d8b70e904129ebbbf50d6dce5dc873444e9f1"
+      },
+      "interface": {
+        "bytes": 13731,
+        "mode": 420,
+        "sha256": "943ac7fe42741311e71a3146680b7cb4488c484bc7215fc8762502b0615c6097"
+      }
+    },
+    "Bootstrap.IntMap": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 133448,
+        "mode": 420,
+        "sha256": "558c6ace92d256dfdc879898b551f374dfbc42690bd5b13377e0638c2ecdba76"
+      },
+      "interface": {
+        "bytes": 32180,
+        "mode": 420,
+        "sha256": "596806bb3df5a52e95d3d743e483b8fb4a619d567c46241969a619939966eb13"
+      }
+    },
+    "Bootstrap.IntRank": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 49216,
+        "mode": 420,
+        "sha256": "a0065af468e6f500949b573ceb08eac89f012bbaa9e086227a2daf8f1df73ea9"
+      },
+      "interface": {
+        "bytes": 9942,
+        "mode": 420,
+        "sha256": "06d620e98af2bac108e5cf93e710683fc2bc6727e3314fd271a20124bb705716"
+      }
+    },
+    "Bootstrap.IntSet": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 145752,
+        "mode": 420,
+        "sha256": "63c5d7be619ea71e5759cc0f1b3282218c125dea0f1b2f852ac6be5f3e2455b9"
+      },
+      "interface": {
+        "bytes": 26426,
+        "mode": 420,
+        "sha256": "969f2aa87d98899fe8bf056df1e91af0b3d2a30b3094f4dcc6387174c32c5b5a"
+      }
+    },
+    "Bootstrap.IntTree": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 13520,
+        "mode": 420,
+        "sha256": "b5522dc73d3491f36977f87984f0732963efb6a925dd1e362c56c72f1e169def"
+      },
+      "interface": {
+        "bytes": 7534,
+        "mode": 420,
+        "sha256": "cc16743eb2a64dbd976cbe782f9b516e8c07fd4a9d7d1c9c1cb730214dac6809"
+      }
+    },
+    "Bootstrap.Kind": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 41848,
+        "mode": 420,
+        "sha256": "d2ba3ab10357f73764364aae261d6d35e6979f2f156d406214096493e473f55d"
+      },
+      "interface": {
+        "bytes": 4949,
+        "mode": 420,
+        "sha256": "c5fecf56f9005308419f1bf47ec73136bac2d6307797db8affb4c4d136a2bda0"
+      }
+    },
+    "Bootstrap.Kinding": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 12904,
+        "mode": 420,
+        "sha256": "ad0c3b3886fb2de958800b90f3c6c83fd83b008dabd0db917bdfbc7098f81941"
+      },
+      "interface": {
+        "bytes": 4575,
+        "mode": 420,
+        "sha256": "67d503b5ba4960275099361f511f30b7863f814329703c0679bd607b739ef355"
+      }
+    },
+    "Bootstrap.Layout": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 231704,
+        "mode": 420,
+        "sha256": "823c7366af13ebbed7230a6cee9df1b6029a8dbc4ad11c133db78a1797a81a91"
+      },
+      "interface": {
+        "bytes": 35315,
+        "mode": 420,
+        "sha256": "c941feef2da8d6a3f7ba9f966ca6e9dd7890b6b59e7f8c0da41ad7873feb8d8c"
+      }
+    },
+    "Bootstrap.Lexer": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 497824,
+        "mode": 420,
+        "sha256": "1e27fc9774a83d353401d61597149772eb5cd4477d2f36bb08d54ecb40a227b7"
+      },
+      "interface": {
+        "bytes": 79507,
+        "mode": 420,
+        "sha256": "de5aa09e671390839c9199227d3d827ddad91418ee3e38c35d6036f514c745ea"
+      }
+    },
+    "Bootstrap.Map": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 86464,
+        "mode": 420,
+        "sha256": "8f866809e19c27c481ede3235a5d51b35fb0c0250f46f4c93bdfbfab7822b285"
+      },
+      "interface": {
+        "bytes": 25613,
+        "mode": 420,
+        "sha256": "b592c807e8f91d82a70471ad4aefb9eba665a75d306d2a43c35f463a9d59e75e"
+      }
+    },
+    "Bootstrap.Module": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 726456,
+        "mode": 420,
+        "sha256": "174d2ce498c877a95febdc802899d9f5c49126e285cd07714d43d9d6cedf30ed"
+      },
+      "interface": {
+        "bytes": 122427,
+        "mode": 420,
+        "sha256": "789f0b9ce0d2a1210bc07fad99e3e1dae9026bb8c264caab4b8479bd2567d5be"
+      }
+    },
+    "Bootstrap.OpenFragment": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 239632,
+        "mode": 420,
+        "sha256": "9b6a02b14515578f6b0e7516eba9eba8b647758f72420c87614695436f9965c9"
+      },
+      "interface": {
+        "bytes": 28785,
+        "mode": 420,
+        "sha256": "66281f593de7935ac7124f648046a68fed1fdac8d1594ea271713a70b7ff5d4b"
+      }
+    },
+    "Bootstrap.Parsec": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 109224,
+        "mode": 420,
+        "sha256": "5e078c8e4ef839d94e69e8906995ec4a4b97c2915d40aa1c0198ef1571b1d0b2"
+      },
+      "interface": {
+        "bytes": 26434,
+        "mode": 420,
+        "sha256": "b7dd5a9116cb355998ef8a383b21640140468e76b2cf4bbffd239dfd0ae5b727"
+      }
+    },
+    "Bootstrap.Parser": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 957664,
+        "mode": 420,
+        "sha256": "f1e1fa5a9577aeda029335ac729e683fb19814d3a6b75778f1a68b52fe47a452"
+      },
+      "interface": {
+        "bytes": 159487,
+        "mode": 420,
+        "sha256": "4d11ac8275769f46cd786084e1364d6445d93a1f0629a1e760859434ca051b33"
+      }
+    },
+    "Bootstrap.Prelude": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 287232,
+        "mode": 420,
+        "sha256": "208e8df0feacb6512c0e211485b3ddc86c4a64d35f593c5bb6da846eae81e36a"
+      },
+      "interface": {
+        "bytes": 83467,
+        "mode": 420,
+        "sha256": "a8d3953b8c74465a6332dc10b494d9b3b2b08f43ef1b8a806cb178199a157726"
+      }
+    },
+    "Bootstrap.Primitive": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 270392,
+        "mode": 420,
+        "sha256": "0d888e4920403e359fce91448469767fa7b265a9ec194b49dcf8b54a70d3b29a"
+      },
+      "interface": {
+        "bytes": 56397,
+        "mode": 420,
+        "sha256": "705b984aabd1952ba31bfb3826b446e7c629fd6eafb7b25470bfdc36cf10e6c3"
+      }
+    },
+    "Bootstrap.QueryGraph": {
+      "origin": "fresh",
+      "object": {
+        "bytes": 340872,
+        "mode": 420,
+        "sha256": "0e4305e20f7016eedf875e7ecd8ac26f6738e75cbd7ef07fe3dd68058a6cd9cd"
+      },
+      "interface": {
+        "bytes": 57096,
+        "mode": 420,
+        "sha256": "b722bfac11e8f76f9cf181a6198f590c0d25574f69b8762e557da34c2322a40c"
+      }
+    },
+    "Bootstrap.ST": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 10472,
+        "mode": 420,
+        "sha256": "88c10e396529c1f78c5abdc0b92232d729750160c85edc13cc48e51d3acf025c"
+      },
+      "interface": {
+        "bytes": 5222,
+        "mode": 420,
+        "sha256": "f3155e4b3e78503dca4c4cab4348881d1ed5b6d45bf6ad670437764e31e8f6e7"
+      }
+    },
+    "Bootstrap.Separate": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 562616,
+        "mode": 420,
+        "sha256": "9f73a5de6d50a49b2cdd6920450b694cb53c12a36c868d7da16f5ebcaed2e5d6"
+      },
+      "interface": {
+        "bytes": 75591,
+        "mode": 420,
+        "sha256": "b2e771008905f47d348b66e7d77bb64445d224a8f04ee39b116d0a2a147408b6"
+      }
+    },
+    "Bootstrap.Set": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 25704,
+        "mode": 420,
+        "sha256": "27961721d87cbdd3a5bb3dbc71259dd482396eb8609425e9c4fdb50fa0040da7"
+      },
+      "interface": {
+        "bytes": 11958,
+        "mode": 420,
+        "sha256": "20c2c05fc44fb608d05923fd3b7607d7b4e58637f1e64690d54a6854655e924d"
+      }
+    },
+    "Bootstrap.SourceEquality": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 65464,
+        "mode": 420,
+        "sha256": "e0f635cfc4d76348f712617d71dd21eb24353efcb0c1a93bfb8a94dad092072b"
+      },
+      "interface": {
+        "bytes": 19540,
+        "mode": 420,
+        "sha256": "46ed85d5e50d7e6943805dffca5689c64da6422fde6c73e022e8912c71b92fc8"
+      }
+    },
+    "Bootstrap.SourceInference": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 510096,
+        "mode": 420,
+        "sha256": "e2a2eff08d35f46e233dd6c2cb9538c2f041b1cae098f70f43b9dc17233408f1"
+      },
+      "interface": {
+        "bytes": 92524,
+        "mode": 420,
+        "sha256": "a4eb862050cddd19a77787d7d3b11d748e8a93f0a8bd216def1327d39fc25d6b"
+      }
+    },
+    "Bootstrap.SourceUnit": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 22880,
+        "mode": 420,
+        "sha256": "f5b2f2a2425a2cb4fc0b9a8f1565efa23d11159b7db21191f3ec03dff8c7938b"
+      },
+      "interface": {
+        "bytes": 7674,
+        "mode": 420,
+        "sha256": "672cb3dac4db6098232ef0407c03c181be0220a8a884967909e3e2ba1ae52855"
+      }
+    },
+    "Bootstrap.Std": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 111008,
+        "mode": 420,
+        "sha256": "a6632893d7590029986be8a13df850c2a5a6084920864b61fc3345feb3ecf8e7"
+      },
+      "interface": {
+        "bytes": 34969,
+        "mode": 420,
+        "sha256": "5c117275721899ee491db15d895222e1c42c7a32378a193ffa52e808032b656b"
+      }
+    },
+    "Bootstrap.Surface": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 188784,
+        "mode": 420,
+        "sha256": "1fbaae4c68444e4e86e47f832cc6b5eb07436257811f24d8446e4366332aa3f0"
+      },
+      "interface": {
+        "bytes": 29442,
+        "mode": 420,
+        "sha256": "bb179c10a0b4a771e8810498168d5b8a189b6e1c20e986166a67972109588c8e"
+      }
+    },
+    "Bootstrap.Types": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 395896,
+        "mode": 420,
+        "sha256": "a6513c027e4d57a71f370eb5d16cd5a6912fe99754271b62034970333c38fd1c"
+      },
+      "interface": {
+        "bytes": 148231,
+        "mode": 420,
+        "sha256": "94c17ad3485bb447669c02407f6e9cd57ec736fc8442e33cd4bc5ef3e2c4b8f5"
+      }
+    },
+    "Bootstrap.Unicode": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 49384,
+        "mode": 420,
+        "sha256": "eca093f4d5169181883cab44c1cd9d6e4c8baca306c198d5cb5fe334a8b6dc82"
+      },
+      "interface": {
+        "bytes": 29925,
+        "mode": 420,
+        "sha256": "4bd605da50543b978bcd4106df29909bda988cc1571e749c8ad8b895d37ba209"
+      }
+    },
+    "Bootstrap.X.Check": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 144648,
+        "mode": 420,
+        "sha256": "1635f262b7454a3bcffbf1fd66fe7ab806ca51c132e60b59e0200e8be5ec6af8"
+      },
+      "interface": {
+        "bytes": 23953,
+        "mode": 420,
+        "sha256": "d7ffb10bcd46fa861e2a17644180e48430b296e53bfcb5b083a4994bf40327b8"
+      }
+    },
+    "Bootstrap.X.Checked": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 151200,
+        "mode": 420,
+        "sha256": "8ae53ecfc2f4c76fcec02732000837b7bee7803c50731d1837e9868be580f2b6"
+      },
+      "interface": {
+        "bytes": 20113,
+        "mode": 420,
+        "sha256": "0c233ea6c1dc7300a8e8dc0942b830005282a135a68dcf6c762b66b697b0fb34"
+      }
+    },
+    "Bootstrap.X.Parser": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 350448,
+        "mode": 420,
+        "sha256": "8f4b01f3882058716495d4daceebb24647370fba435c3b4ab9ea0b9cb1f73581"
+      },
+      "interface": {
+        "bytes": 72600,
+        "mode": 420,
+        "sha256": "7f0ff0a9aae1c117284f82ca68f82daf181d14075112d32c8cae2ee6e1134425"
+      }
+    },
+    "Bootstrap.X.Pretty": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 234440,
+        "mode": 420,
+        "sha256": "0f6c92e1a7623ed47212d06b6e81c5a7e0f35946d121a0350579e7179bf4f081"
+      },
+      "interface": {
+        "bytes": 20576,
+        "mode": 420,
+        "sha256": "c1915fc6bc30285e0ac95f30bfcd7bcdd89e0eec65e0d3e727116b57a247d0b2"
+      }
+    },
+    "Bootstrap.X.Syntax": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 22328,
+        "mode": 420,
+        "sha256": "4cb651e6f877bcea894aaffe6cd42bc81fd2137bcc3a1084167a7df79104d97d"
+      },
+      "interface": {
+        "bytes": 7966,
+        "mode": 420,
+        "sha256": "5eb322f1ffec0b32b7e25106dbeb5cc568866fb1e84f1784b4658ac4d86efb60"
+      }
+    },
+    "Bootstrap.X.Type": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 63544,
+        "mode": 420,
+        "sha256": "bb09b40b43a21e9bf09a9c16a62ee5fdbdcbacf32a621c0d840e594d1f49b760"
+      },
+      "interface": {
+        "bytes": 9352,
+        "mode": 420,
+        "sha256": "7e9cd048be97385ff8f066699c787052c176fb56467294ea52c7abc416c0994f"
+      }
+    },
+    "MLF.Entry.BuiltinPrelude": {
+      "origin": "fresh",
+      "object": {
+        "bytes": 38640,
+        "mode": 420,
+        "sha256": "6a6da6836f2763a9b9b5e58b8d94933becee02987ca1013fc316957a72e85652"
+      },
+      "interface": {
+        "bytes": 11819,
+        "mode": 420,
+        "sha256": "d15354e20217d24d66b4887444df4cd99a876a54bcdba44522388093c0ce04a5"
+      }
+    },
+    "MLF.Host.Async": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 85128,
+        "mode": 420,
+        "sha256": "825988660abd5d244dbacd7997eef81416e2c32d8bafa649e337915fc2dd427f"
+      },
+      "interface": {
+        "bytes": 25315,
+        "mode": 420,
+        "sha256": "037bf998b0e8661fca11c0973e82e8f79deef7db25cc7fa784e93f9149c8d766"
+      }
+    },
+    "MLF.Host.Base": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 146640,
+        "mode": 420,
+        "sha256": "39e77df42f4449793e9fbe1d0f5a1ffce00210641fea5e63af0a79d9642e3823"
+      },
+      "interface": {
+        "bytes": 50285,
+        "mode": 420,
+        "sha256": "407484768179ee76c2fffffc979466a19d8f0987e2427510787a211ab0232b12"
+      }
+    },
+    "MLF.Host.IO": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 143064,
+        "mode": 420,
+        "sha256": "6cbe16b746a4a80422fdbf2659d5eb635ab6b3c6b62c88d869a56dafea8983ff"
+      },
+      "interface": {
+        "bytes": 52977,
+        "mode": 420,
+        "sha256": "74030506bae2d8a2c74f429378345b75ae8a8d178c55ddf1efc3ad28ee593ac7"
+      }
+    },
+    "MLF.Primitive": {
+      "origin": "authenticated-parent-generation",
+      "object": {
+        "bytes": 51016,
+        "mode": 420,
+        "sha256": "252bb1ba2dafc991ee792ca7efcf2d4cd6f414879d88387c1a4a876bd2bb1312"
+      },
+      "interface": {
+        "bytes": 29639,
+        "mode": 420,
+        "sha256": "4ed0c315f6982cd18e494fb9f0b41d5fd567b0e756b0893b095b3230094aa52e"
+      }
+    },
+    "Main": {
+      "origin": "fresh",
+      "object": {
+        "bytes": 6744,
+        "mode": 420,
+        "sha256": "c77d0475f8be9f5b95ea45a2fdaccd558ed434a59b7401a9350c069865504d3d"
+      },
+      "interface": {
+        "bytes": 3899,
+        "mode": 420,
+        "sha256": "50516574ff7da003e84c5f52daf5ec7274d77b3c26f3b102e479b282358f3dad"
+      }
+    }
+  },
+  "c_objects": {
+    "host.o": {
+      "bytes": 32024,
+      "mode": 420,
+      "sha256": "cb34b5da749d1b68b3ee0be9906189ca6eee5319a0f1b15919a60dfa6bbcab19"
+    },
+    "supervisor.o": {
+      "bytes": 26496,
+      "mode": 420,
+      "sha256": "f5585ba93a0b0ef062b93a9ce40e87cc74f89b56198872c641978048b1244b55"
+    }
+  },
+  "commands": [
+    {
+      "label": "compile-Bootstrap-QueryGraph",
+      "argv": [
+        "GHC_EXECUTABLE",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-rtsopts=ignoreAll",
+        "-v",
+        "-fforce-recomp",
+        "-Werror=incomplete-patterns",
+        "-Werror=incomplete-uni-patterns",
+        "-i",
+        "-iGENERATION/objects",
+        "-iPARENT_GENERATION/objects",
+        "-tmpdir",
+        "GENERATION/tmp",
+        "-c",
+        "SOURCE/libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+        "-o",
+        "GENERATION/objects/Bootstrap/QueryGraph.o",
+        "-ohi",
+        "GENERATION/objects/Bootstrap/QueryGraph.hi"
+      ],
+      "cwd": "SOURCE",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "wall_seconds": 2.112213981,
+      "max_individual_child_rss_bytes": 252833792,
+      "sampled_process_tree_peak_rss_bytes": 252432384,
+      "record": {
+        "bytes": 4357,
+        "mode": 420,
+        "sha256": "d7dd6b72c356682fbe7223776ae0a6f4d60b7ece5c479786fa92ff63f5ba620a"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 420,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 13823,
+        "mode": 420,
+        "sha256": "3325a833761a78144a327280ace2c427e3f78c0713fe1ef48f33c20f7ec34026"
+      }
+    },
+    {
+      "label": "compile-Bootstrap-CrateArtifact",
+      "argv": [
+        "GHC_EXECUTABLE",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-rtsopts=ignoreAll",
+        "-v",
+        "-fforce-recomp",
+        "-Werror=incomplete-patterns",
+        "-Werror=incomplete-uni-patterns",
+        "-i",
+        "-iGENERATION/objects",
+        "-iPARENT_GENERATION/objects",
+        "-tmpdir",
+        "GENERATION/tmp",
+        "-c",
+        "SOURCE/libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+        "-o",
+        "GENERATION/objects/Bootstrap/CrateArtifact.o",
+        "-ohi",
+        "GENERATION/objects/Bootstrap/CrateArtifact.hi"
+      ],
+      "cwd": "SOURCE",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "wall_seconds": 13.913289957,
+      "max_individual_child_rss_bytes": 355291136,
+      "sampled_process_tree_peak_rss_bytes": 368513024,
+      "record": {
+        "bytes": 4365,
+        "mode": 420,
+        "sha256": "b91312ae0f60c7fef34a0ac9e1abe949ae66b65834e6f10afda5dcc84a812c10"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 420,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 14571,
+        "mode": 420,
+        "sha256": "1362263ec2880f81b5f7023e75464e3dbd048f58aff8703aac248bd5d5a30754"
+      }
+    },
+    {
+      "label": "compile-Bootstrap-BuiltinPreludeContext",
+      "argv": [
+        "GHC_EXECUTABLE",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-rtsopts=ignoreAll",
+        "-v",
+        "-fforce-recomp",
+        "-Werror=incomplete-patterns",
+        "-Werror=incomplete-uni-patterns",
+        "-i",
+        "-iGENERATION/objects",
+        "-iPARENT_GENERATION/objects",
+        "-tmpdir",
+        "GENERATION/tmp",
+        "-c",
+        "SOURCE/libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
+        "-o",
+        "GENERATION/objects/Bootstrap/BuiltinPreludeContext.o",
+        "-ohi",
+        "GENERATION/objects/Bootstrap/BuiltinPreludeContext.hi"
+      ],
+      "cwd": "SOURCE",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "wall_seconds": 0.722842747,
+      "max_individual_child_rss_bytes": 216154112,
+      "sampled_process_tree_peak_rss_bytes": 214810624,
+      "record": {
+        "bytes": 4401,
+        "mode": 420,
+        "sha256": "c8a4c6fc205ff0b440f4e32b4a5be095b0fde931fc5d61ffd2dc07a1882094a7"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 420,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 13591,
+        "mode": 420,
+        "sha256": "d17746f528ff10d1f1ad246d45380b1201e2304b3f75dec95fcd7d6b0d185bf0"
+      }
+    },
+    {
+      "label": "compile-Bootstrap-BuiltinPreludeLiteral",
+      "argv": [
+        "GHC_EXECUTABLE",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-rtsopts=ignoreAll",
+        "-v",
+        "-fforce-recomp",
+        "-Werror=incomplete-patterns",
+        "-Werror=incomplete-uni-patterns",
+        "-i",
+        "-iGENERATION/objects",
+        "-iPARENT_GENERATION/objects",
+        "-tmpdir",
+        "GENERATION/tmp",
+        "-c",
+        "SOURCE/libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs",
+        "-o",
+        "GENERATION/objects/Bootstrap/BuiltinPreludeLiteral.o",
+        "-ohi",
+        "GENERATION/objects/Bootstrap/BuiltinPreludeLiteral.hi"
+      ],
+      "cwd": "SOURCE",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "wall_seconds": 2.045073786,
+      "max_individual_child_rss_bytes": 254590976,
+      "sampled_process_tree_peak_rss_bytes": 254177280,
+      "record": {
+        "bytes": 4413,
+        "mode": 420,
+        "sha256": "d3be507be925247e2b855b83e8bcc52adf4d71b20fa66a67b3d3c27deb461a13"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 420,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 13769,
+        "mode": 420,
+        "sha256": "41a56796f160bdc441dafb109ba5435484998f613e0aa8e10859ad0f3c164801"
+      }
+    },
+    {
+      "label": "compile-MLF-Entry-BuiltinPrelude",
+      "argv": [
+        "GHC_EXECUTABLE",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-rtsopts=ignoreAll",
+        "-v",
+        "-fforce-recomp",
+        "-Werror=incomplete-patterns",
+        "-Werror=incomplete-uni-patterns",
+        "-i",
+        "-iGENERATION/objects",
+        "-iPARENT_GENERATION/objects",
+        "-tmpdir",
+        "GENERATION/tmp",
+        "-c",
+        "SOURCE/bootstrap/MLF/Entry/BuiltinPrelude.hs",
+        "-o",
+        "GENERATION/objects/MLF/Entry/BuiltinPrelude.o",
+        "-ohi",
+        "GENERATION/objects/MLF/Entry/BuiltinPrelude.hi"
+      ],
+      "cwd": "SOURCE",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "wall_seconds": 0.424959695,
+      "max_individual_child_rss_bytes": 216592384,
+      "sampled_process_tree_peak_rss_bytes": 204111872,
+      "record": {
+        "bytes": 4355,
+        "mode": 420,
+        "sha256": "3ebf462f16b639601687fac853544b17e57025fedfc88699b58824ca574767b9"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 420,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 12312,
+        "mode": 420,
+        "sha256": "448bafa8df9dd9ec3ba069bd158b22c1a2c47fd683239f4728489337ac3da96f"
+      }
+    },
+    {
+      "label": "compile-Main",
+      "argv": [
+        "GHC_EXECUTABLE",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-rtsopts=ignoreAll",
+        "-v",
+        "-fforce-recomp",
+        "-Werror=incomplete-patterns",
+        "-Werror=incomplete-uni-patterns",
+        "-i",
+        "-iGENERATION/objects",
+        "-iPARENT_GENERATION/objects",
+        "-tmpdir",
+        "GENERATION/tmp",
+        "-c",
+        "SOURCE/host/ghc/app/builtin-prelude/Main.hs",
+        "-o",
+        "GENERATION/objects/Main.o",
+        "-ohi",
+        "GENERATION/objects/Main.hi"
+      ],
+      "cwd": "SOURCE",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "wall_seconds": 0.264712065,
+      "max_individual_child_rss_bytes": 191803392,
+      "sampled_process_tree_peak_rss_bytes": 190341120,
+      "record": {
+        "bytes": 4284,
+        "mode": 420,
+        "sha256": "bf401eeaaba30be75bbc29d280c29c661013b6f731513cfe822b634c3a14ce82"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 420,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 10452,
+        "mode": 420,
+        "sha256": "9aa6213561165794ca42f54820826584afce50ae04875262b8cb2f94dd3b08c3"
+      }
+    },
+    {
+      "label": "link-generator",
+      "argv": [
+        "GHC_EXECUTABLE",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-O2",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-package",
+        "base",
+        "-package",
+        "array",
+        "-package",
+        "bytestring",
+        "-package",
+        "text",
+        "-package",
+        "containers",
+        "-package",
+        "directory",
+        "-rtsopts=ignoreAll",
+        "-v",
+        "-fforce-recomp",
+        "-Werror=incomplete-patterns",
+        "-Werror=incomplete-uni-patterns",
+        "-i",
+        "-iGENERATION/objects",
+        "-iPARENT_GENERATION/objects",
+        "-tmpdir",
+        "GENERATION/tmp",
+        "PARENT_GENERATION/objects/Bootstrap/ArtifactStorage.o",
+        "PARENT_GENERATION/objects/Bootstrap/ArtifactStructure.o",
+        "PARENT_GENERATION/objects/Bootstrap/Bitstream.o",
+        "GENERATION/objects/Bootstrap/BuiltinPreludeContext.o",
+        "GENERATION/objects/Bootstrap/BuiltinPreludeLiteral.o",
+        "PARENT_GENERATION/objects/Bootstrap/ClassDemand.o",
+        "PARENT_GENERATION/objects/Bootstrap/Classes.o",
+        "PARENT_GENERATION/objects/Bootstrap/CompilerCore.o",
+        "PARENT_GENERATION/objects/Bootstrap/Constraint.o",
+        "GENERATION/objects/Bootstrap/CrateArtifact.o",
+        "PARENT_GENERATION/objects/Bootstrap/Data.o",
+        "PARENT_GENERATION/objects/Bootstrap/Dependency.o",
+        "PARENT_GENERATION/objects/Bootstrap/Desugar.o",
+        "PARENT_GENERATION/objects/Bootstrap/Elaborate.o",
+        "PARENT_GENERATION/objects/Bootstrap/Evidence.o",
+        "PARENT_GENERATION/objects/Bootstrap/EvidenceBoundary.o",
+        "PARENT_GENERATION/objects/Bootstrap/Fresh.o",
+        "PARENT_GENERATION/objects/Bootstrap/Graph.o",
+        "PARENT_GENERATION/objects/Bootstrap/Graph/Solver.o",
+        "PARENT_GENERATION/objects/Bootstrap/Host.o",
+        "PARENT_GENERATION/objects/Bootstrap/InferenceUnit.o",
+        "PARENT_GENERATION/objects/Bootstrap/IntMap.o",
+        "PARENT_GENERATION/objects/Bootstrap/IntRank.o",
+        "PARENT_GENERATION/objects/Bootstrap/IntSet.o",
+        "PARENT_GENERATION/objects/Bootstrap/IntTree.o",
+        "PARENT_GENERATION/objects/Bootstrap/Kind.o",
+        "PARENT_GENERATION/objects/Bootstrap/Kinding.o",
+        "PARENT_GENERATION/objects/Bootstrap/Layout.o",
+        "PARENT_GENERATION/objects/Bootstrap/Lexer.o",
+        "PARENT_GENERATION/objects/Bootstrap/Map.o",
+        "PARENT_GENERATION/objects/Bootstrap/Module.o",
+        "PARENT_GENERATION/objects/Bootstrap/OpenFragment.o",
+        "PARENT_GENERATION/objects/Bootstrap/Parsec.o",
+        "PARENT_GENERATION/objects/Bootstrap/Parser.o",
+        "PARENT_GENERATION/objects/Bootstrap/Prelude.o",
+        "PARENT_GENERATION/objects/Bootstrap/Primitive.o",
+        "GENERATION/objects/Bootstrap/QueryGraph.o",
+        "PARENT_GENERATION/objects/Bootstrap/ST.o",
+        "PARENT_GENERATION/objects/Bootstrap/Separate.o",
+        "PARENT_GENERATION/objects/Bootstrap/Set.o",
+        "PARENT_GENERATION/objects/Bootstrap/SourceEquality.o",
+        "PARENT_GENERATION/objects/Bootstrap/SourceInference.o",
+        "PARENT_GENERATION/objects/Bootstrap/SourceUnit.o",
+        "PARENT_GENERATION/objects/Bootstrap/Std.o",
+        "PARENT_GENERATION/objects/Bootstrap/Surface.o",
+        "PARENT_GENERATION/objects/Bootstrap/Types.o",
+        "PARENT_GENERATION/objects/Bootstrap/Unicode.o",
+        "PARENT_GENERATION/objects/Bootstrap/X/Check.o",
+        "PARENT_GENERATION/objects/Bootstrap/X/Checked.o",
+        "PARENT_GENERATION/objects/Bootstrap/X/Parser.o",
+        "PARENT_GENERATION/objects/Bootstrap/X/Pretty.o",
+        "PARENT_GENERATION/objects/Bootstrap/X/Syntax.o",
+        "PARENT_GENERATION/objects/Bootstrap/X/Type.o",
+        "GENERATION/objects/MLF/Entry/BuiltinPrelude.o",
+        "PARENT_GENERATION/objects/MLF/Host/Async.o",
+        "PARENT_GENERATION/objects/MLF/Host/Base.o",
+        "PARENT_GENERATION/objects/MLF/Host/IO.o",
+        "PARENT_GENERATION/objects/MLF/Primitive.o",
+        "GENERATION/objects/Main.o",
+        "C_PRODUCER/host.o",
+        "C_PRODUCER/supervisor.o",
+        "-o",
+        "GENERATION/builtin-prelude"
+      ],
+      "cwd": "SOURCE",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "wall_seconds": 1.399896975,
+      "max_individual_child_rss_bytes": 262819840,
+      "sampled_process_tree_peak_rss_bytes": 425127936,
+      "record": {
+        "bytes": 20523,
+        "mode": 420,
+        "sha256": "14c451c033bf95dfa667466fb8ef9dbaed847c114a290849aa0b749600265b59"
+      },
+      "stdout": {
+        "bytes": 0,
+        "mode": 420,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "bytes": 25852,
+        "mode": 420,
+        "sha256": "1db09923c6d113276c2672ced48c72ed47c534dc4bf9c3f2a0d6903fd57952fc"
+      }
+    },
+    {
+      "label": "fresh-literal",
+      "argv": [
+        "GENERATION/builtin-prelude",
+        "builtin-source-v1:0516e68cb23805681ee62d0aab4cc2f4ae6395b69acc68c0a5c1d558526cba58"
+      ],
+      "cwd": "SOURCE",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "wall_seconds": 11.111542895,
+      "max_individual_child_rss_bytes": 153870336,
+      "sampled_process_tree_peak_rss_bytes": 153870336,
+      "record": {
+        "bytes": 2328,
+        "mode": 420,
+        "sha256": "fa658204cffc25b474995a886e4fd264cc810e9dc218338264bcfef1082dfcb5"
+      },
+      "stdout": {
+        "bytes": 2219103,
+        "mode": 420,
+        "sha256": "0e04f145d180c5b3b54f29bc4cb288ab59249be62ac58f346647df8c848f9679"
+      },
+      "stderr": {
+        "bytes": 0,
+        "mode": 420,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "guards": {
+    "phase": {
+      "cleanup_kernel_wait_no_children": true,
+      "complete": true,
+      "elapsed_seconds": 300.6697554589482,
+      "exit_code": 0,
+      "peak_group_rss": 471224320,
+      "reason": null,
+      "receipt": {
+        "bytes": 243066,
+        "mode": 384,
+        "sha256": "046212007a5e622c661d7e2318912aa793cfa460eb56689622e9ba9364ee1807"
+      }
+    },
+    "root": {
+      "cleanup_kernel_wait_no_children": true,
+      "complete": true,
+      "elapsed_seconds": 304.0616908329539,
+      "exit_code": 0,
+      "peak_group_rss": 479055872,
+      "reason": null,
+      "receipt": {
+        "bytes": 39168,
+        "mode": 384,
+        "sha256": "4939caf8a02a9107e5dc37211240edf0ac9ae3c01dfd3de2164202da2cc4702e"
+      }
+    },
+    "stage": {
+      "cleanup_kernel_wait_no_children": true,
+      "complete": true,
+      "elapsed_seconds": 300.27339487400604,
+      "exit_code": 0,
+      "peak_group_rss": 459636736,
+      "reason": null,
+      "receipt": {
+        "bytes": 295609,
+        "mode": 384,
+        "sha256": "85d5aeb077ee5fe5a015e5ab623721d3770ef3bf71e94fb326a82e7e9349b248"
+      }
+    },
+    "whole": {
+      "cleanup_kernel_wait_no_children": true,
+      "complete": true,
+      "elapsed_seconds": 309.2138312580064,
+      "exit_code": 0,
+      "peak_group_rss": 501653504,
+      "reason": null,
+      "receipt": {
+        "bytes": 32458,
+        "mode": 384,
+        "sha256": "709ca0bdb4ccebbc131fbc1a936b3c622bafd2047150dfb513407ddaef0a80dd"
+      }
+    }
+  },
+  "toolchain": {
+    "ghc_version": "9.14.1",
+    "ghc_sha256": "6b0b015104f88cb39030a2e2613dcda21ad449260183ff50d6ebec8a49efe711",
+    "input_inventory_sha256": "b6aa43d2399f722b788e24660078a450a2c3c97958bf2824cb34097e3c0bc52e",
+    "flags": [
+      "-XHaskell2010",
+      "-package-env",
+      "-",
+      "-clear-package-db",
+      "-global-package-db",
+      "-no-user-package-db",
+      "-hide-all-packages",
+      "-O2",
+      "-fpedantic-bottoms",
+      "-fno-state-hack",
+      "-package",
+      "base",
+      "-package",
+      "array",
+      "-package",
+      "bytestring",
+      "-package",
+      "text",
+      "-package",
+      "containers",
+      "-package",
+      "directory",
+      "-rtsopts=ignoreAll",
+      "-v",
+      "-fforce-recomp",
+      "-Werror=incomplete-patterns",
+      "-Werror=incomplete-uni-patterns",
+      "-i",
+      "-iGENERATION/objects",
+      "-iPARENT_GENERATION/objects",
+      "-tmpdir",
+      "GENERATION/tmp"
+    ]
+  },
+  "qualification": {
+    "runtime_equivalence": false,
+    "full_compiler_build": false,
+    "native_runtime": false,
+    "full_ci": false
+  },
+  "scope": "Actual generation is separate from source projection. This summary binds generation-time inputs; later metadata routing is not part of that generation snapshot. Frozen root-edge failed-wrapper and independent-recovery proof are unchanged."
+}

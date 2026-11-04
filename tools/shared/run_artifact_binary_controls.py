@@ -14,6 +14,7 @@ import re
 import stat
 import subprocess
 import sys
+import unittest
 
 HERE=Path(__file__).resolve().parent
 
@@ -52,6 +53,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fixture',required=True,type=Path)
     parser.add_argument('--shared-ghc-fixture',required=True,type=Path)
+    parser.add_argument('--query-fixture',required=True,type=Path)
     parser.add_argument('--shared-native-fixture',required=True,type=Path)
     parser.add_argument('--output',required=True,type=Path)
     parser.add_argument('--partial-write-sink',required=True,
@@ -62,7 +64,7 @@ def main():
     sink_identity=failure_sink(args.partial_write_sink)
     sink=Path(args.partial_write_sink)
     sys.dont_write_bytecode=True
-    fixtures={k:regular(v) for k,v in [('ghc',args.fixture),('shared-ghc',args.shared_ghc_fixture),('shared-native',args.shared_native_fixture)]}
+    fixtures={k:regular(v) for k,v in [('ghc',args.fixture),('shared-ghc',args.shared_ghc_fixture),('shared-native',args.shared_native_fixture),('query-index-ghc',args.query_fixture)]}
     build_receipt=regular(args.build_receipt)
     output=args.output.absolute()
     require(not output.exists() and output.parent.resolve(strict=True)==output.parent,'fresh real output parent')
@@ -71,7 +73,7 @@ def main():
     inputs=[regular(Path(__file__)),build_receipt,*fixtures.values(),
             *[regular(HERE/(name+suffix)) for name,suffix in [
               ('artifact_binary_reference','.py'),('artifact_binary_cases','.py'),('artifact_binary_typed','.py'),('artifact_binary_integration','.py'),('artifact_binary_open','.py'),
-              ('artifact_structure_contract','.json'),('artifact_binary_golden','.json')]]]
+              ('artifact_structure_contract','.json'),('artifact_binary_golden','.json'),('test_query_index','.py')]]]
     fingerprints={str(p):sha(p) for p in inputs}
     output.mkdir()
     record={'format':1,'complete':False,'state':'running','inputs':fingerprints,'commands':[],
@@ -98,6 +100,33 @@ def main():
         row['state']='passed';save();return stdout.read_bytes()
     try:
         ref=load('artifact_binary_reference');cases=load('artifact_binary_cases');typed=load('artifact_binary_typed')
+        query=load('test_query_index')
+        expected_query_tests=('test_actual_row_64_mi_boundary_tiny_wire', 'test_actual_total_256_mi_boundary_tiny_wire', 'test_alternating_long_prefix_attack', 'test_canonicality_and_closure', 'test_depth_both_key_orders', 'test_exact_fields_and_wire_hash', 'test_legacy_and_empty', 'test_small_exact_budgets', 'test_types_ranges_and_hashes')
+        suite=unittest.defaultTestLoader.loadTestsFromTestCase(query.QueryIndexTests)
+        require(tuple(test.id().rsplit('.',1)[-1] for test in suite)==expected_query_tests,
+                'exact named query index oracle inventory')
+        class QueryResult(unittest.TestResult):
+            def __init__(self):
+                super().__init__();self.passed=[]
+            def addSuccess(self,test):
+                super().addSuccess(test);self.passed.append(test.id().rsplit('.',1)[-1])
+        query_result=QueryResult();suite.run(query_result)
+        require(query_result.wasSuccessful() and query_result.testsRun==9
+                and tuple(query_result.passed)==expected_query_tests,
+                'independent query index oracle: '+repr(query_result.errors+query_result.failures))
+        record['query_index_reference_tests']=query_result.testsRun
+        record['query_index_reference_results']=[{'name':name,'state':'passed'}
+                                                for name in query_result.passed]
+        query_expected=(
+            'PASS legacy and v2 exact roundtrip, order, repeated reads, independent location\n'
+            'PASS typed IDs, dictionary/row canonicality, closure, hashes, legacy rejection\n'
+            'PASS actual 4096/4097 depth boundary independent of key order\n'
+            'PASS referenced and codec budgets, exact 64/256 Mi boundaries, long-prefix attack\n').encode()
+        require(run('query-index-pure',[fixtures['query-index-ghc'],'pure'])==query_expected,
+                'complete production query index controls')
+        require(run('query-index-publication',[fixtures['query-index-ghc'],'publication',output/'query-publication'])
+                ==b'PASS cold/warm publication, all failpoints, retained payload SHA, generation SHA\n',
+                'production query index publication controls')
         vectors=json.loads((HERE/'artifact_binary_golden.json').read_text())['vectors']
         corpus=list(cases.corpus())
         for vector in vectors:

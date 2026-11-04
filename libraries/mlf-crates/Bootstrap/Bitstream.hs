@@ -6,6 +6,7 @@ module Bootstrap.Bitstream (
   Value(..), Limits(..), Entry(..), Symbol(..), SymbolState(..), NodeState(..),
   PlanState(..), Tables(..), EncodeTask(..), Layout(..), Cursor(..), Read(..),
   Header(..), Parsed(..), CanonicalTask(..),
+  planRootBounded, encodeRootBounded, decodeGraphRootBounded,
   defaultLimits, maxBytes, maxSymbols, maxSymbolBytes, maxTotalSymbolBytes,
   maxNodes, maxEdges, maxDepth, maxExpandedWork, validLimits, magic,
   hasMagicPrefix, hasMagic, matchMagic, entryKind, compareIds, compareEntry,
@@ -65,6 +66,13 @@ module Bootstrap.Bitstream (
     nodes >= 0 && nodes <= 2147483647 &&
     edges >= 0 && edges <= 2147483647 &&
     depth >= 1 && depth <= 65536 && work >= 0 && work <= 2147483647;
+  -- Aggregate root work is an explicit caller policy. Keep it in the
+  -- same narrow nonnegative range as the existing codec work limit.
+  validRootBudget :: Int -> Bool;
+  validRootBudget work = work >= 0 && work <= 2147483647;
+  withExpandedWork :: Limits -> Int -> Limits;
+  withExpandedWork (Limits bytes symbols single total nodes edges depth _) work =
+    Limits bytes symbols single total nodes edges depth work;
   magic :: String;
   magic = "MLFBIN\r\n";
   hasMagicPrefix :: String -> Bool;
@@ -218,6 +226,46 @@ module Bootstrap.Bitstream (
           symbolCount nodeCount rootCount edges)
     }
   };
+  -- Each root keeps the original subtree-work limit. Symbol/node
+  -- interning and all physical counts remain global across the whole plan.
+  -- The second result is exact expanded work, including every repeated root,
+  -- child and text occurrence. This does not materialize an auxiliary Graph.
+  planRootBounded :: Limits -> Int -> [] Value -> Either String ((,) Tables Int);
+  planRootBounded limits aggregate roots = do {
+    ensure (validLimits limits) "invalid binary codec limits";
+    ensure (validRootBudget aggregate) "invalid binary root-work budget";
+    rootCount <- boundedLength (min (maxEdges limits) aggregate) roots;
+    planned <- planRootsBounded limits aggregate roots []
+      (PlanState (Symbols M.empty [] 0 0) (Nodes M.empty [] 0 0) 0);
+    case planned of {
+      (,,) stack
+        (PlanState (Symbols _ symbols symbolCount _) (Nodes _ entries nodeCount edges) _)
+        remaining ->
+          let { used = aggregate - remaining } in
+          seq used (Right ((,)
+            (Tables (reverse symbols) (reverse entries) (reverse stack)
+              symbolCount nodeCount rootCount edges)
+            used))
+    }
+  };
+  planRootsBounded :: Limits -> Int -> [] Value -> [] Int -> PlanState ->
+    Either String ((,,) ([] Int) PlanState Int);
+  planRootsBounded limits remaining roots stack (PlanState symbols nodes _) =
+    case roots of {
+      [] -> Right ((,,) stack (PlanState symbols nodes 0) remaining);
+      (:) root rest -> do {
+        let { rootLimits =
+          withExpandedWork limits (min (maxExpandedWork limits) remaining) };
+        planned <- planTasks rootLimits ((:) (EncodeOne 1 root) []) stack
+          (PlanState symbols nodes 0);
+        case planned of {
+          (,) nextStack (PlanState nextSymbols nextNodes used) ->
+            let { nextRemaining = remaining - used } in
+            seq nextRemaining (planRootsBounded limits nextRemaining rest nextStack
+              (PlanState nextSymbols nextNodes 0))
+        }
+      }
+    };
   -- Explicit tasks keep valid deep ASTs off the language call stack. Work
   -- is charged on every input occurrence, including repeated subgraphs.
   planTasks :: Limits -> [] EncodeTask -> [] Int -> PlanState -> Either String ((,) ([] Int) PlanState);
@@ -478,6 +526,20 @@ module Bootstrap.Bitstream (
   encode :: Limits -> Int -> [] Value -> IO (Either String ByteArray);
   encode limits schema roots = catchIOError (encodeChecked limits schema roots)
     (\error -> ioReturn (Left ("binary encode IO failure: " ++ textFromChars (ioeGetErrorString error))));
+  encodeRootBounded :: Limits -> Int -> Int -> [] Value -> IO (Either String ByteArray);
+  encodeRootBounded limits aggregate schema roots = catchIOError
+    (encodeRootBoundedChecked limits aggregate schema roots)
+    (\error -> ioReturn (Left ("binary encode IO failure: " ++ textFromChars (ioeGetErrorString error))));
+  encodeRootBoundedChecked :: Limits -> Int -> Int -> [] Value -> IO (Either String ByteArray);
+  encodeRootBoundedChecked limits aggregate schema roots =
+    if schema < 0 || schema > 2147483647 then ioReturn (Left "binary schema ID out of range")
+    else case planRootBounded limits aggregate roots of {
+      Left message -> ioReturn (Left message);
+      Right ((,) tables _) -> case layout limits tables of {
+        Left message -> ioReturn (Left message);
+        Right geometry -> encodeTables schema geometry tables
+      }
+    };
   encodeChecked :: Limits -> Int -> [] Value -> IO (Either String ByteArray);
   encodeChecked limits schema roots =
     if schema < 0 || schema > 2147483647 then ioReturn (Left "binary schema ID out of range")
@@ -1133,6 +1195,13 @@ module Bootstrap.Bitstream (
   };
   decodeGraph :: Limits -> Int -> ByteArray -> IO (Either String Graph);
   decodeGraph = decodeGraphWithText [];
+  -- Node summaries still use the original per-root limit. Only the
+  -- root-section sum uses aggregate, before any Graph reaches an adapter.
+  decodeGraphRootBounded :: Limits -> Int -> Int -> ByteArray -> IO (Either String Graph);
+  decodeGraphRootBounded limits aggregate schema bytes = catchIOError
+    (decodeGraphAfterHeaderRootBounded [] limits aggregate schema
+      (\_ _ -> ioReturn (Right ())) bytes)
+    (\error -> ioReturn (Left ("binary decode IO failure: " ++ textFromChars (ioeGetErrorString error))));
   decodeGraphWithText :: [] String -> Limits -> Int -> ByteArray -> IO (Either String Graph);
   decodeGraphWithText hints limits schema bytes = catchIOError (decodeGraphChecked hints limits schema bytes)
     (\error -> ioReturn (Left ("binary decode IO failure: " ++ textFromChars (ioeGetErrorString error))));
@@ -1204,12 +1273,12 @@ module Bootstrap.Bitstream (
           }
       }
     };
-  checkedGraphTables :: [] String -> Limits -> ByteArray -> Int -> Layout -> Int -> IO (Either String Graph);
-  checkedGraphTables hints limits bytes size geometry expectedCRC =
+  checkedGraphTables :: [] String -> Limits -> Int -> ByteArray -> Int -> Layout -> Int -> IO (Either String Graph);
+  checkedGraphTables hints limits aggregate bytes size geometry expectedCRC =
     let { original = \ignored -> do {
       actual <- checksum bytes size;
       if actual /= expectedCRC then ioReturn (Left "binary checksum mismatch")
-      else decodeGraphTables hints limits bytes geometry
+      else decodeGraphTables hints limits aggregate bytes geometry
     } } in case geometry of {
       Layout _ count length _ nodeOffset _ _ _ _ _ _ _ ->
         if not (null hints) || size < 1024 || count == 0 || count > 1024 || length > 65536
@@ -1223,7 +1292,7 @@ module Bootstrap.Bitstream (
             Just ((,) symbols partial) -> do {
               actual <- checksumBytes table bytes size nodeOffset partial;
               if actual /= expectedCRC then ioReturn (Left "binary checksum mismatch")
-              else decodeNodesAndRoots limits bytes geometry symbols
+              else decodeNodesAndRoots limits aggregate bytes geometry symbols
             }
           }
         }
@@ -1247,7 +1316,12 @@ module Bootstrap.Bitstream (
       if size == n then sameAscii bytes 81 expected n 0 else ioReturn False
     };
   decodeGraphAfterHeader hints limits schema gate bytes =
+    decodeGraphAfterHeaderRootBounded hints limits (maxExpandedWork limits) schema gate bytes;
+  decodeGraphAfterHeaderRootBounded :: [] String -> Limits -> Int -> Int ->
+    (ByteArray -> Layout -> IO (Either String ())) -> ByteArray -> IO (Either String Graph);
+  decodeGraphAfterHeaderRootBounded hints limits aggregate schema gate bytes =
     if not (validLimits limits) then ioReturn (Left "invalid binary codec limits")
+    else if not (validRootBudget aggregate) then ioReturn (Left "invalid binary root-work budget")
     else if schema < 0 || schema > 2147483647 then ioReturn (Left "binary schema ID out of range")
     else do {
       size <- lengthByteArray bytes;
@@ -1262,7 +1336,7 @@ module Bootstrap.Bitstream (
               allowed <- gate bytes geometry;
               case allowed of {
                 Left message -> ioReturn (Left message);
-                Right () -> checkedGraphTables hints limits bytes size geometry expectedCRC
+                Right () -> checkedGraphTables hints limits aggregate bytes size geometry expectedCRC
               }
             }
           }
@@ -1271,29 +1345,29 @@ module Bootstrap.Bitstream (
     };
   decodeTables :: Limits -> ByteArray -> Layout -> IO (Either String ([] Value));
   decodeTables limits bytes geometry = do {
-    graph <- decodeGraphTables [] limits bytes geometry;
+    graph <- decodeGraphTables [] limits (maxExpandedWork limits) bytes geometry;
     ioReturn (bindEither graph (\value -> case value of {
       Graph nodes roots -> collectRoots nodes roots []
     }))
   };
-  decodeGraphTables :: [] String -> Limits -> ByteArray -> Layout -> IO (Either String Graph);
-  decodeGraphTables hints limits bytes geometry = case geometry of {
+  decodeGraphTables :: [] String -> Limits -> Int -> ByteArray -> Layout -> IO (Either String Graph);
+  decodeGraphTables hints limits aggregate bytes geometry = case geometry of {
     Layout _ symbolCount symbolLength _ _ _ _ _ _ _ _ _ -> do {
       symbolResult <- runSection bytes 80 symbolLength (getSymbolsWith (filter (\t -> stringLength t >= 256) (take 9 hints)) limits symbolCount 0 0 M.empty IM.empty);
       case symbolResult of {
         Left message -> ioReturn (Left message);
-        Right symbols -> decodeNodesAndRoots limits bytes geometry symbols
+        Right symbols -> decodeNodesAndRoots limits aggregate bytes geometry symbols
       }
     }
   };
-  decodeNodesAndRoots :: Limits -> ByteArray -> Layout -> IntMap Symbol -> IO (Either String Graph);
-  decodeNodesAndRoots limits bytes geometry symbols = case geometry of {
+  decodeNodesAndRoots :: Limits -> Int -> ByteArray -> Layout -> IntMap Symbol -> IO (Either String Graph);
+  decodeNodesAndRoots limits aggregate bytes geometry symbols = case geometry of {
     Layout _ _ _ nodeCount nodeOffset nodeLength _ rootCount rootOffset rootLength nodeWidth _ -> do {
       nodeResult <- runSection bytes nodeOffset nodeLength (getNodes limits geometry symbols);
       case nodeResult of {
         Left message -> ioReturn (Left message);
         Right nodes -> do {
-          rootResult <- runSection bytes rootOffset rootLength (getRoots limits nodes nodeWidth rootCount);
+          rootResult <- runSection bytes rootOffset rootLength (getRoots (withExpandedWork limits aggregate) nodes nodeWidth rootCount);
           case rootResult of {
             Left message -> ioReturn (Left message);
             Right roots -> ioReturn (do {

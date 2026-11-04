@@ -835,6 +835,8 @@ wireCorpus manifest = do
         ("reject",T.Left _) -> pure ()
         _ -> error ("wire outcome disagrees with fixed oracle: " ++ name)
       graphResult <- W.decodeGraph (W.Limits (read b) (read s) (read one) (read total) (read n) (read e) (read d) (read w)) (read schema) bytes
+      rbGraphResult <- W.decodeGraphRootBounded (W.Limits (read b) (read s) (read one) (read total) (read n) (read e) (read d) (read w)) (read w) (read schema) bytes
+      rbCompareGraph name graphResult rbGraphResult
       case (expected,graphResult,result) of
         ("accept",T.Right graph,T.Right values) -> do
           need (name ++ " graph root inventory") (length (W.graphRoots graph) == length values)
@@ -933,6 +935,7 @@ main = do
       wireCheck (directory ++ "/constructors.bin") roots
       readBounded (directory ++ "/constructors.bin") >>= graphConstructorTests
       semanticEdges directory
+      rbSelfTests
       putStrLn ("PASS constructors " ++ show (length roots))
     ["source-admission",directory] -> sourceAdmissionTests directory
     ["admission"] -> admissionTests
@@ -954,6 +957,7 @@ main = do
     ["formal-error",prefix,message] -> formalError prefix message
     ["formal-bundle",directory,digest] -> formalBundle directory digest
     ["typed-bounds",directory] -> typedBounds directory
+    ["root-bounds"] -> rbSelfTests >> putStrLn "PASS root-bounds"
     ["wire-corpus",manifest] -> wireCorpus manifest
     ["raw-io",directory] -> rawIO directory
     ["partial-write",sink] -> partialWrite sink
@@ -1494,3 +1498,448 @@ releaseForgedCurrent directory = do
   putStrLn "PASS release-forged-current-fully-typed"
   Release.verifyPrelude forged
   error "accepted noncanonical current builtin"
+
+-- Bounded-root codec regression helpers. Keep this block dependency-free:
+-- it uses only ArtifactBinary.hs's existing W/A/T/P/B aliases and imports.
+-- rbSelfTests is silent so the constructors command's stdout stays unchanged.
+rbNeed :: String -> Bool -> IO ()
+rbNeed name ok = unless ok (error name)
+rbExpect :: String -> T.Either P.String a -> IO a
+rbExpect name result = case result of
+  T.Left message -> error (name ++ ": " ++ B.unpack message)
+  T.Right value -> pure value
+rbContains :: String -> String -> Bool
+rbContains wanted actual = take (length wanted) actual == wanted ||
+  case actual of [] -> False; _:rest -> rbContains wanted rest
+rbReject :: String -> T.Either P.String a -> IO ()
+rbReject name result = case result of
+  T.Left _ -> pure ()
+  T.Right _ -> error (name ++ ": unexpectedly accepted")
+rbRejectWith :: String -> String -> T.Either P.String a -> IO ()
+rbRejectWith name wanted result = case result of
+  T.Left message -> rbNeed (name ++ ": " ++ B.unpack message) (rbContains wanted (B.unpack message))
+  T.Right _ -> error (name ++ ": unexpectedly accepted")
+rbLeft :: String -> T.Either P.String a -> IO P.String
+rbLeft name result = case result of
+  T.Left message -> pure message
+  T.Right _ -> error (name ++ ": unexpectedly accepted")
+
+rbLimits :: P.Int -> W.Limits
+rbLimits work = W.Limits 200000 4096 100000 150000 4096 16384 64 work
+rbWork, rbNodes, rbEdges, rbSymbols, rbSingle, rbTotal, rbDepth
+  :: P.Int -> W.Limits -> W.Limits
+rbWork x (W.Limits a b c d e f g _) = W.Limits a b c d e f g x
+rbNodes x (W.Limits a b c d _ f g h) = W.Limits a b c d x f g h
+rbEdges x (W.Limits a b c d e _ g h) = W.Limits a b c d e x g h
+rbSymbols x (W.Limits a _ c d e f g h) = W.Limits a x c d e f g h
+rbSingle x (W.Limits a b _ d e f g h) = W.Limits a b x d e f g h
+rbTotal x (W.Limits a b c _ e f g h) = W.Limits a b (min c x) x e f g h
+rbDepth x (W.Limits a b c d e f _ h) = W.Limits a b c d e f x h
+
+rbBytes :: P.ByteArray -> IO [P.Int]
+rbBytes bytes = P.lengthByteArray bytes >>= \n -> mapM (P.readByteArray bytes) [0..n-1]
+rbFromBytes :: [P.Int] -> IO P.ByteArray
+rbFromBytes values = do
+  bytes <- P.newByteArray (fromIntegral (length values)) 0
+  forM_ (zip [0..] values) $ \(i,v) -> P.writeByteArray bytes i v
+  pure bytes
+rbCRC :: P.ByteArray -> IO ()
+rbCRC bytes = do
+  n <- P.lengthByteArray bytes
+  crc <- W.checksum bytes n
+  _ <- W.putBits bytes 608 32 crc
+  pure ()
+-- Clear existing bits before replacement; ordinary putBits ORs partial bytes.
+rbOverwrite :: P.ByteArray -> P.Int -> P.Int -> P.Int -> IO ()
+rbOverwrite bytes position width value =
+  forM_ [0..width-1] $ \i -> do
+    let bit = position+i
+        index = div bit 8
+        mask = P.shiftLInt 1 (mod bit 8)
+    old <- P.readByteArray bytes index
+    let cleared = P.andInt old (P.xorInt 255 mask)
+        next = if P.andInt (P.unsignedShiftRInt value i) 1 == 0
+               then cleared else P.orInt cleared mask
+    P.writeByteArray bytes index next
+rbChanged :: P.ByteArray -> (P.ByteArray -> IO ()) -> Bool -> IO P.ByteArray
+rbChanged original edit refresh = do
+  bytes <- rbBytes original >>= rbFromBytes
+  edit bytes
+  if refresh then rbCRC bytes else pure ()
+  pure bytes
+
+rbTextBytes :: P.String -> P.Int
+rbTextBytes = sum . map width . B.unpack
+  where
+    width c | P.charCode c < 128 = 1
+            | P.charCode c < 2048 = 2
+            | P.charCode c < 65536 = 3
+            | otherwise = 4
+rbExpanded :: W.Value -> (P.Int,P.Int)
+rbExpanded value = case value of
+  W.VInt _ -> (1,0)
+  W.VBits _ -> (1,0)
+  W.VText text -> (1,rbTextBytes text)
+  W.VNode _ children -> let pairs = map rbExpanded children
+    in (1 + sum (map fst pairs),sum (map snd pairs))
+rbTotals :: [W.Value] -> (P.Int,P.Int)
+rbTotals roots = let pairs = map rbExpanded roots
+  in (sum (map fst pairs),sum (map snd pairs))
+rbSame :: W.Value -> W.Value -> Bool
+rbSame (W.VInt a) (W.VInt b) = a == b
+rbSame (W.VBits a) (W.VBits b) = a == b
+rbSame (W.VText a) (W.VText b) = a == b
+rbSame (W.VNode a xs) (W.VNode b ys) =
+  a == b && length xs == length ys && and (zipWith rbSame xs ys)
+rbSame _ _ = False
+rbValues :: [W.Value] -> [W.Value] -> Bool
+rbValues xs ys = length xs == length ys && and (zipWith rbSame xs ys)
+rbGraphValue :: W.Graph -> P.Int -> W.Value -> IO ()
+rbGraphValue graph index value = do
+  node <- rbExpect "graph lookup" (W.lookupGraphNode graph index)
+  case (node,value) of
+    (W.GInt a,W.VInt b) -> rbNeed "graph integer" (a == b)
+    (W.GBits a,W.VBits b) -> rbNeed "graph bits" (a == b)
+    (W.GText a,W.VText b) -> rbNeed "graph text" (a == b)
+    (W.GNode a xs,W.VNode b ys) -> do
+      rbNeed "graph constructor/arity" (a == b && length xs == length ys)
+      zipWithM_ (rbGraphValue graph) xs ys
+    _ -> error "graph/value kind mismatch"
+
+rbRoundtrip :: String -> W.Limits -> P.Int -> [W.Value] -> IO (P.ByteArray,W.Graph)
+rbRoundtrip name lim aggregate roots = do
+  (tables,used) <- rbExpect (name ++ " plan") (W.planRootBounded lim aggregate roots)
+  geometry <- rbExpect (name ++ " layout") (W.layout lim tables)
+  let (expandedNodes,expandedText) = rbTotals roots
+  rbNeed (name ++ " exact work") (used == expandedNodes+expandedText)
+  bytes <- W.encodeRootBounded lim aggregate 7 roots >>= rbExpect (name ++ " encode")
+  planned <- W.encodeTables 7 geometry tables >>= rbExpect (name ++ " exact-plan encoding")
+  xs <- rbBytes bytes
+  ys <- rbBytes planned
+  rbNeed (name ++ " same-plan bytes") (xs == ys)
+  graph <- W.decodeGraphRootBounded lim aggregate 7 bytes >>= rbExpect (name ++ " decode")
+  rbNeed (name ++ " root count") (length (W.graphRoots graph) == length roots)
+  zipWithM_ (rbGraphValue graph) (W.graphRoots graph) roots
+  stats <- rbExpect (name ++ " stats") (W.graphResourceStats graph)
+  size <- P.lengthByteArray bytes
+  rbNeed (name ++ " resource expansion")
+    (W.resourceExpandedNodes stats == expandedNodes &&
+     W.resourceExpandedTextBytes stats == expandedText &&
+     W.resourceExpandedWork stats == used && W.resourceBytes stats == size)
+  case tables of
+    W.Tables symbols entries ids sy no ro ed -> do
+      rbNeed (name ++ " physical counts")
+        (W.resourceSymbols stats == sy && W.resourceNodes stats == no &&
+         W.resourceEdges stats == ed && ro == fromIntegral (length roots) &&
+         no == fromIntegral (length entries) && sy == fromIntegral (length symbols) &&
+         ids == W.graphRoots graph)
+      rbNeed (name ++ " physical text")
+        (W.resourceSymbolBytes stats == sum [n | W.Symbol _ n <- symbols])
+  pure (bytes,graph)
+
+rbScaled :: IO ()
+rbScaled = do
+  let bomb 0 = W.VInt 0
+      bomb n = let c = bomb (n-1) in W.VNode 9 [c,c]
+  forM_ [0..8 :: Int] $ \depth -> do
+    let root = bomb depth
+        work = 2 ^ (depth+1) - 1 :: P.Int
+        lim = rbLimits work
+        roots = replicate 3 root
+    (bytes,_) <- rbRoundtrip ("scaled DAG " ++ show depth) lim (3*work) roots
+    rbReject "aggregate-minus-one" (W.planRootBounded lim (3*work-1) roots)
+    W.decodeGraphRootBounded lim (3*work-1) 7 bytes >>= rbReject "reader aggregate"
+    rbReject "subtree-minus-one" (W.planRootBounded (rbWork (work-1) lim) (3*work) roots)
+    W.decodeGraphRootBounded (rbWork (work-1) lim) (3*work) 7 bytes >>= rbReject "reader subtree"
+    rbReject "ordinary plan policy" (W.plan lim roots)
+    W.decodeGraph lim 7 bytes >>= rbReject "ordinary graph policy"
+    W.decode lim 7 bytes >>= rbReject "ordinary Value policy"
+  let text = B.literal "\NULéα😀"
+      root = W.VNode 7 [W.VText text,W.VText text]
+  (tables,used) <- rbExpect "unicode plan" (W.planRootBounded (rbLimits 21) 63 (replicate 3 root))
+  rbNeed "unicode exact work" (used == 63)
+  case tables of
+    W.Tables _ _ ids sy no ro ed ->
+      rbNeed "unicode sharing" (sy == 1 && no == 2 && ro == 3 && ed == 2 && ids == [1,1,1])
+  _ <- rbRoundtrip "repeated unicode" (rbLimits 21) 63 (replicate 3 root)
+  let chain 0 = W.VInt 0
+      chain n = W.VNode 1 [chain (n-1)]
+  (deep,_) <- rbRoundtrip "depth exact" (rbDepth 4 (rbLimits 4)) 8 [chain (3::Int),chain 3]
+  W.decodeGraphRootBounded (rbDepth 3 (rbLimits 4)) 8 7 deep >>= rbRejectWith "reader depth" "depth"
+  rbRejectWith "writer depth" "depth" (W.planRootBounded (rbDepth 3 (rbLimits 4)) 8 [chain (3::Int)])
+
+rbPhysical :: IO ()
+rbPhysical = do
+  let ample = rbLimits 100
+      cap name tight aggregate roots = do
+        rbNeed (name ++ " valid test limits") (W.validLimits tight)
+        rbReject (name ++ " plan") (W.planRootBounded tight aggregate roots)
+        W.encodeRootBounded tight aggregate 7 roots >>= rbReject (name ++ " encode")
+        (wire,_) <- rbRoundtrip (name ++ " ample") ample aggregate roots
+        W.decodeGraphRootBounded tight aggregate 7 wire >>= rbReject (name ++ " decode")
+  cap "global nodes" (rbNodes 1 ample) 2 [W.VInt 1,W.VInt 2]
+  cap "global symbols" (rbSymbols 1 ample) 4 [W.VText "a",W.VText "b"]
+  cap "global symbol bytes" (rbTotal 3 ample) 6 [W.VText "ab",W.VText "cd"]
+  cap "single symbol" (rbSingle 3 ample) 5 [W.VText "abcd"]
+  cap "global edges" (rbEdges 2 ample) 5
+    [W.VNode 1 [W.VInt 0,W.VInt 0],W.VNode 2 [W.VInt 0]]
+  cap "root count" (rbEdges 2 ample) 3 (replicate 3 (W.VInt 0))
+  let shared = rbEdges 2 (rbNodes 2 (rbSymbols 1 (rbTotal 1 ample)))
+  _ <- rbRoundtrip "shared physical caps" shared 10
+    (replicate 2 (W.VNode 1 [W.VText "x",W.VText "x"]))
+  let byte80 = W.Limits 80 0 0 0 16 16 64 100
+  (empty,_) <- rbRoundtrip "minimum file" byte80 0 []
+  size <- P.lengthByteArray empty
+  rbNeed "minimum size" (size == 80)
+  (planned,_) <- rbExpect "legacy plan/layout separation" (W.planRootBounded byte80 1 [W.VInt 0])
+  rbRejectWith "layout byte cap" "file byte limit" (W.layout byte80 planned)
+  W.encodeRootBounded byte80 1 7 [W.VInt 0] >>= rbRejectWith "encoder byte cap" "file byte limit"
+  (wire,_) <- rbRoundtrip "ample byte cap" ample 1 [W.VInt 0]
+  W.decodeGraphRootBounded byte80 1 7 wire >>= rbReject "reader byte cap"
+
+rbOrdinary :: IO ()
+rbOrdinary = do
+  let lim = rbLimits 1000
+  (empty,_) <- rbRoundtrip "empty zero" (rbLimits 0) 0 []
+  rbReject "nonempty zero aggregate" (W.planRootBounded lim 0 [W.VInt 0])
+  rbReject "nonempty zero subtree" (W.planRootBounded (rbLimits 0) 1 [W.VInt 0])
+  forM_ [-1,2147483648,minBound,maxBound :: P.Int] $ \aggregate -> do
+    rbRejectWith "invalid aggregate plan" "invalid binary root-work budget" (W.planRootBounded lim aggregate [])
+    W.encodeRootBounded lim aggregate 7 [] >>= rbRejectWith "invalid aggregate encode" "invalid binary root-work budget"
+    W.decodeGraphRootBounded lim aggregate 7 empty >>= rbRejectWith "invalid aggregate decode" "invalid binary root-work budget"
+  _ <- rbRoundtrip "maximum aggregate" lim 2147483647 [W.VInt 42]
+  (one,_) <- rbRoundtrip "one root" lim 1 [W.VInt 1]
+  W.decodeGraphRootBounded lim 0 7 one >>= rbReject "reader zero aggregate"
+  forM_ [-1,2147483648 :: P.Int] $ \schema -> do
+    W.encodeRootBounded lim 1 schema [W.VInt 1] >>= rbRejectWith "encoder schema" "schema"
+    W.decodeGraphRootBounded lim 1 schema one >>= rbRejectWith "decoder schema" "schema"
+  let invalid = W.Limits 79 0 0 0 1 1 1 1
+  rbRejectWith "invalid limits plan" "invalid binary codec limits" (W.planRootBounded invalid 1 [])
+  W.decodeGraphRootBounded invalid 1 7 empty >>= rbRejectWith "invalid limits decode" "invalid binary codec limits"
+  rbNeed "defaults unchanged"
+    (W.maxExpandedWork W.defaultLimits == 67108864 && W.maxBytes W.defaultLimits == 268435456 &&
+     W.maxSymbols W.defaultLimits == 1048576 && W.maxSymbolBytes W.defaultLimits == 16777216 &&
+     W.maxTotalSymbolBytes W.defaultLimits == 134217728 && W.maxNodes W.defaultLimits == 4194304 &&
+     W.maxEdges W.defaultLimits == 16777216 && W.maxDepth W.defaultLimits == 16384)
+  let scalars = [W.VInt minBound,W.VInt maxBound,W.VInt (-1),W.VInt 0,
+        W.VBits minBound,W.VBits maxBound,W.VBits (-1),W.VBits 0,
+        W.VText "",W.VText (B.literal "Aé😀\NUL")]
+      samples = [[],scalars,[W.VNode 0 [],W.VNode 2147483647 [W.VInt 0,W.VText "x"]],
+        replicate 3 (W.VNode 2 [W.VText "same",W.VText "same"])]
+  forM_ samples $ \roots -> do
+    old <- W.encode lim 7 roots >>= rbExpect "ordinary encode"
+    (new,graph) <- rbRoundtrip "ordinary parity" lim (W.maxExpandedWork lim) roots
+    xs <- rbBytes old
+    ys <- rbBytes new
+    rbNeed "ordinary byte identity" (xs == ys)
+    values <- W.decode lim 7 new >>= rbExpect "ordinary decode"
+    rbNeed "ordinary Value identity" (rbValues values roots)
+    ordinary <- W.decodeGraph lim 7 new >>= rbExpect "ordinary graph"
+    rbNeed "ordinary IDs" (W.graphRoots ordinary == W.graphRoots graph)
+
+rbCRCBranches :: IO ()
+rbCRCBranches = do
+  forM_ [939,940 :: Int] $ \n -> do
+    let work = fromIntegral n+1
+        roots = replicate 2 (W.VText (B.literal (replicate n 'x')))
+        lim = rbLimits work
+    (wire,_) <- rbRoundtrip ("CRC threshold " ++ show n) lim (2*work) roots
+    size <- P.lengthByteArray wire
+    rbNeed "1023/1024 exact threshold" (size == fromIntegral n+84)
+    W.decodeGraphRootBounded lim (2*work-1) 7 wire >>= rbReject "CRC aggregate"
+    W.decodeGraph lim 7 wire >>= rbReject "CRC ordinary aggregate"
+    corrupted <- rbChanged wire (\b -> P.writeByteArray b 82 121) False
+    W.decodeGraphRootBounded lim (2*work) 7 corrupted >>= rbRejectWith "CRC corrupt" "checksum mismatch"
+    bad <- rbChanged wire (\b -> P.writeByteArray b 82 192) False
+    W.decodeGraphRootBounded lim (2*work) 7 bad >>= rbRejectWith "malformed stale CRC" "checksum mismatch"
+    rbCRC bad
+    W.decodeGraphRootBounded lim (2*work) 7 bad >>= rbRejectWith "malformed repaired CRC" "UTF-8"
+  let long = W.VText (B.literal (replicate 65535 'q'))
+  _ <- rbRoundtrip "symbol-section fallback" (rbLimits 65536) 131072 [long,long]
+  let many = [W.VText (B.literal ("s" ++ show n)) | n <- [0..1024 :: Int]]
+      (n,t) = rbTotals many
+  _ <- rbRoundtrip "symbol-count fallback" (rbLimits 6) (n+t) many
+  _ <- rbRoundtrip "zero-symbol fallback" (rbLimits 1) 150 [W.VBits i | i <- [0..149]]
+  pure ()
+
+rbGeometry :: P.ByteArray -> IO W.Layout
+rbGeometry bytes = do
+  size <- P.lengthByteArray bytes
+  header <- W.runSection bytes 8 72 (W.getHeader (rbLimits 100000) 7 size) >>= rbExpect "geometry"
+  case header of W.Header geometry _ -> pure geometry
+rbRawTables :: W.Tables -> IO P.ByteArray
+rbRawTables tables = do
+  geometry <- rbExpect "explicit table geometry" (W.layout (rbLimits 100000) tables)
+  W.encodeTables 7 geometry tables >>= rbExpect "explicit table wire"
+rbRejectParity :: String -> String -> P.ByteArray -> IO ()
+rbRejectParity name fragment bytes = do
+  let lim = rbLimits 100000
+  ordinary <- W.decodeGraph lim 7 bytes >>= rbLeft (name ++ " ordinary")
+  values <- W.decode lim 7 bytes >>= rbLeft (name ++ " values")
+  bounded <- W.decodeGraphRootBounded lim 100000 7 bytes >>= rbLeft (name ++ " bounded")
+  larger <- W.decodeGraphRootBounded lim 2147483647 7 bytes >>= rbLeft (name ++ " larger")
+  hinted <- W.decodeGraphWithText [B.literal (replicate 1100 'A')] lim 7 bytes >>= rbLeft (name ++ " hinted")
+  rbNeed (name ++ " diagnostics") (ordinary == values && ordinary == bounded &&
+                                 ordinary == larger && ordinary == hinted)
+  rbNeed (name ++ " expected diagnostic: " ++ B.unpack ordinary) (rbContains fragment (B.unpack ordinary))
+
+rbMalformed :: IO ()
+rbMalformed = do
+  let cases =
+        [("duplicate symbol","duplicate binary symbol",
+          W.Tables [W.Symbol "a" 1,W.Symbol "a" 1] [W.EText 0,W.EText 1] [0,1] 2 2 2 0),
+         ("duplicate node","duplicate binary structural node",
+          W.Tables [] [W.EInt 1,W.EInt 1] [0,1] 0 2 2 0),
+         ("unused symbol","unused binary symbol",
+          W.Tables [W.Symbol "a" 1,W.Symbol "b" 1] [W.EText 0] [0] 2 1 1 0),
+         ("unused node","unused binary node",
+          W.Tables [] [W.EInt 1,W.EInt 2] [0] 0 2 1 0),
+         ("symbol order","symbol first-use order",
+          W.Tables [W.Symbol "a" 1,W.Symbol "b" 1] [W.EText 1,W.EText 0] [0,1] 2 2 2 0),
+         ("node order","node postorder",
+          W.Tables [] [W.EInt 1,W.EInt 2] [1,0] 0 2 2 0),
+         ("self reference","forward, cyclic, or out-of-range",
+          W.Tables [] [W.ENode 0 [0]] [0] 0 1 1 1),
+         ("forward reference","forward, cyclic, or out-of-range",
+          W.Tables [] [W.ENode 0 [1],W.EInt 1] [0] 0 2 1 1),
+         ("root reference","root reference out of range",
+          W.Tables [] [W.EInt 0,W.EInt 1,W.EInt 2] [3] 0 3 1 0),
+         ("symbol reference","symbol reference out of range",
+          W.Tables [W.Symbol "a" 1,W.Symbol "b" 1,W.Symbol "c" 1] [W.EText 3] [0] 3 1 1 0),
+         ("constructor overflow","unsigned quantity",
+          W.Tables [] [W.ENode 2147483648 []] [0] 0 1 1 0),
+         ("edge mismatch","edge count mismatch",
+          W.Tables [] [W.EInt 0] [0] 0 1 1 1)]
+  forM_ cases $ \(name,wanted,tables) -> rbRawTables tables >>= rbRejectParity name wanted
+  (base,_) <- rbRoundtrip "malformed scalar base" (rbLimits 100) 1 [W.VInt 0]
+  geometry <- rbGeometry base
+  case geometry of
+    W.Layout _ _ _ _ nodeOffset _ _ _ rootOffset _ _ _ -> do
+      n <- rbChanged base (\b -> rbOverwrite b (nodeOffset*8+15) 1 1) True
+      rbRejectParity "node padding" "nonzero binary section padding" n
+      r <- rbChanged base (\b -> rbOverwrite b (rootOffset*8+7) 1 1) True
+      rbRejectParity "root padding" "nonzero binary section padding" r
+  forM_ [(8,2,"version"),(12,1,"mandatory flags"),(16,8,"schema mismatch"),
+         (20,81,"header length"),(24,80,"header length"),(32,81,"sections overlap"),
+         (68,2,"reference width"),(72,2,"reference width")] $ \(offset,value,wanted) -> do
+    bad <- rbChanged base (\b -> rbOverwrite b (offset*8) 32 value) True
+    rbRejectParity ("header " ++ show offset) wanted bad
+  magic <- rbChanged base (\b -> P.writeByteArray b 0 0) False
+  rbRejectParity "magic" "magic mismatch" magic
+  raw <- rbBytes base
+  rbFromBytes (take 79 raw) >>= rbRejectParity "short header" "truncated header"
+  rbFromBytes (raw ++ [0]) >>= rbRejectParity "trailing" "header length"
+  (tagged,_) <- rbRoundtrip "tag varint base" (rbLimits 100) 1 [W.VNode 128 []]
+  tagGeometry <- rbGeometry tagged
+  case tagGeometry of
+    W.Layout _ _ _ _ nodeOffset _ _ _ _ _ _ _ -> do
+      bad <- rbChanged tagged (\b -> rbOverwrite b (nodeOffset*8+2) 16 128) True
+      rbRejectParity "noncanonical varint" "noncanonical binary varint" bad
+  (large,_) <- rbRoundtrip "overflow varint base" (rbLimits 100) 1 [W.VInt minBound]
+  intGeometry <- rbGeometry large
+  case intGeometry of
+    W.Layout _ _ _ _ nodeOffset _ _ _ _ _ _ _ -> do
+      bad <- rbChanged large (\b -> rbOverwrite b (nodeOffset*8+2+9*8) 8 2) True
+      rbRejectParity "overflow varint" "overflows 64 bits" bad
+  (textWire,_) <- rbRoundtrip "UTF8 base" (rbLimits 1000) 941
+    [W.VText (B.literal (replicate 940 'x'))]
+  forM_ [("continuation",[128]),("overlong leading",[192,128]),
+         ("overlong scalar",[224,128,128]),("surrogate",[237,160,128]),
+         ("above Unicode",[244,144,128,128]),("invalid lead",[245,128,128,128])]
+    $ \(name,prefix) -> do
+      bad <- rbChanged textWire
+        (\b -> forM_ (zip [82..] prefix) $ \(i,v) -> P.writeByteArray b i v) True
+      rbRejectParity name "UTF-8" bad
+  bad <- rbChanged textWire (\b -> P.writeByteArray b (82+939) 194) True
+  rbRejectParity "truncated scalar" "truncated binary UTF-8 scalar" bad
+
+rbSameObject :: String -> a -> a -> IO ()
+rbSameObject name x y = do
+  x' <- evaluate x
+  y' <- evaluate y
+  sx <- makeStableName x'
+  sy <- makeStableName y'
+  rbNeed name (eqStableName sx sy)
+rbTypedBatch :: IO ()
+rbTypedBatch = do
+  let k1 = T.KArrow T.Star T.Star
+      k2 = T.KArrow k1 k1
+      roots = map A.toKind [k2,k1,k2]
+  (_,graph) <- rbRoundtrip "typed graph" (rbLimits 7) 17 roots
+  rbNeed "typed IDs" (W.graphRoots graph == [2,1,2])
+  decoded <- rbExpect "typed batch" (A.decodeGraphMany A.ShapeKind graph (W.graphRoots graph))
+  kinds <- mapM (rbExpect "typed extraction" . A.expectKind) decoded
+  case (decoded,kinds) of
+    ([d0,_,d2],[a,b,c]) -> do
+      rbSameObject "duplicate root Decoded identity" d0 d2
+      rbSameObject "duplicate root payload identity" a c
+      case a of
+        T.KArrow left right -> do
+          rbSameObject "duplicate child identity" left right
+          rbSameObject "cross-root child/root identity" left b
+          case left of
+            T.KArrow first second -> rbSameObject "nested child identity" first second
+            _ -> error "nested Kind shape"
+        _ -> error "Kind shape"
+      rbNeed "typed order/values" (rbValues (map A.toKind kinds) roots)
+    _ -> error "typed batch shape/count"
+  empty <- rbExpect "empty batch" (A.decodeGraphMany A.ShapeKind graph [])
+  rbNeed "empty batch count" (null empty)
+  rbReject "negative ID" (A.decodeGraphMany A.ShapeKind graph [-1])
+  rbReject "invalid later ID" (A.decodeGraphMany A.ShapeKind graph [2,100])
+  rbReject "wrong shape" (A.decodeGraphMany A.ShapeField graph [2])
+  -- Same raw ID is used under two shapes within one invocation-local memo.
+  let emptyList = W.VNode 1 []
+      pair = W.VNode 2 [emptyList,emptyList]
+  (_,pg) <- rbRoundtrip "shape memo graph" (rbLimits 3) 3 [pair]
+  good <- rbExpect "typed shape-specific pair"
+    (A.decodeGraphMany (A.ShapePair (A.ShapeList A.ShapeInt) (A.ShapeList A.ShapeText)) pg (W.graphRoots pg))
+  case good of
+    [A.DecodedPair (A.DecodedList []) (A.DecodedList [])] -> pure ()
+    _ -> error "shape-specific pair changed"
+  rbReject "memo cannot reuse list as Int"
+    (A.decodeGraphMany (A.ShapePair (A.ShapeList A.ShapeInt) A.ShapeInt) pg (W.graphRoots pg))
+  let fieldGraph text = do
+        (_,g) <- rbRoundtrip ("field graph " ++ B.unpack text) (rbLimits 7) 14
+          (replicate 2 (A.toField (T.Parameter text)))
+        rbNeed "same IDs across graphs" (W.graphRoots g == [1,1])
+        pure g
+      fields name g = do
+        ds <- rbExpect name (A.decodeGraphMany A.ShapeField g (W.graphRoots g))
+        fs <- mapM (rbExpect (name ++ " extraction") . A.expectField) ds
+        case fs of
+          [x,y] -> rbSameObject (name ++ " intra-graph sharing") x y
+          _ -> error "field batch count"
+        pure fs
+      names fs = [B.unpack text | T.Parameter text <- fs]
+  ga <- fieldGraph "alpha"
+  gb <- fieldGraph "omega"
+  fa <- fields "first graph" ga
+  fb <- fields "second graph" gb
+  fa2 <- fields "first graph again" ga
+  rbNeed "same-ID graph-local isolation"
+    (names fa == ["alpha","alpha"] && names fb == ["omega","omega"] &&
+     names fa2 == ["alpha","alpha"])
+
+rbSelfTests :: IO ()
+rbSelfTests = do
+  rbScaled
+  rbPhysical
+  rbOrdinary
+  rbCRCBranches
+  rbMalformed
+  rbTypedBatch
+
+-- This is the only helper needed for the minimal wireCorpus integration.
+-- The original oracle still decides accept/reject independently.
+rbCompareGraph :: String -> T.Either P.String W.Graph -> T.Either P.String W.Graph -> IO ()
+rbCompareGraph name original bounded = case (original,bounded) of
+  (T.Left a,T.Left b) -> rbNeed (name ++ " bounded-root rejection parity") (a == b)
+  (T.Right a,T.Right b) -> do
+    rbNeed (name ++ " bounded-root root IDs") (W.graphRoots a == W.graphRoots b)
+    sa <- rbExpect (name ++ " ordinary graph stats") (W.graphResourceStats a)
+    sb <- rbExpect (name ++ " bounded graph stats") (W.graphResourceStats b)
+    rbNeed (name ++ " bounded-root exact work")
+      (W.resourceExpandedWork sa == W.resourceExpandedWork sb &&
+       W.resourceBytes sa == W.resourceBytes sb)
+  _ -> error (name ++ ": bounded-root decoder changed ordinary admission")

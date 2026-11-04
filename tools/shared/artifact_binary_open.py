@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent schema7 open-pair inspection and explicit companion controls.
+"""Independent schema7/8 open-pair inspection and explicit companion controls.
 
 The frozen wire/typed oracles remain unchanged. This validates complete raw
 syntax and reference identity, not proof evidence. Actual public readers plus
@@ -7,7 +7,7 @@ retained Open.audit results and their complete rebuilt bytes supply the
 separate production-checker evidence.
 """
 import hashlib
-from artifact_binary_reference import Invalid, read_document, tree_document, repair_crc
+from artifact_binary_reference import Invalid, Limits, read_document, tree_document, repair_crc
 from artifact_binary_typed import (value_node as fields, list_values as items,
     text, validate_type, builtin_datatypes, pack, unpack)
 
@@ -42,6 +42,88 @@ def decoded(raw, schema, family=None):
     values = doc.values()
     require(tree_document(values, schema) == raw, 'canonical whole binary bytes')
     return values[0]
+
+OPEN_ROOT_WORK = 64 * 1024**2
+OPEN_PACKAGE_WORK = 256 * 1024**2
+OPEN_FORMATS = {7: 'MLF-OPEN-CRATE-1/checker-1', 8: 'MLF-OPEN-CRATE-2/checker-1'}
+
+
+def open_document(raw):
+    """Keep the frozen default codec unchanged; schema8 owns a bounded root sum."""
+    require(isinstance(raw, bytes) and len(raw) >= 20, 'complete open binary header')
+    schema = int.from_bytes(raw[16:20], 'little')
+    require(schema in OPEN_FORMATS, 'unsupported open schema')
+    limits = Limits() if schema == 7 else Limits(work=OPEN_PACKAGE_WORK)
+    document = read_document(raw, schema, limits)
+    if schema == 8:
+        require(all(work <= OPEN_ROOT_WORK for work in document.expanded_work),
+                'open per-root expanded work cap')
+    values = document.values()
+    require(tree_document(values, schema) == raw, 'canonical whole open binary bytes')
+    if schema == 7:
+        require(len(values) == 1, 'exactly one schema7 open root')
+        opened = fields(values[0], 430, 6)
+    else:
+        require(bool(values), 'open header root required')
+        header = fields(values[0], 432, 6)
+        require(header[5][0] == 'int' and header[5][1] == len(values) - 1,
+                'open fragment count mismatch')
+        for fragment in values[1:]:
+            fields(fragment, 401, 7)
+        opened = (*header[:5], sequence(values[1:]))
+    return schema, document, opened
+
+
+def open_bytes(schema, opened, header_tag=None):
+    """Fixture writer preserves the selected framing, including mutation cases."""
+    require(schema in OPEN_FORMATS, 'unsupported fixture open schema')
+    if schema == 7:
+        return tree_document([node(430 if header_tag is None else header_tag, *opened)], 7)
+    fragments = items(opened[5])
+    header = node(432 if header_tag is None else header_tag,
+                  *opened[:5], ('int', len(fragments)))
+    return tree_document([header, *fragments], 8)
+
+
+def syntax_equal(left, right):
+    """Complete DAG syntax equality, without recursion or hash-only evidence."""
+    pending, seen = [(left, right)], set()
+    while pending:
+        a, b = pending.pop()
+        if type(a) is not type(b):
+            return False
+        if isinstance(a, tuple):
+            key = id(a), id(b)
+            if key in seen:
+                continue
+            seen.add(key)
+            if len(a) != len(b):
+                return False
+            pending.extend(zip(a, b))
+        elif a != b:
+            return False
+    return True
+
+
+def compare_retained_audit(original, audited, dependency_interfaces):
+    before = inspect_pair(original, dependency_interfaces)
+    after = inspect_pair(audited, dependency_interfaces)
+    require(after['schema'] == 8, 'retained audit writer must emit schema8')
+    left = fields(before['interface'], 242, 13)
+    right = fields(after['interface'], 242, 13)
+    require(all(syntax_equal(left[i], right[i]) for i in range(13) if i != 11),
+            'retained audit changed complete interface semantics')
+    # Only the wire-family marker and paired object digest may change in 7 -> 8.
+    # This includes every ordered final field and every verified reference hash.
+    require(syntax_equal(before['opened'][1:], after['opened'][1:]),
+            'retained audit changed complete fragment semantics')
+    exact = tuple(audited) == tuple(original)
+    if before['schema'] == 8:
+        require(exact, 'retained schema8 audit rebuild changed original pair bytes')
+    return {'retained_audit_rebuild_exact': exact,
+            'retained_audit_semantics_exact': True,
+            'retained_audit_schema_transition': [before['schema'], after['schema']]}
+
 
 def keyed(values, label):
     result = {}
@@ -230,9 +312,9 @@ def _inspect_pair(pair, dependency_interfaces):
     require(type(pair) is tuple and len(pair) == 2, 'complete open artifact pair')
     interface = decoded(pair[0], 3, 'CrateInterfaceFields')
     header = fields(interface, 242, 13)
-    opened = fields(decoded(pair[1], 7), 430, 6)
+    schema, document, opened = open_document(pair[1])
     require(text(header[11]) == hashlib.sha256(pair[1]).hexdigest(), 'open object SHA mismatch')
-    require(text(opened[0]) == 'MLF-OPEN-CRATE-1/checker-1', 'wrong open package family')
+    require(text(opened[0]) == OPEN_FORMATS[schema], 'wrong open package family')
     require(text(opened[1]) == compatibility_identity(), 'wrong open compatibility identity')
     dependencies = [decoded(raw, 3, 'CrateInterfaceFields') for raw in dependency_interfaces]
     by_name = keyed([(text(fields(value, 242, 13)[0]), value) for value in dependencies],
@@ -262,14 +344,28 @@ def _inspect_pair(pair, dependency_interfaces):
                   'binding ownership')
     declarations = keyed([(text(fields(value, arity=3)[0]), value) for iface in interfaces
                           for value in items(fields(iface, 242, 13)[8])], 'datatype ownership')
+    wire_work = sum(document.expanded_work[index] for index in document.roots)
+    reference_work = 0
     def references(value, available, encode, label):
+        nonlocal reference_work
         rows = [fields(row, 2, 2) for row in items(value)]
         keys = [text(row[0]) for row in rows]
         require(keys == sorted(set(keys)), label + ' reference order or duplicate')
         for key, digest in rows:
             key = text(key)
             require(key in available, label + ' reference out of scope')
-            require(text(digest) == fingerprint(encode(available[key])), label + ' reference hash')
+            value = encode(available[key])
+            if schema == 8:
+                raw = tree_document([value], 6)
+                hashed = read_document(raw, 6)
+                used = sum(hashed.expanded_work[index] for index in hashed.roots)
+                require(used <= OPEN_PACKAGE_WORK - wire_work - reference_work,
+                        'open combined reference and wire work cap')
+                reference_work += used
+                actual = hashlib.sha256(raw).hexdigest()
+            else:
+                actual = fingerprint(value)
+            require(text(digest) == actual, label + ' reference hash')
         return keys
     binding_refs = references(opened[3], types, lambda value: value, 'binding')
     data_refs = references(opened[4], declarations, declaration_hash_value, 'datatype')
@@ -307,11 +403,14 @@ def _inspect_pair(pair, dependency_interfaces):
             keyed([(text(key), value) for key, value in
                    (fields(row, 2, 2) for row in items(header[9]))], 'interface binding'),
             'complete crate ownership and type inventory')
-    return {'interface': interface, 'opened': opened, 'types': types, 'declarations': declarations,
+    return {'schema': schema, 'interface': interface, 'opened': opened, 'types': types, 'declarations': declarations,
             'summary': {'identity': root,
                         'dependencies': [tuple(text(x) for x in fields(row, 3, 3)) for row in items(header[1])],
                         'modules': [text(value) for value in items(header[2])], 'entry': text(header[10])},
-            'accounting': {'fragment_count': len(fragments), 'binding_references': len(binding_refs),
+            'accounting': {'schema': schema, 'wire_expanded_work': wire_work,
+                           'reference_hash_expanded_work': reference_work if schema == 8 else None,
+                           'combined_expanded_work': wire_work + reference_work if schema == 8 else None,
+                           'fragment_count': len(fragments), 'binding_references': len(binding_refs),
                            'datatype_references': len(data_refs),
                            'metadata_sha256': hashlib.sha256(pair[0]).hexdigest(),
                            'object_sha256': hashlib.sha256(pair[1]).hexdigest()}}
@@ -521,9 +620,9 @@ def compare_companion(closed_pair, open_pair, dependency_interfaces, audited_pai
             same_declaration(declaration, observed['declarations'][key])
     require(tuple(legacy_rebuilt_pair) == closed_pair,
             'actual public legacy reader/writer differs from complete closed pair')
-    require(tuple(audited_pair) == open_pair, 'retained audit rebuild changed original pair bytes')
+    audit = compare_retained_audit(open_pair, audited_pair, dependency_interfaces)
     return {**observed['accounting'], 'complete_companion_content': True,
-            'retained_audit_rebuild_exact': True, 'legacy_public_rebuild_exact': True,
+            **audit, 'legacy_public_rebuild_exact': True,
             'closed_crate_fingerprint_exact': True, 'closed_unit_fingerprints_exact': len(units),
             'fingerprint_evidence': 'independent framed text digests, actual public text-to-binary receipt'}
 
@@ -536,11 +635,12 @@ def repinned(pair, body):
 
 def mutation_cases(pair):
     """Authored invalid variants. Expected public errors do not come from execution."""
-    opened = list(fields(decoded(pair[1], 7), 430, 6))
+    schema, document, original = open_document(pair[1])
+    opened = list(original)
     def change(index, value):
         fields_ = list(opened)
         fields_[index] = value
-        return tree_document([node(430, *fields_)], 7)
+        return open_bytes(schema, fields_)
     cases = []
     wrong_format = change(0, string('MLF-OPEN-CRATE-999/checker-1'))
     cases.append(('wrong-open-family', repinned(pair, wrong_format),
@@ -555,7 +655,7 @@ def mutation_cases(pair):
                   'open crate checker/compiler version mismatch; rebuild object'))
     cases.append(('wrong-open-association', repinned(pair, change(2, string('wrong-association'))),
                   'open crate interface mismatch'))
-    wrong_header = tree_document([node(429, *opened)], 7)
+    wrong_header = open_bytes(schema, opened, header_tag=429)
     cases.append(('wrong-open-header', repinned(pair, wrong_header), 'invalid open crate header'))
     version = bytearray(pair[1])
     version[8:12] = (2).to_bytes(4, 'little')
@@ -567,7 +667,151 @@ def mutation_cases(pair):
     rows[0] = node(2, key, string('0' * 64))
     cases.append(('wrong-open-reference', repinned(pair, change(3, sequence(rows))),
                   'open crate dependency changed: ' + text(key)))
+    if schema == 8:
+        roots = list(document.values())
+        header = list(fields(roots[0], 432, 6))
+        def new_header(count):
+            return tree_document([node(432, *header[:5], count), *roots[1:]], 8)
+        cases.append(('open-empty-roots', repinned(pair, tree_document([], 8)),
+                      'open crate root count'))
+        cases.append(('open-wrong-fragment-count',
+                      repinned(pair, new_header(('int', len(roots)))),
+                      'open crate fragment count mismatch'))
+        cases.append(('open-noninteger-fragment-count',
+                      repinned(pair, new_header(('bits', len(roots) - 1))),
+                      'invalid open crate fragment count'))
+        require(len(roots) > 1, 'nonempty root mutation seed')
+        reordered = tree_document([roots[1], roots[0], *roots[2:]], 8)
+        cases.append(('open-header-after-final', repinned(pair, reordered),
+                      'invalid open crate header'))
+        duplicate = list(opened)
+        duplicate[5] = sequence([*items(opened[5]), items(opened[5])[0]])
+        cases.append(('open-duplicate-final', repinned(pair, open_bytes(schema, duplicate)),
+                      'duplicate open crate fragment'))
+        invalid = list(opened)
+        fragments = list(items(opened[5]))
+        fragments[0] = node(400, *fields(fragments[0], 401, 7))
+        invalid[5] = sequence(fragments)
+        cases.append(('open-wrong-final-envelope', repinned(pair, open_bytes(schema, invalid)),
+                      'invalid final open crate fragment'))
     return cases
+
+
+def resource_mutation_cases(pair, dependency_interfaces):
+    """Tiny physical DAGs exercise the actual reader's early resource gates.
+
+    No expanded syntax is materialized and no production writer is called.
+    Original finals, binding references, metadata and ownership are retained.
+    Added finals have no exports, parameters or free references. Their datatype
+    contexts and SHA references come from the authenticated dependency closure.
+    """
+    observed = inspect_pair(pair, dependency_interfaces)
+    schema, document, opened = open_document(pair[1])
+    require(schema == 8, 'resource controls require the actual schema8 seed')
+    data_names = sorted(observed['declarations'])
+    require(bool(data_names), 'authenticated seed closure needs datatype definitions')
+    context = sequence([string(key) for key in data_names])
+    context_work = 1 + sum(1 + len(key.encode('utf-8')) for key in data_names)
+    augmented = list(opened)
+    augmented[4] = sequence([
+        node(2, string(key), string(fingerprint(declaration_hash_value(
+            observed['declarations'][key])))) for key in data_names])
+    opened = tuple(augmented)
+    baseline_document = read_document(open_bytes(8, opened), 8)
+    baseline = sum(baseline_document.expanded_work[index]
+                   for index in baseline_document.roots)
+    require(baseline < OPEN_ROOT_WORK, 'small resource-control seed required')
+    bindings = list(items(opened[3]))
+    declarations = list(items(opened[4]))
+    require(bool(bindings) and bool(declarations),
+            'resource seed must exercise both actual reference hash paths')
+    def measured_hash(value):
+        raw = tree_document([value], 6)
+        hashed = read_document(raw, 6)
+        return sum(hashed.expanded_work[index] for index in hashed.roots)
+    binding_work = sum(measured_hash(observed['types'][text(fields(row, 2, 2)[0])])
+                       for row in bindings)
+    declaration_work = sum(measured_hash(declaration_hash_value(
+        observed['declarations'][text(fields(row, 2, 2)[0])])) for row in declarations)
+    first_binding = observed['types'][text(fields(bindings[0], 2, 2)[0])]
+    first_declaration = declaration_hash_value(
+        observed['declarations'][text(fields(declarations[0], 2, 2)[0])])
+    # With remainder 1, a nonempty constructor reaches the bounded arity gate;
+    # with remainder 0, even its one-root plan reaches the bounded count gate.
+    require(first_binding[0] == first_declaration[0] == 'node' and
+            bool(fields(first_binding)) and bool(fields(first_declaration)),
+            'reference remainder diagnostics need nonempty constructor roots')
+
+    memo = {}
+    def term_with_work(work):
+        require(work >= 2, 'minimum resource-control term work')
+        if work not in memo:
+            if work <= 4:
+                memo[work] = node(80, string('x' * (work - 2)))
+            else:
+                left = (work - 1) // 2
+                memo[work] = node(72, term_with_work(left),
+                                  term_with_work(work - 1 - left))
+        return memo[work]
+
+    def final_with_work(index, work):
+        name = 'resource-final-' + str(index)
+        receipt = 'resource-rejection-before-audit'
+        # 401, two texts, the real datatype context, three empty lists, then body.
+        overhead = 6 + len(name.encode('utf-8')) + len(receipt.encode('utf-8')) + context_work
+        return node(401, string(name), string(receipt), context, sequence([]),
+                    term_with_work(work - overhead), sequence([]), sequence([]))
+
+    cases, witnesses = [], {}
+    def save(label, extra, expected, target):
+        changed = list(opened)
+        changed[5] = sequence([*items(opened[5]), *extra])
+        raw = open_bytes(8, changed)
+        # The explicit wider sum here measures a deliberately invalid fixture.
+        # It does not alter any default reader or permit per-root overflows.
+        measured = read_document(raw, 8, Limits(work=(1 << 31) - 1))
+        root_work = [measured.expanded_work[index] for index in measured.roots]
+        require(all(work <= OPEN_ROOT_WORK for work in measured.expanded_work),
+                'resource negative accidentally exceeded a per-node/root cap')
+        require(sum(root_work) == target, 'resource negative exact wire-work witness')
+        require(len(raw) <= len(pair[1]) + 65536,
+                'resource negative must remain a tiny physical DAG')
+        require(changed[:5] == list(opened[:5]),
+                'resource negative changed legitimate metadata/references')
+        pinned = repinned(pair, raw)
+        cases.append((label, pinned, expected))
+        witnesses[label] = {
+            'physical_bytes': len(raw), 'physical_nodes': len(measured.nodes),
+            'wire_work': target, 'root_work': root_work,
+            'actual_binding_hash_work': binding_work,
+            'actual_declaration_hash_work': declaration_work,
+            'remaining_before_references': OPEN_PACKAGE_WORK - target,
+            'remaining_after_binding_hashes': OPEN_PACKAGE_WORK - target - binding_work,
+            'metadata_and_binding_references_unchanged': True,
+            'datatype_references_from_authenticated_interfaces': data_names,
+            'original_finals_retained': True}
+
+    def at_work(label, target, expected):
+        remaining = target - baseline
+        quotient, remainder = divmod(remaining, 4)
+        weights = [quotient + (index < remainder) for index in range(4)]
+        require(min(weights) > 128 and max(weights) <= OPEN_ROOT_WORK,
+                'resource negative root distribution')
+        save(label, [final_with_work(index, work) for index, work in enumerate(weights)],
+             expected, target)
+
+    at_work('open-aggregate-unique-finals', OPEN_PACKAGE_WORK + 1,
+            'binary expanded root-work limit exceeded')
+    repeated = final_with_work(0, OPEN_ROOT_WORK)
+    save('open-aggregate-repeated-root', [repeated] * 4,
+         'binary expanded root-work limit exceeded', baseline + 4 * OPEN_ROOT_WORK)
+    for remaining in (1, 0):
+        at_work('open-combined-binding-remainder-' + str(remaining),
+                OPEN_PACKAGE_WORK - remaining, 'binary list count limit exceeded')
+        at_work('open-combined-declaration-remainder-' + str(remaining),
+                OPEN_PACKAGE_WORK - binding_work - remaining,
+                'binary list count limit exceeded')
+    return cases, witnesses
 
 
 def independent_controls(pair, closed_pair, dependency_interfaces, audited_pair,
@@ -618,7 +862,8 @@ def independent_controls(pair, closed_pair, dependency_interfaces, audited_pair,
             rejected.append(label)
         else:
             raise OpenPairError('independent context negative accepted: ' + label)
-    source = list(fields(decoded(pair[1], 7), 430, 6))
+    schema, _, original = open_document(pair[1])
+    source = list(original)
     structural = []
     for label, index, value in (
             ('missing-binding-references', 3, sequence([])),
@@ -626,14 +871,14 @@ def independent_controls(pair, closed_pair, dependency_interfaces, audited_pair,
             ('missing-fragments', 5, sequence([]))):
         changed = list(source)
         changed[index] = value
-        structural.append((label, repinned(pair, tree_document([node(430, *changed)], 7))))
+        structural.append((label, repinned(pair, open_bytes(schema, changed))))
     fragments = list(items(source[5]))
     fragment = list(fields(fragments[0], 401, 7))
     fragment[4] = ('bits', 0)
     fragments[0] = node(401, *fragment)
     changed = list(source)
     changed[5] = sequence(fragments)
-    structural.append(('wrong-typed-body', repinned(pair, tree_document([node(430, *changed)], 7))))
+    structural.append(('wrong-typed-body', repinned(pair, open_bytes(schema, changed))))
     for label, damaged in structural:
         try:
             inspect_pair(damaged, dependency_interfaces)
@@ -653,11 +898,12 @@ def independent_controls(pair, closed_pair, dependency_interfaces, audited_pair,
 
 def audit_mutation_cases(pair):
     """A changed receipt must fail the actual checker audit, not just a byte hash."""
-    opened = list(fields(decoded(pair[1], 7), 430, 6))
+    schema, document, original = open_document(pair[1])
+    opened = list(original)
     fragments = list(items(opened[5]))
     first = list(fields(fragments[0], 401, 7))
     first[1] = string('deliberately-wrong-checked-receipt')
     fragments[0] = node(401, *first)
     opened[5] = sequence(fragments)
-    changed = repinned(pair, tree_document([node(430, *opened)], 7))
+    changed = repinned(pair, open_bytes(schema, opened))
     return [('wrong-checked-receipt', changed, 'open fragment audit mismatch')]

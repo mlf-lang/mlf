@@ -22,7 +22,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 HELPERS = ('artifact_binary_reference.py', 'artifact_binary_cases.py',
            'artifact_binary_typed.py', 'artifact_binary_integration.py', 'artifact_binary_open.py',
-           'artifact_structure_contract.json', 'artifact_binary_golden.json')
+           'artifact_structure_contract.json', 'artifact_binary_golden.json', 'test_query_index.py')
 
 
 def require(ok, message):
@@ -255,6 +255,7 @@ def main():
     parser.add_argument('--build-receipt', type=Path, required=True)
     parser.add_argument('--fixture', type=Path)
     parser.add_argument('--shared-fixture', type=Path)
+    parser.add_argument('--query-fixture', type=Path)
     parser.add_argument('--controls', type=Path)
     parser.add_argument('--clang', required=True)
     parser.add_argument('--gc-prefix', required=True, type=Path)
@@ -270,6 +271,7 @@ def main():
     producer_dir = receipt_path.parent
     fixture = regular(args.fixture or source / 'tools/shared/fixtures/item4/ArtifactBinary.hs')
     shared = regular(args.shared_fixture or source / 'tools/shared/fixtures/item4/RawBinaryShared.hs')
+    query_fixture = regular(args.query_fixture or source / 'tools/shared/fixtures/item4/QueryIndex.hs')
     controls = regular(args.controls or source / 'tools/shared/run_artifact_binary_controls.py')
     helpers = [regular(controls.with_name(name)) for name in HELPERS]
     build_path = regular(source / 'tools/shared/build.py')
@@ -298,7 +300,7 @@ def main():
     headers = [regular(p) for p in sorted((source / 'runtime').rglob('*.h'))]
     require(regular(source / 'runtime/mlf_byte_file.h') in headers,
             'new byte-file transport header missing')
-    inputs = [regular(__file__), fixture, shared, controls, *helpers, build_path,
+    inputs = [regular(__file__), fixture, shared, query_fixture, controls, *helpers, build_path,
               direct_path, source_manifest, runtime, *transport_sources, *headers,
               python, clang, pkg_config, gc_archive, *gc_headers]
     require(all(not p.is_relative_to(output) for p in inputs), 'input inside output')
@@ -386,7 +388,10 @@ def main():
                  if name.endswith('.o') and name != 'objects/Main.o']
         require(links, 'producer has no linkable library objects')
         binaries = {}
-        for label, source_file in (('ghc', fixture), ('shared-ghc', shared)):
+        # QueryGraph controls use the same authenticated GHC objects. They do
+        # not change RawBinaryShared's separate exact49 native source closure.
+        for label, source_file in (('ghc', fixture), ('shared-ghc', shared),
+                                   ('query-index-ghc', query_fixture)):
             directory = output / (label + '-build'); directory.mkdir()
             obj, hi, binary = directory / 'Main.o', directory / 'Main.hi', directory / 'fixture'
             runner.run('compile-' + label, [ghc, '-c', *flags, *build.EXHAUSTIVENESS_FLAGS,
@@ -506,6 +511,7 @@ def main():
         inner = output / 'controls'
         result = runner.run('artifact-binary-controls', [python, '-I', '-B', controls,
             '--fixture', binaries['ghc'], '--shared-ghc-fixture', binaries['shared-ghc'],
+            '--query-fixture', binaries['query-index-ghc'],
             '--shared-native-fixture', native, '--build-receipt', receipt_path,
             '--partial-write-sink', sink, '--output', inner], timeout=900)
         summary = json.loads(result.stdout)
@@ -519,7 +525,13 @@ def main():
                 summary['reference_cases'] == len(body['reference_cases']), 'aggregate count summary mismatch')
         required = {'wire-corpus', 'constructors', 'typed-bounds', 'raw-ghc', 'partial-write-ghc',
                     'shared-ghc', 'shared-native', 'shared-ghc-typed', 'shared-native-typed',
-                    'shared-ghc-public-pair', 'shared-native-public-pair', 'distribution-seed'}
+                    'shared-ghc-public-pair', 'shared-native-public-pair', 'distribution-seed',
+                    'query-index-pure', 'query-index-publication'}
+        require(body.get('query_index_reference_tests') == 9, 'independent query index tests omitted')
+        expected_query_tests=('test_actual_row_64_mi_boundary_tiny_wire', 'test_actual_total_256_mi_boundary_tiny_wire', 'test_alternating_long_prefix_attack', 'test_canonicality_and_closure', 'test_depth_both_key_orders', 'test_exact_fields_and_wire_hash', 'test_legacy_and_empty', 'test_small_exact_budgets', 'test_types_ranges_and_hashes')
+        require(body.get('query_index_reference_results') ==
+                [{'name': name, 'state': 'passed'} for name in expected_query_tests],
+                'independent query index named results omitted or changed')
         names = [row['name'] for row in body['commands']]
         require(len(names) == len(set(names)) and required <= set(names), 'mandatory host/typed/public commands omitted')
         expected_inputs = {str(p): sha(p) for p in [controls, receipt_path, *binaries.values(), *helpers]}

@@ -130,10 +130,268 @@ module Bootstrap.QueryGraph where {
      A.toList (A.toPair A.toText A.toText) reads,A.toMaybe A.toText location];
   encodeIndex config nodes = W.VNode 411
     [W.VText "MLF-CRATE-QUERY-GRAPH-1",W.VText config,A.toList encodeNode (M.elems nodes)];
+
+  -- Version 2 makes string sharing explicit in the schema, rather than asking
+  -- the codec to admit a larger unfolded version-1 value. The dictionary is
+  -- sorted, unique and entirely used; rows are ordered by their key IDs.
+  -- Hash references retain the provider's expected value, not the target's
+  -- current value. Repeated reads, including their order, remain significant.
+  data IndexString = IndexString String Bool Int;
+  data IndexNode = IndexNode Int Int ([] ((,) Int Int)) (Maybe Int);
+  indexKey (IndexNode wanted _ _ _) = wanted;
+  indexHash (IndexNode _ digest _ _) = digest;
+  indexReads (IndexNode _ _ reads _) = reads;
+  indexStrings (QueryNode wanted digest reads location) =
+    append [wanted,digest] (append (concatMap (\((,) k h) -> [k,h]) reads)
+      (case location of { Nothing -> []; Just value -> [value] }));
+  indexString text = do {
+    bytes <- W.utf8Size (W.maxSymbolBytes W.defaultLimits) text;
+    let { hash = validHash text };
+    seq hash (Right (IndexString text hash bytes))
+  };
+  indexStringText (IndexString text _ _) = text;
+  indexStringHash (IndexString _ hash _) = hash;
+  indexStringBytes (IndexString _ _ bytes) = bytes;
+  indexDictionary strings = do {
+    values <- traverseEither indexString strings;
+    Right (M.fromDistinctAscList (mapIndexed (,) values))
+  };
+  encodeIndexV2 config nodes = do {
+    -- Bound hostile source rows before any full-string dictionary lookup.
+    validateIndexSourceWork (W.maxExpandedWork W.defaultLimits) Storage.maxBytes config (M.elems nodes);
+    let { strings = S.toList (S.fromList compareString (concatMap indexStrings (M.elems nodes)));
+      ids = M.fromDistinctAscList (mapIndexed (\index text -> (,) text index) strings);
+      rows = map (\(QueryNode wanted digest reads location) ->
+        IndexNode (M.get compareString wanted ids) (M.get compareString digest ids)
+          (map (\((,) k h) -> (,) (M.get compareString k ids) (M.get compareString h ids)) reads)
+          (mapOptional (\text -> M.get compareString text ids) location)) (M.elems nodes) };
+    dictionary <- indexDictionary strings;
+    _ <- validateIndexRows config dictionary rows;
+    Right (W.VNode 412 [W.VText "MLF-CRATE-QUERY-GRAPH-2",W.VText config,
+      A.toList A.toText strings,A.toList encodeIndexNode rows])
+  };
+  encodeIndexNode (IndexNode wanted digest reads location) = W.VNode 413
+    [W.VInt wanted,W.VInt digest,A.toList (A.toPair A.toInt A.toInt) reads,
+      A.toMaybe A.toInt location];
+  increasingStrings strings = case strings of {
+    [] -> Right ();
+    (:) _ [] -> Right ();
+    (:) first rest@((:) second _) -> do {
+      ensure (compareString first second < 0) "noncanonical query graph dictionary";
+      increasingStrings rest
+    }
+  };
+  increasingIndexRows rows = case rows of {
+    [] -> Right ();
+    (:) _ [] -> Right ();
+    (:) first rest@((:) second _) -> do {
+      ensure (indexKey first < indexKey second) "duplicate/unordered query node";
+      increasingIndexRows rest
+    }
+  };
+  decodeIndexV2 configuration graph format config dictionaryIndex entries = do {
+    f <- A.fromGraphText graph format;
+    c <- A.fromGraphText graph config;
+    ensure (eqString f "MLF-CRATE-QUERY-GRAPH-2" && eqString c configuration) "query graph version mismatch";
+    -- readValue already uses defaultLimits. Keep the same work bound even if
+    -- this pure helper receives a Graph planned under more permissive limits.
+    resources <- W.graphResourceStats graph;
+    ensure (W.resourceExpandedWork resources <= W.maxExpandedWork W.defaultLimits) "query index work limit exceeded";
+    stringIndices <- listAt graph dictionaryIndex;
+    strings <- traverseEither (A.fromGraphText graph) stringIndices;
+    increasingStrings strings;
+    dictionary <- indexDictionary strings;
+    indices <- listAt graph entries;
+    rows <- traverseEither (decodeIndexNode graph) indices;
+    table <- validateIndexRows configuration dictionary rows;
+    -- No string comparison or repeated text validation is needed here.
+    -- Canonical dictionary and row order make this a distinct ascending map.
+    Right (M.fromDistinctAscList (map (\row ->
+      let { node = materializeIndexNode dictionary row } in (,) (nodeKey node) node) (M.elems table)))
+  };
+  decodeIndexNode graph index = do {
+    value <- W.lookupGraphNode graph index;
+    case value of {
+      W.GNode 413 [k,h,edges,location] -> do {
+        wanted <- A.fromGraphInt graph k;
+        digest <- A.fromGraphInt graph h;
+        indices <- listAt graph edges;
+        reads <- traverseEither (decodeIndexRead graph) indices;
+        payload <- decodeIndexLocation graph location;
+        Right (IndexNode wanted digest reads payload)
+      };
+      _ -> Left "malformed indexed query node"
+    }
+  };
+  decodeIndexRead graph index = do {
+    value <- W.lookupGraphNode graph index;
+    case value of {
+      W.GNode 2 [k,h] -> do {
+        wanted <- A.fromGraphInt graph k;
+        digest <- A.fromGraphInt graph h;
+        Right ((,) wanted digest)
+      };
+      _ -> Left "malformed indexed query read"
+    }
+  };
+  decodeIndexLocation graph index = do {
+    value <- W.lookupGraphNode graph index;
+    case value of {
+      W.GNode 4 [] -> Right Nothing;
+      W.GNode 5 [h] -> mapEither Just (A.fromGraphInt graph h);
+      _ -> Left "malformed indexed query location"
+    }
+  };
+  indexNodeReferences (IndexNode wanted digest reads location) =
+    append [wanted,digest] (append (concatMap (\((,) k h) -> [k,h]) reads)
+      (case location of { Nothing -> []; Just value -> [value] }));
+  checkIndexReference dictionary hash index = do {
+    ensure (index >= 0 && index < M.size dictionary) "query string ID out of range";
+    ensure (not hash || indexStringHash (M.get compareInt index dictionary)) "invalid query graph digest";
+    Right ()
+  };
+  checkIndexNode dictionary (IndexNode wanted digest reads location) = do {
+    checkIndexReference dictionary False wanted;
+    checkIndexReference dictionary True digest;
+    mapM_ (\((,) k h) -> do {
+      checkIndexReference dictionary False k;
+      checkIndexReference dictionary True h
+    }) reads;
+    case location of { Nothing -> Right (); Just h -> checkIndexReference dictionary True h }
+  };
+
+  -- The ID grammar remains subject to the codec's original 64 Mi work limit.
+  -- A second, query-only policy bounds later string-key Session operations:
+  -- each row's inline-string projection is <= 64 Mi work, and the complete
+  -- projected index is <= 256 Mi work (Storage.maxBytes, used here as units).
+  -- This is deliberately NOT the old whole-index 64 Mi admission policy.
+  -- Count each referenced UTF-8 occurrence, without expanding/copying text:
+  -- header = 4 + marker/config bytes; row = 5 + key/hash bytes,
+  -- each read = 3 + key/hash bytes; Just location adds 1 + hash bytes.
+  -- The explicit dictionary is separately charged by the unchanged codec.
+  indexCharge remaining amount = do {
+    ensure (amount >= 0 && amount <= remaining) "query index referenced-work limit exceeded";
+    Right (remaining - amount)
+  };
+
+  indexChargeText remaining text = do {
+    -- Scalar length is a cheap lower bound; the exact UTF-8 scan is bounded
+    -- by the remaining budget and the unchanged per-symbol codec limit.
+    _ <- indexCharge remaining (stringLength text);
+    bytes <- W.utf8Size (min remaining (W.maxSymbolBytes W.defaultLimits)) text;
+    indexCharge remaining bytes
+  };
+  indexHeaderRemaining limit configuration = do {
+    first <- indexCharge limit 4;
+    second <- indexChargeText first "MLF-CRATE-QUERY-GRAPH-2";
+    indexChargeText second configuration
+  };
+  indexSourceNodeWork limit (QueryNode wanted digest reads location) = do {
+    first <- indexCharge limit 5;
+    second <- indexChargeText first wanted;
+    third <- indexChargeText second digest;
+    fourth <- foldM (\remaining ((,) k h) -> do {
+      pair <- indexCharge remaining 3;
+      key <- indexChargeText pair k;
+      indexChargeText key h
+    }) third reads;
+    final <- case location of {
+      Nothing -> Right fourth;
+      Just h -> do { tag <- indexCharge fourth 1; indexChargeText tag h }
+    };
+    Right (limit - final)
+  };
+  validateIndexSourceWork nodeLimit totalLimit configuration nodes = do {
+    ensure (nodeLimit >= 0 && totalLimit >= 0) "invalid query index work limits";
+    first <- indexHeaderRemaining totalLimit configuration;
+    _ <- foldM (\remaining node -> do {
+      work <- indexSourceNodeWork (min nodeLimit remaining) node;
+      indexCharge remaining work
+    }) first nodes;
+    Right ()
+  };
+
+  indexChargeReference dictionary remaining index =
+    indexCharge remaining (indexStringBytes (M.get compareInt index dictionary));
+  indexNodeWork limit dictionary (IndexNode wanted digest reads location) = do {
+    first <- indexCharge limit 5;
+    second <- indexChargeReference dictionary first wanted;
+    third <- indexChargeReference dictionary second digest;
+    fourth <- foldM (\remaining ((,) k h) -> do {
+      pair <- indexCharge remaining 3;
+      key <- indexChargeReference dictionary pair k;
+      indexChargeReference dictionary key h
+    }) third reads;
+    final <- case location of {
+      Nothing -> Right fourth;
+      Just h -> do {
+        tag <- indexCharge fourth 1;
+        indexChargeReference dictionary tag h
+      }
+    };
+    Right (limit - final)
+  };
+  -- Reference types/ranges are checked before calling this helper. Parameters
+  -- expose the exact production boundary logic to small, non-massive tests.
+  validateIndexWork nodeLimit totalLimit configuration dictionary rows = do {
+    ensure (nodeLimit >= 0 && totalLimit >= 0) "invalid query index work limits";
+    third <- indexHeaderRemaining totalLimit configuration;
+    _ <- foldM (\remaining row -> do {
+      work <- indexNodeWork nodeLimit dictionary row;
+      indexCharge remaining work
+    }) third rows;
+    Right ()
+  };
+
+  validateIndexRows configuration dictionary rows = do {
+    increasingIndexRows rows;
+    mapM_ (checkIndexNode dictionary) rows;
+    validateIndexWork (W.maxExpandedWork W.defaultLimits) Storage.maxBytes configuration dictionary rows;
+    let { used = S.fromList compareInt (concatMap indexNodeReferences rows);
+      table = M.fromDistinctAscList (map (\row -> (,) (indexKey row) row) rows) };
+    ensure (S.size used == M.size dictionary) "unused query graph dictionary string";
+    mapM_ (\row -> mapM_ (\((,) dependency expected) ->
+      case M.lookup compareInt dependency table of {
+        Nothing -> Left "unpublished query dependency";
+        Just target -> ensure (expected == indexHash target) "query publication has stale dependency version"
+      }) (indexReads row)) rows;
+    _ <- foldM (\heights row -> mapEither snd
+      (indexHeight table S.empty 0 heights (indexKey row))) M.empty rows;
+    Right table
+  };
+  -- Memoize actual subtree height, not just membership in a completed set:
+  -- otherwise dependency-first key order can hide a chain longer than 4096.
+  indexHeight nodes visiting depth heights wanted = do {
+    ensure (depth < 4096) "cyclic/deep query graph";
+    case M.lookup compareInt wanted heights of {
+      Just height -> do {
+        ensure (height <= 4096 - depth) "cyclic/deep query graph";
+        Right ((,) height heights)
+      };
+      Nothing -> do {
+        ensure (not (S.member compareInt wanted visiting)) "cyclic/deep query graph";
+        node <- case M.lookup compareInt wanted nodes of {
+          Just node -> Right node; Nothing -> Left "dangling query graph edge" };
+        result <- foldM (\((,) largest done) ((,) dependency _) -> do {
+          child <- indexHeight nodes (S.insert compareInt wanted visiting) (depth + 1) done dependency;
+          Right ((,) (max largest (fst child)) (snd child))
+        }) ((,) 0 heights) (indexReads node);
+        let { height = fst result + 1; next = M.insert compareInt wanted height (snd result) };
+        seq height (seq next (Right ((,) height next)))
+      }
+    }
+  };
+  materializeIndexNode dictionary (IndexNode wanted digest reads location) =
+    let { text = \index -> indexStringText (M.get compareInt index dictionary) }
+    in QueryNode (text wanted) (text digest)
+      (map (\((,) k h) -> (,) (text k) (text h)) reads) (mapOptional text location);
+
   decodeIndex configuration graph = do {
     root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "query graph root count" };
     value <- W.lookupGraphNode graph root;
     case value of {
+      W.GNode 412 [format,config,dictionary,entries] ->
+        decodeIndexV2 configuration graph format config dictionary entries;
       W.GNode 411 [format,config,entries] -> do {
         f <- A.fromGraphText graph format;
         c <- A.fromGraphText graph config;
@@ -172,8 +430,7 @@ module Bootstrap.QueryGraph where {
   publish session@(Session path config previous _ nodes pending) = do {
     failpoint <- getEnv "MLF_QUERY_FAILPOINT";
     if eqString failpoint "before-results" then ioReturn (Left "query publication interrupted before results") else
-    case validateClosure nodes of { Left e -> ioReturn (Left e); Right _ -> do {
-    let { value = encodeIndex config nodes };
+    case encodeIndexV2 config nodes of { Left e -> ioReturn (Left e); Right value -> do {
     encoded <- encodeHashed value;
     case encoded of { Left e -> ioReturn (Left e); Right ((,) digest bytes) -> do {
       written <- publishValues failpoint session (M.toList pending);

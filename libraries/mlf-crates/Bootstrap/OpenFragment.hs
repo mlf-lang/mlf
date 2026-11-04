@@ -198,16 +198,27 @@ module Bootstrap.OpenFragment
   packageHash (Package _ _ _ digest) = digest;
   packageFormat :: String;
   packageFormat = "MLF-OPEN-CRATE-1/checker-1";
+  -- packageFormat remains part of the existing semantic checker identity.
+  -- Storage framing has an independent version.
+  wireFormat8 :: String;
+  wireFormat8 = "MLF-OPEN-CRATE-2/checker-1";
+  -- Candidate engineering resource class; qualification is required.
+  packageWorkLimit :: Int;
+  packageWorkLimit = Storage.maxBytes;
   -- The distinct binary schema is a committed dispatch, never a fallback to
   -- an older parser after corruption of an open object.
-  packageFamily bytes = do {
+  packageSchema bytes = do {
     size <- lengthByteArray bytes;
     magic <- W.hasMagic bytes;
-    if not magic || size < 20 then ioReturn False else do {
+    if not magic || size < 20 then ioReturn 0 else do {
       a <- readByteArray bytes 16; b <- readByteArray bytes 17;
       c <- readByteArray bytes 18; d <- readByteArray bytes 19;
-      ioReturn (a == 7 && b == 0 && c == 0 && d == 0)
+      ioReturn (if b == 0 && c == 0 && d == 0 then a else 0)
     }
+  };
+  packageFamily bytes = do {
+    schema <- packageSchema bytes;
+    ioReturn (schema == 7 || schema == 8)
   };
   bindingReference ((,) n _) = Structure.toXName n;
   encodeFinal ((,) name fragment) = W.VNode 401
@@ -237,32 +248,287 @@ module Bootstrap.OpenFragment
     }) values;
     ioReturn (sequenceEither hashes)
   };
+
+  -- The returned remainder is derived from the SAME plan that is encoded.
+  -- Single-reference limits remain defaultLimits; aggregate is remaining.
+  hashSyntaxBudget remaining value =
+    catchIOError (hashSyntaxBudgetChecked remaining value)
+      (\error -> ioReturn (Left
+        ("binary encode IO failure: " ++ textFromChars (ioeGetErrorString error))));
+  hashSyntaxBudgetChecked remaining value =
+    case W.planRootBounded W.defaultLimits remaining [value] of {
+      Left message -> ioReturn (Left message);
+      Right ((,) tables used) ->
+        if used < 0 || used > remaining
+        then ioReturn (Left "open crate reference-work accounting mismatch")
+        else case W.layout W.defaultLimits tables of {
+          Left message -> ioReturn (Left message);
+          Right geometry -> do {
+            encoded <- W.encodeTables 6 geometry tables;
+            case encoded of {
+              Left message -> ioReturn (Left message);
+              Right bytes -> do {
+                digest <- byteArrayDigest bytes;
+                let { next = remaining - used };
+                seq next (ioReturn (Right ((,) digest next)))
+              }
+            }
+          }
+        }
+    };
+
+  referenceHashesBudget encode entries remaining reversed =
+    case entries of {
+      [] -> ioReturn (Right ((,) (reverse reversed) remaining));
+      (:) ((,) key value) rest -> do {
+        hashed <- hashSyntaxBudget remaining (encode value);
+        case hashed of {
+          Left message -> ioReturn (Left message);
+          Right ((,) digest next) ->
+            seq next (referenceHashesBudget encode rest next
+              ((:) ((,) key digest) reversed))
+        }
+      }
+    };
+
+  -- One map is also the duplicate-reference check. Its values are the same
+  -- verified shared external values, not copies decoded from the package.
+  validateReferencesBudget encode available references remaining checked =
+    case references of {
+      [] -> ioReturn (Right ((,) checked remaining));
+      (:) ((,) name expected) rest ->
+        if M.member compareString name checked
+        then ioReturn (Left "duplicate open crate reference")
+        else case M.lookup compareString name available of {
+          Nothing -> ioReturn (Left ("missing open crate reference: " ++ name));
+          Just value -> do {
+            hashed <- hashSyntaxBudget remaining (encode value);
+            case hashed of {
+              Left message -> ioReturn (Left message);
+              Right ((,) actual next) ->
+                if not (eqString actual expected)
+                then ioReturn (Left ("open crate dependency changed: " ++ name))
+                else let {
+                  following = M.insert compareString name value checked
+                } in seq next (seq following
+                  (validateReferencesBudget encode available rest next following))
+            }
+          }
+        }
+    };
+
+  -- Reading a recognized schema never retries a different parser.
+  -- Both selected readers authenticate the complete original byte snapshot.
+  readPackage bytes expected compiler metadata allBindings allDeclarations = do {
+    schema <- packageSchema bytes;
+    if schema == 8
+    then readPackage8 bytes expected compiler metadata allBindings allDeclarations
+    else if schema == 7
+    then readPackage7 bytes expected compiler metadata allBindings allDeclarations
+    else ioReturn (Left "unsupported open crate schema")
+  };
+
+  data PackageHeader8 = PackageHeader8 W.Graph
+    ([] ((,) String String)) ([] ((,) String String)) ([] Int) Int;
+  readPackage8 bytes expected compiler metadata allBindings allDeclarations = do {
+    auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
+    digest <- byteArrayDigest bytes;
+    if not (eqString digest expected)
+    then ioReturn (Left "open crate SHA mismatch")
+    else do {
+      decoded <- W.decodeGraphRootBounded
+        W.defaultLimits packageWorkLimit 8 bytes;
+      case do {
+        graph <- decoded;
+        roots <- case W.graphRoots graph of {
+          [] -> Left "open crate root count";
+          (:) header entries -> Right ((,) header entries)
+        };
+        case roots of {
+          (,) header entries -> do {
+            value <- W.lookupGraphNode graph header;
+            case value of {
+              W.GNode 432 [f,c,m,b,d,k] -> do {
+                format <- textAt graph f;
+                identity <- textAt graph c;
+                association <- textAt graph m;
+                ensure (eqString format wireFormat8 &&
+                  eqString identity compiler)
+                  "open crate checker/compiler version mismatch; rebuild object";
+                ensure (eqString association metadata)
+                  "open crate interface mismatch";
+                countNode <- W.lookupGraphNode graph k;
+                savedCount <- case countNode of {
+                  W.GInt count -> Right count;
+                  _ -> Left "invalid open crate fragment count"
+                };
+                count <- W.boundedLength
+                  (W.maxEdges W.defaultLimits - 1) entries;
+                ensure (savedCount == count)
+                  "open crate fragment count mismatch";
+                bindings <- referenceList graph b;
+                declarations <- referenceList graph d;
+                stats <- W.graphResourceStats graph;
+                let { used = W.resourceExpandedWork stats };
+                ensure (used >= 0 && used <= packageWorkLimit)
+                  "open crate package-work accounting mismatch";
+                let { remaining = packageWorkLimit - used };
+                seq remaining
+                  (Right (PackageHeader8 graph bindings declarations entries remaining))
+              };
+              _ -> Left "invalid open crate header"
+            }
+          }
+        }
+      } of {
+        Left message -> ioReturn (Left message);
+        Right (PackageHeader8 graph references dataReferences entries remaining) -> do {
+          bs <- validateReferencesBudget
+            Structure.toXType allBindings references remaining M.empty;
+          case bs of {
+            Left message -> ioReturn (Left message);
+            Right ((,) checkedBindings afterBindings) -> do {
+              ds <- validateReferencesBudget declarationValue
+                allDeclarations dataReferences afterBindings M.empty;
+              case ds of {
+                Left message -> ioReturn (Left message);
+                Right ((,) checkedDeclarations _) -> ioReturn (do {
+                  -- Validate all record envelopes/metadata first.
+                  prepared <- prepareFinals8 graph checkedBindings
+                    checkedDeclarations M.empty S.empty entries;
+                  -- This is a fresh graph-local typed memo, never reusable
+                  -- with another graph. The typed 64Mi work limit is unchanged.
+                  decodedBodies <- Structure.decodeGraphMany
+                    Structure.ShapeXTerm graph (map finalBodyIndex8 prepared);
+                  bodies <- traverseEither Structure.expectXTerm decodedBodies;
+                  fragments <- restoreFinals8 prepared bodies;
+                  if eqString auditSetting "1"
+                    then mapM_ (compose audit snd) fragments
+                    else Right ();
+                  Right (Package metadata fragments bytes digest)
+                })
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  data PackageFinalFields8 = PackageFinalFields8 String String Environment
+    ([] ((,) XName XType)) Int ([] ((,) XName XType)) ([] XName);
+  finalBodyIndex8 (PackageFinalFields8 _ _ _ _ index _ _) = index;
+
+  prepareFinals8 graph types declarations contexts seen entries =
+    case entries of {
+      [] -> Right [];
+      (:) index rest -> do {
+        value <- W.lookupGraphNode graph index;
+        case value of {
+          W.GNode 401 [n,h,ds,ps,t,bs,uses] -> do {
+            name <- textAt graph n;
+            savedStamp <- textAt graph h;
+            ensure (not (S.member compareString name seen))
+              "duplicate open crate fragment";
+            rawData <- decodedList Structure.ShapeText graph ds;
+            names <- traverseEither Structure.expectText rawData;
+            let { identity = Separate.pack names };
+            env <- case M.lookup compareString identity contexts of {
+              Just env -> Right env;
+              Nothing -> do {
+                values <- traverseEither
+                  (\key -> case M.lookup compareString key declarations of {
+                    Just declaration -> Right declaration;
+                    Nothing -> Left "open crate datatype reference out of scope"
+                  }) names;
+                environment values
+              }
+            };
+            params <- finalBindings graph types ps;
+            owned <- finalBindings graph types bs;
+            usedValues <- decodedList Structure.ShapeXName graph uses;
+            used <- traverseEither Structure.expectXName usedValues;
+            ensure (all
+              (\u -> any (\p -> X.equalName u (fst p)) params) used)
+              "open crate reference inventory mismatch";
+            next <- prepareFinals8 graph types declarations
+              (M.insert compareString identity env contexts)
+              (S.insert compareString name seen) rest;
+            Right ((:)
+              (PackageFinalFields8 name savedStamp env params t owned used)
+              next)
+          };
+          _ -> Left "invalid final open crate fragment"
+        }
+      }
+    };
+
+  restoreFinals8 prepared bodies = case prepared of {
+    [] -> case bodies of {
+      [] -> Right [];
+      _ -> Left "open crate decoded body count mismatch"
+    };
+    (:) (PackageFinalFields8 name savedStamp env params _ owned used) rest ->
+      case bodies of {
+        [] -> Left "open crate decoded body count mismatch";
+        (:) source more -> do {
+          next <- restoreFinals8 rest more;
+          Right ((:) ((,) name
+            (Fragment env params source owned used savedStamp)) next)
+        }
+      }
+  };
+
   makePackage compiler metadata fragments = do {
-    let { ps = M.toList (M.fromList compareString (concatMap
-      (\((,) _ f) -> map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty))
-        (append (parameters f) (bindings f))) fragments));
+    let {
+      ps = M.toList (M.fromList compareString (concatMap
+        (\((,) _ f) -> map
+          (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty))
+          (append (parameters f) (bindings f))) fragments));
       ds = M.toList (M.fromList compareString (concatMap
-        (\((,) _ f) -> map (\d -> (,) (D.datatypeName d) d) (declarations (context f))) fragments)) };
-    bh <- referenceHashes Structure.toXType ps;
-    dh <- referenceHashes declarationValue ds;
-    case do { b <- bh; d <- dh; Right ((,) b d) } of {
-      Left e -> ioReturn (Left e);
-      Right ((,) b d) -> do {
-        encoded <- Storage.encode 7 [W.VNode 430
-          [Structure.toText packageFormat,Structure.toText compiler,Structure.toText metadata,
-           Structure.toList (Structure.toPair Structure.toText Structure.toText) b,
-           Structure.toList (Structure.toPair Structure.toText Structure.toText) d,
-           Structure.toList encodeFinal fragments]];
-        case encoded of { Left e -> ioReturn (Left e); Right bytes -> do {
-          digest <- byteArrayDigest bytes;
-          ioReturn (Right (Package metadata fragments bytes digest))
-        } }
+        (\((,) _ f) -> map (\d -> (,) (D.datatypeName d) d)
+          (declarations (context f))) fragments))
+    };
+    case W.boundedLength (W.maxEdges W.defaultLimits - 1) fragments of {
+      Left message -> ioReturn (Left message);
+      Right count -> do {
+        bh <- referenceHashesBudget Structure.toXType ps packageWorkLimit [];
+        case bh of {
+          Left message -> ioReturn (Left message);
+          Right ((,) b afterBindings) -> do {
+            dh <- referenceHashesBudget declarationValue ds afterBindings [];
+            case dh of {
+              Left message -> ioReturn (Left message);
+              Right ((,) d remaining) -> do {
+                let {
+                  header = W.VNode 432
+                    [Structure.toText wireFormat8, Structure.toText compiler,
+                     Structure.toText metadata,
+                     Structure.toList
+                       (Structure.toPair Structure.toText Structure.toText) b,
+                     Structure.toList
+                       (Structure.toPair Structure.toText Structure.toText) d,
+                     W.VInt count];
+                  roots = (:) header (map encodeFinal fragments)
+                };
+                encoded <- W.encodeRootBounded W.defaultLimits remaining 8 roots;
+                case encoded of {
+                  Left message -> ioReturn (Left message);
+                  Right bytes -> do {
+                    digest <- byteArrayDigest bytes;
+                    ioReturn (Right (Package metadata fragments bytes digest))
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   };
   -- Only an acquired immutable object snapshot, its paired interface checksum,
   -- and checked dependency metadata can restore final receipts. No AST enters.
-  readPackage bytes expected compiler metadata allBindings allDeclarations = do {
+  readPackage7 bytes expected compiler metadata allBindings allDeclarations = do {
     auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
     digest <- byteArrayDigest bytes;
     if not (eqString digest expected) then ioReturn (Left "open crate SHA mismatch") else do {
