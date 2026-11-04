@@ -55,7 +55,17 @@
     "suite_stdout": "Passed ordered graph, package scheduling, typed index, region, interpreter and LLVM controls.",
     "before_manager": "8c4556416023ac727e3fb2294070358a3dae8d9e",
     "worker_roundtrip": true,
-    "malformed_import_duplicate_module_and_dependency_cycle_diagnostics_match_before": true
+    "malformed_import_duplicate_module_and_dependency_cycle_diagnostics_match_before": true,
+    "raw_freeze_bounds": {
+      "host_and_llvm": [
+        "snapshot-empty",
+        "snapshot-negative"
+      ],
+      "interpreter": [
+        "snapshot-empty"
+      ],
+      "expected": "array index out of bounds"
+    }
   },
   "packages": {
     "locked_root_plan_sha256": "c75ef5916ccfdc028d80d5aa83258601301841dc322816b4a652e84bd315e678",

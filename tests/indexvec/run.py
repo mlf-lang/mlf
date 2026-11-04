@@ -104,10 +104,13 @@ def main():
     interpreted = [*mlf, "--run", source, "--"]
     run([*interpreted, "success"], expected=EXPECTED)
     run([*interpreted, "set-end"], failure=b"IndexVec index out of bounds")
+    run([*interpreted, "snapshot-empty"], failure=b"array index out of bounds")
     for exe in [out / "Vector/probe", out / "native"]:
         run([exe, "success"], expected=EXPECTED)
         for mode in ["read-negative", "read-end", "huge", "get-end", "set-end"]:
             run([exe, mode], failure=b"IndexVec index out of bounds")
+        for mode in ["snapshot-empty", "snapshot-negative"]:
+            run([exe, mode], failure=b"array index out of bounds")
         run([exe, "capacity"], failure=b"invalid IndexVec length")
     # The invalid declarations are still exported and checked even though main is harmless.
     for name, ghc_diagnostic, mlf_diagnostic in [

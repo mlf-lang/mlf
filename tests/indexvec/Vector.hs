@@ -35,6 +35,8 @@ module Main where {
       "get-end" -> printInt (runST (stBind V.new (\table -> V.get table (V.fromInt 0))));
       "set-end" -> printInt (runST (stBind V.new (\table ->
         stBind (V.set table (V.fromInt 0) 1) (\_ -> stReturn 0))));
+      "snapshot-empty" -> printInt (runST (stBind (newSTArray 0 17) freezeSTArray) 0);
+      "snapshot-negative" -> printInt (runST (stBind (newSTArray 1 17) freezeSTArray) (0-1));
       "capacity" -> printInt (runST (stBind (V.filled 1152921504606846976 0) V.size));
       _ -> do {
         let { empty = V.fromList [] };
