@@ -1,5 +1,7 @@
 # Dependency graph compilation on the installed driver
 
+The single-pass SCC, shared reach sets and incremental publication were measured against both #29 and the original #43. [Foundation query study](foundation-graphs.md).
+
 This comparison measures the public `emlf SOURCE -o PROGRAM` endpoint. The
 #29 installation (`8c455641`) and the IndexVec installation
 (`ff7c8c6c`, implementation through `f46943ab`) both identify
