@@ -379,12 +379,13 @@ module Bootstrap.Crate where {
                   (concatMap (\p -> Artifact.crateBindings (snd p)) interfaces)
             };
             let {
+              importDictionaries name =
+                if eqString (stringSlice name 0 7) "module_" then dictionaries else M.empty;
+              conventions = M.mapWithKey (\name ty -> Separate.importClasses (importDictionaries name) ty) importedTypes;
               imported =
                 M.mapWithKey
                   (\name ty ->
-                     Separate.sourceScheme
-                       (if eqString (stringSlice name 0 7) "module_" then dictionaries else M.empty)
-                       ty)
+                     Separate.sourceScheme (importDictionaries name) ty)
                   importedTypes
             };
             let {
@@ -400,10 +401,10 @@ module Bootstrap.Crate where {
                     memberMap = M.fromList compareString (map (\m -> (,) (Modules.valueName m) m) members) };
               importedInstances <- traverseEither (\((,) _ ((,) name inst)) ->
                 mapEither ((,) name) (Surface.closeSourceInstance members memberMap inst)) inheritedInstances;
-              let { closeLocal = Surface.closeResolvedInstance (Surface.helperScope bindings) };
+              let { closeLocal = Surface.closeIndexedInstance (Surface.helperScope bindings) };
               local <- traverseEither (\((,) metadata row) -> mapEither ((,) (fst (snd metadata))) (closeLocal (snd row)))
                 (zip localInstances localRows);
-              Source.prepareResolvedSourcePlan bindings imported allData allClasses (map snd instances)
+              Source.prepareResolvedSourcePlanWithImports conventions bindings imported allData allClasses (map snd instances)
                 (append importedInstances local) valueScopes (map (\((,) owner _) -> candidates owner) instances)
             });
             lowered <- case sourcePlan of {
@@ -468,8 +469,7 @@ module Bootstrap.Crate where {
           else Query.compileSourceGroups (specIdentity spec) (specCache spec)
             imported protected plan;
         Nothing -> do {
-          result <- Query.compileGroups (specIdentity spec) (specCache spec) imported
-            (Inference.loweredData lowered) (Inference.loweredValues lowered);
+          result <- Query.compileLoweredFileGroups (specIdentity spec) (specCache spec) imported lowered;
           ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
             (M.fromList compareString
               (map (\((,) name ty) -> (,) name (Source.SourceContract ty [] True))

@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.Compiler as Compiler
+import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
@@ -17,7 +18,12 @@ import qualified Bootstrap.Resolved as R
 import qualified Bootstrap.SourceInference as Source
 import qualified Bootstrap.Surface as Surface
 import qualified Bootstrap.QueryGraph as Q
+import qualified Bootstrap.InferenceUnit as Inference
+import qualified Bootstrap.OpenFragment as Open
+import qualified Bootstrap.Separate as Separate
+import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.IndexVec as V
+import qualified Bootstrap.IntSet as I
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Module as Modules
@@ -335,6 +341,12 @@ resolverChecks = do
   hidden <- runScoped ""
   case hidden of
     T.Left _ -> pure (); T.Right _ -> error "importer granted an instance to a different defining module"
+  dictSource <- parsed ("DictRec",unlines ["module DictRec where",
+    "class Tag a where { tag :: a -> Int }","instance Tag Int where { tag x = getName x }",
+    "getName :: Int -> Int","getName x = tag x","untouched x = x"])
+  dictCrate <- right (Crate.prepareCrate (Crate.CrateSpec "dict-rec" "" T.NoImplicitPrelude [] [] "" "") [] [primitive,dictSource])
+  case Crate.preparedSourcePlan dictCrate of
+    T.Just _ -> pure (); T.Nothing -> error "copied helper incorrectly merged a source and dictionary SCC"
   let fresh = D.symbols [("a",False),("b",False),("c",True)]
   let (appended, late) = D.appendSymbols fresh ["selector","dictionary"]
   check "generation appends slots in source order" [3,4] (map V.toInt late)
@@ -378,10 +390,31 @@ resolverChecks = do
     (case D.selectorId generatedView (ix "method") of { T.Just i -> Just (V.toInt i); _ -> Nothing })
   check "ordinary declaration has no selector redirection" True
     (case D.selectorId generatedView (ix "Z") of { T.Nothing -> True; _ -> False })
-  let hiddenImport = D.generatedTable scope [ix "Z"] [] ["Z"] M.empty
+  let abiSymbols = D.symbolsWithKeys [("same","own.key",False),("same","import.key",False)]
+      [abiOwn,abiImport] = V.indices (D.symbolNodes abiSymbols)
+      abiTable = D.generatedTable abiSymbols [abiOwn] [] ["import.key"] M.empty
+  check "imported ABI key reuses the resolver slot despite display collision" (Just (V.toInt abiImport))
+    (case D.generatedImportId abiTable "import.key" of T.Just i -> Just (V.toInt i); _ -> Nothing)
+  check "no duplicate ABI declaration created" 2 (V.count (D.symbolNodes (D.generatedSymbols abiTable)))
+  let splitDomain = D.symbolsWithKeys [("Z","local.Z",False),("B","B",False),("external","external",False),("method","method",True)]
+      hiddenImport = D.generatedTable splitDomain [ix "Z"] [] ["Z"] M.empty
   check "local spelling and independent imported contract have separate slots" (Just 4,Just 0)
     (case D.generatedImportId hiddenImport "Z" of T.Just i -> Just (V.toInt i); _ -> Nothing,
      case D.generatedNameId hiddenImport "Z" of T.Just i -> Just (V.toInt i); _ -> Nothing)
+  let ca = Modules.Entity "A" "AClass" Modules.Class
+      cb = Modules.Entity "B" "BClass" Modules.Class
+      ma = Modules.Entity "A" "m" (Modules.Method "AClass")
+      mb = Modules.Entity "B" "m" (Modules.Method "BClass")
+      resolvedMethods = Modules.resolveNames (Modules.Names (M.fromList Modules.compareEntity
+          [(ca,"CA"),(cb,"CB"),(ma,"m"),(mb,"m")]))
+      activeClass = D.generatedTable (Modules.bindingSymbols resolvedMethods) [] ["select_m"] []
+        (M.singleton "m" ("select_m",["CA"]))
+  localMethod <- right (Modules.termId resolvedMethods ma)
+  inactiveMethod <- right (Modules.termId resolvedMethods mb)
+  check "active class owns its selector" (Just 2) (case D.selectorId activeClass localMethod of
+    T.Just i -> Just (V.toInt i); _ -> Nothing)
+  check "inactive imported method cannot capture another class's same-spelled selector" True
+    (case D.selectorId activeClass inactiveMethod of T.Nothing -> True; _ -> False)
   let collisions = D.symbols [("method",False),("method",True)]
       [local,importedMethod] = V.indices (D.symbolNodes collisions)
       redirects = D.generatedTable collisions [local] ["selector"] [] (M.singleton "method" ("selector",[] :: [H.String]))
@@ -406,6 +439,86 @@ resolverChecks = do
         [(ordinal,H.unpack n) | (ordinal,(n,_,_)) <- rows]
     _ -> error "resolved query plan lost its indexed rows"
 
+typedClassChecks = do
+  let slots = D.symbolsWithKeys [("same","foreign.same",False),("same","own.same",False),("use","own.use",False)]
+      [foreignId,own,use] = V.indices (D.symbolNodes slots)
+      term = R.Lam "same" T.Nothing (R.Let "unused" (R.Global foreignId) (R.Global own))
+      members = D.BoundValues slots [D.Bound own T.Nothing (R.IntLit 1),D.Bound use T.Nothing term]
+      scope = D.indexedScopes slots [(own,memptyMask),(use,memptyMask)]
+      memptyMask = I.empty
+  body <- case Surface.bindIndexed members (T.SConstructor "()") of
+    T.Left reason -> error (H.unpack reason); T.Right value -> pure value
+  let rhsRefs = D.expressionGlobalIds body
+  check "only the imported slot is free after the local declaration is bound" [0] (map V.toInt rhsRefs)
+  result <- case Classes.lowerSeparateClassesAndSlots (M.singleton "foreign.same" (T.SCon "Int" [])) [] scope []
+                 (T.SClassProgram [] [] [] body) of
+    T.Left reason -> error (H.unpack reason); T.Right out -> pure out
+  case result of
+    ((T.SProgram [] (T.SDeclScope [parameter] (T.SLetRec [_] lowered)),_),T.Just generated) -> do
+      check "external signature uses its original resolved slot" 0 (V.toInt parameter)
+      check "class-free lowering keeps the imported slot despite lexical shadowing" [0] (map V.toInt (D.expressionGlobalIds lowered))
+      check "external ABI admission keeps the declaration count" 3 (V.count (D.symbolNodes (D.generatedSymbols generated)))
+    _ -> error "typed external wrapper disappeared"
+  let methods = D.symbols [("method",True),("root",False)]
+      [methodId,sourceId] = V.indices (D.symbolNodes methods)
+      root = D.BoundValues methods [D.Bound sourceId T.Nothing (R.Global methodId)]
+      klass = T.SClassDecl "C" [("a",T.Star)] [] [("method",T.SArrow (T.STVar "a") (T.STVar "a"))]
+      instanceDecl = T.SInstanceDecl [] [] "C" [T.SCon "Int" []] [("method",T.SLam "x" T.Nothing (T.SVar "x"))]
+      rootScopes = D.indexedScopes methods [(sourceId,I.singleton 0)]
+  rootBody <- case Surface.bindIndexed root (T.SConstructor "()") of
+    T.Left reason -> error (H.unpack reason); T.Right value -> pure value
+  out <- case Classes.lowerSeparateClassesAndSlots M.empty ["dictionary"] rootScopes [I.singleton 0]
+                (T.SClassProgram [] [klass] [instanceDecl] rootBody) of
+    T.Left reason -> error (H.unpack reason); T.Right value -> pure value
+  case out of
+    ((T.SProgram _ (T.SDeclScope support (T.SLetRec _ lowered)),_),T.Just table) -> do
+      check "generated selector and dictionary slots are the bound slots" [2,3] (map V.toInt support)
+      let refs = D.expressionGlobalIds lowered
+      check "lowered method occurrence selects its generated slot" True (2 `elem` map V.toInt refs)
+      check "original method marker is not a runtime binding" False (V.toInt methodId `elem` map V.toInt refs)
+      check "class candidate identity" (Just 3) (case D.generatedNameId table "dictionary" of
+        T.Just i -> Just (V.toInt i); _ -> Nothing)
+    _ -> error "class generation did not label support owners"
+  let copied = T.SDeclScope [own] (T.SLet "same" (T.SGlobal own "outer") (T.SApp
+        (T.SGlobal own "inner") (T.SApp (T.SVar "same") (T.SGlobal foreignId "same"))))
+  check "copied helper hides its own slot only in its body" [1,0] (map V.toInt (D.expressionGlobalIds copied))
+  check "scope with typed binder leaves a lexical reference free" ["same"] (map H.unpack (D.expressionNamedReads copied))
+  check "prepared syntax also inventories the owned slot and enclosed occurrence"
+    [1,1,1,0] [V.toInt i | T.DeclRef i _ <- D.querySyntaxRefs copied]
+  let factsBase = D.symbolsWithKeys [("same","A.same",False),("same","B.same",False),
+                                     ("method","C.method",True),("root","Root.root",False)]
+      [qualified,plain,_,owner] = V.indices (D.symbolNodes factsBase)
+      factsScope = D.indexedScopes factsBase [(owner,I.empty)]
+      scheme h = if V.toInt h == V.toInt qualified then T.Just (["C"],True)
+                 else if V.toInt h == V.toInt plain then T.Just ([],False) else T.Nothing
+      rootResult used = Classes.withClassScopes M.empty [] factsScope [] (T.SClassProgram [] [klass] [] (T.SConstructor "()")) $ \inv ->
+        Classes.lowerUnsignedRootAt (\_ _ _ _ -> []) (T.Just owner) (Classes.withCheckedClassContracts scheme inv)
+          M.empty M.empty "root" (T.SGlobal used "same")
+      rootContract used = case rootResult used of
+        T.Right (Classes.SourceRootLowering body labels _ protected) -> (map (\(_,c,_) -> H.unpack c) labels,protected)
+        T.Left reason -> error (H.unpack reason)
+  check "qualified predecessor read by slot despite identical display" (["C"],True) (rootContract qualified)
+  check "ordinary predecessor does not inherit its same-spelled peer's scheme" ([],False) (rootContract plain)
+  let infer slot = Inference.compileOpenGroupIndexed "answer" [(foreignId,"external",T.XCon "Int" [])] []
+        [(use,("answer",T.Nothing,T.SLet "external" (T.SBoolLit True) (T.SGlobal slot "external")))]
+  case infer foreignId of
+    T.Right fragment -> case Open.bindings fragment of
+      [(_,T.XCon n [])] -> check "raw group global import survives local shadow" "Int" (H.unpack n)
+      _ -> error "unexpected raw group export type"
+    T.Left reason -> error (H.unpack reason)
+  let externalType = T.XCon "Int" []
+      typedUnit = Inference.compileLoweredGroupIndexed (const "") "answer" [(foreignId,"external",externalType)] []
+        [(use,("answer",T.Nothing,T.SGlobal foreignId "different-display"))]
+      namedUnit = Inference.compileLoweredGroupUsing (const "") "answer" [CQ.dependencyInterface [("external",externalType)]] []
+        [("answer",T.Nothing,T.SVar "external")]
+  case (typedUnit,namedUnit) of
+    (T.Right t,T.Right n) -> check "unit and named lowering emit identical xMLF"
+      (H.unpack (Pretty.prettyTerm (Separate.objectTerm n))) (H.unpack (Pretty.prettyTerm (Separate.objectTerm t)))
+    (T.Left reason,_) -> error (H.unpack reason)
+    (_,T.Left reason) -> error (H.unpack reason)
+  case infer own of
+    T.Left _ -> pure (); _ -> error "missing declaration slot was captured by a lexical name"
+
 -- The reference propagates named flags to convergence, independently of
 -- reverse edges and the candidate's work queue.
 protectionChecks = do
@@ -420,6 +533,28 @@ protectionChecks = do
         settle flags = let next = spread flags in if next == flags then next else settle next
         flags = Classes.propagateProtection (fromIntegral (length keys)) rows
     check "protection equals independent named fixed point" (settle []) [n | n <- keys,V.at flags (slots Map.! n)]
+-- Recover the calling convention from the checked result path. Do not
+-- instantiate or rewrite the type actually imported by the checker.
+importConventionChecks = do
+  let names = M.fromList H.v_compareString [("DA","A"),("DB","B")]
+      a = T.XTyVar 7
+      int = T.XCon "Int" []
+      dict n = T.XCon n [int]
+      prefix n = T.XArrow (dict n)
+      observe = map H.unpack . Separate.importClasses names
+      bounded = T.XForall a (prefix "DB" (prefix "DB" (T.XArrow int int)))
+                  (prefix "DA" (T.XVar a))
+      shadowed = T.XForall a (prefix "DA" int) (T.XForall a (T.XVar a) (prefix "DB" (T.XVar a)))
+  check "bounded result retains all repeated evidence slots in order" ["A","B","B"] (observe bounded)
+  check "shadowing forall captures the outer environment of its bound" ["B","A"] (observe shadowed)
+  check "unused forall bound does not contribute evidence" [] (observe (T.XForall a bounded int))
+  check "ordinary argument ends the evidence prefix" ["A"] (observe (prefix "DA" (T.XArrow int (prefix "DB" int))))
+  check "constraint inside a function argument is local" [] (observe (T.XArrow (prefix "DA" int) int))
+  check "a bounded ordinary input remains explicit" [] (observe (T.XForall a (dict "DA") (T.XArrow (T.XVar a) int)))
+  check "unbound result variable ends the metadata view" [] (observe (T.XVar a))
+  check "managed call stack can follow an ordinary hidden slot" ["B","MLFHasCallStack"]
+    (observe (T.XForall a (T.XArrow (T.XCon "MLFStackEvidence" []) int) (prefix "DB" (T.XVar a))))
+
 main = do
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
       wide = [("top",map fst chain)] ++ chain
@@ -439,4 +574,6 @@ main = do
   datatypeChecks
   resolverChecks
   protectionChecks
+  importConventionChecks
+  typedClassChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

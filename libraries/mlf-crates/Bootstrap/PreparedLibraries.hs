@@ -28,7 +28,6 @@ module Bootstrap.PreparedLibraries
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.ImportParameters as Parameters;
-  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.ImportedRoot as Imported;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Type as T;
@@ -249,7 +248,7 @@ module Bootstrap.PreparedLibraries
       "prepared library source class mismatch"
   };
   instanceRows raw resolution bindings = let {
-    closeLocal = Surface.closeResolvedInstance (Surface.helperScope bindings);
+    closeLocal = Surface.closeIndexedInstance (Surface.helperScope bindings);
     rows = Modules.resolvedInstanceRows resolution;
     ownership = owners raw;
     imported = M.fromList compareString (concatMap Artifact.crateInstances (interfaces raw));
@@ -388,11 +387,12 @@ module Bootstrap.PreparedLibraries
     };
     _ -> Left "native library requires one canonical builtin implementation"
   };
-  -- Only entities owned by the imported interface may fill an existing
-  -- source slot. An equal printed name in the user crate is a different slot.
-  externalParameters resolution signatures = let {
-    symbols = Modules.bindingSymbols (Modules.resolvedCrateBindings resolution)
-  } in Parameters.admit symbols (Dependency.symbolKeyIndex symbols) signatures;
+  -- Class lowering owns every support/selector slot used in the completed
+  -- wrapper. Its table also maps the imported contracts into this resolution.
+  wrapperImports lowered signatures = case snd lowered of {
+    Just table -> Parameters.fromGenerated table signatures;
+    Nothing -> Left "prepared library lowering lost its declaration table"
+  };
   compileNativeResolvedRootV1 raw resolution = do {
     let { display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
           sourcePhase phase result = Core.atPhase phase (mapLeft display result);
@@ -403,7 +403,7 @@ module Bootstrap.PreparedLibraries
           bindings = Modules.boundIn resolution own;
           entryModule = last resolved };
     entry <- sourcePhase ModuleResolution (Modules.entryExpr resolution entryModule);
-    body <- sourcePhase ModuleResolution (Surface.bindResolvedExpr bindings entry);
+    body <- sourcePhase ModuleResolution (Surface.bindIndexedExpr bindings entry);
     parts <- sourcePhase Inference (canonicalParts resolution);
     instances <- sourcePhase Inference (instanceRows raw resolution bindings);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
@@ -414,10 +414,13 @@ module Bootstrap.PreparedLibraries
             (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
           externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
-    full <- sourcePhase Inference (Classes.lowerSeparateClassesInScopes externals (map fst instances)
-      (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
+    let { conventions = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
+            then Separate.importClasses dictionaries ty else []) signatures };
+    full <- sourcePhase Inference (Classes.lowerSeparateClassesAndSlotsWithImports conventions externals (map fst instances)
+      (Modules.resolvedValueScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
-    selected <- sourcePhase Verification (Parameters.select (externalParameters resolution signatures) full);
+    imports <- sourcePhase Verification (wrapperImports full signatures);
+    selected <- sourcePhase Verification (Parameters.select imports (fst full));
     let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected);
           diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
             (Modules.resolvedCrateDisplayNames resolution)) };
@@ -467,7 +470,7 @@ module Bootstrap.PreparedLibraries
           bindings = Modules.boundIn resolution own;
           entryModule = last resolved };
     entry <- sourcePhase ModuleResolution (Modules.entryExpr resolution entryModule);
-    body <- sourcePhase ModuleResolution (Surface.bindResolvedExpr bindings entry);
+    body <- sourcePhase ModuleResolution (Surface.bindIndexedExpr bindings entry);
     parts <- sourcePhase Inference (canonicalParts resolution);
     instances <- sourcePhase Inference (instanceRows raw resolution bindings);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
@@ -478,10 +481,13 @@ module Bootstrap.PreparedLibraries
             (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
           externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
-    full <- sourcePhase Inference (Classes.lowerSeparateClassesInScopes externals (map fst instances)
-      (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
+    let { conventions = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
+            then Separate.importClasses dictionaries ty else []) signatures };
+    full <- sourcePhase Inference (Classes.lowerSeparateClassesAndSlotsWithImports conventions externals (map fst instances)
+      (Modules.resolvedValueScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
-    selected <- sourcePhase Verification (Parameters.select (externalParameters resolution signatures) full);
+    imports <- sourcePhase Verification (wrapperImports full signatures);
+    selected <- sourcePhase Verification (Parameters.select imports (fst full));
     let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected);
           diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
             (Modules.resolvedCrateDisplayNames resolution)) };

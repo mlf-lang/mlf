@@ -11,13 +11,18 @@ module Bootstrap.Dependency where {
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Resolved as R;
   import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Desugar as Desugar;
   -- Edges point from a declaration to the declarations it needs. Namespace
   -- imports and type observations deliberately do not become value SCC edges.
-  data Observation = Observation ([] String) ([] String) ([] String) ([] String);
+  data Observation = Observation ([] TermRef) ([] String) ([] String) ([] String);
   lexicalValueName name = if stringLength name >= 11 && eqString (stringSlice name 0 11) "$MLF.Infix." then stringSlice name 11 (stringLength name - 11) else name;
-  valueNames (Observation values _ _ _) = values;
+  valueRefs (Observation values _ _ _) = values;
+  valueNames observation = map termRefName (valueRefs observation);
+  expressionNamedReads expression = mapMaybe (\ref -> case ref of {
+    LexicalRef n -> Just n; DeclRef _ _ -> Nothing
+  }) (valueRefs (observeExpression expression));
   typeNames (Observation _ types _ _) = types;
   constructorNames (Observation _ _ constructors _) = constructors;
   classNames (Observation _ _ _ classes) = classes;
@@ -27,10 +32,23 @@ module Bootstrap.Dependency where {
   mergeMany observations = foldlStrict merge emptyObservation observations;
   canonical names = S.toList (S.fromList compareString names);
   normalize (Observation a b c d) =
-    Observation (canonical a) (canonical b) (canonical c) (canonical d);
+    Observation (S.toList (S.fromList compareRead a)) (canonical b) (canonical c) (canonical d);
+  compareRead a b = case compareString (termRefName a) (termRefName b) of {
+    0 -> case (,) a b of {
+      (,) (LexicalRef _) (LexicalRef _) -> 0; (,) (LexicalRef _) _ -> 0 - 1;
+      (,) _ (LexicalRef _) -> 1; (,) (DeclRef i _) (DeclRef j _) -> compareInt (V.toInt i) (V.toInt j)
+    };
+    order -> order
+  };
   without values bound = filter (\n -> not (S.member compareString n bound)) values;
   bindObservation bound (Observation values types constructors classes) =
-    Observation (without values bound) types constructors classes;
+    Observation (filter (\ref -> case ref of {
+      LexicalRef n -> not (S.member compareString n bound); DeclRef _ _ -> True
+    }) values) types constructors classes;
+  bindDeclObservation slots (Observation values types constructors classes) =
+    let { bound = IS.fromList (map V.toInt slots) } in Observation (filter (\ref -> case ref of {
+      LexicalRef _ -> True; DeclRef i _ -> not (IS.member (V.toInt i) bound)
+    }) values) types constructors classes;
   observeType :: SType -> Observation;
   observeType ty =
     case ty of {
@@ -64,7 +82,8 @@ module Bootstrap.Dependency where {
       SAsPattern _ inner -> observePattern inner;
       SLazyPattern inner -> observePattern inner;
       SOverloadedStringPattern _ equality conversion ->
-        Observation ((:) (lexicalValueName equality) ((:) (lexicalValueName conversion) [])) [] [] [];
+        Observation [LexicalRef (lexicalValueName equality),LexicalRef (lexicalValueName conversion)] [] [] [];
+      SIndexedStringPattern _ equality conversion -> Observation [equality,conversion] [] [] [];
       SConstructorPattern n _ -> Observation [] [] ((:) n []) [];
       SNestedPattern n ps ->
         merge (Observation [] [] ((:) n []) []) (mergeMany (map observePattern ps));
@@ -72,31 +91,48 @@ module Bootstrap.Dependency where {
       _ -> emptyObservation
     };
   observeExpression :: SExpr -> Observation;
-  observeExpression expression =
+  observeExpression = observeExpressionWith True;
+  observeExpressionWith includeCandidates = observeSyntax includeCandidates False;
+  -- Prepared input serialization includes declaration markers and their
+  -- enclosed occurrences. Dependency selection uses only free references.
+  querySyntaxRefs expression = valueRefs (observeSyntax True True expression);
+  observeSyntax includeCandidates inventory expression =
+    let { child = observeSyntax includeCandidates inventory } in
     case expression of {
-      SSourceDefinition body -> observeExpression body;
-      SCallSite _ _ body -> observeExpression body;
+      SSourceDefinition body -> child body;
+      SCallSite _ _ body -> child body;
       SSharedBind pattern action body binding failure ->
         merge (observePattern pattern)
-          (merge (bindObservation (S.fromList compareString (Desugar.patternVariables pattern)) (observeExpression body))
-            (mergeMany (map observeExpression ((:) action ((:) binding ((:) failure []))))));
-      SVar n -> Observation ((:) (lexicalValueName n) []) [] [] [];
+          (merge (bindObservation (S.fromList compareString (Desugar.patternVariables pattern)) (child body))
+            (mergeMany (map child ((:) action ((:) binding ((:) failure []))))));
+      SGlobal i n -> Observation [DeclRef i n] [] [] [];
+      SDeclScope ids group -> let {
+        bound result = if inventory then result else bindDeclObservation ids result;
+        owners names result = if inventory then merge (Observation (zipWith DeclRef ids names) [] [] []) result else result
+      } in case group of {
+        SLam name annotation body -> owners [name] (merge (observeOptional annotation) (bound (child body)));
+        SLet name rhs body -> owners [name] (merge (child rhs) (bound (child body)));
+        SLetRec defs body -> owners (map (\((,,) name _ _) -> name) defs) (bound (merge (child body)
+          (mergeMany (map (\((,,) _ mode rhs) -> merge (observeRecursiveMode mode) (child rhs)) defs))));
+        _ -> child group
+      };
+      SVar n -> Observation [LexicalRef (lexicalValueName n)] [] [] [];
       SConstructor n -> Observation [] [] ((:) n []) [];
       SLam n a b ->
-        merge (observeOptional a) (bindObservation (S.singleton n) (observeExpression b));
-      SApp a b -> merge (observeExpression a) (observeExpression b);
+        merge (observeOptional a) (bindObservation (S.singleton n) (child b));
+      SApp a b -> merge (child a) (child b);
       SLet n a b ->
-        merge (observeExpression a) (bindObservation (S.singleton n) (observeExpression b));
-      SAnn a t -> merge (observeExpression a) (observeAnnotation t);
-      SSignature a t -> merge (observeExpression a) (observeAnnotation t);
+        merge (child a) (bindObservation (S.singleton n) (child b));
+      SAnn a t -> merge (child a) (observeAnnotation t);
+      SSignature a t -> merge (child a) (observeAnnotation t);
       SCase a branches ->
-        merge (observeExpression a)
+        merge (child a)
           (mergeMany
              (map
                 (\(SAlternative p b) ->
                    merge (observePattern p)
                      (bindObservation (S.fromList compareString (Desugar.patternVariables p))
-                        (observeExpression b)))
+                        (child b)))
                 branches));
       SEquations rows ->
         mergeMany
@@ -105,20 +141,27 @@ module Bootstrap.Dependency where {
                 merge (mergeMany (map observePattern ps))
                   (bindObservation
                      (S.fromList compareString (concatMap Desugar.patternVariables ps))
-                     (observeExpression b)))
+                     (child b)))
              rows);
-      SDo _ _ -> observeExpression (Desugar.desugarDo expression);
+      SDo _ _ -> child (Desugar.desugarDo expression);
       SLetRec declarations body ->
         bindObservation (S.fromList compareString (map (\((,,) n _ _) -> n) declarations))
-          (merge (observeExpression body)
+          (merge (child body)
              (mergeMany
-                (map (\((,,) _ mode b) -> merge (observeRecursiveMode mode) (observeExpression b))
+                (map (\((,,) _ mode b) -> merge (observeRecursiveMode mode) (child b))
                    declarations)));
       SWanted dictionary candidates ->
-        Observation (map snd candidates) ((:) dictionary []) [] [];
-      SChecked ty b -> merge (observeType ty) (observeExpression b);
+        Observation (if includeCandidates then map (compose LexicalRef snd) candidates else []) ((:) dictionary []) [] [];
+      SWantedRefs dictionary candidates -> Observation (if includeCandidates then map snd candidates else []) [dictionary] [] [];
+      SChecked ty b -> merge (observeType ty) (child b);
       _ -> emptyObservation
     };
+  -- Typed reads survive a same-spelled local binder. Collect every RHS and
+  -- pattern operation, without treating a scope's owner IDs as references.
+  expressionGlobalIds :: SExpr -> [] (V.Index Declaration);
+  expressionGlobalIds expression = mapMaybe (\ref -> case ref of {
+    LexicalRef _ -> Nothing; DeclRef i _ -> Just i
+  }) (valueRefs (observeExpression expression));
   observeDeclaration ((,,) _ annotation body) =
     normalize (merge (observeOptional annotation) (observeExpression body));
   declarationObservations values =
@@ -295,7 +338,7 @@ module Bootstrap.Dependency where {
   -- Each slot owns its canonical spelling and stable definition key. A
   -- resolved entity can share its *printed* name with an inactive import.
   -- Only the stable keys cross a resolution or link-session boundary.
-  data Symbols = Symbols (V.IndexVec Declaration String) ([] (V.Index Declaration)) IntSet
+  data Symbols = Symbols (V.IndexVec Declaration String) ([] (V.Index Declaration)) (IntMap (Maybe String))
                          (V.IndexVec Declaration String);
   symbolNodes (Symbols nodes _ _ _) = nodes;
   symbolName symbols = V.at (symbolNodes symbols);
@@ -309,10 +352,16 @@ module Bootstrap.Dependency where {
   compareSlots nodes i j = compareString (V.at nodes i) (V.at nodes j);
   symbolsWithKeys entries =
     let { nodes = V.fromList (map (\((,,) name _ _) -> name) entries); indices = V.indices nodes;
-          methods = mapMaybe (\((,) ((,,) _ _ method) i) -> if method then Just (V.toInt i) else Nothing)
+          methods = mapMaybe (\((,) ((,,) _ _ method) i) -> if method then Just ((,) (V.toInt i) Nothing) else Nothing)
                       (zip entries indices);
           keys = V.fromList (map (\((,,) _ key _) -> key) entries)
-    } in Symbols nodes (sortBy (compareSlots nodes) indices) (IS.fromList methods) keys;
+    } in Symbols nodes (sortBy (compareSlots nodes) indices) (IM.fromList methods) keys;
+  withMethodOwners (Symbols nodes order methods keys) owners =
+    Symbols nodes order (foldlStrict (\table ((,) i owner) -> IM.insert (V.toInt i) (Just owner) table) methods owners) keys;
+  methodOwner (Symbols _ _ methods _) i = case IM.lookup (V.toInt i) methods of {
+    Just owner -> owner; Nothing -> Nothing
+  };
+  methodKeyCompare = comparePair compareString compareString;
   -- Named adapters and standalone link sessions already have stable names.
   symbols entries = symbolsWithKeys (map (\((,) n m) -> (,,) n n m) entries);
   -- Generated names are qualified by their owner at the lowering boundary.
@@ -328,41 +377,64 @@ module Bootstrap.Dependency where {
   extendSymbols table names = fst (appendSymbols table names);
   -- Visibility belongs to the defining declaration. Only active definitions
   -- enter the adapter used by the named surface/class lowering boundary.
+  data ClassContext = ClassContext GeneratedTable Bool (V.Index Declaration -> Maybe ((,) ([] String) Bool));
   data ValueScopes a = NamedScopes (Map String a) |
-    IndexedScopes Bool Symbols (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe a));
+    IndexedScopes Bool (Maybe ClassContext) Symbols (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe a));
   indexedScopes symbols entries = let {
     names = M.fromList compareString (map (\((,) i _) -> (,) (symbolName symbols i) i) entries);
     table = runST (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
       stBind (ST.map_ (\((,) i a) -> V.set rows i (Just a)) entries) (\_ -> V.freeze rows)))
-  } in IndexedScopes True symbols names table;
+  } in IndexedScopes True Nothing symbols names table;
   mapScopes f scopes = case scopes of {
     NamedScopes named -> NamedScopes (M.map f named);
-    IndexedScopes top symbols names table -> IndexedScopes top symbols names
+    IndexedScopes top tableId symbols names table -> IndexedScopes top tableId symbols names
       (V.fromList (map (mapOptional f) (V.toList table)))
   };
   namedScopes scopes = case scopes of {
     NamedScopes named -> named;
-    IndexedScopes _ _ names table -> M.map (\i -> case V.at table i of {
+    IndexedScopes _ _ _ names table -> M.map (\i -> case V.at table i of {
       Just a -> a; Nothing -> panic "inactive declaration scope"
     }) names
   };
   lookupScope name scopes = case scopes of {
     NamedScopes named -> M.lookup compareString name named;
-    IndexedScopes _ _ names table -> case M.lookup compareString name names of {
+    IndexedScopes _ _ _ names table -> case M.lookup compareString name names of {
       Nothing -> Nothing; Just i -> V.at table i
     }
   };
   scopeAt scopes i = case scopes of {
-    IndexedScopes _ _ _ table -> V.at table i;
+    IndexedScopes _ _ _ _ table -> V.at table i;
     NamedScopes _ -> panic "named visibility has no declaration IDs"
   };
+  scopeContext scopes = case scopes of {
+    NamedScopes _ -> Nothing; IndexedScopes _ context _ _ _ -> context
+  };
+  scopeGeneration scopes = mapOptional (\(ClassContext table _ _) -> table) (scopeContext scopes);
+  scopeContract scopes i = case scopeContext scopes of {
+    Nothing -> Nothing; Just (ClassContext _ _ read) -> read i
+  };
+  withScopeContext context scopes = case scopes of {
+    NamedScopes _ -> scopes;
+    IndexedScopes top _ symbols names rows -> IndexedScopes top context symbols names rows
+  };
   nestedScopes scopes = case scopes of {
-    IndexedScopes _ symbols names table -> IndexedScopes False symbols names table;
+    IndexedScopes _ generated symbols names table -> IndexedScopes False generated symbols names table;
     NamedScopes _ -> scopes
   };
   bindingScope scopes name copied fallback = case scopes of {
-    IndexedScopes False _ _ _ -> if copied then fromMaybe fallback (lookupScope name scopes) else fallback;
+    IndexedScopes False _ _ _ _ -> if copied then fromMaybe fallback (lookupScope name scopes) else fallback;
     _ -> fromMaybe fallback (lookupScope name scopes)
+  };
+  lookupSourceScope scopes i = case scopes of {
+    NamedScopes _ -> Nothing;
+    IndexedScopes _ _ _ _ rows -> if V.toInt i < 0 || V.toInt i >= V.count rows then Nothing else V.at rows i
+  };
+  scopeForBinder scopes ref copied fallback = case ref of {
+    DeclRef i name -> case scopes of {
+      NamedScopes _ -> bindingScope scopes name copied fallback;
+      IndexedScopes _ _ _ _ _ -> fromMaybe fallback (lookupSourceScope scopes i)
+    };
+    LexicalRef name -> bindingScope scopes name copied fallback
   };
   data Bound = Bound (V.Index Declaration) (Maybe SAnnotation) (R.Expr Declaration);
   boundId (Bound i _ _) = i;
@@ -381,39 +453,49 @@ module Bootstrap.Dependency where {
   -- Class generation owns the slots of its local outputs. Interface-only
   -- selectors and dictionaries join the same table as imported bindings.
   data GeneratedTable = GeneratedTable Symbols ([] (V.Index Declaration))
-    (Map String (V.Index Declaration)) (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe (V.Index Declaration)));
+    (Map String (V.Index Declaration)) (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe ((,) (V.Index Declaration) ([] String))));
   generatedSymbols (GeneratedTable symbols _ _ _ _) = symbols;
   generatedSlots (GeneratedTable _ slots _ _ _) = slots;
   generatedNameId (GeneratedTable _ _ names _ _) name = M.lookup compareString name names;
   generatedImportId (GeneratedTable _ _ _ imports _) name = M.lookup compareString name imports;
-  selectorId (GeneratedTable _ _ _ _ selectors) i = V.at selectors i;
-  generatedTable base sources supportNames imports methods =
+  selectorEntry (GeneratedTable _ _ _ _ selectors) i = V.at selectors i;
+  selectorId table i = mapOptional fst (selectorEntry table i);
+  generatedTable base sources supportNames imports methods = let {
+    entries = mapMaybe (\((,) name binding) -> case snd binding of {
+      (:) owner _ -> Just ((,) ((,) owner name) binding); [] -> Nothing
+    }) (M.toList methods)
+  } in generatedTableFor base sources supportNames imports methods (M.fromList methodKeyCompare entries);
+  generatedTableFor base sources supportNames imports methods ownedMethods =
     let {
       nodes = symbolNodes base; start = V.count nodes;
       byId i = (,) (symbolName base i) i;
       active = M.fromList compareString (map byId sources);
       owners = IS.fromList (map V.toInt sources);
       inactive = filter (\i -> not (IS.member (V.toInt i) owners)) (V.indices nodes);
-      available = M.fromList compareString (map (\i -> (,) (symbolKey base i) i) inactive);
+      available = symbolKeyIndex base;
       missing = filter (\n -> not (M.member compareString n available)) imports;
       symbols = extendSymbols base (append supportNames missing);
       support = map V.fromInt (range start (start + length supportNames - 1));
       extra = map V.fromInt (range (start + length supportNames) (V.count (symbolNodes symbols) - 1));
       assigned ids = M.fromList compareString (map (\i -> (,) (symbolName symbols i) i) ids);
-      external = M.union compareString (assigned extra) available;
+      keys = M.union compareString (assigned extra) available;
+      external = M.fromList compareString (map (\key -> (,) key (M.get compareString key keys)) imports);
       names = M.union compareString active (M.union compareString (assigned support)
-        (M.union compareString external (M.fromList compareString (map byId inactive))));
-      choose i = case M.lookup compareString (symbolName base i) methods of {
+        (M.union compareString keys (M.fromList compareString (map byId inactive))));
+      choose i = case (case methodOwner base i of {
+        Nothing -> M.lookup compareString (symbolName base i) methods;
+        Just owner -> M.lookup methodKeyCompare ((,) owner (symbolName base i)) ownedMethods
+      }) of {
         Nothing -> Nothing;
-        Just ((,) name _) -> M.lookup compareString name names
+        Just ((,) name classes) -> mapOptional (\j -> (,) j classes) (M.lookup compareString name names)
       };
       selectors = case base of { Symbols _ _ methodIds _ -> runST
         (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
           stBind (ST.map_ (\n -> let { i = V.fromInt n } in V.set rows i (choose i))
-            (IS.toAscList methodIds)) (\_ -> V.freeze rows))) }
+            (IM.keys methodIds)) (\_ -> V.freeze rows))) }
     } in GeneratedTable symbols support names external selectors;
   scopeOwnerId scopes name = case scopes of {
-    IndexedScopes _ _ names _ -> M.lookup compareString name names;
+    IndexedScopes _ _ _ names _ -> M.lookup compareString name names;
     NamedScopes _ -> Nothing
   };
   -- Only later-generated syntax arrives by spelling. Source edges use the
@@ -440,7 +522,7 @@ module Bootstrap.Dependency where {
           targets i = mapMaybe (generatedNameId generation) (fromMaybe []
             (case scopes of {
               NamedScopes values -> M.lookup compareString (symbolName base i) values;
-              IndexedScopes _ _ _ _ -> scopeAt scopes i
+              IndexedScopes _ _ _ _ _ -> scopeAt scopes i
             }))
     } in resolvedGroupsWith bindings generation generated targets;
   resolvedGroupsWith (BoundValues base bound) generation generated targets = do {

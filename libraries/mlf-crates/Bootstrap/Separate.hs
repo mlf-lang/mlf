@@ -122,6 +122,10 @@ module Bootstrap.Separate where {
           names;
       freshPure (M.union compareString (M.fromList compareString pairs) env)
     };
+  hygieneRef env ref = case ref of {
+    LexicalRef n -> LexicalRef (hygieneName env n);
+    DeclRef _ _ -> ref
+  };
   hygienePattern :: Map String String -> SPattern -> SPattern;
   hygienePattern env p =
     case p of {
@@ -131,6 +135,7 @@ module Bootstrap.Separate where {
       SAnnotatedPattern n a -> SAnnotatedPattern (hygieneName env n) a;
       SOverloadedStringPattern s equal fromString ->
         SOverloadedStringPattern s (hygieneName env equal) (hygieneName env fromString);
+      SIndexedStringPattern t eq from -> SIndexedStringPattern t (hygieneRef env eq) (hygieneRef env from);
       SAsPattern n pattern -> SAsPattern (hygieneName env n) (hygienePattern env pattern);
       SLazyPattern pattern -> SLazyPattern (hygienePattern env pattern);
       _ -> p
@@ -139,6 +144,20 @@ module Bootstrap.Separate where {
   hygieneIn env expression =
     case expression of {
       SVar n -> freshPure (SVar (hygieneName env n));
+      SGlobal _ _ -> freshPure expression;
+      SWantedRefs n cs -> freshPure (SWantedRefs n (map (\((,) role r) -> (,) role (hygieneRef env r)) cs));
+      SDeclScope ids enclosed -> do {
+        b <- case enclosed of {
+          SLam n a body -> do { x <- hygieneIn env body; freshPure (SLam n a x) };
+          SLet n a body -> do { x <- hygieneIn env a; y <- hygieneIn env body; freshPure (SLet n x y) };
+          SLetRec ds body -> do {
+            defs <- mapM (\((,,) n mode rhs) -> do { x <- hygieneIn env rhs; freshPure ((,,) n mode x) }) ds;
+            x <- hygieneIn env body; freshPure (SLetRec defs x)
+          };
+          _ -> freshFail "invalid declaration binder in separate compilation"
+        };
+        freshPure (SDeclScope ids b)
+      };
       SLam n a b ->
         do {
           scope <- hygieneBind env ((:) n []);
@@ -234,6 +253,10 @@ module Bootstrap.Separate where {
   -- Managed call-stack qualification is represented by a private evidence
   -- wrapper, never by the raw first-class CallStack value type. No class or
   -- instance dictionary for HasCallStack is fabricated during reconstruction.
+  dictionaryClass :: forall a. Map String String -> String -> [] a -> Maybe String;
+  dictionaryClass dictionaries name args =
+    if eqString name "MLFStackEvidence" && null args then Just Classes.callStackPredicate else
+    if eqString name "MLFCallStack" then Nothing else M.lookup compareString name dictionaries;
   sourceSchemeIn :: Map String String -> Bool -> XType -> SType;
   sourceSchemeIn dictionaries qualified ty =
     case ty of {
@@ -244,10 +267,7 @@ module Bootstrap.Separate where {
         case a of {
           XCon d ts ->
             case if qualified
-                 then (if eqString d "MLFStackEvidence" && null ts
-                       then Just "MLFHasCallStack"
-                       else if eqString d "MLFCallStack" then Nothing
-                       else M.lookup compareString d dictionaries)
+                 then dictionaryClass dictionaries d ts
                  else Nothing of {
               Just c ->
                 let {
@@ -270,6 +290,25 @@ module Bootstrap.Separate where {
           (sourceSchemeIn dictionaries False bound)
           (sourceSchemeIn dictionaries qualified body)
     };
+  -- Only call metadata follows a bounded result variable. Keep the exact
+  -- imported XType for the checked wrapper. Capture the environment at the
+  -- forall's definition so repeated variable names retain lexical scope.
+  data PrefixBound = PrefixBound XType (Map XTyVar PrefixBound);
+  importClasses :: Map String String -> XType -> [] String;
+  importClasses dictionaries ty = importClassesIn dictionaries M.empty ty;
+  importClassesIn :: Map String String -> Map XTyVar PrefixBound -> XType -> [] String;
+  importClassesIn dictionaries bounds ty = case ty of {
+    XForall variable bound body -> importClassesIn dictionaries
+      (M.insert T.compareTyVar variable (PrefixBound bound bounds) bounds) body;
+    XVar variable -> case M.lookup T.compareTyVar variable bounds of {
+      Nothing -> [];
+      Just (PrefixBound definition outer) -> importClassesIn dictionaries outer definition
+    };
+    XArrow (XCon name args) result -> case dictionaryClass dictionaries name args of {
+      Nothing -> []; Just cls -> (:) cls (importClassesIn dictionaries bounds result)
+    };
+    _ -> []
+  };
   sourceScheme dictionaries ty = sourceSchemeIn dictionaries True ty;
   freshInteger :: Fresh Int;
   freshInteger = Fresh (\count used -> Right ((,,) count (count + 1) used));

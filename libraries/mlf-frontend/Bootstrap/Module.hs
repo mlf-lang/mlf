@@ -340,8 +340,9 @@ module Bootstrap.Module where {
   resolvedScopeRows modules scopeOf = concatMap (\entry ->
     let { scope = scopeOf (moduleIdentity (resolvedSource entry)) } in
     map (\binding -> (,) (Dependency.boundId binding) scope) (renamedBindings (resolvedContents entry))) modules;
-  resolvedCrateValueScopes (ResolvedCrate bindings modules masks _) =
+  resolvedValueScopesIn (ResolvedCrate bindings _ masks _) modules =
     Dependency.indexedScopes (bindingSymbols bindings) (resolvedScopeRows modules (\name -> M.get compareString name masks));
+  resolvedCrateValueScopes crate = resolvedValueScopesIn crate (resolvedCrateModules crate);
   resolvedCrateInstanceScopes (ResolvedCrate _ modules masks _) = concatMap (\entry ->
     map (\_ -> M.get compareString (moduleIdentity (resolvedSource entry)) masks)
       (resolvedInstances (resolvedContents entry))) modules;
@@ -1134,7 +1135,13 @@ module Bootstrap.Module where {
   resolveNamesWithKey stable (Names allocated) = let {
     isTerm entry = case role (fst entry) of { Value -> True; Method _ -> True; _ -> False };
     parts = partition isTerm (M.toList allocated); terms = fst parts;
-    symbols = Dependency.symbolsWithKeys (map (\((,) e n) -> (,,) n (stable e) (case role e of { Method _ -> True; _ -> False })) terms);
+    base = Dependency.symbolsWithKeys (map (\((,) e n) -> (,,) n (stable e) (case role e of { Method _ -> True; _ -> False })) terms);
+    methodOwner ((,) ((,) entity _) i) = case role entity of {
+      Method className -> let { klass = Entity (owner entity) className Class } in
+        Just ((,) i (M.findWithDefault compareEntity (stable klass) klass allocated));
+      _ -> Nothing
+    };
+    symbols = Dependency.withMethodOwners base (mapMaybe methodOwner (zip terms (V.indices (Dependency.symbolNodes base))));
     slots = M.fromDistinctAscList (zipWith (\entry i -> (,) (fst entry) (TermSlot i)) terms
       (V.indices (Dependency.symbolNodes symbols)));
     others = M.fromDistinctAscList (map (\((,) e n) -> (,) e (OtherName n)) (snd parts))
@@ -1171,6 +1178,7 @@ module Bootstrap.Module where {
   resolvePattern bindings env pattern = let { child = resolvePattern bindings env } in case pattern of {
     SAsPattern name inner -> mapEither (R.AsPattern name) (child inner);
     SLazyPattern inner -> mapEither R.LazyPattern (child inner);
+    SIndexedStringPattern _ _ _ -> Left "resolved pattern cannot enter source name resolution";
     SOverloadedStringPattern text _ _ -> do {
       eq <- termId bindings (Entity "MLF.Primitive" "==" (Method "Eq"));
       from <- termId bindings (Entity "MLF.Primitive" "fromString" (Method "IsString"));
@@ -1281,6 +1289,9 @@ module Bootstrap.Module where {
     };
     SDo _ _ -> child (Desugar.desugarDo expression);
     SChecked _ _ -> Left "checked source forms are reserved for dictionary translation";
+    SGlobal _ _ -> Left "resolved global cannot enter source name resolution";
+    SDeclScope _ _ -> Left "resolved binder cannot enter source name resolution";
+    SWantedRefs _ _ -> Left "dictionary holes are reserved for dictionary translation";
     SWanted _ _ -> Left "dictionary holes are reserved for dictionary translation"
   };
   ownName names local namespace name =
@@ -1629,8 +1640,9 @@ module Bootstrap.Module where {
            Right (ResolvedCrate bindings resolved scopes reach)
          };
   linkModules :: PreludeMode -> [] SourceModule -> Either String LinkedModule;
-  linkModules mode supplied = mapEither fst (linkModulesInScopes mode supplied);
-  linkModulesInScopes mode supplied =
+  linkModules mode supplied = mapEither fst (linkModulesUsing Surface.bindResolvedExpr Surface.closeResolvedInstance mode supplied);
+  linkModulesInScopes = linkModulesUsing Surface.bindIndexedExpr Surface.closeIndexedInstance;
+  linkModulesUsing bind close mode supplied =
     do {
       crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
       let {
@@ -1656,9 +1668,9 @@ module Bootstrap.Module where {
         entryModule = last resolved
       };
       entry <- entryExpr crate entryModule;
-      body <- mapLeft (displayNames publicNames) (Surface.bindResolvedExpr bindings entry);
+      body <- mapLeft (displayNames publicNames) (bind bindings entry);
       instances' <- mapLeft (displayNames publicNames) (mapM
-        (compose (Surface.closeResolvedInstance (Surface.helperScope bindings)) snd) instances);
+        (compose (close (Surface.helperScope bindings)) snd) instances);
       let {
         program =
           if (null cs && null instances')

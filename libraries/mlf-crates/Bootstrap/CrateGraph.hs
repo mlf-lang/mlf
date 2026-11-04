@@ -7,7 +7,6 @@ module Bootstrap.CrateGraph where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
-  import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.SourceInference as Source;
@@ -24,6 +23,7 @@ module Bootstrap.CrateGraph where {
   import qualified Bootstrap.EvidenceBoundary as Boundary;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.Surface as Surface;
 
   data State = State G.Session Source.CheckedContracts
     (Map String Open.Environment) ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray);
@@ -109,39 +109,48 @@ module Bootstrap.CrateGraph where {
   -- It still uses the same open bodies, dependency graph and crate transaction.
   -- Preserve its existing conservative (protected, no source-class slots)
   -- calling contract, including mixed source/dictionary recursive groups.
+  -- Standalone named callers own no resolver or class-lowering table.
   compileLowered verify crateId compilerHash cacheDir imports datatypes members =
-    compileLoweredIn (Dependency.BoundValues (Dependency.symbols []) [])
-      verify crateId compilerHash cacheDir imports datatypes members;
-  compileLoweredIn (Dependency.BoundValues base source) verify crateId compilerHash cacheDir imports datatypes members =
-    case do {
-      groups <- Dependency.declarationGroups members;
-      inventory <- Q.prepareData datatypes;
-      types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
-      let { contracts = M.map (\ty -> Source.SourceContract ty [] True) types;
-        values = M.fromList compareString (map (\m@((,,) name _ _) -> (,) name m) members) };
-      let { sourceIds = map Dependency.boundId source;
-        locals = S.fromList compareString (map (Dependency.symbolName base) sourceIds);
-        extra = filter (\n -> not (S.member compareString n locals)) (map Source.sourceName members);
-        all = Dependency.extendSymbols base extra;
-        generated = map V.fromInt (range (V.count (Dependency.symbolNodes base)) (V.count (Dependency.symbolNodes all) - 1));
-        scope = Source.declarationScope all (append sourceIds generated) [] (M.keys contracts) };
-      checked <- Source.installContracts scope contracts;
-      steps <- traverseEither (\names -> mapEither (\ids -> (,) ids (\current -> prepareLowered values current names))
-        (traverseEither (Source.requireDecl scope) names)) groups;
-      Right ((,,) steps inventory checked)
-    } of {
+    case Dependency.declarationGroups members of {
       Left e -> ioReturn (Left e);
-      Right ((,,) steps inventory checked) -> start verify crateId compilerHash cacheDir
-        "lowered" inventory datatypes checked steps
+      Right groups -> let {
+        names = map Source.sourceName members; base = Dependency.symbols (map (\n -> (,) n False) names);
+        ids = V.indices (Dependency.symbolNodes base);
+        scope = Source.declarationScope base ids [] (concatMap (compose (map fst) Separate.unitBindings) imports)
+      } in case traverseEither (traverseEither (Source.requireDecl scope)) groups of {
+        Left e -> ioReturn (Left e); Right grouped -> startLowered scope (zip ids members) grouped
+          verify crateId compilerHash cacheDir imports datatypes
+      }
     };
-  prepareLowered :: Map String ((,,) String (Maybe SAnnotation) SExpr) ->
-    Map String Source.SourceContract -> [] String -> Either String Source.PreparedGroup;
-  prepareLowered values contracts names = do {
-    members <- traverseEither (\name -> case M.lookup compareString name values of {
-      Just member -> Right member; Nothing -> Left "lowered query member disappeared"
-    }) names;
-    Right (Source.PreparedGroup members members [] M.empty
-      (map (\name -> (,,) name [] True) names) Nothing [])
+  -- Only actual resolved inputs enter this boundary. Class lowering has
+  -- already allocated all selectors and dictionaries. The fallback uses
+  -- that exact table and traverses the final, rewritten expression edges.
+  compileLoweredIn lowered verify crateId compilerHash cacheDir imports = case Inference.loweredDeclarationTable lowered of {
+    Nothing -> ioReturn (Left "resolved lowered group has no declaration table");
+    Just generation -> let { entries = Inference.loweredIdValues lowered;
+      scope = Source.loweredScope generation (map fst entries)
+    } in case Surface.indexedMemberGroups entries of {
+      Left e -> ioReturn (Left e);
+      Right grouped -> startLowered scope entries grouped verify crateId compilerHash cacheDir imports
+        (Inference.loweredData lowered)
+    }
+  };
+  startLowered scope entries grouped verify crateId compilerHash cacheDir imports datatypes = case do {
+    inventory <- Q.prepareData datatypes;
+    types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
+    checked <- Source.installContracts scope (M.map (\ty -> Source.SourceContract ty [] True) types);
+    let { values = M.fromList Source.compareDecl entries;
+      prepare ids _ = do {
+        members <- traverseEither (\i -> case M.lookup Source.compareDecl i values of {
+          Just member -> Right member; Nothing -> Left "lowered query member disappeared"
+        }) ids;
+        Right (Source.PreparedGroup members members [] M.empty
+          (map (\i -> (,,) (Source.declName scope i) [] True) ids) Nothing [])
+      }
+    };
+    Right ((,,) inventory checked (map (\ids -> (,) ids (prepare ids)) grouped))
+  } of { Left e -> ioReturn (Left e); Right ((,,) inventory checked steps) ->
+    start verify crateId compilerHash cacheDir "lowered" inventory datatypes checked steps
   };
   start verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
         statistics <- G.profile;
@@ -167,7 +176,7 @@ module Bootstrap.CrateGraph where {
     (:) ((,) owners prepare) rest -> case state of {
       State session contracts contexts objects inferred reused reports statistics ->
         let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in
-        case bindEither (prepare (Source.checkedNamed contracts)) (Source.slotPrepared contracts owners) of {
+        case bindEither (prepare contracts) (Source.slotPrepared contracts owners) of {
           Left e -> ioReturn (Left e);
           Right ((,) slots prepared) -> do {
             let { declarations = Q.requiredDataIn inventory (Source.groupMembers prepared)
@@ -234,7 +243,10 @@ module Bootstrap.CrateGraph where {
                           raw = case cached of {
                             Right fragment -> Right fragment;
                             Left _ -> do {
-                              fragment <- Inference.compileOpenGroup group
+                              fragment <- if Source.usesIndexedTerms scope then do {
+                                members <- Source.indexedMembers slots prepared;
+                                Inference.compileOpenGroupIndexed group (Source.expectedParameters slots prepared) declarations members
+                              } else Inference.compileOpenGroup group
                                 [Q.dependencyInterface (Source.groupBindings prepared)] declarations (Source.groupMembers prepared);
                               canonical <- Source.canonicalOpen fragment;
                               Source.validatePreparedOpen slots prepared canonical;

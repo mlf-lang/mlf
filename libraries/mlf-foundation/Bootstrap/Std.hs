@@ -5,6 +5,15 @@
 module Bootstrap.Std where {
   import MLF.Primitive;
   import Bootstrap.Types;
+  import qualified Bootstrap.IndexVec as V;
+  eqTermRef a b = case (,) a b of {
+    (,) (LexicalRef x) (LexicalRef y) -> eqString x y;
+    (,) (DeclRef i _) (DeclRef j _) -> V.toInt i == V.toInt j;
+    _ -> False
+  };
+  namedCandidates xs = map (\((,) role ref) -> (,) role (termRefName ref)) xs;
+  termRefName ref = case ref of { LexicalRef n -> n; DeclRef _ n -> n };
+  referenceExpr ref = case ref of { LexicalRef n -> SVar n; DeclRef i n -> SGlobal i n };
   id :: forall a. a -> a;
   id x = x;
   const :: forall a b. a -> b -> a;

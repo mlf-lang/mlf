@@ -66,7 +66,7 @@ def main():
         "-ibootstrap",
         *["-i" + str(d) for d in sorted((ROOT / "libraries").iterdir())],
     ]
-    for name in ["Graphs", "Vector", "World", "DeclQueryControls", "ImportBindings", "PreparedImports", "FragmentAdmission"]:
+    for name in ["Graphs", "Vector", "World", "DeclQueryControls", "ImportBindings", "PreparedImports", "FragmentAdmission", "DeclCore"]:
         obj = out / name
         obj.mkdir()
         run([*ghc, "-odir", obj, "-hidir", obj, HERE / (name + ".hs"), *host, "-o", obj / "probe"])
@@ -81,6 +81,8 @@ def main():
         expected=b"prepared source and native wrapper import controls passed\n")
 
     run([out / "FragmentAdmission/probe", out], expected=b"raw and final fragment admission controls passed\n")
+    run([out / "DeclCore/probe"],
+        expected=b"Core declaration slots, lexical shadowing, polymorphic imports and recursion passed\n")
 
     source = HERE / "Vector.hs"
     mlf = [emlf, "-i", ROOT / "libraries/mlf-foundation"]

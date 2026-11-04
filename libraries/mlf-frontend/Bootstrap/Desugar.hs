@@ -38,6 +38,9 @@ module Bootstrap.Desugar where {
       SSharedBind pattern action body binding failure ->
         append (patternVariables pattern) (concatMap allNames ((:) action ((:) body ((:) binding ((:) failure [])))));
       SVar name -> (:) name [];
+      SGlobal _ name -> [name];
+      SDeclScope _ body -> allNames body;
+      SWantedRefs n candidates -> (:) n (map (compose termRefName snd) candidates);
       SConstructor name -> (:) name [];
       SLam name _ body -> (:) name (allNames body);
       SApp f a -> append (allNames f) (allNames a);
@@ -110,6 +113,7 @@ module Bootstrap.Desugar where {
       };
       freshPure (SApp (SApp f a) (SLam name Nothing continuation))
     };
+    SDeclScope ids body -> do { b <- sharedGo env body; freshPure (SDeclScope ids b) };
     SSourceDefinition body -> do { b <- sharedGo env body; freshPure (SSourceDefinition b) };
     SCallSite n location body -> do { b <- sharedGo env body; freshPure (SCallSite n location b) };
     SLam n annotation body -> do { b <- sharedGo env body; freshPure (SLam n annotation b) };
@@ -143,6 +147,7 @@ module Bootstrap.Desugar where {
   go :: SExpr -> Fresh SExpr;
   go expression =
     case expression of {
+      SDeclScope ids body -> do { b <- go body; freshPure (SDeclScope ids b) };
       SSourceDefinition body -> do { b <- go body; freshPure (SSourceDefinition b) };
       SCallSite name location body -> do {
         result <- go body; freshPure (SCallSite name location result)

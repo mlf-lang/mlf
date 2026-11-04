@@ -333,6 +333,7 @@ module Bootstrap.Standalone where {
   rewriteExpr :: Scope -> Set String -> SExpr -> Rewrite SExpr;
   rewriteExpr scope bound expression = case expression of {
     SVar name -> variable scope bound name;
+    SDeclScope ids b -> do { next <- rewriteExpr scope bound b; unchanged (SDeclScope ids next) };
     SConstructor name -> constructor scope name;
     SLam name annotation body -> do {
       annotation' <- rewriteOptionalAnnotation scope annotation;
@@ -489,6 +490,7 @@ module Bootstrap.Standalone where {
     SNestedPattern name patterns -> (:) name (concatMap patternNames patterns);
     SAnnotatedPattern name annotation -> (:) name (annotationNames annotation);
     SOverloadedStringPattern _ equality conversion -> (:) equality ((:) conversion []);
+    SIndexedStringPattern _ eq from -> [termRefName eq,termRefName from];
     SAsPattern name inner -> (:) name (patternNames inner);
     SLazyPattern inner -> patternNames inner;
     _ -> []
@@ -496,6 +498,9 @@ module Bootstrap.Standalone where {
   expressionNames :: SExpr -> [] String;
   expressionNames expression = case expression of {
     SVar name -> (:) name [];
+    SGlobal _ name -> [name];
+    SDeclScope _ b -> expressionNames b;
+    SWantedRefs n candidates -> (:) n (map (compose termRefName snd) candidates);
     SConstructor name -> (:) name [];
     SLam name annotation body -> (:) name (append (maybe [] annotationNames annotation) (expressionNames body));
     SApp f a -> append (expressionNames f) (expressionNames a);

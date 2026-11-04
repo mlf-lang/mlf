@@ -21,15 +21,26 @@ main = do
       imports = Parameters.admit symbols external sigs
       parameter n = (n, T.InferRecursive, T.SIntLit 0)
       select names body = Parameters.select imports
-        (T.SProgram [] (T.SLetRec (map parameter names) body), M.empty)
+        (T.SProgram [] (T.SDeclScope [V.fromInt 2,V.fromInt 3] (T.SLetRec (map parameter names) body)), M.empty)
       slots selected = map (V.toInt . fst) (Parameters.entries selected)
       expect label ids result = case result of
         T.Left e -> error (label ++ ": " ++ H.unpack e)
         T.Right (_, selected) -> unless (slots selected == ids) (error label)
   expect "unused RHS / wanted candidate / ABI order" [2,3] $
-    select ["a","z"] (T.SLet "unused" (T.SWanted "Dict" [(T.InstanceEvidence,"z")]) (T.SVar "a"))
+    select ["a","z"] (T.SLet "unused" (T.SWantedRefs "Dict" [(T.InstanceEvidence,T.DeclRef (V.fromInt 3) "a")]) (T.SGlobal (V.fromInt 2) "a"))
   expect "lexically shadowed import" [] $
     select ["a","z"] (T.SLam "a" T.Nothing (T.SVar "a"))
+  expect "same spelling, local declaration and lexical binder" [2] $
+    select ["a","z"] (T.SLam "a" T.Nothing
+      (T.SApp (T.SGlobal (V.fromInt 0) "a") (T.SGlobal (V.fromInt 2) "a")))
+  expect "implicit overloaded pattern operations" [2,3] $
+    select ["a","z"] (T.SCase (T.SStringLit "") [T.SAlternative
+      (T.SIndexedStringPattern (T.ScalarString "") (T.DeclRef (V.fromInt 2) "a") (T.DeclRef (V.fromInt 3) "a"))
+      (T.SIntLit 0)])
+  let mixed = T.SLam "a" T.Nothing (T.SWantedRefs "Dict" [(T.GivenEvidence,T.LexicalRef "a"),
+        (T.SuperclassEvidence,T.LexicalRef "b"), (T.InstanceEvidence,T.DeclRef (V.fromInt 2) "a")])
+  unless (map H.unpack (D.expressionNamedReads mixed) == ["b"] &&
+          map V.toInt (D.expressionGlobalIds mixed) == [2]) (error "mixed reference domains")
   let zero = Parameters.namedImports M.empty
   expect "empty signature inventory" [] $
     Parameters.select zero (T.SProgram [] (T.SIntLit 0), M.empty)

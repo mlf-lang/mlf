@@ -1685,16 +1685,16 @@ module Bootstrap.CrateArtifact where {
                M.fromList compareString (entrySignatures entry (concatMap crateBindings interfaces))
            };
            let {
+             importDictionaries n = if eqString (stringSlice n 0 7) "module_" then dictionaries else M.empty;
+             conventions = M.mapWithKey (\n ty -> Separate.importClasses (importDictionaries n) ty) signatures;
              externals =
                M.mapWithKey
                  (\n ty ->
-                    Separate.sourceScheme
-                      (if eqString (stringSlice n 0 7) "module_" then dictionaries else M.empty)
-                      ty)
+                    Separate.sourceScheme (importDictionaries n) ty)
                  signatures
            };
            lowered <-
-             Classes.lowerSeparateClasses externals (map fst visibleInstances)
+             Classes.lowerSeparateClassesWithImports conventions externals (map fst visibleInstances)
                (SClassProgram (concatMap crateData interfaces) classes (map snd visibleInstances)
                   (SVar entry));
            compiled <- mapLeft Compiler.prettyError (Compiler.finishCompilation lowered);

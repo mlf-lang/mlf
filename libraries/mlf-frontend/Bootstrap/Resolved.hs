@@ -58,8 +58,10 @@ module Bootstrap.Resolved where {
   };
 
   namedExpr :: forall d. (V.Index d -> String) -> Expr d -> SExpr;
-  namedExpr name term = let { child = namedExpr name; pattern = namedPattern name } in case term of {
-    Global i -> SVar (name i); Local n -> SVar n; CallStack -> SVar "$MLF.Stack.callStack";
+  namedExpr name = projectExpr (compose SVar name) (namedPattern name);
+  indexedExpr name = projectExpr (\i -> SGlobal i (name i)) (indexedPattern name);
+  projectExpr global pattern term = let { child = projectExpr global pattern } in case term of {
+    Global i -> global i; Local n -> SVar n; CallStack -> SVar "$MLF.Stack.callStack";
     Constructor n -> SConstructor n; Prim p -> SPrimitive p;
     IntLit n -> SIntLit n; DoubleLit n -> SDoubleLit n; BoolLit b -> SBoolLit b; StringLit s -> SStringLit s;
     Lam n annotation b -> SLam n annotation (child b);
@@ -72,10 +74,12 @@ module Bootstrap.Resolved where {
     SharedBind p a b bind fail -> SSharedBind (pattern p) (child a) (child b) (child bind) (child fail)
   };
   namedPattern :: forall d. (V.Index d -> String) -> Pattern d -> SPattern;
-  namedPattern name pattern = case pattern of {
-    OverloadedStringPattern text eq from -> SOverloadedStringPattern text (name eq) (name from);
-    AsPattern n p -> SAsPattern n (namedPattern name p); LazyPattern p -> SLazyPattern (namedPattern name p);
-    NestedPattern n ps -> SNestedPattern n (map (namedPattern name) ps);
+  namedPattern name = projectPattern (\text eq from -> SOverloadedStringPattern text (name eq) (name from));
+  indexedPattern name = projectPattern (\text eq from -> SIndexedStringPattern text (DeclRef eq (name eq)) (DeclRef from (name from)));
+  projectPattern overloaded pattern = case pattern of {
+    OverloadedStringPattern text eq from -> overloaded text eq from;
+    AsPattern n p -> SAsPattern n (projectPattern overloaded p); LazyPattern p -> SLazyPattern (projectPattern overloaded p);
+    NestedPattern n ps -> SNestedPattern n (map (projectPattern overloaded) ps);
     ConstructorPattern n fields -> SConstructorPattern n fields; DefaultPattern n -> SDefaultPattern n;
     AnnotatedPattern n a -> SAnnotatedPattern n a; IntPattern n -> SIntPattern n;
     StringPattern s -> SStringPattern s; BoolPattern b -> SBoolPattern b

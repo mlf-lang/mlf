@@ -64,6 +64,7 @@ module Bootstrap.Classes where {
   };
   managedExpression :: SExpr -> Bool;
   managedExpression expression = case expression of {
+    SDeclScope _ body -> managedExpression body;
     SSourceDefinition body -> managedExpression body;
     SCallSite _ _ body -> managedExpression body;
     SVar name -> eqString name "$MLF.Stack.callStack";
@@ -87,6 +88,7 @@ module Bootstrap.Classes where {
   -- path removes them without changing annotations or ordinary MLF inference.
   eraseCallSites :: SExpr -> SExpr;
   eraseCallSites expression = case expression of {
+    SDeclScope ids body -> SDeclScope ids (eraseCallSites body);
     SSourceDefinition body -> eraseCallSites body;
     SCallSite _ _ body -> eraseCallSites body;
     SLam name annotation body -> SLam name annotation (eraseCallSites body);
@@ -374,7 +376,10 @@ module Bootstrap.Classes where {
                       SProgram -> Either String ((,) SProgram (Map String String));
   lowerCoreClasses imported valueIndices instanceIndices program =
     lowerCoreClassesWith Nothing imported (Dependency.NamedScopes valueIndices) instanceIndices program;
-  lowerSeparateClasses externals instanceNames original =
+  managedImports conventions externals = any managedType (M.elems externals) ||
+    any (elem eqString callStackPredicate) (M.elems conventions);
+  lowerSeparateClasses = lowerSeparateClassesWithImports M.empty;
+  lowerSeparateClassesWithImports conventions externals instanceNames original =
     do {
       program <-
         Surface.lowerSurface
@@ -384,8 +389,8 @@ module Bootstrap.Classes where {
            });
       case program of {
         SClassProgram ds [] [] body ->
-          if managedExpression body || any managedType (M.elems externals)
-          then lowerCoreClassesWith (Just ((,) externals instanceNames)) S.empty (Dependency.NamedScopes M.empty) Nothing program
+          if managedExpression body || managedImports conventions externals
+          then lowerCoreClassesWithImports conventions (Just ((,) externals instanceNames)) S.empty (Dependency.NamedScopes M.empty) Nothing program
           else let {
             parameters =
               map
@@ -400,7 +405,7 @@ module Bootstrap.Classes where {
                                else SLetRec parameters (eraseCallSites body)))
                M.empty);
         _ ->
-          lowerCoreClassesWith (Just ((,) externals instanceNames)) S.empty (Dependency.NamedScopes M.empty) Nothing program
+          lowerCoreClassesWithImports conventions (Just ((,) externals instanceNames)) S.empty (Dependency.NamedScopes M.empty) Nothing program
       }
     };
   -- Crate lowering has a complete declaration/instance inventory, but candidate
@@ -413,59 +418,67 @@ module Bootstrap.Classes where {
                                     SProgram -> Either String ((,) SProgram (Map String String));
   lowerSeparateClassesWithScopes externals instanceNames valueScopes =
     lowerSeparateClassesInScopes externals instanceNames (Dependency.NamedScopes valueScopes);
-  lowerSeparateClassesInScopes externals instanceNames valueScopes instanceScopes original =
-    do {
-      program <-
-        Surface.lowerSurface
-          (case original of {
-             SProgram ds b -> SClassProgram ds [] [] b;
-             _ -> original
-           });
-      case program of {
-        SClassProgram ds [] [] body ->
-          if managedExpression body || any managedType (M.elems externals)
-          then lowerCoreClassesWith (Just ((,) externals instanceNames)) S.empty valueScopes (Just instanceScopes) program
-          else let {
-            parameters =
-              map
-                (\((,) n ty) ->
-                   (,,) n (CheckRecursive (SAnnotation [] ty))
-                     (SChecked ty
-                        (SApp (SPrimitive PPanic) (SStringLit "unlinked crate parameter"))))
-                (M.toList externals)
-          } in
-          Right
-            ((,) (SProgram ds (if null parameters then eraseCallSites body
-                               else SLetRec parameters (eraseCallSites body)))
-               M.empty);
-        _ ->
-          lowerCoreClassesWith (Just ((,) externals instanceNames)) S.empty valueScopes
-            (Just instanceScopes)
-            program
-      }
+  lowerSeparateClassesInScopes externals names scopes masks original =
+    mapEither fst (lowerSeparateClassesAndSlots externals names scopes masks original);
+  lowerSeparateClassesAndSlots = lowerSeparateClassesAndSlotsWithImports M.empty;
+  lowerSeparateClassesAndSlotsWithImports conventions externals names scopes masks original = do {
+    surface <- Surface.lowerSurface (case original of {
+      SProgram datatypes body -> SClassProgram datatypes [] [] body; _ -> original
+    });
+    case surface of {
+      SProgram _ _ -> Left "expected a class program";
+      SClassProgram datatypes classes instances body ->
+        if null classes && null instances && not (managedExpression body) && not (managedImports conventions externals)
+        then let {
+          parameters = map (\((,) n ty) -> (,,) n (CheckRecursive (SAnnotation [] ty))
+            (SChecked ty (SApp (SPrimitive PPanic) (SStringLit "unlinked crate parameter")))) (M.toList externals);
+          generation = classSlots scopes [] externals M.empty M.empty;
+          core = wrapImports generation parameters (eraseCallSites body)
+        } in Right ((,) ((,) (SProgram datatypes core) M.empty) generation)
+        else withValidatedClasses (Just ((,) externals names)) S.empty M.empty (Just masks)
+          datatypes classes instances body (\base validated -> do {
+            inventory <- prepareClassesWithImports conventions (Just ((,) externals names)) S.empty scopes (Just masks)
+              datatypes instances base validated;
+            lowered <- finishClassesBody inventory body;
+            freshPure ((,) lowered (inventoryDeclarations inventory))
+          })
+    }
+  };
+  wrapImports generation parameters inner = if null parameters then inner else
+    let { group = SLetRec parameters inner } in case generation of {
+      Nothing -> group;
+      Just table -> SDeclScope (map (\((,,) n _ _) -> case Dependency.generatedImportId table n of {
+        Just i -> i; Nothing -> panic "unbound interface parameter"
+      }) parameters) group
     };
+  classSlots scopes localBindings externals methods ownedMethods = case scopes of {
+    Dependency.NamedScopes _ -> Nothing;
+    Dependency.IndexedScopes _ _ symbols members _ -> Just (Dependency.generatedTableFor symbols (M.elems members)
+      localBindings (M.keys externals) methods ownedMethods)
+  };
   lowerCoreClassesWith :: Maybe ((,) (Map String SType) ([] String)) ->
                           Set String ->
                           Dependency.ValueScopes IntSet ->
                           Maybe ([] IntSet) ->
                           SProgram -> Either String ((,) SProgram (Map String String));
-  lowerCoreClassesWith config imported valueIndices instanceIndices program =
+  lowerCoreClassesWith = lowerCoreClassesWithImports M.empty;
+  lowerCoreClassesWithImports conventions config imported valueIndices instanceIndices program =
     case program of {
       SProgram ds body ->
         case config of {
           Nothing ->
             if managedExpression body
-            then lowerCoreClassesWith config imported valueIndices instanceIndices
+            then lowerCoreClassesWithImports conventions config imported valueIndices instanceIndices
                    (SClassProgram ds [] [] body)
             else Right ((,) (SProgram ds (eraseCallSites body)) M.empty);
           Just _ ->
-            lowerCoreClassesWith config imported valueIndices instanceIndices
+            lowerCoreClassesWithImports conventions config imported valueIndices instanceIndices
               (SClassProgram ds [] [] body)
         };
       SClassProgram datatypes declarations instances body ->
         withValidatedClasses config imported M.empty instanceIndices datatypes declarations
           instances body (\base classes ->
-            lowerClassesBody config imported valueIndices instanceIndices datatypes instances body
+            lowerClassesBodyWithImports conventions config imported valueIndices instanceIndices datatypes instances body
               base classes)
     };
   withValidatedClasses :: forall a.
@@ -541,7 +554,8 @@ module Bootstrap.Classes where {
                               [] IntSet -> SProgram -> (ClassInventory -> Fresh a) -> Either String a;
   withScopedClassInventory externals instanceNames valueScopes =
     withClassScopes externals instanceNames (Dependency.NamedScopes valueScopes);
-  withClassScopes externals instanceNames valueScopes instanceScopes original action =
+  withClassScopes = withClassScopesAndImports M.empty;
+  withClassScopesAndImports conventions externals instanceNames valueScopes instanceScopes original action =
     do {
       surface <- Surface.lowerSurface (case original of {
         SProgram ds body -> SClassProgram ds [] [] body;
@@ -552,7 +566,7 @@ module Bootstrap.Classes where {
           withValidatedClasses (Just ((,) externals instanceNames)) S.empty M.empty
             (Just instanceScopes) ds declarations instances body
             (\base classes -> do {
-              inventory <- prepareClassesInScopes (Just ((,) externals instanceNames)) S.empty
+              inventory <- prepareClassesWithImports conventions (Just ((,) externals instanceNames)) S.empty
                 valueScopes (Just instanceScopes) ds instances base classes;
               action inventory
             });
@@ -594,17 +608,35 @@ module Bootstrap.Classes where {
     (Map String ((,) String ([] String)))
     ClassSupports (Map String String) (Map String SType);
   data ClassSupports = ClassSupports ([] ((,,) String SAnnotation SExpr)) (Maybe Dependency.GeneratedTable)
-    (Dependency.ValueScopes ([] ((,) EvidenceRole (V.Index Declaration))));
-  supportDefinitions (ClassSupports defs _ _) = defs;
-  inventoryDeclarations (ClassInventory _ _ _ _ _ _ (ClassSupports _ table _) _ _) = table;
-  inventoryCandidateIds (ClassInventory _ _ _ _ _ _ (ClassSupports _ _ scopes) _ _) i =
+    (Dependency.ValueScopes ([] ((,) EvidenceRole (V.Index Declaration)))) (Map String ([] String));
+  supportDefinitions (ClassSupports defs _ _ _) = defs;
+  inventoryDeclarations (ClassInventory _ _ _ _ _ _ (ClassSupports _ table _ _) _ _) = table;
+  withCheckedClassContracts read inventory = attachClassContracts True (\_ -> read) inventory;
+  attachClassContracts checked reader inventory@(ClassInventory ds env infos scopes candidates methods supports names externals) =
+    case Dependency.scopeContext scopes of {
+      Nothing -> inventory;
+      Just (Dependency.ClassContext table typed _) ->
+        if typed && not checked then inventory else let {
+          context = Just (Dependency.ClassContext table checked (reader table))
+        } in ClassInventory ds env infos (Dependency.withScopeContext context scopes) candidates methods supports names externals
+    };
+  -- Compatibility callers supply named schemes. Admit their finite map once.
+  withNamedClassContracts overloads protected = attachClassContracts False (\table -> let {
+    bind acc key ((,) _ classes) = case Dependency.generatedNameId table key of {
+      Nothing -> acc; Just i -> IM.insert (V.toInt i)
+        ((,) classes (M.findWithDefault compareString False key protected)) acc
+    };
+    facts = M.foldlWithKeyStrict bind IM.empty overloads
+  } in \i -> IM.lookup (V.toInt i) facts);
+  inventoryCandidateIds (ClassInventory _ _ _ _ _ _ (ClassSupports _ _ scopes _) _ _) i =
     fromMaybe [] (Dependency.scopeAt scopes i);
   prepareClassesBody :: Maybe ((,) (Map String SType) ([] String)) ->
                         Set String -> Map String IntSet -> Maybe ([] IntSet) ->
                         [] DataDecl -> [] SInstanceDecl -> DataEnv -> [] SClassDecl ->
                         Fresh ClassInventory;
   prepareClassesBody config imported indices = prepareClassesInScopes config imported (Dependency.NamedScopes indices);
-  prepareClassesInScopes config imported valueIndices instanceIndices datatypes instances base classes =
+  prepareClassesInScopes = prepareClassesWithImports M.empty;
+  prepareClassesWithImports conventions config imported valueIndices instanceIndices datatypes instances base classes =
     do {
       entries <-
         mapM
@@ -667,9 +699,6 @@ module Bootstrap.Classes where {
         select = selectCandidates names supers
       };
       let {
-        valueScopes = Dependency.mapScopes select valueIndices
-      };
-      let {
         instanceScopes =
           case instanceIndices of {
             Nothing -> replicate (length instances) globalCandidates;
@@ -688,9 +717,24 @@ module Bootstrap.Classes where {
           (methodBindings imported True entries)
       };
       let {
-        methodEnv = withExternalOverloads externalSchemes baseMethodEnv
+        methodEnv = withImportedOverloads conventions externalSchemes baseMethodEnv
       };
       selectorGroups <- mapM (\entry -> selectorDefinitions infos (snd entry)) entries;
+      let {
+        ownedMethods = M.fromList Dependency.methodKeyCompare (concatMap (\entry ->
+          map (\((,) n spec) -> (,) ((,) (fst entry) n) spec) (methodEntries entry)) entries);
+        generation = classSlots valueIndices (filter (\n -> not (M.member compareString n externalSchemes))
+          (append (map (\((,,) n _ _) -> n) (concat selectorGroups)) names)) externalSchemes baseMethodEnv ownedMethods
+      };
+      let { context = mapOptional (\table -> let {
+              remember acc key ty = case Dependency.generatedImportId table key of {
+                Nothing -> acc; Just i -> let { classes = importedClasses conventions key ty } in
+                  IM.insert (V.toInt i) ((,) classes (managedType ty || elem eqString callStackPredicate classes)) acc
+              };
+              facts = M.foldlWithKeyStrict remember IM.empty externalSchemes
+            } in Dependency.ClassContext table False (\i -> IM.lookup (V.toInt i) facts)) generation;
+            valueScopes = Dependency.withScopeContext context (Dependency.mapScopes select valueIndices)
+      };
       definitions <-
         mapM
           (\((,) ((,) name inst) available) ->
@@ -714,13 +758,6 @@ module Bootstrap.Classes where {
           (M.fromList compareString
             (map (\((,) name (Info _ dict _ _ _)) -> (,) dict name) entries))
       };
-      let {
-        generation = case valueIndices of {
-          Dependency.NamedScopes _ -> Nothing;
-          Dependency.IndexedScopes _ symbols members _ -> Just (Dependency.generatedTable symbols (M.elems members)
-            (map (\((,,) n _ _) -> n) localBindings) (M.keys externalSchemes) baseMethodEnv)
-        }
-      };
       candidateIds <- case generation of {
         Nothing -> freshPure (Dependency.NamedScopes M.empty);
         Just table -> do {
@@ -733,7 +770,7 @@ module Bootstrap.Classes where {
         }
       };
       freshPure (ClassInventory (append datatypes dictionaries) ds infos valueScopes
-        globalCandidates baseMethodEnv (ClassSupports localBindings generation candidateIds) display externalSchemes)
+        globalCandidates baseMethodEnv (ClassSupports localBindings generation candidateIds conventions) display externalSchemes)
     };
   lowerClassesBody :: Maybe ((,) (Map String SType) ([] String)) ->
                       Set String ->
@@ -743,28 +780,32 @@ module Bootstrap.Classes where {
                       [] SInstanceDecl ->
                       SExpr ->
                       DataEnv -> [] SClassDecl -> Fresh ((,) SProgram (Map String String));
-  lowerClassesBody config imported valueIndices instanceIndices datatypes instances body base classes =
+  lowerClassesBody = lowerClassesBodyWithImports M.empty;
+  lowerClassesBodyWithImports conventions config imported valueIndices instanceIndices datatypes instances body base classes =
     do {
-      inventory <- prepareClassesInScopes config imported valueIndices instanceIndices
+      inventory <- prepareClassesWithImports conventions config imported valueIndices instanceIndices
         datatypes instances base classes;
       finishClassesBody inventory body
     };
   finishClassesBody :: ClassInventory -> SExpr ->
                        Fresh ((,) SProgram (Map String String));
   finishClassesBody (ClassInventory datatypes ds infos valueScopes globalCandidates
-                     baseMethodEnv (ClassSupports localBindings _ _) display externalSchemes) body =
+                     baseMethodEnv (ClassSupports localBindings generation _ conventions) display externalSchemes) body =
     do {
-      let { methodEnv = withExternalOverloads externalSchemes baseMethodEnv };
+      let { methodEnv = withImportedOverloads conventions externalSchemes baseMethodEnv };
       boundValueShared3 <- lowerExpr valueScopes ds infos methodEnv globalCandidates body;
       case boundValueShared3 of {
         (,) expression wants ->
           do {
             let {
-              result = closeWants infos globalCandidates wants expression
+              result = closeWantsIn infos (wantedScope valueScopes globalCandidates) wants expression
             };
             let {
-              inner = if null localBindings then result else SLetRec
-                (map (\((,,) name annotation rhs) -> (,,) name (CheckRecursive annotation) rhs) localBindings) result
+              inner = if null localBindings then result else let {
+                group = SLetRec (map (\((,,) name annotation rhs) -> (,,) name (CheckRecursive annotation) rhs) localBindings) result
+              } in case generation of {
+                Nothing -> group; Just table -> SDeclScope (Dependency.generatedSlots table) group
+              }
             };
             externalBindings <-
               mapM
@@ -778,7 +819,7 @@ module Bootstrap.Classes where {
                    })
                 (M.toList externalSchemes);
             let {
-              output = if null externalBindings then inner else SLetRec externalBindings inner
+              output = wrapImports generation externalBindings inner
             };
             freshPure ((,) (SProgram datatypes output) display)
           }
@@ -824,7 +865,7 @@ module Bootstrap.Classes where {
       let { environment = M.union compareString overloads baseMethodEnv };
       reserveSourceNames ((:) name (append (Desugar.allNames body)
         (environmentNames overloads baseMethodEnv environment (map snd candidates))));
-      let { usesManaged = protectedSourceBody environment protected body };
+      let { usesManaged = protectedInScopes valueScopes environment protected body };
       lowered <- lowerExpr (Dependency.nestedScopes valueScopes) ds infos environment candidates body;
       case lowered of {
         (,) rhs wanted -> do {
@@ -853,13 +894,34 @@ module Bootstrap.Classes where {
     Map String Bool -> [] ((,,) String (Maybe SAnnotation) SExpr) ->
     Fresh ((,) SExpr ([] ((,,) String ([] String) Bool)));
   lowerSourceGroupUnchangedOwned = lowerSourceGroupUsingNames sourceOwnedEnvironmentNames;
-  lowerSourceGroupUsingNames environmentNames inventory overloads protected members =
+  lowerSourceGroupUsingNames environmentNames = lowerSourceGroupUsingSlots environmentNames Nothing;
+  lowerSourceGroupUsingSlots environmentNames declaredSlots inventory overloads protected members =
     case inventory of {
       ClassInventory _ ds infos valueScopes candidates methods _ _ _ -> do {
-        original <- freshLift (Surface.bindValues members (SConstructor "()"));
-        freshLift (traverseEither
-          (\((,,) name _ _) -> ensure (isJust (Dependency.lookupScope name valueScopes))
-            "source group member has no authenticated definition scope") members);
+        (,) owners original <- freshLift (case Dependency.scopeGeneration valueScopes of {
+          Nothing -> do {
+            original <- Surface.bindValues members (SConstructor "()");
+            traverseEither (\((,,) name _ _) -> ensure (isJust (Dependency.lookupScope name valueScopes))
+              "source group member has no authenticated definition scope") members;
+            Right ((,) (map (compose LexicalRef Surface.valueName) members) original)
+          };
+          Just table -> do {
+            slots <- case declaredSlots of {
+              Just ids -> do {
+                ensure (length ids == length members) "source group declaration count mismatch";
+                Right ids
+              };
+              Nothing -> traverseEither (\member -> case Dependency.generatedNameId table (Surface.valueName member) of {
+                Nothing -> Left "source group member has no authenticated definition scope"; Just i -> Right i
+              }) members
+            };
+            traverseEither (\i -> ensure (isJust (Dependency.lookupSourceScope valueScopes i))
+              "source group member has no authenticated definition scope") slots;
+            let { owned = zip slots members };
+            original <- Surface.bindIndexedMembers owned (SConstructor "()");
+            Right ((,) (map (\((,) i m) -> DeclRef i (Surface.valueName m)) owned) original)
+          }
+        });
         surface <- freshLift (Surface.lowerExpressionWithData ds original);
         let { environment = M.union compareString overloads methods };
         let { declared = M.fromList compareString (map (\((,,) name annotation rhs) ->
@@ -870,7 +932,7 @@ module Bootstrap.Classes where {
             Right ((case annotation of {
               Just (SAnnotation _ ty) -> managedType ty;
               Nothing -> False
-            }) || protectedSourceBody (M.union compareString declared environment) protected normalized)
+            }) || protectedInScopes valueScopes (M.union compareString declared environment) protected normalized)
           }) members);
         let { groupProtected = any (\flag -> flag) protection };
         reserveSourceNames (append (Desugar.allNames surface)
@@ -880,8 +942,8 @@ module Bootstrap.Classes where {
           wants <- freshLift (Q.slotsAt plan (qualifiedNode expression));
           freshLift (ensure (null wants) "source group leaked ordinary obligations");
           let { bindings = qualifiedTopBindings expression };
-          contracts <- mapM (\((,,) name annotation rhs) -> do {
-            value <- freshLift (case M.lookup compareString name bindings of {
+          contracts <- mapM (\((,) owner ((,,) name annotation rhs)) -> do {
+            value <- freshLift (case M.lookup compareRef owner bindings of {
               Nothing -> Left ("source planner lost top-level binding: " ++ name);
               Just result -> Right result
             });
@@ -891,7 +953,7 @@ module Bootstrap.Classes where {
               freshLift (traverseEither (Q.slotClass plan) slots)
             } else freshPure explicit;
             freshPure ((,,) name classes groupProtected)
-          }) members;
+          }) (zip owners members);
           body <- renderQualified plan infos IM.empty expression;
           freshPure ((,) body contracts)
         } }
@@ -915,12 +977,14 @@ module Bootstrap.Classes where {
       _ -> []
     }
   };
-  qualifiedTopBindings :: QualifiedExpr -> Map String QualifiedExpr;
+  qualifiedTopBindings :: QualifiedExpr -> Map TermRef QualifiedExpr;
   qualifiedTopBindings (QualifiedExpr _ form) = case form of {
-    QualifiedLet name rhs body -> M.insert compareString name rhs (qualifiedTopBindings body);
-    QualifiedRec definitions body -> M.union compareString
-      (M.fromList compareString (map (\((,,) name _ rhs) -> (,) name rhs) definitions))
-      (qualifiedTopBindings body);
+    QualifiedLet owner rhs body -> M.insert compareRef owner rhs (qualifiedTopBindings body);
+    QualifiedRec slots definitions body -> let {
+      entry ref ((,,) _ _ rhs) = (,) ref rhs;
+      owners = if null slots then map (\((,,) n _ _) -> LexicalRef n) definitions
+        else zipWith (\i ((,,) n _ _) -> DeclRef i n) slots definitions
+    } in M.union compareRef (M.fromList compareRef (zipWith entry owners definitions)) (qualifiedTopBindings body);
     _ -> M.empty
   };
   sourceEnvironmentNames environment suffix =
@@ -944,6 +1008,20 @@ module Bootstrap.Classes where {
           Nothing -> False;
           Just ((,) _ predicates) -> any (\predicate -> eqString predicate callStackPredicate) predicates
         }) (Surface.freeNames body);
+  protectedInScopes scopes environment protected body = case Dependency.scopeGeneration scopes of {
+    Nothing -> protectedSourceBody environment protected body;
+    Just table -> let {
+      flag i = case Dependency.scopeContract scopes i of {
+        Just ((,) classes protected) -> protected || elem eqString callStackPredicate classes; Nothing -> False
+      };
+      reads ref = case ref of {
+        LexicalRef _ -> False;
+        DeclRef i _ -> flag i || (case Dependency.selectorEntry table i of {
+          Nothing -> False; Just ((,) target classes) -> flag target || elem eqString callStackPredicate classes
+        })
+      }
+    } in managedExpression body || any reads (Dependency.valueRefs (Dependency.observeExpression body))
+  };
   -- Metadata is derived before class expansion, including original instance
   -- methods. It cannot be recovered from a plain result target type.
   inventorySourceProtection :: ClassInventory -> [] ((,) String SInstanceDecl) ->
@@ -961,7 +1039,7 @@ module Bootstrap.Classes where {
     Either String (Map String Bool);
   inventoryProtection = inventoryProtectionWith Nothing;
   inventoryProtectionWith resolvedRefs (ClassInventory _ ds infos _ _ methods
-    (ClassSupports supports assigned _) _ externals)
+    (ClassSupports supports assigned _ _) _ externals)
     importedProtection instances members = do {
       ensure (all (\name -> M.member compareString name importedProtection) (M.keys externals))
         "imported source protection inventory is incomplete";
@@ -1016,18 +1094,21 @@ module Bootstrap.Classes where {
           } in Dependency.generatedTable symbols sourceIds supportNames (M.keys externals) methods
         };
         symbols = Dependency.generatedSymbols generation;
-        refsIn i reference = let {
+        refsIn i ref = case ref of {
+          DeclRef r _ -> [r];
+          LexicalRef reference -> let {
           original = case resolvedRefs of {
             Nothing -> [];
             Just resolve -> filter (\r -> eqString reference (Dependency.symbolName symbols r)) (resolve i)
           }
         } in if null original then case Dependency.generatedNameId generation reference of {
           Nothing -> []; Just r -> [r]
-        } else original;
+        } else original
+        };
         redirected r = case Dependency.selectorId generation r of {
           Just selector -> [r, selector]; Nothing -> [r]
         };
-        references body = Dependency.valueNames (Dependency.observeExpression body);
+        references body = Dependency.valueRefs (Dependency.observeExpression body);
         required name = case Dependency.generatedNameId generation name of {
           Just i -> Right i; Nothing -> Left ("missing protection declaration: " ++ name)
         };
@@ -1039,15 +1120,13 @@ module Bootstrap.Classes where {
       rows <- traverseEither (\((,,) name direct bodies) -> do {
         i <- required name;
         let { supportRefs = case M.lookup compareString name supportBodies of {
-                Nothing -> []; Just rhs -> filter (\n -> elem eqString n supportNames) (Surface.freeNames rhs)
+                Nothing -> []; Just rhs -> filter (\ref -> elem eqString (termRefName ref) supportNames)
+                  (Dependency.valueRefs (Dependency.observeExpressionWith False rhs))
               };
               namesRead = append (concatMap references bodies) supportRefs;
               refs = concatMap (refsIn i) namesRead;
-              hasProtectedMethod r = case Dependency.selectorId generation r of {
-                Nothing -> False;
-                Just _ -> case M.lookup compareString (Dependency.symbolName symbols r) methods of {
-                  Nothing -> False; Just ((,) _ predicates) -> elem eqString callStackPredicate predicates
-                }
+              hasProtectedMethod r = case Dependency.selectorEntry generation r of {
+                Nothing -> False; Just ((,) _ classes) -> elem eqString callStackPredicate classes
               }
         };
         Right ((,,) i (direct || any managedExpression bodies || any hasProtectedMethod refs)
@@ -1082,13 +1161,15 @@ module Bootstrap.Classes where {
   withExternalOverloads :: Map String SType ->
                            Map String ((,) String ([] String)) ->
                            Map String ((,) String ([] String));
-  withExternalOverloads externals methods =
-    M.union compareString
-      (M.mapWithKey
-        (\n ty -> case scheme ty of {
-          (,,) _ ps _ -> (,) n (map (\(SPredicate c _) -> c) ps)
-        }) externals)
-      methods;
+  withExternalOverloads = withImportedOverloads M.empty;
+  withImportedOverloads conventions externals methods =
+    M.union compareString (M.mapWithKey (\n ty -> (,) n (importedClasses conventions n ty)) externals) methods;
+  importedClasses conventions name ty = case M.lookup compareString name conventions of {
+    Just classes -> classes;
+    Nothing -> case scheme ty of { (,,) _ ps _ -> map (\(SPredicate c _) -> c) ps }
+  };
+  inventoryImportedClasses (ClassInventory _ _ _ _ _ _ (ClassSupports _ _ _ conventions) _ _) =
+    importedClasses conventions;
   selectCandidates :: [] String ->
                       [] ((,) EvidenceRole String) -> IntSet -> [] ((,) EvidenceRole String);
   selectCandidates names supers indices =
@@ -1100,24 +1181,15 @@ module Bootstrap.Classes where {
   methodBindings :: Set String ->
                     Bool -> [] ((,) String Info) -> Map String ((,) String ([] String));
   methodBindings imported isImported entries =
-    M.fromList compareString
-      (concatMap
-         (\((,) name (Info declaration _ _ methods _)) ->
-            if if isImported
-               then S.member compareString name imported
-               else not (S.member compareString name imported)
-            then map
-                   (\((,) method selector) ->
-                      let {
-                        local =
-                          case lookup eqString method (classMethods declaration) of {
-                            Nothing -> [];
-                            Just ty -> case scheme ty of { (,,) _ ps _ -> map (\(SPredicate c _) -> c) ps }
-                          }
-                      } in (,) method ((,) selector ((:) name local)))
-                   methods
-            else [])
-         entries);
+    M.fromList compareString (concatMap methodEntries (filter (\entry ->
+      let { belongs = S.member compareString (fst entry) imported } in
+      if isImported then belongs else not belongs) entries));
+  methodEntries ((,) name (Info declaration _ _ methods _)) = map
+    (\((,) method selector) -> let {
+      local = case lookup eqString method (classMethods declaration) of {
+        Nothing -> []; Just ty -> case scheme ty of { (,,) _ ps _ -> map (\(SPredicate c _) -> c) ps }
+      }
+    } in (,) method ((,) selector ((:) name local))) methods;
   instanceDefinition :: Dependency.ValueScopes ([] ((,) EvidenceRole String)) ->
                         DataEnv ->
                         Map String Info ->
@@ -1162,7 +1234,7 @@ module Bootstrap.Classes where {
                      case boundValueShared5 of {
                        Info _ dict _ _ _ ->
                          do {
-                           freshPure (SWanted dict candidates)
+                           freshPure (wantedHole (wantedScope valueScopes candidates) dict)
                          }
                      }
                    })
@@ -1487,23 +1559,62 @@ module Bootstrap.Classes where {
     };
   -- Planning fixes dictionary arity/provenance, never predicate argument types.
   -- Those remain ordinary dictionary-arrow constraints in the existing solver.
-  data QualifiedBinding = QualifiedKnown String ([] String)
-                        | QualifiedTemplate String Int Int
-                        | QualifiedRecursive String Int;
+  data QualifiedBinding = QualifiedKnown TermRef ([] String)
+                        | QualifiedTemplate TermRef Int Int
+                        | QualifiedRecursive TermRef Int;
+  -- Per-expression extensions are lexical or explicitly owned by a slot.
+  -- An unextended predecessor consults its scheme lazily, so lowering a
+  -- singleton does not traverse every declaration in its crate.
+  data QualifiedEnv = QualifiedEnv (Map TermRef (Maybe QualifiedBinding)) (TermRef -> Maybe QualifiedBinding);
+  lookupQualified ref (QualifiedEnv bound external) = case M.lookup compareRef ref bound of {
+    Nothing -> external ref; Just binding -> binding
+  };
+  putQualified ref binding (QualifiedEnv bound external) =
+    QualifiedEnv (M.insert compareRef ref (Just binding) bound) external;
+  forgetQualified ref (QualifiedEnv bound external) =
+    QualifiedEnv (M.insert compareRef ref Nothing bound) external;
+  compareRef a b = case a of {
+    LexicalRef x -> case b of { LexicalRef y -> compareString x y; DeclRef _ _ -> 0 - 1 };
+    DeclRef x _ -> case b of { LexicalRef _ -> 1; DeclRef y _ -> compareInt (V.toInt x) (V.toInt y) }
+  };
+  scopedBinder slots name = case slots of {
+    [] -> LexicalRef name;
+    [i] -> DeclRef i name;
+    _ -> panic "declaration binder arity mismatch"
+  };
+  scopeBinding ref expression = case ref of {
+    LexicalRef _ -> expression; DeclRef i _ -> SDeclScope [i] expression
+  };
   -- Managed evidence is synthesized at each use, never a demand seed.
+  data WantedScope = NamedEvidence ([] ((,) EvidenceRole String)) |
+    DeclEvidence ([] ((,) EvidenceRole TermRef));
+  wantedScope scopes candidates = case Dependency.scopeGeneration scopes of {
+    Nothing -> NamedEvidence candidates;
+    Just table -> let {
+      bind ((,) role name) = (,) role (case role of {
+        GivenEvidence -> LexicalRef name;
+        _ -> case Dependency.generatedNameId table name of {
+          Just i -> DeclRef i name; Nothing -> panic "unbound generated evidence candidate"
+        }
+      })
+    } in DeclEvidence (map bind candidates)
+  };
+  wantedHole scopes dict = case scopes of {
+    NamedEvidence choices -> SWanted dict choices; DeclEvidence choices -> SWantedRefs dict choices
+  };
   data QualifiedArgument = OrdinaryArgument Int | ManagedArgument SExpr;
   data QualifiedExpr = QualifiedExpr Int QualifiedForm;
   data QualifiedForm = QualifiedPlain SExpr
-                     | QualifiedVariable String (Maybe ((,) Int Int))
+                     | QualifiedVariable TermRef (Maybe ((,) Int Int))
                      | QualifiedApply QualifiedExpr QualifiedExpr
                      | QualifiedContext QualifiedExpr ([] QualifiedArgument)
-                     | QualifiedLambda String (Maybe SAnnotation) QualifiedExpr
-                     | QualifiedLet String QualifiedExpr QualifiedExpr
+                     | QualifiedLambda TermRef (Maybe SAnnotation) QualifiedExpr
+                     | QualifiedLet TermRef QualifiedExpr QualifiedExpr
                      | QualifiedAnnotation QualifiedExpr SAnnotation
                      | QualifiedSignature QualifiedExpr SAnnotation
                      | QualifiedCase QualifiedExpr ([] ((,) SPattern QualifiedExpr))
-                     | QualifiedChecked SType ([] String) ([] ((,) EvidenceRole String)) QualifiedExpr
-                     | QualifiedRec ([] ((,,) String RecursiveMode QualifiedExpr)) QualifiedExpr;
+                     | QualifiedChecked SType ([] String) WantedScope QualifiedExpr
+                     | QualifiedRec ([] (V.Index Declaration)) ([] ((,,) String RecursiveMode QualifiedExpr)) QualifiedExpr;
   data QualifiedBuild = QualifiedBuild ([] Q.Frame) ([] Q.Seed) ([] Q.Use)
                                       ([] ((,) Int Q.Demand));
   data QualifiedResult = QualifiedResult QualifiedExpr QualifiedBuild;
@@ -1554,12 +1665,12 @@ module Bootstrap.Classes where {
       }) seeds;
       freshPure (QualifiedBuild [] seeds [] nodes)
     };
-  qualifiedManagedScope :: Map String QualifiedBinding -> Map String ((,) String ([] String));
-  qualifiedManagedScope env = case M.lookup compareString callStackScopeKey env of {
-    Just (QualifiedKnown name _) -> M.singleton callStackScopeKey ((,) name []);
+  qualifiedManagedScope :: QualifiedEnv -> Map String ((,) String ([] String));
+  qualifiedManagedScope env = case lookupQualified (LexicalRef callStackScopeKey) env of {
+    Just (QualifiedKnown name _) -> M.singleton callStackScopeKey ((,) (termRefName name) []);
     _ -> M.empty
   };
-  qualifiedEvidence :: Maybe ((,) String SourceSpan) -> Int -> Map String QualifiedBinding ->
+  qualifiedEvidence :: Maybe ((,) String SourceSpan) -> Int -> QualifiedEnv ->
                        String -> QualifiedResult -> [] String -> Fresh QualifiedResult;
   qualifiedEvidence site owner env hint source classes = do {
     arguments <- mapM (\classId ->
@@ -1579,19 +1690,19 @@ module Bootstrap.Classes where {
         (Q.UnionNodes (map fst nodes)) (qualifiedMerge (qualifiedBuild source) build)
     }
   };
-  qualifiedKnown :: Maybe ((,) String SourceSpan) -> Int -> Map String QualifiedBinding ->
-                    String -> String -> [] String -> Fresh QualifiedResult;
+  qualifiedKnown :: Maybe ((,) String SourceSpan) -> Int -> QualifiedEnv ->
+                    String -> TermRef -> [] String -> Fresh QualifiedResult;
   qualifiedKnown site owner env hint name classes = do {
-    source <- qualifiedMake (QualifiedPlain (SVar name)) Q.Empty qualifiedEmpty;
+    source <- qualifiedMake (QualifiedPlain (referenceExpr name)) Q.Empty qualifiedEmpty;
     qualifiedEvidence site owner env hint source classes
   };
   planQualifiedFunction :: Maybe ((,) String SourceSpan) ->
     Dependency.ValueScopes ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
-    Map String QualifiedBinding -> [] ((,) EvidenceRole String) -> SExpr -> Fresh QualifiedResult;
+    QualifiedEnv -> [] ((,) EvidenceRole String) -> SExpr -> Fresh QualifiedResult;
   planQualifiedFunction site valueScopes ds infos owner env candidates expression =
     case expression of {
       SSourceDefinition body -> planQualifiedFunction site valueScopes ds infos owner
-        (M.delete compareString callStackScopeKey env) candidates body;
+        (forgetQualified (LexicalRef callStackScopeKey) env) candidates body;
       SCallSite name location body -> planQualifiedFunction (Just ((,) name location))
         valueScopes ds infos owner env candidates body;
       SAnn rhs (SAnnotation [] ty) ->
@@ -1611,12 +1722,15 @@ module Bootstrap.Classes where {
     _ -> False
   };
   planQualified :: Maybe ((,) String SourceSpan) -> Dependency.ValueScopes ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
-                   Map String QualifiedBinding -> [] ((,) EvidenceRole String) ->
+                   QualifiedEnv -> [] ((,) EvidenceRole String) ->
                    SExpr -> Fresh QualifiedResult;
-  planQualified site valueScopes ds infos owner env candidates expression =
+  planQualified = planQualifiedAt [];
+  planQualifiedAt slots site valueScopes ds infos owner env candidates expression =
     case expression of {
+      SDeclScope ids rhs -> planQualifiedAt ids site valueScopes ds infos owner env candidates rhs;
+      SGlobal i hint -> planReference site owner env (DeclRef i hint);
       SSourceDefinition body -> planQualified site valueScopes ds infos owner
-        (M.delete compareString callStackScopeKey env) candidates body;
+        (forgetQualified (LexicalRef callStackScopeKey) env) candidates body;
       SCallSite name location value ->
         if eqString name "an expression type signature" && managedAnnotation value
         then planQualifiedFunction (Just ((,) name location)) valueScopes ds infos owner env candidates value
@@ -1628,18 +1742,7 @@ module Bootstrap.Classes where {
           qualifiedMake (QualifiedPlain stack) Q.Empty qualifiedEmpty
         }
         else
-        case M.lookup compareString x env of {
-          Nothing -> qualifiedMake (QualifiedPlain expression) Q.Empty qualifiedEmpty;
-          Just (QualifiedKnown name classes) -> qualifiedKnown site owner env x name classes;
-          Just (QualifiedRecursive name source) ->
-            qualifiedMake (QualifiedVariable name Nothing) (Q.RefNode source) qualifiedEmpty;
-          Just (QualifiedTemplate name frame source) ->
-            do {
-              use <- qualifiedId;
-              qualifiedMake (QualifiedVariable name (Just ((,) use source))) (Q.InstantiateNode use source)
-                (QualifiedBuild [] [] ((:) (Q.Use use frame owner) []) [])
-            }
-        };
+        planReference site owner env (LexicalRef x);
       SApp a b ->
         do {
           left <- planQualifiedFunction site (Dependency.nestedScopes valueScopes) ds infos owner env candidates a;
@@ -1662,17 +1765,17 @@ module Bootstrap.Classes where {
             Nothing -> []; Just (SAnnotation _ ty) -> qualifiedClasses ty
           } };
           result <- planQualified site (Dependency.nestedScopes valueScopes) ds infos owner
-            (M.insert compareString x (QualifiedKnown x classes) env) candidates body;
-          qualifiedJoin (QualifiedLambda x translated (qualifiedExpression result)) ((:) result [])
+            (putQualified (scopedBinder slots x) (QualifiedKnown (scopedBinder slots x) classes) env) candidates body;
+          qualifiedJoin (QualifiedLambda (scopedBinder slots x) translated (qualifiedExpression result)) ((:) result [])
         };
       SLet x (SSignature rhs (SAnnotation [] ty)) body ->
         do {
           left <- planQualified site (Dependency.nestedScopes valueScopes) ds infos owner env
-            (Dependency.bindingScope valueScopes x (copiedBinding rhs) candidates)
+            (Dependency.scopeForBinder valueScopes (scopedBinder slots x) (copiedBinding rhs) candidates)
             (SSignature rhs (SAnnotation [] ty));
           right <- planQualified site valueScopes ds infos owner
-            (M.insert compareString x (QualifiedKnown x (qualifiedClasses ty)) env) candidates body;
-          qualifiedMake (QualifiedLet x (qualifiedExpression left) (qualifiedExpression right))
+            (putQualified (scopedBinder slots x) (QualifiedKnown (scopedBinder slots x) (qualifiedClasses ty)) env) candidates body;
+          qualifiedMake (QualifiedLet (scopedBinder slots x) (qualifiedExpression left) (qualifiedExpression right))
             (Q.RefNode (qualifiedNode (qualifiedExpression right)))
             (qualifiedMerge (qualifiedBuild left) (qualifiedBuild right))
         };
@@ -1680,18 +1783,18 @@ module Bootstrap.Classes where {
         do {
           frame <- qualifiedId;
           left <- planQualified site (Dependency.nestedScopes valueScopes) ds infos frame env
-            (Dependency.bindingScope valueScopes x (copiedBinding rhs) candidates) rhs;
+            (Dependency.scopeForBinder valueScopes (scopedBinder slots x) (copiedBinding rhs) candidates) rhs;
           build <- qualifiedFinish frame (Just owner) (qualifiedBuild left);
           let {
-            inferred = QualifiedTemplate x frame (qualifiedNode (qualifiedExpression left));
+            inferred = QualifiedTemplate (scopedBinder slots x) frame (qualifiedNode (qualifiedExpression left));
             explicit = sourceDeclaredClasses Nothing rhs;
             -- Match source-export interface provenance, including copied and
             -- located wrappers, without interpreting a target dictionary arrow.
-            binding = if null explicit then inferred else QualifiedKnown x explicit
+            binding = if null explicit then inferred else QualifiedKnown (scopedBinder slots x) explicit
           };
           right <- planQualified site valueScopes ds infos owner
-            (M.insert compareString x binding env) candidates body;
-          qualifiedMake (QualifiedLet x (qualifiedExpression left) (qualifiedExpression right))
+            (putQualified (scopedBinder slots x) binding env) candidates body;
+          qualifiedMake (QualifiedLet (scopedBinder slots x) (qualifiedExpression left) (qualifiedExpression right))
             (Q.RefNode (qualifiedNode (qualifiedExpression right)))
             (qualifiedMerge build (qualifiedBuild right))
         };
@@ -1725,7 +1828,7 @@ module Bootstrap.Classes where {
         do {
           result <- planQualified site valueScopes ds infos owner env candidates rhs;
           planned <- mapM (\(SAlternative pattern body) -> do {
-            let { scope = foldr (\n -> M.insert compareString n (QualifiedKnown n []))
+            let { scope = foldr (\n -> putQualified (LexicalRef n) (QualifiedKnown (LexicalRef n) []))
                           env (Surface.patternVariables pattern) };
             branch <- planQualified site (Dependency.nestedScopes valueScopes) ds infos owner scope candidates body;
             freshPure ((,) pattern branch)
@@ -1736,21 +1839,32 @@ module Bootstrap.Classes where {
         };
       SDo _ _ -> planQualified site valueScopes ds infos owner env candidates (Desugar.desugarDo expression);
       SLetRec definitions body ->
-        planQualifiedRecursive site valueScopes ds infos owner env candidates definitions body;
+        planQualifiedRecursive slots site valueScopes ds infos owner env candidates definitions body;
       SSharedBind _ _ _ _ _ -> freshFail "shared do bind escaped surface lowering";
       SEquations _ -> freshFail "surface equations escaped lowering";
       SWanted _ _ -> freshFail "dictionary holes are reserved for dictionary translation";
       SChecked _ _ -> freshFail "checked source forms are reserved for dictionary translation";
       _ -> qualifiedMake (QualifiedPlain expression) Q.Empty qualifiedEmpty
     };
+  planReference site owner env ref = case lookupQualified ref env of {
+    Nothing -> qualifiedMake (QualifiedPlain (referenceExpr ref)) Q.Empty qualifiedEmpty;
+    Just (QualifiedKnown name classes) -> qualifiedKnown site owner env (termRefName ref) name classes;
+    Just (QualifiedRecursive name source) ->
+      qualifiedMake (QualifiedVariable name Nothing) (Q.RefNode source) qualifiedEmpty;
+    Just (QualifiedTemplate name frame source) -> do {
+      use <- qualifiedId;
+      qualifiedMake (QualifiedVariable name (Just ((,) use source))) (Q.InstantiateNode use source)
+        (QualifiedBuild [] [] [(Q.Use use frame owner)] [])
+    }
+  };
   planQualifiedSigned :: Maybe ((,) String SourceSpan) -> Dependency.ValueScopes ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
-                         Map String QualifiedBinding -> [] ((,) EvidenceRole String) ->
+                         QualifiedEnv -> [] ((,) EvidenceRole String) ->
                          SExpr -> SType -> Fresh QualifiedResult;
   planQualifiedSigned site valueScopes ds infos owner env available expression ty =
     case expression of {
       -- Reset copied definition scope before installing its own explicit givens.
       SSourceDefinition body -> planQualifiedSigned site valueScopes ds infos owner
-        (M.delete compareString callStackScopeKey env) available body ty;
+        (forgetQualified (LexicalRef callStackScopeKey) env) available body ty;
       SCallSite name location body -> planQualifiedSigned (Just ((,) name location))
         valueScopes ds infos owner env available body ty;
       _ -> do {
@@ -1763,19 +1877,19 @@ module Bootstrap.Classes where {
           local = append (map (\((,) _ name) -> (,) GivenEvidence name) ordinary) available;
           scope = foldl (\current ((,) classId name) ->
             if eqString classId callStackPredicate
-            then M.insert compareString callStackScopeKey (QualifiedKnown name []) current
+            then putQualified (LexicalRef callStackScopeKey) (QualifiedKnown (LexicalRef name) []) current
             else current) env (zip classes names)
         };
         frame <- qualifiedId;
         result <- planQualified site valueScopes ds infos frame scope local expression;
         build <- qualifiedFinish frame (Just owner) (qualifiedBuild result);
-        qualifiedMake (QualifiedChecked translated names local (qualifiedExpression result)) Q.Empty build
+        qualifiedMake (QualifiedChecked translated names (wantedScope valueScopes local) (qualifiedExpression result)) Q.Empty build
       }
     };
-  planQualifiedRecursive :: Maybe ((,) String SourceSpan) -> Dependency.ValueScopes ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
-                            Map String QualifiedBinding -> [] ((,) EvidenceRole String) ->
+  planQualifiedRecursive :: [] (V.Index Declaration) -> Maybe ((,) String SourceSpan) -> Dependency.ValueScopes ([] ((,) EvidenceRole String)) -> DataEnv -> Map String Info -> Int ->
+                            QualifiedEnv -> [] ((,) EvidenceRole String) ->
                             [] ((,,) String RecursiveMode SExpr) -> SExpr -> Fresh QualifiedResult;
-  planQualifiedRecursive site valueScopes ds infos owner env candidates definitions body =
+  planQualifiedRecursive slots site valueScopes ds infos owner env candidates definitions body =
     do {
       freshLift (traverseEither (\((,,) n mode _) -> case mode of {
         InferRecursive -> Right ();
@@ -1783,6 +1897,8 @@ module Bootstrap.Classes where {
         _ -> Left ("recursive definition " ++ n ++ " requires an explicit closed signature")
       }) definitions);
       let {
+        refs = M.fromList compareString (zipWith (\i ((,,) n _ _) -> (,) n (DeclRef i n)) slots definitions);
+        ref n = M.findWithDefault compareString (LexicalRef n) n refs;
         unsigned = filter (\((,,) _ mode _) -> case mode of {
           InferRecursive -> True; _ -> False
         }) definitions;
@@ -1791,17 +1907,21 @@ module Bootstrap.Classes where {
         }) definitions;
         fixed = foldr (\((,,) n mode _) scope -> case mode of {
           CheckRecursive (SAnnotation [] ty) ->
-            M.insert compareString n (QualifiedKnown n (qualifiedClasses ty)) scope;
+            putQualified (ref n) (QualifiedKnown (ref n) (qualifiedClasses ty)) scope;
           _ -> scope
         }) env signed;
-        groups = Dependency.components (map (\((,,) n _ rhs) ->
-          (,) n (Dependency.valueNames (Dependency.observeExpression rhs))) unsigned)
+        owners = M.fromList compareInt (map (\((,) n target) -> case target of {
+          DeclRef i _ -> (,) (V.toInt i) n; LexicalRef _ -> panic "invalid recursive declaration slot"
+        }) (M.toList refs));
+        dependencies rhs = if null slots then Dependency.expressionNamedReads rhs else
+          mapMaybe (\i -> M.lookup compareInt (V.toInt i) owners) (Dependency.expressionGlobalIds rhs);
+        groups = Dependency.components (map (\((,,) n _ rhs) -> (,) n (dependencies rhs)) unsigned)
       };
       accumulated <- foldM (\((,,) scope previous build) group -> do {
         frame <- qualifiedId;
         entries <- mapM (\n -> do { node <- qualifiedId; freshPure ((,) n node) }) group;
         let {
-          shared = foldr (\((,) n node) -> M.insert compareString n (QualifiedRecursive n node))
+          shared = foldr (\((,) n node) -> putQualified (ref n) (QualifiedRecursive (ref n) node))
                     scope entries
         };
         planned <- mapM (\((,) n node) -> do {
@@ -1810,7 +1930,7 @@ module Bootstrap.Classes where {
             Just ((,,) _ _ rhs) -> Right rhs
           });
           result <- planQualified site (Dependency.nestedScopes valueScopes) ds infos frame shared
-            (Dependency.bindingScope valueScopes n (copiedBinding rhs) candidates) rhs;
+            (Dependency.scopeForBinder valueScopes (ref n) (copiedBinding rhs) candidates) rhs;
           let {
             link = QualifiedBuild [] [] []
               ((:) ((,) node (Q.RefNode (qualifiedNode (qualifiedExpression result)))) [])
@@ -1820,7 +1940,7 @@ module Bootstrap.Classes where {
         }) entries;
         completed <- qualifiedFinish frame (Just owner) (qualifiedBuilds (map snd planned));
         let {
-          exported = foldr (\((,) n node) -> M.insert compareString n (QualifiedTemplate n frame node))
+          exported = foldr (\((,) n node) -> putQualified (ref n) (QualifiedTemplate (ref n) frame node))
                        scope entries
         };
         freshPure ((,,) exported (append previous (map fst planned)) (qualifiedMerge build completed))
@@ -1831,7 +1951,7 @@ module Bootstrap.Classes where {
             CheckRecursive (SAnnotation [] ty) -> do {
               translated <- freshLift (translateLocalScheme ds infos ty);
               result <- planQualifiedSigned site (Dependency.nestedScopes valueScopes) ds infos owner scope
-                (Dependency.bindingScope valueScopes n (copiedBinding rhs) candidates) rhs ty;
+                (Dependency.scopeForBinder valueScopes (ref n) (copiedBinding rhs) candidates) rhs ty;
               freshPure ((,) ((,,) n (CheckRecursive (SAnnotation [] translated))
                 (qualifiedExpression result)) (qualifiedBuild result))
             };
@@ -1844,7 +1964,7 @@ module Bootstrap.Classes where {
               Just definition -> Right definition
             }) definitions);
           continuation <- planQualified site valueScopes ds infos owner scope candidates body;
-          qualifiedMake (QualifiedRec ordered (qualifiedExpression continuation))
+          qualifiedMake (QualifiedRec slots ordered (qualifiedExpression continuation))
             (Q.RefNode (qualifiedNode (qualifiedExpression continuation)))
             (qualifiedBuilds ((:) build ((:) (qualifiedBuild continuation) (map snd checked))))
         }
@@ -1870,7 +1990,7 @@ module Bootstrap.Classes where {
       QualifiedExpr node form ->
         case form of {
           QualifiedPlain source -> freshPure source;
-          QualifiedVariable name mapping -> renderQualifiedArguments plan bindings node mapping (SVar name);
+          QualifiedVariable name mapping -> renderQualifiedArguments plan bindings node mapping (referenceExpr name);
           QualifiedApply a b -> do {
             left <- renderQualified plan infos bindings a;
             right <- renderQualified plan infos bindings b;
@@ -1893,13 +2013,13 @@ module Bootstrap.Classes where {
           };
           QualifiedLambda name annotation body -> do {
             result <- renderQualified plan infos bindings body;
-            freshPure (SLam name annotation result)
+            freshPure (scopeBinding name (SLam (termRefName name) annotation result))
           };
           QualifiedLet name rhs body -> do {
             parameters <- qualifiedParameters plan rhs;
             left <- renderQualified plan infos (qualifiedParameterMap parameters) rhs;
             right <- renderQualified plan infos bindings body;
-            freshPure (SLet name (foldr (\((,,) _ n _) b -> SLam n Nothing b) left parameters) right)
+            freshPure (scopeBinding name (SLet (termRefName name) (foldr (\((,,) _ n _) b -> SLam n Nothing b) left parameters) right))
           };
           QualifiedAnnotation source annotation -> do {
             result <- renderQualified plan infos bindings source;
@@ -1921,9 +2041,9 @@ module Bootstrap.Classes where {
             parameters <- qualifiedParameters plan source;
             result <- renderQualified plan infos (qualifiedParameterMap parameters) source;
             freshPure (SChecked ty (foldr (\n b -> SLam n Nothing b)
-              (closeWants infos candidates (qualifiedWants parameters) result) names))
+              (closeWantsIn infos candidates (qualifiedWants parameters) result) names))
           };
-          QualifiedRec definitions body -> do {
+          QualifiedRec slots definitions body -> do {
             lowered <- mapM (\((,,) name mode rhs) -> do {
               parameters <- qualifiedParameters plan rhs;
               result <- renderQualified plan infos (qualifiedParameterMap parameters) rhs;
@@ -1931,7 +2051,7 @@ module Bootstrap.Classes where {
                 (foldr (\((,,) _ n _) b -> SLam n Nothing b) result parameters))
             }) definitions;
             result <- renderQualified plan infos bindings body;
-            freshPure (SLetRec lowered result)
+            freshPure (if null slots then SLetRec lowered result else SDeclScope slots (SLetRec lowered result))
           }
         }
     };
@@ -1975,13 +2095,25 @@ module Bootstrap.Classes where {
   prepareQualified site valueScopes ds infos env candidates expression = do {
     owner <- qualifiedId;
     result <- planQualified site valueScopes ds infos owner
-      (M.map (\((,) name classes) -> QualifiedKnown name classes) env) candidates expression;
+      (qualifiedEnvironment valueScopes env) candidates expression;
     build <- qualifiedFinish owner Nothing (qualifiedBuild result);
     plan <- freshLift (case build of {
       QualifiedBuild frames seeds uses nodes -> Q.solve frames seeds uses (IM.fromList nodes)
     });
     freshPure ((,) (qualifiedExpression result) plan)
   };
+  qualifiedEnvironment scopes entries = QualifiedEnv M.empty (\ref -> case ref of {
+    LexicalRef n -> mapOptional (\((,) name classes) -> QualifiedKnown (LexicalRef name) classes)
+      (M.lookup compareString n entries);
+    DeclRef i _ -> case Dependency.scopeGeneration scopes of {
+      Nothing -> Nothing;
+      Just table -> case Dependency.selectorEntry table i of {
+        Just ((,) target classes) -> Just (QualifiedKnown
+          (DeclRef target (Dependency.symbolName (Dependency.generatedSymbols table) target)) classes);
+        Nothing -> mapOptional (\((,) classes _) -> QualifiedKnown ref classes) (Dependency.scopeContract scopes i)
+      }
+    }
+  });
   managedAnnotation :: SExpr -> Bool;
   managedAnnotation expression = case expression of {
     SAnn _ (SAnnotation _ ty) -> managedType ty;
@@ -2120,7 +2252,7 @@ module Bootstrap.Classes where {
         (,) body wants ->
           do {
             let {
-              closed = closeWants infos local wants body
+              closed = closeWantsIn infos (wantedScope valueScopes local) wants body
             };
             freshPure (SChecked translated (foldr (\n b -> SLam n Nothing b) closed names))
           }
@@ -2129,7 +2261,8 @@ module Bootstrap.Classes where {
     };
   closeWants :: Map String Info ->
                 [] ((,) EvidenceRole String) -> [] ((,) String String) -> SExpr -> SExpr;
-  closeWants infos candidates wants expression =
+  closeWants infos candidates = closeWantsIn infos (NamedEvidence candidates);
+  closeWantsIn infos candidates wants expression =
     let {
       replacements =
         M.fromList compareString
@@ -2141,34 +2274,36 @@ module Bootstrap.Classes where {
                 })
              wants)
     } in
-    closeWanted replacements candidates expression;
+    closeWantedIn replacements candidates expression;
   closeWanted :: Map String String -> [] ((,) EvidenceRole String) -> SExpr -> SExpr;
-  closeWanted replacements candidates expression =
+  closeWanted replacements candidates = closeWantedIn replacements (NamedEvidence candidates);
+  closeWantedIn replacements candidates expression =
     case expression of {
-      SSourceDefinition body -> SSourceDefinition (closeWanted replacements candidates body);
+      SSourceDefinition body -> SSourceDefinition (closeWantedIn replacements candidates body);
+      SDeclScope ids body -> SDeclScope ids (closeWantedIn replacements candidates body);
       SCallSite name location body ->
-        SCallSite name location (closeWanted replacements candidates body);
+        SCallSite name location (closeWantedIn replacements candidates body);
       SVar n ->
         case M.lookup compareString n replacements of {
           Nothing -> expression;
-          Just d -> SWanted d candidates
+          Just d -> wantedHole candidates d
         };
-      SLam n a b -> SLam n a (closeWanted replacements candidates b);
+      SLam n a b -> SLam n a (closeWantedIn replacements candidates b);
       SApp a b ->
-        SApp (closeWanted replacements candidates a) (closeWanted replacements candidates b);
+        SApp (closeWantedIn replacements candidates a) (closeWantedIn replacements candidates b);
       SLet n a b ->
-        SLet n (closeWanted replacements candidates a) (closeWanted replacements candidates b);
-      SAnn a ty -> SAnn (closeWanted replacements candidates a) ty;
-      SSignature a ty -> SSignature (closeWanted replacements candidates a) ty;
+        SLet n (closeWantedIn replacements candidates a) (closeWantedIn replacements candidates b);
+      SAnn a ty -> SAnn (closeWantedIn replacements candidates a) ty;
+      SSignature a ty -> SSignature (closeWantedIn replacements candidates a) ty;
       SCase a branches ->
-        SCase (closeWanted replacements candidates a)
-          (map (\(SAlternative p b) -> SAlternative p (closeWanted replacements candidates b))
+        SCase (closeWantedIn replacements candidates a)
+          (map (\(SAlternative p b) -> SAlternative p (closeWantedIn replacements candidates b))
              branches);
-      SChecked ty a -> SChecked ty (closeWanted replacements candidates a);
+      SChecked ty a -> SChecked ty (closeWantedIn replacements candidates a);
       SLetRec definitions body ->
         SLetRec
-          (map (\((,,) n t a) -> (,,) n t (closeWanted replacements candidates a)) definitions)
-          (closeWanted replacements candidates body);
+          (map (\((,,) n t a) -> (,,) n t (closeWantedIn replacements candidates a)) definitions)
+          (closeWantedIn replacements candidates body);
       _ -> expression
     };
   instantiateMethod :: Map String SType -> SType -> Fresh SType;

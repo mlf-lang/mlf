@@ -14,6 +14,7 @@ module Bootstrap.CrateQuery where {
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.SourceInference as Source;
+  import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.SourceUnit as Unit;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Bitstream as W;
@@ -76,6 +77,11 @@ module Bootstrap.CrateQuery where {
     ScalarString text -> node "scalar-source-string" ((:) text []);
     CharString codes -> node "char-source-string" ((:) (list showInt codes) [])
   };
+  encodeTermRef ref = case ref of {
+    LexicalRef n -> node "local" [n];
+    DeclRef i _ -> node "decl" [showInt (V.toInt i)]
+  };
+  encodeScopes ids = list (compose showInt V.toInt) ids;
   encodePattern :: SPattern -> String;
   encodePattern pattern =
     case pattern of {
@@ -89,6 +95,8 @@ module Bootstrap.CrateQuery where {
       SAsPattern n pattern -> node "as-pattern" ((:) n ((:) (encodePattern pattern) []));
       SLazyPattern pattern -> node "lazy-pattern" ((:) (encodePattern pattern) []);
       SStringPattern s -> node "string-pattern" ((:) s []);
+      SIndexedStringPattern s equal conversion -> node "indexed-string-pattern"
+        [encodeSourceString s,encodeTermRef equal,encodeTermRef conversion];
       SOverloadedStringPattern s equal fromString ->
         node "overloaded-string-pattern" ((:) (encodeSourceString s) ((:) equal ((:) fromString [])));
       SBoolPattern b -> node "boolean-pattern" ((:) (boolean b) [])
@@ -109,6 +117,10 @@ module Bootstrap.CrateQuery where {
   encodeExpression :: SExpr -> String;
   encodeExpression expression =
     case expression of {
+      SGlobal i _ -> node "decl" [showInt (V.toInt i)];
+      SDeclScope ids body -> node "declaration-scope" [encodeScopes ids,encodeExpression body];
+      SWantedRefs dictionary refs -> node "wanted-declarations"
+        [dictionary,list (\((,) role ref) -> node (encodeRole role) [encodeTermRef ref]) refs];
       SVar n -> node "variable" ((:) n []);
       SConstructor n -> node "constructor" ((:) n []);
       SLam n annotation body ->
@@ -187,6 +199,10 @@ module Bootstrap.CrateQuery where {
   inlineScopeKey candidates = keyList (\candidate -> KeyText (encodeCandidate candidate)) candidates;
   expressionKey :: ([] ((,) EvidenceRole String) -> SourceKey) -> SExpr -> SourceKey;
   expressionKey scope expression = let { child = expressionKey scope } in case expression of {
+    SGlobal i _ -> keyNode "decl" [KeyText (showInt (V.toInt i))];
+    SDeclScope ids body -> keyNode "declaration-scope" [KeyText (encodeScopes ids),child body];
+    SWantedRefs dictionary refs -> keyNode "wanted-declarations" [KeyText dictionary,
+      keyList (\((,) role ref) -> keyNode (encodeRole role) [KeyText (encodeTermRef ref)]) refs];
     SVar n -> keyNode "variable" [KeyText n];
     SConstructor n -> keyNode "constructor" [KeyText n];
     SLam n annotation body -> keyNode "lambda"
@@ -489,36 +505,49 @@ module Bootstrap.CrateQuery where {
       SForall Flexible n (SBottomKind _) body -> (:) n (leadingTypes body);
       _ -> []
     };
-  canonicalPattern :: Map String String -> Map String String -> Int -> SPattern -> SPattern;
-  canonicalPattern env types typeDepth pattern =
+  ordinalToken i = "ref:" ++ showInt (V.toInt i);
+  canonicalTermRef rank env ref = case ref of {
+    LexicalRef n -> canonicalReference env n;
+    DeclRef i _ -> ordinalToken (rank i)
+  };
+  canonicalPattern = canonicalPatternWith (\i -> i);
+  canonicalPatternWith :: (V.Index Declaration -> V.Index Declaration) -> Map String String -> Map String String -> Int -> SPattern -> SPattern;
+  canonicalPatternWith rank env types typeDepth pattern =
     case pattern of {
       SConstructorPattern n names ->
         SConstructorPattern n (map (Separate.mapMaybeValue (canonicalReference env)) names);
       SDefaultPattern name ->
         SDefaultPattern (Separate.mapMaybeValue (canonicalReference env) name);
       SNestedPattern n patterns ->
-        SNestedPattern n (map (canonicalPattern env types typeDepth) patterns);
+        SNestedPattern n (map (canonicalPatternWith rank env types typeDepth) patterns);
       SAnnotatedPattern n annotation ->
         SAnnotatedPattern (canonicalReference env n)
           (canonicalAnnotation types typeDepth annotation);
+      SIndexedStringPattern s equal conversion -> SOverloadedStringPattern s
+        (canonicalTermRef rank env equal) (canonicalTermRef rank env conversion);
       SOverloadedStringPattern s equal fromString ->
         SOverloadedStringPattern s (canonicalReference env equal) (canonicalReference env fromString);
       SAsPattern n pattern ->
-        SAsPattern (canonicalReference env n) (canonicalPattern env types typeDepth pattern);
-      SLazyPattern pattern -> SLazyPattern (canonicalPattern env types typeDepth pattern);
+        SAsPattern (canonicalReference env n) (canonicalPatternWith rank env types typeDepth pattern);
+      SLazyPattern pattern -> SLazyPattern (canonicalPatternWith rank env types typeDepth pattern);
       _ -> pattern
     };
-  canonicalExpression :: Map String String -> Int -> Map String String -> Int -> SExpr -> SExpr;
-  canonicalExpression env depth types typeDepth expression =
+  canonicalExpression = canonicalExpressionWith (\i -> i);
+  canonicalExpressionWith :: (V.Index Declaration -> V.Index Declaration) -> Map String String -> Int -> Map String String -> Int -> SExpr -> SExpr;
+  canonicalExpressionWith rank env depth types typeDepth expression =
     let {
-      child = canonicalExpression env depth types typeDepth
+      child = canonicalExpressionWith rank env depth types typeDepth
     } in
     case expression of {
+      SGlobal i _ -> SVar (ordinalToken (rank i));
+      SDeclScope ids body -> SDeclScope (map rank ids) (child body);
+      SWantedRefs dictionary refs -> SWanted dictionary (map (\((,) role ref) ->
+        (,) role (canonicalTermRef rank env ref)) refs);
       SVar n -> SVar (canonicalReference env n);
       SLam n annotation body ->
         SLam ("local:" ++ showInt depth)
           (Separate.mapMaybeValue (canonicalAnnotation types typeDepth) annotation)
-          (canonicalExpression (M.insert compareString n ("local:" ++ showInt depth) env)
+          (canonicalExpressionWith rank (M.insert compareString n ("local:" ++ showInt depth) env)
              (depth + 1)
              types
              typeDepth
@@ -526,7 +555,7 @@ module Bootstrap.CrateQuery where {
       SApp a b -> SApp (child a) (child b);
       SLet n a b ->
         SLet ("local:" ++ showInt depth) (child a)
-          (canonicalExpression (M.insert compareString n ("local:" ++ showInt depth) env)
+          (canonicalExpressionWith rank (M.insert compareString n ("local:" ++ showInt depth) env)
              (depth + 1)
              types
              typeDepth
@@ -540,7 +569,7 @@ module Bootstrap.CrateQuery where {
           }
         } in
         SSignature
-          (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
+          (canonicalExpressionWith rank env depth (canonicalScope "type:" types typeDepth names)
              (typeDepth + length names) a)
           (canonicalAnnotation types typeDepth annotation);
       SCase a branches ->
@@ -553,8 +582,8 @@ module Bootstrap.CrateQuery where {
                 let {
                   scope = canonicalScope "local:" env depth names
                 } in
-                SAlternative (canonicalPattern scope types typeDepth pattern)
-                  (canonicalExpression scope (depth + length names) types typeDepth body))
+                SAlternative (canonicalPatternWith rank scope types typeDepth pattern)
+                  (canonicalExpressionWith rank scope (depth + length names) types typeDepth body))
              branches);
       SEquations rows ->
         SEquations
@@ -566,16 +595,16 @@ module Bootstrap.CrateQuery where {
                 let {
                   scope = canonicalScope "local:" env depth names
                 } in
-                (,) (map (canonicalPattern scope types typeDepth) patterns)
-                  (canonicalExpression scope (depth + length names) types typeDepth body))
+                (,) (map (canonicalPatternWith rank scope types typeDepth) patterns)
+                  (canonicalExpressionWith rank scope (depth + length names) types typeDepth body))
              rows);
       SSourceDefinition body -> SSourceDefinition (child body);
       SCallSite label span body -> SCallSite label span (child body);
       SSharedBind pattern action continuation bindMethod failure ->
         let { names = Desugar.patternVariables pattern } in
         let { scope = canonicalScope "local:" env depth names } in
-        SSharedBind (canonicalPattern scope types typeDepth pattern) (child action)
-          (canonicalExpression scope (depth + length names) types typeDepth continuation)
+        SSharedBind (canonicalPatternWith rank scope types typeDepth pattern) (child action)
+          (canonicalExpressionWith rank scope (depth + length names) types typeDepth continuation)
           (child bindMethod) (child failure);
       SDo _ _ -> child (Desugar.desugarDo expression);
       SLetRec definitions body ->
@@ -588,8 +617,8 @@ module Bootstrap.CrateQuery where {
         let {
           nextDepth = (depth + length names)
         } in
-        SLetRec (map (canonicalRecursive scope nextDepth types typeDepth) definitions)
-          (canonicalExpression scope nextDepth types typeDepth body);
+        SLetRec (map (canonicalRecursiveWith rank scope nextDepth types typeDepth) definitions)
+          (canonicalExpressionWith rank scope nextDepth types typeDepth body);
       SWanted dictionary candidates ->
         SWanted dictionary
           (map (\((,) role n) -> (,) role (canonicalReference env n)) candidates);
@@ -598,20 +627,21 @@ module Bootstrap.CrateQuery where {
           names = leadingTypes ty
         } in
         SChecked (canonicalTypeIn types typeDepth ty)
-          (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
+          (canonicalExpressionWith rank env depth (canonicalScope "type:" types typeDepth names)
              (typeDepth + length names)
              body);
       _ -> expression
     };
-  canonicalRecursive :: Map String String ->
+  canonicalRecursive = canonicalRecursiveWith (\i -> i);
+  canonicalRecursiveWith :: (V.Index Declaration -> V.Index Declaration) -> Map String String ->
                         Int ->
                         Map String String ->
                         Int -> (,,) String RecursiveMode SExpr -> (,,) String RecursiveMode SExpr;
-  canonicalRecursive env depth types typeDepth ((,,) n mode body) =
+  canonicalRecursiveWith rank env depth types typeDepth ((,,) n mode body) =
     case mode of {
       InferRecursive ->
         (,,) (canonicalReference env n) InferRecursive
-          (canonicalExpression env depth types typeDepth body);
+          (canonicalExpressionWith rank env depth types typeDepth body);
       CheckRecursive annotation ->
         let {
           names =
@@ -622,12 +652,12 @@ module Bootstrap.CrateQuery where {
         } in
         (,,) (canonicalReference env n)
           (CheckRecursive (canonicalAnnotation types typeDepth annotation))
-          (canonicalExpression env depth (canonicalScope "type:" types typeDepth names)
+          (canonicalExpressionWith rank env depth (canonicalScope "type:" types typeDepth names)
              (typeDepth + length names)
              body)
     };
-  canonicalMember = canonicalMemberIn M.empty (\n -> n);
-  canonicalMemberIn globals owner ((,,) n annotation body) =
+  canonicalMember = canonicalMemberIn (\i -> i) M.empty (\n -> n);
+  canonicalMemberIn rank globals owner ((,,) n annotation body) =
     let {
       names = case annotation of {
         Just (SAnnotation [] ty) -> leadingTypes ty;
@@ -635,23 +665,26 @@ module Bootstrap.CrateQuery where {
       }
     } in
     (,,) (owner n) (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
-      (canonicalExpression globals 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
+      (canonicalExpressionWith rank globals 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
   -- The table is ordered by defining identity. Its ordinals belong only
   -- to this Prepared value, independently of resolver slot order or crate.
-  data ReferenceTable = ReferenceTable ([] String) (Map String String);
-  referenceDefinitions (ReferenceTable keys _) = keys;
-  referenceToken (ReferenceTable _ names) name = M.findWithDefault compareString name name names;
-  referenceMember table@(ReferenceTable _ names) = canonicalMemberIn names (referenceToken table);
+  data ReferenceTable = ReferenceTable ([] String) (Map String String)
+    (Map (V.Index Declaration) (V.Index Declaration));
+  referenceDefinitions (ReferenceTable keys _ _) = keys;
+  referenceToken (ReferenceTable _ names _) name = M.findWithDefault compareString name name names;
+  referenceMember table@(ReferenceTable _ names ranks) =
+    canonicalMemberIn (\i -> M.get Source.compareDecl i ranks) names (referenceToken table);
   referenceTable slots prepared = let {
     scope = Source.slotScope slots;
-    observed = concatMap (compose (Source.expressionDeclarations scope) Source.sourceRhs)
+    observed = concatMap (compose (Source.declarationRefs scope) (compose Dependency.querySyntaxRefs Source.sourceRhs))
       (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
     ids = append (Source.memberIds slots) (append (Source.parameterIds slots)
       (append (Source.candidateIds slots) observed));
     definitions = M.toList (M.fromList compareString (map (\i -> (,) (Source.declStable scope i) i) ids));
-    names = zipWith (\ordinal ((,) _ i) -> (,) (Source.declName scope i) ("ref:" ++ showInt ordinal))
-      (range 0 (length definitions - 1)) definitions
-  } in ReferenceTable (map fst definitions) (M.fromList compareString names);
+    ranks = zipWith (\ordinal ((,) _ i) -> (,) i (V.fromInt ordinal))
+      (range 0 (length definitions - 1)) definitions;
+    names = map (\((,) i rank) -> (,) (Source.declName scope i) (ordinalToken rank)) ranks
+  } in ReferenceTable (map fst definitions) (M.fromList compareString names) (M.fromList Source.compareDecl ranks);
   data DatatypeId = DatatypeId;
   data TypeInventory = TypeInventory (Dependency.NamedGraph DatatypeId DataDecl)
     (Map String String) (V.IndexVec DatatypeId IntSet);
@@ -1967,26 +2000,53 @@ module Bootstrap.CrateQuery where {
                [] ([] String) ->
                QueryState -> IO (Either String ((,) ([] Separate.UnitObject) QueryReport));
   runGroups crateId compilerHash cacheDir inventory values groups (QueryState available objects inferred reused results) =
-    case groups of {
-      [] ->
-        ioReturn (Right ((,) (reverse objects) (QueryReport inferred reused (reverse results))));
-      (:) names rest ->
-        do {
-          let {
-            members = map (\n -> M.get compareString n values) names
-          };
-          let {
-            bindings = selectedBindings members available
-          };
+    runLoweredGroups (namedLoweredQuery crateId compilerHash values) cacheDir inventory groups
+      available objects inferred reused results;
+  data LoweredQuery state = LoweredQuery String ([] String) ([] ((,,) String (Maybe SAnnotation) SExpr))
+    ([] ((,) String XType)) (([] DataDecl) -> String) (([] DataDecl) -> Either String Separate.UnitObject)
+    (Separate.UnitObject -> Either String state);
+  namedLoweredQuery crateId compilerHash values available names = let {
+    members = map (\n -> M.get compareString n values) names;
+    bindings = selectedBindings members available; name = groupName crateId names
+  } in Right (LoweredQuery name names members bindings (queryKey crateId compilerHash members bindings)
+    (\ds -> Inference.compileLoweredGroup name
+      (if null bindings then [] else [dependencyInterface bindings]) ds members)
+    (\object -> foldM Inference.mergeExternal available (Separate.unitBindings (Separate.objectInterface object))));
+  indexedLoweredQuery crateId compilerHash values checked ids = do {
+    let { scope = Source.checkedScope checked; names = map (Source.declName scope) ids; name = groupName crateId names };
+    members <- traverseEither (\i -> case M.lookup Source.compareDecl i values of {
+      Just m -> Right m; Nothing -> Left "lowered query member disappeared"
+    }) ids;
+    (,) slots prepared <- Source.slotPrepared checked ids
+      (Source.PreparedGroup members members [] M.empty (map (\n -> (,,) n [] True) names) Nothing []);
+    let { external = Source.groupBindings prepared; table = referenceTable slots prepared;
+      owners = M.fromList compareString (zip names ids);
+      key ds = node "MLF-LOWERED-DECLARATIONS-1" [crateId,compilerHash,list id (referenceDefinitions table),
+        list (compose encodeMember (referenceMember table)) members,list encodeBinding external,encodeDatatypeContext ds];
+      infer ds = Inference.compileLoweredGroupIndexed (compose Separate.fingerprint Pretty.prettyTerm)
+        name (Source.expectedParameters slots prepared) ds (zip ids members);
+      publish object = do {
+        delta <- traverseEither (\((,) n ty) -> case M.lookup compareString n owners of {
+          Just i -> Right ((,) i (Source.SourceContract ty [] True));
+          Nothing -> Left "lowered group changed declaration ownership"
+        }) (Separate.unitBindings (Separate.objectInterface object));
+        Right (Source.publishContracts checked delta)
+      }
+    };
+    Right (LoweredQuery name names members external key infer publish)
+  };
+  runLoweredGroups :: forall state group. (state -> group -> Either String (LoweredQuery state)) ->
+    String -> TypeInventory -> [] group -> state -> [] Separate.UnitObject -> Int -> Int -> [] GroupResult ->
+    IO (Either String ((,) ([] Separate.UnitObject) QueryReport));
+  runLoweredGroups prepare cacheDir inventory groups available objects inferred reused results = case groups of {
+    [] -> ioReturn (Right ((,) (reverse objects) (QueryReport inferred reused (reverse results))));
+    (:) group rest -> case prepare available group of {
+      Left error -> ioReturn (Left error);
+      Right (LoweredQuery name names members bindings encode infer publish) -> do {
           let {
             datatypes = requiredDataIn inventory members bindings
           };
-          let {
-            name = groupName crateId names
-          };
-          let {
-            key = queryKey crateId compilerHash members bindings datatypes
-          };
+          let { key = encode datatypes };
           writeFile (cacheDir ++ "/query-key.new") key;
           digest <- fileDigest (cacheDir ++ "/query-key.new");
           let {
@@ -2006,11 +2066,7 @@ module Bootstrap.CrateQuery where {
               case cached of {
                 Right object -> Right ((,) True object);
                 Left _ ->
-                  mapEither ((,) False)
-                    (Inference.compileLoweredGroup name
-                       (if null bindings then [] else (:) (dependencyInterface bindings) [])
-                       datatypes
-                       members)
+                  mapEither ((,) False) (infer datatypes)
               }
           };
           case result of {
@@ -2025,8 +2081,7 @@ module Bootstrap.CrateQuery where {
                 case saved of {
                   Left error -> ioReturn (Left error);
                   Right _ ->
-                    case foldM Inference.mergeExternal available
-                           (Separate.unitBindings (Separate.objectInterface object)) of {
+                    case publish object of {
                       Left error -> ioReturn (Left error);
                       Right next ->
                         let {
@@ -2035,16 +2090,15 @@ module Bootstrap.CrateQuery where {
                               (list encodeBinding
                                  (Separate.unitBindings (Separate.objectInterface object)))
                         } in
-                        runGroups crateId compilerHash cacheDir inventory values rest
-                          (QueryState next ((:) object objects) (inferred + (if hit then 0 else 1))
-                             (reused + (if hit then 1 else 0))
-                             ((:) (GroupResult name names hit semantic digest) results))
+                        runLoweredGroups prepare cacheDir inventory rest next ((:) object objects)
+                          (inferred + (if hit then 0 else 1)) (reused + (if hit then 1 else 0))
+                          ((:) (GroupResult name names hit semantic digest) results)
                     }
                 }
               }
           }
         }
-    };
+    } };
   compileGroups :: String ->
                    String ->
                    [] Separate.UnitInterface ->
@@ -2054,46 +2108,47 @@ module Bootstrap.CrateQuery where {
   compileGroups crateId directory imports datatypes members =
     case Dependency.declarationGroups members of {
       Left error -> ioReturn (Left error);
-      Right groups ->
-        case prepareData datatypes of {
-          Left error -> ioReturn (Left error);
-          Right inventory ->
-            case foldM Inference.mergeExternal M.empty
-                   (concatMap Separate.unitBindings imports) of {
-              Left error -> ioReturn (Left error);
-              Right available ->
-                if (stringLength directory == 0)
-                then ioReturn (Left "inference cache directory is empty")
-                else do {
-                       let {
-                         cacheDir = cachePath directory
-                       };
-                       code <- cacheCommand ((:) "/bin/mkdir" ((:) "-p" ((:) cacheDir [])));
-                       if (code /= 0)
-                       then ioReturn (Left "cannot create inference cache directory")
-                       else do {
-                              lock <- acquireFileLock (cacheDir ++ "/.lock");
-                              executable <- getExecutablePath;
-                              compilerHash <- fileDigest executable;
-                              result <-
-                                runGroups crateId compilerHash cacheDir inventory
-                                  (M.fromList compareString
-                                     (map
-                                        (\member ->
-                                           case member of {
-                                             (,,) n _ _ -> (,) n member
-                                           })
-                                        members))
-                                  groups
-                                  (QueryState available [] 0 0 []);
-                              cleaned <- cleanupQueryKey cacheDir result;
-                              releaseFileLock lock;
-                              ioReturn cleaned
-                            }
-                     }
-            }
-        }
+      Right groups -> let {
+        values = M.fromList compareString (map (\m -> (,) (Source.sourceName m) m) members)
+      } in compileLoweredFile directory imports datatypes (\types -> Right types)
+        (\digest -> namedLoweredQuery crateId digest values) groups
     };
+  compileLoweredFileGroups :: String -> String -> [] Separate.UnitInterface -> Inference.LoweredDeclarations ->
+    IO (Either String ((,) ([] Separate.UnitObject) QueryReport));
+  compileLoweredFileGroups crateId directory imports lowered = case Inference.loweredDeclarationTable lowered of {
+    Nothing -> compileGroups crateId directory imports (Inference.loweredData lowered) (Inference.loweredValues lowered);
+    Just table -> let {
+      entries = Inference.loweredIdValues lowered; scope = Source.loweredScope table (map fst entries);
+      values = M.fromList Source.compareDecl entries;
+      initial types = Source.installContracts scope (M.map (\ty -> Source.SourceContract ty [] True) types)
+    } in case Surface.indexedMemberGroups entries of {
+      Left e -> ioReturn (Left e); Right groups -> compileLoweredFile directory imports (Inference.loweredData lowered)
+        initial (\digest -> indexedLoweredQuery crateId digest values) groups
+    }
+  };
+  compileLoweredFile directory imports datatypes initialize prepare groups = case do {
+    inventory <- prepareData datatypes;
+    types <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings imports);
+    available <- initialize types;
+    ensure (not (eqString directory "")) "inference cache directory is empty";
+    Right ((,) inventory available)
+  } of {
+    Left e -> ioReturn (Left e); Right ((,) inventory available) -> do {
+      let { cacheDir = cachePath directory };
+      code <- cacheCommand ["/bin/mkdir","-p",cacheDir];
+      if code /= 0 then ioReturn (Left "cannot create inference cache directory") else do {
+        lock <- acquireFileLock (cacheDir ++ "/.lock");
+        result <- catchIOError (do {
+          executable <- getExecutablePath;
+          compilerHash <- fileDigest executable;
+          run <- runLoweredGroups (prepare compilerHash) cacheDir inventory groups available [] 0 0 [];
+          cleanupQueryKey cacheDir run
+        }) (\e -> ioReturn (Left (textFromChars (ioeGetErrorString e))));
+        releaseFileLock lock;
+        ioReturn result
+      }
+    }
+  };
   encodeSourceContract ((,) name contract) = node "source-contract"
     ((:) (encodeBinding ((,) name (Source.contractType contract)))
       ((:) (list (\x -> x) (Source.contractClasses contract))
@@ -2205,6 +2260,17 @@ module Bootstrap.CrateQuery where {
   -- Raw checked inference payloads retain their established validator.
   -- Source keys use their own format3 admission, never the legacy format2
   -- key parser; unsupported source contexts retain the self-contained format1.
+  compilePreparedUnit fallback encodings prepared name datatypes = case Source.preparedSlots prepared of {
+    Just slots -> if Source.usesIndexedTerms (Source.slotScope slots) then do {
+      entries <- Source.indexedMembers slots prepared;
+      let { fingerprint = case encodings of {
+        Nothing -> compose Separate.fingerprint Pretty.prettyTerm;
+        Just (SourceEncodings pool _) -> Separate.fingerprintTermWithDatatypes pool
+      } };
+      Inference.compileLoweredGroupIndexed fingerprint name (Source.expectedParameters slots prepared) datatypes entries
+    } else fallback;
+    Nothing -> fallback
+  };
   runSourceGroups :: String -> String -> String -> TypeInventory -> Source.SourcePlan ->
     [] ([] String) -> Map String Source.SourceContract -> [] Separate.UnitObject ->
     Int -> Int -> [] GroupResult ->
@@ -2289,12 +2355,12 @@ module Bootstrap.CrateQuery where {
         let { cached = snd cachedRead };
         let { raw = case cached of {
           Right object -> Right ((,) True object);
-          Left _ -> mapEither (\object -> (,) False (Unit.pending object)) (case encodings of {
+          Left _ -> mapEither (\object -> (,) False (Unit.pending object)) (compilePreparedUnit (case encodings of {
             Nothing -> Inference.compileLoweredGroup name
               ((:) (dependencyInterface bindings) []) datatypes members;
             Just (SourceEncodings pool _) -> Inference.compileLoweredGroupWithDatatypes pool name
               ((:) (dependencyInterface bindings) []) datatypes members
-          })
+          }) encodings prepared name datatypes)
         } };
         case raw of {
           Left error -> ioReturn (Left error);
@@ -2365,7 +2431,7 @@ module Bootstrap.CrateQuery where {
                 lock <- acquireFileLock (cacheDir ++ "/.lock");
                 executable <- getExecutablePath;
                 compilerHash <- fileDigest executable;
-                let { owned = if shareEncoding then Just (Source.fileSourceContext plan contracts) else Nothing;
+                let { owned = Source.querySourceContext shareEncoding plan contracts;
                       encodings = if shareEncoding
                       then Just (prepareSourceEncodings (Source.planData plan)) else Nothing };
                 result <- if not (validSourceContextDigest compilerHash)

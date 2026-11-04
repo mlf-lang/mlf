@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.ImportParameters (Signatures, admit, namedImports, entries, namedEntries, project, select, remove) where {
+module Bootstrap.ImportParameters (Signatures, admit, fromGenerated, namedImports, prefix, matchesPrefix, entries, namedEntries, project, select, selectNamed, remove) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -28,27 +28,45 @@ module Bootstrap.ImportParameters (Signatures, admit, namedImports, entries, nam
     bindings = map (\((,) key ty) -> (,) (M.get compareString key slots) ty) rows
   } in Signatures symbols bindings;
   namedImports = admit (Dependency.symbols []) M.empty;
+  fromGenerated table signatures = mapEither (Signatures (Dependency.generatedSymbols table))
+    (traverseEither (\((,) key ty) -> case Dependency.generatedImportId table key of {
+      Just i -> Right ((,) i ty); Nothing -> Left ("import signature lacks a declaration slot: " ++ key)
+    }) (M.toList signatures));
+  prefix expression = case expression of {
+    SDeclScope ids (SLetRec ps body) -> Just ((,,) (Just ids) ps body);
+    SLetRec ps body -> Just ((,,) Nothing ps body); _ -> Nothing
+  };
+  matchesPrefix ids rows = eqList eqInt (map V.toInt ids) (map (compose V.toInt fst) rows);
 
-  -- Complete class lowering has already validated the input. Bind its free
-  -- references once at the named AST boundary. Observation includes SWanted
-  -- candidates and unused local RHSs, and respects lexical shadowing.
+  -- Fully resolved lowering retains IDs, even when a local binder has the
+  -- same spelling. Newly introduced candidate references carry IDs as well.
   select :: Signatures -> (,) SProgram (Map String String) ->
     Either String ((,) ((,) SProgram (Map String String)) Signatures);
-  select imports@(Signatures symbols rows) ((,) program dictionaries) = case program of {
+  select = selectUsing True (\_ -> Dependency.expressionGlobalIds);
+  -- The standalone named API has no resolver. Only here can a free spelling
+  -- be translated to a wrapper slot. Observe every RHS and evidence candidate.
+  selectNamed = selectUsing False (\imports inner -> let {
+    names = M.fromDistinctAscList (zip (map fst (namedEntries imports)) (map fst (entries imports)))
+  } in mapMaybe (\key -> M.lookup compareString key names)
+    (Dependency.valueNames (Dependency.observeExpression inner)));
+  selectUsing resolved references imports@(Signatures symbols rows) ((,) program dictionaries) = case program of {
     SClassProgram _ _ _ _ -> Left "prepared import selection requires lowered classes";
     SProgram ds expression ->
       if null rows then Right ((,) ((,) program dictionaries) imports)
-      else case expression of {
-        SLetRec parameters inner -> do {
+      else case prefix expression of {
+        Just ((,,) ids parameters inner) -> do {
+          ensure (case ids of { Nothing -> not resolved; Just actual -> matchesPrefix actual rows })
+            "prepared import declaration inventory mismatch";
           let { keys = map (compose (Dependency.symbolName symbols) fst) rows };
           ensure (eqList eqString (map (\((,,) name _ _) -> name) parameters) keys)
             "prepared import parameter inventory mismatch";
           let {
-            slots = M.fromDistinctAscList (zip keys (map fst rows));
-            needed = IS.fromList (map V.toInt (mapMaybe (\key -> M.lookup compareString key slots)
-              (Dependency.valueNames (Dependency.observeExpression inner))));
+            needed = IS.fromList (map V.toInt (references imports inner));
             selected = filter (\((,) row _) -> IS.member (V.toInt (fst row)) needed) (zip rows parameters);
-            output = if null selected then inner else SLetRec (map snd selected) inner
+            prefixGroup = SLetRec (map snd selected) inner;
+            output = if null selected then inner else case ids of {
+              Nothing -> prefixGroup; Just _ -> SDeclScope (map (compose fst fst) selected) prefixGroup
+            }
           };
           Right ((,) ((,) (SProgram ds output) dictionaries) (Signatures symbols (map fst selected)))
         };

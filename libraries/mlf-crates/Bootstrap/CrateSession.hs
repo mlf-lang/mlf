@@ -18,7 +18,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate,
     withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
     specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
-    preparedResolution, preparedNames, preparedLayouts, preparedReach, entryBindings,
+    preparedResolution, preparedNames, preparedLayouts, preparedReach,
     preparedData, preparedClasses, preparedInstances, preparedEntry);
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.CrateGraph as CrateGraph;
@@ -75,8 +75,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
           else Query.compileSourceGroups (specIdentity spec) (specCache spec)
             imported protected plan;
         Nothing -> do {
-          result <- Query.compileGroups (specIdentity spec) (specCache spec) imported
-            (Inference.loweredData lowered) (Inference.loweredValues lowered);
+          result <- Query.compileLoweredFileGroups (specIdentity spec) (specCache spec) imported lowered;
           ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
             (M.fromList compareString
               (map (\((,) name ty) -> (,) name (Source.SourceContract ty [] True))
@@ -227,11 +226,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     compiled <- if Query.validSourceContextDigest compiler
       then case plan of {
         Just source -> CrateGraph.compile verify (specIdentity spec) compiler directory imported protected source;
-        Nothing -> let { lowered = preparedLowered prepared } in case entryBindings spec (preparedResolution prepared) of {
-          Left e -> ioReturn (Left e);
-          Right ((,) _ bindings) -> CrateGraph.compileLoweredIn bindings verify (specIdentity spec) compiler directory imported
-            (Inference.loweredData lowered) (Inference.loweredValues lowered)
-        }
+        Nothing -> CrateGraph.compileLoweredIn (preparedLowered prepared) verify (specIdentity spec) compiler directory imported
       }
       else ioReturn (Left "cannot fingerprint query graph compiler");
     case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.result state of {
@@ -400,12 +395,12 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
         let { cached = snd cachedRead };
         let { raw = case cached of {
           Right object -> Right ((,) True object);
-          Left _ -> mapEither (\object -> (,) False (Unit.pending object)) (case encodings of {
+          Left _ -> mapEither (\object -> (,) False (Unit.pending object)) (Query.compilePreparedUnit (case encodings of {
             Nothing -> compileLoweredGroup name
               ((:) (Query.dependencyInterface bindings) []) datatypes members;
             Just (Query.SourceEncodings pool _) -> compileLoweredGroupWithDatatypes pool name
               ((:) (Query.dependencyInterface bindings) []) datatypes members
-          })
+          }) encodings prepared name datatypes)
         } };
         case raw of {
           Left error -> ioReturn (Left error);
@@ -470,7 +465,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                 lock <- acquireFileLock (cacheDir ++ "/.lock");
                 executable <- getExecutablePath;
                 compilerHash <- fileDigest executable;
-                let { owned = if shareEncoding then Just (Source.fileSourceContext plan contracts) else Nothing;
+                let { owned = Source.querySourceContext shareEncoding plan contracts;
                       encodings = if shareEncoding
                       then Just (Query.prepareSourceEncodings (Source.planData plan)) else Nothing };
                 result <- if not (Query.validSourceContextDigest compilerHash)

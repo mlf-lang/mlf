@@ -440,7 +440,7 @@ module MLF.PreparedCompiler
           (SClassProgram (append builtinData ownData) (append builtinClasses ownClasses)
             (append (map snd builtinInstances) instances) body));
         selected <- Core.atPhase Verification
-          (Parameters.select (Parameters.namedImports signatures) fullLowered);
+          (Parameters.selectNamed (Parameters.namedImports signatures) fullLowered);
         let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected) };
         compiled <- finishImported root (snd selected) lowered;
         let {
