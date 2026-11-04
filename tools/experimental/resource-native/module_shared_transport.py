@@ -69,6 +69,7 @@ MAX_RECURSIVE_WRAPPERS = 8
 MAX_RECURSIVE_CAPTURES = 64  # Includes the self owner when it is actually used.
 MAX_GENERIC_CAPTURES = 64  # Explicit lexical bindings, even when owners alias.
 GENERIC_CAPTURE_POLICY = 'closed-scalar-generalization-captures/1'
+GENERIC_CALLABLE_CAPTURE_POLICY = 'closed-scalar-concrete-callable-generalization-captures/1'
 SUM_POLICY = 'closed-scalar-sum/1'
 SUM_SELF_POLICY = 'closed-self-atom/1'
 RECURSION_POLICY = 'closed-single-function-recursion/1'
@@ -991,14 +992,35 @@ def _nominal_atom(typ, budget):
     return False
 
 
-def _generic_captures(cursor, cursor_path, free, inferred, schemes, top_level, budget, path):
-    """Exact closed scalar imports, never a claim about physical provenance."""
+def _generic_callable_source(root, definition_path, ident, typ, inferred, budget, occurrence):
+    """Find the nearest lexical binding, not a ready/origin/Code assertion."""
+    node, prefix, binding = root, (), None
+    for component in definition_path:
+        budget.tick()
+        if component != 'body' or node['tag'] not in ('let', 'with_data'):
+            _fail('CAPTURE', 'callable import binding must be on the concrete outer spine', occurrence)
+        if node['tag'] == 'let' and node['name']['id'] == ident:
+            binding = (prefix, node)
+        node, prefix = node[component], prefix + (component,)
+    if binding is None or binding[1]['value']['tag'] != 'lambda':
+        _fail('CAPTURE', 'callable import requires a directly bound ordinary lambda', occurrence)
+    source, bound = binding
+    value = source + ('value',)
+    if inferred.scope_at[value] is not None or not _same(inferred.types[value], typ):
+        _fail('CAPTURE', 'callable import binding has a different closed type or scope', occurrence)
+    return {'binding_source': _address('normalized', source),
+            'value_source': _address('normalized', value)}
+
+
+def _generic_captures(root, cursor, cursor_path, free, inferred, schemes, top_level, budget, path):
+    """Exact scalar/direct-callable imports, never physical provenance claims."""
     if not top_level or cursor['tag'] != 'lambda':
         _fail('CAPTURE', 'captured generalization requires a top-level direct lambda', path)
     if len(free) > MAX_GENERIC_CAPTURES:
         _fail('LIMIT', 'generalized scalar imports exceed 64 bindings', path)
     occurrences = {ident: [] for ident in free}
     types = {}
+    callables = {}
     for suffix, node in _walk(cursor):
         budget.tick()
         if node['tag'] != 'var' or node['name']['id'] not in occurrences:
@@ -1006,20 +1028,31 @@ def _generic_captures(cursor, cursor_path, free, inferred, schemes, top_level, b
         ident = node['name']['id']
         address = cursor_path + suffix
         typ = inferred.types[address]
-        if ident in schemes or not _scalar(typ):
-            _fail('CAPTURE', 'generic imports require ordinary closed Int/Bool bindings', address)
+        if ident in schemes:
+            _fail('CAPTURE', 'generic imports cannot contain a Scheme or shared view', address)
+        if not _scalar(typ):
+            if not _closed_scalar_callable(typ, budget):
+                _fail('CAPTURE', 'generic imports require closed scalar or scalar-arrow bindings', address)
+            if ident not in callables:
+                callables[ident] = _generic_callable_source(root, path, ident, typ, inferred, budget, address)
         if ident in types and not _same(types[ident], typ):
             _fail('CAPTURE', 'generic import occurrence types disagree', address)
         types[ident] = typ
         occurrences[ident].append(_address('normalized', address))
-    rows = []
+    rows, callable_rows = [], []
     for ident in free:
         budget.tick()
         if not occurrences[ident]:
             _fail('CAPTURE', 'generic import has no exact free occurrence', path)
         row = {'binding': ident, 'type': types[ident], 'occurrences': occurrences[ident]}
+        if ident in callables:
+            row.update(callables[ident])
+            callable_rows.append(row)
+        else:
+            rows.append(row)
         budget.record(row)
-        rows.append(row)
+    if callable_rows:
+        return {'policy': GENERIC_CALLABLE_CAPTURE_POLICY, 'scalars': rows, 'callables': callable_rows}
     return {'policy': GENERIC_CAPTURE_POLICY, 'scalars': rows}
 
 
@@ -1089,7 +1122,7 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
                 if len(definitions) >= MAX_DEFINITIONS or len(prefix) > MAX_PARAMETERS:
                     _fail('LIMIT', 'definition/formal bound', path)
                 free = sorted(_free_terms(node['value']))
-                captures = (_generic_captures(cursor, cursor_path, free, normalized_infer,
+                captures = (_generic_captures(normalized, cursor, cursor_path, free, normalized_infer,
                             schemes, top_level, budget, path) if free else None)
                 typ = normalized_infer.types[value_path]
                 body_type = normalized_infer.types[cursor_path]

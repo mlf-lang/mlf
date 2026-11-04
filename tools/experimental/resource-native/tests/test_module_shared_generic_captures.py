@@ -140,8 +140,8 @@ class GenericCaptureTests(unittest.TestCase):
         rhs = f.tabs(101, f.lam(21,f.tv(101),f.app(f.var(22),f.lit())))
         self.reject(f.shared(f.let(22,f.use(1,f.I),f.let(20,rhs,f.app(f.use(20,f.B),f.boolean())))))
 
-    def test_callable_and_nominal_imports_rejected(self):
-        raw = fixture(); raw['value'] = f.lam(80,f.I,f.var(80))
+    def test_pending_callable_and_nominal_imports_rejected(self):
+        raw = fixture(); raw['value'] = f.app(f.lam(81,f.I,f.lam(80,f.I,f.var(80))),f.lit())
         raw['body']['value']['body']['body'] = f.app(f.var(1),f.lit())
         self.reject(raw)
         raw = f.with_data(f.let(1, f.ctor('Pack',f.lit()),

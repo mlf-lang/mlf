@@ -47,7 +47,37 @@ HISTORICAL_STAGE24_NEGATIVES = {
 }
 # Stage25 admits the two historical primitive bodies above. Active refusal
 # coverage uses these separately captured, still-forbidden source cases.
-NEGATIVES = {'bool-result-conditional': ('import SharedPoly\nlet flag = ltInt 20 21 in\nlet k = \\x -> if flag then true else false in\nif k 0 then 42 else 0\n', 'PRIMITIVE', ['body', 'body', 'value', 'body', 'body', 'function', 'function', 'function'], 'retained conditional must be instantiated at Int'), 'callable-import': ('import SharedPoly\nlet helper = \\n -> addInt 21 n in\nlet k = \\x -> helper 0 in\naddInt (k true) (k 0)\n', 'CAPTURE', ['body', 'body', 'value', 'body', 'body', 'function'], 'generic imports require ordinary closed Int/Bool bindings')}
+HISTORICAL_STAGE25_CALLABLE_IMPORT = ('import SharedPoly\n'
+ 'let helper = \\n -> addInt 21 n in\n'
+ 'let k = \\x -> helper 0 in\n'
+ 'addInt (k true) (k 0)\n',
+ 'CAPTURE',
+ ['body', 'body', 'value', 'body', 'body', 'function'],
+ 'generic imports require ordinary closed Int/Bool bindings')
+# Stage26 admits the historical direct helper but still rejects an application
+# returned helper. Keep both old positive cases and the Bool-result refusal.
+NEGATIVES = {'bool-result-conditional': ('import SharedPoly\n'
+                             'let flag = ltInt 20 21 in\n'
+                             'let k = \\x -> if flag then true else false in\n'
+                             'if k 0 then 42 else 0\n',
+                             'PRIMITIVE',
+                             ['body',
+                              'body',
+                              'value',
+                              'body',
+                              'body',
+                              'function',
+                              'function',
+                              'function'],
+                             'retained conditional must be instantiated at Int'),
+ 'pending-callable-import': ('import SharedPoly\n'
+                             'let maker = \\z -> \\n -> addInt z n in\n'
+                             'let helper = maker 21 in\n'
+                             'let k = \\x -> helper 0 in\n'
+                             'addInt (k true) (k 0)\n',
+                             'CAPTURE',
+                             ['body', 'body', 'body', 'value', 'body', 'body', 'function'],
+                             'callable import requires a directly bound ordinary lambda')}
 ACCESS_SCOPE = ('The actual capture node and full metadata identity transport are checked; '
                 'public events do not expose each acquired owner Access or callback Env. '
                 'Post-begin retain and discharge are checked in emitted C and fresh resource facts.')

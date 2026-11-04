@@ -462,11 +462,100 @@ uint32_t rt8_private_intrinsic_scalar_type(Rt8Context *c,uint32_t id) {
  G(c,3,TYPE,EQUATION,1,id,2,is_bool||is_i64);
  return is_bool?IR8_PACKET_SHAPE_KIND_BOOL:IR8_PACKET_SHAPE_KIND_I64;
 }
-/* A registered capture may retain a concrete intrinsic scalar without changing
+/* Walk the target's own admitted representation, not the consumer's OPEN
+ * representation or the canonical-arrow coordinate representation. Ordinary
+ * closures may correctly use a legacy @signature shape. Strictly descending
+ * Type IDs, the existing depth bound and charged readers bound this local walk. */
+static void capture_callable_contract(Rt8Context *c,uint32_t root,uint32_t representation) {
+ uint32_t stack[RT8_MAX_WALK_DEPTH][3],sp=1;
+ rt8_private_charge(c,sizeof(stack[0])+1);
+ stack[0][0]=root;stack[0][1]=representation;stack[0][2]=1;
+ while(sp){Ir8PacketType t;Ir8PacketRepresentation rep;Ir8PacketShapeBinding shape;
+  Ir8PacketShapeTyping typing;Ir8PacketShapeSpec spec;uint32_t id,rid,depth;
+  rt8_private_charge(c,sizeof(stack[0])+4);--sp;
+  id=stack[sp][0];rid=stack[sp][1];depth=stack[sp][2];
+  rt8_private_table(c,1,id,&t,sizeof(t));rt8_private_table(c,9,rid,&rep,sizeof(rep));
+  rt8_private_table(c,7,rep.shape,&shape,sizeof(shape));
+  rt8_private_table(c,8,rep.typing,&typing,sizeof(typing));
+  rt8_private_descriptor(c,1,rep.shape,&spec,sizeof(spec));
+  G(c,3,TYPE,EQUATION,1,id,1,depth<=RT8_MAX_WALK_DEPTH&&
+   (t.tag==IR8_PACKET_TYPE_TAG_ARROW||t.tag==IR8_PACKET_TYPE_TAG_CLOSED));
+  G(c,2,TYPE,EQUATION,8,typing.id,2,typing.shape==shape.id&&typing.type==id&&typing.scope==N&&
+   rep.shape==shape.id&&rep.typing==typing.id&&spec.shape==shape.id&&spec.typing==typing.id&&
+   spec.representation==rep.id&&spec.kind==shape.kind&&spec.argument_rep==shape.argument_rep&&
+   spec.result_rep==shape.result_rep&&spec.fields_object==N&&spec.field_first==0&&spec.field_count==0);
+  if(t.tag==IR8_PACKET_TYPE_TAG_ARROW){Ir8PacketCallableContract contract;
+   G(c,3,TYPE,EQUATION,1,id,5,t.atom==N&&t.scheme==N&&t.index==N&&
+    t.argument<id&&t.result<id&&t.protocol==IR8_PACKET_PROTOCOL_REPEAT&&
+    t.result_identity==IR8_PACKET_RESULT_IDENTITY_UNKNOWN);
+   G(c,2,TYPE,EQUATION,7,shape.id,5,shape.kind==IR8_PACKET_SHAPE_KIND_REPEAT&&
+    rep.ready_kind==IR8_PACKET_READY_KIND_FUNCTION&&shape.source_scheme==N&&
+    shape.argument_rep!=N&&shape.result_rep!=N);
+   if(shape.source_tag==IR8_PACKET_SHAPE_SOURCE_LEGACY){
+    const char *name=rt8_private_string(c,shape.source_reference);
+    G(c,2,TYPE,EQUATION,7,shape.id,1,shape.source_type==N&&name[0]=='@'&&name[1]!=0);
+   }else G(c,2,TYPE,EQUATION,7,shape.id,1,
+    shape.source_tag==IR8_PACKET_SHAPE_SOURCE_CANONICAL_ARROW&&shape.source_type==id&&shape.source_reference==N);
+   rt8_private_table(c,2,typing.contract,&contract,sizeof(contract));
+   G(c,3,TYPE,EQUATION,2,contract.id,1,contract.type==id&&contract.argument==t.argument&&
+    contract.result==t.result&&contract.protocol==t.protocol&&contract.result_identity==t.result_identity);
+   G(c,3,TYPE,COUNT,1,id,N,depth<RT8_MAX_WALK_DEPTH&&sp<=RT8_MAX_WALK_DEPTH-2);
+   rt8_private_charge(c,2*sizeof(stack[0])+8);
+   stack[sp][0]=t.result;stack[sp][1]=shape.result_rep;stack[sp][2]=depth+1;++sp;
+   stack[sp][0]=t.argument;stack[sp][1]=shape.argument_rep;stack[sp][2]=depth+1;++sp;
+  }else{
+   G(c,3,TYPE,EQUATION,1,id,1,t.scheme==N&&t.index==N&&t.argument==N&&t.result==N&&t.protocol==N&&t.result_identity==N);
+   const char *atom=rt8_private_string(c,t.atom);
+   int is_bool=capture_atom_equal(c,atom,"#bool"),is_i64=capture_atom_equal(c,atom,"#i64");
+   G(c,3,TYPE,EQUATION,1,id,2,is_bool||is_i64);
+   G(c,2,TYPE,EQUATION,7,shape.id,1,shape.source_tag==IR8_PACKET_SHAPE_SOURCE_LEGACY&&
+    shape.source_reference==t.atom&&shape.source_type==N&&shape.source_scheme==N&&
+    shape.kind==(is_bool?IR8_PACKET_SHAPE_KIND_BOOL:IR8_PACKET_SHAPE_KIND_I64)&&
+    shape.argument_rep==N&&shape.result_rep==N&&typing.contract==N&&rep.ready_kind==IR8_PACKET_READY_KIND_SCALAR);
+  }
+ }
+}
+static void capture_concrete_callable(Rt8Context *c,const Ir8PacketType *type,const Rt8ValueFacts *target) {
+ Ir8PacketCodeTyping code;Ir8PacketCodeExecution execution;Ir8PacketCodeSpec descriptor;
+ Ir8PacketRepresentation rep;Ir8PacketShapeSpec shape;
+ G(c,25,STATE,STATE,14,target->site.id,5,target->site.category==IR8_PACKET_SITE_CATEGORY_CLOSURE&&
+  target->site.context_tag==IR8_PACKET_SITE_CONTEXT_CONCRETE&&target->node->state==RT8_NS_CLOSURE);
+ (void)rt8_private_code_execution(c,target->node->code,target->node->origin.env,&code,&execution);
+ G(c,10,ORIGIN,EQUATION,5,code.id,1,code.id==target->site.code&&code.scope==N&&code.kind==IR8_PACKET_CODE_KIND_FUNCTION&&
+  code.callable_type==type->id&&code.argument==type->argument&&code.result==type->result&&
+  code.expected_protocol==IR8_PACKET_PROTOCOL_REPEAT&&code.expected_identity_flag==0&&
+  execution.id==target->execution.code_execution&&execution.env==0&&execution.code==code.id&&
+  execution.callable_type==type->id&&execution.argument==type->argument&&execution.result==type->result);
+ rt8_private_descriptor(c,2,code.id,&descriptor,sizeof(descriptor));
+ /* CodeSpec describes the canonical E0 result of Type resolution. A concrete
+  * closure can instead carry its own legacy @signature representation. Bind
+  * these independently through the same callable Type, not by representation
+  * ID equality; the physical representation is authenticated below. */
+ uint32_t principal_rep=N;
+ for(uint32_t i=0,n=table_count(c,13);i<n;++i){Ir8PacketRepresentationResolution resolution;
+  rt8_private_charge(c,3);rt8_private_table(c,13,i,&resolution,sizeof(resolution));
+  if(resolution.type==execution.callable_type&&resolution.env==execution.env){
+   principal_rep=resolution.representation;break;}
+ }
+ G(c,10,ORIGIN,EQUATION,5,code.id,1,descriptor.code==code.id&&descriptor.principal_env==0&&
+  principal_rep!=N&&descriptor.principal_rep==principal_rep&&descriptor.capture_count==code.captures.count&&descriptor.body_binding==1);
+ rt8_private_table(c,9,target->execution.representation,&rep,sizeof(rep));
+ rt8_private_descriptor(c,1,rep.shape,&shape,sizeof(shape));
+ G(c,2,STATE,EQUATION,14,target->site.id,7,
+  rt8_private_descriptor_auth(c,1,target->node->shape)==shape.shape&&
+  target->shape.shape==shape.shape&&target->shape.typing==shape.typing&&target->shape.representation==rep.id&&
+  target->shape.kind==IR8_PACKET_SHAPE_KIND_REPEAT&&shape.kind==IR8_PACKET_SHAPE_KIND_REPEAT&&
+  target->shape.argument_rep==shape.argument_rep&&target->shape.result_rep==shape.result_rep&&
+  target->shape.fields_object==shape.fields_object&&target->shape.field_first==shape.field_first&&target->shape.field_count==shape.field_count);
+ capture_callable_contract(c,type->id,rep.id);
+}
+/* A registered capture may retain a concrete intrinsic scalar or ready concrete
+ * scalar-arrow closure without changing
  * its principal Access. This is a native safety rule, not a source-import
  * whitelist: exact source owners and Down proofs remain checked-Code authority.
  * In particular, SCALAR describes the representation, not the node's readiness.
- * All other edges, and generic-owned scalar captures, keep the old rule. */
+ * All other edges, and generic-owned captures, keep the old rule. Source-level
+ * forced/unknown provenance exclusions remain checked-Code obligations. */
 void rt8_private_capture_publish(Rt8Context *c,const Rt8Origin *host,
  const Rt8SlotFacts *slot,const Rt8ValueFacts *target) {
  if(host->kind!=IR8_PACKET_ORIGIN_KIND_GENERIC||
@@ -487,6 +576,9 @@ void rt8_private_capture_publish(Rt8Context *c,const Rt8Origin *host,
  G(c,3,TYPE,EQUATION,16,slot->row.id,6,slot->row.type==slot->resolved_type&&
   target->row.type==slot->resolved_type&&target->execution.principal_type==slot->resolved_type);
  rt8_private_table(c,1,slot->resolved_type,&type,sizeof(type));
+ if(type.tag==IR8_PACKET_TYPE_TAG_ARROW){
+  capture_concrete_callable(c,&type,target);rt8_private_guard_seen(c,9);return;
+ }
  G(c,3,TYPE,EQUATION,1,type.id,1,type.tag==IR8_PACKET_TYPE_TAG_CLOSED&&type.scheme==N&&
   type.index==N&&type.argument==N&&type.result==N&&type.protocol==N&&type.result_identity==N);
  const char *atom=rt8_private_string(c,type.atom);

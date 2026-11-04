@@ -9,7 +9,7 @@ from __future__ import annotations
 from .program_schema import (fail, exact, mapping, sequence, name, diagnostic_path,
     SCHEMAS, GENERIC_OPS, INSTANCE_SCALAR_OPS, PRIMITIVES, INSTRUCTION_LIMIT, SITE_CODE_LIMIT, CAPTURE_LIMIT, instruction_schema)
 from .ownership import Symbols, State
-from .provenance import Analysis, CAPTURE_ORIGIN_CASES
+from .provenance import Analysis, CAPTURE_ORIGIN_CASES, CALLABLE_CAPTURE_ORIGIN_CASES, scalar_arrow
 
 CATEGORIES = {'alloc': 'DATA', 'closure': 'CLOSURE', 'thunk': 'THUNK', 'hole': 'HOLE',
               'application': 'APPLICATION', 'application_borrow': 'APPLICATION',
@@ -27,6 +27,7 @@ class BodyChecker:
         self.concrete_context = budget.row(kind='concrete')
         self.effect_scopes = None  # conditional only: old programs pay no new work
         self.imported_scopes = None  # allocated/charged only on the new import path
+        self.callable_scopes = None  # no scalar-only output/work change
 
     def resolve(self, reference, scope, path):
         # The adapter performs unchanged lexical declaration checks, including
@@ -225,7 +226,14 @@ class BodyChecker:
                         cp = p + '.imports.' + child
                         ty = self.resolve(instruction['imports'][child]['layout'], None, cp + '.layout')
                         if ty not in (self.int_type, self.bool_type):
-                            fail(cp + '.layout', 'type', 'GENERIC_IMPORT', 'generic imports admit only exact intrinsic scalar Types')
+                            if not scalar_arrow(self.a.types, ty, self.b):
+                                fail(cp + '.layout', 'type', 'GENERIC_IMPORT', 'import needs intrinsic scalar or recursively closed Repeat/unknown scalar-arrow')
+                            if self.callable_scopes is None:
+                                self.b.charge(); self.callable_scopes = {}
+                            if scheme not in self.callable_scopes: self.b.put(self.callable_scopes, scheme, True)
+                            if self.effect_scopes is None:
+                                self.b.charge(); self.effect_scopes = {}
+                            if scheme not in self.effect_scopes: self.b.put(self.effect_scopes, scheme, [])
                 _, body_type, _ = self.d.scheme(scheme)
                 intro_id = len(self.a.intros)
                 row = self.b.record_append(self.a.intros, id=intro_id, scheme=scheme, container=container, generalize_path=path_record,
@@ -367,6 +375,14 @@ class BodyChecker:
             return False
         return self.a.provenance[value.provenance]['value']['context']['kind'] == 'concrete'
 
+    def concrete_callable_origin(self, value):
+        if not value.ready or value.ticket or not self.concrete_scalar_origin(value): return False
+        site = self.a.sites[self.a.exact_site(value.provenance)]
+        if site['category'] != 'CLOSURE' or site['code'] is None or site['principal_type'] != value.type: return False
+        code = self.a.codes[site['code']]
+        return (code['kind'] == 'function' and code['type_scope'] is None
+                and code['callable_type'] == value.type and scalar_arrow(self.a.types, value.type, self.b))
+
     def neutral_publication(self, value, scope, path):
         # Known concrete aliases may cross only CAPTURE edges. Unknown callback
         # facts retain the old dynamic neutral-origin checks; never label them E0.
@@ -378,6 +394,10 @@ class BodyChecker:
         capture_union = (scope is not None and self.imported_scopes is not None
                          and scope in self.imported_scopes and role[0] == 'captures'
                          and expected in (self.int_type, self.bool_type))
+        callable_union = (scope is not None and self.callable_scopes is not None
+                          and scope in self.callable_scopes and role[0] == 'captures'
+                          and expected not in (self.int_type, self.bool_type)
+                          and scalar_arrow(self.a.types, expected, self.b))
         if scope is not None and role[0] != 'captures':
             source_site = self.a.exact_site(fact['provenance'])
             if source_site is not None and self.a.sites[source_site]['type_scope'] is None:
@@ -385,10 +405,10 @@ class BodyChecker:
                      'concrete imports cannot enter a neutral noncapture value edge')
         # Conditional capture union is expressed explicitly by metadata. Do not
         # assert the stronger neutral-only premise for an imported scalar edge.
-        rules = self.rules(None if capture_union else scope, relation=relation, no_once=no_once, anchor=anchor)
+        rules = self.rules(None if capture_union or callable_union else scope, relation=relation, no_once=no_once, anchor=anchor)
         self.a.obligation(ir_index, role, 'publish', site,
                           (('inputs', 0), ('inputs', source_index)), expected, scope, rules,
-                          origin_cases=CAPTURE_ORIGIN_CASES if capture_union else None)
+                          origin_cases=CAPTURE_ORIGIN_CASES if capture_union else CALLABLE_CAPTURE_ORIGIN_CASES if callable_union else None)
 
     def allocated(self, site, context, group, type_id, *, ready=False, ticket=False):
         self.a.sites[site]['principal_type'] = type_id
@@ -604,8 +624,11 @@ class BodyChecker:
                         cp = p + '.imports.' + child_name
                         ty = self.resolve(row['layout'], None, cp + '.layout')
                         value, index = self.value(state, ir_index, row['value'], ('imports', child_name, 'value'), cp + '.value', expected=ty)
-                        if value.ticket or not self.concrete_scalar_origin(value):
-                            fail(cp, 'resource', 'GENERIC_IMPORT', 'import requires ticket-free allocated concrete unprojected MONO scalar owner')
+                        if ty in (self.int_type, self.bool_type):
+                            if value.ticket or not self.concrete_scalar_origin(value):
+                                fail(cp, 'resource', 'GENERIC_IMPORT', 'import requires ticket-free allocated concrete unprojected MONO scalar owner')
+                        elif not self.concrete_callable_origin(value):
+                            fail(cp, 'resource', 'GENERIC_IMPORT', 'callable import requires ready allocated concrete unscoped CLOSURE with exact Code and full Type')
                         self.down(state, value, authority.group, cp)
                         alias = self.symbols.copied_handle(value)
                         child.bind(child_name, alias, cp)

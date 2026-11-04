@@ -550,6 +550,36 @@ class Planner:
         self.tick(); require(self.code_count + len(self.allocation_map) < MAX_CODES, 'combined Site/Code limit')
         self.code_count += 1; return prefix + str(self.code_count)
 
+    def generic_callable_binding(self, definition, row, typ):
+        require(transport._closed_scalar_callable(row['type'], self),
+                'generic callable source type is not an exact closed scalar arrow')
+        require(typ[0] == 'arrow', 'generic callable import needs a root arrow')
+        pending = [(typ, 1)]
+        while pending:
+            self.tick(); item, depth = pending.pop()
+            require(depth <= MAX_TYPE_DEPTH, 'generic callable type depth limit')
+            if item in SCALARS.values():
+                continue
+            require(item[0] == 'arrow' and item[3:] == ('repeat', 'unknown'),
+                    'generic callable import requires recursive closed scalar-arrow contracts')
+            pending.extend(((item[1], depth+1), (item[2], depth+1)))
+        node, prefix, binding = self.root, (), None
+        for part in definition['binding_source']['path']:
+            self.tick()
+            require(part == 'body' and node['tag'] in ('let', 'with_data'),
+                    'generic callable binding must be on the concrete outer spine')
+            if node['tag'] == 'let' and node['name']['id'] == row['binding']:
+                binding = (prefix, node)
+            node, prefix = node[part], prefix + (part,)
+        require(binding is not None and binding[1]['value']['tag'] == 'lambda',
+                'generic callable import requires a directly bound ordinary lambda')
+        source, value = binding
+        require(row['binding_source'] == address(source) and
+                row['value_source'] == address(source + ('value',)),
+                'generic callable source binding/value address differs')
+        require(self.same_type(self.logical(value['value']['parameter_type'], None), typ[1]),
+                'generic callable source parameter differs from its full contract')
+
     def generalized_imports(self, definition, env, block, scope):
         """Declare imports; the checked emitter acquires aliases after begin."""
         free = definition['free_term_bindings']
@@ -559,16 +589,33 @@ class Planner:
         require(scope is None and block.root == 'entry' and not block.prefix and not self.knot_depth,
                 'captured generalization requires the concrete top-level spine')
         evidence = definition.get('captures', {})
-        require(set(evidence) == {'policy', 'scalars'} and
-                evidence['policy'] == transport.GENERIC_CAPTURE_POLICY,
-                'generic scalar capture policy differs')
+        callable_rows = evidence.get('callables', [])
+        if callable_rows:
+            require(set(evidence) == {'policy', 'scalars', 'callables'} and
+                    evidence['policy'] == transport.GENERIC_CALLABLE_CAPTURE_POLICY,
+                    'generic callable capture policy differs')
+            require(type(callable_rows) is list and all(type(r) is dict and
+                    set(r) == {'binding', 'type', 'occurrences', 'binding_source', 'value_source'} and
+                    type(r['binding']) is int for r in callable_rows), 'generic callable import rows differ')
+            self.tick(len(callable_rows))
+            require([r['binding'] for r in callable_rows] == sorted({r['binding'] for r in callable_rows}),
+                    'generic callable import rows must be unique and ordered')
+        else:
+            require(set(evidence) == {'policy', 'scalars'} and
+                    evidence['policy'] == transport.GENERIC_CAPTURE_POLICY,
+                    'generic scalar capture policy differs')
         rows = evidence['scalars']
-        require(type(rows) is list and 1 <= len(rows) <= MAX_CAPTURES and
+        require(type(rows) is list and (0 if callable_rows else 1) <= len(rows) <= MAX_CAPTURES and
                 all(type(r) is dict and set(r) == {'binding', 'type', 'occurrences'} and
                     type(r['binding']) is int for r in rows), 'generic scalar import rows differ')
-        require(
+        if callable_rows:
+            require([r['binding'] for r in rows] == sorted({r['binding'] for r in rows}),
+                    'generic scalar import rows must be unique and ordered')
+            rows = sorted(rows + callable_rows, key=lambda r:r['binding'])
+            self.tick(len(rows))
+        require(1 <= len(rows) <= MAX_CAPTURES and
                 [r['binding'] for r in rows] == free == sorted(set(free)),
-                'generic scalar import binding inventory differs')
+                'generic import binding inventory differs')
         cursor_path = tuple(definition['rhs_cursor']['path'])
         cursor = self.node_at(cursor_path)
         require(cursor['tag'] == 'lambda', 'captured generic RHS must remain a direct lambda')
@@ -582,11 +629,17 @@ class Planner:
         imports = {}; inner = {}; support = []; mapping = []
         for row in rows:
             self.tick()
-            require(set(row) == {'binding', 'type', 'occurrences'}, 'generic scalar capture fields differ')
             ident = row['binding']; ref = env.get(ident)
             typ = self.logical(row['type'], None)
-            require(typ in SCALARS.values() and isinstance(ref, Reference) and
-                    self.same_type(ref.logical, typ), 'generic import requires an exact available scalar Reference')
+            if 'binding_source' in row:
+                self.generic_callable_binding(definition, row, typ)
+                if isinstance(ref, Reference):
+                    self.tick(self.type_cost(typ)[1] + self.type_cost(ref.logical)[1])
+            else:
+                require(set(row) == {'binding', 'type', 'occurrences'} and typ in SCALARS.values(),
+                        'generic scalar capture fields/type differ')
+            require(isinstance(ref, Reference) and self.same_type(ref.logical, typ),
+                    'generic import requires an exact available Reference')
             require(row['occurrences'] == occurrences[ident] and occurrences[ident],
                     'generic scalar capture occurrences differ')
             name = self.fresh('import')

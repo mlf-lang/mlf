@@ -64,7 +64,7 @@ PACKAGE_FILES = (
 )
 PRODUCTION_PINS = {
     'runtime_emit.py': (8606, '1a470b8a1962f0f98f2c6ba29bbe2c12eba22e0a98831e185065745dd1cf4fee'),
-    'runtime_emit_body.py': (62808, '039b3331e4adf993cbc3831c9e4ea0800eab34f8bab09859e4452439dfdbd529'),
+    'runtime_emit_body.py': (67650, '24116115ab9b67ad8dd4ebc99b61f270243a4723914a16a1b908a7916d5a8354'),
     'runtime_emit_budget.py': (20006, 'b214480e3daa9d49cdd1e5ab5e77fdfa1f12433ca692700ad59a98c753653867'),
 }
 ABI_SHA256 = 'c6e3a34ea54b7f7224f94ece8a24a821d74e32d60db0a0fb16933252a2623500'

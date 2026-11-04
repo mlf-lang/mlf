@@ -11,7 +11,7 @@ from functools import cmp_to_key
 import json
 
 from .program_schema import INSTANCE_SCALAR_OPS
-from .provenance import CLOSED_ENTRY_POLICY
+from .provenance import CLOSED_ENTRY_POLICY, CALLABLE_ENTRY_POLICY
 
 from .metadata_budget import (fail, TYPE_LIMIT, TYPE_DEPTH, ENVIRONMENT_LIMIT,
                               _compare)
@@ -546,6 +546,31 @@ class TypeClosure:
         return (0,)
 
 
+def scalar_arrow_rows(types, root, b):
+    """Independent bounded canonical-row proof, not a root tag shortcut."""
+    if type(root) is not int or not 0 <= root < len(types) or types[root]['tag'] != 'arrow': return False
+    b.creation(2); stack, depths = [(root, False)], {}
+    while stack:
+        b.work(); value, done = stack.pop()
+        if value in depths: continue
+        row = types[_integer(value, len(types), 'metadata.imports')]
+        if row['tag'] == 'closed':
+            if row['atom'] not in ('#i64', '#bool'): return False
+            b.put(depths, value, 1)
+        elif row['tag'] == 'arrow' and row['protocol'] == 'repeat' and row['result_identity'] == 'unknown':
+            a, z = row['argument'], row['result']
+            if type(a) is not int or type(z) is not int or not 0 <= a < value or not 0 <= z < value: return False
+            if done:
+                depth = 1 + max(depths[a], depths[z])
+                if depth > TYPE_DEPTH: return False
+                b.put(depths, value, depth)
+            else:
+                b.append(stack, (value, True)); b.append(stack, (z, False)); b.append(stack, (a, False))
+        else: return False
+        if len(depths) > TYPE_LIMIT: return False
+    return True
+
+
 def _contexts(raw, derived, scheme_map, budget, closure):
     """Validate raw paths independently of the type/free-variable appearance."""
     budget.creation(4)
@@ -604,6 +629,15 @@ def _contexts(raw, derived, scheme_map, budget, closure):
                     expected_container = None if code is None else code['id']
                     if intro['container'] != expected_container:
                         fail('metadata.introductions', 'metadata-origin', 'INTRO_CONTEXT', 'introduction container differs')
+                    for contract in instruction.get('imports', {}).values():
+                        reference = contract['layout']
+                        if raw['types'][reference[1:]]['tag'] == 'arrow':
+                            ty = closure.reference(reference)
+                            if not scalar_arrow_rows(closure.tables['types'], ty, budget):
+                                _error('metadata.closed_entry', 'CLOSED_ENTRY', 'callable import full scalar-arrow contract differs')
+                            if effects is None: budget.creation(); effects = {}
+                            scope = scheme_map[intro['scheme']]
+                            if scope not in effects: budget.put(effects, scope, budget.listing(()))
                     nested = budget.row(kind='introduction', intro=intro['id'])
                     budget.creation(3 + len(segments))
                     pending.append((instruction['body'], segments + ('body',), nested))
@@ -622,6 +656,51 @@ def _contexts(raw, derived, scheme_map, budget, closure):
     if effects is None and claimed:
         _error('metadata.closed_entry', 'CLOSED_ENTRY', 'unexpected effect proof on an old scope')
     closure._closed_entries = effects
+    return result
+
+
+def _callable_import_rows(raw, derived, closure, current, parent, b):
+    """Bind new imports to raw closure allocation, complete Type and alias facts."""
+    result = None
+    for position, name in enumerate(sorted(current.get('imports', {})), 1):
+        contract = current['imports'][name]
+        if raw['types'][contract['layout'][1:]]['tag'] != 'arrow': continue
+        if result is None: result = b.listing(())
+        b.work(32 + len(name)); b.creation(3)
+        old, alias = parent['inputs'][position], parent['outputs'][position]
+        if (old['role'] != ['imports', name, 'value'] or alias['role'] != ['imports', name]
+                or old['kind'] != 'value' or old['mode'] != 'own' or old['view'] != 'MONO'
+                or old['projection'] is not None or old['scheme'] is not None or old['anchor'] is not None
+                or old['ticket'] is not False or old['ready'] is not True):
+            _error('metadata.closed_entry', 'CLOSED_ENTRY', 'callable import requires a ready unprojected MONO owner')
+        for key in old:
+            b.work()
+            if key not in ('role', 'capability', 'storage'):
+                _equal_tree(old[key], alias[key], b, 'metadata.closed_entry')
+        for key in ('capability', 'storage'):
+            if type(alias[key]) is not int or alias[key] < 0 or alias[key] == old[key]:
+                _error('metadata.closed_entry', 'CLOSED_ENTRY', 'callable import alias is not fresh')
+        ty = closure.reference(contract['layout'])
+        if ty != closure.old(old['type']) or not scalar_arrow_rows(closure.tables['types'], ty, b):
+            _error('metadata.closed_entry', 'CLOSED_ENTRY', 'callable import exact full Type mismatch')
+        prov = derived['provenance'][_integer(old['provenance'], len(derived['provenance']), 'metadata.closed_entry')]['value']
+        if prov.get('kind') != 'allocated' or prov.get('context') != {'kind':'concrete'}:
+            _error('metadata.closed_entry', 'CLOSED_ENTRY', 'callable import is not a concrete allocation')
+        site = derived['sites'][_integer(prov.get('site'), len(derived['sites']), 'metadata.closed_entry')]
+        if site['type_scope'] is not None or site['category'] != 'CLOSURE' or site['principal_type'] != old['type']:
+            _error('metadata.closed_entry', 'CLOSED_ENTRY', 'callable import has wrong Site/category/Type')
+        code = derived['code_typing'][_integer(site['code'], len(derived['code_typing']), 'metadata.closed_entry')]
+        if code['kind'] != 'function' or code['type_scope'] is not None or code['callable_type'] != old['type']:
+            _error('metadata.closed_entry', 'CLOSED_ENTRY', 'callable import has wrong registered Code')
+        spec = raw['functions'][code['name']]
+        if spec['type_scope'] is not None or closure.reference('@' + spec['signature']) != ty:
+            _error('metadata.closed_entry', 'CLOSED_ENTRY', 'raw concrete Code full contract differs')
+        path = site['path']
+        inst = raw['entry'] if path['root'] == 'entry' else raw['functions' if path['root'] == 'function' else 'codes'][path['name']]['body']
+        for part in path['segments']: b.work(); inst = inst[part]
+        if inst['op'] != 'closure' or inst['function'] != code['name']:
+            _error('metadata.closed_entry', 'CLOSED_ENTRY', 'callable import raw allocation differs')
+        b.append(result, b.row(binding=name, input=position, output=position, type=old['type'], site=site['id'], code=code['id']))
     return result
 
 
@@ -667,10 +746,15 @@ def _closed_entry_proofs(raw, derived, closure, effects, b):
             b.work(); current = current[part]
         if current['op'] != 'generalize' or current['scheme'] != intro['scheme']:
             _error(p, 'CLOSED_ENTRY', 'raw introduction identity differs')
+        callable_imports = _callable_import_rows(raw, derived, closure, current, records[_path_key(path, b)][1], b) if any(raw['types'][c['layout'][1:]]['tag'] == 'arrow' for c in current.get('imports', {}).values()) else None
         b.creation(5)
         owners, edges, scoped, root_site, root_code = {}, {}, [], None, None
-        for name in current.get('imports', {}):
-            b.work(); b.put(owners, name, 'import')
+        if callable_imports is None:
+            for name in current.get('imports', {}):
+                b.work(); b.put(owners, name, 'import')
+        else:
+            for position, name in enumerate(b.ordered(current['imports']), 1):
+                b.work(); b.creation(); b.put(owners, name, ('import', position))
         for index, inst in enumerate(current['body']):
             b.work()
             b.creation(2 + len(path['segments']))
@@ -694,12 +778,26 @@ def _closed_entry_proofs(raw, derived, closure, effects, b):
                     _error(p, 'CLOSED_ENTRY', 'root allocation Code identity differs')
                 for name, value in inst['captures'].items():
                     b.work()
-                    if owners.get(value) != 'import':
-                        _error(p, 'CLOSED_ENTRY', 'root capture is not an actual import alias')
+                    token = owners.get(value)
+                    if callable_imports is None:
+                        if token != 'import': _error(p, 'CLOSED_ENTRY', 'root capture is not an actual import alias')
+                    else:
+                        if type(token) is not tuple or token[0] != 'import':
+                            _error(p, 'CLOSED_ENTRY', 'root capture is not an actual checked import binding')
+                        parent = records[_path_key(path, b)][1]
+                        expected = parent['outputs'][token[1]]
+                        actual = None
+                        for fact in rec['inputs']:
+                            b.work()
+                            if fact['role'] == ['captures', name]: actual = fact
+                        if actual is None: _error(p, 'CLOSED_ENTRY', 'root capture operand role is absent')
+                        for field in ('kind','group','node','mode','type','ready','ticket','view','scheme','projection','provenance'):
+                            b.work(); _equal_tree(actual[field], expected[field], b, p)
                     ty = closure.reference(raw_codes[root_code]['captures'][name]['layout'], scope)
                     row = closure.tables['types'][ty]
-                    if row['tag'] != 'closed' or row['atom'] not in ('#i64', '#bool'):
-                        _error(p, 'CLOSED_ENTRY', 'root capture must be intrinsic scalar')
+                    if not ((row['tag'] == 'closed' and row['atom'] in ('#i64', '#bool'))
+                            or (callable_imports is not None and scalar_arrow_rows(closure.tables['types'], ty, b))):
+                        _error(p, 'CLOSED_ENTRY', 'root capture must preserve checked scalar or concrete callable import')
                 b.put(owners, inst['out'], 'root')
             elif op == 'seal':
                 if root_site is None or owners.get(inst['value']) != 'root' or intro['result_sites'] != [root_site]:
@@ -740,6 +838,9 @@ def _closed_entry_proofs(raw, derived, closure, effects, b):
             b.work(); b.append(ids, records[key][0])
         proof = b.row(policy=CLOSED_ENTRY_POLICY, root_site=root_site, root_code=root_code,
                       codes=scoped, effects=b.ordered(ids))
+        if callable_imports is not None:
+            proof['policy'] = CALLABLE_ENTRY_POLICY
+            b.put(proof, 'callable_imports', callable_imports)
         if 'closed_entry' not in intro: _error(p, 'CLOSED_ENTRY', 'missing independently derived effect proof')
         _equal_tree(intro['closed_entry'], proof, b, p)
         b.put(result, scope, proof)

@@ -6,7 +6,7 @@ All declarations live in the enclosing C function. No existing emitter is used.
 from __future__ import annotations
 
 from .program_schema import INSTANCE_SCALAR_OPS
-from .provenance import CLOSED_ENTRY_POLICY
+from .provenance import CLOSED_ENTRY_POLICY, CALLABLE_ENTRY_POLICY
 
 from .runtime_emit_budget import (LIMITS, Writer, encode, exact, fail,
                                   plain_index, same, text_equal)
@@ -248,6 +248,52 @@ class Planner:
                       handles=0, vectors=0, accessors=0, scopes=0)
         b.append(self.functions, frame)
 
+    def callable_import(self, inst, derived, child, pos):
+        """Independently bind raw full type DAG and ready concrete allocation."""
+        b = self.b
+        old, alias = derived['inputs'][pos], derived['outputs'][pos]
+        contract = inst['imports'][child]
+        root = plain_index(old['type'], len(self.resource['types']), 'OPERAND')
+        if self.resource['types'][root]['tag'] != 'arrow': fail('OPERAND', 'callable import root is not arrow')
+        b.creation(2); stack, seen = [(contract['layout'][1:], root, 1)], {}
+        while stack:
+            name, index, depth = stack.pop(); b.work()
+            if depth > 32: fail('OPERAND', 'callable import Type exceeds depth32')
+            b.creation(); key = (name, index)
+            if key in seen: continue
+            b.put(seen, key, True)
+            if len(seen) > 4096: fail('OPERAND', 'callable import Type exceeds size4096')
+            declared = b.get(self.raw['types'], name, 'OPERAND')
+            row = self.resource['types'][plain_index(index, len(self.resource['types']), 'OPERAND')]
+            if declared['tag'] == 'closed':
+                exact(declared, ('tag','layout'), b, 'OPERAND')
+                if declared['layout'] not in ('#i64','#bool') or row['tag'] != 'closed': fail('OPERAND', 'non-scalar callable leaf')
+                text_equal(declared['layout'], row['atom'], b, 'OPERAND')
+            elif declared['tag'] == 'arrow':
+                exact(declared, ('tag','argument','result','protocol','result_identity'), b, 'OPERAND')
+                if row['tag'] != 'arrow' or declared['protocol'] != 'repeat' or declared['result_identity'] != 'unknown' or row['protocol'] != 'repeat' or row['result_identity'] != 'unknown':
+                    fail('OPERAND', 'callable import requires full Repeat/unknown contract')
+                for field in ('argument','result'):
+                    target = plain_index(row[field], len(self.resource['types']), 'OPERAND')
+                    if target >= index: fail('OPERAND', 'callable Type DAG is not topological')
+                    b.append(stack, (declared[field], target, depth + 1))
+            else: fail('OPERAND', 'open callable import')
+        if old['ready'] is not True or old['projection'] is not None or old['scheme'] is not None:
+            fail('OPERAND', 'callable import is not a ready concrete owner')
+        prov = self.resource['provenance'][plain_index(old['provenance'], len(self.resource['provenance']), 'OPERAND')]['value']
+        exact(prov, ('kind','site','context'), b, 'OPERAND')
+        same(prov['context'], b.row(kind='concrete'), b, 'OPERAND')
+        if prov['kind'] != 'allocated': fail('OPERAND', 'callable import has no exact allocation')
+        site = self.resource['sites'][plain_index(prov['site'], len(self.resource['sites']), 'OPERAND')]
+        if site['category'] != 'CLOSURE' or site['type_scope'] is not None or site['principal_type'] != root:
+            fail('OPERAND', 'callable import Site/category/Type differs')
+        code = self.resource['code_typing'][plain_index(site['code'], len(self.resource['code_typing']), 'OPERAND')]
+        if code['kind'] != 'function' or code['type_scope'] is not None or code['callable_type'] != root:
+            fail('OPERAND', 'callable import Code differs')
+        actual = raw_at(self.raw, site['path'], b)
+        if actual['op'] != 'closure' or actual['function'] != code['name']: fail('OPERAND', 'callable raw allocation differs')
+        return b.row(binding=child, input=pos, output=pos, type=root, site=site['id'], code=code['id'])
+
     def inventory(self):
         b = self.b
         resource_paths = b.mapping()
@@ -300,11 +346,16 @@ class Planner:
                                 fail('OPERAND', 'import needs an explicit Type and down relation')
                             b.key_work(reference); b.creation()
                             declared = b.get(self.raw['types'], reference[1:], 'OPERAND')
-                            exact(declared, ('tag', 'layout'), b, 'OPERAND')
-                            actual = self.resource['types'][plain_index(old['type'], len(self.resource['types']), 'OPERAND')]
-                            if declared['tag'] != 'closed' or declared['layout'] not in ('#i64', '#bool') or actual['tag'] != 'closed':
-                                fail('OPERAND', 'import Type must be an intrinsic scalar')
-                            text_equal(declared['layout'], actual['atom'], b, 'OPERAND')
+                            if declared['tag'] == 'arrow':
+                                self.callable_import(inst, derived, child, pos)
+                                if effects is None: effects = b.mapping()
+                                if inst['scheme'] not in effects: b.put(effects, inst['scheme'], b.listing())
+                            else:
+                                exact(declared, ('tag', 'layout'), b, 'OPERAND')
+                                actual = self.resource['types'][plain_index(old['type'], len(self.resource['types']), 'OPERAND')]
+                                if declared['tag'] != 'closed' or declared['layout'] not in ('#i64', '#bool') or actual['tag'] != 'closed':
+                                    fail('OPERAND', 'import Type must be an intrinsic scalar')
+                                text_equal(declared['layout'], actual['atom'], b, 'OPERAND')
                             exact(alias, _FACT_KEYS, b, 'OPERAND')
                             b.creation(3); same(alias['role'], ['imports', child], b, 'OPERAND')
                             for field in _FACT_KEYS:
@@ -360,8 +411,20 @@ class Planner:
                 continue
             expected += 1
             proof = b.get(intro, 'closed_entry', 'INTRO')
-            exact(proof, ('policy', 'root_site', 'root_code', 'codes', 'effects'), b, 'INTRO')
-            text_equal(proof['policy'], CLOSED_ENTRY_POLICY, b, 'INTRO')
+            current = raw_at(self.raw, intro['generalize_path'], b)
+            imported = None
+            if any(self.raw['types'][c['layout'][1:]]['tag'] == 'arrow' for c in current.get('imports', {}).values()):
+                imported = b.listing()
+                parent = b.get(self.by_path, path_key(intro['generalize_path'], b), 'INTRO')['derived']
+                for pos, child in enumerate(b.ordered(current['imports']), 1):
+                    if self.raw['types'][current['imports'][child]['layout'][1:]]['tag'] == 'arrow':
+                        b.append(imported, self.callable_import(current, parent, child, pos))
+            keys = ('policy', 'root_site', 'root_code', 'codes', 'effects')
+            if imported is not None:
+                b.creation(6); keys = keys + ('callable_imports',)
+            exact(proof, keys, b, 'INTRO')
+            text_equal(proof['policy'], CALLABLE_ENTRY_POLICY if imported is not None else CLOSED_ENTRY_POLICY, b, 'INTRO')
+            if imported is not None: same(proof['callable_imports'], imported, b, 'INTRO')
             same(proof, b.get(covered, intro['id'], 'INTRO'), b, 'INTRO')
             codes = b.listing()
             for code in self.resource['code_typing']:
@@ -380,7 +443,7 @@ class Planner:
             if site['category'] != 'CLOSURE' or site['type_scope'] != scope or site['code'] != proof['root_code']:
                 fail('INTRO', 'closed-entry root Site/Code identity differs')
             same(intro['result_sites'], b.listing((site['id'],)), b, 'INTRO')
-            raw = raw_at(self.raw, intro['generalize_path'], b)
+            raw = current
             closure = None
             for inst in raw['body']:
                 b.work()
@@ -393,7 +456,7 @@ class Planner:
             root_code = self.resource['code_typing'][plain_index(proof['root_code'], len(self.resource['code_typing']), 'INTRO')]
             text_equal(closure['function'], root_code['name'], b, 'INTRO')
             for code in codes:
-                b.put(self.code_mapping[code], 'invocation_policy', CLOSED_ENTRY_POLICY)
+                b.put(self.code_mapping[code], 'invocation_policy', proof['policy'])
         if expected != len(covered) or expected != len(effects):
             fail('INTRO', 'closed-entry proof census differs')
 

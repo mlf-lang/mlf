@@ -8,6 +8,8 @@ from .program_schema import fail
 
 FORMAT = 'resource-ir-v8-resource-analysis/1'
 CLOSED_ENTRY_POLICY = 'instance-only-scoped-scalars/1'
+CALLABLE_ENTRY_POLICY = 'instance-only-concrete-callable-imports/1'
+CALLABLE_CAPTURE_ORIGIN_CASES = ('same-neutral-capsule/project', 'concrete-E0-ready-scalar-arrow-closure/identity')
 CAPTURE_ORIGIN_CASES = ('same-neutral-capsule/project', 'concrete-E0-intrinsic-scalar/identity')
 RULES = ('exact_mono_type', 'down_support', 'same_group', 'strict_below',
          'argument_identity', 'no_once_copy', 'live_exact_anchor',
@@ -18,6 +20,34 @@ COUNTS = ('functions', 'thunks', 'instructions', 'checked_factory_arms', 'alloca
 PENDING_GATES = ('runtime-table-closure', 'physical-representation-and-Access',
                  'model-and-native-ABI', 'source-proof-and-lowering', 'single-code-emission',
                  'allocator-and-terminal-requalification', 'GC-replacement', 'performance')
+
+
+def scalar_arrow(types, root, budget):
+    """Bounded flat-ID scalar-arrow predicate; never unfold a shared DAG."""
+    if type(root) is not int or not 0 <= root < len(types) or types[root]['tag'] != 'arrow':
+        return False
+    budget.charge(2); pending, depths = [(root, False)], {}
+    while pending:
+        budget.examine(); current, done = pending.pop()
+        if current in depths: continue
+        if type(current) is not int or not 0 <= current < len(types): return False
+        row = types[current]
+        if row['tag'] == 'closed':
+            if row['atom'] not in ('#i64', '#bool'): return False
+            budget.put(depths, current, 1)
+        elif row['tag'] == 'arrow' and row['protocol'] == 'repeat' and row['result_identity'] == 'unknown':
+            a, z = row['argument'], row['result']
+            if type(a) is not int or type(z) is not int or not 0 <= a < current or not 0 <= z < current: return False
+            if done:
+                depth = 1 + max(depths[a], depths[z])
+                if depth > 32: return False
+                budget.put(depths, current, depth)
+            else:
+                budget.append(pending, (current, True))
+                budget.append(pending, (z, False)); budget.append(pending, (a, False))
+        else: return False
+        if len(depths) > 4096: return False
+    return True
 
 
 class Analysis:
@@ -206,13 +236,20 @@ class Analysis:
                 if record['path'] == intro['generalize_path']:
                     parent = record; break
             if parent is None: fail(p, 'coverage', 'CLOSED_ENTRY', 'missing actual introduction record')
-            for fact in parent['outputs'][1:]:
+            callable_imports = None
+            for pos, fact in enumerate(parent['outputs'][1:], 1):
                 b.examine(); b.add(aliases, fact['provenance'])
+                if self.types[fact['type']]['tag'] == 'arrow':
+                    if callable_imports is None: b.charge(); callable_imports = []
+                    source_site = self.exact_site(fact['provenance'])
+                    b.append(callable_imports, b.row(binding=fact['role'][1], input=pos, output=pos,
+                        type=fact['type'], site=source_site, code=self.sites[source_site]['code']))
             for fact in root['inputs'][1:]:
                 b.examine()
                 ty = self.types[fact['type']]
                 if (fact['view'] != 'MONO' or fact['projection'] is not None or fact['provenance'] not in aliases
-                        or ty['tag'] != 'closed' or ty['atom'] not in ('#i64', '#bool')):
+                        or not ((ty['tag'] == 'closed' and ty['atom'] in ('#i64', '#bool'))
+                                or (callable_imports is not None and scalar_arrow(self.types, fact['type'], b)))):
                     fail(p, 'coverage', 'CLOSED_ENTRY', 'neutral root captures must preserve checked scalar import provenance')
             b.charge(3); scoped, seen, pending = [], set(), [root_code]
             for code in self.codes:
@@ -238,8 +275,12 @@ class Analysis:
                     if index != roots[0]: fail(p, 'coverage', 'CLOSED_ENTRY', 'additional neutral allocation')
                 elif meta['intro'] is not None or meta['container'] not in seen:
                     fail(p, 'coverage', 'CLOSED_ENTRY', 'unproved same-S allocation origin')
-            b.put(intro, 'closed_entry', b.row(policy=CLOSED_ENTRY_POLICY, root_site=site,
-                root_code=root_code, codes=scoped, effects=b.listing(effects[scheme])))
+            proof = b.row(policy=CLOSED_ENTRY_POLICY, root_site=site,
+                root_code=root_code, codes=scoped, effects=b.listing(effects[scheme]))
+            if callable_imports is not None:
+                proof['policy'] = CALLABLE_ENTRY_POLICY
+                b.put(proof, 'callable_imports', callable_imports)
+            b.put(intro, 'closed_entry', proof)
 
     def final_data(self, ir_sha256, declaration_sha256):
         # Immutable paths reused directly; copied sorted inventories are charged.

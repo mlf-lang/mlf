@@ -10,7 +10,8 @@ Unchanged no-import generated graphs retain their stronger neutral premises.
 from __future__ import annotations
 
 from .metadata_budget import fail
-from .provenance import CAPTURE_ORIGIN_CASES
+from .provenance import CAPTURE_ORIGIN_CASES, CALLABLE_CAPTURE_ORIGIN_CASES, CALLABLE_ENTRY_POLICY
+from .metadata_types import scalar_arrow_rows
 from .metadata_representations import fact_at, instruction_at, path_key, key2, key3, access_key
 
 GUARDS = ('registered-membership', 'exact-site-origin', 'physical-origin',
@@ -204,7 +205,15 @@ class EdgeClosure:
             return False
         self.b.work()
         row = self.t.tables['types'][ty]
-        return row['tag'] == 'closed' and row['atom'] in ('#i64', '#bool')
+        if row['tag'] == 'closed' and row['atom'] in ('#i64', '#bool'): return True
+        return (self.t._closed_entries is not None and scope in self.t._closed_entries
+                and self.t._closed_entries[scope]['policy'] == CALLABLE_ENTRY_POLICY
+                and scalar_arrow_rows(self.t.tables['types'], ty, self.b))
+
+    def capture_rule(self, ty, projected=False):
+        if self.t.tables['types'][ty]['tag'] == 'arrow':
+            return 'capture-project-or-concrete-callable-identity' if projected else 'capture-neutral-or-concrete-callable'
+        return 'capture-project-or-identity' if projected else 'capture-neutral-or-concrete-scalar'
 
     def identity_guards(self, code):
         self.b.work()
@@ -270,11 +279,15 @@ class EdgeClosure:
                 b.work(len(CAPTURE_ORIGIN_CASES))
                 cases = obligation['origin_cases']
                 row = t.tables['types'][ty]
+                callable_case = row['tag'] == 'arrow'
+                expected_cases = CALLABLE_CAPTURE_ORIGIN_CASES if callable_case else CAPTURE_ORIGIN_CASES
+                eligible = (scalar_arrow_rows(t.tables['types'], ty, b) if callable_case
+                            else row['tag'] == 'closed' and row['atom'] in ('#i64', '#bool'))
                 if (type(cases) is not list or len(cases) != 2
-                        or any(cases[i] != CAPTURE_ORIGIN_CASES[i] for i in range(2))
+                        or any(cases[i] != expected_cases[i] for i in range(2))
                         or obligation['kind'] != 'publish' or obligation['scope'] is None
                         or obligation['role'][0] != 'captures'
-                        or row['tag'] != 'closed' or row['atom'] not in ('#i64', '#bool')
+                        or not eligible
                         or 'neutral_same_capsule' in obligation['rules']):
                     fail('metadata.boundaries', 'metadata-closure', 'CAPTURE_ORIGIN', 'invalid conditional capture-origin premises')
             slots = self.associated_slots(obligation)
@@ -289,8 +302,9 @@ class EdgeClosure:
                     site = r.tables['sites'][obligation['host_site']]
                     if capture_union and t.tables['environments'][env]['mode'] == 'NEUTRAL':
                         # N and C are mutually exclusive actual-origin cases.
-                        rule = 'capture-neutral-or-concrete-scalar'
+                        rule = self.capture_rule(ty)
                         guards |= N | C
+                        if callable_case: guards |= _mask(('code-association', 'state-category'))
                     if env not in t.execution_envs(site['path']):
                         fail('metadata.boundaries', 'metadata-origin', 'CONTEXT', 'publication environment cannot allocate its host')
                 elif kind == 'application_argument':
@@ -391,7 +405,8 @@ class EdgeClosure:
                 rule, guards = 'publish-by-host-origin', M | self.origin_guards(env) | L | Q
                 site = r.tables['sites'][slot['site']]
                 if slot['role']['kind'] == 'capture' and self.imported_capture(site['scope'], slot['type']) and self.t.tables['environments'][env]['mode'] == 'NEUTRAL':
-                    rule, guards = 'capture-neutral-or-concrete-scalar', guards | N | C
+                    rule, guards = self.capture_rule(slot['type']), guards | N | C
+                    if t.tables['types'][slot['type']]['tag'] == 'arrow': guards |= _mask(('code-association', 'state-category'))
                 boundary = self.boundary(b.row(kind='slot', slot=slot['id'], site_execution=execution_id),
                     slot['type'], env, rule, guards)
                 b.append(self.site_boundaries[slot['site']], boundary)
@@ -427,7 +442,8 @@ class EdgeClosure:
                         rule = 'transport-by-request'
                     if origin in ('GENERIC_NEUTRAL', 'GENERIC_PROJECTED') and self.imported_capture(code['scope'], capture['type']):
                         guards |= N | C
-                        rule = 'capture-project-or-identity' if origin == 'GENERIC_PROJECTED' else 'capture-neutral-or-concrete-scalar'
+                        rule = self.capture_rule(capture['type'], origin == 'GENERIC_PROJECTED')
+                        if t.tables['types'][capture['type']]['tag'] == 'arrow': guards |= _mask(('code-association', 'state-category'))
                     key = b.row(kind='entry', code_execution=execution['id'], origin_case=origin, role='capture', name=capture['name'])
                     boundary = self.boundary(key, capture['type'], env, rule, guards)
                     b.append(self.code_boundaries[code['id']], boundary)

@@ -64,6 +64,10 @@ the shared direct lambda with checked closed scalar operations and an Int-result
 conditional, preserving original imports and memo identity. Finite local native
 and fresh-source qualification also passes after the checked-Prelude target
 integration. Exact-commit CI remains separate. No default is enabled.
+[Concrete callable captures](resource_ir_v8/README_STAGE26.md) extend a shared
+generalized direct lambda with authenticated ready E0 helper closures and their
+original captured owners. Finite native, guard, sanitizer and fresh advanced-target
+source checks pass. Exact-head CI remains separate; default behavior is unchanged.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general
