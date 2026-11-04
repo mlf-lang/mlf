@@ -3,6 +3,7 @@
 import importlib.util
 import copy
 import json
+import types
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -31,6 +32,16 @@ class CurrentCompatibilityTests(unittest.TestCase):
             migration = importlib.util.module_from_spec(migration_spec)
             migration_spec.loader.exec_module(migration)
             expected = migration.migrate(expected)
+        # The previous historical/numeric/Patricia chain must still end at
+        # the exact current target. Resource additions are a separate reviewed
+        # transition, never new expected values learned from this checkout.
+        resource_path = ROOT / 'tools/shared/resource_source_migration.py'
+        resource = types.ModuleType('explicit_resource_phase_a_migration')
+        resource.__file__ = str(resource_path)
+        exec(compile(resource_path.read_bytes(), str(resource_path), 'exec'), resource.__dict__)
+        observed = resource.authenticate_current_source(ROOT, expected)
+        expected = resource.migrate(expected)
+        self.assertEqual(observed, expected)
         self.assertEqual(actual, expected)
 
     def test_source_and_literal_mutations_rejected(self):

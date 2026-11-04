@@ -1,0 +1,1 @@
+data Unit = Wrap (); let x = Wrap () in case x of { Wrap y -> y }

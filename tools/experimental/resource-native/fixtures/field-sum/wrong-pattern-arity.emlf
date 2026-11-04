@@ -1,0 +1,1 @@
+data Kind = Star | KArrow Kind Kind; case KArrow Star Star of { Star -> 0; KArrow only -> 20 }

@@ -1,0 +1,1 @@
+let rec b : Int = b in let unused : Int = addInt b 1 in 42

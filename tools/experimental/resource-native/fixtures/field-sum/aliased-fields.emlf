@@ -1,0 +1,1 @@
+data Kind = Star | KArrow Kind Kind; let rec kindArity : Kind -> Int = \k -> case k of { Star -> 0; KArrow _ rest -> 1 + kindArity rest } in let identity : Kind -> Kind = \x -> x in let n : Kind = identity (KArrow Star Star) in case KArrow n n of { Star -> 0; KArrow left right -> addInt (kindArity left) (kindArity right) }

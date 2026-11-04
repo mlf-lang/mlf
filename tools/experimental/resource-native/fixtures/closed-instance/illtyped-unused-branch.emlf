@@ -1,0 +1,1 @@
+data Maybe a = Nothing | Just a; let maybe : forall b a. b -> (a -> b) -> Maybe a -> b = \fallback f value -> case value of { Nothing -> fallback; Just x -> f x } in if true then maybe 0 (\x -> addInt x 1) (Just 41) else false

@@ -1,0 +1,34 @@
+{
+  "contract": {
+    "path": "FINAL_CONTRACT.md",
+    "sha256": "f3ad74dc05e744c7200f0da766d9639e494bd5139abaea1aab221a9d90097ba1"
+  },
+  "files": {
+    "codegen.py": {
+      "bytes": 19586,
+      "sha256": "c5d74f95cf16aab4a5cd21b3d6bf69884bd8cacd1b265df5e451b3c6cb3ba4c1"
+    },
+    "native/rir_runtime.c": {
+      "bytes": 56623,
+      "sha256": "b2ff391791361bff75e5d319533e70c638e38e57bbf3baa1d0be41b1258ede28"
+    },
+    "native/rir_runtime.h": {
+      "bytes": 13510,
+      "sha256": "93f6f74eb728b9842d70a84ab80fa90dadb1fb7b4cd920b35cae4957225c93f4"
+    },
+    "resource_ir/__init__.py": {
+      "bytes": 269,
+      "sha256": "3729ca2025fb561e44b92cdf6d92090865e404c8342406d12d03d59d4846b409"
+    },
+    "resource_ir/checker.py": {
+      "bytes": 47287,
+      "sha256": "fa5b46bb61ae67b540f32603d23800e7ba3da6a0d9a578d2e0a21a6267226db6"
+    },
+    "resource_ir/runtime.py": {
+      "bytes": 47905,
+      "sha256": "583a373eb7d29c92149bda4aa4cc5cbadf1303d6d62ae81fbef38b04d57bf63c"
+    }
+  },
+  "identity": "resource-ir-field-sum/1",
+  "schema": "field-sum-core-implementation-manifest/1"
+}

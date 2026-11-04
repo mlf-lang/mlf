@@ -1,0 +1,175 @@
+{
+  "conditional_with_free_flag": {
+    "tag": "type_application",
+    "value": {
+      "body": {
+        "argument": {
+          "name": {
+            "hint": "flag",
+            "id": 39073
+          },
+          "tag": "var"
+        },
+        "function": {
+          "tag": "type_application",
+          "value": {
+            "body": {
+              "arguments": [
+                {
+                  "id": 39084,
+                  "tag": "var"
+                }
+              ],
+              "id": 13,
+              "name": "ifThenElse",
+              "tag": "primitive"
+            },
+            "bound": {
+              "tag": "bottom"
+            },
+            "id": 39084,
+            "tag": "type_lambda"
+          },
+          "witness": {
+            "first": {
+              "tag": "inner",
+              "witness": {
+                "tag": "bottom",
+                "type": {
+                  "id": 87406,
+                  "tag": "var"
+                }
+              }
+            },
+            "second": {
+              "tag": "elim"
+            },
+            "tag": "then"
+          }
+        },
+        "tag": "application"
+      },
+      "bound": {
+        "tag": "bottom"
+      },
+      "id": 87406,
+      "tag": "type_lambda"
+    },
+    "witness": {
+      "first": {
+        "tag": "inner",
+        "witness": {
+          "tag": "bottom",
+          "type": {
+            "arguments": [],
+            "name": "Int",
+            "tag": "constructor"
+          }
+        }
+      },
+      "second": {
+        "tag": "elim"
+      },
+      "tag": "then"
+    }
+  },
+  "extract_sha256": "958761a0c67ef5c92c39f87869da3025440a2ab37556d63a91bf856626928915",
+  "flag_binding": {
+    "hint": "flag",
+    "id": 39073
+  },
+  "historical_checked_sha256": "7bdfd3f3ae320226cf970936b5c32141eb56272618ec021a9eb7e9387c32bcfb",
+  "shared_binding": {
+    "hint": "moduleEntity175",
+    "id": 38887
+  },
+  "shared_rhs": {
+    "body": {
+      "argument": {
+        "body": {
+          "body": {
+            "name": {
+              "hint": "x",
+              "id": 38908
+            },
+            "tag": "var"
+          },
+          "name": {
+            "hint": "x",
+            "id": 38908
+          },
+          "tag": "let",
+          "value": {
+            "argument": {
+              "name": {
+                "hint": "x",
+                "id": 38903
+              },
+              "tag": "var"
+            },
+            "function": {
+              "body": {
+                "name": {
+                  "hint": "coerce",
+                  "id": 38913
+                },
+                "tag": "var"
+              },
+              "parameter": {
+                "hint": "coerce",
+                "id": 38913
+              },
+              "parameter_type": {
+                "id": 38892,
+                "tag": "var"
+              },
+              "tag": "lambda"
+            },
+            "tag": "application"
+          }
+        },
+        "parameter": {
+          "hint": "x",
+          "id": 38903
+        },
+        "parameter_type": {
+          "id": 38892,
+          "tag": "var"
+        },
+        "tag": "lambda"
+      },
+      "function": {
+        "body": {
+          "name": {
+            "hint": "coerce",
+            "id": 38900
+          },
+          "tag": "var"
+        },
+        "parameter": {
+          "hint": "coerce",
+          "id": 38900
+        },
+        "parameter_type": {
+          "from": {
+            "id": 38892,
+            "tag": "var"
+          },
+          "tag": "arrow",
+          "to": {
+            "id": 38892,
+            "tag": "var"
+          }
+        },
+        "tag": "lambda"
+      },
+      "tag": "application"
+    },
+    "bound": {
+      "tag": "bottom"
+    },
+    "id": 38892,
+    "tag": "type_lambda"
+  },
+  "status": "raw-extracted-subtrees-not-complete-source-or-K-evidence"
+}

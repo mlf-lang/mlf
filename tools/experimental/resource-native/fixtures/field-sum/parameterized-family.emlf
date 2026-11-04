@@ -1,0 +1,1 @@
+data Tag a = Empty | With a; case With 20 of { Empty -> 0; With n -> n }

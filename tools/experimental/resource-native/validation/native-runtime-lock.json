@@ -1,0 +1,14 @@
+{
+  "audit_receipt": "provenance/NATIVE_LIFECYCLE_ACCEPTANCE.json",
+  "audit_receipt_sha256": "8a3d126888fe1e556ef0582d835e2076dcdd4b92d68c773b7094c7c2d64c6c7f",
+  "files": {
+    "rir_runtime.c": "01e37374c17e32e155296d244cede59c78fa844a857ee2f4c884d4b8733d3728",
+    "rir_runtime.h": "218b05aaf832b0be3cf5eaa2c20624c21cb383b0899c1ee03a1c062c5c01d35c"
+  },
+  "identity": "resource-ir-terminal-destroy/1",
+  "implementation_manifest": "provenance/TERMINAL_IMPLEMENTATION_MANIFEST.json",
+  "implementation_manifest_sha256": "c55bcd2e296c15bacfd69e1577be625491ec1e8823cf904b3fce50a624eb611e",
+  "runtime_location": "runtime",
+  "schema": "source-terminal-native-lock/1",
+  "source_integration_status": "parent-authorized-new-candidate; independent source acceptance pending"
+}

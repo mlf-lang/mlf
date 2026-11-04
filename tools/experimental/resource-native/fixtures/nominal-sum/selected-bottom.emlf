@@ -1,0 +1,1 @@
+data Flag = Flexible | Rigid; let rec b : Int = b in case Rigid of { Flexible -> 42; Rigid -> b }

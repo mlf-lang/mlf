@@ -79,7 +79,11 @@
         "MLF.PreparedCompiler": "bootstrap/MLF/PreparedCompiler.hs",
         "MLF.PreparedLibraryData": "bootstrap/MLF/PreparedLibraryData.hs",
         "MLF.PreparedNativeData": "bootstrap/MLF/PreparedNativeData.hs",
-        "MLF.NativeBuild": "bootstrap/MLF/NativeBuild.hs"
+        "MLF.NativeBuild": "bootstrap/MLF/NativeBuild.hs",
+        "MLF.ResourceExport": "bootstrap/MLF/ResourceExport.hs",
+        "MLF.ResourceModules": "bootstrap/MLF/ResourceModules.hs",
+        "MLF.ResourceProjection": "bootstrap/MLF/ResourceProjection.hs",
+        "MLF.ResourceModuleExport": "bootstrap/MLF/ResourceModuleExport.hs"
       }
     },
     "mlfpkg": {

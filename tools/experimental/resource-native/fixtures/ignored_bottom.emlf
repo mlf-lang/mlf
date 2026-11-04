@@ -1,0 +1,1 @@
+let f : () -> () = \x -> () in let rec b : () = b in f b

@@ -1,0 +1,3204 @@
+{
+  "abi_schema": {
+    "bytes": 25780,
+    "path": "tests/fixtures/ir8-runtime-abi-stage05a.json",
+    "sha256": "c6e3a34ea54b7f7224f94ece8a24a821d74e32d60db0a0fb16933252a2623500"
+  },
+  "cases": [
+    {
+      "id": "P01",
+      "name": "concrete_empty_finish",
+      "raw_sha256": "2dd27c15272a16861f5e406c76dec2b8d0940d0ea1867cdc371923d220c14f95",
+      "raw_utf8_bytes": 152,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/18/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P02",
+      "name": "concrete_fill_force_hole",
+      "raw_sha256": "e3f499cfe00cce11dd8eeeaec266dc0e62695181590cb32e38fd59a37a9764f1",
+      "raw_utf8_bytes": 468,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/19/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P03",
+      "name": "closed_full_contract_alias_interchange",
+      "raw_sha256": "19a0e4dd05065945bb51ceb74a490d45b9ffef04e908d1341961a73e1e0b1596",
+      "raw_utf8_bytes": 1278,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/5/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P04",
+      "name": "concrete_nullary_case_all_arms",
+      "raw_sha256": "b0cc17aef6a823e3c100790540f7692f2af062520c037d198fa911d54018bfcb",
+      "raw_utf8_bytes": 734,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/21/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P05",
+      "name": "pending_shared_three_lambda_two_application_shape",
+      "raw_sha256": "aacfd5113470d8cd0011a14b3c6808ef366fb3cbbac1951afc6241c6b190daf6",
+      "raw_utf8_bytes": 2405,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/2/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P06",
+      "name": "curried_const_complete_ib_bi_views",
+      "raw_sha256": "7738bd5421b679f36825b1055dd87698a556bf129d876b2ea2d26692944a3c4f",
+      "raw_utf8_bytes": 2500,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/10/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P07",
+      "name": "dead_parameter_two_complete_vectors",
+      "raw_sha256": "7a628bbfe66f6062dfad1d43ba2496ef28581713b38ac362f3500c1021ff7672",
+      "raw_utf8_bytes": 1569,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/6/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P08",
+      "name": "neutral_closed_looking_arrow_and_scalar",
+      "raw_sha256": "c3d5dace3bb782ff16ba4eef9f83ffec5b7adac26d020f2611bb55df4583b257",
+      "raw_utf8_bytes": 2069,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/26/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P09",
+      "name": "two_scheme_closed_higher_order_capture",
+      "raw_sha256": "5909f1ddc4317183d7c4f188e8b3e06c927fb313bd212dcd2779883ef4bce7a9",
+      "raw_utf8_bytes": 2771,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/11/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P10",
+      "name": "generic_thunk_and_instance_deferred_return",
+      "raw_sha256": "d520e3e6449f975b82cf5700581f2d4897f45aa1363257a589a0069c1c82a753",
+      "raw_utf8_bytes": 2094,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/29/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P11",
+      "name": "concrete_callable_field_foreign_projection",
+      "raw_sha256": "f44111459be998de864c8e2104c1020eb8610a331986cbf3de5c27f75ec959e4",
+      "raw_utf8_bytes": 2081,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/27/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "P12",
+      "name": "sum_scalar_field_foreign_factory_capture",
+      "raw_sha256": "9cb4d15935f8ddd15b5b0893f41b12f4470a4c2dc936740173d0f7d3e06adc83",
+      "raw_utf8_bytes": 2850,
+      "selection_reason": "unchanged frozen Stage04 twelve-case source baseline; not additional native invocation permission",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/28/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "D1",
+      "name": "D1-ready-int-first",
+      "raw_sha256": "aae483b64348831af8a1b39f0939e74335ea75e7ff70067f331bc2afc6fbafc9",
+      "raw_utf8_bytes": 2175,
+      "selection_reason": "explicit Stage05 demand/curried/laziness raw proposal, still checker-unverified",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\"},{\"body\":[{\"captures\":{},\"function\":\"id\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"f\"},{\"op\":\"seal\",\"value\":\"f\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ri\",\"value\":\"shared\"},{\"instantiation\":\"int_use\",\"op\":\"instantiate\",\"out\":\"fi\",\"value\":\"ri\"},{\"op\":\"retain\",\"out\":\"rb\",\"value\":\"shared\"},{\"instantiation\":\"bool_use\",\"op\":\"instantiate\",\"out\":\"fb\",\"value\":\"rb\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"in\":\"home\",\"kind\":\"bool\",\"op\":\"scalar\",\"out\":\"b\",\"value\":true},{\"argument\":\"i\",\"function\":\"fi\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ai\"},{\"argument\":\"b\",\"function\":\"fb\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ab\"},{\"op\":\"retain\",\"out\":\"memo_again\",\"value\":\"ai\"},{\"op\":\"force\",\"out\":\"first_result\",\"value\":\"ai\"},{\"op\":\"drop\",\"value\":\"first_result\"},{\"op\":\"force\",\"out\":\"second_result\",\"value\":\"ab\"},{\"op\":\"drop\",\"value\":\"second_result\"},{\"op\":\"force\",\"out\":\"memo_result\",\"value\":\"memo_again\"},{\"op\":\"drop\",\"value\":\"memo_result\"},{\"op\":\"retain\",\"out\":\"rr\",\"value\":\"shared\"},{\"instantiation\":\"int_use\",\"op\":\"instantiate\",\"out\":\"fr\",\"value\":\"rr\"},{\"argument\":\"i\",\"function\":\"fr\",\"in\":\"home\",\"op\":\"application\",\"out\":\"fresh_again\"},{\"op\":\"drop\",\"value\":\"fi\"},{\"op\":\"drop\",\"value\":\"fb\"},{\"op\":\"drop\",\"value\":\"fr\"},{\"op\":\"drop\",\"value\":\"shared\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"b\"},{\"op\":\"force\",\"out\":\"answer\",\"value\":\"fresh_again\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer\"}],\"families\":{},\"functions\":{\"id\":{\"body\":[{\"op\":\"return\",\"value\":\"x\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"id\",\"type_scope\":\"S\"}},\"instantiations\":{\"bool_use\":{\"arguments\":[\"B\"],\"scheme\":\"S\"},\"int_use\":{\"arguments\":[\"I\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"AA\",\"parameters\":1}},\"signatures\":{\"id\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"AA\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"}},\"version\":8}\n"
+    },
+    {
+      "id": "D2",
+      "name": "D2-ready-bool-first",
+      "raw_sha256": "cdc4c940722f5cacbb9f95906a233ddec8b4f7505326613ed06dbb22f1cc1848",
+      "raw_utf8_bytes": 2176,
+      "selection_reason": "explicit Stage05 demand/curried/laziness raw proposal, still checker-unverified",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\"},{\"body\":[{\"captures\":{},\"function\":\"id\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"f\"},{\"op\":\"seal\",\"value\":\"f\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ri\",\"value\":\"shared\"},{\"instantiation\":\"int_use\",\"op\":\"instantiate\",\"out\":\"fi\",\"value\":\"ri\"},{\"op\":\"retain\",\"out\":\"rb\",\"value\":\"shared\"},{\"instantiation\":\"bool_use\",\"op\":\"instantiate\",\"out\":\"fb\",\"value\":\"rb\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"in\":\"home\",\"kind\":\"bool\",\"op\":\"scalar\",\"out\":\"b\",\"value\":true},{\"argument\":\"i\",\"function\":\"fi\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ai\"},{\"argument\":\"b\",\"function\":\"fb\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ab\"},{\"op\":\"retain\",\"out\":\"memo_again\",\"value\":\"ab\"},{\"op\":\"force\",\"out\":\"first_result\",\"value\":\"ab\"},{\"op\":\"drop\",\"value\":\"first_result\"},{\"op\":\"force\",\"out\":\"second_result\",\"value\":\"ai\"},{\"op\":\"drop\",\"value\":\"second_result\"},{\"op\":\"force\",\"out\":\"memo_result\",\"value\":\"memo_again\"},{\"op\":\"drop\",\"value\":\"memo_result\"},{\"op\":\"retain\",\"out\":\"rr\",\"value\":\"shared\"},{\"instantiation\":\"bool_use\",\"op\":\"instantiate\",\"out\":\"fr\",\"value\":\"rr\"},{\"argument\":\"b\",\"function\":\"fr\",\"in\":\"home\",\"op\":\"application\",\"out\":\"fresh_again\"},{\"op\":\"drop\",\"value\":\"fi\"},{\"op\":\"drop\",\"value\":\"fb\"},{\"op\":\"drop\",\"value\":\"fr\"},{\"op\":\"drop\",\"value\":\"shared\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"b\"},{\"op\":\"force\",\"out\":\"answer\",\"value\":\"fresh_again\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer\"}],\"families\":{},\"functions\":{\"id\":{\"body\":[{\"op\":\"return\",\"value\":\"x\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"id\",\"type_scope\":\"S\"}},\"instantiations\":{\"bool_use\":{\"arguments\":[\"B\"],\"scheme\":\"S\"},\"int_use\":{\"arguments\":[\"I\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"AA\",\"parameters\":1}},\"signatures\":{\"id\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"AA\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"}},\"version\":8}\n"
+    },
+    {
+      "id": "D3",
+      "name": "D3-pending-int-first",
+      "raw_sha256": "692bd573ddfdb1a677e5d108a6289e0835e3df3d94eaac6fbedb35781e65223d",
+      "raw_utf8_bytes": 2928,
+      "selection_reason": "explicit Stage05 demand/curried/laziness raw proposal, still checker-unverified",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\"},{\"body\":[{\"captures\":{},\"function\":\"outer\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"outer\"},{\"captures\":{},\"function\":\"id\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"inner\"},{\"argument\":\"inner\",\"function\":\"outer\",\"in\":\"$home\",\"op\":\"application\",\"out\":\"cursor\"},{\"op\":\"drop\",\"value\":\"outer\"},{\"op\":\"drop\",\"value\":\"inner\"},{\"op\":\"seal\",\"value\":\"cursor\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ri\",\"value\":\"shared\"},{\"instantiation\":\"int_use\",\"op\":\"instantiate\",\"out\":\"fi\",\"value\":\"ri\"},{\"op\":\"retain\",\"out\":\"rb\",\"value\":\"shared\"},{\"instantiation\":\"bool_use\",\"op\":\"instantiate\",\"out\":\"fb\",\"value\":\"rb\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"in\":\"home\",\"kind\":\"bool\",\"op\":\"scalar\",\"out\":\"b\",\"value\":true},{\"argument\":\"i\",\"function\":\"fi\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ai\"},{\"argument\":\"b\",\"function\":\"fb\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ab\"},{\"op\":\"retain\",\"out\":\"memo_again\",\"value\":\"ai\"},{\"op\":\"force\",\"out\":\"first_result\",\"value\":\"ai\"},{\"op\":\"drop\",\"value\":\"first_result\"},{\"op\":\"force\",\"out\":\"second_result\",\"value\":\"ab\"},{\"op\":\"drop\",\"value\":\"second_result\"},{\"op\":\"force\",\"out\":\"memo_result\",\"value\":\"memo_again\"},{\"op\":\"drop\",\"value\":\"memo_result\"},{\"op\":\"retain\",\"out\":\"rr\",\"value\":\"shared\"},{\"instantiation\":\"int_use\",\"op\":\"instantiate\",\"out\":\"fr\",\"value\":\"rr\"},{\"argument\":\"i\",\"function\":\"fr\",\"in\":\"home\",\"op\":\"application\",\"out\":\"fresh_again\"},{\"op\":\"drop\",\"value\":\"fi\"},{\"op\":\"drop\",\"value\":\"fb\"},{\"op\":\"drop\",\"value\":\"fr\"},{\"op\":\"drop\",\"value\":\"shared\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"b\"},{\"op\":\"force\",\"out\":\"answer\",\"value\":\"fresh_again\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer\"}],\"families\":{},\"functions\":{\"coerce\":{\"body\":[{\"op\":\"return\",\"value\":\"x\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"id\",\"type_scope\":\"S\"},\"id\":{\"body\":[{\"captures\":{},\"function\":\"coerce\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"c\"},{\"argument\":\"x\",\"function\":\"c\",\"in\":\"$home\",\"op\":\"application\",\"out\":\"app\"},{\"op\":\"drop\",\"value\":\"c\"},{\"op\":\"drop\",\"value\":\"x\"},{\"op\":\"return\",\"value\":\"app\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"id\",\"type_scope\":\"S\"},\"outer\":{\"body\":[{\"op\":\"return\",\"value\":\"f\"}],\"captures\":{},\"parameter\":\"f\",\"signature\":\"outer\",\"type_scope\":\"S\"}},\"instantiations\":{\"bool_use\":{\"arguments\":[\"B\"],\"scheme\":\"S\"},\"int_use\":{\"arguments\":[\"I\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"AA\",\"parameters\":1}},\"signatures\":{\"id\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"},\"outer\":{\"argument\":\"^AA\",\"protocol\":\"repeat\",\"result\":\"^AA\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"AA\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"}},\"version\":8}\n"
+    },
+    {
+      "id": "D4",
+      "name": "D4-pending-bool-first",
+      "raw_sha256": "f6e4323807fe39b318706439cfc788ece2cd2ebbff66c651e26e646654ad2822",
+      "raw_utf8_bytes": 2929,
+      "selection_reason": "explicit Stage05 demand/curried/laziness raw proposal, still checker-unverified",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\"},{\"body\":[{\"captures\":{},\"function\":\"outer\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"outer\"},{\"captures\":{},\"function\":\"id\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"inner\"},{\"argument\":\"inner\",\"function\":\"outer\",\"in\":\"$home\",\"op\":\"application\",\"out\":\"cursor\"},{\"op\":\"drop\",\"value\":\"outer\"},{\"op\":\"drop\",\"value\":\"inner\"},{\"op\":\"seal\",\"value\":\"cursor\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ri\",\"value\":\"shared\"},{\"instantiation\":\"int_use\",\"op\":\"instantiate\",\"out\":\"fi\",\"value\":\"ri\"},{\"op\":\"retain\",\"out\":\"rb\",\"value\":\"shared\"},{\"instantiation\":\"bool_use\",\"op\":\"instantiate\",\"out\":\"fb\",\"value\":\"rb\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"in\":\"home\",\"kind\":\"bool\",\"op\":\"scalar\",\"out\":\"b\",\"value\":true},{\"argument\":\"i\",\"function\":\"fi\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ai\"},{\"argument\":\"b\",\"function\":\"fb\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ab\"},{\"op\":\"retain\",\"out\":\"memo_again\",\"value\":\"ab\"},{\"op\":\"force\",\"out\":\"first_result\",\"value\":\"ab\"},{\"op\":\"drop\",\"value\":\"first_result\"},{\"op\":\"force\",\"out\":\"second_result\",\"value\":\"ai\"},{\"op\":\"drop\",\"value\":\"second_result\"},{\"op\":\"force\",\"out\":\"memo_result\",\"value\":\"memo_again\"},{\"op\":\"drop\",\"value\":\"memo_result\"},{\"op\":\"retain\",\"out\":\"rr\",\"value\":\"shared\"},{\"instantiation\":\"bool_use\",\"op\":\"instantiate\",\"out\":\"fr\",\"value\":\"rr\"},{\"argument\":\"b\",\"function\":\"fr\",\"in\":\"home\",\"op\":\"application\",\"out\":\"fresh_again\"},{\"op\":\"drop\",\"value\":\"fi\"},{\"op\":\"drop\",\"value\":\"fb\"},{\"op\":\"drop\",\"value\":\"fr\"},{\"op\":\"drop\",\"value\":\"shared\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"b\"},{\"op\":\"force\",\"out\":\"answer\",\"value\":\"fresh_again\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer\"}],\"families\":{},\"functions\":{\"coerce\":{\"body\":[{\"op\":\"return\",\"value\":\"x\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"id\",\"type_scope\":\"S\"},\"id\":{\"body\":[{\"captures\":{},\"function\":\"coerce\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"c\"},{\"argument\":\"x\",\"function\":\"c\",\"in\":\"$home\",\"op\":\"application\",\"out\":\"app\"},{\"op\":\"drop\",\"value\":\"c\"},{\"op\":\"drop\",\"value\":\"x\"},{\"op\":\"return\",\"value\":\"app\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"id\",\"type_scope\":\"S\"},\"outer\":{\"body\":[{\"op\":\"return\",\"value\":\"f\"}],\"captures\":{},\"parameter\":\"f\",\"signature\":\"outer\",\"type_scope\":\"S\"}},\"instantiations\":{\"bool_use\":{\"arguments\":[\"B\"],\"scheme\":\"S\"},\"int_use\":{\"arguments\":[\"I\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"AA\",\"parameters\":1}},\"signatures\":{\"id\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"},\"outer\":{\"argument\":\"^AA\",\"protocol\":\"repeat\",\"result\":\"^AA\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"AA\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"}},\"version\":8}\n"
+    },
+    {
+      "id": "D5",
+      "name": "D5-curried-both-repeat",
+      "raw_sha256": "beb4fd45aab2b58835ca5fb11907010a72c73503cced0ed4579b6282c7dc71ba",
+      "raw_utf8_bytes": 2900,
+      "selection_reason": "explicit Stage05 demand/curried/laziness raw proposal, still checker-unverified",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\"},{\"body\":[{\"captures\":{},\"function\":\"constant\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"k\"},{\"op\":\"seal\",\"value\":\"k\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ki0\",\"value\":\"shared\"},{\"instantiation\":\"ib\",\"op\":\"instantiate\",\"out\":\"ki\",\"value\":\"ki0\"},{\"instantiation\":\"bi\",\"op\":\"instantiate\",\"out\":\"kb\",\"value\":\"shared\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"in\":\"home\",\"kind\":\"bool\",\"op\":\"scalar\",\"out\":\"b\",\"value\":true},{\"argument\":\"i\",\"function\":\"ki\",\"in\":\"home\",\"op\":\"application\",\"out\":\"partial_i\"},{\"argument\":\"b\",\"function\":\"kb\",\"in\":\"home\",\"op\":\"application\",\"out\":\"partial_b\"},{\"op\":\"drop\",\"value\":\"ki\"},{\"op\":\"drop\",\"value\":\"kb\"},{\"op\":\"force\",\"out\":\"curried_i\",\"value\":\"partial_i\"},{\"op\":\"force\",\"out\":\"curried_b\",\"value\":\"partial_b\"},{\"argument\":\"b\",\"function\":\"curried_i\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_1\"},{\"op\":\"force\",\"out\":\"answer_1\",\"value\":\"result_1\"},{\"op\":\"drop\",\"value\":\"answer_1\"},{\"argument\":\"i\",\"function\":\"curried_b\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_2\"},{\"op\":\"force\",\"out\":\"answer_2\",\"value\":\"result_2\"},{\"op\":\"drop\",\"value\":\"answer_2\"},{\"argument\":\"b\",\"function\":\"curried_i\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_3\"},{\"op\":\"force\",\"out\":\"answer_3\",\"value\":\"result_3\"},{\"op\":\"drop\",\"value\":\"answer_3\"},{\"argument\":\"i\",\"function\":\"curried_b\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_4\"},{\"op\":\"force\",\"out\":\"answer_4\",\"value\":\"result_4\"},{\"op\":\"drop\",\"value\":\"curried_i\"},{\"op\":\"drop\",\"value\":\"curried_b\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"b\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer_4\"}],\"families\":{},\"functions\":{\"constant\":{\"body\":[{\"captures\":{\"saved\":\"x\"},\"function\":\"return_x\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"curried\"},{\"op\":\"drop\",\"value\":\"x\"},{\"op\":\"return\",\"value\":\"curried\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"K\",\"type_scope\":\"S\"},\"return_x\":{\"body\":[{\"op\":\"drop\",\"value\":\"ignored\"},{\"op\":\"return\",\"value\":\"saved\"}],\"captures\":{\"saved\":{\"layout\":\"^A\",\"relation\":\"down\"}},\"parameter\":\"ignored\",\"signature\":\"R\",\"type_scope\":\"S\"}},\"instantiations\":{\"bi\":{\"arguments\":[\"B\",\"I\"],\"scheme\":\"S\"},\"ib\":{\"arguments\":[\"I\",\"B\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"K\",\"parameters\":2}},\"signatures\":{\"K\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^ZA\",\"result_identity\":\"unknown\"},\"R\":{\"argument\":\"^Z\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"},\"K\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"ZA\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"Z\":{\"index\":1,\"scheme\":\"S\",\"tag\":\"rigid\"},\"ZA\":{\"argument\":\"Z\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"}},\"version\":8}\n"
+    },
+    {
+      "id": "D6",
+      "name": "D6-dead-full-vectors",
+      "raw_sha256": "503b9cf5a8f54e13748a11622b89b8d492c27614ef6fd1407ff675ed593507f8",
+      "raw_utf8_bytes": 1717,
+      "selection_reason": "explicit Stage05 demand/curried/laziness raw proposal, still checker-unverified",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\"},{\"body\":[{\"captures\":{},\"function\":\"id\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"f\"},{\"op\":\"seal\",\"value\":\"f\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ri\",\"value\":\"shared\"},{\"instantiation\":\"int_use\",\"op\":\"instantiate\",\"out\":\"fi\",\"value\":\"ri\"},{\"op\":\"retain\",\"out\":\"rb\",\"value\":\"shared\"},{\"instantiation\":\"bool_use\",\"op\":\"instantiate\",\"out\":\"fb\",\"value\":\"rb\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"j\",\"value\":43},{\"argument\":\"i\",\"function\":\"fi\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ai\"},{\"argument\":\"j\",\"function\":\"fb\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ab\"},{\"op\":\"drop\",\"value\":\"fi\"},{\"op\":\"drop\",\"value\":\"fb\"},{\"op\":\"drop\",\"value\":\"shared\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"j\"},{\"op\":\"force\",\"out\":\"first_result\",\"value\":\"ai\"},{\"op\":\"drop\",\"value\":\"first_result\"},{\"op\":\"force\",\"out\":\"answer\",\"value\":\"ab\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer\"}],\"families\":{},\"functions\":{\"id\":{\"body\":[{\"op\":\"return\",\"value\":\"x\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"id\",\"type_scope\":\"S\"}},\"instantiations\":{\"bool_use\":{\"arguments\":[\"I\",\"B\"],\"scheme\":\"S\"},\"int_use\":{\"arguments\":[\"I\",\"I\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"AA\",\"parameters\":2}},\"signatures\":{\"id\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"AA\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"}},\"version\":8}\n"
+    },
+    {
+      "id": "D7",
+      "name": "D7-data-and-factory-demand",
+      "raw_sha256": "a3aed871f788f1b853c375263e55d69845c6b0d3049aa078eca939464132ec02",
+      "raw_utf8_bytes": 2704,
+      "selection_reason": "explicit Stage05 demand/curried/laziness raw proposal, still checker-unverified",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{\"none\":{\"body\":[{\"in\":\"$home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"zero\",\"value\":0},{\"op\":\"return\",\"value\":\"zero\"}],\"captures\":{},\"result\":\"#i64\",\"type_scope\":null},\"some\":{\"body\":[{\"argument\":\"item\",\"function\":\"fn\",\"in\":\"$home\",\"op\":\"application\",\"out\":\"pending\"},{\"op\":\"drop\",\"value\":\"fn\"},{\"op\":\"drop\",\"value\":\"item\"},{\"op\":\"return\",\"value\":\"pending\"}],\"captures\":{\"fn\":{\"layout\":\"@ClosedI\",\"relation\":\"down\"},\"item\":{\"layout\":\"#i64\",\"relation\":\"down\"}},\"result\":\"#i64\",\"type_scope\":null}},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\"},{\"body\":[{\"captures\":{},\"function\":\"id\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"f\"},{\"op\":\"seal\",\"value\":\"f\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"instantiation\":\"int_use\",\"op\":\"instantiate\",\"out\":\"fi\",\"value\":\"shared\"},{\"fields\":{\"fn\":\"fi\"},\"in\":\"home\",\"layout\":\"CallableBox\",\"op\":\"alloc\",\"out\":\"box\"},{\"field\":\"fn\",\"op\":\"field\",\"out\":\"field_loan\",\"value\":\"box\"},{\"op\":\"retain\",\"out\":\"field_owner\",\"value\":\"field_loan\"},{\"op\":\"end_borrow\",\"value\":\"field_loan\"},{\"op\":\"drop\",\"value\":\"box\"},{\"op\":\"drop\",\"value\":\"fi\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"payload\",\"value\":42},{\"argument\":\"payload\",\"function\":\"field_owner\",\"in\":\"home\",\"op\":\"application\",\"out\":\"direct\"},{\"op\":\"force\",\"out\":\"direct_result\",\"value\":\"direct\"},{\"op\":\"drop\",\"value\":\"direct_result\"},{\"family\":\"CallableOption\",\"fields\":[\"payload\"],\"in\":\"home\",\"op\":\"construct_sum\",\"out\":\"wrapped\",\"variant\":\"Some\"},{\"op\":\"drop\",\"value\":\"payload\"},{\"arms\":{\"None\":{\"captures\":{},\"code\":\"none\"},\"Some\":{\"captures\":{\"fn\":{\"kind\":\"external\",\"value\":\"field_owner\"},\"item\":{\"index\":0,\"kind\":\"field\"}},\"code\":\"some\"}},\"family\":\"CallableOption\",\"in\":\"home\",\"op\":\"case_fields_i64\",\"out\":\"factory\",\"scrutinee\":\"wrapped\"},{\"op\":\"drop\",\"value\":\"wrapped\"},{\"op\":\"drop\",\"value\":\"field_owner\"},{\"op\":\"force\",\"out\":\"answer\",\"value\":\"factory\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer\"}],\"families\":{\"CallableOption\":{\"fields\":{\"None\":[],\"Some\":[\"#i64\"]},\"variants\":[\"None\",\"Some\"]}},\"functions\":{\"id\":{\"body\":[{\"op\":\"return\",\"value\":\"x\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"id\",\"type_scope\":\"S\"}},\"instantiations\":{\"int_use\":{\"arguments\":[\"I\"],\"scheme\":\"S\"}},\"layouts\":{\"CallableBox\":{\"fn\":\"@ClosedI\"}},\"schemes\":{\"S\":{\"body\":\"AA\",\"parameters\":1}},\"signatures\":{\"ClosedI\":{\"argument\":\"#i64\",\"protocol\":\"repeat\",\"result\":\"#i64\",\"result_identity\":\"unknown\"},\"id\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"AA\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"}},\"version\":8}\n"
+    },
+    {
+      "id": "D8",
+      "name": "D8-ignored-then-demanded-knot",
+      "raw_sha256": "488ad7e43261983337242db9bc490424d522f782e1331e408222c06958d531a6",
+      "raw_utf8_bytes": 2920,
+      "selection_reason": "explicit Stage05 demand/curried/laziness raw proposal, still checker-unverified",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{\"cycle\":{\"body\":[{\"op\":\"return\",\"value\":\"link\"}],\"captures\":{\"link\":{\"layout\":\"#i64\",\"relation\":\"down\"}},\"result\":\"#i64\",\"type_scope\":null}},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\"},{\"in\":\"home\",\"layout\":\"#i64\",\"op\":\"hole\",\"out\":\"loop\"},{\"captures\":{\"link\":\"loop\"},\"code\":\"cycle\",\"in\":\"home\",\"op\":\"thunk\",\"out\":\"cycle_cursor\"},{\"hole\":\"loop\",\"op\":\"fill\",\"value\":\"cycle_cursor\"},{\"op\":\"drop\",\"value\":\"cycle_cursor\"},{\"body\":[{\"captures\":{},\"function\":\"constant\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"k\"},{\"op\":\"seal\",\"value\":\"k\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ki0\",\"value\":\"shared\"},{\"instantiation\":\"ii\",\"op\":\"instantiate\",\"out\":\"k_ignore\",\"value\":\"ki0\"},{\"instantiation\":\"ii\",\"op\":\"instantiate\",\"out\":\"k_demand\",\"value\":\"shared\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"argument\":\"i\",\"function\":\"k_ignore\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ignore_partial\"},{\"op\":\"drop\",\"value\":\"k_ignore\"},{\"op\":\"force\",\"out\":\"ignore_closure\",\"value\":\"ignore_partial\"},{\"argument\":\"loop\",\"function\":\"ignore_closure\",\"in\":\"home\",\"op\":\"application\",\"out\":\"ignored_call\"},{\"op\":\"drop\",\"value\":\"ignore_closure\"},{\"op\":\"force\",\"out\":\"ignored_42\",\"value\":\"ignored_call\"},{\"op\":\"drop\",\"value\":\"ignored_42\"},{\"argument\":\"loop\",\"function\":\"k_demand\",\"in\":\"home\",\"op\":\"application\",\"out\":\"demand_partial\"},{\"op\":\"drop\",\"value\":\"k_demand\"},{\"op\":\"force\",\"out\":\"demand_closure\",\"value\":\"demand_partial\"},{\"argument\":\"i\",\"function\":\"demand_closure\",\"in\":\"home\",\"op\":\"application\",\"out\":\"demanded_call\"},{\"op\":\"drop\",\"value\":\"demand_closure\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"loop\"},{\"op\":\"force\",\"out\":\"unreachable_answer\",\"value\":\"demanded_call\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"unreachable_answer\"}],\"families\":{},\"functions\":{\"constant\":{\"body\":[{\"captures\":{\"saved\":\"x\"},\"function\":\"return_x\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"curried\"},{\"op\":\"drop\",\"value\":\"x\"},{\"op\":\"return\",\"value\":\"curried\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"K\",\"type_scope\":\"S\"},\"return_x\":{\"body\":[{\"op\":\"drop\",\"value\":\"ignored\"},{\"op\":\"return\",\"value\":\"saved\"}],\"captures\":{\"saved\":{\"layout\":\"^A\",\"relation\":\"down\"}},\"parameter\":\"ignored\",\"signature\":\"R\",\"type_scope\":\"S\"}},\"instantiations\":{\"ii\":{\"arguments\":[\"I\",\"I\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"K\",\"parameters\":2}},\"signatures\":{\"K\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^ZA\",\"result_identity\":\"unknown\"},\"R\":{\"argument\":\"^Z\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"},\"K\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"ZA\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"Z\":{\"index\":1,\"scheme\":\"S\",\"tag\":\"rigid\"},\"ZA\":{\"argument\":\"Z\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"}},\"version\":8}\n"
+    },
+    {
+      "id": "G01",
+      "name": "loan_view_move_and_promotion",
+      "raw_sha256": "6380f6f472bed57552392db9c6f9f31ad526a332a57e6f438c4018645f2242ff",
+      "raw_utf8_bytes": 1374,
+      "selection_reason": "borrow and application_borrow; exact anchored loan view move",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/7/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "G02",
+      "name": "child_group_seal_and_scheme_authority",
+      "raw_sha256": "95984b98c224ed7f8a1328bcd0baaf94ab33d96e1f3d16f13845e89d868203b5",
+      "raw_utf8_bytes": 1480,
+      "selection_reason": "new_below and child-scope seal export lifetime",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/8/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "G03",
+      "name": "concrete_primitive_selection",
+      "raw_sha256": "2d2d320d0b60e607f6a2526410d22398b828c648671c55f20c392644308a8445",
+      "raw_utf8_bytes": 734,
+      "selection_reason": "prim2 and select_i64",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/20/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "G04",
+      "name": "scoped_intermediate_dead_parameter_substitution",
+      "raw_sha256": "c05f9b177b3337467e6c0eebd5faabf36316da526fc665fffe1a3f45f551a21a",
+      "raw_utf8_bytes": 1918,
+      "selection_reason": "genuinely unallocated unused scoped Code plus dead intermediate type",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/25/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "id": "G05",
+      "name": "generalize_inside_concrete_callback",
+      "raw_sha256": "17aefb06a6e631ed51d012a3a97edbb3add09d36f7f377a9370355ca9390ab87",
+      "raw_utf8_bytes": 1774,
+      "selection_reason": "generalize/token/export inside concrete callback",
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/15/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "SCHEME_VALUE",
+        "layer": "type",
+        "path": "entry[2].value"
+      },
+      "id": "L01",
+      "name": "lower_reject_scheme_force",
+      "raw_sha256": "0f2a6f5f48ae6a2ab67ffa7ad4f4961b50f4b1f0fdecfe994e7a2aac8dd21699",
+      "raw_utf8_bytes": 1724,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/31/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "OPCODE",
+        "layer": "schema",
+        "path": "entry[1].body[0]"
+      },
+      "id": "L02",
+      "name": "lower_mask_introduction_force",
+      "raw_sha256": "42b640c69865eb1a24410ecf4b8b26bca1c2b7014a16a63a6ff5d1606e8725be",
+      "raw_utf8_bytes": 1691,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/32/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "TYPE",
+        "layer": "type",
+        "path": "functions.constant.body[0].captures.saved"
+      },
+      "id": "L03",
+      "name": "lower_reject_noninjective_int_int_capture_swap",
+      "raw_sha256": "19aa36c01e43d0fe3d3a65069635a6be6c5dc0216e94ce45698986f4ee41a056",
+      "raw_utf8_bytes": 2496,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/33/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "TYPE",
+        "layer": "type",
+        "path": "functions.return_x.body[1].value"
+      },
+      "id": "L04",
+      "name": "lower_reject_noninjective_int_int_return_swap",
+      "raw_sha256": "1d770fb728be3310e3b3111dd8d7b7decd6f59a180e09e7715ed4e3578af69cd",
+      "raw_utf8_bytes": 2496,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/34/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "SCOPE",
+        "layer": "declarations",
+        "path": "query.reference"
+      },
+      "id": "L05",
+      "name": "lower_reject_cross_scheme_same_index_rigid",
+      "raw_sha256": "b751e50c9ae75683975442df127e4996cd6a3aaa61f1b035ce63148126c0bd96",
+      "raw_utf8_bytes": 2771,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/35/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "INTRODUCTION_COVERAGE",
+        "layer": "coverage",
+        "path": "schemes.S"
+      },
+      "id": "L06",
+      "name": "lower_reject_missing_introduction",
+      "raw_sha256": "1e7c62d1424c1a4a96e83ec0e92946a3cf372d2d8185e21c6f6b9ace8cb737ee",
+      "raw_utf8_bytes": 1487,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/36/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "ALLOCATION_SCOPE",
+        "layer": "graph",
+        "path": "functions.apply.body[0]"
+      },
+      "id": "L07",
+      "name": "lower_reject_cross_scope_allocation",
+      "raw_sha256": "f7f0000cf6b8427131b3d24a105c5d4f09177ff2c2813c70557c32736bf5507a",
+      "raw_utf8_bytes": 2750,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/37/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "LIVE_LOAN",
+        "layer": "resource",
+        "path": "entry[4]"
+      },
+      "id": "L08",
+      "name": "lower_reject_move_owner_with_loan",
+      "raw_sha256": "66167e8bbffa488b7508df69292990d4464621c3d3b074db2a95abc0d5de570c",
+      "raw_utf8_bytes": 1694,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/38/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "STRICT_IMPORT",
+        "layer": "resource",
+        "path": "entry[2]"
+      },
+      "id": "L09",
+      "name": "lower_authority_A05_nonstrict_scheme_import",
+      "raw_sha256": "797b13da94152a0c9bf7c151057a121cf43dc29f178af68d31f73a9958bc1fb3",
+      "raw_utf8_bytes": 1751,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/39/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "TYPE",
+        "layer": "type",
+        "path": "entry[3].argument"
+      },
+      "id": "L10",
+      "name": "lower_reject_contract_alias_refinement",
+      "raw_sha256": "6581fdee20008d6ea2b56953ccc4ee60178feafe1db74fcc449348cea395d4f8",
+      "raw_utf8_bytes": 1279,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/40/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "TYPE",
+        "layer": "type",
+        "path": "entry[3].argument"
+      },
+      "id": "L11",
+      "name": "lower_reject_nested_arrow_protocol",
+      "raw_sha256": "e291f192e55168585497322c967394b3fc00f639b207a7a80a63cebec29f7f9f",
+      "raw_utf8_bytes": 1250,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/41/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "ALLOCATION_CYCLE",
+        "layer": "graph",
+        "path": "functions.id"
+      },
+      "id": "L12",
+      "name": "lower_reject_scoped_self_allocation_cycle",
+      "raw_sha256": "bf3266ebc67a4ad5afaaf0e08250e570addfdfe0c8779d62972b226e6db624f8",
+      "raw_utf8_bytes": 1764,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/42/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "DUPLICATE_KEY",
+        "layer": "schema",
+        "path": "program"
+      },
+      "id": "L13",
+      "name": "lower_reject_duplicate_json_key",
+      "raw_sha256": "0c47bc757c443a00c76d00938d7bdce513dfce1361d66f3541ba98aea2c911f1",
+      "raw_utf8_bytes": 25,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/43/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "JSON",
+        "layer": "schema",
+        "path": "program"
+      },
+      "id": "L14",
+      "name": "lower_reject_nonfinite_json",
+      "raw_sha256": "50f6f985e57e457a05aa5b5cbb99b534e5e0ddac9be6cb8773951d03815bde42",
+      "raw_utf8_bytes": 15,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/44/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "SCHEMA",
+        "layer": "schema",
+        "path": "program"
+      },
+      "id": "L15",
+      "name": "metadata_reject_producer_accesses",
+      "raw_sha256": "06152250577d2c80460e3e386fce8f9d8a9e99597357c571e8796dc99de74578",
+      "raw_utf8_bytes": 330,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/45/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "VERSION",
+        "layer": "schema",
+        "path": "program.version"
+      },
+      "id": "L16",
+      "name": "metadata_reject_version7",
+      "raw_sha256": "e98971e7271291175a510ccef9a92dcde11325c3249aee0729ef829c514347c3",
+      "raw_utf8_bytes": 316,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/46/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "ONCE",
+        "layer": "metadata-subset",
+        "path": "metadata.types[2].protocol"
+      },
+      "id": "L17",
+      "name": "metadata_subset_once_callable",
+      "raw_sha256": "04fa4af2967c36f333b27a3b85d681e4df97f5a1586139b97b73eab22aabc97d",
+      "raw_utf8_bytes": 739,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/47/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "ONCE",
+        "layer": "metadata-subset",
+        "path": "metadata.types[2].protocol"
+      },
+      "id": "L18",
+      "name": "metadata_subset_unused_nested_once",
+      "raw_sha256": "b42917571cbcb7d54e3279be505551e924232ef298eff2848ffc28fdfab19ddc",
+      "raw_utf8_bytes": 547,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/48/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "OWNERSHIP",
+        "layer": "resource",
+        "path": "entry[3].value"
+      },
+      "id": "L19",
+      "name": "metadata_lower_force_loan_owner",
+      "raw_sha256": "5af2c7ce8284255f738571aad5b413760f0f54351ebaae1e1f8bb055d375781a",
+      "raw_utf8_bytes": 574,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/49/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "OWNERSHIP",
+        "layer": "resource",
+        "path": "entry[3].fields.item"
+      },
+      "id": "L20",
+      "name": "metadata_lower_alloc_loan_owner",
+      "raw_sha256": "538c17a55062c44e77e7cbd5a4e5a2d890409ae806feb7850d74a0449fce6f84",
+      "raw_utf8_bytes": 1441,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/50/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "OWNERSHIP",
+        "layer": "resource",
+        "path": "entry[9]"
+      },
+      "id": "L21",
+      "name": "lower_reject_application_loan_owned_position",
+      "raw_sha256": "f8c41862c80715de4268856cb1a3cf4d6ae4d8aa5fd44323ce7afe7e129003b2",
+      "raw_utf8_bytes": 1700,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/51/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "FIELD_SHAPE",
+        "layer": "declarations",
+        "path": "families.CallableOption.fields.Some[0]"
+      },
+      "id": "L22",
+      "name": "metadata_lower_callable_sum_field_unsupported",
+      "raw_sha256": "ccc0c40529f2df1a8d70e8b366a125760fedabdd78a1bacea9759acd01d47615",
+      "raw_utf8_bytes": 2721,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/52/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "TYPE_COUNT",
+        "layer": "metadata-bounds",
+        "path": "metadata.types"
+      },
+      "id": "L23",
+      "name": "metadata_fresh_types_4097",
+      "raw_sha256": "a93c5ec9196ca17ce1a6e17b78cf5f33e286dfa0362e95bf8943b1528a4f9cdc",
+      "raw_utf8_bytes": 55074,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/53/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "expected_diagnostic": {
+        "code": "ROW_COUNT",
+        "layer": "metadata-bounds",
+        "path": "metadata.access_transport_resolution_rows"
+      },
+      "id": "L24",
+      "name": "metadata_public_row_overflow_n47",
+      "raw_sha256": "1ee02fe927e12ab6a3c0e6d513b400e3e7f0613b998b8d710bc5f1ade63248e0",
+      "raw_utf8_bytes": 60719,
+      "source_file": "tests/fixtures/ir8-metadata.json",
+      "source_json_pointer": "/cases/54/text",
+      "storage": "repository-json-extraction"
+    },
+    {
+      "basis": "D5",
+      "bytes": 5940,
+      "classification": "separate authorized host-only naming control; no native baseline",
+      "expected_diagnostic": null,
+      "file": "U01-unicode-injection-valid.json",
+      "id": "U01",
+      "input_api": "loads_runtime(text)",
+      "input_mutation_path": null,
+      "raw_sha256": "38859d2acdcdaf50cd9c125ff1283b50badeaee64eeb921d91d9ffaabcd58da5",
+      "raw_utf8_bytes": 5940,
+      "renames": {
+        "answer_1": "u00_κ🦊\"\\\n*/;#include<evil.h>//_answer_1",
+        "answer_2": "u01_κ🦊\"\\\n*/;#include<evil.h>//_answer_2",
+        "answer_3": "u02_κ🦊\"\\\n*/;#include<evil.h>//_answer_3",
+        "answer_4": "u03_κ🦊\"\\\n*/;#include<evil.h>//_answer_4",
+        "b": "u04_κ🦊\"\\\n*/;#include<evil.h>//_b",
+        "bi": "u05_κ🦊\"\\\n*/;#include<evil.h>//_bi",
+        "constant": "u06_κ🦊\"\\\n*/;#include<evil.h>//_constant",
+        "curried": "u07_κ🦊\"\\\n*/;#include<evil.h>//_curried",
+        "curried_b": "u08_κ🦊\"\\\n*/;#include<evil.h>//_curried_b",
+        "curried_i": "u09_κ🦊\"\\\n*/;#include<evil.h>//_curried_i",
+        "home": "u10_κ🦊\"\\\n*/;#include<evil.h>//_home",
+        "i": "u11_κ🦊\"\\\n*/;#include<evil.h>//_i",
+        "ib": "u12_κ🦊\"\\\n*/;#include<evil.h>//_ib",
+        "ignored": "u13_κ🦊\"\\\n*/;#include<evil.h>//_ignored",
+        "k": "u14_κ🦊\"\\\n*/;#include<evil.h>//_k",
+        "kb": "u15_κ🦊\"\\\n*/;#include<evil.h>//_kb",
+        "ki": "u16_κ🦊\"\\\n*/;#include<evil.h>//_ki",
+        "ki0": "u17_κ🦊\"\\\n*/;#include<evil.h>//_ki0",
+        "partial_b": "u18_κ🦊\"\\\n*/;#include<evil.h>//_partial_b",
+        "partial_i": "u19_κ🦊\"\\\n*/;#include<evil.h>//_partial_i",
+        "result_1": "u20_κ🦊\"\\\n*/;#include<evil.h>//_result_1",
+        "result_2": "u21_κ🦊\"\\\n*/;#include<evil.h>//_result_2",
+        "result_3": "u22_κ🦊\"\\\n*/;#include<evil.h>//_result_3",
+        "result_4": "u23_κ🦊\"\\\n*/;#include<evil.h>//_result_4",
+        "return_x": "u24_κ🦊\"\\\n*/;#include<evil.h>//_return_x",
+        "saved": "u25_κ🦊\"\\\n*/;#include<evil.h>//_saved",
+        "shared": "u26_κ🦊\"\\\n*/;#include<evil.h>//_shared",
+        "x": "u27_κ🦊\"\\\n*/;#include<evil.h>//_x"
+      },
+      "sha256": "38859d2acdcdaf50cd9c125ff1283b50badeaee64eeb921d91d9ffaabcd58da5",
+      "source_reason": "Uniform exact-string key/value rename of callback identities/references, parameters/captures, SSA outputs/uses and instantiation IDs/occurrences; declarations/types/Scheme and $home unchanged.",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\"},{\"body\":[{\"captures\":{},\"function\":\"u06_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_constant\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"u14_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_k\"},{\"op\":\"seal\",\"value\":\"u14_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_k\"}],\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"op\":\"generalize\",\"out\":\"u26_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"u17_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ki0\",\"value\":\"u26_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_shared\"},{\"instantiation\":\"u12_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ib\",\"op\":\"instantiate\",\"out\":\"u16_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ki\",\"value\":\"u17_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ki0\"},{\"instantiation\":\"u05_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_bi\",\"op\":\"instantiate\",\"out\":\"u15_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_kb\",\"value\":\"u26_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_shared\"},{\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"u11_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_i\",\"value\":42},{\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"kind\":\"bool\",\"op\":\"scalar\",\"out\":\"u04_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_b\",\"value\":true},{\"argument\":\"u11_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_i\",\"function\":\"u16_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ki\",\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"op\":\"application\",\"out\":\"u19_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_partial_i\"},{\"argument\":\"u04_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_b\",\"function\":\"u15_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_kb\",\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"op\":\"application\",\"out\":\"u18_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_partial_b\"},{\"op\":\"drop\",\"value\":\"u16_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ki\"},{\"op\":\"drop\",\"value\":\"u15_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_kb\"},{\"op\":\"force\",\"out\":\"u09_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried_i\",\"value\":\"u19_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_partial_i\"},{\"op\":\"force\",\"out\":\"u08_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried_b\",\"value\":\"u18_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_partial_b\"},{\"argument\":\"u04_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_b\",\"function\":\"u09_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried_i\",\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"op\":\"application\",\"out\":\"u20_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_result_1\"},{\"op\":\"force\",\"out\":\"u00_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_answer_1\",\"value\":\"u20_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_result_1\"},{\"op\":\"drop\",\"value\":\"u00_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_answer_1\"},{\"argument\":\"u11_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_i\",\"function\":\"u08_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried_b\",\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"op\":\"application\",\"out\":\"u21_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_result_2\"},{\"op\":\"force\",\"out\":\"u01_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_answer_2\",\"value\":\"u21_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_result_2\"},{\"op\":\"drop\",\"value\":\"u01_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_answer_2\"},{\"argument\":\"u04_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_b\",\"function\":\"u09_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried_i\",\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"op\":\"application\",\"out\":\"u22_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_result_3\"},{\"op\":\"force\",\"out\":\"u02_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_answer_3\",\"value\":\"u22_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_result_3\"},{\"op\":\"drop\",\"value\":\"u02_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_answer_3\"},{\"argument\":\"u11_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_i\",\"function\":\"u08_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried_b\",\"in\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\",\"op\":\"application\",\"out\":\"u23_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_result_4\"},{\"op\":\"force\",\"out\":\"u03_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_answer_4\",\"value\":\"u23_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_result_4\"},{\"op\":\"drop\",\"value\":\"u09_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried_i\"},{\"op\":\"drop\",\"value\":\"u08_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried_b\"},{\"op\":\"drop\",\"value\":\"u11_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_i\"},{\"op\":\"drop\",\"value\":\"u04_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_b\"},{\"op\":\"drop\",\"value\":\"u10_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_home\"},{\"op\":\"finish_scalar\",\"value\":\"u03_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_answer_4\"}],\"families\":{},\"functions\":{\"u06_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_constant\":{\"body\":[{\"captures\":{\"u25_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_saved\":\"u27_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_x\"},\"function\":\"u24_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_return_x\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"u07_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried\"},{\"op\":\"drop\",\"value\":\"u27_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_x\"},{\"op\":\"return\",\"value\":\"u07_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_curried\"}],\"captures\":{},\"parameter\":\"u27_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_x\",\"signature\":\"K\",\"type_scope\":\"S\"},\"u24_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_return_x\":{\"body\":[{\"op\":\"drop\",\"value\":\"u13_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ignored\"},{\"op\":\"return\",\"value\":\"u25_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_saved\"}],\"captures\":{\"u25_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_saved\":{\"layout\":\"^A\",\"relation\":\"down\"}},\"parameter\":\"u13_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ignored\",\"signature\":\"R\",\"type_scope\":\"S\"}},\"instantiations\":{\"u05_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_bi\":{\"arguments\":[\"B\",\"I\"],\"scheme\":\"S\"},\"u12_κ🦊\\\"\\\\\\n*/;#include<evil.h>//_ib\":{\"arguments\":[\"I\",\"B\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"K\",\"parameters\":2}},\"signatures\":{\"K\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^ZA\",\"result_identity\":\"unknown\"},\"R\":{\"argument\":\"^Z\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"},\"K\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"ZA\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"Z\":{\"index\":1,\"scheme\":\"S\",\"tag\":\"rigid\"},\"ZA\":{\"argument\":\"Z\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"}},\"version\":8}\n"
+    },
+    {
+      "basis": "D5",
+      "bytes": 2906,
+      "classification": "separate authorized host-only naming control; no native baseline",
+      "expected_diagnostic": {
+        "code": "NAME",
+        "layer": "schema",
+        "path": "entry[0].out"
+      },
+      "file": "U02-nul-name-invalid.json",
+      "id": "U02",
+      "input_api": "loads_runtime(text)",
+      "input_mutation_path": "/entry/0/out",
+      "raw_sha256": "bd0eb31ff0ea1951fc197e4d47a138bdaa804fcffdbc0431aa7a9894d9044da6",
+      "raw_utf8_bytes": 2906,
+      "renames": null,
+      "sha256": "bd0eb31ff0ea1951fc197e4d47a138bdaa804fcffdbc0431aa7a9894d9044da6",
+      "source_reason": "U02 reaches name preflight after valid NUL-escaped JSON; U03 file is valid ASCII JSON with \\ud800, then owned snapshot rejects decoded non-scalar at program before name checking.",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"home\\u0000\"},{\"body\":[{\"captures\":{},\"function\":\"constant\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"k\"},{\"op\":\"seal\",\"value\":\"k\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ki0\",\"value\":\"shared\"},{\"instantiation\":\"ib\",\"op\":\"instantiate\",\"out\":\"ki\",\"value\":\"ki0\"},{\"instantiation\":\"bi\",\"op\":\"instantiate\",\"out\":\"kb\",\"value\":\"shared\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"in\":\"home\",\"kind\":\"bool\",\"op\":\"scalar\",\"out\":\"b\",\"value\":true},{\"argument\":\"i\",\"function\":\"ki\",\"in\":\"home\",\"op\":\"application\",\"out\":\"partial_i\"},{\"argument\":\"b\",\"function\":\"kb\",\"in\":\"home\",\"op\":\"application\",\"out\":\"partial_b\"},{\"op\":\"drop\",\"value\":\"ki\"},{\"op\":\"drop\",\"value\":\"kb\"},{\"op\":\"force\",\"out\":\"curried_i\",\"value\":\"partial_i\"},{\"op\":\"force\",\"out\":\"curried_b\",\"value\":\"partial_b\"},{\"argument\":\"b\",\"function\":\"curried_i\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_1\"},{\"op\":\"force\",\"out\":\"answer_1\",\"value\":\"result_1\"},{\"op\":\"drop\",\"value\":\"answer_1\"},{\"argument\":\"i\",\"function\":\"curried_b\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_2\"},{\"op\":\"force\",\"out\":\"answer_2\",\"value\":\"result_2\"},{\"op\":\"drop\",\"value\":\"answer_2\"},{\"argument\":\"b\",\"function\":\"curried_i\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_3\"},{\"op\":\"force\",\"out\":\"answer_3\",\"value\":\"result_3\"},{\"op\":\"drop\",\"value\":\"answer_3\"},{\"argument\":\"i\",\"function\":\"curried_b\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_4\"},{\"op\":\"force\",\"out\":\"answer_4\",\"value\":\"result_4\"},{\"op\":\"drop\",\"value\":\"curried_i\"},{\"op\":\"drop\",\"value\":\"curried_b\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"b\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer_4\"}],\"families\":{},\"functions\":{\"constant\":{\"body\":[{\"captures\":{\"saved\":\"x\"},\"function\":\"return_x\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"curried\"},{\"op\":\"drop\",\"value\":\"x\"},{\"op\":\"return\",\"value\":\"curried\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"K\",\"type_scope\":\"S\"},\"return_x\":{\"body\":[{\"op\":\"drop\",\"value\":\"ignored\"},{\"op\":\"return\",\"value\":\"saved\"}],\"captures\":{\"saved\":{\"layout\":\"^A\",\"relation\":\"down\"}},\"parameter\":\"ignored\",\"signature\":\"R\",\"type_scope\":\"S\"}},\"instantiations\":{\"bi\":{\"arguments\":[\"B\",\"I\"],\"scheme\":\"S\"},\"ib\":{\"arguments\":[\"I\",\"B\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"K\",\"parameters\":2}},\"signatures\":{\"K\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^ZA\",\"result_identity\":\"unknown\"},\"R\":{\"argument\":\"^Z\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"},\"K\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"ZA\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"Z\":{\"index\":1,\"scheme\":\"S\",\"tag\":\"rigid\"},\"ZA\":{\"argument\":\"Z\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"}},\"version\":8}\n"
+    },
+    {
+      "basis": "D5",
+      "bytes": 2902,
+      "classification": "separate authorized host-only naming control; no native baseline",
+      "expected_diagnostic": {
+        "code": "UTF8",
+        "layer": "schema",
+        "path": "program"
+      },
+      "file": "U03-escaped-surrogate-invalid.json",
+      "id": "U03",
+      "input_api": "loads_runtime(text)",
+      "input_mutation_path": "/entry/0/out",
+      "raw_sha256": "0589b4eb529bc15e116164edd118336245163e974eff1734a9af3b94338dfe0c",
+      "raw_utf8_bytes": 2902,
+      "renames": null,
+      "sha256": "0589b4eb529bc15e116164edd118336245163e974eff1734a9af3b94338dfe0c",
+      "source_reason": "U02 reaches name preflight after valid NUL-escaped JSON; U03 file is valid ASCII JSON with \\ud800, then owned snapshot rejects decoded non-scalar at program before name checking.",
+      "storage": "embedded-exact-raw-text",
+      "text": "{\"codes\":{},\"entry\":[{\"imports\":[],\"op\":\"new_root\",\"out\":\"\\ud800\"},{\"body\":[{\"captures\":{},\"function\":\"constant\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"k\"},{\"op\":\"seal\",\"value\":\"k\"}],\"in\":\"home\",\"op\":\"generalize\",\"out\":\"shared\",\"scheme\":\"S\"},{\"op\":\"retain\",\"out\":\"ki0\",\"value\":\"shared\"},{\"instantiation\":\"ib\",\"op\":\"instantiate\",\"out\":\"ki\",\"value\":\"ki0\"},{\"instantiation\":\"bi\",\"op\":\"instantiate\",\"out\":\"kb\",\"value\":\"shared\"},{\"in\":\"home\",\"kind\":\"i64\",\"op\":\"scalar\",\"out\":\"i\",\"value\":42},{\"in\":\"home\",\"kind\":\"bool\",\"op\":\"scalar\",\"out\":\"b\",\"value\":true},{\"argument\":\"i\",\"function\":\"ki\",\"in\":\"home\",\"op\":\"application\",\"out\":\"partial_i\"},{\"argument\":\"b\",\"function\":\"kb\",\"in\":\"home\",\"op\":\"application\",\"out\":\"partial_b\"},{\"op\":\"drop\",\"value\":\"ki\"},{\"op\":\"drop\",\"value\":\"kb\"},{\"op\":\"force\",\"out\":\"curried_i\",\"value\":\"partial_i\"},{\"op\":\"force\",\"out\":\"curried_b\",\"value\":\"partial_b\"},{\"argument\":\"b\",\"function\":\"curried_i\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_1\"},{\"op\":\"force\",\"out\":\"answer_1\",\"value\":\"result_1\"},{\"op\":\"drop\",\"value\":\"answer_1\"},{\"argument\":\"i\",\"function\":\"curried_b\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_2\"},{\"op\":\"force\",\"out\":\"answer_2\",\"value\":\"result_2\"},{\"op\":\"drop\",\"value\":\"answer_2\"},{\"argument\":\"b\",\"function\":\"curried_i\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_3\"},{\"op\":\"force\",\"out\":\"answer_3\",\"value\":\"result_3\"},{\"op\":\"drop\",\"value\":\"answer_3\"},{\"argument\":\"i\",\"function\":\"curried_b\",\"in\":\"home\",\"op\":\"application\",\"out\":\"result_4\"},{\"op\":\"force\",\"out\":\"answer_4\",\"value\":\"result_4\"},{\"op\":\"drop\",\"value\":\"curried_i\"},{\"op\":\"drop\",\"value\":\"curried_b\"},{\"op\":\"drop\",\"value\":\"i\"},{\"op\":\"drop\",\"value\":\"b\"},{\"op\":\"drop\",\"value\":\"home\"},{\"op\":\"finish_scalar\",\"value\":\"answer_4\"}],\"families\":{},\"functions\":{\"constant\":{\"body\":[{\"captures\":{\"saved\":\"x\"},\"function\":\"return_x\",\"in\":\"$home\",\"op\":\"closure\",\"out\":\"curried\"},{\"op\":\"drop\",\"value\":\"x\"},{\"op\":\"return\",\"value\":\"curried\"}],\"captures\":{},\"parameter\":\"x\",\"signature\":\"K\",\"type_scope\":\"S\"},\"return_x\":{\"body\":[{\"op\":\"drop\",\"value\":\"ignored\"},{\"op\":\"return\",\"value\":\"saved\"}],\"captures\":{\"saved\":{\"layout\":\"^A\",\"relation\":\"down\"}},\"parameter\":\"ignored\",\"signature\":\"R\",\"type_scope\":\"S\"}},\"instantiations\":{\"bi\":{\"arguments\":[\"B\",\"I\"],\"scheme\":\"S\"},\"ib\":{\"arguments\":[\"I\",\"B\"],\"scheme\":\"S\"}},\"layouts\":{},\"schemes\":{\"S\":{\"body\":\"K\",\"parameters\":2}},\"signatures\":{\"K\":{\"argument\":\"^A\",\"protocol\":\"repeat\",\"result\":\"^ZA\",\"result_identity\":\"unknown\"},\"R\":{\"argument\":\"^Z\",\"protocol\":\"repeat\",\"result\":\"^A\",\"result_identity\":\"unknown\"}},\"types\":{\"A\":{\"index\":0,\"scheme\":\"S\",\"tag\":\"rigid\"},\"B\":{\"layout\":\"#bool\",\"tag\":\"closed\"},\"I\":{\"layout\":\"#i64\",\"tag\":\"closed\"},\"K\":{\"argument\":\"A\",\"protocol\":\"repeat\",\"result\":\"ZA\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"},\"Z\":{\"index\":1,\"scheme\":\"S\",\"tag\":\"rigid\"},\"ZA\":{\"argument\":\"Z\",\"protocol\":\"repeat\",\"result\":\"A\",\"result_identity\":\"unknown\",\"tag\":\"arrow\"}},\"version\":8}\n"
+    }
+  ],
+  "evidence_schema": {
+    "caps_bytes": {
+      "attempts_journal": 1048576,
+      "combined_total": 268435456,
+      "host_results": 7340032,
+      "inputs": 1048576,
+      "owned_total": 251658240,
+      "per_emission_four_sources_aggregate": 6291456,
+      "per_emission_receipt": 1048576,
+      "stderr": 4194304,
+      "stdout": 4194304,
+      "supervisor_reserve": 8388608,
+      "with_streams": 260046848
+    },
+    "format": "ir8-stage05-host-evidence-design/1",
+    "global_files": [
+      "INPUTS.json",
+      "HOST_RESULTS.json",
+      "ATTEMPTS.jsonl"
+    ],
+    "journal": {
+      "append_only": true,
+      "common_keys": [
+        "format",
+        "sequence",
+        "test_id",
+        "operation_id",
+        "operation_kind",
+        "event",
+        "monotonic_ns",
+        "details"
+      ],
+      "events": {
+        "action-failed": "Exact observed error, known-started/known-returned state, saved or partial files and no implicit retry.",
+        "action-returned": "Set immediate in-memory known-completed state and exact success/rejection/result hashes before any fallible journal/evidence operation, then append record. Expected and actual diagnostic are separate.",
+        "attempt-intended": "Write+flush before invoking action. details records exact callable name/input identity or reproducible construction/patch, planned output identity and current counters. No action begins after a failed intention write.",
+        "save-intended": "Before file creation reserve complete count/bytes and record expected path/size/hash; exclusive file write only.",
+        "saved": "After successful bounded write/flush/close/readback record actual complete path/size/hash; writing this journal event may itself fail and must mark persistence uncertain.",
+        "stopped": "Terminal in-memory counts, first failure, planned-unstarted count, incomplete operations and custody status; absence is not success."
+      },
+      "failure_policy": "If journal/evidence write fails after action return, retain known-returned state in memory, attempt bounded stderr/final report, halt. If durable report cannot be written, existing intent without matching terminal is explicitly uncertain to supervisor; never infer success or fewer actions. No child process launch inside suite.",
+      "format": "ir8-stage05-host-attempt/1",
+      "operation_kind": [
+        "target-api",
+        "oracle-lower-api",
+        "opaque-construction-lower-api",
+        "oracle-verification",
+        "private-budget-control",
+        "artifact-persistence"
+      ],
+      "sequence": "contiguous zero-based plain integers"
+    },
+    "mutant_record_required": [
+      "test_id",
+      "base_emission_id",
+      "expected_diagnostic",
+      "actual_diagnostic",
+      "source_splices",
+      "typed_json_patches",
+      "pre_images",
+      "post_images",
+      "reconstruction_order"
+    ],
+    "mutation_rule": "All offsets are into specified predecessor bytes; ordered reconstruction updates offsets deterministically. Each exact_match_count=1; before/after full hash and length validated. JSON patches preserve exact types and canonical encoding; source/output/manifest hash refreshes themselves are explicit patches. No name/hash-only mutant receipt.",
+    "notes": [
+      "All fields and nested schemas require exact source-review freeze before execution. This is a design, not a report that any call has run.",
+      "Resource/metadata snapshots from repeated lower calls may be full-byte compared and linked to the exact retained equal string. Do not claim all internal checker calls were individually persisted.",
+      "Complete checkout manifest and supervisor records are external to this subset and consume the stated reserve. No hidden ZIP members or cleanup to evade total evidence cap."
+    ],
+    "pin_keys": [
+      "path",
+      "bytes",
+      "sha256"
+    ],
+    "receipt_fields": [
+      "format",
+      "emission_id",
+      "test_id",
+      "target_call_id",
+      "input_raw_text",
+      "canonical_ir_json",
+      "resource_derived_json",
+      "metadata_json",
+      "packet_manifest_json",
+      "runtime_manifest_json",
+      "runtime_manifest_sha256",
+      "bindings",
+      "final_statistics_typed",
+      "lower_reports_typed",
+      "independent_expected",
+      "independent_source_census",
+      "source_files",
+      "lower_byte_equivalence_associations"
+    ],
+    "script_interface": {
+      "arguments": [
+        "--evidence-root",
+        "ABSOLUTE_NEW_PATH"
+      ],
+      "environment_override_for_evidence": false,
+      "imports": "verified resource-native parent of script only; no old test modules",
+      "interpreter_flags": [
+        "-B",
+        "-S"
+      ],
+      "output_parent": "supervisor creates fresh outer root only; child evidence root absent",
+      "removed_environment": "PYTHONPATH and all inherited credential/network/proxy settings",
+      "sanitized_environment": {
+        "HOME": "fresh outer support directory",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/usr/bin:/bin",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONHASHSEED": "0",
+        "TMPDIR": "fresh outer support directory",
+        "TZ": "UTC"
+      },
+      "script_path": "absolute verified repository tests/test_stage05_runtime_emit.py"
+    },
+    "source_splice_keys": [
+      "artifact",
+      "byte_offset",
+      "remove_bytes_base64",
+      "insert_bytes_base64",
+      "exact_match_count"
+    ],
+    "status": "proposed-not-executed",
+    "stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "success_emission_sets": [
+      {
+        "directory": "emissions/001",
+        "emission_id": "001",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P01"
+      },
+      {
+        "directory": "emissions/002",
+        "emission_id": "002",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P02"
+      },
+      {
+        "directory": "emissions/003",
+        "emission_id": "003",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P03"
+      },
+      {
+        "directory": "emissions/004",
+        "emission_id": "004",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P04"
+      },
+      {
+        "directory": "emissions/005",
+        "emission_id": "005",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P05"
+      },
+      {
+        "directory": "emissions/006",
+        "emission_id": "006",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P06"
+      },
+      {
+        "directory": "emissions/007",
+        "emission_id": "007",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P07"
+      },
+      {
+        "directory": "emissions/008",
+        "emission_id": "008",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P08"
+      },
+      {
+        "directory": "emissions/009",
+        "emission_id": "009",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P09"
+      },
+      {
+        "directory": "emissions/010",
+        "emission_id": "010",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P10"
+      },
+      {
+        "directory": "emissions/011",
+        "emission_id": "011",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P11"
+      },
+      {
+        "directory": "emissions/012",
+        "emission_id": "012",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "P12"
+      },
+      {
+        "directory": "emissions/013",
+        "emission_id": "013",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "D1"
+      },
+      {
+        "directory": "emissions/014",
+        "emission_id": "014",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "D2"
+      },
+      {
+        "directory": "emissions/015",
+        "emission_id": "015",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "D3"
+      },
+      {
+        "directory": "emissions/016",
+        "emission_id": "016",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "D4"
+      },
+      {
+        "directory": "emissions/017",
+        "emission_id": "017",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "D5"
+      },
+      {
+        "directory": "emissions/018",
+        "emission_id": "018",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "D6"
+      },
+      {
+        "directory": "emissions/019",
+        "emission_id": "019",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "D7"
+      },
+      {
+        "directory": "emissions/020",
+        "emission_id": "020",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "D8"
+      },
+      {
+        "directory": "emissions/021",
+        "emission_id": "021",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "G01"
+      },
+      {
+        "directory": "emissions/022",
+        "emission_id": "022",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "G02"
+      },
+      {
+        "directory": "emissions/023",
+        "emission_id": "023",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "G03"
+      },
+      {
+        "directory": "emissions/024",
+        "emission_id": "024",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "G04"
+      },
+      {
+        "directory": "emissions/025",
+        "emission_id": "025",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "G05"
+      },
+      {
+        "directory": "emissions/026",
+        "emission_id": "026",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "U01"
+      },
+      {
+        "directory": "emissions/027",
+        "emission_id": "027",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "A01"
+      },
+      {
+        "directory": "emissions/028",
+        "emission_id": "028",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 2,
+        "test_id": "A01"
+      },
+      {
+        "directory": "emissions/029",
+        "emission_id": "029",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "A02"
+      },
+      {
+        "directory": "emissions/030",
+        "emission_id": "030",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 2,
+        "test_id": "A02"
+      },
+      {
+        "directory": "emissions/031",
+        "emission_id": "031",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "A04"
+      },
+      {
+        "directory": "emissions/032",
+        "emission_id": "032",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 1,
+        "test_id": "A05"
+      },
+      {
+        "directory": "emissions/033",
+        "emission_id": "033",
+        "files": [
+          "ir8_packet_generated.h",
+          "ir8_packet_generated.c",
+          "ir8_runtime_generated.h",
+          "ir8_runtime_generated.c",
+          "receipt.json"
+        ],
+        "successful_call_ordinal_in_test": 2,
+        "test_id": "A05"
+      }
+    ],
+    "success_file_count": 168,
+    "success_test_count": 128,
+    "typed_json_patch_keys": [
+      "artifact",
+      "json_pointer",
+      "operation",
+      "old_typed_value",
+      "new_typed_value",
+      "serialization"
+    ]
+  },
+  "formal_positive_count": 25,
+  "format": "ir8-stage05-runtime-test-cases/1",
+  "inventory": {
+    "execution_order": [
+      "P01..P12",
+      "D1..D8",
+      "G01..G05",
+      "L01..L24",
+      "U01..U03",
+      "A01..A14",
+      "M01..M44",
+      "B01..B18"
+    ],
+    "expected_success_tests": 128,
+    "failfast": true,
+    "format": "ir8-stage05-host-tests-proposal/1",
+    "groups": {
+      "api-custody": 14,
+      "formal-positive": 25,
+      "lower-rejection": 24,
+      "private-budget-or-source-accounting": 18,
+      "private-independent-oracle-mutation": 44,
+      "separate-naming-control": 3
+    },
+    "oracle_mutation_verifications": 44,
+    "oracle_success_verifications": 33,
+    "skips_allowed": 0,
+    "status": "design-only; not source implemented or executed",
+    "target_expected_rejections_or_signature_errors": 34,
+    "target_public_attempts_if_all_expected": 67,
+    "target_successful_emissions": 33,
+    "tests": [
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P01",
+        "input": "P01",
+        "name": "concrete_empty_finish",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P02",
+        "input": "P02",
+        "name": "concrete_fill_force_hole",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P03",
+        "input": "P03",
+        "name": "closed_full_contract_alias_interchange",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P04",
+        "input": "P04",
+        "name": "concrete_nullary_case_all_arms",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P05",
+        "input": "P05",
+        "name": "pending_shared_three_lambda_two_application_shape",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P06",
+        "input": "P06",
+        "name": "curried_const_complete_ib_bi_views",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P07",
+        "input": "P07",
+        "name": "dead_parameter_two_complete_vectors",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P08",
+        "input": "P08",
+        "name": "neutral_closed_looking_arrow_and_scalar",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P09",
+        "input": "P09",
+        "name": "two_scheme_closed_higher_order_capture",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P10",
+        "input": "P10",
+        "name": "generic_thunk_and_instance_deferred_return",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P11",
+        "input": "P11",
+        "name": "concrete_callable_field_foreign_projection",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "P12",
+        "input": "P12",
+        "name": "sum_scalar_field_foreign_factory_capture",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "D1",
+        "input": "D1",
+        "name": "D1-ready-int-first",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "D2",
+        "input": "D2",
+        "name": "D2-ready-bool-first",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "D3",
+        "input": "D3",
+        "name": "D3-pending-int-first",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "D4",
+        "input": "D4",
+        "name": "D4-pending-bool-first",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "D5",
+        "input": "D5",
+        "name": "D5-curried-both-repeat",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "D6",
+        "input": "D6",
+        "name": "D6-dead-full-vectors",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "D7",
+        "input": "D7",
+        "name": "D7-data-and-factory-demand",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "D8",
+        "input": "D8",
+        "name": "D8-ignored-then-demanded-knot",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "G01",
+        "input": "G01",
+        "name": "loan_view_move_and_promotion",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "G02",
+        "input": "G02",
+        "name": "child_group_seal_and_scheme_authority",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "G03",
+        "input": "G03",
+        "name": "concrete_primitive_selection",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "G04",
+        "input": "G04",
+        "name": "scoped_intermediate_dead_parameter_substitution",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "emit_runtime(raw); complete independent fresh raw/resource/metadata source correspondence and strict result schema; retain all four actual source strings and combined receipt",
+        "diagnostic": null,
+        "expected": "source artifact only; no invocation",
+        "group": "formal-positive",
+        "id": "G05",
+        "input": "G05",
+        "name": "generalize_inside_concrete_callback",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "SCHEME_VALUE",
+          "layer": "type",
+          "path": "entry[2].value"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L01",
+        "input": "L01",
+        "name": "lower_reject_scheme_force",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "OPCODE",
+          "layer": "schema",
+          "path": "entry[1].body[0]"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L02",
+        "input": "L02",
+        "name": "lower_mask_introduction_force",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "TYPE",
+          "layer": "type",
+          "path": "functions.constant.body[0].captures.saved"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L03",
+        "input": "L03",
+        "name": "lower_reject_noninjective_int_int_capture_swap",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "TYPE",
+          "layer": "type",
+          "path": "functions.return_x.body[1].value"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L04",
+        "input": "L04",
+        "name": "lower_reject_noninjective_int_int_return_swap",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "SCOPE",
+          "layer": "declarations",
+          "path": "query.reference"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L05",
+        "input": "L05",
+        "name": "lower_reject_cross_scheme_same_index_rigid",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "INTRODUCTION_COVERAGE",
+          "layer": "coverage",
+          "path": "schemes.S"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L06",
+        "input": "L06",
+        "name": "lower_reject_missing_introduction",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "ALLOCATION_SCOPE",
+          "layer": "graph",
+          "path": "functions.apply.body[0]"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L07",
+        "input": "L07",
+        "name": "lower_reject_cross_scope_allocation",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "LIVE_LOAN",
+          "layer": "resource",
+          "path": "entry[4]"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L08",
+        "input": "L08",
+        "name": "lower_reject_move_owner_with_loan",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "STRICT_IMPORT",
+          "layer": "resource",
+          "path": "entry[2]"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L09",
+        "input": "L09",
+        "name": "lower_authority_A05_nonstrict_scheme_import",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "TYPE",
+          "layer": "type",
+          "path": "entry[3].argument"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L10",
+        "input": "L10",
+        "name": "lower_reject_contract_alias_refinement",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "TYPE",
+          "layer": "type",
+          "path": "entry[3].argument"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L11",
+        "input": "L11",
+        "name": "lower_reject_nested_arrow_protocol",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "ALLOCATION_CYCLE",
+          "layer": "graph",
+          "path": "functions.id"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L12",
+        "input": "L12",
+        "name": "lower_reject_scoped_self_allocation_cycle",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "DUPLICATE_KEY",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L13",
+        "input": "L13",
+        "name": "lower_reject_duplicate_json_key",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "JSON",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L14",
+        "input": "L14",
+        "name": "lower_reject_nonfinite_json",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "SCHEMA",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L15",
+        "input": "L15",
+        "name": "metadata_reject_producer_accesses",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "VERSION",
+          "layer": "schema",
+          "path": "program.version"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L16",
+        "input": "L16",
+        "name": "metadata_reject_version7",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "ONCE",
+          "layer": "metadata-subset",
+          "path": "metadata.types[2].protocol"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L17",
+        "input": "L17",
+        "name": "metadata_subset_once_callable",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "ONCE",
+          "layer": "metadata-subset",
+          "path": "metadata.types[2].protocol"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L18",
+        "input": "L18",
+        "name": "metadata_subset_unused_nested_once",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "OWNERSHIP",
+          "layer": "resource",
+          "path": "entry[3].value"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L19",
+        "input": "L19",
+        "name": "metadata_lower_force_loan_owner",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "OWNERSHIP",
+          "layer": "resource",
+          "path": "entry[3].fields.item"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L20",
+        "input": "L20",
+        "name": "metadata_lower_alloc_loan_owner",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "OWNERSHIP",
+          "layer": "resource",
+          "path": "entry[9]"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L21",
+        "input": "L21",
+        "name": "lower_reject_application_loan_owned_position",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "FIELD_SHAPE",
+          "layer": "declarations",
+          "path": "families.CallableOption.fields.Some[0]"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L22",
+        "input": "L22",
+        "name": "metadata_lower_callable_sum_field_unsupported",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "TYPE_COUNT",
+          "layer": "metadata-bounds",
+          "path": "metadata.types"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L23",
+        "input": "L23",
+        "name": "metadata_fresh_types_4097",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); preserve exact first lower machine triple; no accepted partial result",
+        "diagnostic": {
+          "code": "ROW_COUNT",
+          "layer": "metadata-bounds",
+          "path": "metadata.access_transport_resolution_rows"
+        },
+        "expected": "reject",
+        "group": "lower-rejection",
+        "id": "L24",
+        "input": "L24",
+        "name": "metadata_public_row_overflow_n47",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); U01 full oracle and numeric-only UTF-8 C emission; U02/U03 exact first lower triple, no generic any-error",
+        "diagnostic": null,
+        "expected": "source artifact only",
+        "group": "separate-naming-control",
+        "id": "U01",
+        "input": "U01",
+        "name": "U01-unicode-injection-valid.json",
+        "public_attempts": 1,
+        "successful_emissions": 1
+      },
+      {
+        "check": "loads_runtime(exact pinned text); U01 full oracle and numeric-only UTF-8 C emission; U02/U03 exact first lower triple, no generic any-error",
+        "diagnostic": {
+          "code": "NAME",
+          "layer": "schema",
+          "path": "entry[0].out"
+        },
+        "expected": "reject",
+        "group": "separate-naming-control",
+        "id": "U02",
+        "input": "U02",
+        "name": "U02-nul-name-invalid.json",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "loads_runtime(exact pinned text); U01 full oracle and numeric-only UTF-8 C emission; U02/U03 exact first lower triple, no generic any-error",
+        "diagnostic": {
+          "code": "UTF8",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "separate-naming-control",
+        "id": "U03",
+        "input": "U03",
+        "name": "U03-escaped-surrogate-invalid.json",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Compare loads_runtime(text) with emit_runtime(parsed raw): all four source strings and canonical raw byte-equal, every call independently checked; retain both exact manifests/statistics.",
+        "diagnostic": null,
+        "expected": "assert",
+        "group": "api-custody",
+        "id": "A01",
+        "input": "P05",
+        "name": "loads_matches_emit",
+        "public_attempts": 2,
+        "successful_emissions": 2
+      },
+      {
+        "check": "Emit original and recursively reverse insertion order of every raw dict, preserving arrays/scalars. Four outputs and canonical raw must match exactly; independently verify each manifest and phased counters, not guessed work equality.",
+        "diagnostic": null,
+        "expected": "assert",
+        "group": "api-custody",
+        "id": "A02",
+        "input": "D7",
+        "name": "dict_order_invariance",
+        "public_attempts": 2,
+        "successful_emissions": 2
+      },
+      {
+        "check": "Use retained primary artifact. Each public field and nested statistics pair immutable, no mutable containers; exact field list and emitted-uncompiled repr. Iterate fixed field inventory without extra public calls.",
+        "diagnostic": null,
+        "expected": "assert",
+        "group": "api-custody",
+        "id": "A03",
+        "input": "P05",
+        "name": "immutable_result",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Emit same plain raw object, replace entry[1].value integer42 with bool True, call again. Exact lower rejection; first immutable artifact stays byte-identical. No cached admission.",
+        "diagnostic": {
+          "code": "SCALAR_VALUE",
+          "layer": "schema",
+          "path": "entry[1]"
+        },
+        "expected": "reject",
+        "group": "api-custody",
+        "id": "A04",
+        "input": "P02",
+        "name": "same_object_fresh_recheck",
+        "public_attempts": 2,
+        "successful_emissions": 1
+      },
+      {
+        "check": "Delegating instrumentation observes one emit_packet plus one extra check_resources and one new monotonic emitter Budget per public call. Original implementations execute unchanged; no substituted result. Record actual call topology and budget identity without claiming hidden lower calls absent.",
+        "diagnostic": null,
+        "expected": "assert",
+        "group": "api-custody",
+        "id": "A05",
+        "input": "P01,P02",
+        "name": "lower_calls_and_budget_fresh",
+        "public_attempts": 2,
+        "successful_emissions": 2
+      },
+      {
+        "check": "Construct actual fresh public ResourceCheck, pass that object as emit_runtime raw. This is a separate public lower prerequisite, not a target emission.",
+        "diagnostic": {
+          "code": "SCHEMA",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "api-custody",
+        "id": "A06",
+        "input": "P01",
+        "name": "reject_resource_object",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Construct actual fresh public MetadataClosure, pass as emit_runtime raw.",
+        "diagnostic": {
+          "code": "SCHEMA",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "api-custody",
+        "id": "A07",
+        "input": "P01",
+        "name": "reject_metadata_object",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Construct actual fresh public PacketEmission, pass as emit_runtime raw.",
+        "diagnostic": {
+          "code": "SCHEMA",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "api-custody",
+        "id": "A08",
+        "input": "P01",
+        "name": "reject_packet_object",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Pass retained actual RuntimeEmission as raw, not its canonical raw text.",
+        "diagnostic": {
+          "code": "SCHEMA",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "api-custody",
+        "id": "A09",
+        "input": "P05",
+        "name": "reject_runtime_object",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Pass test-only non-dict FakeChecked object with verified=True, all valid copied digest strings and canonical_ir_json=P01 text; it cannot grant admission.",
+        "diagnostic": {
+          "code": "SCHEMA",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "api-custody",
+        "id": "A10",
+        "input": "P01",
+        "name": "reject_fake_opaque_metadata",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Exactly emit_runtime(raw, metadata={}); strict public signature must raise TypeError before lower admission, no compatibility flag.",
+        "diagnostic": {
+          "kind": "TypeError",
+          "message_exact": false
+        },
+        "expected": "reject",
+        "group": "api-custody",
+        "id": "A11",
+        "input": "P01",
+        "name": "reject_metadata_keyword",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "P01 parsed plain raw plus exactly one top-level metadata={} member; no bypass of exact raw keys.",
+        "diagnostic": {
+          "code": "SCHEMA",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "reject",
+        "group": "api-custody",
+        "id": "A12",
+        "input": "P01",
+        "name": "reject_extra_raw_metadata",
+        "public_attempts": 1,
+        "successful_emissions": 0
+      },
+      {
+        "check": "AST/source-only inspection of three new production Python files and all successful generated C: no old runtime/codegen/default wiring, target evaluation, subprocess/compiler/run/session/main or fake callback bodies. Fixed allowlisted includes/imports; no old evidence-producing test import.",
+        "diagnostic": null,
+        "expected": "assert",
+        "group": "api-custody",
+        "id": "A13",
+        "input": "all",
+        "name": "no_execution_or_old_imports",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Use genuine retained P01: no codes/label_offsets/label_bytes native arrays or zero-sized C arrays, exact header-only binding plus real entry; all counts zero except required header; no synthetic raw.",
+        "diagnostic": null,
+        "expected": "assert",
+        "group": "api-custody",
+        "id": "A14",
+        "input": "P01",
+        "name": "genuine_zero_code_zero_label",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Add exactly one unexpected manifest key, recompute manifest hash.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SCHEMA",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.schema"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M01",
+        "input": "P01",
+        "name": "manifest_extra_key",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Replace metadata digest with another valid 64hex value in manifest and native expected-binding bytes; refresh hashes. Fresh lower bindings remain authority.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_BINDING",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.binding"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M02",
+        "input": "D5",
+        "name": "coherent_wrong_binding",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Replace manifest ABI digest with valid wrong digest; preserve all structural key types.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_ABI",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.abi"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M03",
+        "input": "P01",
+        "name": "wrong_abi_hash",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Remove unused_b body, corresponding Code binding/member count and manifest row; renumber any resulting declared sizes consistently.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_CODE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.code"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M04",
+        "input": "G04",
+        "name": "omit_dead_code",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Duplicate first Code-ID binding/mapping while preserving number of rows; numeric ID remains in range.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_CODE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.code"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M05",
+        "input": "D5",
+        "name": "duplicate_code_id",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Add a second actual body/binding associated with a second Env of the same Code, refresh counts/hash. No raw Code declaration exists for it.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_CODE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.code"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M06",
+        "input": "D5",
+        "name": "per_environment_body_clone",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Change actual entry[1] i64 literal40 to41, leave raw body hash and logical instruction identity unchanged, refresh output/manifest hashes. Literal semantics must come from raw.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_OPERAND",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.operand"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M07",
+        "input": "G03",
+        "name": "coherent_wrong_scalar_source",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Change entry mapping path from empty segments to [0], leaving valid raw syntax and rt8_entry.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_ENTRY",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.entry"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M08",
+        "input": "P02",
+        "name": "wrong_entry_body_path",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Attribute outer callback generalize occurrence to entry with same numeric segments; raw paths are structured not display names.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_PATH",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.path"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M09",
+        "input": "G05",
+        "name": "wrong_enclosing_path",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Remove one raw drop helper call and its manifest occurrence coherently; update source/frame counts as needed.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_INSTRUCTION",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.instruction"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M10",
+        "input": "D1",
+        "name": "omit_raw_drop",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Duplicate one drop call and matching manifest occurrence; fresh raw inventory still has one occurrence.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_INSTRUCTION",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.instruction"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M11",
+        "input": "D1",
+        "name": "duplicate_raw_occurrence",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "At entry[2], replace rt8_borrow with rt8_retain and change manifest helper consistently; same syntactic arity but wrong loan semantics.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_HELPER",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.helper"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M12",
+        "input": "G01",
+        "name": "borrow_becomes_retain",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "At first bool scalar use rt8_scalar_i64 instead of rt8_scalar_bool, with a plain numeric converted argument and coherent manifest helper.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_HELPER",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.helper"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M13",
+        "input": "D2",
+        "name": "bool_uses_int_helper",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "At entry[4], transpose left=x and right=y C expressions and matching manifest input expressions; both are valid i64 capabilities. Exact raw identity must reject even for commutative add.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_OPERAND",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.operand"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M14",
+        "input": "G03",
+        "name": "swapped_primitive_operands",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Place one rt8_retain call directly in an rt8_application argument instead of a preceding assignment; no unspecified evaluation order permitted.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SOURCE_BOUNDARY",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.source_boundary"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M15",
+        "input": "D1",
+        "name": "nested_effect_argument",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Replace the first application Site ID with the other application Site ID, update manifest sites and source accessor; exact path association must reject.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SITE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.site"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M16",
+        "input": "D3",
+        "name": "wrong_valid_site",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Delete None factory arm including its Site and associated manifest sites element; counts become self-consistent but raw variant inventory is incomplete.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SITE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.site"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M17",
+        "input": "P12",
+        "name": "omit_nullary_factory_arm",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Swap the None/Some Site numeric operands and manifest Site order while preserving valid IDs and both arms.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SITE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.site"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M18",
+        "input": "P12",
+        "name": "swap_factory_arm_sites",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Change seal mapping path to adjacent non-seal callback instruction, leaving scope token/export spelling unchanged.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_INTRO",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.intro"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M19",
+        "input": "G05",
+        "name": "wrong_intro_seal_association",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Move the generalize exported hN declaration into a child C block while leaving its later outer use; parser records lexical declarations and rejects escaped lifetime.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_LIFETIME",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.lifetime"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M20",
+        "input": "G05",
+        "name": "child_scoped_export_local",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Replace one zeroed GenericScope initializer with nonzero numeric initialization; exact zero-initialization before begin is mandatory.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_LIFETIME",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.lifetime"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M21",
+        "input": "G05",
+        "name": "nonzero_scope_initializer",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Insert rt8_force immediately before instantiate and include invented mapping row; source ordering/count must match raw exactly.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_INSTRUCTION",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.instruction"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M22",
+        "input": "D1",
+        "name": "extra_force_at_instantiate",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "At entry[3], use live shared owner instead of raw loan source and coherently update manifest c_expression only; raw_name remains checked loan.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_OPERAND",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.operand"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M23",
+        "input": "G01",
+        "name": "wrong_live_capability",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "At entry[6], replace application_borrow helper with application and manifest helper; fixed raw opcode forbids ownership change.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_HELPER",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.helper"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M24",
+        "input": "G01",
+        "name": "loan_application_becomes_owned",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Assign rt8_fill to fresh hN and declare an output mapping for entry[3], rather than retaining the exact hole input expression and ticket-state fact update.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_OPERAND",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.operand"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M25",
+        "input": "P02",
+        "name": "fill_allocates_new_output",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Remove the dead generic argument from a full Use vector and associated metadata view claims; raw instantiation vector remains complete.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_USE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.use"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M26",
+        "input": "D6",
+        "name": "dead_parameter_vector_collapsed",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Remove the first instantiate occurrence from its Use row without changing raw or actual helper call.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_USE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.use"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M27",
+        "input": "D1",
+        "name": "missing_use_occurrence",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Replace one checked accessor with direct packet-byte pointer cast/member load; no reinterpretation/direct dynamic Env read.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SOURCE_BOUNDARY",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.source_boundary"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M28",
+        "input": "D5",
+        "name": "direct_packet_row_load",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Replace generic literal site_shape accessor with closed shape accessor selected from display signature; scoped-neutral allocation must resolve through exact Site.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SITE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.site"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M29",
+        "input": "P08",
+        "name": "hardcoded_generic_shape",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Replace constant closure Code binding accessor with return_x Code ID and update manifest operand expression; both IDs valid but raw site refers to constant.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SITE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.site"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M30",
+        "input": "D5",
+        "name": "wrong_existing_code",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Reorder label rows/native bytes/offsets by first encounter and consistently rewrite label accessor IDs, rather than unsigned UTF-8 byte sorting.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_LABEL",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.label"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M31",
+        "input": "U01",
+        "name": "label_encounter_order",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Subtract one terminator from the second label offset consistently in manifest and offset member; labels remain syntactically valid byte arrays.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_LABEL",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.label"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M32",
+        "input": "U01",
+        "name": "label_offset_excludes_nul",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Replace one numeric-label accessor with raw quoted C label literal; extra static storage/injection path is forbidden even if escaped.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SOURCE_BOUNDARY",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.source_boundary"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M33",
+        "input": "U01",
+        "name": "hidden_c_string_literal",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Remove fn capture-name label from pool and use null in Rt8FactoryCapture.name; fn is an actual textual record operand even when stored elsewhere.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_LABEL",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.label"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M34",
+        "input": "P12",
+        "name": "factory_capture_name_omitted",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Add static const unsigned char hidden[1]={0}; all original manifest root rows remain coherent but full actual object census has a third object.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_STORAGE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.storage"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M35",
+        "input": "D5",
+        "name": "uncounted_static_object",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Add codes[0] member and matching zero-count member plan; omitted-array contract rejects even if compiler extension would accept.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_STORAGE",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.storage"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M36",
+        "input": "P01",
+        "name": "zero_count_array",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Subtract four actual pointer members per scope token from frames.local_pointer_cells and pointer_cells while leaving scope_token_count unchanged.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_FRAME",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.frame"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M37",
+        "input": "G05",
+        "name": "scope_pointer_cells_discounted",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Set native_status.callbacks_executed=true; output remains uncompiled and never executed.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SCHEMA",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.schema"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M38",
+        "input": "P01",
+        "name": "claims_callbacks_executed",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Add legacy runtime header include; explicit include allowlist excludes old ABI linkage.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SOURCE_BOUNDARY",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.source_boundary"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M39",
+        "input": "P01",
+        "name": "legacy_runtime_include",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Add main with session/run invocation; source-only artifact must contain only real Code bodies, entry and fixed getters.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_SOURCE_BOUNDARY",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.source_boundary"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M40",
+        "input": "P01",
+        "name": "generated_main_invocation",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "P09 entry first generalize: exact scalar zeroed g0 declaration becomes Rt8Handle *g0; fresh declaration rule rejects before helper/Intro/frame checks.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_LIFETIME",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.lifetime"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M41",
+        "input": "P09",
+        "name": "scope_token_wrong_c_type",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "P09 entry[1]/entry[2]: remove g1, use g0 in only second begin/seal, coherently change second Intro token and entry frame by -1 token/-4 pointer cells; reject at second generalize by per-body raw-derived injectivity. Sequential, not nested coverage.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_LIFETIME",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.lifetime"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M42",
+        "input": "P09",
+        "name": "sequential_intro_token_alias",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "P09 entry: insert g2={0} after g1, coherently increment entry frame by1 token/4 pointer cells, leave raw/calls/Intro rows unchanged; reject exact declared/used token census at body completion.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_LIFETIME",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.lifetime"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M43",
+        "input": "P09",
+        "name": "unused_scope_token",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "P01 rt8_entry has no v local. Insert one Rt8Handle *v0 scalar declaration after its unique function-opening prefix, preserve all frame/semantic claims, refresh hashes/statistics. Reject missing array extent at the v declaration-shape rule.",
+        "custody": "Freeze unique parsed selector and byte splice/typed JSON patch before test-source ACK. Store base emission ID, exact ordered patches, before/after complete bytes/hash, claimed and actual diagnostic. Refresh output and manifest hashes so a trivial checksum failure does not substitute for the target invariant. No emitter private mapping calls.",
+        "diagnostic": {
+          "code": "O_FRAME",
+          "layer": "stage05-source-oracle",
+          "path": "oracle.frame"
+        },
+        "expected": "independent oracle rejects coherent mutated artifact",
+        "group": "private-independent-oracle-mutation",
+        "id": "M44",
+        "input": "P01",
+        "name": "scalar_vector_local_omitted_from_census",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Set private counter to limit-1, reserve1 succeeds at2097152, next1 rejects before creation; failed reservation leaves count unchanged.",
+        "diagnostic": {
+          "code": "CREATION_UNITS",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.creation_units"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B01",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "creation_reservation",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Same two reservations at16777216 work; every fixed and variable comparison reservation monotonic.",
+        "diagnostic": {
+          "code": "WORK_UNITS",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.work_units"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B02",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "work_reservation",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Instrument byte reservation exactly33554432 then+1; include both retained packet strings, not merely new runtime strings. Private lengths, not valid giant program.",
+        "diagnostic": {
+          "code": "SOURCE_BYTES",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.source_bytes"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B03",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "four_source_aggregate",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Instrument exact8388608 then+1 before append; no accepted partially encoded manifest.",
+        "diagnostic": {
+          "code": "MANIFEST_BYTES",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.manifest_bytes"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B04",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "manifest_bytes",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Two private synthetic states: seed label_utf8_bytes1048574 then label 'x' reaches1048576; separately seed1048575 then label 'y' attempts1048577 and rejects LABEL_BYTES before insertion. Failed label_count/label_utf8_bytes/label_set unchanged; charged examination work may increase and is recorded.",
+        "diagnostic": {
+          "code": "LABEL_BYTES",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.label_bytes"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B05",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "label_bytes",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Private label budget/count at65536 rejects one new distinct label before insertion; exact reuse of an existing label leaves count unchanged. No fabricated65536-label program.",
+        "diagnostic": {
+          "code": "LABEL_COUNT",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.labels_count"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B06",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "distinct_labels",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Private Writer.emit of4096 ASCII bytes succeeds;4097 bytes rejects before append at runtime.abi/runtime-emitter-schema/ABI. Public streaming writer may split long strings; this tests only its bounded low-level append. No valid-max-program claim.",
+        "diagnostic": {
+          "code": "ABI",
+          "layer": "runtime-emitter-schema",
+          "path": "runtime.abi"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B07",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "bounded_chunk",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Private source-plan census at512 succeeds and513 rejects. Include body5/entry1 parameters, hN, every vector/accessor pointer member and4 per scope token. Counts are synthetic, no maximum valid raw claim.",
+        "diagnostic": {
+          "code": "FRAME_POINTER_CELLS",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.frames"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B08",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "pointer_cells",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Private bounded owned JSON scan allows64 open containers;65 fails before frame allocation/json.loads. Instrument decode callback and reserve counters.",
+        "diagnostic": {
+          "code": "SNAPSHOT_DEPTH",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.snapshot_depth"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B09",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "owned_decode_depth",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Independent lower parser control uses nested plain arrays/text at32 and33;32 may pass depth scan but is not a valid raw program,33 rejects before decode at unchanged lower limit.",
+        "diagnostic": {
+          "code": "INPUT_DEPTH",
+          "layer": "schema",
+          "path": "program"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B10",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "raw_depth_stricter",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Private plain_index domain check with value=False, selected CODE_CENSUS/runtime.code_mapping coordinate and upper exclusive bound4294967295. Reject before C emission; helper signature is still a source-freeze prerequisite. No raw program or public admission is fabricated.",
+        "diagnostic": {
+          "code": "CODE_CENSUS",
+          "layer": "runtime-emitter-schema",
+          "path": "runtime.code_mapping"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B11",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "reject_bool_count",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Private plain_index domain check with value=-1, selected CODE_CENSUS/runtime.code_mapping coordinate and upper exclusive bound4294967295. Reject before C emission; helper signature is still a source-freeze prerequisite. No raw program or public admission is fabricated.",
+        "diagnostic": {
+          "code": "CODE_CENSUS",
+          "layer": "runtime-emitter-schema",
+          "path": "runtime.code_mapping"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B12",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "reject_negative_count",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Private plain_index domain check with value=4294967296, selected CODE_CENSUS/runtime.code_mapping coordinate and upper exclusive bound4294967295. Reject before C emission; helper signature is still a source-freeze prerequisite. No raw program or public admission is fabricated.",
+        "diagnostic": {
+          "code": "CODE_CENSUS",
+          "layer": "runtime-emitter-schema",
+          "path": "runtime.code_mapping"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B13",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "reject_wide_index",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Use exact four-byte scalar U+1F98A in private writer; reserve scalar conversion, UTF-8 bytes/work and terminator before new output, use bounded chunks and no unchecked whole-string encode. Instrumentation failure is assertion, not target admission.",
+        "diagnostic": null,
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B14",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "unicode_preallocation_accounting",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Fixed private comparisons of [a*4095+b,a*4095+c] and structured path traversal show each inspected character/segment charged before comparison/walk; fail a pre-reservation before work starts.",
+        "diagnostic": null,
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B15",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "comparison_and_path_work",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Use fixed owned JSON {\"a\":[1,2]} and delegating decode instrumentation; reserve container headers/members and work before allocation/json.loads. No fake checked artifact is fed to public API.",
+        "diagnostic": null,
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B16",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "decode_creation_preflight",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Inspect/instrument retained P05: pre-manifest snapshot is after result/container reservation, final counters>=pre; actual four-source/manifest/label bytes exact; no encoded final-statistics fixed point.",
+        "diagnostic": null,
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B17",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "statistics_phase",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      },
+      {
+        "check": "Private writer at source limit fails next1 before append; immutable path/layer/code/message and no accepted RuntimeEmission; any partial private snapshot labeled non-admitting.",
+        "diagnostic": {
+          "code": "SOURCE_BYTES",
+          "layer": "runtime-emitter-bounds",
+          "path": "runtime.source_bytes"
+        },
+        "expected": "specified reservation/assertion and rejection; never public max-program acceptance",
+        "freeze_status": "private helper names/instrumentation and unresolved coordinates require exact source-review freeze before execution",
+        "group": "private-budget-or-source-accounting",
+        "id": "B18",
+        "input": "fixed private synthetic state, not another raw fixture",
+        "name": "failure_atomicity_and_error_immutability",
+        "public_attempts": 0,
+        "successful_emissions": 0
+      }
+    ]
+  },
+  "lower_rejection_count": 24,
+  "naming_control_count": 3,
+  "source_fixture_file": {
+    "bytes": 273334,
+    "path": "tests/fixtures/ir8-metadata.json",
+    "sha256": "a12f7c43bfbe4dc1e12df0c1d6059491c1e0451e28073066d3949f8c5caed7ca"
+  },
+  "source_freeze_clarifications": [
+    {
+      "field": "expected diagnostic code",
+      "new": "SCHEMA",
+      "old": "JSON",
+      "reason": "unchanged lower snapshot rejects non-dict root before recursive JSON domain checks",
+      "test_id": "A06"
+    },
+    {
+      "field": "expected diagnostic code",
+      "new": "SCHEMA",
+      "old": "JSON",
+      "reason": "unchanged lower snapshot rejects non-dict root before recursive JSON domain checks",
+      "test_id": "A07"
+    },
+    {
+      "field": "expected diagnostic code",
+      "new": "SCHEMA",
+      "old": "JSON",
+      "reason": "unchanged lower snapshot rejects non-dict root before recursive JSON domain checks",
+      "test_id": "A08"
+    },
+    {
+      "field": "expected diagnostic code",
+      "new": "SCHEMA",
+      "old": "JSON",
+      "reason": "unchanged lower snapshot rejects non-dict root before recursive JSON domain checks",
+      "test_id": "A09"
+    },
+    {
+      "field": "expected diagnostic code",
+      "new": "SCHEMA",
+      "old": "JSON",
+      "reason": "unchanged lower snapshot rejects non-dict root before recursive JSON domain checks",
+      "test_id": "A10"
+    },
+    {
+      "field": "exact hook arguments",
+      "new": [
+        {
+          "expected_total": 1048576,
+          "label": "x",
+          "label_utf8_bytes_seed": 1048574,
+          "utf8_with_nul": 2
+        },
+        {
+          "attempted_total": 1048577,
+          "label": "y",
+          "label_utf8_bytes_seed": 1048575,
+          "utf8_with_nul": 2
+        }
+      ],
+      "old": "abstract exact1048576 then+1 byte reservation",
+      "reason": "nonempty labels include NUL, minimum2B; separate synthetic seeds target exact bound and first byte over without invalid emptylabel",
+      "test_id": "B05"
+    },
+    {
+      "field": "plain_index exclusive count",
+      "new": 4294967295,
+      "old": 4294967296,
+      "reason": "count itself must be plain uint32 so intended value-domain check is reached",
+      "test_id": "B11"
+    },
+    {
+      "field": "plain_index exclusive count",
+      "new": 4294967295,
+      "old": 4294967296,
+      "reason": "count itself must be plain uint32 so intended value-domain check is reached",
+      "test_id": "B12"
+    },
+    {
+      "field": "plain_index exclusive count",
+      "new": 4294967295,
+      "old": 4294967296,
+      "reason": "count itself must be plain uint32 so intended value-domain check is reached",
+      "test_id": "B13"
+    }
+  ]
+}

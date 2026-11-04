@@ -13,6 +13,9 @@ module MLF.Entry.Emlf where {
   import qualified Bootstrap.Compiler as C;
   import qualified MLF.PreparedCompiler as Prepared;
   import qualified MLF.NativeBuild as NativeBuild;
+  import qualified MLF.ResourceExport as ResourceExport;
+  import qualified MLF.ResourceModules as ResourceModules;
+  import qualified MLF.ResourceModuleExport as ResourceModuleExport;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Parser as Parse;
@@ -109,6 +112,8 @@ module MLF.Entry.Emlf where {
     };
   runArgs :: PreludeMode -> [] String -> [] String -> IO ();
   runArgs mode paths arguments = case arguments of {
+    (:) "--emit-resource-json" rest -> resourceSourceCommand mode paths rest;
+    (:) "--emit-resource-module-json" rest -> resourceModuleCommand mode paths rest;
     (:) "--compile" rest -> NativeBuild.run mode paths rest;
     ["--native-install-info"] -> do {
       result <- Prepared.nativeInstallInfo;
@@ -762,6 +767,55 @@ module MLF.Entry.Emlf where {
           }
         }
     };
+  -- Additive module route: explicit stdin/current-root policy only. Ordinary
+  -- loader/inference/checking and compiler-owned intrinsic injection stay intact.
+  resourceModuleCommand :: PreludeMode -> [] String -> [] String -> IO ();
+  resourceModuleCommand mode paths arguments = case mode of {
+    ImplicitPrelude -> fatal "ResourceModule: explicit --no-prelude required";
+    NoImplicitPrelude -> if L.not (L.null paths) then fatal "ResourceModule: arbitrary include roots are outside this policy"
+      else case arguments of {
+        ["-"] -> do {
+          input <- getContents;
+          compiled <- ResourceModules.compileCaptured "<stdin>" input;
+          case compiled of {
+            Left error -> fatal (C.prettyError error);
+            Right result -> case ResourceModuleExport.exportCaptured
+              "a250ec334b70b0e587c2dd6e894d111bf879c024"
+              "83b015caaede361f354e1698cea29acf67bd68211fae72a25f303f43f254a9d3" result of {
+                Left message -> fatal ("ResourceModule: unsupported fragment: " ++ message);
+                Right output -> putStrLn output
+              }
+          }
+        };
+        _ -> fatal "ResourceModule: only an explicit captured stdin root is admitted"
+      }
+  };
+  -- Experimental standalone-only projection of the actual source compiler result.
+  -- Reject named modules/imports before resolution: the runner binds one input.
+  resourceSourceCommand :: PreludeMode -> [] String -> [] String -> IO ();
+  resourceSourceCommand mode paths arguments = case parseSource True arguments of {
+    Left message -> fatal message;
+    Right source -> do {
+      loaded <- load source;
+      case loaded of { (,) file input ->
+        case SourceParser.parseModule file input of {
+          Left message -> fatal (C.prettyError (CompileError Parsing message));
+          Right parsed -> if L.not (C.standalone parsed)
+            then fatal "ResourceExport: unsupported named module/imports; standalone source required"
+            else do {
+              compiled <- Prepared.compileSourceWithImports mode paths file input;
+              case compiled of {
+                Left error -> fatal (C.prettyError error);
+                Right result -> case ResourceExport.exportChecked "a250ec334b70b0e587c2dd6e894d111bf879c024" "83b015caaede361f354e1698cea29acf67bd68211fae72a25f303f43f254a9d3" (Prepared.checkedTerm result) of {
+                  Left message -> fatal ("ResourceExport: unsupported fragment: " ++ message);
+                  Right output -> putStrLn output
+                }
+              }
+            }
+        }
+      }
+    }
+  };
   -- Native emission retains the normal source parser and diagnostics. The
   -- prepared adapter authenticates its fixed installation before producing
   -- IR whose explicit link inputs are returned by --native-install-info.

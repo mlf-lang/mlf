@@ -1,0 +1,1 @@
+data Box = Box Int; case Box (addInt 20 22) of { Box n -> n }

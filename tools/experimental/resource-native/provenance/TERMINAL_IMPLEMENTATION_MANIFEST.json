@@ -1,0 +1,17 @@
+{
+  "contract_sha256": "92cd46f8e986bb0f11913d139165e57d3fea6209d3ca469f7a90d7d03e260202",
+  "default_failure_policy": "diagnostic retention unchanged",
+  "files": {
+    "native/rir_runtime.c": {
+      "bytes": 60999,
+      "sha256": "01e37374c17e32e155296d244cede59c78fa844a857ee2f4c884d4b8733d3728"
+    },
+    "native/rir_runtime.h": {
+      "bytes": 15535,
+      "sha256": "218b05aaf832b0be3cf5eaa2c20624c21cb383b0899c1ee03a1c062c5c01d35c"
+    }
+  },
+  "identity": "resource-ir-terminal-destroy/1",
+  "schema": "terminal-destroy-native-implementation-manifest/1",
+  "source_frontend_adoption": false
+}

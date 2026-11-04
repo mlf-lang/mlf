@@ -1,0 +1,1 @@
+data Ring = Ring Ring (); let rec r = Ring r () in case r of { Ring t p -> case t of { Ring _ q -> q } }

@@ -1,0 +1,1 @@
+data Box = Box Int; data Tag = Empty | With Box; case With (Box 20) of { Empty -> 0; With box -> case box of { Box n -> n } }

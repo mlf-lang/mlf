@@ -1,0 +1,1 @@
+let f : Bool -> Int -> Int -> Int = ifThenElse in f true 42 0

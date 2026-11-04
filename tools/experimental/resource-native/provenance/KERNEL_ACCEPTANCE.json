@@ -1,0 +1,23 @@
+{
+  "status": "accepted",
+  "schema": "independent-field-sum-core-acceptance/1",
+  "created_utc": "2026-11-02T16:31:32.496781+00:00",
+  "implementation_manifest_sha256": "e66da7f94b5985a6daebd0351eea19b9d9389f904259060d7f56ffaf7be65dfe",
+  "implementation_manifest_path": "/workspace/scratch/c43337ba2cad/rebuild-field-sum-core-20261102/IMPLEMENTATION_MANIFEST.json",
+  "final_contract_sha256": "f3ad74dc05e744c7200f0da766d9639e494bd5139abaea1aab221a9d90097ba1",
+  "review_sha256": "d1e7dd83b0e8422dab643781984be7180b75afd95571ee6d0f7dc71e7192390b",
+  "review_path": "/workspace/scratch/c43337ba2cad/audit-field-sum-core-20261102/CORE_REVIEW.md",
+  "scope": "Bounded v7 Int/Bool/SUM field constructor and allocating selected-thunk factory core. Allows bridge integration, not genuine Kind source acceptance, arbitrary programs, wider fields/polymorphism/defaults/modules, M1-M6, full GC or performance.",
+  "evidence_sha256": {
+    "independent-summary.json": "b3912b4bae21bad84650cb96bbefe71d25d0a65e4d1b5cdae0438a7143d0b020",
+    "independent-commands.json": "82e240f58b4726f4a9a67728633a8d9ff32f2077c720b6849fbc091b09696b85",
+    "worker-evidence-review.json": "15faf6af93acdb504113d740501ea283132242d15260f37e0b2da4cb78d59c82"
+  },
+  "audit_gate_allows_bridge_integration": true,
+  "kernel_root": "/workspace/scratch/c43337ba2cad/rebuild-field-sum-core-20261102",
+  "module_sha256": {
+    "resource_ir/__init__.py": "3729ca2025fb561e44b92cdf6d92090865e404c8342406d12d03d59d4846b409",
+    "resource_ir/checker.py": "fa5b46bb61ae67b540f32603d23800e7ba3da6a0d9a578d2e0a21a6267226db6",
+    "resource_ir/runtime.py": "583a373eb7d29c92149bda4aa4cc5cbadf1303d6d62ae81fbef38b04d57bf63c"
+  }
+}

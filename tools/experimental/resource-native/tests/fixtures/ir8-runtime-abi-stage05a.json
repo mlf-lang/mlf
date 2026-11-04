@@ -1,0 +1,789 @@
+{
+  "schema": "resource-ir-v8-stage05a-abi-proposal/1",
+  "status": "pending independent interface review; no implementation/execution authority",
+  "namespace_mapping": "core conceptual Rt/rt_* -> isolated Rt8/rt8_*; exact argument order and semantics unchanged",
+  "constants": {
+    "RT8_BINDING_ABI_REVISION": 1,
+    "RT8_BINDING_PURPOSE_STATIC_REAL_BODIES": 1,
+    "RT8_BINDING_MAGIC": [
+      73,
+      82,
+      56,
+      66,
+      73,
+      78,
+      68,
+      0
+    ],
+    "RT8_MAX_STATIC_BYTES": 4194304,
+    "RT8_MAX_LABEL_BYTES": 1048576,
+    "RT8_MAX_LABELS": 65536,
+    "RT8_MAX_BINDING_WORK": 67108864,
+    "RT8_MAX_GUARD_WORK": 67108864,
+    "RT8_MAX_WORKSPACE_BYTES": 131072,
+    "RT8_MAX_STACK_HANDLE_BYTES": 128,
+    "RT8_MAX_GENERATED_POINTER_CELLS": 512,
+    "RT8_MAX_WALK_DEPTH": 32,
+    "RT8_NULL": 4294967295
+  },
+  "actual_aliases": {
+    "Rt8Env": "Ir8PacketEnv",
+    "Rt8Site": "Ir8PacketSite",
+    "Rt8Access": "Ir8PacketAccess",
+    "Rt8Intro": "Ir8PacketIntro",
+    "Rt8Instantiation": "Ir8PacketUse",
+    "Rt8Shape": "Ir8PacketShapeSpec",
+    "Rt8Family": "Ir8PacketFamilySpec",
+    "Rt8Variant": "Ir8PacketVariantSpec",
+    "Rt8BindingWorkspace": "Ir8PacketWorkspace"
+  },
+  "enums": {
+    "Rt8StorageKind": {
+      "RT8_STORAGE_DEAD": 0,
+      "RT8_STORAGE_HEAP": 1,
+      "RT8_STORAGE_LOCAL": 2
+    },
+    "Rt8ScopeState": {
+      "RT8_SCOPE_UNUSED": 0,
+      "RT8_SCOPE_ACTIVE": 1,
+      "RT8_SCOPE_SEALED": 2
+    },
+    "status": {
+      "OK": 0,
+      "ARGUMENT": 1,
+      "ABI": 2,
+      "SIZE_LIMIT": 3,
+      "ALIGNMENT": 4,
+      "PACKET": 5,
+      "BINDING": 6,
+      "STATIC_LIMIT": 7,
+      "WORK_LIMIT": 8,
+      "REFERENCE": 9,
+      "TYPE": 10,
+      "ORIGIN": 11,
+      "STATE": 12,
+      "OWNERSHIP": 13,
+      "OVERFLOW": 14,
+      "INTERNAL": 15,
+      "UNBOUND": 16
+    },
+    "phase": {
+      "NONE": 0,
+      "ARGUMENTS": 1,
+      "NATIVE_HEADER": 2,
+      "EXPECTED_BINDINGS": 3,
+      "PACKET": 4,
+      "NATIVE_LAYOUT": 5,
+      "CODE_BINDINGS": 6,
+      "LABELS": 7,
+      "STATIC_CENSUS": 8,
+      "FINAL": 9,
+      "LOOKUP": 10,
+      "DYNAMIC_GUARD": 11
+    },
+    "detail": {
+      "NONE": 0,
+      "NULL_ARGUMENT": 1,
+      "REVISION": 2,
+      "MAGIC": 3,
+      "PURPOSE": 4,
+      "LENGTH": 5,
+      "OVERFLOW": 6,
+      "OFFSET": 7,
+      "OVERLAP": 8,
+      "ALIGNMENT": 9,
+      "COUNT": 10,
+      "ORDER": 11,
+      "DUPLICATE": 12,
+      "MISSING": 13,
+      "EXTRA": 14,
+      "NULL_CALLBACK": 15,
+      "BINDING_MISMATCH": 16,
+      "STATIC_BUDGET": 17,
+      "UNSUPPORTED": 18,
+      "UNREGISTERED": 19,
+      "DOMAIN": 20,
+      "APPLICABILITY": 21,
+      "WORK_EXHAUSTED": 22,
+      "EQUATION": 23,
+      "ANCHOR": 24,
+      "OWNER": 25,
+      "TOKEN": 26,
+      "STATE": 27,
+      "DEPENDENT_LOAN": 28,
+      "TICKET": 29,
+      "INTERNAL_INVARIANT": 30
+    },
+    "region": {
+      "NONE": 0,
+      "PACKET": 1,
+      "BINDING": 2
+    },
+    "domain_kind": {
+      "NONE": 0,
+      "PACKET_TABLE": 1,
+      "PACKET_DESCRIPTOR": 2,
+      "NATIVE_CODE": 3,
+      "LABEL": 4
+    }
+  },
+  "callback_typedefs": {
+    "Rt8Body": "Rt8Handle *(*)(Rt8Context *, Rt8Handle *home, Rt8Handle **captures, Rt8Handle *argument, const Rt8Env *env)",
+    "Rt8Entry": "void (*)(Rt8Context *)"
+  },
+  "ordered_struct_fields": {
+    "Rt8Program": [
+      {
+        "name": "packet",
+        "c_type": "const void *"
+      },
+      {
+        "name": "packet_bytes",
+        "c_type": "size_t"
+      },
+      {
+        "name": "binding",
+        "c_type": "const void *"
+      },
+      {
+        "name": "binding_bytes",
+        "c_type": "size_t"
+      }
+    ],
+    "Rt8Code": [
+      {
+        "name": "code_id",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "body",
+        "c_type": "Rt8Body"
+      }
+    ],
+    "Rt8BindingHeader": [
+      {
+        "name": "magic",
+        "c_type": "unsigned char[8]",
+        "diagnostic_field": 0
+      },
+      {
+        "name": "abi_revision",
+        "c_type": "uint32_t",
+        "diagnostic_field": 1
+      },
+      {
+        "name": "purpose",
+        "c_type": "uint32_t",
+        "diagnostic_field": 2
+      },
+      {
+        "name": "binding_bytes",
+        "c_type": "uint32_t",
+        "diagnostic_field": 3
+      },
+      {
+        "name": "binding_alignment",
+        "c_type": "uint32_t",
+        "diagnostic_field": 4
+      },
+      {
+        "name": "packet_bytes",
+        "c_type": "uint32_t",
+        "diagnostic_field": 5
+      },
+      {
+        "name": "packet_alignment",
+        "c_type": "uint32_t",
+        "diagnostic_field": 6
+      },
+      {
+        "name": "code_offset",
+        "c_type": "uint32_t",
+        "diagnostic_field": 7
+      },
+      {
+        "name": "code_count",
+        "c_type": "uint32_t",
+        "diagnostic_field": 8
+      },
+      {
+        "name": "label_index_offset",
+        "c_type": "uint32_t",
+        "diagnostic_field": 9
+      },
+      {
+        "name": "label_count",
+        "c_type": "uint32_t",
+        "diagnostic_field": 10
+      },
+      {
+        "name": "label_bytes_offset",
+        "c_type": "uint32_t",
+        "diagnostic_field": 11
+      },
+      {
+        "name": "label_bytes",
+        "c_type": "uint32_t",
+        "diagnostic_field": 12
+      },
+      {
+        "name": "runtime_total_static_bytes",
+        "c_type": "uint32_t",
+        "diagnostic_field": 13
+      },
+      {
+        "name": "expected",
+        "c_type": "Ir8PacketExpectedBindings",
+        "diagnostic_field": 14
+      },
+      {
+        "name": "entry",
+        "c_type": "Rt8Entry",
+        "diagnostic_field": 15
+      }
+    ],
+    "Rt8BindingReport": [
+      {
+        "name": "status",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "phase",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "detail",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "region",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "domain_kind",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "domain",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "object",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "row",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "field",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "guard_index",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "work_used",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "work_limit",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "packet_checked",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "packet_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "binding_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "runtime_total_static_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "workspace_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "header_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "code_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "label_index_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "label_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "padding_bytes",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "code_count",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "label_count",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "binding_validated",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "runtime_admitted",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "source_admitted",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "graph_executed",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "runtime_guards_executed",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "packet",
+        "c_type": "Ir8PacketReport"
+      }
+    ],
+    "Rt8Work": [
+      {
+        "name": "used",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "total",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "limit",
+        "c_type": "uint64_t"
+      }
+    ],
+    "Rt8Handle": [
+      {
+        "name": "id",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "scope",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "loans",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "group",
+        "c_type": "Rt8Group *"
+      },
+      {
+        "name": "node",
+        "c_type": "Rt8Node *"
+      },
+      {
+        "name": "anchor",
+        "c_type": "Rt8Handle *"
+      },
+      {
+        "name": "previous",
+        "c_type": "Rt8Handle *"
+      },
+      {
+        "name": "next",
+        "c_type": "Rt8Handle *"
+      },
+      {
+        "name": "role",
+        "c_type": "unsigned"
+      },
+      {
+        "name": "home",
+        "c_type": "int"
+      },
+      {
+        "name": "storage_kind",
+        "c_type": "Rt8StorageKind"
+      },
+      {
+        "name": "access",
+        "c_type": "const Rt8Access *"
+      },
+      {
+        "name": "fill_ticket",
+        "c_type": "uint32_t"
+      }
+    ],
+    "Rt8GenericScope": [
+      {
+        "name": "frame_id",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "capsule_id",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "handle_watermark",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "intro",
+        "c_type": "const Rt8Intro *"
+      },
+      {
+        "name": "authority",
+        "c_type": "Rt8Handle *"
+      },
+      {
+        "name": "prior_env",
+        "c_type": "const Rt8Env *"
+      },
+      {
+        "name": "prior_capsule_id",
+        "c_type": "uint64_t"
+      },
+      {
+        "name": "prior_intro",
+        "c_type": "const Rt8Intro *"
+      },
+      {
+        "name": "prior_origin_kind",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "state",
+        "c_type": "uint32_t"
+      }
+    ],
+    "Rt8CaseArm": [
+      {
+        "name": "variant",
+        "c_type": "const Rt8Variant *"
+      },
+      {
+        "name": "value",
+        "c_type": "Rt8Handle *"
+      }
+    ],
+    "Rt8FactoryCapture": [
+      {
+        "name": "name",
+        "c_type": "const char *"
+      },
+      {
+        "name": "kind",
+        "c_type": "Rt8FactoryCaptureKind"
+      },
+      {
+        "name": "field_index",
+        "c_type": "size_t"
+      },
+      {
+        "name": "external",
+        "c_type": "Rt8Handle *"
+      }
+    ],
+    "Rt8FactoryArm": [
+      {
+        "name": "variant",
+        "c_type": "const Rt8Variant *"
+      },
+      {
+        "name": "site",
+        "c_type": "const Rt8Site *"
+      },
+      {
+        "name": "code",
+        "c_type": "const Rt8Code *"
+      },
+      {
+        "name": "capture_count",
+        "c_type": "size_t"
+      },
+      {
+        "name": "captures",
+        "c_type": "const Rt8FactoryCapture *"
+      }
+    ],
+    "Rt8Diagnostic": [
+      {
+        "name": "status",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "phase",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "detail",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "region",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "domain_kind",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "domain",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "object",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "row",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "field",
+        "c_type": "uint32_t"
+      },
+      {
+        "name": "guard_index",
+        "c_type": "uint32_t"
+      }
+    ],
+    "Rt8ProgramView": [
+      {
+        "name": "program",
+        "c_type": "Rt8Program"
+      },
+      {
+        "name": "binding_header",
+        "c_type": "Rt8BindingHeader"
+      },
+      {
+        "name": "packet_header",
+        "c_type": "Ir8PacketProgramHeader"
+      },
+      {
+        "name": "typed_header",
+        "c_type": "Ir8PacketTypedHeader"
+      },
+      {
+        "name": "string_pool",
+        "c_type": "Ir8PacketObjectDirectoryEntry"
+      }
+    ],
+    "Rt8ReadState": [
+      {
+        "name": "work",
+        "c_type": "Rt8Work *"
+      },
+      {
+        "name": "diagnostic",
+        "c_type": "Rt8Diagnostic *"
+      }
+    ]
+  },
+  "factory_capture_kind": {
+    "RT8_FACTORY_FIELD": 1,
+    "RT8_FACTORY_EXTERNAL": 2
+  },
+  "scalar_primitive_values": {
+    "RT8_PRIM_ADD_INT": 8,
+    "RT8_PRIM_SUB_INT": 9,
+    "RT8_PRIM_EQ_INT": 10,
+    "RT8_PRIM_LT_INT": 11,
+    "RT8_PRIM_MUL_INT": 14
+  },
+  "public_binding_api": "uint32_t rt8_binding_validate(const Rt8Program *, const Ir8PacketExpectedBindings *, Rt8BindingWorkspace *, Rt8BindingReport *);",
+  "generated_api": [
+    "Rt8Program ir8_runtime_generated_program(void);",
+    "const Ir8PacketExpectedBindings *ir8_runtime_generated_expected_bindings(void);"
+  ],
+  "generated_artifacts": {
+    "header": "ir8_runtime_generated.h",
+    "source": "ir8_runtime_generated.c",
+    "root_type": "struct Ir8Runtime_generated_v1",
+    "root_symbol": "ir8_runtime_generated_root",
+    "member_order": [
+      "header",
+      "codes (omit if zero)",
+      "label_offsets (omit if zero)",
+      "label_bytes (omit if zero)"
+    ]
+  },
+  "ctx_accessors": {
+    "rt8_site": "const Rt8Site *rt8_site(Rt8Context *, uint32_t site_id);",
+    "rt8_code": "const Rt8Code *rt8_code(Rt8Context *, uint32_t code_id);",
+    "rt8_intro": "const Rt8Intro *rt8_intro(Rt8Context *, uint32_t intro_id);",
+    "rt8_instantiation": "const Rt8Instantiation *rt8_instantiation(Rt8Context *, uint32_t use_id);",
+    "rt8_shape": "const Rt8Shape *rt8_shape(Rt8Context *, uint32_t shape_id);",
+    "rt8_family": "const Rt8Family *rt8_family(Rt8Context *, uint32_t family_id);",
+    "rt8_variant": "const Rt8Variant *rt8_variant(Rt8Context *, uint32_t variant_descriptor_id);",
+    "rt8_env": "const Rt8Env *rt8_env(Rt8Context *, uint32_t env_id);",
+    "rt8_site_shape": "const Rt8Shape *rt8_site_shape(Rt8Context *, const Rt8Site *);",
+    "rt8_label": "const char *rt8_label(Rt8Context *, uint32_t label_id);"
+  },
+  "fixed_accessor_domains": {
+    "rt8_site": [
+      "packet-table",
+      14
+    ],
+    "rt8_intro": [
+      "packet-table",
+      18
+    ],
+    "rt8_instantiation": [
+      "packet-table",
+      19
+    ],
+    "rt8_env": [
+      "packet-table",
+      4
+    ],
+    "rt8_shape": [
+      "packet-descriptor",
+      1
+    ],
+    "rt8_family": [
+      "packet-descriptor",
+      3
+    ],
+    "rt8_variant": [
+      "packet-descriptor",
+      4
+    ],
+    "rt8_code": [
+      "native-code",
+      0
+    ],
+    "rt8_label": [
+      "native-label",
+      0
+    ]
+  },
+  "instruction_helpers": {
+    "rt8_new_root": "Rt8Handle *rt8_new_root(Rt8Context *, size_t import8_count, Rt8Handle *const *imports);",
+    "rt8_new_below": "Rt8Handle *rt8_new_below(Rt8Context *, Rt8Handle *ceiling, size_t import8_count, Rt8Handle *const *imports);",
+    "rt8_alloc": "Rt8Handle *rt8_alloc(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, const Rt8Shape *, Rt8Handle *const *fields, const char *out);",
+    "rt8_closure": "Rt8Handle *rt8_closure(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, const Rt8Code *, Rt8Handle *const *captures, const char *out);",
+    "rt8_thunk": "Rt8Handle *rt8_thunk(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, const Rt8Code *, Rt8Handle *const *captures, const char *out);",
+    "rt8_application": "Rt8Handle *rt8_application(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, Rt8Handle *function, Rt8Handle *argument, const char *out);",
+    "rt8_application_borrow": "Rt8Handle *rt8_application_borrow(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, Rt8Handle *function, Rt8Handle *argument, const char *out);",
+    "rt8_hole": "Rt8Handle *rt8_hole(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, const Rt8Shape *, const char *out);",
+    "rt8_fill": "void rt8_fill(Rt8Context *, Rt8Handle *hole, Rt8Handle *value, const char *hole_variable, const char *value_variable);",
+    "rt8_retain": "Rt8Handle *rt8_retain(Rt8Context *, Rt8Handle *);",
+    "rt8_drop": "void rt8_drop(Rt8Context *, Rt8Handle *);",
+    "rt8_borrow": "Rt8Handle *rt8_borrow(Rt8Context *, Rt8Handle *);",
+    "rt8_end_borrow": "void rt8_end_borrow(Rt8Context *, Rt8Handle *);",
+    "rt8_field": "Rt8Handle *rt8_field(Rt8Context *, Rt8Handle *source, size_t field_index, const char *out, const char *source_variable);",
+    "rt8_force": "Rt8Handle *rt8_force(Rt8Context *, Rt8Handle *, const char *out, const char *source_variable);",
+    "rt8_return": "Rt8Handle *rt8_return(Rt8Context *, Rt8Handle *);",
+    "rt8_finish_entry": "void rt8_finish_entry(Rt8Context *);",
+    "rt8_scalar_i64": "Rt8Handle *rt8_scalar_i64(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, const Rt8Shape *, int64_t, const char *out);",
+    "rt8_scalar_bool": "Rt8Handle *rt8_scalar_bool(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, const Rt8Shape *, int, const char *out);",
+    "rt8_prim2": "Rt8Handle *rt8_prim2(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, Rt8ScalarPrimitive, const Rt8Shape *result, Rt8Handle *left, Rt8Handle *right, const char *out);",
+    "rt8_select_i64": "Rt8Handle *rt8_select_i64(Rt8Context *, Rt8Handle *authority, Rt8Handle *ready_bool, Rt8Handle *then_owner, Rt8Handle *else_owner, const char *out);",
+    "rt8_construct_nullary": "Rt8Handle *rt8_construct_nullary(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, const Rt8Family *, const Rt8Variant *, const char *out);",
+    "rt8_case_i64": "Rt8Handle *rt8_case_i64(Rt8Context *, Rt8Handle *authority, const Rt8Family *, Rt8Handle *ready_scrutinee, size_t arm_count, const Rt8CaseArm *, const char *out);",
+    "rt8_construct_sum": "Rt8Handle *rt8_construct_sum(Rt8Context *, Rt8Handle *authority, const Rt8Site *site, const Rt8Family *, const Rt8Variant *, size_t field_count, Rt8Handle *const *fields, const char *out);",
+    "rt8_case_fields_i64": "Rt8Handle *rt8_case_fields_i64(Rt8Context *, Rt8Handle *authority, const Rt8Family *, Rt8Handle *ready_scrutinee, size_t arm_count, const Rt8FactoryArm *, const char *out);",
+    "rt8_finish_scalar": "void rt8_finish_scalar(Rt8Context *, Rt8Handle *owned_ready_scalar);",
+    "rt8_generic_begin": "void rt8_generic_begin(Rt8Context *, Rt8GenericScope *zeroed_local, const Rt8Intro *, Rt8Handle *authority);",
+    "rt8_generic_seal": "Rt8Handle *rt8_generic_seal(Rt8Context *, Rt8GenericScope *, Rt8Handle *owned_result, const char *out);",
+    "rt8_instantiate": "Rt8Handle *rt8_instantiate(Rt8Context *, Rt8Handle *owner_or_loan, const Rt8Instantiation *, const char *out, const char *source_variable);"
+  },
+  "instruction_helper_count": 29,
+  "implemented_in_stage05a": [
+    "rt8_binding_validate and private bounded view readers only"
+  ],
+  "declared_but_unresolved_in_stage05a": "All ctx accessors and instruction helpers, including real body references; no stubs or legacy forwarding",
+  "later_session_decisions": {
+    "open": "Fresh admission/options before allocation; input wrapper/view fields copied into Context; validation failure leaves caller session NULL. Exact runtime report/options/session definitions require the subsequent runtime ABI review.",
+    "step": "Invoke only the admitted entry, with no caller entry argument.",
+    "scope": "No session functions implemented or linked as runtime acceptance in Stage05A."
+  },
+  "failure_coordinates": "Absent coordinate UINT32_MAX, enum NONE=0. Native header fields follow diagnostic_field. Code fields code_id=0/body=1. Label row=index, field offset=0/bytes=1. Nested packet failure preserves complete packet report.",
+  "static_inventory_policy": "Exactly two complete program-specific static aggregates, all padding included. Independent compiler census rejects any uncounted program-specific allocated non-executable data. Common runtime/compiler/harness support and code inventoried separately.",
+  "private_reader_api": [
+    "uint32_t rt8_binding_prepare(const Rt8Program *, const Ir8PacketExpectedBindings *, Rt8BindingWorkspace *, Rt8ProgramView *, Rt8BindingReport *);",
+    "uint32_t rt8_view_table_read(const Rt8ProgramView *, uint32_t domain, uint32_t row, void *out, size_t out_bytes, Rt8ReadState *);",
+    "uint32_t rt8_view_descriptor_read(const Rt8ProgramView *, uint32_t domain, uint32_t row, void *out, size_t out_bytes, Rt8ReadState *);",
+    "uint32_t rt8_view_object_read(const Rt8ProgramView *, uint32_t object, uint32_t element, uint32_t row, void *out, size_t out_bytes, Rt8ReadState *);",
+    "uint32_t rt8_view_table_ref(const Rt8ProgramView *, uint32_t domain, uint32_t row, const void **out, Rt8ReadState *);",
+    "uint32_t rt8_view_descriptor_ref(const Rt8ProgramView *, uint32_t domain, uint32_t row, const void **out, Rt8ReadState *);",
+    "uint32_t rt8_view_table_auth(const Rt8ProgramView *, uint32_t domain, const void *reference, uint32_t *row, Rt8ReadState *);",
+    "uint32_t rt8_view_descriptor_auth(const Rt8ProgramView *, uint32_t domain, const void *reference, uint32_t *row, Rt8ReadState *);",
+    "uint32_t rt8_view_code_read(const Rt8ProgramView *, uint32_t code_id, Rt8Code *out, Rt8ReadState *);",
+    "uint32_t rt8_view_code_ref(const Rt8ProgramView *, uint32_t code_id, const Rt8Code **out, Rt8ReadState *);",
+    "uint32_t rt8_view_code_auth(const Rt8ProgramView *, const Rt8Code *, uint32_t *code_id, Rt8ReadState *);",
+    "uint32_t rt8_view_label(const Rt8ProgramView *, uint32_t label_id, const char **out, Rt8ReadState *);",
+    "uint32_t rt8_view_label_auth(const Rt8ProgramView *, const char *, uint32_t *label_id, Rt8ReadState *);",
+    "uint32_t rt8_work_reserve(Rt8ReadState *, uint64_t units);"
+  ],
+  "private_reader_rules": [
+    "Private only; no raw table/read/retype interface is emitted into user bodies. Caller cannot supply a ProgramView to public binding/session admission.",
+    "Validate exact out_bytes equals compiler sizeof selected element before copying. Reference/auth/read outputs remain unchanged on failure; work/first diagnostic reflect actually reserved preflight work.",
+    "Every candidate and byte is charged before inspection. Failure recording cannot recursively charge. Unknown pointers are compared only for exact equality with safe computed member starts.",
+    "Binding prepare copies fixed fields into a local view and publishes the view only after success; failure zeroes the destination view. A later open must call prepare afresh.",
+    "Rt8ReadState and diagnostic/work storage are immediate-use caller locals or current Context-owned state, never packet references, heap caches or admission credentials."
+  ],
+  "tick_rule": {
+    "ordinary_instruction_helpers": 1,
+    "rt8_generic_begin": 1,
+    "rt8_instantiate": 1,
+    "rt8_generic_seal": 0,
+    "ctx_accessors_and_private_readers": 0,
+    "factory_internal_acquisition": 0,
+    "authority": "CORE_FINAL_CONTRACT.md generalize/instantiate tick rule and B5; validation work is independently charged."
+  },
+  "report_initialization": {
+    "status": "initially INTERNAL until a terminal result is recorded",
+    "phase": "ARGUMENTS",
+    "detail": "NONE",
+    "absent_coordinate": 4294967295,
+    "all_counters": 0,
+    "work_limit": 67108864,
+    "all_acceptance_execution_flags": 0,
+    "nested_packet": "zeroed until called; packet_checked explicitly distinguishes not-run; nested report is preserved unchanged after call",
+    "success": "status OK, phase FINAL, detail NONE, all coordinates UINT32_MAX, binding_validated 1 only; actual counters and sizes populated"
+  },
+  "count_prechecks": {
+    "code_count_max": 2048,
+    "label_count_max": 65536,
+    "label_bytes_max": 1048576,
+    "each_root_bytes_max": 4194304,
+    "total_two_roots_max": 4194304,
+    "all_count_gates": "Before a count-controlled read/loop or extent calculation. Packet imposes its stricter exact Code+Site joint lower bound independently."
+  },
+  "public_lifecycle_scope": "Only declaration/runtime-source future decisions, not public lifecycle functions or fake types in Stage05A. Actual runtime options/report/Context/Node/Slot/Pending/Frame definitions and session implementation require the next complete source-review gate.",
+  "label_policy": {
+    "contents": "Every emitted textual helper/record operand, including SSA diagnostics and Rt8FactoryCapture.name. Include/count strings also present in packet.",
+    "ordering": "Deduplicate exact UTF-8 byte sequences, then strict unsigned-byte lexical order; offset index follows that order.",
+    "forbidden": "First-encounter order, hidden C string literals, packet-string fallback, names used to guess Code/Site identity.",
+    "factory_capture_name": "Validate against already-selected Code capture row/position; obtain using rt8_label."
+  },
+  "work_failure_precedence": [
+    "invalid work-state/limit",
+    "per-operation remaining-unit reservation",
+    "cumulative uint64 overflow",
+    "perform reserved work"
+  ],
+  "diagnostic_initialization": "Private Rt8Diagnostic starts OK/NONE with absent coordinates. Public report starts INTERNAL until terminal result; first private failure is copied into report exactly once. Report initialization is not treated as an existing failure.",
+  "ctx_failure_transfer": "Ctx accessor/instruction helper failure poisons and transfers non-returningly to the enclosing installed active session fault boundary. No NULL/error-return continuation and no emitter status polling. Successful void/pointer returns retain documented semantics. No-Context binding/reader functions return numeric status; eventual ctx wrappers convert non-OK to non-returning fault. Valid active sequential context is a precondition."
+}

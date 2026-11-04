@@ -14,6 +14,10 @@ import run_fingerprint as fingerprint
 import source_migration as migration
 
 ROOT = Path(__file__).resolve().parents[3]
+resource_spec=importlib.util.spec_from_file_location('patricia_resource_source_migration',
+    ROOT/'tools/shared/resource_source_migration.py')
+resource=importlib.util.module_from_spec(resource_spec)
+resource_spec.loader.exec_module(resource)
 datatype_spec=importlib.util.spec_from_file_location('datatype_context_contract',
     ROOT/'tools/performance/datatype-context/source_contract.py')
 datatype=importlib.util.module_from_spec(datatype_spec)
@@ -39,6 +43,11 @@ full_spec=importlib.util.spec_from_file_location('projection_patch_contract',
     ROOT/'tools/performance/full-compiler/source_contract.py')
 full=importlib.util.module_from_spec(full_spec)
 full_spec.loader.exec_module(full)
+
+def current_resource_registry(base):
+    # Keep the historical 128-owner endpoint separate from live resource bytes.
+    historical=migration.migrate(base)
+    return resource.authenticate_current_source(ROOT,historical)
 
 def before_full_registry(base):
     return migration.apply_changes(migration.through_full_compiler(base),
@@ -239,6 +248,7 @@ class AdapterTests(unittest.TestCase):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
         delta=migration.sparse_delta()
         previous=before_sparse_registry(base)
+        current=current_resource_registry(base)
         paths={'Bootstrap.Classes':'libraries/mlf-inference/Bootstrap/Classes.hs',
                'Bootstrap.CrateQuery':'libraries/mlf-crates/Bootstrap/CrateQuery.hs',
                'Bootstrap.CrateSession':'libraries/mlf-crates/Bootstrap/CrateSession.hs',
@@ -248,7 +258,7 @@ class AdapterTests(unittest.TestCase):
         for name,row in delta['changed_sources'].items():
             self.assertEqual(previous[name],row['old'])
             self.assertEqual(before_permission_registry(base)[name],row['new'])
-            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),migration.migrate(base)[name])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),current[name])
         bad=json.loads(json.dumps(delta))
         bad['changed_sources']['Bootstrap.SourceInference']['old']='0'*64
         with patch.object(migration,'sparse_delta',return_value=bad),self.assertRaises(ValueError):
@@ -265,7 +275,7 @@ class AdapterTests(unittest.TestCase):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
         delta=migration.permission_delta()
         result=before_canonical_carry_registry(base)
-        current=migration.migrate(base)
+        current=current_resource_registry(base)
         self.assertEqual(delta['parent_manifest_sha256'],migration.BATCH_MANIFEST_SHA)
         paths={'Bootstrap.Graph':'libraries/mlf-inference/Bootstrap/Graph.hs',
                'MLF.BuiltinPreludeData':'bootstrap/MLF/BuiltinPreludeData.hs'}
@@ -290,6 +300,7 @@ class AdapterTests(unittest.TestCase):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
         previous=before_canonical_carry_registry(base)
         result=before_c3_registry(base)
+        current=current_resource_registry(base)
         delta=migration.canonical_carry_delta()
         paths={'Bootstrap.Separate':'libraries/mlf-crates/Bootstrap/Separate.hs',
                'Bootstrap.CrateArtifact':'libraries/mlf-crates/Bootstrap/CrateArtifact.hs',
@@ -305,7 +316,7 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(previous[name],row['old'])
             self.assertEqual(result[name],row['new'])
             self.assertEqual(migration.through_full_compiler(base)[name],row['new'])
-            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),migration.migrate(base)[name])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),current[name])
 
     def test_canonical_carry_wrong_predecessors_and_registry_pollution_rejected(self):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
@@ -403,13 +414,14 @@ class AdapterTests(unittest.TestCase):
     def test_c3_registry_matches_all_live_shared_owners(self):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
         result=migration.migrate(base)
+        current=current_resource_registry(base)
         found={}
         inventory=json.loads((ROOT/'shared-sources.json').read_bytes())
         for row in inventory['modules']:
             name=row['module']
             self.assertNotIn(name,found)
             found[name]=hashlib.sha256((ROOT/row['path']).read_bytes()).hexdigest()
-        self.assertEqual(found,result)
+        self.assertEqual(found,current)
         delta=migration.c3_delta()
         parent=before_c3_registry(base)
         self.assertEqual(delta['parent_manifest_sha256'],migration.CANONICAL_CARRY_MANIFEST_SHA)
@@ -417,6 +429,47 @@ class AdapterTests(unittest.TestCase):
         owner=delta['changed_sources']['Bootstrap.CrateSession']
         self.assertEqual(owner['old'],c3.OLD_SHA)
         self.assertEqual(owner['new'],c3.NEW_SHA)
+
+    def test_resource_bridge_rejects_wrong_historical_endpoints(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        historical=migration.migrate(base)
+        self.assertEqual(len(historical),128)
+        missing=dict(historical);missing.pop('Bootstrap.Graph')
+        wrong={**historical,'Bootstrap.Graph':'0'*64}
+        extra={**historical,'Unexpected':'1'*64}
+        current=current_resource_registry(base)
+        self.assertEqual(len(current),132)
+        for label,bad in [('missing',missing),('wrong',wrong),('extra',extra),
+                          ('unmigrated',base),('pre-prelude',migration.through_full_compiler(base)),('already-current',current)]:
+            with self.subTest(case=label),self.assertRaisesRegex(ValueError,'exact128-module current-target input'):
+                resource.authenticate_current_source(ROOT,bad)
+
+    def test_resource_bridge_rejects_incomplete_or_reordered_inventory(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        current=current_resource_registry(base)
+        rows=json.loads((ROOT/'shared-sources.json').read_bytes())['modules']
+        wrong_path=[dict(row) for row in rows];wrong_path[0]['path']='../escaping.hs'
+        wrong_role=[dict(row) for row in rows];wrong_role[0]['role']='direct-test'
+        for label,bad in [('missing',rows[:-1]),('extra',rows+[rows[0]]),
+                          ('duplicate',[rows[0],rows[0],*rows[2:]]),
+                          ('reordered',[rows[1],rows[0],*rows[2:]]),
+                          ('wrong-path',wrong_path),('wrong-role',wrong_role)]:
+            with self.subTest(case=label),self.assertRaisesRegex(ValueError,'exact132 ordered shared-source'):
+                resource.authenticate_inventory(bad,current)
+
+    def test_resource_bridge_rejects_changed_added_and_unchanged_hashes(self):
+        base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        current=current_resource_registry(base)
+        rows=json.loads((ROOT/'shared-sources.json').read_bytes())['modules']
+        for name in current:
+            bad={**current,name:'0'*64}
+            with self.subTest(module=name),self.assertRaisesRegex(ValueError,'exact132 shared source byte identities'):
+                resource.authenticate_inventory(rows,bad)
+        missing=dict(current);missing.pop('Bootstrap.Graph')
+        extra={**current,'Unexpected':'1'*64}
+        for label,bad in [('missing',missing),('extra',extra),('historical',migration.migrate(base))]:
+            with self.subTest(case=label),self.assertRaisesRegex(ValueError,'exact132 shared source byte identities'):
+                resource.authenticate_inventory(rows,bad)
 
     def test_c3_registry_rejects_wrong_parent_and_manifest(self):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
