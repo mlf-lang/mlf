@@ -356,6 +356,25 @@ retain/terminal pair also pass locally. These nonrecursive fixtures exercise
 [Stage21 results and limits](../resource_ir_v8/README_STAGE21.md) for the retained
 observer correction and exact scope. Exact-commit CI remains separate.
 
+The Stage22 higher-order shared-function suite uses the same CLI contract:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_higher_order_shared.py \
+  --ghc /absolute/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /absolute/new-higher-order-shared-directory
+```
+
+It tests `sharedApply` with ordinary callable term arguments, not arrow-valued
+shared type coordinates. The default `--case all` runs both equal- and
+opposite-coordinate sources. Both pass finite native/sanitizer checks and the
+final fresh suite: 16 clean child records, identical checked capture bytes and
+complete native reports equal to initial coarse/O0. Report controls are 26 for A
+and 33 for B; structural controls are 10 and 13 per placement plan and fresh CLI,
+not per optimization/sanitizer. Only A has fixed-fuel retain/terminal coverage.
+See the [Stage22 scope and evidence](../resource_ir_v8/README_STAGE22.md).
+The isolated 20-minute CI job preserves all existing jobs and limits; exact
+Stage22 CI has not run.
+
 This remains a bounded opt-in experiment. It does not establish arbitrary MLF
 source support, general nominal or callable-SUM coverage, all runtime guards,
 full GC replacement or a performance improvement.

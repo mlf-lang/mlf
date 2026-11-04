@@ -73,6 +73,13 @@ nominal generic principals/operations and generic or mutual recursion remain
 outside this slice. DATA field-arrow and Int-result SUM-case restrictions are
 unchanged. Historical stage sections retain their earlier scope below.
 
+[Stage22](../resource_ir_v8/README_STAGE22.md) tests already-admitted higher-order
+`sharedApply` with pending ordinary callables and a reused partial. It changes no
+production code or type-argument boundary. Equal- and opposite-coordinate cases
+pass local native, sanitizer and the final default two-case fresh-source suite.
+The fixed-fuel retain/terminal pair covers the equal-coordinate case only.
+Exact Stage22 CI remains separate.
+
 ## Stage08: closed DATA and callable fields
 
 Only referenced declarations with no type parameters and exactly one constructor

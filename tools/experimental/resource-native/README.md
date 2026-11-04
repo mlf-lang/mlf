@@ -43,6 +43,11 @@ dead coordinates, with independently replayed nominal beta and bounded packet/
 instantiation authentication. Its finite local source/native checks pass;
 exact-commit CI remains separate. This does not broaden generic principal code
 or field policies.
+[Higher-order shared-source qualification](resource_ir_v8/README_STAGE22.md)
+exercises already-admitted `sharedApply` with pending callable arguments and a
+reused partial, without production or type-argument changes. Both equal- and
+opposite-coordinate cases pass finite local native and fresh-source checks;
+exact Stage22 CI remains separate.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general
