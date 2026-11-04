@@ -9,11 +9,12 @@ module Bootstrap.PreparedLibraries
    metadataHash, objectHash, libraryObject, compileLoaded, checkedTerm,
    sourceType, reused, nameMap, NativeRoot, nativeCheckedWrapper, nativeSignatures,
    nativeSourceType, nativeInferredType, nativeDeclarations, nativeBuiltinCount, compileNativeRoot, compileNativeRootUsing,
-   nativeLibrary, nativeLibraryDeclarations, nativeExportSignatures) where {
+   nativeLibrary, nativeLibraryDeclarations, nativeExportSignatures, nativeInstalledIds, nativeLayoutIds, nativeSelectedIds) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Lexer as Lexer;
@@ -275,13 +276,31 @@ module Bootstrap.PreparedLibraries
   -- This value authenticates the freshly checked user wrapper only. Installed
   -- native code identity and file pins are enforced by the compiler consumer.
   -- Raw library metadata does not manufacture a checked library implementation.
-  data NativeRoot = NativeRoot Checked.CheckedTerm (Map String XType) String XType ([] DataDecl) Int;
-  nativeCheckedWrapper (NativeRoot value _ _ _ _ _) = value;
-  nativeSignatures (NativeRoot _ value _ _ _ _) = value;
-  nativeSourceType (NativeRoot _ _ value _ _ _) = value;
-  nativeInferredType (NativeRoot _ _ _ value _ _) = value;
-  nativeDeclarations (NativeRoot _ _ _ _ value _) = value;
-  nativeBuiltinCount (NativeRoot _ _ _ _ _ value) = value;
+  data NativeRoot = NativeRoot Checked.CheckedTerm (Map String XType) String XType ([] DataDecl) Int Parameters.Signatures;
+  nativeCheckedWrapper (NativeRoot value _ _ _ _ _ _) = value;
+  nativeSignatures (NativeRoot _ value _ _ _ _ _) = value;
+  nativeSourceType (NativeRoot _ _ value _ _ _ _) = value;
+  nativeInferredType (NativeRoot _ _ _ value _ _ _) = value;
+  nativeDeclarations (NativeRoot _ _ _ _ value _ _) = value;
+  nativeBuiltinCount (NativeRoot _ _ _ _ _ value _) = value;
+  -- The checked wrapper and ABI layout must interpret the same consumer IDs.
+  nativeLayoutIds :: NativeRoot -> [] ((,) (V.Index Declaration) ((,) String XType));
+  nativeLayoutIds (NativeRoot _ _ _ _ _ _ inventory) =
+    zipWith (\((,) d _) signature -> (,) d signature)
+      (Parameters.entries inventory) (Parameters.namedEntries inventory);
+  nativeSelectedIds :: NativeRoot -> [] (V.Index Declaration);
+  nativeSelectedIds compiled = let { selected = nativeSignatures compiled } in
+    map fst (filter (\((,) _ ((,) key _)) -> M.member compareString key selected) (nativeLayoutIds compiled));
+  -- Installed objects have independent declaration numbering. Their published
+  -- ABI order is by stable key, even if the declarations arrive in another order.
+  nativeInstalledIds :: RawLibrary -> Either String ([] ((,) (V.Index Declaration) ((,) String XType)));
+  nativeInstalledIds raw = do {
+    let { entries = concatMap Artifact.crateBindings (interfaces raw);
+          numbered = zipWith (\d ((,) key ty) -> (,) key ((,) d ((,) key ty)))
+            (map V.fromInt (range 0 (length entries - 1))) entries };
+    Artifact.uniqueNames "native export" (map fst entries);
+    Right (map snd (M.toList (M.fromList compareString numbered)))
+  };
   nativeLibraryDeclarationsV1 raw = foldEither Separate.mergeDeclaration []
     (concatMap Artifact.crateLoweredData (interfaces raw));
   nativeExportSignatures raw = M.toList (M.fromList compareString
@@ -457,7 +476,7 @@ module Bootstrap.PreparedLibraries
       })
     };
     Right (NativeRoot (fst local) (snd local) (display (Imported.sourceType compiled))
-      (Imported.inferredType compiled) declarations (length (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures))))
+      (Imported.inferredType compiled) declarations (length (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures))) imports)
   };
   compilePreparedV1 raw admitted resolution = do {
     let { linked = libraryState admitted;

@@ -58,10 +58,16 @@ module MLF.PreparedCompiler
   };
   nativeLayout :: Libraries.RawLibrary -> Either String NativeLLVM.ExportLayout;
   nativeLayout raw = do {
+    installed <- Libraries.nativeInstalledIds raw;
+    nativeLayoutFor raw installed
+  };
+  nativeLayoutFor raw bindings = do {
+    ensure (eqList Separate.sameSignature (map snd bindings) (Libraries.nativeExportSignatures raw))
+      "native declaration mapping differs from installed export keys or types";
     declarations <- Libraries.nativeLibraryDeclarations raw;
-    NativeLLVM.prepareLayoutWithTypeNames (Libraries.inputIdentity raw)
-      (map (\((,) key ty) -> (,,) key (Constraint.targetNameHint key) ty)
-        (Libraries.nativeExportSignatures raw)) declarations NativeData.reservedTypeNames
+    base <- NativeLLVM.prepareLayoutIds (Libraries.inputIdentity raw)
+      (map (\((,) d ((,) key ty)) -> (,) d ((,,) key (Constraint.targetNameHint key) ty)) bindings) declarations;
+    NativeLLVM.withTypeNames base NativeData.reservedTypeNames
   };
   emitNativeLibraryChunks :: Either String ([] String);
   emitNativeLibraryChunks = do {
@@ -215,9 +221,9 @@ module MLF.PreparedCompiler
             graph <- Core.atPhase ModuleResolution loaded;
             raw <- Core.atPhase Verification fixedNativeLibrary;
             compiled <- Libraries.compileNativeRootUsing LibraryData.parseLibrary raw mode graph;
-            layout <- Core.atPhase Verification (nativeLayout raw);
-            chunks <- Core.atPhase Verification (NativeLLVM.emitRoot layout
-              (M.keys (Libraries.nativeSignatures compiled)) (Libraries.nativeCheckedWrapper compiled));
+            layout <- Core.atPhase Verification (nativeLayoutFor raw (Libraries.nativeLayoutIds compiled));
+            chunks <- Core.atPhase Verification (NativeLLVM.emitRootIds layout
+              (Libraries.nativeSelectedIds compiled) (Libraries.nativeCheckedWrapper compiled));
             Right (NativeCompilation manifest chunks (length (M.keys (Libraries.nativeSignatures compiled)))
               (Libraries.nativeBuiltinCount compiled) ""
               (map (\entry -> (,) (Modules.sourcePath (Modules.loadedSource entry))

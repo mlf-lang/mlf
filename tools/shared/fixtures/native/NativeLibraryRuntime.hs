@@ -7,6 +7,7 @@ import System.Environment (getArgs)
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.X.Checked as C
 import qualified Bootstrap.LLVM.Library as N
+import qualified Bootstrap.IndexVec as V
 import qualified MLF.Primitive as P
 
 right (T.Right value) = value
@@ -29,13 +30,17 @@ emitExtension directory = do
  let saved = T.DataDecl "Saved" [] [T.ConstructorDecl "SavedValue" [T.Applied "Int" []]]
      user = T.DataDecl "User" [] [T.ConstructorDecl "UserBox" [T.Applied "Int" []]]
      ty = T.XCon "Saved" []
-     entries = [("saved","parameter",ty)]
-     base = right (N.prepareLayout identity entries [saved])
+     -- Two independently numbered compilations share ABI slots 0 and 1.
+     entries = [("decoy","decoy",int),("saved","parameter",ty)]
+     prepare ids = right (N.prepareLayoutIds identity (zip (map V.fromInt ids) entries) [saved])
+     base = prepare [12,7]
      fragment = T.XWithData [saved] (T.XLet (T.XName 0 "saved")
        (T.XApp (T.XConstructor "SavedValue" []) (T.XIntTerm 42)) unit)
-     linked = right (C.appendSpine C.emptySpine (right (C.check fragment)))
+     decoy = right (C.appendSpine C.emptySpine (right (C.check (T.XLet (T.XName 2 "decoy") (T.XIntTerm 999) unit))))
+     linked = right (C.appendSpine decoy (right (C.check fragment)))
      census = right (N.libraryTypeNames base linked)
-     layout = right (N.prepareLayoutWithTypeNames identity entries [saved] census)
+     layout = right (N.withTypeNames base census)
+     consumer = right (N.withTypeNames (prepare [7,12]) census)
      arg = T.XName 0 "parameter"; field = T.XName 1 "field"; result = T.XName 2 "result"
      ioUnit = T.XCon "IO" [T.XCon "()" []]
      body = T.XAbs arg ty (T.XCase (T.XVarTerm arg) ioUnit
@@ -46,7 +51,7 @@ emitExtension directory = do
  writeFile (directory ++ "/extension-library.ll") (concatMap P.textToChars (right (N.emitLibrary layout linked)))
  forM_ [("extension-user-first",[user,saved]),("extension-saved-first",[saved,user])] $ \(label,ds) ->
    writeFile (directory ++ "/" ++ label ++ ".ll") (concatMap P.textToChars
-     (right (N.emitRoot layout ["saved"] (right (C.check (T.XWithData ds body))))))
+     (right (N.emitRootIds consumer [V.fromInt 12] (right (C.check (T.XWithData ds body))))))
 emitOpenFields directory = do
  let box = T.DataDecl "DoubleBox" [] [T.ConstructorDecl "MkDoubleBox" [T.Applied "Double" []]]
      boxTy = T.XCon "DoubleBox" []; boolTy = T.XCon "Bool" []; doubleTy = T.XCon "Double" []
