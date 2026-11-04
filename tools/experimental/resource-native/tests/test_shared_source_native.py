@@ -165,7 +165,10 @@ def build_producer(ghc, cc, output, env):
     build.mkdir()
     objects = build / 'objects'
     objects.mkdir()
-    version, err = run([ghc, '--numeric-version'], build, 'version', cwd=REPO,
+    # Limit only the short version probe's RTS virtual reservation, not RSS.
+    # GHC's default 1TiB reservation can crowd thread startup under RLIMIT_AS.
+    version, err = run([ghc, '--numeric-version', '+RTS', '-xr32m', '-RTS'],
+                      build, 'version', cwd=REPO,
                       env=env, wall=10, cpu=10, memory=1 << 30)
     require(version.read_text().strip() == '9.14.1', 'GHC 9.14.1 is required')
     require(not err.read_bytes(), 'unexpected GHC version diagnostic')
