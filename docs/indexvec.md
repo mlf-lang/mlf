@@ -28,18 +28,19 @@ a trie search. `fromList` uses exact allocation when the input is enumerable.
 
 | Path | Representation and ordering |
 | --- | --- |
-| Declaration SCCs | `Bootstrap.Dependency.components` interns canonical names and builds dense node and edge vectors. Both Kosaraju passes traverse IDs and indexed visited flags. Roots, outgoing edges and members keep their lexical ordering. Duplicate declarations still fail before SCC construction. Only local value references become declaration edges. |
-| Module imports and instance reach | `Bootstrap.Module` uses module IDs for the shared-module cycle check and transitive visibility. External-only names are leaf vertices. It returns the named owner/reach sets consumed by resolution and crate interfaces. Aliases, source positions, import selectors and instance ownership stay on the source and interface records. |
+| Declaration SCCs | `Bootstrap.Dependency.components` interns canonical names and builds dense node and edge vectors. One path-based DFS tracks discovery and closure in an indexed mark table. An edge to an open vertex merges candidate roots. Closing a surviving root emits its whole component in the historical finish order. Roots, outgoing edges and members keep their lexical ordering. Duplicate declarations still fail before SCC construction. Only local value references become declaration edges. |
+| Module imports and instance reach | `Bootstrap.Module` uses module IDs for the shared-module cycle check and transitive visibility. All modules in an SCC share one reach set. In dependency-first order each component unions its member IDs with the previously computed sets of its successors. External-only names are leaf vertices. It returns the named owner/reach sets consumed by resolution and crate interfaces. Aliases, source positions, import selectors and instance ownership stay on the source and interface records. |
+| Datatypes used by crate queries | `Bootstrap.CrateQuery` indexes validated declarations in lexical order. Each SCC query unions the precomputed reach sets for its observed type names, constructor owners and binding schemes, then reads just those declarations by ID. |
+| Persistent query graph | During admission, physical wire IDs share decoded and hash-checked read pairs across owners. Closure validation resolves dependency versions and walks typed ordinals with three DFS colours. An exactly equal, previously admitted canonical generation retains its content address. Publication still verifies the retained payloads. |
 | Package DAG and scheduling | `Package.Manifest` builds separate typed tables for packages and modules after validating names and canonical paths. Module discovery retains dependency-first order, including cycles inside a crate. `Package.Scheduler.libraryJobs` takes the closure of selected direct dependencies by ID and emits jobs in the original package order. Worker JSON is name-based and reconstructs the index on read. |
 
 Initial manifest discovery works in IO and identifies local packages by
 canonical path, releases by digest, and conflicts by their names. This phase
 precedes ID assignment so its cycle and path diagnostics still use the original
 trail. Namespace export fixed points operate on visible entities and selectors.
-Persistent query graphs use content addresses for cache validation and
-publication. The inference constraint graph has its own solver identities.
-These graphs have different identity or visibility contracts from the
-dependency tables covered here.
+The persistent query format records keys, digests and ordered dependencies.
+Its temporary ordinals belong to one admitted graph. The inference constraint
+graph keeps its own solver identities.
 
 Primitive code 132 is appended to the wire inventory. Earlier code assignments
 retain their meaning. The builtin interface advances to `/12` and the primitive
@@ -59,7 +60,8 @@ python3 -B tests/indexvec/run.py --compiler INSTALL/bin/emlf --output FRESH_DIR
 Pass `--reference-manager BEFORE/bin/mlfpkg` to check the actual plan and failure
 diagnostics byte for byte against the previous implementation. The graph
 fixture independently derives SCC membership by mutual reachability and checks
-ordered output for every three-node graph.
+ordered output and reach for every three-node graph, deep chains and rings.
+It also checks query depth, corrupt dependencies and canonical generation reuse.
 
 The installed compiler measurements and their raw receipts are in the
 [comparison report](../benchmarks/results/2026-11-04-indexvec/README.md).
