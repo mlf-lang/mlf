@@ -49,8 +49,7 @@ Raw 是收尾的输入。基线的
 
 为记录这个边界，图中使用内部收尾节点 `FinishScc(members)`：它读取 raw、prepared metadata、
 contracts、scope，以及适用的稳定 evidence 查询，返回最终组对象和成员 contracts。
-第一版保存它的结果 SHA 和依赖边，完整结果只在会话内共享；磁盘仍保存 raw 和各个 `Binding`，
-查询缓存不另存最终组 body，正式 `.mlfco` 保存收尾后的 body。
+查询缓存保存收尾记录、它的有序依赖边、raw 和各个 `Binding`。正式 `.mlfco` 保存最终组 body。
 收尾也在显式环境中处理开放片段；需要最终对象时，从已检查 raw 运行收尾。
 body 和环境未改变时保留已有检查凭据；产生新 body 的变换需要建立相应的新检查凭据。
 `Binding(def)` 依赖这个收尾节点，再对该定义的完整 contract 单独计算结果 SHA。

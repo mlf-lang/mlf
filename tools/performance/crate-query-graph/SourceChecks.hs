@@ -106,6 +106,9 @@ sourceChecks root = do
  (old,_,oldContracts)<-Old.compileSourceGroups "source-oracle" oldCache [] M.empty plan >>= expect "old source oracle"
  (cold,coldReport,contracts)<-CG.compileSourceGroups False "source-oracle" newCache [] M.empty plan >>= expect "new cold source query"
  assert "cold groups" (Old.inferredCount coldReport==fromIntegral (length cold) && Old.reusedCount coldReport==0)
+ case cold of
+  (group,fragment):_ -> finishHashChecks group fragment
+  [] -> error "missing finish hash fixture"
  assert "contracts match legacy source oracle" (contractView contracts==contractView oldContracts)
  oldOpen<-mapM (\o->expect "legacy receipt" (U.objectChecked o) >>= expect "open legacy receipt" . O.fromChecked) old
  assert "same source group inventory" (length oldOpen==length cold)
@@ -162,6 +165,23 @@ sourceChanges root = do
    assert "changed source all warm hits"(Old.inferredCount warmReport==0 && length inc==length warm && map(view.snd) inc==map(view.snd) warm)
    if label=="body" && version==1 then assert "source body edit one inferred"(Old.inferredCount report==1) else pure ()
    putStrLn("PASS source change "++label++" "++show version)) (zip [0::Int ..] versions)) cases
+
+finishHashChecks group fragment = do
+ let refs = [("a","version-a"),("b","version-b")]
+     content rs = G.hashValue (CG.rawValue rs group fragment) >>= expect "canonical fragment content"
+ raw <- content refs
+ let previous = G.QueryNode "raw" raw [] (T.Just raw)
+     finalHash mode body node rs =
+       CG.finishContentHash mode group body fragment node refs rs
+ kept <- finalHash False SI.KeepRawBody previous refs >>= expect "retained raw content"
+ checked <- finalHash True SI.KeepRawBody previous refs >>= expect "verified retained content"
+ adapted <- finalHash False (SI.AdaptedBody fragment) previous refs >>= expect "identical adapted content"
+ assert "equal final values keep one SHA through either recipe" (raw == kept && raw == checked && raw == adapted)
+ reordered <- finalHash False SI.KeepRawBody previous (reverse refs) >>= expect "changed environment"
+ expected <- content (reverse refs)
+ assert "ordered environment is part of the final fragment" (reordered == expected && reordered /= raw)
+ mismatch <- finalHash True SI.KeepRawBody (G.QueryNode "raw" "incorrect" [] T.Nothing) refs
+ assert "ICH verifies the retained fragment" (case mismatch of T.Left _ -> True; _ -> False)
 
 graphChecks root = do
  let path=B.literal (root++"/graph-controls"); config="compiler-a/builtin-a/checker-1"

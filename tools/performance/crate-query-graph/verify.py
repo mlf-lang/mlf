@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/shared'))
 from artifact_binary_reference import read_document, tree_document
 from artifact_binary_typed import value_node as node, text, list_values as items, unpack
+from finish_receipts import check_receipts, forge_generation
 
 
 def sha(data): return hashlib.sha256(data).hexdigest()
@@ -142,6 +143,9 @@ def main():
             inc = compile(f'{version}-incremental')
             report = json.loads(inc.with_suffix('.queries').read_text())
             current, nodes = graph(cache)
+            receipts = check_receipts(inc, cache, nodes)
+            if name == 'scope-order' and version == 1:
+                assert receipts['rewritten'] > 0, 'expected a final evidence adapter'
             if name == 'recursive-dictionary':
                 idx = cache / 'query-graph-v1/generations' / (current + '.mlfqg')
                 configuration = text(node(read(idx, 6), 411, 3)[1])
@@ -299,7 +303,7 @@ def main():
         # stable evidence can be recomputed without invalidating raw inference.
         _, nodes = graph(cache)
         damaged_kinds = []
-        for kind in ('Binding', 'Datatype', 'Evidence'):
+        for kind in ('Binding', 'Datatype', 'Evidence', 'FinishScc'):
             matches = [n['payload'] for k,n in nodes.items() if unpack(k)[0] == kind and n['payload']]
             if not matches: continue
             (cache / 'query-graph-v1/results' / (matches[0] + '.mlfqr')).unlink()
@@ -309,6 +313,24 @@ def main():
             graph(cache); damaged_kinds.append(kind)
         record.setdefault('shared_repair', {})[name] = damaged_kinds
         if name == 'body':
+            generation, nodes = graph(cache)
+            target = next(n for k,n in nodes.items() if unpack(k)[0] == 'FinishScc')
+            path = cache / 'query-graph-v1/results' / (target['payload'] + '.mlfqr')
+            path.write_bytes(b'damaged finish receipt')
+            repaired = compile('damaged-finish')
+            assert sha(path.read_bytes()) == target['sha'] and outputs(repaired) == outputs(inc)
+            assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 0
+            modes = ('swapped', 'stale', 'reordered', 'wrong-address', 'finish-as-raw', 'previous-format')
+            for mode in modes:
+                forged = forge_generation(cache, generation, mode)
+                if mode != 'wrong-address':
+                    assert graph(cache)[0] == forged  # Valid checksums and dependency closure.
+                repaired = compile('repair-finish-' + mode)
+                assert graph(cache)[0] == generation and outputs(repaired) == outputs(inc)
+                report = json.loads(repaired.with_suffix('.queries').read_text())
+                expected = len(report['groups']) if mode in ('wrong-address', 'previous-format') else int(mode == 'finish-as-raw')
+                assert report['inferred_groups'] == expected
+            record['finish_receipt_recovery'] = ['damaged', 'missing', *modes]
             cache.rename(folder / 'before-concurrent-writers')
             with ThreadPoolExecutor(max_workers=2) as pool:
                 writes = list(pool.map(compile, ['writer-a', 'writer-b']))
