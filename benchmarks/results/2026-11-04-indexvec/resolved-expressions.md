@@ -21,6 +21,8 @@ Every query report contains 504 groups and 511 members. The largest group has fo
 
 Warm builds reused 504 groups. Editing `Bootstrap.Version` inferred one group and reused 503. Cold builds inferred 504 groups. Across all four states, the interfaces, objects, query reports, logical query graph and retained payloads matched the previous #43. Compiler order rotated, each run restored its arm's own seed where applicable, and OS filesystem caches stayed warm.
 
+A separate development build carried checked predecessor overloads, protection and reserved names incrementally between groups. In six paired rounds per state, mean warm time went from 3.766 to 3.761 s and mean edit time from 4.046 to 4.040 s. That 5–6 ms difference did not justify the additional query-driver state. The released implementation uses ID-based member selection. The raw results include these 24 trials separately from the installed comparison.
+
 ## Identity controls
 
 A two-crate fixture gives the same exported declaration different slots in producer and client. The defining crate's canonical spelling agrees in both tables. All four old/new producer and client combinations generated identical interfaces, objects and cold query reports. Each linked program printed `42` under both readers. A native resolver probe also checked a qualified reference and a shadowing local, and five xMLF outputs matched the previous compiler and passed checking in both directions.

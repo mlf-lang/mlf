@@ -1248,5 +1248,236 @@
         "unit.queries": "1457e3179060c6ccbbe0bca81fbef7e7cd00767c4698ce6e59329f6e98a067d8"
       }
     }
+  },
+  "predecessor_experiment": {
+    "implementation": "Development-only build of the same GHC -O2 sources with CrateGraph carrying the existing OwnedSourceContext through planSteps. Initial checked contracts build the overload, protection and reserved-name views, and each finalized SCC extends them with its delta. Identical sorted SCC membership and member projection. Same 14 modules, restored per-arm seeds, alternating arm and state order. All three output digests agree on every paired run.",
+    "binaries": {
+      "indexed": "00cd3e2224864f4b2a009f829a425455b3d7e24a384a48d68fe0b32864be20f1",
+      "views": "77af7d7a63b585dab64643077ca59811055172b6afa092e7fc3e7b0c1c2e2ed4"
+    },
+    "summary": {
+      "warm": {
+        "indexed": {
+          "wall_s": 3.7659296181666666,
+          "cpu_s": 3.7441164999999996,
+          "rss_bytes": 134908586.66666666
+        },
+        "views": {
+          "wall_s": 3.7612764651666666,
+          "cpu_s": 3.710310333333333,
+          "rss_bytes": 134987776
+        },
+        "paired_wall_change_percent": -0.12355921304406658,
+        "faster_pairs": 5
+      },
+      "edit": {
+        "indexed": {
+          "wall_s": 4.046096902833334,
+          "cpu_s": 4.022978833333333,
+          "rss_bytes": 149970944
+        },
+        "views": {
+          "wall_s": 4.039673361166667,
+          "cpu_s": 3.9869155,
+          "rss_bytes": 152010752
+        },
+        "paired_wall_change_percent": -0.15875896749206753,
+        "faster_pairs": 4
+      }
+    },
+    "samples": [
+      {
+        "round": 0,
+        "state": "warm",
+        "arm": "indexed",
+        "wall_s": 3.694990375,
+        "cpu_s": 3.679976,
+        "rss_bytes": 135118848
+      },
+      {
+        "round": 0,
+        "state": "warm",
+        "arm": "views",
+        "wall_s": 3.849891,
+        "cpu_s": 3.672226,
+        "rss_bytes": 135168000
+      },
+      {
+        "round": 0,
+        "state": "edit",
+        "arm": "views",
+        "wall_s": 3.955615208,
+        "cpu_s": 3.9265019999999997,
+        "rss_bytes": 152010752
+      },
+      {
+        "round": 0,
+        "state": "edit",
+        "arm": "indexed",
+        "wall_s": 4.073982917,
+        "cpu_s": 4.043633,
+        "rss_bytes": 150028288
+      },
+      {
+        "round": 1,
+        "state": "edit",
+        "arm": "indexed",
+        "wall_s": 4.0356855,
+        "cpu_s": 4.019932,
+        "rss_bytes": 150028288
+      },
+      {
+        "round": 1,
+        "state": "edit",
+        "arm": "views",
+        "wall_s": 4.012874792,
+        "cpu_s": 3.9698529999999996,
+        "rss_bytes": 151437312
+      },
+      {
+        "round": 1,
+        "state": "warm",
+        "arm": "views",
+        "wall_s": 3.742154166,
+        "cpu_s": 3.7233009999999997,
+        "rss_bytes": 135168000
+      },
+      {
+        "round": 1,
+        "state": "warm",
+        "arm": "indexed",
+        "wall_s": 3.77050275,
+        "cpu_s": 3.741104,
+        "rss_bytes": 135118848
+      },
+      {
+        "round": 2,
+        "state": "warm",
+        "arm": "indexed",
+        "wall_s": 3.787196375,
+        "cpu_s": 3.768268,
+        "rss_bytes": 135184384
+      },
+      {
+        "round": 2,
+        "state": "warm",
+        "arm": "views",
+        "wall_s": 3.759591,
+        "cpu_s": 3.7321400000000002,
+        "rss_bytes": 134529024
+      },
+      {
+        "round": 2,
+        "state": "edit",
+        "arm": "views",
+        "wall_s": 4.031581667,
+        "cpu_s": 4.005535,
+        "rss_bytes": 152010752
+      },
+      {
+        "round": 2,
+        "state": "edit",
+        "arm": "indexed",
+        "wall_s": 4.036234041,
+        "cpu_s": 4.009380999999999,
+        "rss_bytes": 149962752
+      },
+      {
+        "round": 3,
+        "state": "edit",
+        "arm": "indexed",
+        "wall_s": 3.95936325,
+        "cpu_s": 3.944977,
+        "rss_bytes": 149962752
+      },
+      {
+        "round": 3,
+        "state": "edit",
+        "arm": "views",
+        "wall_s": 4.068292375,
+        "cpu_s": 3.9910050000000004,
+        "rss_bytes": 152223744
+      },
+      {
+        "round": 3,
+        "state": "warm",
+        "arm": "views",
+        "wall_s": 3.680989292,
+        "cpu_s": 3.658976,
+        "rss_bytes": 135331840
+      },
+      {
+        "round": 3,
+        "state": "warm",
+        "arm": "indexed",
+        "wall_s": 3.720952709,
+        "cpu_s": 3.698279,
+        "rss_bytes": 134496256
+      },
+      {
+        "round": 4,
+        "state": "warm",
+        "arm": "indexed",
+        "wall_s": 3.737984166,
+        "cpu_s": 3.714631,
+        "rss_bytes": 134414336
+      },
+      {
+        "round": 4,
+        "state": "warm",
+        "arm": "views",
+        "wall_s": 3.7147275,
+        "cpu_s": 3.681203,
+        "rss_bytes": 135168000
+      },
+      {
+        "round": 4,
+        "state": "edit",
+        "arm": "views",
+        "wall_s": 3.918239,
+        "cpu_s": 3.8969679999999998,
+        "rss_bytes": 152141824
+      },
+      {
+        "round": 4,
+        "state": "edit",
+        "arm": "indexed",
+        "wall_s": 4.038796292,
+        "cpu_s": 4.013502,
+        "rss_bytes": 149815296
+      },
+      {
+        "round": 5,
+        "state": "edit",
+        "arm": "indexed",
+        "wall_s": 4.132519417,
+        "cpu_s": 4.106448,
+        "rss_bytes": 150028288
+      },
+      {
+        "round": 5,
+        "state": "edit",
+        "arm": "views",
+        "wall_s": 4.251437125,
+        "cpu_s": 4.1316299999999995,
+        "rss_bytes": 152240128
+      },
+      {
+        "round": 5,
+        "state": "warm",
+        "arm": "views",
+        "wall_s": 3.820305833,
+        "cpu_s": 3.794016,
+        "rss_bytes": 134561792
+      },
+      {
+        "round": 5,
+        "state": "warm",
+        "arm": "indexed",
+        "wall_s": 3.883951334,
+        "cpu_s": 3.8624409999999996,
+        "rss_bytes": 135118848
+      }
+    ]
   }
 }
