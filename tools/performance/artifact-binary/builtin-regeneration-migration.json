@@ -1,0 +1,41 @@
+{
+  "base_head": "aa661e80f159d4851f05b71bbf77fa868da23b7e",
+  "base_tree": "8fd27c3bd6b715b8be00b731cf974a6bd35e269a",
+  "current_inventory_sha256": "46b45c12e78a56b3fd134270b927fee336b7755e4ac47ad2dcbe440a4a3dd422",
+  "current_registry_sha256": "0a4872f55933ae158cf76735bfe05c00ac7368c0ed38887638a43d244ab715d1",
+  "evidence": {
+    "file": "builtin-regeneration-provenance.json",
+    "sha256": "97607a02391ff79dc1e11795d233aefe4aa5077a89120346612c01828aa788cd"
+  },
+  "file_count": 196,
+  "format": "builtin-regeneration-source-migration-v1",
+  "module_count": 135,
+  "parent_inventory_sha256": "0f8ea1134f6604f57529733329ed9df774fd06f92930e893e0381a6879b9b6b8",
+  "parent_registry_sha256": "fef91be4eb4359680920dcb395ece28526c3fe6e2d2b51b0c77d1c3ae507ec95",
+  "primitive_count": 132,
+  "qualification_scope": "Source identity and reversible projection only; no new runtime or generation qualification.",
+  "transition": {
+    "added_paths": [],
+    "changed_paths": [
+      "bootstrap/MLF/BuiltinPreludeData.hs",
+      "mlf.lock"
+    ],
+    "deltas": {
+      "bootstrap/MLF/BuiltinPreludeData.hs": {
+        "file": "builtin-regeneration-deltas/000.json",
+        "new": "f5ec5f115ed013bc40993039f02249eb809c5aa1ecf22d0c39bc4564a8c73e78",
+        "old": "02481fb9c2460ab5e2ca6577416ffc36b66085dc95bd04df491d9c14ce610f56",
+        "sha256": "eb2f6235aebacf3f4a6adedd80531636825ca40a4df0382f972193f407f7f59a"
+      },
+      "mlf.lock": {
+        "file": "builtin-regeneration-deltas/001.json",
+        "new": "531c9b120eb85e1a66f90d4bc8a10cc9c537e7ac052063a0ab76f0a5336aeaae",
+        "old": "48df44dfebb7b382dd0427e77395a3fce2fb2dae870aa1b8476a96bc9a1901d1",
+        "sha256": "77a92eb910030ddcf2680d1cb1ed0593d346491c24a07e0338f79d7fff015a78"
+      }
+    }
+  },
+  "writer_contract_sha256": "d0bd6478e7ffe525a72e1f6d0053e86a8773a133913297df335d0cf67407510c",
+  "writer_manifest_sha256": "0919d3dbe4e5acde7efd63737803fec6e58d092639faa43367930c559c931cf6",
+  "writer_value_sha256": "55d2e6cb8277b60763131372f9c4c7dcfdbf57eb61eb47c264f2d8fdc60d1778"
+}

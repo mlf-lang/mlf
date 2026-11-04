@@ -108,10 +108,115 @@ esac
         self.assertFalse(self.archive.exists())
         self.assertFalse(self.staging.exists())
         self.assertEqual(self.receipt["installed_before"], self.receipt["installed_after"])
-        self.assertEqual(self.receipt["installed_tree_before"], self.receipt["installed_tree_after"])
+        self.assertTrue(cleanup.same_installed_tree(
+            self.receipt["installed_tree_before"], self.receipt["installed_tree_after"]))
         self.assertGreater(self.receipt["installed_tree_before"]["runtime_files_scanned"], 3)
         self.assertIn("validated", [event.get("status") for event in self.events])
         self.assertIsInstance(self.receipt["free_bytes_after"], int)
+        self.assert_preserved()
+
+
+    def test_allocation_only_changes_are_recorded_but_not_identity_changes(self):
+        original = cleanup.tree_snapshot
+        snapshots = []
+        def snapshot(root, device, installed=False):
+            value = original(root, device, installed=installed)
+            if installed:
+                value["allocated_bytes"] = 4096 * (len(snapshots) + 1)
+                snapshots.append(dict(value))
+            return value
+        with mock.patch.object(cleanup, "tree_snapshot", side_effect=snapshot):
+            self.run_cleanup()
+        self.assertEqual(len(snapshots), 3)
+        self.assertEqual(self.receipt["status"], "complete")
+        self.assertEqual(self.receipt["installed_tree_before"], snapshots[0])
+        self.assertEqual(self.receipt["installed_tree_after"], snapshots[2])
+        self.assertEqual(snapshots[0]["allocated_bytes"], 4096)
+        self.assertEqual(snapshots[1]["allocated_bytes"], 8192)
+        self.assertEqual(snapshots[2]["allocated_bytes"], 12288)
+        self.assertEqual(set(self.receipt["removed"]), {str(self.archive), str(self.staging)})
+        self.assertFalse(self.archive.exists())
+        self.assertFalse(self.staging.exists())
+        self.assertEqual(self.receipt["installed_before"], self.receipt["installed_after"])
+        self.assert_preserved()
+
+    def test_only_allocation_statistic_is_ignored(self):
+        before = {"sha256": "a" * 64, "entries": 7,
+                  "allocated_bytes": 4096, "runtime_files_scanned": 4}
+        self.assertTrue(cleanup.same_installed_tree(before, dict(before)))
+        self.assertTrue(cleanup.same_installed_tree(
+            before, {**before, "allocated_bytes": 8192}))
+        for field, value in (("sha256", "b" * 64), ("entries", 8),
+                             ("runtime_files_scanned", 5), ("future_identity_field", True)):
+            with self.subTest(field=field):
+                changed = {**before, field: value, "allocated_bytes": 8192}
+                self.assertFalse(cleanup.same_installed_tree(before, changed))
+                self.assertFalse(cleanup.same_installed_tree(changed, before))
+        for field in ("sha256", "entries", "runtime_files_scanned"):
+            changed = dict(before)
+            del changed[field]
+            with self.subTest(missing=field):
+                self.assertFalse(cleanup.same_installed_tree(before, changed))
+
+    def test_actual_identity_changes_remain_detected(self):
+        # No production tree is touched. Each subcase changes one fresh fixture.
+        nonruntime = self.lib / "ordinary-data"
+        runtime = self.lib / "settings"
+        nonruntime.write_bytes(b"ordinary data\n")
+        alias = self.prefix / "settings-alias"
+        alias.symlink_to(runtime.relative_to(self.prefix))
+        device = self.prefix.stat().st_dev
+        def changed(action):
+            before = cleanup.tree_snapshot(self.prefix, device, installed=True)
+            action()
+            after = cleanup.tree_snapshot(self.prefix, device, installed=True)
+            self.assertFalse(cleanup.same_installed_tree(before, after))
+        changed(lambda: nonruntime.write_bytes(b"modified data\n"))
+        changed(lambda: runtime.write_bytes(b"{}\n"))
+        changed(lambda: nonruntime.chmod(0o600))
+        added = self.prefix / "added"
+        changed(lambda: added.write_bytes(b"new\n"))
+        changed(added.unlink)
+        renamed = self.lib / "renamed-data"
+        changed(lambda: nonruntime.rename(renamed))
+        replacement = self.home / "replacement"
+        replacement.write_bytes(renamed.read_bytes())
+        replacement.chmod(renamed.stat().st_mode & 0o777)
+        self.assertNotEqual(replacement.stat().st_ino, renamed.stat().st_ino)
+        changed(lambda: replacement.replace(renamed))
+        def to_directory():
+            renamed.unlink()
+            renamed.mkdir()
+        changed(to_directory)
+        def retarget():
+            alias.unlink()
+            alias.symlink_to((self.db / "base.conf").relative_to(self.prefix))
+        changed(retarget)
+
+    def test_installed_change_during_validation_refuses_before_deletion(self):
+        original = cleanup.installed_check
+        def checked(prefix):
+            result = original(prefix)
+            (self.lib / "settings").write_text("changed during validation\n")
+            return result
+        with mock.patch.object(cleanup, "installed_check", side_effect=checked):
+            self.refuse("Installed files changed during validation")
+
+    def test_installed_change_after_deletion_is_reported_as_incomplete(self):
+        original = cleanup.installed_check
+        def checked(prefix):
+            result = original(prefix)
+            if not self.staging.exists():
+                (self.lib / "settings").write_text("changed after cleanup\n")
+            return result
+        with mock.patch.object(cleanup, "installed_check", side_effect=checked):
+            with self.assertRaisesRegex(RuntimeError, "Installed files changed after cleanup"):
+                self.run_cleanup()
+        self.assertTrue(self.receipt["cleanup_started"])
+        self.assertNotEqual(self.receipt["status"], "complete")
+        self.assertEqual(set(self.receipt["removed"]), {str(self.archive), str(self.staging)})
+        self.assertFalse(self.archive.exists())
+        self.assertFalse(self.staging.exists())
         self.assert_preserved()
 
     def test_bad_archive_pin(self):
