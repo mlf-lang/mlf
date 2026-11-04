@@ -1648,10 +1648,13 @@ class RecursiveCaptureReplayTests(unittest.TestCase):
         row=m.derive_shared_fragment(raw)['recursion']['bindings'][0]
         self.assertEqual(row['free_term_bindings'],[]);self.assertNotIn('captures',row)
 
-    def test_ordinary_closed_callable_and_view_alias_are_still_rejected(self):
+    def test_ordinary_closed_callable_and_view_alias_require_new_policy(self):
         rhs=lam(11,I,app(var(20),app(var(10),var(11))))
-        self.reject(let(20,lam(21,I,var(21)),rec_binding(10,arr(I,I),rhs,lit())),'RECURSION')
-        self.reject(shared(let(20,use(1,I),rec_binding(10,arr(I,I),rhs,lit()))),'RECURSION')
+        for raw in (let(20,lam(21,I,var(21)),rec_binding(10,arr(I,I),rhs,lit())),
+                    shared(let(20,use(1,I),rec_binding(10,arr(I,I),rhs,lit())))):
+            caps=m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']
+            self.assertEqual(caps['policy'],'closed-scalar-callable-shared-view-captures/1')
+            self.assertEqual(caps['callables'][0]['binding'],name(20));self.assertEqual(caps['views'],[])
 
     def test_nominal_owner_is_not_an_admitted_external_capture(self):
         rhs=lam(11,I,sum_case(var(20),[sum_arm('Nil',(),lit()),sum_arm('Cons',(21,22),var(21))]))
@@ -1745,6 +1748,8 @@ class RetainedRecursiveCaptureTests(unittest.TestCase):
         self.assertTrue(report['fragment_admitted'])
         self.assertFalse(report['source_admitted']);self.assertFalse(report['native_admitted'])
         capture=json.loads(path.read_bytes());out=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+        self.assertEqual(hashlib.sha256(m._json(out).encode()).hexdigest(),
+                         'cdee763c1d7c33b2d44194a6865a388506b28576182866ed31587c3986249f7a')
         self.assertEqual(out['steps'],capture['normalization']['steps'])
         self.assertEqual(out['raw_normalized'],capture['normalization']['raw_normalized'])
         self.assertEqual(out['checked_type'],I);self.assertEqual(len(out['steps']),2)
@@ -1777,6 +1782,240 @@ class RetainedRecursiveCaptureTests(unittest.TestCase):
         self.assertEqual(old_path.read_bytes(),old_bytes)
         old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
         self.assertEqual(old['fragment_error']['code'],'RECURSION')
+
+
+def callable_capture(alias=False):
+    """Synthetic pending/alias owners, with no original or native execution."""
+    tree=captured_recursion();bonus=tree['body']['body'];rec=bonus['body']
+    fn=rec['bindings'][0]['value']['argument']
+    fn['body']['alternatives'][1]['body']=add(app(var(70),var(60) if alias else lit(0)),
+                                            app(var(30),var(33)))
+    value=(use(1,I) if alias else lam(72,I,app(use(1,I),add(var(72),var(60)))))
+    bonus['body']=let(70,app(lam(71,arr(I,I),var(71)),value),rec)
+    return tree
+
+
+class RecursiveCallableCaptureReplayTests(unittest.TestCase):
+    reject=ReplayTests.reject
+
+    def test_pending_callable_retains_graph_and_transitive_shared_origin_proof(self):
+        tree=callable_capture();out=m.derive_shared_fragment(tree)
+        row,=out['recursion']['bindings'];caps=row['captures']
+        self.assertEqual(caps['policy'],'closed-scalar-callable-shared-view-captures/1')
+        self.assertEqual(caps['scalars'],[]);self.assertEqual(caps['views'],[])
+        fn,=caps['callables'];self.assertEqual(fn['binding'],name(70));self.assertEqual(fn['type'],arr(I,I))
+        self.assertEqual(row['free_term_bindings'],[70])
+        self.assertEqual([m._get(tree,a['path']) for a in fn['occurrences']],[var(70)])
+        self.assertEqual(out['raw_normalized'],tree)
+        self.assertEqual(out['input_erased'],p.erase_total(tree))
+        self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I],[B]])
+        self.assertEqual(len(out['term_correspondence']),len(m._ordinary(tree)))
+        self.assertEqual(m.validate_shared_fragment(tree,out),out)
+
+    def test_ordinary_alias_does_not_reconstruct_a_recursive_view_capture(self):
+        tree=callable_capture(True);out=m.derive_shared_fragment(tree)
+        row,=out['recursion']['bindings'];caps=row['captures']
+        self.assertEqual(row['free_term_bindings'],[60,70])
+        self.assertEqual(caps['scalars'][0]['binding'],name(60))
+        self.assertEqual(caps['callables'][0]['binding'],name(70))
+        self.assertEqual(caps['views'],[])
+        self.assertEqual(out['raw_normalized']['body']['body']['body']['value']['argument'],use(1,I))
+        self.assertEqual(len(out['polymorphism']['uses']),2)
+
+    def test_no_origin_Code_Access_or_readiness_is_invented(self):
+        caps=m.derive_shared_fragment(callable_capture())['recursion']['bindings'][0]['captures']
+        self.assertEqual(set(caps),{'policy','scalars','views','callables'})
+        self.assertEqual(set(caps['callables'][0]),{'binding','type','occurrences'})
+
+    def test_recursively_closed_higher_order_scalar_arrow_preserved_exactly(self):
+        typ=arr(arr(I,I),arr(B,I))
+        value=lam(21,arr(I,I),lam(22,B,app(var(21),lit())))
+        rhs=lam(11,I,app(app(var(20),lam(23,I,var(23))),boolean()))
+        out=m.derive_shared_fragment(let(20,value,rec_binding(10,arr(I,I),rhs,lit())))
+        self.assertEqual(out['recursion']['bindings'][0]['captures']['callables'][0]['type'],typ)
+
+    def test_pending_curried_view_result_stays_an_ordinary_owner(self):
+        generic=tabs(100,tabs(101,lam(2,tv(100),lam(3,tv(101),var(2)))))
+        rhs=lam(11,I,app(var(20),boolean()))
+        raw=let(1,generic,let(20,app(use(1,I,B),lit()),rec_binding(10,arr(I,I),rhs,
+            choose(app(app(use(1,B,I),boolean()),lit()),app(var(10),lit()),lit(0)))))
+        out=m.derive_shared_fragment(raw);caps=out['recursion']['bindings'][0]['captures']
+        self.assertEqual(caps['callables'][0]['type'],arr(B,I));self.assertEqual(caps['views'],[])
+        self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I,B],[B,I]])
+        self.assertEqual(out['raw_normalized'],raw)
+
+    def test_same_arrow_and_same_hint_do_not_merge_distinct_binders(self):
+        raw=let(20,lam(21,I,var(21)),let(30,lam(31,I,var(31)),
+            rec_binding(10,arr(I,I),lam(11,I,add(app(var(20),var(11)),app(var(30),var(11)))),lit())))
+        for _,node in m._walk(raw):
+            if type(node.get('name')) is dict and node['name']['id'] in (20,30):node['name']['hint']='same'
+        rows=m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']['callables']
+        self.assertEqual([r['binding'] for r in rows],[name(20,'same'),name(30,'same')])
+
+    def test_repeated_and_nested_occurrences_keep_one_owner_with_complete_paths(self):
+        tree=callable_capture();rec=tree['body']['body']['body']['body']
+        arms=rec['bindings'][0]['value']['argument']['body']['alternatives']
+        arms[0]['body']=app(lam(80,I,add(app(var(70),lit()),app(var(70),var(80)))),lit())
+        out=m.derive_shared_fragment(tree);rows=out['recursion']['bindings'][0]['captures']['callables']
+        self.assertEqual(len(rows),1);self.assertEqual(len(rows[0]['occurrences']),3)
+        self.assertEqual([m._get(tree,p['path']) for p in rows[0]['occurrences']],[var(70)]*3)
+        self.assertEqual(len({tuple(p['path']) for p in rows[0]['occurrences']}),3)
+
+    def test_all_three_capture_categories_are_separate_and_counted(self):
+        tree=callable_capture(True);rec=tree['body']['body']['body']['body']
+        arm=rec['bindings'][0]['value']['argument']['body']['alternatives'][1]
+        arm['body']=add(app(use(1,I),var(60)),add(app(var(70),var(60)),app(var(30),var(33))))
+        out=m.derive_shared_fragment(tree);row=out['recursion']['bindings'][0];caps=row['captures']
+        self.assertEqual(row['free_term_bindings'],[1,60,70])
+        self.assertEqual(len(caps['scalars']),1);self.assertEqual(len(caps['callables']),1)
+        self.assertEqual(len(caps['views']),1);self.assertEqual(len(row['self_uses']),1)
+        with mock.patch.object(m,'MAX_RECURSIVE_CAPTURES',3):self.reject(tree,'LIMIT')
+
+    def test_64_owner_boundary_with_and_without_used_self(self):
+        def tree(count,self_use):
+            terms=[app(var(1000+i),lit(0)) for i in range(count)]
+            if self_use:terms.append(app(var(10),var(11)))
+            while len(terms)>1:
+                terms=[add(terms[i],terms[i+1]) if i+1<len(terms) else terms[i]
+                       for i in range(0,len(terms),2)]
+            raw=rec_binding(10,arr(I,I),lam(11,I,terms[0]),lit())
+            for i in reversed(range(count)):raw=let(1000+i,var(20),raw)
+            return let(20,lam(21,I,var(21)),raw)
+        for count,self_use in ((63,True),(64,False)):
+            with self.subTest(count=count,self_use=self_use):
+                row=m.derive_shared_fragment(tree(count,self_use))['recursion']['bindings'][0]
+                self.assertEqual(len(row['captures']['callables']),count)
+                self.assertEqual(bool(row['self_uses']),self_use)
+        self.reject(tree(64,True),'LIMIT')
+
+    def test_closed_callable_predicate_exact_leaves_root_and_work_charging(self):
+        budget=m._Budget();before=budget.work
+        self.assertTrue(m._closed_scalar_callable(arr(arr(I,I),arr(B,I)),budget))
+        self.assertEqual(budget.work-before,7)
+        bad=[I,B,tv(100),forall(100,arr(tv(100),tv(100))),arr(I,tv(100)),
+             arr(nominal_type('Chain'),I),arr(I,nominal_type('Cell')),
+             arr(I,forall(100,arr(tv(100),tv(100)))),arr(I,{'tag':'bottom'}),
+             {'tag':'arrow','from':I,'to':I,'invented':True}]
+        for typ in bad:
+            with self.subTest(typ=typ):self.assertFalse(m._closed_scalar_callable(typ,m._Budget()))
+        with mock.patch.object(m,'MAX_WORK',2),self.assertRaises(m.SharedTransportError) as caught:
+            m._closed_scalar_callable(arr(I,I),m._Budget())
+        self.assertEqual(caught.exception.code,'LIMIT')
+
+    def test_nominal_domain_or_result_callable_owners_are_rejected(self):
+        domain=let(20,lam(21,nominal_type('Chain'),lit()),
+            rec_binding(10,arr(I,I),lam(11,I,app(var(20),ctor('Nil'))),lit()))
+        result=let(20,lam(21,I,ctor('Nil')),
+            rec_binding(10,arr(I,I),lam(11,I,sum_case(app(var(20),var(11)),
+                [sum_arm('Nil',(),lit()),sum_arm('Cons',(22,23),var(22))])),lit()))
+        self.reject(with_data(domain,recursive_decl()),'RECURSION')
+        self.reject(with_data(result,recursive_decl()),'RECURSION')
+
+    def test_open_higher_rank_and_bare_scheme_are_not_ordinary_callables(self):
+        raw=lam(20,arr(tv(500),I),rec_binding(10,arr(I,I),lam(11,I,lit()),lit()))
+        self.reject(raw,'TYPE_SCOPE')
+        raw=lam(20,arr(forall(500,arr(tv(500),tv(500))),I),
+            rec_binding(10,arr(I,I),lam(11,I,lit()),lit()))
+        self.reject(raw)
+        raw=shared(rec_binding(10,arr(I,I),lam(11,I,let(20,var(1),lit())),lit()))
+        self.reject(raw)
+
+    def test_full_arrow_argument_mismatch_is_not_accepted_by_capture_shape(self):
+        raw=let(20,lam(21,B,lit()),rec_binding(10,arr(I,I),lam(11,I,app(var(20),lit())),lit()))
+        self.reject(raw,'TYPE')
+
+    def test_out_of_scope_and_forged_capture_evidence_are_rejected(self):
+        self.reject(rec_binding(10,arr(I,I),lam(11,I,app(var(20),lit())),lit()),'SCHEMA')
+        tree=callable_capture();out=m.derive_shared_fragment(tree)
+        mutations=[lambda c:c.pop('callables'),lambda c:c.update(policy=m.RECURSIVE_CAPTURE_POLICY),
+            lambda c:c['callables'].clear(),lambda c:c['callables'][0].update(binding=name(999)),
+            lambda c:c['callables'][0].update(type=arr(B,I)),lambda c:c['callables'][0]['occurrences'].clear(),
+            lambda c:c['callables'][0]['occurrences'].append({'stage':'normalized','path':[]}),
+            lambda c:c['callables'][0].update(origin='E0'),
+            lambda c:c['callables'].append(copy.deepcopy(c['callables'][0]))]
+        for index,mutate in enumerate(mutations):
+            forged=copy.deepcopy(out);mutate(forged['recursion']['bindings'][0]['captures'])
+            with self.subTest(index=index),self.assertRaises(m.SharedTransportError) as caught:
+                m.validate_shared_fragment(tree,forged)
+            self.assertEqual(caught.exception.code,'EVIDENCE')
+
+    def test_previous_scalar_shared_only_evidence_is_byte_identical(self):
+        out=m.derive_shared_fragment(captured_recursion())
+        self.assertEqual(hashlib.sha256(m._json(out).encode()).hexdigest(),
+                         'deaa5084cdcac0be57aedef29f451bf3e59f5c47fab336b7319c5e05ddb24cd4')
+        caps=out['recursion']['bindings'][0]['captures']
+        self.assertEqual(caps['policy'],m.RECURSIVE_CAPTURE_POLICY);self.assertNotIn('callables',caps)
+
+
+RECURSIVE_CALLABLE_CAPTURE_ROOT=os.environ.get('IR8_RECURSIVE_CALLABLE_CAPTURE_ROOT')
+
+
+@unittest.skipUnless(RECURSIVE_CALLABLE_CAPTURE_ROOT,
+                    'set IR8_RECURSIVE_CALLABLE_CAPTURE_ROOT for completed ordinary callable captures')
+class RetainedRecursiveCallableCaptureTests(unittest.TestCase):
+    def test_both_genuine_captures_replay_without_predicting_callable_targets(self):
+        from source_capture_v8 import verify_capture
+        root=Path(RECURSIVE_CALLABLE_CAPTURE_ROOT).resolve()
+        pins={
+            'pending-step':('8d6452d60f503b6e685f4abd48ca8967489a25135ec75d0e681e719199e7a5df',
+                            '3f8464fc2be27830957126ec052f71afadcfe031b4a0e16ec4febb877dbe8be0'),
+            'view-alias':('feb1656e2b397be0fed3eba1f40ba95785eb1029a8aab6fdb5aa164fefa01668',
+                          '00d66d88c00af704cdc01c85aebf38a14694ca2990cdd1423eda3ca80b230170')}
+        for label,(capture_hash,source_hash) in pins.items():
+            with self.subTest(label=label):
+                path=root/('capture-'+label+'01')/'capture.stdout'
+                old_path=path.parent/'verification.json';old_bytes=old_path.read_bytes()
+                report=verify_capture(path,fixture_root=root/'inputs'/label,entry='main.emlf',
+                    expected_source_hashes={'main.emlf':source_hash,
+                        'SharedPoly.emlf':'50fd7fa662c9290a61b0a69012cd2e886a44075de9827dff4edd3f0c839573a7'},
+                    expected_capture_sha256=capture_hash)
+                self.assertTrue(report['fragment_admitted']);self.assertFalse(report['source_admitted'])
+                self.assertFalse(report['native_admitted'])
+                capture=json.loads(path.read_bytes());out=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+                self.assertEqual(out['steps'],capture['normalization']['steps'])
+                self.assertEqual(out['raw_normalized'],capture['normalization']['raw_normalized'])
+                self.assertEqual(len(out['steps']),2);self.assertEqual(out['checked_type'],I)
+                definition,=out['polymorphism']['definitions'];join,=report['retained_prefix_binding_joins']
+                self.assertEqual(definition['binding'],join['binding'])
+                self.assertEqual(join['resolver_allocation']['entity'],
+                    {'namespace':'terms','owner':'SharedPoly','role':{'tag':'value'},'spelling':'sharedId'})
+                self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I],[B]])
+                raw=out['raw_normalized'];shared_let=m._get(raw,definition['binding_source']['path'])
+                bonus=shared_let['body'];step=bonus['body'];rec=step['body']
+                self.assertEqual(bonus['tag'],'let');self.assertEqual(bonus['value']['tag'],'application')
+                self.assertEqual(step['tag'],'let');self.assertEqual(step['value']['tag'],'application')
+                self.assertEqual(rec['tag'],'letrec');row,=out['recursion']['bindings'];caps=row['captures']
+                self.assertEqual(caps['policy'],m.RECURSIVE_CALLABLE_CAPTURE_POLICY)
+                self.assertEqual(caps['views'],[]);ordinary,=caps['callables']
+                self.assertEqual(ordinary['binding'],step['name']);self.assertEqual(ordinary['type'],arr(I,I))
+                self.assertEqual([m._get(raw,a['path']) for a in ordinary['occurrences']],
+                                 [{'tag':'var','name':step['name']}])
+                self.assertEqual(row['binding'],rec['bindings'][0]['name'])
+                self.assertEqual(step['value']['function']['body'],
+                                 {'tag':'var','name':step['value']['function']['parameter']})
+                self.assertEqual(step['value']['function']['parameter_type'],arr(I,I))
+                int_use=out['polymorphism']['uses'][0]
+                self.assertEqual(m._get(raw,int_use['variable']['path']),{'tag':'var','name':definition['binding']})
+                if label=='pending-step':
+                    self.assertEqual(caps['scalars'],[]);self.assertEqual(row['free_term_bindings'],[step['name']['id']])
+                    self.assertEqual(step['value']['argument']['tag'],'lambda')
+                    self.assertEqual(step['value']['argument']['body']['tag'],'let')
+                    self.assertEqual(step['value']['argument']['body']['value']['tag'],'application')
+                    self.assertEqual(m._free_terms(step['value']),{definition['binding']['id'],bonus['name']['id']})
+                else:
+                    scalar,=caps['scalars'];self.assertEqual(scalar['binding'],bonus['name'])
+                    self.assertEqual(row['free_term_bindings'],sorted([step['name']['id'],bonus['name']['id']]))
+                    self.assertEqual(step['value']['argument']['tag'],'type_application')
+                    self.assertEqual(step['value']['argument'],m._get(raw,int_use['source']['path']))
+                    self.assertEqual(m._free_terms(step['value']),{definition['binding']['id']})
+                nil,cons=out['nominal_sum']['cases'][0]['arms']
+                self.assertEqual(m._get(raw,nil['body']['path']),lit(0))
+                for occurrence in ordinary['occurrences']:
+                    self.assertEqual(occurrence['path'][:len(cons['body']['path'])],cons['body']['path'])
+                # Static occurrence/graph facts do not predict eventual Code or runtime demand.
+                self.assertEqual(old_path.read_bytes(),old_bytes)
+                old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
+                self.assertEqual(old['fragment_error']['code'],'RECURSION')
 
 
 if __name__ == '__main__':

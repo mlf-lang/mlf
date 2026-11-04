@@ -12,8 +12,9 @@ all arms checked and their exact declaration/source identities retained. A self
 field is the same finite nominal identity, never a recursively expanded type.
 One concrete monomorphic recursive function can use an owned, coarse typed
 hole. Its complete checked RHS graph remains lazy; no wrapper is contracted.
-Closed scalar owners and complete shared-view pairs may be captured without
-changing their existing group support, capsule origin or target Access.
+Closed scalar owners, closed scalar-arrow owners and complete shared-view pairs
+may be captured without changing existing support, origin or target Access.
+An ordinary callable owner may remain pending; its type predicts no Code.
 """
 from __future__ import annotations
 
@@ -564,7 +565,7 @@ class Planner:
         return result
 
     def recursive_captures(self, evidence, mono, pairs, env, views):
-        """Carry existing scalar owners and saved full-vector views, unchanged.
+        """Carry existing ordinary owners and saved full-vector views unchanged.
 
         The knot retains its current home. Incoming strict support facts remain
         valid; capture/Instantiate publication uses the ordinary machinery and
@@ -581,15 +582,43 @@ class Planner:
         require(len(mono)+len(pairs)+bool(evidence['self_uses']) <= MAX_CAPTURES,
                 'recursive carrier capture count exceeds 64')
         captures = evidence.get('captures')
-        require(captures is not None and captures['policy'] == 'closed-scalar-shared-view-captures/1',
-                'recursive capture policy differs')
-        require([row['binding']['id'] for row in captures['scalars']] == sorted(mono),
-                'recursive scalar capture inventory differs')
+        require(captures is not None, 'recursive capture evidence missing')
+        callables = captures.get('callables', [])
+        if captures['policy'] == 'closed-scalar-shared-view-captures/1':
+            require('callables' not in captures and
+                    [row['binding']['id'] for row in captures['scalars']] == sorted(mono),
+                    'recursive scalar capture inventory differs')
+        else:
+            require(captures['policy'] == 'closed-scalar-callable-shared-view-captures/1' and callables,
+                    'recursive capture policy differs')
+            self.tick(len(callables)+len(captures['scalars']))
+            scalar_ids = [row['binding']['id'] for row in captures['scalars']]
+            callable_ids = [row['binding']['id'] for row in callables]
+            require(scalar_ids == sorted(set(scalar_ids)) and callable_ids == sorted(set(callable_ids)) and
+                    not set(scalar_ids).intersection(callable_ids) and
+                    set(scalar_ids)|set(callable_ids) == mono, 'recursive ordinary capture partition differs')
         for row in captures['scalars']:
             ident = row['binding']['id']; typ = self.logical(row['type'],None)
             source = env.get(ident)
             require(typ in SCALARS.values() and isinstance(source,Reference) and source.logical == typ,
                     'recursive ordinary capture must be an available closed scalar owner')
+            inner[ident] = source
+        for row in callables:
+            ident = row['binding']['id']; typ = self.logical(row['type'],None)
+            require(typ[0] == 'arrow', 'recursive callable capture must have an arrow root')
+            work = [typ]
+            while work:
+                self.tick(); part = work.pop()
+                if part in SCALARS.values():
+                    continue
+                require(part[0] == 'arrow' and part[3:] == ('repeat','unknown'),
+                        'recursive callable capture requires exact closed scalar-arrow structure')
+                work.extend((part[1],part[2]))
+            source = env.get(ident)
+            require(isinstance(source,Reference) and source.logical == typ,
+                    'recursive callable capture must be an available exact ordinary owner')
+            # In particular, do not acquire a Scheme view or inspect readiness
+            # here. A pending owner may eventually resolve to a shared Instance.
             inner[ident] = source
         keys = []
         for row in captures['views']:

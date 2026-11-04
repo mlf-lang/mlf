@@ -16,8 +16,9 @@ nominal types are never unfolded. This does not admit nominal Scheme arguments,
 nominal atoms in generic code, callable SUM fields, cross-family recursion,
 or parameterized/higher-rank data. At most one retained recursive group globally
 is admitted, containing one concrete closed monomorphic function. Its optional
-capture policy permits closed Int/Bool owners and exact full-vector lexical
-shared views, not ordinary callable/nominal owners or bare Schemes. Its
+capture policies permit closed Int/Bool owners, exact full-vector lexical
+shared views, and ordinary owners of recursively closed scalar-arrow types.
+Nominal owners, open/higher-rank callables and bare Schemes remain excluded. Its
 introduction spine has at most eight exact typed passthrough
 wrappers. This is not a termination proof or generic/value-recursion permission.
 The complete RHS, including ordinary annotation applications, remains unchanged.
@@ -57,6 +58,7 @@ SUM_POLICY = 'closed-scalar-sum/1'
 SUM_SELF_POLICY = 'closed-self-atom/1'
 RECURSION_POLICY = 'closed-single-function-recursion/1'
 RECURSIVE_CAPTURE_POLICY = 'closed-scalar-shared-view-captures/1'
+RECURSIVE_CALLABLE_CAPTURE_POLICY = 'closed-scalar-callable-shared-view-captures/1'
 NOMINAL_POLICY = 'closed-single-constructor-data/1'
 INT = {'tag': 'constructor', 'name': 'Int', 'arguments': []}
 BOOL = {'tag': 'constructor', 'name': 'Bool', 'arguments': []}
@@ -1025,6 +1027,26 @@ def _nominal_inventory(root, inferred, registry, budget):
     return data, sums
 
 
+def _closed_scalar_callable(typ, budget):
+    """A root arrow with only exact Int/Bool leaves, not a Code/origin proof.
+
+    Raw input is already snapshotted and depth/cell bounded. Charge each node
+    of this iterative check; do not recursively expand aliases or nominals.
+    """
+    if type(typ) is not dict or typ.get('tag') != 'arrow':
+        return False
+    work = [typ]
+    while work:
+        budget.tick()
+        node = work.pop()
+        if _scalar(node):
+            continue
+        if type(node) is not dict or set(node) != {'tag', 'from', 'to'} or node['tag'] != 'arrow':
+            return False
+        work.extend((node['from'], node['to']))
+    return True
+
+
 def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, budget):
     """Partition all external raw variables using checked lexical use evidence.
 
@@ -1044,7 +1066,7 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, bud
             if path in uses:
                 _fail('RECURSION', 'shared view occurrence is not unique', path)
             uses[path] = use
-    scalars, views, accounted = {}, {}, set()
+    scalars, callables, views, accounted = {}, {}, {}, set()
     for relative, node in _walk(rhs):
         budget.tick()
         if node['tag'] != 'var' or node['name']['id'] not in free:
@@ -1057,10 +1079,17 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, bud
             if not _same(row['type'], typ):
                 _fail('RECURSION', 'scalar capture has inconsistent lexical types', path)
             row['occurrences'].append(_address('normalized', path))
+        elif _closed_scalar_callable(typ, budget):
+            # This is the lexical ordinary owner, possibly still pending. Its
+            # eventual target/Code/Access cannot be deduced from an arrow type.
+            row = callables.setdefault(ident, {'binding': node['name'], 'type': typ, 'occurrences': []})
+            if not _same(row['type'], typ):
+                _fail('RECURSION', 'callable capture has inconsistent complete lexical types', path)
+            row['occurrences'].append(_address('normalized', path))
         else:
             use = uses.pop(path, None)
             if use is None:
-                _fail('RECURSION', 'external capture is not a closed scalar or exact shared view', path)
+                _fail('RECURSION', 'external capture is not a closed scalar/callable or exact shared view', path)
             definition = definitions[use['definition']]
             if definition['binding']['id'] != ident:
                 _fail('RECURSION', 'shared capture binder differs from its lexical definition', path)
@@ -1071,13 +1100,18 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, bud
                     or not _same(row['instantiated_type'], use['instantiated_type'])):
                 _fail('RECURSION', 'shared capture full-vector type differs', path)
             row['uses'].append(use['id'])
-        if len(scalars) + len(views) + bool(self_uses) > MAX_RECURSIVE_CAPTURES:
+        if len(scalars) + len(callables) + len(views) + bool(self_uses) > MAX_RECURSIVE_CAPTURES:
             _fail('LIMIT', 'recursive carrier exceeds 64 captures including self', path)
     if accounted != free or uses:
         _fail('RECURSION', 'recursive free-term inventory is not completely classified', rhs_path)
-    return {'policy': RECURSIVE_CAPTURE_POLICY,
-            'scalars': [scalars[key] for key in sorted(scalars)],
-            'views': [views[key] for key in sorted(views)]}
+    result = {'policy': RECURSIVE_CAPTURE_POLICY,
+              'scalars': [scalars[key] for key in sorted(scalars)],
+              'views': [views[key] for key in sorted(views)]}
+    # No new key or policy for existing scalar/shared-only or capture-free code.
+    if callables:
+        result['policy'] = RECURSIVE_CALLABLE_CAPTURE_POLICY
+        result['callables'] = [callables[key] for key in sorted(callables)]
+    return result
 
 
 def _recursion_inventory(root, inferred, inventory, budget):

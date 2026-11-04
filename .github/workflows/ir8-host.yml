@@ -146,6 +146,11 @@ jobs:
           set -euo pipefail
           python3 -B tools/experimental/resource-native/tests/test_planner_v8_recursive_captures.py \
             2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/recursive-captures-planner.log"
+      - name: Check ordinary callable captures and prior-plan preservation
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_planner_v8_callable_captures.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/callable-captures-planner.log"
       - name: Retain fragment evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -157,7 +162,7 @@ jobs:
   ir8-controlled-source:
     name: Controlled IR8 shared-source integration
     runs-on: ubuntu-24.04
-    # Reuse one GHC install for 24 fresh cases (4 portable + 8 CLI + 3 coarse + 3 groups + 2 SUM + 2 self-SUM + 1 recursion + 1 captures).
+    # Reuse one GHC install for 26 fresh cases (4 portable + 8 CLI + 3 coarse + 3 groups + 2 SUM + 2 self-SUM + 1 recursion + 1 captures + 2 callables).
     # Keep the 60-minute job ceiling and all per-process and memory limits unchanged.
     timeout-minutes: 60
     steps:
@@ -225,6 +230,11 @@ jobs:
           python3 -B tools/experimental/resource-native/tests/test_source_v8_recursive_captures.py \
             --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
             --output "$RUNNER_TEMP/ir8-source-recursive-captures"
+      - name: Run fresh recursive functions with ordinary callable captures
+        run: |
+          python3 -B tools/experimental/resource-native/tests/test_source_v8_callable_captures.py \
+            --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
+            --output "$RUNNER_TEMP/ir8-source-callable-captures"
       - name: Retain source evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -240,5 +250,6 @@ jobs:
             ${{ runner.temp }}/ir8-source-recursive-sum
             ${{ runner.temp }}/ir8-source-monomorphic-recursion
             ${{ runner.temp }}/ir8-source-recursive-captures
+            ${{ runner.temp }}/ir8-source-callable-captures
           if-no-files-found: warn
           retention-days: 14

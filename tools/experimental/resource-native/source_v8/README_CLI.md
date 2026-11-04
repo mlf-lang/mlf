@@ -57,6 +57,11 @@ default placement and fault policy are unchanged.
 to capture closed Int/Bool owners and complete lexical shared views, retaining
 their actual Access/origin. It does not admit arbitrary ordinary callable or
 nominal captures, bare Schemes, partial vectors or additional recursive groups.
+[Stage16](../resource_ir_v8/README_STAGE16.md) additionally permits ordinary
+lexical callable captures with complete closed arrows over Int/Bool. Such owners
+may remain pending and resolve to a concrete closure or a full shared callable
+view without a new CLI option. Nominal-valued captures and recursive generic
+definitions remain rejected.
 See the [fragment contract](README.md) for its limits.
 
 For example, a closed callable field can use the same `SharedPoly.emlf` above:
