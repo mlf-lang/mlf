@@ -62,6 +62,16 @@ const validate = text => {
   assert.match(producer, /jq -e '\.complete == true and \.producer_host == "GHC" and \.typecheck_only == false' \.mlf-build\/shared-ghc\/receipt.json/);
   const toolchain = commandStep('https://downloads.haskell.org/~ghc/9.14.1/');
   assert.doesNotMatch(toolchain, /^        if:/m, 'Every producer has its own verified toolchain');
+  assert.ok(toolchain.includes('python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json\n'),
+    'Each shard verifies and removes only its pinned install inputs');
+  const installedAt = toolchain.indexOf('make install)');
+  const cleanupAt = toolchain.indexOf('python3 -B tools/release/cleanup-ghc-install.py');
+  assert.ok(installedAt >= 0 && cleanupAt >= 0 && installedAt < cleanupAt,
+    'Install-input cleanup follows successful installation');
+  for (const flags of ['-B', '-O -B']) {
+    assert.ok(job(text, 'metadata').includes('python3 ' + flags + ' tools/release/test-ghc-install-cleanup.py\n'),
+      'Keep normal and optimized cleanup refusal controls');
+  }
   const checkout = commandStep('uses: actions/checkout@');
   assert.doesNotMatch(checkout, /^        if:/m);
   assert.match(checkout, /fetch-depth: 0/);
@@ -96,8 +106,18 @@ const validate = text => {
   assert.match(numeric, /for suite in host native legacy; do/);
   assert.match(numeric, /run_controls.py --suite "\$suite" --producer \.mlf-build\/shared-ghc/);
   assert.match(commandStep('tools/performance/patricia/run_native.py'), /--mode standalone\n/);
+  const graphChecks = [
+    'tools/performance/crate-query-graph/verify.py',
+    'tools/performance/crate-query-graph/source_checks.py',
+  ];
+  for (const command of graphChecks) {
+    const step = commandStep(command);
+    assert.match(step, /^        if: matrix.optimization == '2'$/m);
+    assert.match(step, /resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 /);
+  }
   const o2Only = [
     ...migrated,
+    ...graphChecks,
     'python3 -B tools/performance/patricia/test_adapters.py',
     'python3 -O -B tools/performance/patricia/test_adapters.py',
     'tools/shared/test_source_context_cache.py',
@@ -155,6 +175,9 @@ const validate = text => {
       'Keep binary build, target, and independent-oracle evidence: ' + evidence);
   }
 
+  assert.ok(upload.includes('            .mlf-build/ghc-install-cleanup.json\n'),
+    'Retain exact cleanup scope, validation and refusal receipts');
+
   const artifact = upload.match(/^          name: (.+)$/m)?.[1];
   assert.ok(artifact);
   const artifactNames = legs.map(leg => artifact.replaceAll('${{ matrix.optimization }}', leg.optimization).replaceAll('${{ matrix.suite }}', leg.suite));
@@ -175,6 +198,15 @@ const controls = [
   ['matrix exclusion', '        include:\n', '        exclude: []\n        include:\n'],
   ['outer bound changed', '    timeout-minutes: 120\n', '    timeout-minutes: 121\n'],
   ['fail-fast cancellation', '      fail-fast: false\n', '      fail-fast: true\n'],
+  ['installation omitted before cleanup', '&& make install)', '&& true)'],
+  ['premature install-input cleanup',
+    '          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux"',
+    '          python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json\n          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux"'],
+  ['install-input cleanup omitted', 'python3 -B tools/release/cleanup-ghc-install.py --receipt', 'python3 -B tools/release/omitted-cleanup.py --receipt'],
+  ['cleanup receipt argument omitted', '--receipt .mlf-build/ghc-install-cleanup.json', '--receipt .mlf-build/omitted-cleanup.json'],
+  ['cleanup evidence omitted', '            .mlf-build/ghc-install-cleanup.json\n', ''],
+  ['normal cleanup controls omitted', '          python3 -B tools/release/test-ghc-install-cleanup.py\n', ''],
+  ['optimized cleanup controls omitted', '          python3 -O -B tools/release/test-ghc-install-cleanup.py\n', ''],
   ['producer skipped', '      - name: Build exact committed shared sources and direct test runners\n', "      - name: Build exact committed shared sources and direct test runners\n        if: matrix.optimization == '2'\n"],
   ['producer authentication removed', '.complete == true and .producer_host == "GHC" and .typecheck_only == false', '.complete == true'],
   ['direct coverage skipped', "if: matrix.suite == 'all' || matrix.suite == 'direct'", "if: matrix.suite == 'all'"],
@@ -193,9 +225,19 @@ const controls = [
   ['O2 guest omitted',
     "      - name: Check actual MLF mixed-framework source acceptance\n        if: matrix.optimization == '2'\n",
     "      - name: Check actual MLF mixed-framework source acceptance\n        if: false\n"],
+  ['O2 graph fingerprints omitted',
+    "      - name: Check query graph fingerprints and publication recovery\n        if: matrix.optimization == '2'\n",
+    "      - name: Check query graph fingerprints and publication recovery\n        if: false\n"],
+  ['O2 source graph omitted',
+    "      - name: Check source query graph and lowered fallback\n        if: matrix.optimization == '2'\n",
+    "      - name: Check source query graph and lowered fallback\n        if: false\n"],
+  ['graph fingerprints command omitted', 'tools/performance/crate-query-graph/verify.py', 'tools/performance/crate-query-graph/omitted.py'],
+  ['source graph command omitted', 'tools/performance/crate-query-graph/source_checks.py', 'tools/performance/crate-query-graph/omitted_source.py'],
+  ['graph fingerprint resource guard relaxed', '--rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard', '--rss-mib 6144 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard'],
+  ['source graph resource guard relaxed', '--rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard', '--rss-mib 6144 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard'],
   ['O2 source context omitted',
-    "      - name: Check shared source-query contexts and legacy cache compatibility\n        if: matrix.optimization == '2'\n",
-    "      - name: Check shared source-query contexts and legacy cache compatibility\n        if: false\n"],
+    "      - name: Check retained legacy query API contexts and codecs\n        if: matrix.optimization == '2'\n",
+    "      - name: Check retained legacy query API contexts and codecs\n        if: false\n"],
   ['O2 artifact binary omitted',
     "      - name: Check binary artifact codecs and real native storage\n        if: matrix.optimization == '2'\n",
     "      - name: Check binary artifact codecs and real native storage\n        if: false\n"],
@@ -224,7 +266,8 @@ const controls = [
 ];
 for (const [name, before, after] of controls) {
   assert.ok(workflow.includes(before), `Mutation ${name} must hit the actual workflow`);
-  if (name === 'O2 guest omitted' || name === 'O2 source context omitted' || name === 'O2 artifact binary omitted') {
+  if (['O2 guest omitted', 'O2 graph fingerprints omitted', 'O2 source graph omitted',
+       'O2 source context omitted', 'O2 artifact binary omitted'].includes(name)) {
     assert.equal(workflow.split(before).length, 2, `Mutation ${name} must select exactly one named step`);
   }
   const mutated = workflow.replace(before, after);
