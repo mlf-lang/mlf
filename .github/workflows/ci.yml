@@ -195,6 +195,10 @@ jobs:
         if: matrix.optimization == '2'
         run: |
           set -euo pipefail
+          python3 -B tools/performance/patricia/test_open_file_comparison.py
+          python3 -O -B tools/performance/patricia/test_open_file_comparison.py
+          python3 -B tools/performance/patricia/test_open_file_controls.py
+          python3 -O -B tools/performance/patricia/test_open_file_controls.py
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-builtin-guard python3 -B tools/performance/patricia/run_integrated.py --suite builtin --producer .mlf-build/shared-ghc --output .mlf-build/patricia-builtin-controls
           python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/patricia-files-guard python3 -B tools/performance/patricia/run_file_controls.py --reference-source "$PWD" --reference-producer .mlf-build/shared-ghc --producer .mlf-build/shared-ghc --builtin-prefix .mlf-build/patricia-builtin-controls/builtin --output .mlf-build/patricia-file-controls
       - name: Execute the actual shared suite-receipt helpers
@@ -393,6 +397,11 @@ jobs:
             .mlf-build/patricia-*/**/stdout
             .mlf-build/patricia-*/**/stderr
             .mlf-build/patricia-*/**/*.hs
+            .mlf-build/patricia-file-controls/**/*.mlfci
+            .mlf-build/patricia-file-controls/**/*.mlfco
+            .mlf-build/patricia-file-controls/**/*.queries
+            .mlf-build/patricia-file-controls/**/*.spec
+            .mlf-build/patricia-file-controls/**/*.xterm-v6.bin
             .mlf-build/int64-*/**/*.json
             .mlf-build/int64-*/**/stdout
             .mlf-build/int64-*/**/stderr
