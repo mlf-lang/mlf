@@ -1,4 +1,4 @@
-"""Reviewed live graph135 source loader; frozen132 evidence remains historical.
+"""Reviewed writer-preflight source loader; graph135 and frozen132 evidence are unchanged.
 
 Install beside source_contract.py and the future frozen metadata bundle at
  tools/performance/artifact-binary/. The historical source chain is unchanged.
@@ -10,8 +10,8 @@ import types
 import os
 import stat
 
-FINAL_MANIFEST_SHA256 = '71532df8a848c84d9803c3aa4b9adba65fcb53c90a56e7551a5c6555b2dc00be'
-CONTRACT_SOURCE_SHA256 = 'e41fb3ac880e2f53872de56571918b0c26409998fe771f2547f37da8271cf682'
+FINAL_MANIFEST_SHA256 = '0919d3dbe4e5acde7efd63737803fec6e58d092639faa43367930c559c931cf6'
+CONTRACT_SOURCE_SHA256 = 'd0bd6478e7ffe525a72e1f6d0053e86a8773a133913297df335d0cf67407510c'
 
 
 def read_implementation(path):
@@ -40,10 +40,10 @@ def live_contract(history_root, source_root=None):
     if FINAL_MANIFEST_SHA256 is None:
         raise ValueError('binary source migration is not frozen; live135 admission is unavailable')
     directory = Path(__file__).resolve().parent
-    path = directory / 'query_graph_contract.py'
+    path = directory / 'writer_preflight_contract.py'
     raw = read_implementation(path)
     if hashlib.sha256(raw).hexdigest() != CONTRACT_SOURCE_SHA256:
-        raise ValueError('fixed graph source contract implementation SHA')
+        raise ValueError('fixed writer-preflight source contract implementation SHA')
     module = types.ModuleType('fixed_binary_source_contract')
     module.__file__ = str(path)
     # Execute only this separately author-pinned maintenance implementation;

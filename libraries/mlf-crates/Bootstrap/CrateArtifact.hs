@@ -3663,10 +3663,15 @@ module Bootstrap.CrateArtifact where {
     ioReturn (mapLeft (\message -> path ++ ": " ++ message) result)
   };
   writeObjectEither :: String -> CrateObject -> IO (Either String ());
-  writeObjectEither prefix object = case object of {
-    OpenCrateObject iface package -> writeOpenObject prefix iface package;
-    _ -> writeClosedObjectEither prefix object
-  };
+  writeObjectEither prefix object =
+    if Storage.hasNul prefix 0 then ioReturn (Left "file path contains NUL") else do {
+      let { path = prefix ++ ".mlfco"; destination = if Host.absolutePath path then path else "./" ++ path };
+      isDirectory <- directoryExists destination;
+      if isDirectory then ioReturn (Left "artifact destination is a directory") else case object of {
+        OpenCrateObject iface package -> writeOpenObject prefix iface package;
+        _ -> writeClosedObjectEither prefix object
+      }
+    };
   writeClosedObjectEither prefix object =
     if Storage.hasNul prefix 0 then ioReturn (Left "file path contains NUL") else do {
       let { path = prefix ++ ".mlfco"; destination = if Host.absolutePath path then path else "./" ++ path };

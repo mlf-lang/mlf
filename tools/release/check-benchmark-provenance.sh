@@ -27,6 +27,8 @@ python3 -B tools/release/check_benchmark_transition.py
 python3 -B tools/release/test_benchmark_transition.py
 python3 -B tools/performance/artifact-binary/test_query_graph_migration.py
 python3 -B -O tools/performance/artifact-binary/test_query_graph_migration.py
+python3 -B tools/performance/artifact-binary/test_writer_preflight_migration.py
+python3 -B -O tools/performance/artifact-binary/test_writer_preflight_migration.py
 jq -r '.workloads[].provenance[] | select(.original_source != .build_source) | [.original_source,.build_source] | @tsv' "$manifest" > "$work/adaptations.tsv"
 
 count=0

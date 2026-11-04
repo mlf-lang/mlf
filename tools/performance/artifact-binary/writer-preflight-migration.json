@@ -1,0 +1,37 @@
+{
+  "base_head": "6d829369efd58c482ac28ac6e0a8cdd96b17adb4",
+  "base_tree": "2c9b7f9e083213e613ac86fd09e5f90f293cd1aa",
+  "current_inventory_sha256": "0f8ea1134f6604f57529733329ed9df774fd06f92930e893e0381a6879b9b6b8",
+  "current_registry_sha256": "fef91be4eb4359680920dcb395ece28526c3fe6e2d2b51b0c77d1c3ae507ec95",
+  "file_count": 196,
+  "format": "writer-preflight-source-migration-v1",
+  "graph_contract_sha256": "e41fb3ac880e2f53872de56571918b0c26409998fe771f2547f37da8271cf682",
+  "graph_manifest_sha256": "71532df8a848c84d9803c3aa4b9adba65fcb53c90a56e7551a5c6555b2dc00be",
+  "graph_source_head": "bdc5db805975c3d77fb3eb93c6199b7452820658",
+  "module_count": 135,
+  "parent_inventory_sha256": "2ccbe4074f68fbaa61b3dbf21dfbf59e19660f82c6815f11b82c1854dcaf7451",
+  "parent_registry_sha256": "3eccb49ed80b55d1b84fe52f14f12ff7bb21ef81704d90889bec184aa87d8eb3",
+  "primitive_count": 132,
+  "qualification_scope": "Source identity and reversible projection only; no new runtime or generation qualification.",
+  "transition": {
+    "added_paths": [],
+    "changed_paths": [
+      "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "mlf.lock"
+    ],
+    "deltas": {
+      "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": {
+        "file": "writer-preflight-deltas/000.json",
+        "new": "d13d59ed310bb8ef447596437516cfadbbbb025da632b18930e2b4263ac97826",
+        "old": "b6ee095b0bad180db43d84dff1a8a3da211bfd81df43179e426abc5b5f7d5743",
+        "sha256": "99add389a436ca5f32f51a468774cb4876b3fbd95d358d2c6461338148fef432"
+      },
+      "mlf.lock": {
+        "file": "writer-preflight-deltas/001.json",
+        "new": "48df44dfebb7b382dd0427e77395a3fce2fb2dae870aa1b8476a96bc9a1901d1",
+        "old": "3e410f09732ed30926efce187304630d937bd9a9140feb7dabb665c5420df5e9",
+        "sha256": "95a41d522dce91708a295ad2b6cac85c9592050756ea2a1366f3f892daa32523"
+      }
+    }
+  }
+}
