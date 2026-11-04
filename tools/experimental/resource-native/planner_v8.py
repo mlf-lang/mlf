@@ -7,8 +7,9 @@ imported or changed. No ordinary lambda cloning, beta reduction, identity-name
 recognition, nominal fallback, or per-type RHS expansion is performed. Referenced
 closed single-constructor DATA uses exact independently replayed declarations;
 constructor payloads and whole cases remain lazy ordinary term graphs.
-Closed scalar-field SUM uses selected-only Int-result arm factories, with all
-arms checked and their exact declaration/source identities retained.
+Closed scalar/self-atom SUM uses selected-only Int-result arm factories, with
+all arms checked and their exact declaration/source identities retained. A self
+field is the same finite nominal identity, never a recursively expanded type.
 """
 from __future__ import annotations
 
@@ -111,6 +112,7 @@ class Planner:
                                      'source': r['source'], 'layout': layout,
                                      'fields': [{'index': i, 'field': 'f'+str(i), 'type': self.type_name(t)}
                                                 for i,t in enumerate(fields)]})
+        recursive_indices = []
         for r in self.sum_rows.values():
             typ = self.logical(r['type'], None); family = 'F' + str(r['index'])
             self.sum_families[r['index']] = family
@@ -121,15 +123,23 @@ class Planner:
                 self.tick(); require(v['index'] == i, 'SUM declaration variant order differs')
                 name = 'V' + str(i); variants.append(name)
                 types = [self.logical(t, None) for t in v['field_types']]
-                require(len(types) <= 32 and all(t in SCALARS.values() for t in types),
-                        'SUM fields require complete intrinsic scalar vector')
-                fields[name] = [t[1] for t in types]
+                require(len(types) <= 32 and all(t in SCALARS.values() or t == typ for t in types),
+                        'SUM fields require intrinsic scalars or the exact self nominal atom')
+                if typ in types and r['index'] not in recursive_indices:
+                    recursive_indices.append(r['index'])
+                fields[name] = [t[1] if t in SCALARS.values() else '%' + family for t in types]
                 variant_map.append({'index':i, 'variant':name, 'constructor':v['constructor'],
                                     'constructor_source':v['constructor_source'],
                                     'fields':[self.type_name(t) for t in types]})
             self.families[family] = {'variants':variants, 'fields':fields}
             self.sum_map.append({'declaration':r['index'], 'name':r['name'], 'source':r['source'],
                                  'family':family, 'variants':variant_map})
+        if recursive_indices:
+            require(sums.get('self_recursive') == {
+                'policy': 'closed-self-atom/1', 'declarations': sorted(recursive_indices)},
+                'SUM self-atom evidence differs')
+        else:
+            require('self_recursive' not in sums, 'spurious SUM self-atom evidence')
         self.definitions = fragment['polymorphism']['definitions']
         self.def_by_path = {tuple(d['binding_source']['path']): d for d in self.definitions}
         self.def_by_binder = {d['binding']['id']: d for d in self.definitions}
@@ -524,7 +534,9 @@ class Planner:
         fields = []
         for source,typ in zip(row['arguments'], expected):
             ap = tuple(source['path']); ref = self.emit(self.node_at(ap), ap, env, views, home, block, None)
-            require(ref.logical == typ and typ in SCALARS.values(), 'SUM field exact scalar type differs')
+            require(ref.logical == typ and (typ in SCALARS.values() or
+                    typ == self.logical(declaration['type'], None)),
+                    'SUM field exact scalar/self type differs')
             fields.append(ref)
         typ = self.logical(row['result_type'], None)
         require(typ == self.logical(declaration['type'], None), 'SUM nominal identity differs')
@@ -574,8 +586,9 @@ class Planner:
                 self.tick()
                 if f['binding'] is None: continue
                 capture = self.fresh('sumfield'); ft = self.logical(f['type'],None)
-                require(ft in SCALARS.values() and ft == self.logical(v['field_types'][f['index']],None),
-                        'SUM pattern field exact scalar type differs')
+                require((ft in SCALARS.values() or ft == self.logical(declaration['type'],None)) and
+                        ft == self.logical(v['field_types'][f['index']],None),
+                        'SUM pattern field exact scalar/self type differs')
                 captures[capture] = {'layout':self.layout(ft),'relation':'down'}
                 bindings[capture] = {'kind':'field','index':f['index']}
                 arm_env[f['binding']['id']] = Reference(capture,ft)

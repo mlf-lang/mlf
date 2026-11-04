@@ -9,10 +9,12 @@ The fragment seam implements SOURCE_WIRE_CONTRACT_DRAFT.md f73198a9, sections
 3--5, for Int/Bool/arrows and the existing scalar primitives/Int conditional.
 One outer with_data can additionally supply referenced, closed, nonrecursive,
 parameter-free, single-constructor DATA. Its fields are Int/Bool or closed
-arrows recursively over those scalars. Multi-constructor SUM families instead
-require only Int/Bool fields and exhaustive Int-result cases. This does not
-admit nominal Scheme arguments, nominal atoms in generic code, callable SUM
-fields, or recursive/higher-rank data.
+arrows recursively over those scalars. Multi-constructor SUM families permit
+Int/Bool fields and exact zero-argument self-family atoms, with exhaustive
+Int-result cases. The optional self_recursive marker records that extension;
+nominal types are never unfolded. This does not admit nominal Scheme arguments,
+nominal atoms in generic code, callable SUM fields, cross-family recursion,
+parameterized/higher-rank data, or recursive term bindings.
 
 Public results are JSON data, never opaque proof authority. Definition rows omit
 resolver_binding; correspondence rows omit original. Those missing fields MUST
@@ -44,6 +46,7 @@ MAX_NOMINALS = 32
 MAX_FIELDS = 32
 MAX_VARIANTS = 64
 SUM_POLICY = 'closed-scalar-sum/1'
+SUM_SELF_POLICY = 'closed-self-atom/1'
 NOMINAL_POLICY = 'closed-single-constructor-data/1'
 INT = {'tag': 'constructor', 'name': 'Int', 'arguments': []}
 BOOL = {'tag': 'constructor', 'name': 'Bool', 'arguments': []}
@@ -229,6 +232,7 @@ class _Nominals:
         self.budget = budget
         self.declarations = root['declarations'] if root['tag'] == 'with_data' else []
         self.by_name, self.by_constructor, self.selected = {}, {}, {}
+        self.self_recursive = set()
         for index, declaration in enumerate(self.declarations):
             budget.tick()
             name = declaration['name']
@@ -267,6 +271,7 @@ class _Nominals:
             _fail('LIMIT', 'SUM variant count exceeds 64', source + ('constructors',))
         if len(declaration['constructors']) > 1:
             variants = []
+            self_recursive = False
             for variant_index, constructor in enumerate(declaration['constructors']):
                 self.budget.tick()
                 cp = source + ('constructors', str(variant_index))
@@ -275,15 +280,25 @@ class _Nominals:
                 fields = []
                 for field_index, field in enumerate(constructor['fields']):
                     self.budget.tick()
-                    if field['tag'] != 'applied' or field['arguments'] or field['name'] not in ('Int', 'Bool'):
-                        _fail('NOMINAL', 'SUM fields require closed Int/Bool only', cp + ('fields', str(field_index)))
-                    fields.append(INT if field['name'] == 'Int' else BOOL)
+                    if field['tag'] != 'applied' or field['arguments'] or field['name'] not in ('Int', 'Bool', name):
+                        _fail('NOMINAL', 'SUM fields require Int/Bool or the exact closed self-family atom',
+                              cp + ('fields', str(field_index)))
+                    if field['name'] == name:
+                        # This is a finite nominal reference, not a request to
+                        # select or expand its definition recursively. The raw
+                        # declaration/name maps already establish its identity.
+                        fields.append({'tag': 'constructor', 'name': name, 'arguments': []})
+                        self_recursive = True
+                    else:
+                        fields.append(INT if field['name'] == 'Int' else BOOL)
                 variants.append({'index': variant_index, 'constructor': constructor['name'],
                                  'constructor_source': _address('projected', cp), 'field_types': fields})
             row = {'index': index, 'name': name, 'source': _address('projected', source),
                    'type': {'tag': 'constructor', 'name': name, 'arguments': []}, 'variants': variants}
             self.budget.record(row)
             self.selected[index] = row
+            if self_recursive:
+                self.self_recursive.add(index)
             return row
         constructor = declaration['constructors'][0]
         if len(constructor['fields']) > MAX_FIELDS:
@@ -964,6 +979,10 @@ def _nominal_inventory(root, inferred, registry, budget):
              'constructors': constructors, 'cases': cases} if data_rows else None)
     sums = ({'policy': SUM_POLICY, 'declarations': sum_rows,
              'constructors': sum_constructors, 'cases': sum_cases} if sum_rows else None)
+    if registry.self_recursive:
+        marker = {'policy': SUM_SELF_POLICY, 'declarations': sorted(registry.self_recursive)}
+        budget.record(marker)
+        sums['self_recursive'] = marker
     return data, sums
 
 

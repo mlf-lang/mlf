@@ -7,7 +7,8 @@ The Stage05 guide gives reproducible host and native test commands. A separate
 fresh ordinary compiler capture to independent replay, IR8 planning and the real
 runtime for a bounded scalar/callable fragment, now extended with closed
 single-constructor DATA and closed callable fields, plus
-[bounded scalar-field SUMs](source_v8/README.md#stage10-closed-scalar-field-sums).
+[bounded scalar-field SUMs](source_v8/README.md#stage10-closed-scalar-field-sums) and
+[finite self-family SUM graphs](source_v8/README.md#stage11-finite-self-family-sum-graphs).
 SUM cases check every arm but allocate only the selected arm's lazy factory.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it

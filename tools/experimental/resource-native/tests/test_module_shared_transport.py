@@ -862,9 +862,8 @@ class SumReplayTests(unittest.TestCase):
         self.reject(with_data(value, sum_decl()), 'NOMINAL')
         self.reject(with_data(let(10, ctor('Number'), app(var(10), lit())), sum_decl()), 'CONSTRUCTOR')
 
-    def test_callable_recursive_cross_nominal_and_open_fields_rejected_even_unselected(self):
-        fields = [field_type(arr(I, I)), field_type(nominal_type('Choice')),
-                  field_type(nominal_type('Other')), {'tag': 'parameter', 'name': 'a'},
+    def test_callable_cross_nominal_and_open_fields_rejected_even_unselected(self):
+        fields = [field_type(arr(I, I)), field_type(nominal_type('Other')), {'tag': 'parameter', 'name': 'a'},
                   {'tag': 'applied', 'name': 'Int', 'arguments': [field_type(I)]}]
         for field in fields:
             with self.subTest(field=field):
@@ -1018,6 +1017,291 @@ class GenuineSumCaptureTests(unittest.TestCase):
                 number_arm = m._get(result['raw_normalized'], sums['cases'][0]['arms'][1]['body']['path'])
                 self.assertIn(payload_let['name']['id'], m._free_terms(number_arm))
         self.assertNotEqual(bindings[0], bindings[1])  # observed IDs, never hardcoded to either capture
+
+
+# Synthetic self-family fixtures: finite terms, not recursive term bindings.
+def recursive_decl(n='Chain', empty='Nil', full='Cons'):
+    return sum_decl(n, ((empty, ()), (full, (I, nominal_type(n)))))
+
+
+def recursive_sum(lazy=False):
+    tail = (app(lam(30, I, ctor('Cons', var(30), ctor('Nil'))), add(lit(100), lit(23)))
+            if lazy else ctor('Cons', var(10), ctor('Nil')))
+    branch = (var(20) if lazy else sum_case(var(21),
+        [sum_arm('Nil', (), var(20)), sum_arm('Cons', (22, None), add(var(20), var(22)))]))
+    answer = sum_case(var(12), [sum_arm('Nil', (), lit(0)),
+                               sum_arm('Cons', (20, None if lazy else 21), branch)])
+    return with_data(shared(let(10, add(lit(20), lit(22 if lazy else 1)),
+        let(11, tail, let(12, ctor('Cons', var(10), var(11)),
+            choose(app(use(1, B), boolean()), app(use(1, I), answer), lit(0)))))), recursive_decl())
+
+
+class SelfRecursiveSumReplayTests(unittest.TestCase):
+    reject = SumReplayTests.reject
+
+    def test_finite_two_link_graph_and_nested_cases(self):
+        tree = recursive_sum(); result = m.derive_shared_fragment(tree)
+        sums = result['nominal_sum']; declaration, = sums['declarations']
+        self.assertEqual(sums['self_recursive'], {'policy': 'closed-self-atom/1', 'declarations': [0]})
+        self.assertEqual(declaration['variants'][1]['field_types'], [I, declaration['type']])
+        self.assertEqual(result['raw_normalized'], tree)
+        self.assertEqual(result['input_erased'], p.erase_total(tree))
+        self.assertEqual(len(sums['constructors']), 3)
+        self.assertEqual([c['variant'] for c in sums['constructors']], [1, 0, 1])
+        self.assertEqual(len(sums['cases']), 2)
+        outer, inner = sums['cases']
+        self.assertEqual(outer['arms'][1]['fields'][1]['type'], nominal_type('Chain'))
+        self.assertEqual(outer['arms'][1]['fields'][1]['binding'], name(21))
+        self.assertEqual(m._get(tree, inner['scrutinee']['path']), var(21))
+        self.assertEqual(inner['arms'][1]['fields'][1]['binding'], None)
+        self.assertEqual([u['arguments'] for u in result['polymorphism']['uses']], [[B], [I]])
+        self.assertEqual(len(result['polymorphism']['definitions']), 1)
+        self.assertEqual(len(result['term_correspondence']), len(m._ordinary(tree)))
+        self.assertEqual(m.validate_shared_fragment(tree, result), result)
+        heads = [m._get(tree, row['arguments'][0]['path'])
+                 for row in sums['constructors'] if row['variant'] == 1]
+        self.assertEqual(heads, [var(10), var(10)])
+
+    def test_pending_nominal_result_application_not_reduced_or_generalized(self):
+        tree = recursive_sum(True); result = m.derive_shared_fragment(tree)
+        tail = tree['body']['body']['body']['value']
+        self.assertEqual(tail['tag'], 'application')
+        self.assertEqual(tail['function']['parameter_type'], I)
+        self.assertEqual(result['raw_normalized'], tree)
+        self.assertEqual(len(result['polymorphism']['definitions']), 1)
+        self.assertEqual(result['nominal_sum']['cases'][0]['arms'][1]['fields'][1],
+                         {'index': 1, 'binding': None, 'type': nominal_type('Chain')})
+        rows = result['term_correspondence']
+        self.assertTrue(any(r['tag'] == 'lambda' and
+                            r['normalized']['path'] == ['body','body','body','value','function'] for r in rows))
+        self.assertTrue(any(r['tag'] == 'application' and
+                            r['normalized']['path'] == ['body','body','body','value'] for r in rows))
+
+    def test_selected_nullary_still_validates_and_records_self_field(self):
+        result = m.derive_shared_fragment(with_data(ctor('Nil'), recursive_decl()))
+        self.assertEqual(result['nominal_sum']['self_recursive']['declarations'], [0])
+        self.assertEqual(result['nominal_sum']['constructors'][0]['arguments'], [])
+        self.assertEqual(result['nominal_sum']['declarations'][0]['variants'][1]['field_types'][1],
+                         nominal_type('Chain'))
+
+    def test_marker_only_for_referenced_self_rows_in_original_order(self):
+        ds = [recursive_decl('A','A0','A1'), sum_decl(), recursive_decl('B','B0','B1'),
+              recursive_decl('Unused','U0','U1'), data_decl()]
+        tree = with_data(let(10, ctor('B0'), let(11, ctor('Empty'),
+                    let(12, ctor('A0'), let(13, ctor('Pack', lit()), lit())))), *ds)
+        result = m.derive_shared_fragment(tree)
+        self.assertEqual(result['nominal_sum']['self_recursive']['declarations'], [0, 2])
+        self.assertEqual([r['index'] for r in result['nominal_sum']['declarations']], [0, 1, 2])
+        self.assertEqual(result['nominal_data']['declarations'][0]['index'], 4)
+        self.assertNotIn('self_recursive', result['nominal_data'])
+        self.assertEqual(result['raw_normalized']['declarations'], ds)
+        unreferenced = m.derive_shared_fragment(with_data(ctor('Empty'), recursive_decl(), sum_decl()))
+        self.assertNotIn('self_recursive', unreferenced['nominal_sum'])
+
+    def test_scalar_sum_complete_golden_bytes_unchanged(self):
+        # Computed by read-only host replay of the frozen Stage10 implementation.
+        goldens = {False: 'cfdddd7943efb24e9139c0ea700bc0afc471c37279a654cf09a8a848c58c2e46',
+                   True: '8e007e7d60e21d0cf31fa75a8d59e426cc9a98e0a6a97bae562064945b58b670'}
+        for empty, expected in goldens.items():
+            result = m.derive_shared_fragment(shared_sum(empty))
+            self.assertNotIn('self_recursive', result['nominal_sum'])
+            digest = hashlib.sha256(json.dumps(result, sort_keys=True, separators=(',', ':'),
+                                               ensure_ascii=False).encode()).hexdigest()
+            self.assertEqual(digest, expected)
+
+    def test_equal_shape_foreign_tail_and_nominal_aliases_rejected(self):
+        ds = [recursive_decl(), recursive_decl('Other','O0','O1')]
+        self.reject(with_data(ctor('Cons', lit(), ctor('O0')), *ds), 'TYPE')
+        self.reject(with_data(app(lam(10, nominal_type('Chain'), lit()), ctor('O0')), *ds), 'TYPE')
+        # A display hint cannot turn the wrong family into the self atom.
+        d = recursive_decl(); d['constructors'][1]['fields'][1]['name'] = 'Other'
+        self.reject(with_data(ctor('Nil'), d, ds[1]), 'NOMINAL')
+
+    def test_cross_family_and_mutual_fields_rejected_even_with_base_constructor(self):
+        for field_name in ('Other', 'Missing'):
+            a = recursive_decl(); a['constructors'][1]['fields'][1]['name'] = field_name
+            b = recursive_decl('Other','O0','O1'); b['constructors'][1]['fields'][1]['name'] = 'Chain'
+            self.reject(with_data(ctor('Nil'), a, b), 'NOMINAL')
+
+    def test_open_applied_arrow_and_parameterized_self_fields_rejected(self):
+        fields = [
+            {'tag':'applied','name':'Chain','arguments':[field_type(I)]},
+            {'tag':'parameter','name':'a'},
+            field_type(arr(I, nominal_type('Chain'))),
+            field_type(arr(nominal_type('Chain'), I)),
+            {'tag':'applied','name':'Int','arguments':[field_type(nominal_type('Chain'))]},
+        ]
+        for field in fields:
+            d = recursive_decl(); d['constructors'][1]['fields'][1] = field
+            self.reject(with_data(ctor('Nil'), d), 'NOMINAL')
+        d = recursive_decl(); d['parameters'] = [{'name':'a','kind':{'tag':'star'}}]
+        self.reject(with_data(ctor('Nil'), d), 'NOMINAL')
+        c = ctor('Nil'); c['arguments'] = [I]
+        self.reject(with_data(c, recursive_decl()), 'NOMINAL')
+
+    def test_recursive_single_constructor_data_is_not_admitted(self):
+        self.reject(with_data(lam(10, nominal_type('Cell'), lit()),
+                             data_decl('Cell', 'Cell', (I, nominal_type('Cell')))), 'NOMINAL')
+
+    def test_finite_type_atom_does_not_authorize_letrec_or_forward_self_use(self):
+        d = recursive_decl()
+        self.reject(with_data({'tag':'letrec', 'bindings':[{'name':name(10),
+            'type':nominal_type('Chain'), 'value':ctor('Cons',lit(),var(10))}], 'body':lit()}, d), 'FRAGMENT')
+        self.reject(with_data(let(10, ctor('Cons',lit(),var(10)),lit()),d), 'SCHEMA')
+
+    def test_generic_nominal_result_or_argument_and_nominal_use_still_rejected(self):
+        d = recursive_decl()
+        rhs = tabs(100, lam(2, tv(100), ctor('Nil')))
+        self.reject(with_data(let(1,rhs,app(use(1,I),lit())),d), 'NOMINAL_SCOPE')
+        rhs = tabs(100, lam(2, nominal_type('Chain'), lam(3, tv(100), var(3))))
+        self.reject(with_data(let(1,rhs,app(app(use(1,I),ctor('Nil')),lit())),d), 'NOMINAL_SCOPE')
+        self.reject(with_data(shared(app(use(1,nominal_type('Chain')),ctor('Nil'))),d), 'USE')
+        self.reject(with_data(tapp(tabs(100,lam(2,tv(100),var(2))),inst(nominal_type('Chain'))),d), 'DIRECT')
+
+    def test_constructor_saturation_and_exact_tail_type(self):
+        for value,code in [(ctor('Cons'), 'CONSTRUCTOR'), (ctor('Cons',lit()),'CONSTRUCTOR'),
+                           (ctor('Cons',lit(),lit()),'TYPE'), (ctor('Cons',boolean(),ctor('Nil')),'TYPE')]:
+            self.reject(with_data(value,recursive_decl()),code)
+
+    def test_nested_cases_require_all_arm_coverage_and_scopes(self):
+        tree = recursive_sum(); outer = next(n for _,n in m._walk(tree) if n['tag']=='case')
+        inner = outer['alternatives'][1]['body']
+        for target in ('outer','inner'):
+            for mutation in ('missing','duplicate','foreign','escaped'):
+                bad = copy.deepcopy(tree); cases = [n for _,n in m._walk(bad) if n['tag']=='case']
+                node = cases[0 if target=='outer' else 1]
+                if mutation=='missing': node['alternatives'].pop()
+                elif mutation=='duplicate': node['alternatives'][1] = copy.deepcopy(node['alternatives'][0])
+                elif mutation=='foreign': node['alternatives'][0]['pattern']['constructor'] = 'OtherNil'
+                else: node['alternatives'][0]['body'] = var(21 if target=='outer' else 22)
+                self.reject(bad)
+        # Bound tail cannot be silently treated as an Int by the nested arm.
+        bad = copy.deepcopy(tree); cases = [n for _,n in m._walk(bad) if n['tag']=='case']
+        cases[1]['alternatives'][0]['body'] = var(21); self.reject(bad,'TYPE')
+        self.assertEqual(inner['result_type'], I)
+
+    def test_unselected_nested_body_and_proof_not_skipped(self):
+        inner = sum_case(ctor('Nil'), [sum_arm('Nil',(),lit()),
+                    sum_arm('Cons',(20,None),tapp(lit(),inst(I)))])
+        outer = sum_case(ctor('Nil'), [sum_arm('Nil',(),lit()), sum_arm('Cons',(21,22),inner)])
+        self.reject(with_data(outer,recursive_decl()), 'PROOF')
+        outer['alternatives'][1]['body']['alternatives'][1]['body'] = boolean()
+        self.reject(with_data(outer,recursive_decl()), 'TYPE')
+
+    def test_self_fields_are_atoms_not_expanded_at_each_occurrence(self):
+        d = sum_decl('Tree', (('Leaf', (I,)), ('Fork', (nominal_type('Tree'), nominal_type('Tree')))))
+        tree = with_data(let(10,ctor('Leaf',lit()),ctor('Fork',var(10),var(10))),d)
+        result = m.derive_shared_fragment(tree); row, = result['nominal_sum']['declarations']
+        self.assertEqual(row['variants'][1]['field_types'], [row['type'],row['type']])
+        self.assertEqual(len(result['nominal_sum']['declarations']), 1)
+        fork = next(c for c in result['nominal_sum']['constructors'] if c['variant']==1)
+        self.assertEqual([m._get(tree,a['path']) for a in fork['arguments']], [var(10),var(10)])
+
+    def test_marker_and_self_type_recomputed_not_claimed(self):
+        raw=recursive_sum(); result=m.derive_shared_fragment(raw)
+        changes=[lambda x:x['nominal_sum'].pop('self_recursive'),
+                 lambda x:x['nominal_sum']['self_recursive'].update(policy='anything'),
+                 lambda x:x['nominal_sum']['self_recursive'].update(declarations=[]),
+                 lambda x:x['nominal_sum']['self_recursive'].update(declarations=[True]),
+                 lambda x:x['nominal_sum']['self_recursive'].update(declarations=[0,0]),
+                 lambda x:x['nominal_sum']['declarations'][0]['variants'][1]['field_types'][1].update(name='Other')]
+        for mutate in changes:
+            claimed=copy.deepcopy(result);mutate(claimed)
+            with self.assertRaisesRegex(m.SharedTransportError,'EVIDENCE'):
+                m.validate_shared_fragment(raw,claimed)
+        scalar=shared_sum();claimed=m.derive_shared_fragment(scalar)
+        claimed['nominal_sum']['self_recursive']={'policy':m.SUM_SELF_POLICY,'declarations':[0]}
+        with self.assertRaisesRegex(m.SharedTransportError,'EVIDENCE'):m.validate_shared_fragment(scalar,claimed)
+
+    def test_existing_bounds_and_new_marker_are_charged(self):
+        self_type=nominal_type('Chain')
+        d=sum_decl('Chain', (('Nil',()),('Many',(self_type,)*32)))
+        result=m.derive_shared_fragment(with_data(ctor('Nil'),d))
+        self.assertEqual(len(result['nominal_sum']['declarations'][0]['variants'][1]['field_types']),32)
+        d['constructors'][1]['fields'].append(field_type(self_type))
+        self.reject(with_data(ctor('Nil'),d),'LIMIT')
+        for key in ('MAX_WORK','MAX_ROWS','MAX_METADATA_BYTES'):
+            with mock.patch.object(m,key,1):self.reject(recursive_sum(),'LIMIT')
+        tree=ctor('Nil')
+        for _ in range(101):tree=ctor('Cons',lit(),tree)
+        self.reject(with_data(tree,recursive_decl()),'LIMIT')
+        original=m._Budget.record; seen=[]
+        def record(budget,row):
+            if isinstance(row,dict) and row.get('policy')==m.SUM_SELF_POLICY:
+                seen.append(copy.deepcopy(row))
+            return original(budget,row)
+        with mock.patch.object(m._Budget,'record',record):m.derive_shared_fragment(recursive_sum())
+        self.assertEqual(seen,[{'policy':m.SUM_SELF_POLICY,'declarations':[0]}])
+
+
+RECURSIVE_SUM_CAPTURE_ROOT = os.environ.get('IR8_RECURSIVE_SUM_CAPTURE_ROOT')
+
+
+@unittest.skipUnless(RECURSIVE_SUM_CAPTURE_ROOT,
+                    'set IR8_RECURSIVE_SUM_CAPTURE_ROOT for completed self-recursive source captures')
+class GenuineSelfRecursiveSumCaptureTests(unittest.TestCase):
+    def test_both_completed_captures_full_replay_and_original_nominal_owner(self):
+        from source_capture_v8 import verify_capture
+        root=Path(RECURSIVE_SUM_CAPTURE_ROOT)
+        pins={
+            'nested':('a50b94a241c03c93f05bf688d63c437ad295daef020bb1362047064d42a4356f',
+                      '3b45474da38bf68024ca844c54a6ed74c145a787fd52def8416d8ac2d6a3da6f'),
+            'lazy-tail':('e61b3fca2b4d1c10479c41a1c37720ec2de44081c25191f6112d829393f10865',
+                         'b8554d9f385a1ed28d05e03161a466a7786efd39b36329943a042c8c420e5d1f'),
+        }
+        for label,(capture_sha,source_sha) in pins.items():
+            with self.subTest(capture=label):
+                path=root/('capture-'+label+'01')/'capture.stdout'
+                report=verify_capture(path,fixture_root=root/'inputs'/label,entry='main.emlf',
+                    expected_source_hashes={'main.emlf':source_sha,
+                        'SharedPoly.emlf':'50fd7fa662c9290a61b0a69012cd2e886a44075de9827dff4edd3f0c839573a7'},
+                    expected_capture_sha256=capture_sha)
+                self.assertTrue(report['fragment_admitted'])
+                self.assertFalse(report['source_admitted']);self.assertFalse(report['native_admitted'])
+                capture=json.loads(path.read_bytes())
+                result=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+                self.assertEqual(result['steps'],capture['normalization']['steps'])
+                self.assertEqual(result['raw_normalized'],capture['normalization']['raw_normalized'])
+                self.assertEqual(result['checked_type'],I);self.assertEqual(len(result['steps']),2)
+                self.assertEqual([u['arguments'] for u in result['polymorphism']['uses']],[[B],[I]])
+                definition,=result['polymorphism']['definitions'];join,=report['retained_prefix_binding_joins']
+                self.assertEqual(join['binding'],definition['binding'])
+                self.assertEqual(join['resolver_allocation']['entity'],
+                    {'namespace':'terms','owner':'SharedPoly','role':{'tag':'value'},'spelling':'sharedId'})
+                sums=result['nominal_sum'];declaration,=sums['declarations']
+                self.assertEqual(sums['self_recursive'],
+                    {'policy':m.SUM_SELF_POLICY,'declarations':[declaration['index']]})
+                self.assertEqual(declaration['variants'][1]['field_types'],[I,declaration['type']])
+                entities={x['allocated']:x['entity'] for x in capture['module_custody']['resolution']['entities']}
+                self.assertEqual(entities[declaration['name']],
+                    {'namespace':'types','owner':'Main','role':{'tag':'datatype'},'spelling':'IntList'})
+                for variant,spelling in zip(declaration['variants'],('Nil','Cons')):
+                    self.assertEqual(entities[variant['constructor']],{'namespace':'terms','owner':'Main',
+                        'role':{'tag':'constructor','datatype':'IntList'},'spelling':spelling})
+                raw=result['raw_normalized'];self.assertEqual(len(raw['declarations']),7)
+                definition_let=m._get(raw,definition['binding_source']['path'])
+                payload=definition_let['body'];tail=payload['body'];outer=tail['body']
+                self.assertTrue(all(n['tag']=='let' for n in (payload,tail,outer)))
+                self.assertEqual(payload['value']['tag'],'application')
+                self.assertEqual(outer['value']['argument'],{'tag':'var','name':tail['name']})
+                self.assertEqual(outer['value']['function']['argument'],{'tag':'var','name':payload['name']})
+                if label=='nested':
+                    self.assertEqual(len(sums['cases']),2)
+                    self.assertEqual(tail['value']['function']['argument'],{'tag':'var','name':payload['name']})
+                    outer_case,inner_case=sums['cases']
+                    binding=outer_case['arms'][1]['fields'][1]['binding']
+                    self.assertEqual(m._get(raw,inner_case['scrutinee']['path']),{'tag':'var','name':binding})
+                else:
+                    self.assertEqual(len(sums['cases']),1)
+                    pending=tail['value'];self.assertEqual(pending['tag'],'application')
+                    self.assertEqual(pending['function']['tag'],'lambda')
+                    self.assertEqual(pending['function']['parameter_type'],I)
+                    self.assertEqual(sums['cases'][0]['arms'][1]['fields'][1]['binding'],None)
+                    self.assertTrue(any(r['tag']=='lambda' and m._get(raw,r['normalized']['path'])==pending['function']
+                                        for r in result['term_correspondence']))
+                # Original rejection files are historical and remain untouched.
+                old=json.loads((path.parent/'verification.json').read_bytes())
+                self.assertFalse(old['fragment_admitted']);self.assertEqual(old['fragment_error']['code'],'NOMINAL')
 
 
 if __name__ == '__main__':

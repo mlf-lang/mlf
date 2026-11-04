@@ -43,7 +43,7 @@ primitives and an Int conditional. Pending shared RHSs, captured callable views,
 dead type parameters and curried callable values have separate regression
 cases. Bare, partial or open shared uses, recursive/nested generic definitions,
 unsupported proofs and higher-rank uses reject. Stage08 adds closed nominal
-DATA and Stage10 adds the scalar-field SUM subset below; neither admits every
+DATA, Stage10 adds scalar-field SUMs, and Stage11 adds exact self-family fields; none admits every
 preserved declaration automatically.
 
 ## Stage08: closed DATA and callable fields
@@ -145,8 +145,9 @@ separately, reuses the same GHC install and keeps the 60-minute job ceiling.
 Referenced closed, parameter-free nominal declarations with 2 through 64
 constructors are admitted as SUMs. Each variant has at most 32 fields, each
 exactly Int or Bool. Nullary variants are valid. The combined referenced DATA
-and SUM declaration limit remains 32. Recursive types, nested nominal fields,
-callable SUM fields, parameters and generic nominal scopes remain unsupported.
+and SUM declaration limit remains 32. Stage10 itself excludes recursive types
+and nested nominal fields; Stage11 below adds only exact self-family atoms.
+Callable SUM fields, parameters and generic nominal scopes remain unsupported.
 All declarations stay in the source evidence; unrelated compiler dictionaries
 are not silently admitted or deleted. Exact nominal identity is preserved.
 
@@ -219,6 +220,80 @@ cases separately from the earlier suites, preserving all earlier steps and
 the 60-minute job ceiling. The retained-capture comparisons and fresh source
 builds are separate evidence; exact-commit CI is still pending.
 
+## Stage11: finite self-family SUM graphs
+
+The only further field type is the selected SUM declaration's own exact
+zero-argument nominal identity. For `IntList = Nil | Cons Int IntList`, metadata
+contains the finite reference `%F<declaration-index>`, not an unfolded recursive
+type. The declaration name, index and source address remain part of logical
+identity; equal shapes never make two families interchangeable. Selection does
+not recurse through declarations. The optional `nominal_sum.self_recursive`
+marker is recomputed as policy `closed-self-atom/1` plus sorted original indices;
+old scalar SUM and DATA evidence retains its exact prior shape and values.
+
+All earlier bounds remain: at most 32 selected DATA/SUM declarations, 2–64 SUM
+variants, 32 fields, 32 external plus 32 field factory captures (64 total), and
+unchanged depth/work/metadata/runtime limits. Only finite lexical term graphs
+are admitted. Type parameters, cross-family/mutual recursion, recursive DATA,
+callable SUM fields, source `letrec` or recursive functions, and nominal types in
+generic scopes or complete Scheme vectors remain excluded. This is neither
+heap-cycle support nor general recursive MLF.
+
+Nested exhaustive Int-result cases use the same selected-only arm factories.
+Self fields retain exact nominal types and Down captures. A case does not force
+stored fields while selecting its variant. SUM constructors and case thunks
+remain coarse under both placement modes; eligible supports may use the existing
+opt-in DATA strategy. Runtime, packet, IR checker, ABI and source producer code
+are unchanged. The conditional's type-computation replay remains outer-first.
+
+Two genuine source captures established the actual current-compiler shape before
+this extension. Their producer checks succeeded, while the old scalar-only guard
+rejected the self field before native execution. Those diagnostics are preserved.
+The new complete replay passes source custody, projection, normalization and
+resolver joins. The focused transport suite passes 117 tests, including both old
+and new complete captures; the broader suite passes 269 of 272 with three existing
+external-artifact skips. Seven new planner tests and 17 previous SUM tests pass,
+including complete old-output goldens and malformed unselected factory checks.
+
+Eight retained-capture C conditions, two sources under coarse/groups and O0/O2,
+return Int 42 with fault 0 and seven balanced empty ledger categories. The nested
+case stores one pending 21 node in both Cons heads and memoizes it once. The
+wildcard-tail case retains a monomorphic ordinary application and its pending 123
+argument without demanding either, entering its lambda, or constructing the
+lambda's inner Cons/Nil. Only selected factories run, and one genuine shared RHS
+serves complete Bool/Int views. O0/O2 complete reports match within each mode.
+All eight reports pass the observer and 56 copied-report/plan negative controls.
+
+The initial observer incorrectly treated an application's function handle as
+its code field and expected a closure state of READY rather than CLOSURE. Five
+actual successful target pairs were retained and rechecked after those two
+observer-only corrections; only the remaining three pairs were newly executed.
+No production change or rerun of those five targets was needed.
+
+The fresh suite command is:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_recursive_sum.py \
+  --ghc /absolute/path/to/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /tmp/ir8-source-recursive-sum-fresh
+```
+
+The new suite retains source snapshots, actual checked captures/replay, generated
+C, process results, native reports and `recursive-sum-observations.json`. The
+fresh default-coarse suite passed locally on 2026-11-04: all 16 process records
+returned zero without cleanup errors, and both complete native reports match
+their earlier coarse-O0 reports. This is a fresh producer/build/source result,
+separate from replaying stored captures for the matrix.
+
+Two representative ASan/UBSan conditions also passed with complete native
+reports unchanged: nested/groups-O0 and lazy-tail/coarse-O0. LeakSanitizer was
+disabled in this environment; this is not all-combinations or leak-detector
+coverage. The old planner suite passed all 20 tests including five real native
+fragments; placement passed 19 of 20 with its external-capture test skipped, and
+all 42 CLI host tests passed. CI adds the new seven planner checks and two fresh
+source cases, preserves earlier steps/process limits and the 60-minute ceiling,
+and retains 22 fresh source cases in total. Exact-commit CI remains pending.
+
 ## Fragment and planner tests
 
 From the repository root, with POSIX, Python 3.12 or newer and an existing C11
@@ -231,13 +306,17 @@ python3 -B tools/experimental/resource-native/tests/test_planner_v8_placement.py
 
 python3 -B tools/experimental/resource-native/tests/test_planner_v8_sum.py
 
+python3 -B tools/experimental/resource-native/tests/test_planner_v8_recursive_sum.py
+
 CC=gcc IR8_PLANNER_NATIVE=1 \
 IR8_PLANNER_NATIVE_OUTPUT=/tmp/ir8-planner-native-fresh \
 python3 -B tools/experimental/resource-native/tests/test_planner_v8.py
 ```
 
-The fragment suite now has 99 unittest cases, including one optional retained
-SUM capture test. Without `IR8_SUM_CAPTURE_ROOT`, that test is skipped, as in CI.
+The fragment suite now has 117 unittest cases, including two optional retained
+SUM capture tests. They require `IR8_SUM_CAPTURE_ROOT` and
+`IR8_RECURSIVE_SUM_CAPTURE_ROOT` respectively; both are skipped in CI, which
+separately runs the fresh source suites.
 The original planner suite has 20 unittest
 cases;
 its final test runs five native fragment subcases: pending shared RHS, nested
@@ -343,8 +422,8 @@ Still unqualified:
 
 - A complete public source-admission/export/3 interface and the full
   polymorphism/representation/runtime-inventory correspondence join.
-- Parameterized or recursive nominal types, nominal-valued fields,
-  callable-valued SUM storage, recursive generic source programs, arbitrary
+- Parameterized types, cross-family/mutual recursion, recursive DATA,
+  callable-valued SUM storage, recursive source functions/generic programs, arbitrary
   imported libraries, higher-rank use and broader MLF.
 - Complete independent observation of every Access/Env/Transport transition and
   positive/negative coverage of all 27 runtime guard families.

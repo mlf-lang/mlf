@@ -35,14 +35,15 @@ sharedId x = x
 
 The current fragment admits Int, Bool and arrows, supported scalar primitives,
 Int conditionals and bounded rank-1 shared callable uses with complete closed
-Int/Bool vectors, plus referenced closed, parameter-free DATA and scalar-field SUMs.
+Int/Bool vectors, plus referenced closed, parameter-free DATA and scalar/self-field SUMs.
 DATA fields are Int, Bool or recursively closed arrows over those scalars; exact
 nominal identities are not merged by equal field layouts. It preserves the
 shared RHS, ordinary pending applications,
 actual checked type-computation witnesses and curried captures. Unsupported
 proofs, open/partial shared uses, higher-rank or impredicative arguments,
-parameterized/recursive nominal types, nominal-valued fields, callable SUM fields and
-recursive generic definitions reject before native execution. Ordinary function
+parameterized types, mutual/cross-family recursion, nested DATA fields, callable
+SUM fields and recursive generic definitions reject before native execution.
+A SUM field may refer only to its own exact zero-argument family, besides Int/Bool. Ordinary function
 types and DATA case results may mention admitted nominal types; SUM cases require
 Int results. Retained generic scopes and Scheme vectors may not contain nominal
 types. All declarations remain evidence, without automatically
@@ -121,8 +122,24 @@ computation, not an eager scalar or a cloned expression. Changing only
 `Number payload` to `Empty` keeps the external payload allocation but leaves it
 undemanded. SUM constructors and case thunks remain coarse under either CLI
 placement mode; `--data-groups` may separate other eligible supports. This adds
-no callable/recursive SUM support, runtime/ABI change or automatic strategy.
+no callable SUM support, runtime/ABI change or automatic strategy. Stage11 adds
+only the exact self-family field subset below.
 See the [bounded SUM contract and evidence](README.md#stage10-closed-scalar-field-sums).
+
+## Finite self-family SUM graphs
+
+Stage11 additionally admits fields equal to the same exact parameter-free SUM
+family: for example, `data IntList = Nil | Cons Int IntList`. This is a finite
+nominal atom in metadata, not recursive type expansion. All prior declaration,
+variant, field, capture, depth and work limits stay unchanged. Cross-family and
+mutual recursion, type parameters, callable SUM fields, source `letrec`, recursive
+functions and nominal generic scopes/vectors remain unsupported.
+
+Constructor graphs are finite ordinary terms. Nested exhaustive Int-result cases
+retain per-arm identities and Down field captures. A wildcard tail remains an
+actual stored pending computation, but is never forced merely by case selection.
+SUM containers remain coarse in both modes; this is not cycle collection or an
+early SUM reclamation strategy. See the [contract and evidence](README.md#stage11-finite-self-family-sum-graphs).
 
 ## Source and toolchain custody
 
@@ -256,6 +273,22 @@ Int 42 with seven balanced empty ledger categories. Number shares one payload
 memo and a deferred Int argument; Empty never demands the external payload.
 The eight retained-capture native conditions are separate evidence, and
 exact-head CI remains pending.
+
+The separate Stage11 two-case fresh source suite is:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_recursive_sum.py \
+  --ghc /absolute/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /absolute/new-recursive-sum-suite-directory
+```
+
+It writes `recursive-sum-observations.json` for `nested` and `lazy-tail`, including
+copied-report negative controls. Optional `--data-groups` changes eligible
+supporting placement, not SUM container placement. The fresh default suite passed
+locally on 2026-11-04: all 16 process records returned zero, both native reports
+exactly match their earlier coarse-O0 baselines, and both return Int 42 with
+seven balanced empty ledgers. The new CI step uses default coarse placement and
+retains earlier suites and limits; exact-commit CI is still pending.
 
 This remains a bounded opt-in experiment. It does not establish arbitrary MLF
 source support, general nominal or callable-SUM coverage, all runtime guards,
