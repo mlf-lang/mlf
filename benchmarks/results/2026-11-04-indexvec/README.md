@@ -1,6 +1,6 @@
 # Dependency graph compilation on the installed driver
 
-The single-pass SCC, shared reach sets and incremental publication were measured against both #29 and the original #43. [Foundation query study](foundation-graphs.md). The follow-up carries resolver-issued declaration IDs into those graphs. [Resolver ID measurements](resolver-ids.md). The next comparison places those IDs on resolved expressions and selects each query group by its member IDs. [Resolved-expression benchmark](resolved-expressions.md).
+The single-pass SCC, shared reach sets and incremental publication were measured against both #29 and the original #43. [Foundation query study](foundation-graphs.md). The follow-up carries resolver-issued declaration IDs into those graphs. [Resolver ID measurements](resolver-ids.md). The next comparison places those IDs on resolved expressions and selects each query group by its member IDs. [Resolved-expression benchmark](resolved-expressions.md). The decoder then builds indexed graphs directly using IO-world arrays. [Dense decoder measurements](dense-decoder.md).
 
 This comparison measures the public `emlf SOURCE -o PROGRAM` endpoint. The
 #29 installation (`8c455641`) and the IndexVec installation

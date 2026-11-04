@@ -101,6 +101,16 @@ packageChecks = do
   let world = Modules.Entity "Prelude" "IOWorld" Modules.BuiltinType
       bridge = Modules.Entity "Prelude" "stToIO" (Modules.Primitive T.PSTToIO)
   check "IO world entities preserve existing generated name" (nameOf [user]) (nameOf [world,bridge,extra,user])
+  let builtin ident modules = Artifact.CrateInterface ident [] modules [] [] [] [] [] [] [] "" "" []
+      identityCheck iface = case Artifact.validateBuiltinOwnership iface of
+        T.Left message -> Left (H.unpack message)
+        T.Right _ -> Right ()
+  check "current IO-world builtin identity admitted" (Right ())
+    (identityCheck (builtin "mlf:builtin-shared-haskell-v1:13" ["MLF.Primitive","Prelude"]))
+  check "preceding builtin identity rejected" (Left "stale or forged builtin crate identity")
+    (identityCheck (builtin "mlf:builtin-shared-haskell-v1:12" ["MLF.Primitive","Prelude"]))
+  check "incomplete current builtin rejected" (Left "builtin crate must own exactly Prelude and MLF.Primitive")
+    (identityCheck (builtin "mlf:builtin-shared-haskell-v1:13" ["Prelude"]))
   let direct = M.fromList H.v_compareString
                  [(H.literal k,S.fromList H.v_compareString (map H.literal ns))
                   | (k,ns) <- [("A",["B","External"]),("B",["A"]),("Alone",[])]]
