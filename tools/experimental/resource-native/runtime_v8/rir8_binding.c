@@ -9,7 +9,7 @@
 #define N RT8_NULL
 #define TRY(e) do { uint32_t rt8_rc_=(e); if (rt8_rc_!=S(OK)) return rt8_rc_; } while (0)
 /* Fixed predicate groups reserve their full bounded cost before evaluation. */
-#define REQUIRE(s,n,p,k,d) do { TRY(rt8_work_reserve((s),(n))); \
+#define REQUIRE(s,n,p,k,d) do { TRY(work_reserve_internal((s),(n))); \
     if (!(p)) return fail((s),S(k),D(d)); } while (0)
 
 static uint32_t fail(Rt8ReadState *s,uint32_t status,uint32_t detail) {
@@ -24,7 +24,7 @@ static uint32_t active(Rt8ReadState *s) {
     if (!s->work || !s->diagnostic) return fail(s,S(ARGUMENT),D(NULL_ARGUMENT));
     return s->diagnostic->status;
 }
-uint32_t rt8_work_reserve(Rt8ReadState *s,uint64_t units) {
+static inline uint32_t work_reserve_internal(Rt8ReadState *s,uint64_t units) {
     uint32_t status=active(s);
     if (status!=S(OK)) return status;
     /* These fixed accounting preconditions cannot recursively charge. */
@@ -38,6 +38,12 @@ uint32_t rt8_work_reserve(Rt8ReadState *s,uint64_t units) {
         return fail(s,S(OVERFLOW),D(OVERFLOW));
     s->work->used+=units; s->work->total+=units;
     return S(OK);
+}
+/* Keep the external ABI for other translation units. Internal reservations
+ * use the same logic directly; symbol interposition is not a contract of this
+ * direct-linked route. The compiler may choose whether to inline the helper. */
+uint32_t rt8_work_reserve(Rt8ReadState *s,uint64_t units) {
+    return work_reserve_internal(s,units);
 }
 static void location(Rt8ReadState *s,uint32_t region,uint32_t kind,
                      uint32_t domain,uint32_t object,uint32_t row,uint32_t field) {
@@ -82,7 +88,7 @@ static uint32_t absolute_alignment(Rt8ReadState *s,const void *root,size_t total
                                    uint32_t off,size_t alignment) {
     TRY(root_range(s,root,total)); TRY(extent(s,total,off,0));
     REQUIRE(s,1,alignment!=0,ALIGNMENT,ALIGNMENT);
-    TRY(rt8_work_reserve(s,3));
+    TRY(work_reserve_internal(s,3));
     if (((uintptr_t)root+(uintptr_t)off)%(uintptr_t)alignment!=0)
         return fail(s,S(ALIGNMENT),D(ALIGNMENT));
     return S(OK);
@@ -92,12 +98,12 @@ static uint32_t copy_root(Rt8ReadState *s,const void *root,size_t total,
     if (!out) return fail(s,S(ARGUMENT),D(NULL_ARGUMENT));
     TRY(root_range(s,root,total)); TRY(extent(s,total,off,bytes));
     /* Reservation failure cannot write even the first destination byte. */
-    TRY(rt8_work_reserve(s,(uint64_t)bytes));
+    TRY(work_reserve_internal(s,(uint64_t)bytes));
     memcpy(out,(const unsigned char *)root+(size_t)off,bytes); return S(OK);
 }
 static uint32_t layout(Rt8ReadState *s,uint32_t element,size_t *bytes,size_t *align) {
     /* Fixed dispatch is bounded; reserve all 40 possible tag predicates. */
-    TRY(rt8_work_reserve(s,40));
+    TRY(work_reserve_internal(s,40));
     switch (element) {
     case 1: *bytes=sizeof(Ir8PacketType); *align=_Alignof(Ir8PacketType); return S(OK);
     case 2: *bytes=sizeof(Ir8PacketCallableContract); *align=_Alignof(Ir8PacketCallableContract); return S(OK);
@@ -160,7 +166,7 @@ static uint32_t directory(const Rt8ProgramView *v,uint32_t id,
     REQUIRE(s,2,d.kind>=1 && d.kind<=8,REFERENCE,DOMAIN);
     TRY(mul32(s,d.count,d.element_bytes,&object_bytes));
     REQUIRE(s,1,d.object_bytes==object_bytes,REFERENCE,LENGTH);
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if (d.count==0) {
         REQUIRE(s,1,d.offset==N,REFERENCE,OFFSET);
     } else {
@@ -168,7 +174,7 @@ static uint32_t directory(const Rt8ProgramView *v,uint32_t id,
         TRY(extent(s,v->program.packet_bytes,d.offset,d.object_bytes));
         TRY(absolute_alignment(s,v->program.packet,v->program.packet_bytes,d.offset,align));
     }
-    TRY(rt8_work_reserve(s,sizeof(d))); *out=d; return S(OK);
+    TRY(work_reserve_internal(s,sizeof(d))); *out=d; return S(OK);
 }
 /* d is the call-local result of directory(), still covered by the borrowed
  * immutable-root precondition. No entry is retained between reader calls. */
@@ -202,7 +208,7 @@ uint32_t rt8_view_object_read(const Rt8ProgramView *v,uint32_t object,uint32_t e
 }
 static uint32_t descriptor_element(Rt8ReadState *s,uint32_t domain,uint32_t *out) {
     REQUIRE(s,2,domain>=1 && domain<=6,REFERENCE,DOMAIN);
-    TRY(rt8_work_reserve(s,6));
+    TRY(work_reserve_internal(s,6));
     switch(domain) {
     case 1: *out=31; break; case 2: *out=32; break; case 3: *out=33; break;
     case 4: *out=34; break; case 5: case 6: *out=35; break;
@@ -212,18 +218,18 @@ static uint32_t descriptor_element(Rt8ReadState *s,uint32_t domain,uint32_t *out
 }
 static uint32_t domain_span(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
                             Ir8PacketSpan *span,uint32_t *element,Rt8ReadState *s) {
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if (kind==RT8_DOMAIN_KIND_PACKET_TABLE) {
         REQUIRE(s,2,domain>=1 && domain<=20,REFERENCE,DOMAIN);
-        TRY(rt8_work_reserve(s,sizeof(*span))); *span=v->typed_header.table[domain-1]; *element=domain;
+        TRY(work_reserve_internal(s,sizeof(*span))); *span=v->typed_header.table[domain-1]; *element=domain;
     } else {
         REQUIRE(s,1,kind==RT8_DOMAIN_KIND_PACKET_DESCRIPTOR,REFERENCE,DOMAIN);
         TRY(descriptor_element(s,domain,element));
-        TRY(rt8_work_reserve(s,sizeof(*span))); *span=v->typed_header.descriptor[domain-1];
+        TRY(work_reserve_internal(s,sizeof(*span))); *span=v->typed_header.descriptor[domain-1];
     }
     /* A finite row ceiling is still needed before an authentication scan. */
     REQUIRE(s,1,span->count<=RT8_MAX_STATIC_BYTES/sizeof(uint32_t),REFERENCE,COUNT);
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if (span->count==0) REQUIRE(s,1,span->object==N,REFERENCE,MISSING);
     else REQUIRE(s,1,span->object!=N,REFERENCE,MISSING);
     return S(OK);
@@ -242,14 +248,14 @@ static uint32_t domain_location_checked(const Rt8ProgramView *v,uint32_t kind,ui
                                uint32_t element,const Ir8PacketObjectDirectoryEntry *d,
                                uint32_t *off,Rt8ReadState *s) {
     uint32_t offset,id,expected_kind;
-    TRY(rt8_work_reserve(s,1)); expected_kind=kind==RT8_DOMAIN_KIND_PACKET_TABLE?1:3;
+    TRY(work_reserve_internal(s,1)); expected_kind=kind==RT8_DOMAIN_KIND_PACKET_TABLE?1:3;
     REQUIRE(s,1,d->kind==expected_kind,REFERENCE,DOMAIN);
     REQUIRE(s,1,d->domain_or_subkind==domain,REFERENCE,DOMAIN);
     REQUIRE(s,1,d->owner==N,REFERENCE,APPLICABILITY);
     REQUIRE(s,1,d->secondary_owner==N,REFERENCE,APPLICABILITY);
     REQUIRE(s,1,d->count==span->count,REFERENCE,COUNT);
     TRY(object_location_checked(v,d,element,row,wanted,&offset,s));
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if (kind==RT8_DOMAIN_KIND_PACKET_TABLE) {
         /* All twenty table row types begin with their checked uint32_t id. */
         TRY(copy_root(s,v->program.packet,v->program.packet_bytes,offset,sizeof(id),&id));
@@ -293,7 +299,7 @@ static uint32_t domain_ref_finish(const Rt8ProgramView *v,uint32_t kind,uint32_t
                            Rt8ReadState *s) {
     uint32_t off;
     TRY(domain_location_checked(v,kind,domain,row,bytes,span,element,d,&off,s));
-    TRY(rt8_work_reserve(s,sizeof(*out)+1));
+    TRY(work_reserve_internal(s,sizeof(*out)+1));
     *out=(const unsigned char *)v->program.packet+(size_t)off; return S(OK);
 }
 static uint32_t domain_ref_first(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
@@ -338,23 +344,23 @@ static uint32_t domain_auth(const Rt8ProgramView *v,uint32_t kind,uint32_t domai
     /* Peel the first visit: empty domains never read a directory. The local d
      * belongs to this immutable view and this call only. No callback or root
      * mutation occurs during the scan; public reads/refs still start fresh. */
-    TRY(rt8_work_reserve(s,1)); if (i>=span.count) goto missing;
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1)); if (i>=span.count) goto missing;
+    TRY(work_reserve_internal(s,1));
     TRY(domain_ref_first(v,kind,domain,i,&candidate,&d,s));
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if (reference==candidate) goto found;
     for(i=1;;++i) {
-        TRY(rt8_work_reserve(s,1)); if (i>=span.count) break;
-        TRY(rt8_work_reserve(s,1));
+        TRY(work_reserve_internal(s,1)); if (i>=span.count) break;
+        TRY(work_reserve_internal(s,1));
         TRY(domain_ref_next(v,kind,domain,i,&candidate,&d,&span,element,s));
-        TRY(rt8_work_reserve(s,1));
+        TRY(work_reserve_internal(s,1));
         if (reference==candidate) goto found;
     }
 missing:
     location(s,RT8_REGION_PACKET,kind,domain,span.object,N,N);
     return fail(s,S(REFERENCE),D(UNREGISTERED));
 found:
-    TRY(rt8_work_reserve(s,sizeof(*out))); *out=i; return S(OK);
+    TRY(work_reserve_internal(s,sizeof(*out))); *out=i; return S(OK);
 }
 uint32_t rt8_view_table_auth(const Rt8ProgramView *v,uint32_t d,const void *ref,
                             uint32_t *out,Rt8ReadState *s) {
@@ -392,13 +398,13 @@ uint32_t rt8_view_code_read(const Rt8ProgramView *v,uint32_t id,Rt8Code *out,Rt8
     s->diagnostic->field=6;
     REQUIRE(s,1,spec.body_binding==IR8_PACKET_BODY_BINDING_UNBOUND,BINDING,APPLICABILITY);
     location(s,RT8_REGION_BINDING,RT8_DOMAIN_KIND_NATIVE_CODE,0,N,id,N);
-    TRY(rt8_work_reserve(s,sizeof(code))); *out=code; return S(OK);
+    TRY(work_reserve_internal(s,sizeof(code))); *out=code; return S(OK);
 }
 uint32_t rt8_view_code_ref(const Rt8ProgramView *v,uint32_t id,const Rt8Code **out,Rt8ReadState *s) {
     Rt8Code code; uint32_t off;
     TRY(reader_begin(v,s,out)); TRY(rt8_view_code_read(v,id,&code,s));
     TRY(code_offset(v,id,&off,s));
-    TRY(rt8_work_reserve(s,sizeof(*out)+1));
+    TRY(work_reserve_internal(s,sizeof(*out)+1));
     *out=(const Rt8Code *)((const unsigned char *)v->program.binding+(size_t)off);
     return S(OK);
 }
@@ -410,10 +416,10 @@ uint32_t rt8_view_code_auth(const Rt8ProgramView *v,const Rt8Code *ref,uint32_t 
     REQUIRE(s,1,v->binding_header.code_count<=2048,REFERENCE,COUNT);
     for(i=0;;++i) {
         const Rt8Code *candidate;
-        TRY(rt8_work_reserve(s,1)); if(i>=v->binding_header.code_count) break;
-        TRY(rt8_work_reserve(s,1)); TRY(rt8_view_code_ref(v,i,&candidate,s));
-        TRY(rt8_work_reserve(s,1));
-        if(ref==candidate) { TRY(rt8_work_reserve(s,sizeof(*out))); *out=i; return S(OK); }
+        TRY(work_reserve_internal(s,1)); if(i>=v->binding_header.code_count) break;
+        TRY(work_reserve_internal(s,1)); TRY(rt8_view_code_ref(v,i,&candidate,s));
+        TRY(work_reserve_internal(s,1));
+        if(ref==candidate) { TRY(work_reserve_internal(s,sizeof(*out))); *out=i; return S(OK); }
     }
     location(s,RT8_REGION_BINDING,RT8_DOMAIN_KIND_NATIVE_CODE,0,N,N,N);
     return fail(s,S(REFERENCE),D(UNREGISTERED));
@@ -433,7 +439,7 @@ static uint32_t label_index(const Rt8ProgramView *v,uint32_t id,uint32_t *out,Rt
     TRY(absolute_alignment(s,v->program.binding,v->program.binding_bytes,off,_Alignof(uint32_t)));
     TRY(copy_root(s,v->program.binding,v->program.binding_bytes,off,sizeof(index),&index));
     REQUIRE(s,1,index<v->binding_header.label_bytes,REFERENCE,OFFSET);
-    TRY(rt8_work_reserve(s,sizeof(*out))); *out=index; return S(OK);
+    TRY(work_reserve_internal(s,sizeof(*out))); *out=index; return S(OK);
 }
 static uint32_t label_byte(const Rt8ProgramView *v,uint32_t index,unsigned char *out,Rt8ReadState *s) {
     uint32_t off;
@@ -446,19 +452,19 @@ static uint32_t label_bounds(const Rt8ProgramView *v,uint32_t id,
                              uint32_t *start,uint32_t *end,Rt8ReadState *s) {
     uint32_t first,last,next; unsigned char b;
     TRY(label_index(v,id,&first,s)); TRY(add32(s,id,1,&next));
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if(next<v->binding_header.label_count) TRY(label_index(v,next,&last,s));
     else last=v->binding_header.label_bytes;
     REQUIRE(s,1,last>first,REFERENCE,ORDER);
     REQUIRE(s,2,last-first>=2,REFERENCE,LENGTH); /* one nonempty string + NUL */
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if(id==0) REQUIRE(s,1,first==0,REFERENCE,OFFSET);
     else {
         REQUIRE(s,1,first!=0,REFERENCE,OFFSET);
-        TRY(rt8_work_reserve(s,1)); TRY(label_byte(v,first-1,&b,s));
+        TRY(work_reserve_internal(s,1)); TRY(label_byte(v,first-1,&b,s));
         REQUIRE(s,1,b==0,REFERENCE,OFFSET);
     }
-    TRY(rt8_work_reserve(s,1)); TRY(label_byte(v,last-1,&b,s));
+    TRY(work_reserve_internal(s,1)); TRY(label_byte(v,last-1,&b,s));
     REQUIRE(s,1,b==0,REFERENCE,LENGTH);
     *start=first; *end=last; return S(OK);
 }
@@ -469,7 +475,7 @@ uint32_t rt8_view_label(const Rt8ProgramView *v,uint32_t id,const char **out,Rt8
     TRY(label_bounds(v,id,&first,&last,s));
     TRY(add32(s,v->binding_header.label_bytes_offset,first,&off));
     TRY(extent(s,v->program.binding_bytes,off,1));
-    TRY(rt8_work_reserve(s,sizeof(*out)+1));
+    TRY(work_reserve_internal(s,sizeof(*out)+1));
     *out=(const char *)((const unsigned char *)v->program.binding+(size_t)off); return S(OK);
 }
 uint32_t rt8_view_label_auth(const Rt8ProgramView *v,const char *ref,uint32_t *out,Rt8ReadState *s) {
@@ -479,10 +485,10 @@ uint32_t rt8_view_label_auth(const Rt8ProgramView *v,const char *ref,uint32_t *o
     REQUIRE(s,1,v->binding_header.label_count<=RT8_MAX_LABELS,REFERENCE,COUNT);
     for(i=0;;++i) {
         const char *candidate;
-        TRY(rt8_work_reserve(s,1)); if(i>=v->binding_header.label_count) break;
-        TRY(rt8_work_reserve(s,1)); TRY(rt8_view_label(v,i,&candidate,s));
-        TRY(rt8_work_reserve(s,1));
-        if(ref==candidate) { TRY(rt8_work_reserve(s,sizeof(*out))); *out=i; return S(OK); }
+        TRY(work_reserve_internal(s,1)); if(i>=v->binding_header.label_count) break;
+        TRY(work_reserve_internal(s,1)); TRY(rt8_view_label(v,i,&candidate,s));
+        TRY(work_reserve_internal(s,1));
+        if(ref==candidate) { TRY(work_reserve_internal(s,sizeof(*out))); *out=i; return S(OK); }
     }
     location(s,RT8_REGION_BINDING,RT8_DOMAIN_KIND_LABEL,0,N,N,N);
     return fail(s,S(REFERENCE),D(UNREGISTERED));
@@ -490,12 +496,12 @@ uint32_t rt8_view_label_auth(const Rt8ProgramView *v,const char *ref,uint32_t *o
 /* Strict UTF-8; bounded sequences, no locale or host string functions. */
 static uint32_t utf8_string(const Rt8ProgramView *v,uint32_t first,uint32_t last,Rt8ReadState *s) {
     uint32_t pos=first,stop,length,j,next; unsigned char a,b;
-    REQUIRE(s,1,last>first,BINDING,LENGTH); TRY(rt8_work_reserve(s,1)); stop=last-1;
+    REQUIRE(s,1,last>first,BINDING,LENGTH); TRY(work_reserve_internal(s,1)); stop=last-1;
     for(;;) {
-        TRY(rt8_work_reserve(s,1)); if(pos>=stop) break;
-        TRY(rt8_work_reserve(s,1)); TRY(label_byte(v,pos,&a,s));
+        TRY(work_reserve_internal(s,1)); if(pos>=stop) break;
+        TRY(work_reserve_internal(s,1)); TRY(label_byte(v,pos,&a,s));
         REQUIRE(s,1,a!=0,BINDING,LENGTH);
-        TRY(rt8_work_reserve(s,8));
+        TRY(work_reserve_internal(s,8));
         if(a<0x80) length=1;
         else if(a>=0xc2 && a<=0xdf) length=2;
         else if(a>=0xe0 && a<=0xef) length=3;
@@ -504,10 +510,10 @@ static uint32_t utf8_string(const Rt8ProgramView *v,uint32_t first,uint32_t last
         TRY(add32(s,pos,length,&next)); REQUIRE(s,1,next<=stop,BINDING,LENGTH);
         for(j=1;;++j) {
             uint32_t at;
-            TRY(rt8_work_reserve(s,1)); if(j>=length) break;
-            TRY(rt8_work_reserve(s,1)); TRY(add32(s,pos,j,&at)); TRY(label_byte(v,at,&b,s));
+            TRY(work_reserve_internal(s,1)); if(j>=length) break;
+            TRY(work_reserve_internal(s,1)); TRY(add32(s,pos,j,&at)); TRY(label_byte(v,at,&b,s));
             REQUIRE(s,2,b>=0x80 && b<=0xbf,BINDING,UNSUPPORTED);
-            TRY(rt8_work_reserve(s,13));
+            TRY(work_reserve_internal(s,13));
             if(j==1 && ((a==0xe0 && b<0xa0)||(a==0xed && b>0x9f)||
                         (a==0xf0 && b<0x90)||(a==0xf4 && b>0x8f)))
                 return fail(s,S(BINDING),D(UNSUPPORTED));
@@ -520,10 +526,10 @@ static uint32_t label_order(const Rt8ProgramView *v,uint32_t a,uint32_t aend,
                             uint32_t b,uint32_t bend,Rt8ReadState *s) {
     for(;;) {
         unsigned char x,y;
-        TRY(rt8_work_reserve(s,1));
+        TRY(work_reserve_internal(s,1));
         REQUIRE(s,1,a<aend,BINDING,LENGTH); REQUIRE(s,1,b<bend,BINDING,LENGTH);
         TRY(label_byte(v,a,&x,s)); TRY(label_byte(v,b,&y,s));
-        TRY(rt8_work_reserve(s,1)); if(x<y) return S(OK);
+        TRY(work_reserve_internal(s,1)); if(x<y) return S(OK);
         REQUIRE(s,1,x==y,BINDING,ORDER);
         REQUIRE(s,1,x!=0,BINDING,DUPLICATE);
         TRY(add32(s,a,1,&a)); TRY(add32(s,b,1,&b));
@@ -534,12 +540,12 @@ static uint32_t check_labels(const Rt8ProgramView *v,Rt8ReadState *s) {
     REQUIRE(s,1,v->binding_header.label_count<=RT8_MAX_LABELS,BINDING,COUNT);
     for(i=0;;++i) {
         uint32_t first,last;
-        TRY(rt8_work_reserve(s,1)); if(i>=v->binding_header.label_count) break;
-        TRY(rt8_work_reserve(s,1));
+        TRY(work_reserve_internal(s,1)); if(i>=v->binding_header.label_count) break;
+        TRY(work_reserve_internal(s,1));
         location(s,RT8_REGION_BINDING,RT8_DOMAIN_KIND_LABEL,0,N,i,0);
         TRY(label_bounds(v,i,&first,&last,s)); REQUIRE(s,1,first==expected,BINDING,OFFSET);
         s->diagnostic->field=1; TRY(utf8_string(v,first,last,s));
-        TRY(rt8_work_reserve(s,1)); if(i!=0) TRY(label_order(v,previous,previous_end,first,last,s));
+        TRY(work_reserve_internal(s,1)); if(i!=0) TRY(label_order(v,previous,previous_end,first,last,s));
         previous=first; previous_end=last; expected=last;
     }
     location(s,RT8_REGION_BINDING,RT8_DOMAIN_KIND_LABEL,0,N,N,N);
@@ -556,8 +562,8 @@ static uint32_t check_native_header(Rt8ProgramView *v,Rt8ReadState *s) {
     TRY(copy_root(s,v->program.binding,v->program.binding_bytes,0,sizeof(*h),h));
     TRY(header_field(s,0));
     for(i=0;;++i) {
-        TRY(rt8_work_reserve(s,1)); if(i>=8) break;
-        TRY(rt8_work_reserve(s,1)); REQUIRE(s,1,h->magic[i]==magic[i],ABI,MAGIC);
+        TRY(work_reserve_internal(s,1)); if(i>=8) break;
+        TRY(work_reserve_internal(s,1)); REQUIRE(s,1,h->magic[i]==magic[i],ABI,MAGIC);
     }
     TRY(header_field(s,1)); REQUIRE(s,1,h->abi_revision==RT8_BINDING_ABI_REVISION,ABI,REVISION);
     TRY(header_field(s,2)); REQUIRE(s,1,h->purpose==RT8_BINDING_PURPOSE_STATIC_REAL_BODIES,ABI,PURPOSE);
@@ -573,11 +579,11 @@ static uint32_t check_native_header(Rt8ProgramView *v,Rt8ReadState *s) {
 static uint32_t check_expected(const Rt8BindingHeader *h,const Ir8PacketExpectedBindings *e,Rt8ReadState *s) {
     uint32_t i,j; TRY(header_field(s,14));
     for(i=0;;++i) {
-        TRY(rt8_work_reserve(s,1)); if(i>=5) break;
-        TRY(rt8_work_reserve(s,1));
+        TRY(work_reserve_internal(s,1)); if(i>=5) break;
+        TRY(work_reserve_internal(s,1));
         for(j=0;;++j) {
-            TRY(rt8_work_reserve(s,1)); if(j>=32) break;
-            TRY(rt8_work_reserve(s,1));
+            TRY(work_reserve_internal(s,1)); if(j>=32) break;
+            TRY(work_reserve_internal(s,1));
             REQUIRE(s,1,h->expected.digests[i].bytes[j]==e->digests[i].bytes[j],BINDING,BINDING_MISMATCH);
         }
     }
@@ -587,7 +593,7 @@ static uint32_t member(const Rt8ProgramView *v,uint32_t offset,uint32_t count,
                         size_t size,size_t alignment,uint32_t *cursor,uint32_t *bytes,Rt8ReadState *s) {
     uint32_t n,end;
     TRY(mul32(s,count,(uint32_t)size,&n));
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if(count==0) {
         REQUIRE(s,1,offset==N,BINDING,EXTRA); *bytes=0; return S(OK);
     }
@@ -615,11 +621,11 @@ static uint32_t check_layout(Rt8ProgramView *v,Rt8BindingReport *r,Rt8ReadState 
     REQUIRE(s,1,v->packet_header.directory_count<=IR8_PACKET_MAX_DIRECTORY,BINDING,COUNT);
     /* Even unused nonempty packet members must satisfy absolute alignment. */
     for(i=0;;++i) {
-        TRY(rt8_work_reserve(s,1)); if(i>=v->packet_header.directory_count) break;
-        TRY(rt8_work_reserve(s,1));
+        TRY(work_reserve_internal(s,1)); if(i>=v->packet_header.directory_count) break;
+        TRY(work_reserve_internal(s,1));
         location(s,RT8_REGION_PACKET,RT8_DOMAIN_KIND_NONE,N,i,N,N);
         TRY(directory(v,i,&d,s));
-        TRY(rt8_work_reserve(s,1));
+        TRY(work_reserve_internal(s,1));
         if(d.count!=0) REQUIRE(s,2,v->packet_header.packet_alignment%d.element_alignment==0,ALIGNMENT,ALIGNMENT);
     }
     location(s,RT8_REGION_PACKET,RT8_DOMAIN_KIND_NONE,N,v->packet_header.typed_header_object,0,N);
@@ -631,10 +637,10 @@ static uint32_t check_layout(Rt8ProgramView *v,Rt8BindingReport *r,Rt8ReadState 
     REQUIRE(s,1,d.count==1,REFERENCE,COUNT);
     TRY(rt8_view_object_read(v,v->packet_header.typed_header_object,IR8_PACKET_ELEMENT_TYPED_HEADER,
                             0,&typed,sizeof(typed),s));
-    TRY(rt8_work_reserve(s,sizeof(typed))); v->typed_header=typed;
+    TRY(work_reserve_internal(s,sizeof(typed))); v->typed_header=typed;
     location(s,RT8_REGION_PACKET,RT8_DOMAIN_KIND_NONE,N,v->packet_header.string_pool_object,N,N);
     TRY(directory(v,v->packet_header.string_pool_object,&d,s));
-    TRY(rt8_work_reserve(s,sizeof(d))); v->string_pool=d;
+    TRY(work_reserve_internal(s,sizeof(d))); v->string_pool=d;
     REQUIRE(s,1,v->string_pool.kind==IR8_PACKET_OBJECT_KIND_STRING_POOL,REFERENCE,DOMAIN);
     REQUIRE(s,1,v->string_pool.element_type==IR8_PACKET_ELEMENT_UTF8_BYTE,REFERENCE,DOMAIN);
     TRY(header_field(s,7));
@@ -647,7 +653,7 @@ static uint32_t check_layout(Rt8ProgramView *v,Rt8BindingReport *r,Rt8ReadState 
     TRY(member(v,v->binding_header.label_bytes_offset,v->binding_header.label_bytes,sizeof(unsigned char),_Alignof(unsigned char),&cursor,&bytes,s));
     r->label_bytes=bytes;
     TRY(header_field(s,10));
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if(v->binding_header.label_count==0) REQUIRE(s,1,v->binding_header.label_bytes==0,BINDING,EXTRA);
     else REQUIRE(s,1,v->binding_header.label_bytes!=0,BINDING,MISSING);
     r->header_bytes=(uint32_t)sizeof(Rt8BindingHeader);
@@ -661,12 +667,12 @@ static uint32_t check_codes(const Rt8ProgramView *v,Rt8ReadState *s) {
     TRY(header_field(s,15)); REQUIRE(s,1,v->binding_header.entry!=NULL,UNBOUND,NULL_CALLBACK);
     for(i=0;;++i) {
         Rt8Code code;
-        TRY(rt8_work_reserve(s,1)); if(i>=v->binding_header.code_count) break;
-        TRY(rt8_work_reserve(s,1)); TRY(rt8_view_code_read(v,i,&code,s));
+        TRY(work_reserve_internal(s,1)); if(i>=v->binding_header.code_count) break;
+        TRY(work_reserve_internal(s,1)); TRY(rt8_view_code_read(v,i,&code,s));
         for(j=0;;++j) {
             Rt8Code previous;
-            TRY(rt8_work_reserve(s,1)); if(j>=i) break;
-            TRY(rt8_work_reserve(s,1)); TRY(rt8_view_code_read(v,j,&previous,s));
+            TRY(work_reserve_internal(s,1)); if(j>=i) break;
+            TRY(work_reserve_internal(s,1)); TRY(rt8_view_code_read(v,j,&previous,s));
             location(s,RT8_REGION_BINDING,RT8_DOMAIN_KIND_NATIVE_CODE,0,N,i,1);
             REQUIRE(s,1,code.body!=previous.body,BINDING,DUPLICATE);
         }
@@ -684,7 +690,7 @@ static uint32_t census(const Rt8ProgramView *v,Rt8BindingReport *r,Rt8ReadState 
     REQUIRE(s,1,members<=v->program.binding_bytes,BINDING,LENGTH);
     TRY(add32(s,r->packet.member_bytes_sum,r->packet.padding_bytes,&packet_total));
     REQUIRE(s,1,packet_total==v->program.packet_bytes,BINDING,EQUATION);
-    TRY(rt8_work_reserve(s,1)); r->padding_bytes=(uint32_t)v->program.binding_bytes-members;
+    TRY(work_reserve_internal(s,1)); r->padding_bytes=(uint32_t)v->program.binding_bytes-members;
     r->runtime_total_static_bytes=total; return S(OK);
 }
 static uint32_t validate_all(const Rt8Program *program,const Ir8PacketExpectedBindings *expected,
@@ -693,14 +699,14 @@ static uint32_t validate_all(const Rt8Program *program,const Ir8PacketExpectedBi
     Ir8PacketExpectedBindings e; uint32_t packet_status;
     uintptr_t packet_start,binding_start,packet_end,binding_end;
     /* Typed wrapper/expected storage is a valid, disjoint caller precondition. */
-    TRY(rt8_work_reserve(s,sizeof(v->program))); memcpy(&v->program,program,sizeof(v->program));
-    TRY(rt8_work_reserve(s,sizeof(e))); memcpy(&e,expected,sizeof(e));
+    TRY(work_reserve_internal(s,sizeof(v->program))); memcpy(&v->program,program,sizeof(v->program));
+    TRY(work_reserve_internal(s,sizeof(e))); memcpy(&e,expected,sizeof(e));
     if(!v->program.packet || !v->program.binding) return fail(s,S(ARGUMENT),D(NULL_ARGUMENT));
     REQUIRE(s,1,v->program.packet_bytes>=sizeof(Ir8PacketProgramHeader),SIZE_LIMIT,LENGTH);
     REQUIRE(s,1,v->program.binding_bytes>=sizeof(Rt8BindingHeader),SIZE_LIMIT,LENGTH);
     TRY(root_range(s,v->program.packet,v->program.packet_bytes));
     TRY(root_range(s,v->program.binding,v->program.binding_bytes));
-    TRY(rt8_work_reserve(s,4));
+    TRY(work_reserve_internal(s,4));
     packet_start=(uintptr_t)v->program.packet; binding_start=(uintptr_t)v->program.binding;
     packet_end=packet_start+(uintptr_t)v->program.packet_bytes;
     binding_end=binding_start+(uintptr_t)v->program.binding_bytes;
@@ -713,7 +719,7 @@ static uint32_t validate_all(const Rt8Program *program,const Ir8PacketExpectedBi
     packet_status=ir8_packet_validate(v->program.packet,v->program.packet_bytes,&e,workspace,&r->packet);
     /* The packet's separate bounded work is not charged a second time here. */
     REQUIRE(s,1,packet_status==r->packet.status,INTERNAL,INTERNAL_INVARIANT);
-    TRY(rt8_work_reserve(s,1));
+    TRY(work_reserve_internal(s,1));
     if(packet_status!=IR8_PACKET_NATIVE_STATUS_OK) {
         location(s,RT8_REGION_PACKET,RT8_DOMAIN_KIND_NONE,r->packet.domain,
                  r->packet.object,r->packet.row,r->packet.field);
@@ -748,7 +754,7 @@ uint32_t rt8_binding_prepare(const Rt8Program *program,const Ir8PacketExpectedBi
     } else {
         status=validate_all(program,expected,workspace,&v,report,&state);
         if(status==S(OK)) {
-            status=rt8_work_reserve(&state,sizeof(v));
+            status=work_reserve_internal(&state,sizeof(v));
             if(status==S(OK)) { *out=v; report->binding_validated=1; }
         }
     }

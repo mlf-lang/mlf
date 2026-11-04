@@ -42,7 +42,7 @@ TABLES(ASSERT_TABLE)
 DESCRIPTORS(ASSERT_DESCRIPTOR)
 _Static_assert(sizeof(Root)<RT8_MAX_STATIC_BYTES,"bounded readable test root");
 
-enum Operation { READ, REF, AUTH, OBJECT_READ };
+enum Operation { READ, REF, AUTH, OBJECT_READ, RESERVE };
 typedef struct Result {
     uint32_t status;
     Rt8Diagnostic diagnostic;
@@ -376,12 +376,72 @@ static void argument_cases(void) {
     emit("reservation-atomic",0,0,0,READ,&r);
 }
 
+/* Reserve controls have their own counter and diagnostic expectations. They
+ * do not relax invoke()'s ordinary reader invariants (total == used + 17). */
+static void reserve_case(const char *name,unsigned absent,uint64_t used,uint64_t total,
+                         uint64_t limit,uint64_t units,uint32_t prior,
+                         uint32_t expected_status,uint32_t expected_detail,
+                         uint64_t expected_used,uint64_t expected_total) {
+    Rt8Work work={used,total,limit};
+    Rt8Diagnostic d={0};
+    d.status=prior; d.detail=RT8_DETAIL_DOMAIN; d.phase=RT8_PHASE_LOOKUP;
+    d.region=RT8_REGION_PACKET; d.domain_kind=RT8_DOMAIN_KIND_PACKET_TABLE;
+    d.domain=3; d.object=4; d.row=2; d.field=7; d.guard_index=9;
+    Rt8Diagnostic expected=d;
+    /* Missing state/diagnostic leaves the allocated diagnostic untouched.
+     * A prior failure likewise remains the first failure. */
+    if(!(absent&5u) && prior==RT8_STATUS_OK) {
+        expected.status=expected_status; expected.detail=expected_detail;
+    }
+    Rt8ReadState state={(absent&2u)?NULL:&work,(absent&4u)?NULL:&d};
+    uint32_t rc=rt8_work_reserve((absent&1u)?NULL:&state,units);
+    int ok=rc==expected_status && work.used==expected_used && work.total==expected_total &&
+        work.limit==limit && memcmp(&d,&expected,sizeof(d))==0;
+    if(!ok) ++failures;
+    Result r={rc,d,work.used,work.total,0,ok};
+    emit(name,0,0,0,RESERVE,&r);
+}
+
+static void reserve_cases(void) {
+#define R(name,absent,used,total,limit,units,prior,status,detail,end_used,end_total) \
+    reserve_case(name,absent,used,total,limit,units,RT8_STATUS_##prior, \
+                 RT8_STATUS_##status,RT8_DETAIL_##detail,end_used,end_total)
+    R("reserve-null-state",1,5,22,8,1,OK,ARGUMENT,DOMAIN,5,22);
+    R("reserve-null-work",2,5,22,8,1,OK,ARGUMENT,NULL_ARGUMENT,5,22);
+    R("reserve-null-diagnostic",4,5,22,8,1,OK,ARGUMENT,DOMAIN,5,22);
+    R("reserve-null-both",6,5,22,8,1,OK,ARGUMENT,DOMAIN,5,22);
+    R("reserve-prior-failure",0,5,22,8,1,REFERENCE,REFERENCE,DOMAIN,5,22);
+    R("reserve-prior-before-null-work",2,5,22,8,1,REFERENCE,REFERENCE,DOMAIN,5,22);
+    R("reserve-prior-before-invalid-work",0,9,1,0,UINT64_MAX,REFERENCE,REFERENCE,DOMAIN,9,1);
+    R("reserve-zero-limit",0,0,17,0,0,OK,ARGUMENT,COUNT,0,17);
+    R("reserve-over-limit",0,0,17,RT8_MAX_GUARD_WORK+1u,0,OK,ARGUMENT,COUNT,0,17);
+    R("reserve-limit-before-invariant",0,9,1,0,UINT64_MAX,OK,ARGUMENT,COUNT,9,1);
+    R("reserve-used-above-limit",0,9,22,8,0,OK,INTERNAL,INTERNAL_INVARIANT,9,22);
+    R("reserve-total-below-used",0,5,4,8,0,OK,INTERNAL,INTERNAL_INVARIANT,5,4);
+    R("reserve-invariant-before-budget",0,9,1,8,UINT64_MAX,OK,INTERNAL,INTERNAL_INVARIANT,9,1);
+    R("reserve-exact-limit",0,5,22,8,3,OK,OK,DOMAIN,8,25);
+    R("reserve-zero-units",0,5,22,8,0,OK,OK,DOMAIN,5,22);
+    R("reserve-zero-at-limit",0,5,22,5,0,OK,OK,DOMAIN,5,22);
+    R("reserve-exhausted-one",0,5,22,5,1,OK,WORK_LIMIT,WORK_EXHAUSTED,5,22);
+    R("reserve-over-remaining-one",0,5,22,8,4,OK,WORK_LIMIT,WORK_EXHAUSTED,5,22);
+    R("reserve-budget-before-overflow",0,5,UINT64_MAX,5,1,OK,WORK_LIMIT,WORK_EXHAUSTED,5,UINT64_MAX);
+    R("reserve-huge-units",0,5,22,8,UINT64_MAX,OK,WORK_LIMIT,WORK_EXHAUSTED,5,22);
+    R("reserve-total-overflow",0,5,UINT64_MAX-1u,8,2,OK,OVERFLOW,OVERFLOW,5,UINT64_MAX-1u);
+    R("reserve-total-max-overflow",0,5,UINT64_MAX,8,1,OK,OVERFLOW,OVERFLOW,5,UINT64_MAX);
+    R("reserve-total-exact-max",0,5,UINT64_MAX-1u,8,1,OK,OK,DOMAIN,6,UINT64_MAX);
+    R("reserve-zero-total-max",0,5,UINT64_MAX,8,0,OK,OK,DOMAIN,5,UINT64_MAX);
+    R("reserve-maximum-valid-limit",0,0,0,RT8_MAX_GUARD_WORK,RT8_MAX_GUARD_WORK,OK,OK,DOMAIN,
+      RT8_MAX_GUARD_WORK,RT8_MAX_GUARD_WORK);
+#undef R
+}
+
 int main(void) {
     for(uint32_t domain=1;domain<=20;++domain) domain_cases(RT8_DOMAIN_KIND_PACKET_TABLE,domain);
     for(uint32_t domain=1;domain<=6;++domain) domain_cases(RT8_DOMAIN_KIND_PACKET_DESCRIPTOR,domain);
     for(uint32_t domain=1;domain<=20;++domain) authentication_cases(RT8_DOMAIN_KIND_PACKET_TABLE,domain);
     for(uint32_t domain=1;domain<=6;++domain) authentication_cases(RT8_DOMAIN_KIND_PACKET_DESCRIPTOR,domain);
     argument_cases();
+    reserve_cases();
     /* Independently sum the fixed nonempty directory predicate/copy charges:
      * 97 predicate/range/dispatch units plus two complete directory copies.
      * Later auth rows also omit two span checks/copies (6 or 13 fixed units

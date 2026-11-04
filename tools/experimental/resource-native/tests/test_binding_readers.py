@@ -2,7 +2,8 @@
 """Explicit low-level reader differential tests, not runtime/packet admission.
 
 Run with a fresh --output directory for portable current-only O0/O2 checks.
-Optionally supply --baseline-root pointing to the unchanged Stage11, Stage14 or Stage15 repository
+Optionally supply --baseline-root pointing to the unchanged Stage11, Stage14,
+Stage15 or Stage17/18 repository
 for exact differential diagnostics/data/work checks. Both modes use the same
 bounded storage driver and real binding/packet sources. No callback, runtime,
 source compiler or evaluator is mocked or invoked. This is a correctness/work-
@@ -23,8 +24,9 @@ from source_build_v8 import MIB, executable, require, run, save
 BASELINE_BINDING_SHA = '4bbbf9eb9f9638dccd12e46d51fce0b0ae16b05f7ce6d8e2cd8e460f66e27f4f'
 STAGE14_BINDING_SHA = 'd06bcb313748642e69b3bf511d6bda95a7d3673c12f65f80fc7c02aca16132ba'
 STAGE15_BINDING_SHA = '519f8a90b29d8e3d915193f674f3aef08a8bb4cd6d0a5ca9db6efad5ed4e3f50'
+STAGE17_BINDING_SHA = '48586d46d990f6e9a4e167e69f2ae6a4b906376b9f3ea677f9ea54455386f491'
 BASELINES = {BASELINE_BINDING_SHA: 'stage11', STAGE14_BINDING_SHA: 'stage14',
-             STAGE15_BINDING_SHA: 'stage15'}
+             STAGE15_BINDING_SHA: 'stage15', STAGE17_BINDING_SHA: 'stage17'}
 AUTH_SUCCESS_CASES = ('freshness-prime', 'freshness-restored', 'freshness-span-restored', 'short-one', 'short-two',
                       'after-target-id', 'budget-auth-first-middle')
 
@@ -45,6 +47,8 @@ def load_rows(path):
     keys = [(r['case'], r['kind'], r['domain'], r['row'], r['op']) for r in rows]
     require(len(set(keys)) == len(keys), 'duplicate reader case')
     require(all(r['output_ok'] == 1 for r in rows), 'reader output changed unexpectedly')
+    require(len([r for r in rows if r['op'] == 4]) == 25,
+            'all direct external-wrapper controls must run')
     return rows, summary
 
 
@@ -90,12 +94,19 @@ def compare(old, new, census, baseline):
     require(len(old) == len(new), 'differential case count differs')
     saved = 0
     for a, b in zip(old, new):
+        # The wrapper has explicit invalid-counter/NULL-state controls; these
+        # are not ordinary reads and do not use the reader total==used+17 rule.
+        if a['op'] == 4:
+            require(a == b, 'external reserve wrapper changed: ' + str((a, b)))
+            continue
+        if baseline == 'stage17':
+            require(a == b, 'inline reserve changed a reader field: ' + str((a, b)))
         require({k: v for k, v in a.items() if k not in ('used', 'total')} ==
                 {k: v for k, v in b.items() if k not in ('used', 'total')},
                 'reader status/coordinates/bytes/sentinel differ: ' + str(a))
         later_rows = reused_auth_directory_calls(a)
         delta = 0
-        if later_rows:
+        if later_rows and baseline != 'stage17':
             require(a['kind'] in (1, 2), 'unknown authentication domain kind')
             key = 'auth_table_reuse_work' if a['kind'] == 1 else 'auth_descriptor_reuse_work'
             delta = later_rows * census[key]
@@ -114,7 +125,7 @@ def compare(old, new, census, baseline):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline-root', type=Path,
-                        help='optional unchanged Stage11, Stage14 or Stage15 repository for exact differential checks')
+                        help='optional unchanged Stage11, Stage14, Stage15 or Stage17/18 repository for differential checks')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
     args = parser.parse_args(argv)
@@ -123,7 +134,7 @@ def main(argv=None):
     if args.baseline_root is not None:
         old = args.baseline_root.resolve() / 'tools/experimental/resource-native'
         baseline_sha = digest(old / 'runtime_v8/rir8_binding.c')
-        require(baseline_sha in BASELINES, 'expected exact Stage11, Stage14 or Stage15 binding source')
+        require(baseline_sha in BASELINES, 'expected exact Stage11, Stage14, Stage15 or Stage17/18 binding source')
         baseline = BASELINES[baseline_sha]
         # Differential mode cannot silently compare different contracts.
         for relative in ('runtime_v8/rir8_binding.h', 'runtime_v8/rir8_binding_internal.h',
@@ -168,10 +179,13 @@ def main(argv=None):
                'status': 'pass', 'cases_per_build': len(results[('optimized', '-O0')][0]),
                'builds': 2*len(sources), 'native_runs': 2*len(sources),
                'baseline': baseline, 'baseline_binding_sha256': baseline_sha,
+               'external_wrapper_cases': 25,
                'optimized_binding_sha256': digest(BASE / 'runtime_v8/rir8_binding.c'),
                'driver_sha256': digest(HERE / 'binding_reader_driver.c'),
                'all_work_budgets_below_success': 'all operations final row; auth first/middle/final; all20table/6descriptor',
                'notes': ['No authentication scan shortcut.', 'No output changes on failure.',
+                         'Stage17/18 differential mode requires every field, including all work, to remain exact.',
+                         'External-wrapper boundary controls keep separate explicit counter expectations.',
                          'First row fully validates; later auth rows reuse only same-call directory/span/element facts.',
                          'Independent calls, span-object replacement, short spans, and post-match ID corruption are checked.',
                          'Exact baseline diagnostics/work deltas require optional differential mode.']}

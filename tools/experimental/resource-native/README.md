@@ -9,7 +9,11 @@ with portable O0/O2 reader regressions. [Stage15 auth-scan reuse](resource_ir_v8
 reuses that directory only within one authentication call while preserving every
 preceding-row check. [Stage17 span/layout reuse](resource_ir_v8/README_STAGE17.md)
 also reuses only call-local facts while keeping every row safety check. Each
-stage documents its own finite same-program timing and limits. A separate
+stage documents its own finite same-program timing and limits.
+[Stage19 binding-local reserve inlining](resource_ir_v8/README_STAGE19.md)
+preserves every work charge and full report while trading larger binding code
+for finite elapsed-time gains in one independent replication; its first cohort
+and scalar result remain inconclusive. A separate
 [controlled shared-source fragment experiment](source_v8/README.md) connects a
 fresh ordinary compiler capture to independent replay, IR8 planning and the real
 runtime for a bounded scalar/callable fragment, now extended with closed
