@@ -21,6 +21,9 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     preparedResolution, preparedNames, preparedLayouts, preparedReach,
     preparedData, preparedClasses, preparedInstances, preparedEntry);
   import qualified Bootstrap.CrateQuery as Query;
+  import qualified Bootstrap.CrateGraph as CrateGraph;
+  import qualified Bootstrap.QueryGraph as QueryGraph;
+  import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.Separate as Separate;
@@ -182,8 +185,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
         Left message -> ioReturn (Left message);
         Right ((,,) updated loaded prepared) ->
           do {
-            result <- compilePreparedWithEncoding verifyAll shareEncoding
-              (\object payload report -> (,,) object payload report) updated loaded prepared;
+            result <- compileGraphSources verifyAll updated loaded prepared (preparedSourcePlan prepared) prefix;
             case result of {
               Left message ->
                 let {
@@ -197,23 +199,87 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                       names
                 } in
                 ioReturn (Left (Modules.displayNames diagnostics message));
-              Right ((,,) object payload report) ->
-                do {
-                  written <- Artifact.writeObjectWithPayloadEither prefix object payload;
-                  case written of {
-                    Left message -> ioReturn (Left message);
-                    Right _ -> do {
-                      writeFile (prefix ++ ".queries")
-                        (Query.reportJSON (specIdentity spec)
-                           (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
-                      ioReturn (Right ())
-                    }
-                  }
-                }
+              Right _ -> ioReturn (Right ())
             }
           }
       }
     };
+
+  compileGraphSources verify spec interfaces prepared plan prefix = do {
+    let { directory = Query.cachePath (specCache spec) };
+    created <- Query.cacheCommand ["/bin/mkdir","-p",directory];
+    if created /= 0 then ioReturn (Left "cannot create query graph cache directory") else do {
+      lock <- acquireFileLock (directory ++ "/.lock");
+      result <- catchIOError (compileGraphLocked verify spec interfaces prepared plan prefix directory)
+        (\error -> ioReturn (Left (textFromChars (ioeGetErrorString error))));
+      releaseFileLock lock;
+      ioReturn result
+    }
+  };
+  compileGraphLocked verify spec interfaces prepared plan prefix directory = do {
+    executable <- getExecutablePath;
+    compiler <- fileDigest executable;
+    let { imported = map (\((,) _ iface) -> Separate.UnitInterface (Artifact.crateId iface)
+          [] [] [] [] [] (Artifact.crateBindings iface) "metadata") interfaces;
+      protected = M.fromList compareString (concatMap (compose Artifact.crateProtection snd) interfaces) };
+    compiled <- if Query.validSourceContextDigest compiler
+      then case plan of {
+        Just source -> CrateGraph.compile verify (specIdentity spec) compiler directory imported protected source;
+        Nothing -> let { lowered = preparedLowered prepared } in
+          CrateGraph.compileLowered verify (specIdentity spec) compiler directory imported
+            (Inference.loweredData lowered) (Inference.loweredValues lowered)
+      }
+      else ioReturn (Left "cannot fingerprint query graph compiler");
+    case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.result state of {
+      (,,,) fragments report contracts session -> case graphInterface spec interfaces prepared fragments contracts of {
+        Left e -> ioReturn (Left e);
+        Right iface -> do {
+          outputStarted <- QueryGraph.clock (CrateGraph.statistics state);
+          made <- Artifact.makeOpenObject iface (map snd interfaces) fragments;
+          case made of { Left e -> ioReturn (Left e); Right object -> do {
+            written <- Artifact.writeObjectEither prefix object;
+            case written of { Left e -> ioReturn (Left e); Right _ -> do {
+              writeFile (prefix ++ ".queries") (Query.reportJSON (specIdentity spec)
+                (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
+              QueryGraph.elapsed (CrateGraph.statistics state) 4 outputStarted;
+              publishStarted <- QueryGraph.clock (CrateGraph.statistics state);
+              published <- QueryGraph.publish session;
+              QueryGraph.elapsed (CrateGraph.statistics state) 5 publishStarted;
+              QueryGraph.writeProfile (prefix ++ ".query-profile") (CrateGraph.statistics state);
+              ioReturn (mapEither (\_ -> ()) published)
+            } }
+          } }
+        }
+      }
+    } }
+  };
+  graphInterface spec interfaces prepared fragments contracts = do {
+    let { resolved = Modules.resolvedCrateModules (preparedResolution prepared);
+      modules = map (compose Modules.moduleIdentity Modules.resolvedSource) resolved;
+      dependencies = map (\path -> case find (\p -> eqString (fst p) path) interfaces of {
+        Nothing -> panic "missing direct crate metadata";
+        Just ((,) _ iface) -> (,,) (Artifact.crateId iface) path (Artifact.semanticFingerprint iface)
+      }) (specDependencies spec);
+      external = Set.fromList compareString (concatMap (\((,) _ iface) ->
+        map D.datatypeName (Artifact.crateLoweredData iface)) interfaces);
+      layouts = filter (\d -> not (Set.member compareString (D.datatypeName d) external)) (preparedLayouts prepared);
+      reach = map (\name -> (,) name (Set.toList
+        (M.findWithDefault compareString Set.empty name (preparedReach prepared)))) modules;
+      bindings = concatMap (\((,) _ f) -> map (\((,) n ty) ->
+        (,) (X.nameHint n) (Separate.normalType ty)) (Open.bindings f)) fragments };
+    exports <- traverseEither (\r -> mapEither (\scope ->
+      (,) (Modules.moduleIdentity (Modules.resolvedSource r)) (Set.toList (Modules.visible scope)))
+      (Modules.resolvedExports (specMode spec) r)) resolved;
+    protection <- traverseEither (\((,) name _) -> case M.lookup compareString name contracts of {
+      Just contract -> Right ((,) name (Source.contractProtected contract));
+      Nothing -> Left "open final source binding lacks protection contract"
+    }) bindings;
+    let { iface = Artifact.CrateInterface (specIdentity spec) dependencies modules exports reach
+      (preparedData prepared) (preparedClasses prepared) (preparedInstances prepared)
+      layouts bindings (preparedEntry prepared) "pending" protection };
+    Artifact.validateInterface iface;
+    Right iface
+  };
 
   compileSpecFile :: String -> String -> IO (Either String ());
   compileSpecFile = compileSpecFileWithPrelude Nothing;

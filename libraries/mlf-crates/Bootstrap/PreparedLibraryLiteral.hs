@@ -31,6 +31,7 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
   } else objectV1 value;
   objectV1 :: Artifact.CrateObject -> String;
   objectV1 value = case value of {
+    Artifact.OpenCrateObject _ _ -> objectV1 (Artifact.legacyObject value);
     Artifact.CrateObject iface fragments -> L.application "CrateObject"
       [L.interface iface, L.list fragment fragments];
     Artifact.LegacyCrateObject iface fragments -> L.application "LegacyCrateObject"
@@ -77,10 +78,12 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
     Right () -> objectPieceV1 value serial
   } else objectPieceV1 value serial;
   objectPieceV1 :: Artifact.CrateObject -> Int -> L.TermPieces;
-  objectPieceV1 value serial = let {
+  objectPieceV1 original serial = objectPieceClosed (Artifact.legacyObject original) serial;
+  objectPieceClosed value serial = let {
     units = L.listPieces (map fragmentPiece (Artifact.objectFragments value)) serial;
     label = "mlfLiteralObject" ++ showInt (L.pieceNext units);
     rendered = case value of {
+      Artifact.OpenCrateObject _ _ -> panic "literal legacy adapter invariant";
       Artifact.CrateObject iface _ -> L.application "CrateObject" [L.interface iface, L.pieceText units];
       Artifact.LegacyCrateObject iface _ -> L.application "LegacyCrateObject" [L.interface iface, L.pieceText units];
       Artifact.EnvelopeCrateObject legacy iface _ -> L.application "EnvelopeCrateObject"
@@ -129,7 +132,7 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
   fragmentValue value = W.VNode 241
     [unitValue (Separate.objectInterface value), Q.toXTerm (Separate.objectTerm value)];
   objectValue :: Artifact.CrateObject -> W.Value;
-  objectValue value = W.VNode 243 [Q.toBool (Artifact.envelopeLegacyObject value),
+  objectValue original = let { value = Artifact.legacyObject original } in W.VNode 243 [Q.toBool (Artifact.envelopeLegacyObject value),
     interfaceValue (Artifact.objectInterface value), Q.toList fragmentValue (Artifact.objectFragments value)];
 
   data Scan = One Int W.Value | Many Int ([] W.Value);
@@ -166,7 +169,7 @@ module Bootstrap.PreparedLibraryLiteral (rawLibrary, rawLibraryPieces) where {
     scan limits [One 1 (objectValue value)] 0 0
   };
   checkObject :: Artifact.CrateObject -> Either String ();
-  checkObject value = do {
+  checkObject original = let { value = Artifact.legacyObject original } in do {
     checkObjectWith Artifact.crateEnvelopeLimits value;
     _ <- Artifact.envelopePrepareMarkedLink Artifact.crateEnvelopeLimits value;
     Right ()

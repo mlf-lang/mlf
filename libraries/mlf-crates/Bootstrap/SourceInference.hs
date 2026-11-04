@@ -13,6 +13,7 @@ module Bootstrap.SourceInference where {
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.EvidenceBoundary as Boundary;
   import qualified Bootstrap.InferenceUnit as Inference;
+  import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.Separate as Separate;
@@ -1123,6 +1124,111 @@ module Bootstrap.SourceInference where {
           }) (Separate.unitBindings (Separate.objectInterface object));
         finalized <- snd admitted;
         Right (FinalGroup finalized (M.fromList compareString contracts))
+      }
+    }
+  };
+
+  data OpenFinalGroup = OpenFinalGroup Open.Fragment (Map String SourceContract);
+  openFinalObject (OpenFinalGroup object _) = object;
+  openFinalContracts (OpenFinalGroup _ contracts) = contracts;
+  openRootParts object = case (,) (Open.body object) (Open.bindings object) of {
+    (,) (XLet binder rhs (XConstructor "()" [])) [(,) owned ty] -> do {
+      ensure (X.equalName binder owned) "open root member identity mismatch";
+      Right ((,,) binder ty rhs)
+    };
+    _ -> Left "source root did not retain a single nonrecursive checked binding"
+  };
+  validatePreparedOpen prepared object = do {
+    ensure (eqList eqString (sortBy compareString (map sourceName (groupMembers prepared)))
+      (sortBy compareString (map (compose X.nameHint fst) (Open.bindings object))))
+      "raw group changed source ownership";
+    case groupAuthority prepared of {
+      Nothing -> Right ();
+      Just (RootAuthority name labels _ _ _) -> do {
+        parts <- openRootParts object;
+        case parts of { (,,) binder _ rhs -> do {
+          ensure (eqString name (X.nameHint binder)) "raw source identity mismatch";
+          validateRawSlots labels (X.erase rhs)
+        } }
+      }
+    }
+  };
+  canonicalOpen object = do {
+    plan <- Wire.prepareGraphPlan Wire.defaultLimits [Structure.toXTerm (Open.body object)];
+    graph <- Wire.realizeGraphPlan plan;
+    identity <- case Wire.graphRoots graph of { [root] -> Right root; _ -> Left "open raw root count" };
+    normalized <- finalSyntaxRun graph [FinalVisit identity (FinalTerm (Open.body object))] []
+      (FinalSyntaxState M.empty M.empty 0 0 0);
+    result <- finalSyntaxTerm normalized;
+    if finalSyntaxUnchanged identity normalized then Right object else Open.normalize object result
+  };
+  prepareOpenFinish prepared object = do {
+    usedFlags <- traverseEither (\name -> case find
+      (\((,) n _) -> eqString n (X.nameHint name)) (groupParameterProtection prepared) of {
+        Just ((,) _ protected) -> Right protected;
+        Nothing -> Left "used checked predecessor lacks protection authority"
+      }) (Open.usedParameters object);
+    let { usedProtected = any (\flag -> flag) usedFlags };
+    case groupAuthority prepared of {
+      Nothing -> do {
+        contracts <- traverseEither (\((,) binder ty) ->
+          case find (\((,,) n _ _) -> eqString n (X.nameHint binder)) (groupContracts prepared) of {
+            Nothing -> Left "final source group lacks calling-convention metadata";
+            Just ((,,) name classes protected) -> Right ((,) name (SourceContract ty classes (protected || usedProtected)))
+          }) (Open.bindings object);
+        Right (ReadyOpenFinish (OpenFinalGroup object (M.fromList compareString contracts)))
+      };
+      Just (RootAuthority name labels protected candidates protectedCandidates) -> do {
+        parts <- openRootParts object;
+        case parts of { (,,) binder ty rhs -> let {
+          unchanged = \flag -> Right (ReadyOpenFinish (OpenFinalGroup object
+            (M.fromList compareString [(,) name (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)])));
+          isProtected = protected || usedProtected
+        } in if isProtected || null labels then unchanged isProtected else do {
+          slots <- targetSlots labels rhs;
+          case slots of {
+            Nothing -> unchanged isProtected;
+            Just mapped -> do {
+              authorized <- candidateParameters (Open.parameters object) (Open.body object) candidates;
+              let { boundary = Boundary.Boundary 0 Boundary.UnsignedRoot False 0
+                (map (\((,,) n _ _) -> n) mapped);
+                obligations = map
+                  (\((,) ordinal ((,,) n cls dictionary)) ->
+                    Boundary.Slot 0 ordinal n (Boundary.GeneratedOrdinary cls dictionary) 0)
+                  (zip (range 0 (length mapped - 1)) mapped) };
+              plan <- Boundary.checkedPlan (groupRegistry prepared) boundary obligations (Open.parameters object)
+                [Boundary.EvidenceScope 0 authorized] ty rhs;
+              Right (PendingOpenFinish object name binder ty labels isProtected protectedCandidates plan)
+            }
+          }
+        } }
+      }
+    }
+  };
+
+  data OpenFinish = ReadyOpenFinish OpenFinalGroup | PendingOpenFinish Open.Fragment String XName XType
+    ([] ((,,) String String String)) Bool ([] String) Boundary.CheckedPlan;
+  openFinishRequests finish = case finish of {
+    ReadyOpenFinish _ -> [];
+    PendingOpenFinish _ _ _ _ _ _ _ plan -> Boundary.checkedRequests plan
+  };
+  completeOpenFinish finish answers = case finish of {
+    ReadyOpenFinish group -> Right group;
+    PendingOpenFinish object name binder ty labels protected protectedCandidates plan -> do {
+      recipe <- Boundary.finishCheckedPlan plan answers;
+      let { unchanged = \flag -> Right (OpenFinalGroup object (M.fromList compareString
+        [(,) name (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)])) };
+      case recipe of {
+        Boundary.KeepRecipe -> unchanged protected;
+        Boundary.ChangeRecipe result body required supports ->
+          if any (\n -> elem eqString (X.nameHint n) protectedCandidates) supports then unchanged True else do {
+            final <- Open.check (Open.context object) required (XLet binder body (XConstructor "()" []));
+            ensure (case Open.bindings final of {
+              [(,) actual actualType] -> X.equalName actual binder && Type.alphaEq actualType result;
+              _ -> False }) "checked evidence adapter type mismatch";
+            canonical <- canonicalOpen final;
+            Right (OpenFinalGroup canonical (M.fromList compareString [(,) name (SourceContract result [] False)]))
+          }
       }
     }
   }

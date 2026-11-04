@@ -1,0 +1,367 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Bootstrap.OpenFragment
+  (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
+   parameters, body, bindings, usedParameters, context, fingerprint,
+   normalize, encodeBody, decodeTrusted, audit, closedTerm, fresh,
+   Package, makePackage, readPackage, packageFragments, packageBytes,
+   packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity) where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import Bootstrap.Std;
+  import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.X.Check as Check;
+  import qualified Bootstrap.X.Checked as Checked;
+  import qualified Bootstrap.X.Syntax as X;
+  import qualified Bootstrap.X.Type as T;
+  import qualified Bootstrap.X.Pretty as Pretty;
+  import qualified Bootstrap.Separate as Separate;
+  import qualified Bootstrap.EvidenceBoundary as Boundary;
+  import qualified Bootstrap.Bitstream as W;
+  import qualified Bootstrap.ArtifactStructure as Structure;
+  import qualified Bootstrap.ArtifactStorage as Storage;
+
+  -- Environments and receipts are immutable. The constructor is private;
+  -- decoding below is the only trusted-disk admission, after a byte SHA match.
+  data Environment = Environment ([] DataDecl) DataEnv;
+  environment ds = mapEither (Environment ds) (D.validateDeclarations ds);
+  -- DataDecl and an all-Star DataDeclK denote the same declaration. Bound
+  -- parameter spellings and saturated application syntax are not identities.
+  canonicalField scope depth field = case field of {
+    Parameter name -> Parameter (M.findWithDefault compareString name name scope);
+    Function a b -> Function (canonicalField scope depth a) (canonicalField scope depth b);
+    Applied name arguments -> Applied name (map (canonicalField scope depth) arguments);
+    Application a b -> let { function = canonicalField scope depth a; argument = canonicalField scope depth b }
+      in case function of { Applied name args -> Applied name (snoc args argument); _ -> Application function argument };
+    Quantified name kind body -> let { fresh = "type:" ++ showInt depth } in
+      Quantified fresh kind (canonicalField (M.insert compareString name fresh scope) (depth + 1) body)
+  };
+  canonicalDeclaration declaration = let {
+    binders = D.datatypeBinders declaration;
+    normalized = map (\((,) index ((,) _ kind)) -> (,) ("type:" ++ showInt index) kind)
+      (zip (range 0 (length binders - 1)) binders);
+    scope = M.fromList compareString (zip (map fst binders) (map fst normalized))
+  } in DataDeclK (D.datatypeName declaration) normalized (map (\(ConstructorDecl name fields) ->
+    ConstructorDecl name (map (canonicalField scope (length binders)) fields)) (D.datatypeConstructors declaration));
+  declarationValue declaration = Structure.toDataDecl (canonicalDeclaration declaration);
+  declarations (Environment ds _) = ds;
+  dataEnvironment (Environment _ ds) = ds;
+  data Fragment = Fragment Environment ([] ((,) XName XType)) XTerm
+    ([] ((,) XName XType)) ([] XName) String;
+  context (Fragment env _ _ _ _ _) = env;
+  parameters (Fragment _ ps _ _ _ _) = ps;
+  body (Fragment _ _ term _ _ _) = term;
+  bindings (Fragment _ _ _ bs _ _) = bs;
+  usedParameters (Fragment _ _ _ _ used _) = used;
+  fingerprint (Fragment _ _ _ _ _ stamp) = stamp;
+  stamp env ps term bs = Separate.fingerprint (Separate.pack
+    [Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env)),
+     Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps),
+     Pretty.prettyTerm term,
+     Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs)]);
+  make env ps term bs = Fragment env ps term bs
+    (Boundary.nubNames (Boundary.freeNames term)) (stamp env ps term bs);
+  check :: Environment -> [] ((,) XName XType) -> XTerm -> Either String Fragment;
+  check env@(Environment _ ds) ps term = do {
+    let { names = map fst ps };
+    ensure (length names == length (nubBy X.equalName names)) "duplicate open-fragment parameter";
+    let { scope = XEnv M.empty (M.fromList X.compareName ps) };
+    mapM_ (Check.termType ds M.empty) (map snd ps);
+    answer <- Check.inferDeclarationSpine ds scope term;
+    owned <- snd answer;
+    ensure (all (\p -> S.null (T.freeVars (snd p))) owned) "open fragment exports an open type";
+    Right (make env ps term owned)
+  };
+  fromChecked checked = do {
+    let { source = Checked.term checked;
+      parts = case source of { XWithData ds term -> (,) ds term; term -> (,) [] term };
+      split = Separate.splitParameters (snd parts) };
+    env <- environment (fst parts);
+    owned <- Checked.declarationBindings checked;
+    Right (make env (fst split) (snd split) owned)
+  };
+  -- Compatibility/export adapter only. Query IO and the new crate format use
+  -- body and explicit references directly, never this materialization.
+  closedTerm fragment = XWithData (declarations (context fragment))
+    (foldr (\((,) n ty) rest -> XAbs n ty rest) (body fragment) (parameters fragment));
+  normalize fragment term = check (context fragment) (parameters fragment) term;
+  audit fragment = do {
+    checked <- check (context fragment) (parameters fragment) (body fragment);
+    ensure (eqString (fingerprint checked) (fingerprint fragment)) "open fragment audit mismatch";
+    Right checked
+  };
+  -- Injective alpha-renaming preserves this exact checked environment/body.
+  -- Imported identities participate even if the body never uses them.
+  fresh serial fragment = let {
+    ids = IS.toList (foldl (\seen p -> IS.insert (X.nameId (fst p)) seen)
+      (Separate.termIdentities (body fragment) IS.empty) (parameters fragment));
+    replacements = IM.fromList (zip ids (range serial (advanceIdentity serial (length ids) - 1)));
+    name = \(XName n hint) -> XName (IM.get n replacements) hint;
+    variable = \(XTyVar n) -> XTyVar (IM.get n replacements);
+    ps = map (\((,) n ty) -> (,) (name n) ty) (parameters fragment);
+    term = Separate.mapTerm name variable (body fragment);
+    bs = map (\((,) n ty) -> (,) (name n) (Separate.normalType ty)) (bindings fragment);
+    renamed = Fragment (context fragment) ps term bs
+      (map name (usedParameters fragment)) (stamp (context fragment) ps term bs)
+  } in (,) (advanceIdentity serial (length ids)) renamed;
+  -- The environment and external types are supplied from verified shared
+  -- dependency nodes. This record contains their local identities, not copies.
+  encodeBody stage name fragment = W.VNode 400
+    [W.VText stage, W.VText name, W.VText (fingerprint fragment),
+     Structure.toList (Structure.toPair Structure.toXName (\p -> W.VText p))
+       (map (\((,) n _) -> (,) n (X.nameHint n)) (parameters fragment)),
+     Structure.toXTerm (body fragment),
+     Structure.toList (Structure.toPair Structure.toXName Structure.toXType) (bindings fragment),
+     Structure.toList Structure.toXName (usedParameters fragment)];
+  -- A reader cannot attach a claimed type to an AST. It must acquire the
+  -- immutable bytes whose SHA came from the trusted generation/object index.
+  decodeTrusted path expected references stage name env expectedParameters expectedMembers = do {
+    acquired <- Storage.readRaw path;
+    case acquired of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> do {
+        actual <- byteArrayDigest bytes;
+        if not (eqString actual expected) then ioReturn (Left "open fragment payload SHA mismatch") else do {
+          decoded <- W.decodeGraph W.defaultLimits 6 bytes;
+          ioReturn (do {
+            graph <- decoded;
+            root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "open fragment root count" };
+            envelope <- W.lookupGraphNode graph root;
+            record <- case envelope of {
+              W.GNode 425 [rs,record] -> do {
+                values <- Structure.decodeGraphValue
+                  (Structure.ShapeList (Structure.ShapePair Structure.ShapeText Structure.ShapeText)) graph rs;
+                saved <- Structure.expectList (Structure.expectPair Structure.expectText Structure.expectText) values;
+                ensure (eqList (eqPair eqString eqString) saved references) "open fragment environment version mismatch";
+                Right record
+              };
+              _ -> Left "open fragment environment record missing"
+            };
+            value <- W.lookupGraphNode graph record;
+            case value of {
+              W.GNode 400 [s,n,h,ps,t,bs,uses] -> do {
+                savedStage <- textAt graph s;
+                savedName <- textAt graph n;
+                savedStamp <- textAt graph h;
+                ensure (eqString savedStage stage && eqString savedName name) "open fragment stage/owner mismatch";
+                rawParameters <- decodedList
+                  (Structure.ShapePair Structure.ShapeXName Structure.ShapeText) graph ps;
+                pairs <- traverseEither (Structure.expectPair Structure.expectXName Structure.expectText) rawParameters;
+                typed <- traverseEither (\((,) binder key) -> do {
+                  ensure (eqString (X.nameHint binder) key) "open fragment parameter identity mismatch";
+                  ty <- case lookup eqString key expectedParameters of {
+                    Nothing -> Left "open fragment has an undeclared dependency";
+                    Just ty -> Right ty };
+                  Right ((,) binder ty)
+                }) pairs;
+                ensure (eqList eqString (map snd pairs) (map fst expectedParameters)) "open fragment dependency inventory mismatch";
+                term <- Structure.fromGraphXTerm graph t;
+                ownedValues <- decodedList
+                  (Structure.ShapePair Structure.ShapeXName Structure.ShapeXType) graph bs;
+                owned <- traverseEither (Structure.expectPair Structure.expectXName Structure.expectXType) ownedValues;
+                ensure (eqList eqString (sortBy compareString (map (compose X.nameHint fst) owned))
+                  (sortBy compareString expectedMembers)) "open fragment member inventory mismatch";
+                usedValues <- decodedList Structure.ShapeXName graph uses;
+                used <- traverseEither Structure.expectXName usedValues;
+                ensure (all (\x -> any (\p -> X.equalName x (fst p)) typed) used)
+                  "open fragment free-reference inventory mismatch";
+                let { result = Fragment env typed term owned used savedStamp };
+                -- ICH verification is serialization/fingerprint verification,
+                -- independent of the explicit semantic-audit operation.
+                Right result
+              };
+              _ -> Left "unsupported open fragment record"
+            }
+          })
+        }
+      }
+    }
+  };
+  decodedList shape graph index = do {
+    decoded <- Structure.decodeGraphValue (Structure.ShapeList shape) graph index;
+    Structure.expectList (\value -> Right value) decoded
+  };
+  textAt graph index = do {
+    value <- W.lookupGraphNode graph index;
+    case value of { W.GText text -> Right text; _ -> Left "expected open fragment text" }
+  };
+  data Package = Package String ([] ((,) String Fragment)) ByteArray String;
+  packageMetadata (Package metadata _ _ _) = metadata;
+  packageFragments (Package _ fragments _ _) = fragments;
+  packageBytes (Package _ _ bytes _) = bytes;
+  packageHash (Package _ _ _ digest) = digest;
+  packageFormat :: String;
+  packageFormat = "MLF-OPEN-CRATE-1/checker-1";
+  -- The distinct binary schema is a committed dispatch, never a fallback to
+  -- an older parser after corruption of an open object.
+  packageFamily bytes = do {
+    size <- lengthByteArray bytes;
+    magic <- W.hasMagic bytes;
+    if not magic || size < 20 then ioReturn False else do {
+      a <- readByteArray bytes 16; b <- readByteArray bytes 17;
+      c <- readByteArray bytes 18; d <- readByteArray bytes 19;
+      ioReturn (a == 7 && b == 0 && c == 0 && d == 0)
+    }
+  };
+  bindingReference ((,) n _) = Structure.toXName n;
+  encodeFinal ((,) name fragment) = W.VNode 401
+    [Structure.toText name, Structure.toText (fingerprint fragment),
+     Structure.toList Structure.toText (map D.datatypeName (declarations (context fragment))),
+     Structure.toList bindingReference (parameters fragment), Structure.toXTerm (body fragment),
+     Structure.toList bindingReference (bindings fragment),
+     Structure.toList Structure.toXName (usedParameters fragment)];
+  hashSyntax value = do {
+    encoded <- Storage.encode 6 [value];
+    case encoded of { Left e -> ioReturn (Left e); Right bytes -> do {
+      digest <- byteArrayDigest bytes; ioReturn (Right digest)
+    } }
+  };
+  -- Formal artifacts are shared by emlf, package tools and library generators.
+  -- Their executable hashes differ even in one build. The artifact ABI/checker
+  -- version and actual builtin dictionary identify their shared interpretation;
+  -- local query caches separately bind the complete producer executable SHA.
+  -- Bump packageFormat whenever a checked-artifact invariant changes.
+  compatibilityIdentity = hashSyntax (W.VNode 431
+    [Structure.toText "MLF/shared-haskell-v1",Structure.toText packageFormat,
+     Structure.toList Structure.toDataDecl D.builtinDeclarations]);
+  referenceHashes encode values = do {
+    hashes <- mapM (\((,) key value) -> do {
+      digest <- hashSyntax (encode value);
+      ioReturn (mapEither ((,) key) digest)
+    }) values;
+    ioReturn (sequenceEither hashes)
+  };
+  makePackage compiler metadata fragments = do {
+    let { ps = M.toList (M.fromList compareString (concatMap
+      (\((,) _ f) -> map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty))
+        (append (parameters f) (bindings f))) fragments));
+      ds = M.toList (M.fromList compareString (concatMap
+        (\((,) _ f) -> map (\d -> (,) (D.datatypeName d) d) (declarations (context f))) fragments)) };
+    bh <- referenceHashes Structure.toXType ps;
+    dh <- referenceHashes declarationValue ds;
+    case do { b <- bh; d <- dh; Right ((,) b d) } of {
+      Left e -> ioReturn (Left e);
+      Right ((,) b d) -> do {
+        encoded <- Storage.encode 7 [W.VNode 430
+          [Structure.toText packageFormat,Structure.toText compiler,Structure.toText metadata,
+           Structure.toList (Structure.toPair Structure.toText Structure.toText) b,
+           Structure.toList (Structure.toPair Structure.toText Structure.toText) d,
+           Structure.toList encodeFinal fragments]];
+        case encoded of { Left e -> ioReturn (Left e); Right bytes -> do {
+          digest <- byteArrayDigest bytes;
+          ioReturn (Right (Package metadata fragments bytes digest))
+        } }
+      }
+    }
+  };
+  -- Only an acquired immutable object snapshot, its paired interface checksum,
+  -- and checked dependency metadata can restore final receipts. No AST enters.
+  readPackage bytes expected compiler metadata allBindings allDeclarations = do {
+    auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
+    digest <- byteArrayDigest bytes;
+    if not (eqString digest expected) then ioReturn (Left "open crate SHA mismatch") else do {
+      decoded <- W.decodeGraph W.defaultLimits 7 bytes;
+      case do {
+        graph <- decoded;
+        root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "open crate root count" };
+        value <- W.lookupGraphNode graph root;
+        case value of {
+          W.GNode 430 [f,c,m,b,d,fs] -> do {
+            format <- textAt graph f; identity <- textAt graph c; association <- textAt graph m;
+            ensure (eqString format packageFormat && eqString identity compiler) "open crate checker/compiler version mismatch; rebuild object";
+            ensure (eqString association metadata) "open crate interface mismatch";
+            bindings <- referenceList graph b;
+            declarations <- referenceList graph d;
+            entries <- nodeList graph fs;
+            Right ((,,,) graph bindings declarations entries)
+          };
+          _ -> Left "invalid open crate header"
+        }
+      } of {
+        Left e -> ioReturn (Left e);
+        Right ((,,,) graph bindings declarations entries) -> do {
+          bs <- validateReferences Structure.toXType allBindings bindings;
+          ds <- validateReferences declarationValue allDeclarations declarations;
+          ioReturn (do {
+            checkedBindings <- bs; checkedDeclarations <- ds;
+            fragments <- decodeFinals graph checkedBindings checkedDeclarations M.empty entries;
+            ensure (length fragments == length (nubBy eqString (map fst fragments))) "duplicate open crate fragment";
+            if eqString auditSetting "1" then mapM_ (compose audit snd) fragments else Right ();
+            Right (Package metadata fragments bytes digest)
+          })
+        }
+      }
+    }
+  };
+  referenceList graph index = do {
+    values <- Structure.decodeGraphValue (Structure.ShapeList
+      (Structure.ShapePair Structure.ShapeText Structure.ShapeText)) graph index;
+    Structure.expectList (Structure.expectPair Structure.expectText Structure.expectText) values
+  };
+  nodeList graph index = do {
+    value <- W.lookupGraphNode graph index;
+    case value of { W.GNode 1 entries -> Right entries; _ -> Left "expected open crate list" }
+  };
+  validateReferences encode available references = do {
+    checked <- mapM (\((,) name expected) -> case M.lookup compareString name available of {
+      Nothing -> ioReturn (Left ("missing open crate reference: " ++ name));
+      Just value -> do {
+        actual <- hashSyntax (encode value);
+        ioReturn (do { digest <- actual;
+          ensure (eqString digest expected) ("open crate dependency changed: " ++ name);
+          Right ((,) name value) })
+      }
+    }) references;
+    ioReturn (do {
+      values <- sequenceEither checked;
+      ensure (length values == length (nubBy eqString (map fst values))) "duplicate open crate reference";
+      Right (M.fromList compareString values)
+    })
+  };
+  decodeFinals graph types declarations contexts entries = case entries of {
+    [] -> Right [];
+    (:) index rest -> do {
+      value <- W.lookupGraphNode graph index;
+      case value of {
+        W.GNode 401 [n,h,ds,ps,t,bs,uses] -> do {
+          name <- textAt graph n; savedStamp <- textAt graph h;
+          rawData <- decodedList Structure.ShapeText graph ds;
+          names <- traverseEither Structure.expectText rawData;
+          let { identity = Separate.pack names };
+          env <- case M.lookup compareString identity contexts of {
+            Just env -> Right env;
+            Nothing -> do {
+              values <- traverseEither (\key -> case M.lookup compareString key declarations of {
+                Just d -> Right d; Nothing -> Left "open crate datatype reference out of scope" }) names;
+              environment values
+            }
+          };
+          params <- finalBindings graph types ps;
+          owned <- finalBindings graph types bs;
+          source <- Structure.fromGraphXTerm graph t;
+          usedValues <- decodedList Structure.ShapeXName graph uses;
+          used <- traverseEither Structure.expectXName usedValues;
+          ensure (all (\u -> any (\p -> X.equalName u (fst p)) params) used) "open crate reference inventory mismatch";
+          let { fragment = Fragment env params source owned used savedStamp };
+          next <- decodeFinals graph types declarations (M.insert compareString identity env contexts) rest;
+          Right ((:) ((,) name fragment) next)
+        };
+        _ -> Left "invalid final open crate fragment"
+      }
+    }
+  };
+  finalBindings graph types index = do {
+    raw <- decodedList Structure.ShapeXName graph index;
+    names <- traverseEither Structure.expectXName raw;
+    ensure (length names == length (nubBy X.equalName names)) "duplicate open crate binder";
+    traverseEither (\name -> case M.lookup compareString (X.nameHint name) types of {
+      Just ty -> Right ((,) name ty); Nothing -> Left "open crate binding reference out of scope"
+    }) names
+  }
+}

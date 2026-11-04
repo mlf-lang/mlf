@@ -114,6 +114,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.CrateGraph",
+      "path": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.CrateQuery",
       "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
       "role": "implementation"
@@ -309,6 +314,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.OpenFragment",
+      "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Parsec",
       "path": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
       "role": "implementation"
@@ -341,6 +351,11 @@
     {
       "module": "Bootstrap.ProcessHost",
       "path": "libraries/mlf-interpreter/Bootstrap/ProcessHost.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.QueryGraph",
+      "path": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
       "role": "implementation"
     },
     {

@@ -114,7 +114,10 @@ module Bootstrap.PreparedLibraries
   checkedLibraryV1 raw = do {
     validateRegistry raw;
     let { ifaces = interfaces raw; byName = Artifact.interfaceMap ifaces;
-          objects = M.fromList compareString (map (\entry -> let { object = libraryObject entry }
+          -- The installed native literal ABI still consumes closed CheckedTerm
+          -- spines. Conversion is confined to this legacy prepared-library ABI;
+          -- ordinary open-object loading/linking uses explicit environments.
+          objects = M.fromList compareString (map (\entry -> let { object = Artifact.legacyObject (libraryObject entry) }
             in (,) (Artifact.crateId (Artifact.objectInterface object)) object) (libraryObjects raw)) };
     ordered <- Artifact.dependencyClosure byName [] [] (map Artifact.crateId ifaces);
     traverseEither (Artifact.validateDependencies byName) ordered;
@@ -510,7 +513,7 @@ module Bootstrap.PreparedLibraries
   };
   -- N7 object-known dispatch. A constructor selects policy, never admission.
   -- Every marked operation enters Artifact through the ACTUAL object list.
-  knownLibraryObjects raw = map libraryObject (libraryObjects raw);
+  knownLibraryObjects raw = map (compose Artifact.legacyObject libraryObject) (libraryObjects raw);
   hasEnvelopeLibraryObjects raw = any Artifact.envelopeMarked (knownLibraryObjects raw);
   -- Registry identity and witness errors precede object policy inspection.
   -- The marker selects fresh actual-object admission, never a proof shortcut.

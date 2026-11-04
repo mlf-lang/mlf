@@ -239,6 +239,7 @@ module Package.Release where {
     do {
       iface <- relocateInterface locations (Artifact.objectInterface object);
       case object of {
+        Artifact.OpenCrateObject _ package -> Right (Artifact.OpenCrateObject iface package);
         Artifact.CrateObject _ fragments -> Right (Artifact.CrateObject iface fragments);
         Artifact.LegacyCrateObject _ fragments -> Right (Artifact.LegacyCrateObject iface fragments);
         Artifact.EnvelopeCrateObject legacy _ fragments ->
