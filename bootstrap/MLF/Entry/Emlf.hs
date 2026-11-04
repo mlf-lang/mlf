@@ -191,7 +191,7 @@ module MLF.Entry.Emlf where {
                                                            } in
                                                            do {
                                                              result <-
-                                                               CrateSession.compileSpecFile file prefix;
+                                                               CrateSession.compileSpecFileWithPrelude Prepared.cratePrelude file prefix;
                                                              case result of {
                                                                Left message -> fatal message;
                                                                Right _ -> ioReturn ()
@@ -780,8 +780,8 @@ module MLF.Entry.Emlf where {
           case compiled of {
             Left error -> fatal (C.prettyError error);
             Right result -> case ResourceModuleExport.exportCaptured
-              "c5928b5be73cd78d194405e734aa012415570e1a"
-              "5b68d1d794eefe163d5484b99344dc2cc81806f60118e6863933acb06371e976" result of {
+              "a250ec334b70b0e587c2dd6e894d111bf879c024"
+              "83b015caaede361f354e1698cea29acf67bd68211fae72a25f303f43f254a9d3" result of {
                 Left message -> fatal ("ResourceModule: unsupported fragment: " ++ message);
                 Right output -> putStrLn output
               }
@@ -806,7 +806,7 @@ module MLF.Entry.Emlf where {
               compiled <- Prepared.compileSourceWithImports mode paths file input;
               case compiled of {
                 Left error -> fatal (C.prettyError error);
-                Right result -> case ResourceExport.exportChecked "c5928b5be73cd78d194405e734aa012415570e1a" "5b68d1d794eefe163d5484b99344dc2cc81806f60118e6863933acb06371e976" (Prepared.checkedTerm result) of {
+                Right result -> case ResourceExport.exportChecked "a250ec334b70b0e587c2dd6e894d111bf879c024" "83b015caaede361f354e1698cea29acf67bd68211fae72a25f303f43f254a9d3" (Prepared.checkedTerm result) of {
                   Left message -> fatal ("ResourceExport: unsupported fragment: " ++ message);
                   Right output -> putStrLn output
                 }

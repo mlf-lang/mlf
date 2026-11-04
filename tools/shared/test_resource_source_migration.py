@@ -107,7 +107,7 @@ class ResourceSourceMigrationTests(unittest.TestCase):
         mutators = {
             'wrong-target': lambda x: x.update(from_commit='0' * 40),
             'wrong-tree': lambda x: x.update(from_tree='0' * 40),
-            'wrong-plan': lambda x: x.update(integration_plan_sha256='0' * 64),
+            'wrong-plan': lambda x: x.update(historical_integration_plan_sha256='0' * 64),
             'wrong-snapshot-digest': lambda x: x.update(target_snapshot_sha256='0' * 64),
             'wrong-base-byte': lambda x: x['target_snapshot']['modules'][0].update(sha256='1' * 64),
             'wrong-count': lambda x: x.update(module_count=131),
@@ -134,6 +134,47 @@ class ResourceSourceMigrationTests(unittest.TestCase):
             self.assertNotEqual(bad, self.value)
             with self.subTest(name=name), self.assertRaises(ValueError):
                 migration.validate_transition(bad)
+
+
+    def test_c592_transition_remains_immutable_and_not_a_live_fallback(self):
+        historical, value = migration.historical_transition()
+        old = {row['module']: row['sha256'] for row in value['target_snapshot']['modules']}
+        destination = {row['module']: row['sha256'] for row in historical.validate_transition(value)}
+        self.assertEqual(historical.migrate(old), destination)
+        self.assertEqual(len(old), 128)
+        self.assertEqual(len(destination), 132)
+        self.assertEqual(value['from_commit'], 'c5928b5be73cd78d194405e734aa012415570e1a')
+        self.assertEqual(value['unchanged_shared_input_count'], 124)
+        for rejected in (old, destination):
+            with self.assertRaisesRegex(ValueError, 'exact128-module current-target input'):
+                migration.migrate(rejected)
+        with self.assertRaises(ValueError):
+            historical.migrate(self.base)
+
+    def test_exact_eight_owner_target_step_precedes_four_owner_resource_step(self):
+        historical, value = migration.historical_transition()
+        old = {row['module']: row['sha256'] for row in value['target_snapshot']['modules']}
+        changed = {name for name in old if old[name] != self.base[name]}
+        self.assertEqual(changed, {'Bootstrap.BuiltinPreludeContext',
+            'Bootstrap.BuiltinPreludeLiteral', 'Bootstrap.Crate', 'Bootstrap.CrateSession',
+            'MLF.BuiltinPreludeData', 'MLF.Entry.BuiltinPrelude', 'MLF.Entry.Emlf',
+            'MLF.PreparedCompiler'})
+        self.assertEqual({name for name in self.base if self.base[name] != self.hashes[name]},
+                         migration.CHANGED)
+        self.assertEqual(len(set(self.base) - migration.CHANGED), 124)
+        for name in sorted(changed):
+            mixed = dict(self.base)
+            mixed[name] = old[name]
+            with self.subTest(owner=name), self.assertRaisesRegex(ValueError, 'exact128-module current-target input'):
+                migration.migrate(mixed)
+        self.assertEqual(migration.target_from_history(), self.value['target_snapshot'])
+
+    def test_both_historical_transition_identities_are_required(self):
+        for key in ('historical_transition_sha256', 'crate_prelude_transition_sha256'):
+            value = copy.deepcopy(self.value)
+            value[key] = '0' * 64
+            with self.subTest(field=key), self.assertRaises(ValueError):
+                migration.validate_transition(value)
 
 
 if __name__ == '__main__':

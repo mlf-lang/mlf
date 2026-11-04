@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.BuiltinPreludeContext
   (RawPrelude(..), PreparedPrelude, prepareFresh, checkCompilerPrelude,
-   inputIdentity, rawTerm, interface, linked, names, environment, sourceValues,
+   inputIdentity, rawTerm, preparedRaw, prepareObject, interface, linked, names, environment, sourceValues,
    protectedNames, contracts, sourceExternals) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -34,6 +34,7 @@ module Bootstrap.BuiltinPreludeContext
   data PreparedPrelude = PreparedPrelude RawPrelude Checked.CheckedTerm Artifact.FragmentState;
   inputIdentity (RawPrelude identity _ _ _ _ _ _ _ _ _ _ _) = identity;
   rawTerm (RawPrelude _ _ _ term _ _ _ _ _ _ _ _) = term;
+  preparedRaw (PreparedPrelude raw _ _) = raw;
   interface (PreparedPrelude (RawPrelude _ _ iface _ _ _ _ _ _ _ _ _) _ _) = iface;
   linked (PreparedPrelude _ _ state) = state;
   names (PreparedPrelude (RawPrelude _ _ _ _ _ _ value _ _ _ _ _) _ _) = value;

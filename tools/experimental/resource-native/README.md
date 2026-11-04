@@ -76,13 +76,23 @@ scope.
 
 ---
 
-# Local current-PR25 integration (qualification recorded separately)
+# Checked-Prelude target integration (qualification recorded separately)
 
-This source tree composes the exact PR25 target
-`c5928b5be73cd78d194405e734aa012415570e1a` with the preserved PR28 history
-`ae680d2e8698b2a99f1957114b76394a1d6b39f5` and the reconstructed Phase A
-module/terminal-lifecycle implementation. It is a **local integration**, not a
-published, merged, default-runtime or fully CI-qualified release.
+This source tree composes PR25 target
+`a250ec334b70b0e587c2dd6e894d111bf879c024` with the preserved PR28 resource
+history through Stage24. The target's checked split Prelude is used by the
+ordinary crate driver; the resource routes remain additive and opt-in.
+This source composition alone is not a merged, default-runtime or fully
+CI-qualified release.
+
+The original c592 resource transition remains immutable in
+`tools/shared/resource_source_migration.json`. Its preserved helper replays that
+historical transition without granting it live-source admission. The live bridge
+replays the exact eight-owner checked-Prelude target step, then admits only the
+complete new 128-owner target followed by the four resource changes and four
+resource additions. The previous producer baseline, contract, transition and
+helper are preserved under `provenance/c592-history` and are replayed as lineage,
+not reused as current compiler receipts.
 
 The current maintained builder and both exporter routes now use the exact
 `provenance/current-target-source.json` baseline and separately pinned

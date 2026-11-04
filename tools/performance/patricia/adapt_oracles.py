@@ -12,6 +12,13 @@ OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n          
 NEW_INDEX = b'Rank.indexMap selected'
 
 def without_projection_patch(raw):
+    # The following full-compiler adapter still rejects unreviewed input.
+    path=Path(__file__).resolve().parent.parent/'crate-prelude/source_contract.py'
+    spec=importlib.util.spec_from_file_location('crate_prelude_inverse',path)
+    prelude=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(prelude)
+    if sha(raw)==prelude.manifest()['changed_sources']['Bootstrap.CrateSession']['new']:
+        raw=prelude.restore_session(raw)
     path=Path(__file__).resolve().parent.parent/'full-compiler/source_contract.py'
     spec=importlib.util.spec_from_file_location('owned_projection_inverse',path)
     adapter=importlib.util.module_from_spec(spec)
@@ -52,6 +59,13 @@ def with_rank_view(raw):
     require(raw.count(marker)==1 and raw.count(b'IntMapTree Node')==3
             and raw.count(OLD_INDEX)==1 and RANK_IMPORT not in raw, 'exact previous session rank interface')
     return raw.replace(marker,marker+RANK_IMPORT).replace(b'IntMapTree Node',b'Rank.MapIndex Node').replace(OLD_INDEX,NEW_INDEX)
+
+def private_session_header(source):
+    headers = ['module Bootstrap.CrateSession (compileSpecFile) where {',
+               'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude) where {']
+    require(sum(source.count(header) for header in headers) == 1, 'unique private header')
+    return next(header for header in headers if header in source)
+
 
 def prepare(root,out):
     out.mkdir(parents=True,exist_ok=False)
@@ -119,7 +133,7 @@ def prepare(root,out):
         require(''.join(difflib.restore(difference,2))==s,'exact adapted inverse')
         (out/(name+'.ndiff')).write_text(''.join(difference))
         changes.append({'source':str(path),'source_sha256':sha(original.encode()),'adapted':str(out/name),'adapted_sha256':sha(raw),'algorithm_body_unchanged':frozen,'inverse_verified':True})
-    owner=root/'libraries/mlf-crates/Bootstrap/CrateSession.hs';s=owner.read_text();before='module Bootstrap.CrateSession (compileSpecFile) where {';after='module SessionUnderTest where {'
+    owner=root/'libraries/mlf-crates/Bootstrap/CrateSession.hs';s=owner.read_text();before=private_session_header(s);after='module SessionUnderTest where {'
     require(s.count(before)==1 and after not in s,'unique private header')
     adapted=s.replace(before,after);require(adapted.replace(after,before)==s,'private header inverse')
     (out/'SessionUnderTest.hs').write_text(adapted)

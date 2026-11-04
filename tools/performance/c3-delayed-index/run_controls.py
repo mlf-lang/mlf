@@ -63,7 +63,7 @@ def main():
             frozen=subprocess.check_output(['git','show',BASELINE+':'+OWNER],cwd=ROOT)
             H.require(hashlib.sha256(frozen).hexdigest()==BASELINE_SHA,'frozen full private-owner oracle')
             for name,raw in [('LegacySession',frozen),('CandidateSession',(ROOT/OWNER).read_bytes())]:
-                old=b'module Bootstrap.CrateSession (compileSpecFile) where {'
+                old=A.private_session_header(raw.decode()).encode()
                 new=('module '+name+' where {').encode()
                 H.require(raw.count(old)==1 and new not in raw,'unique private-owner header')
                 changed=raw.replace(old,new)

@@ -9,19 +9,20 @@ from pathlib import Path
 import hashlib
 import json
 import re
+import types
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
-MANIFEST = HERE / 'resource_source_migration.json'
+MANIFEST = HERE / 'resource_source_migration_a250.json'
 # Finalize only after the genuine combined-source builtin regeneration and
 # Entry identity transition, followed by exact independent source review.
 # This finalized digest admits only the exact reviewed transition bytes.
-MANIFEST_SHA256 = '9729306434730c32472762bd875e4ba17573b764a5eb86268703c4f8699e86fa'
-TARGET_SNAPSHOT_SHA256 = '0747cafe709e4963ff60875dca95bfbf7b176b93b99441d746b593c5b909823b'
-TARGET_CANONICAL_SHA256 = 'af3cde7e818d0d249efb05163973d64bccc53fb95625b108e32bfd60d7c78383'
-TARGET_COMMIT = 'c5928b5be73cd78d194405e734aa012415570e1a'
-TARGET_TREE = '60e441003697e5ad02c8d93189cf9cd68d691c9f'
-PLAN_SHA256 = '4a345187d9a8b22e371d9dff3c225d7a71c9244ea05c5911b6de3a539719a75a'
+MANIFEST_SHA256 = 'd382ab93f4435cae7b5db175f9f2bce26e240c4a98c3bf68d55b3e8ee6f1323d'
+TARGET_SNAPSHOT_SHA256 = 'ff436fd32e816688068e16a941ab6af6ccbd2f501b16df70a98fd79ef1f77431'
+TARGET_CANONICAL_SHA256 = '2773d0fe6e0afd4ff712a1bc2053672f91d5d2d2b29911320fa2690dfbc34a2b'
+TARGET_COMMIT = 'a250ec334b70b0e587c2dd6e894d111bf879c024'
+TARGET_TREE = '63400c29c679ffc5e1a67b46ebbde12c5f81ddf4'
+HISTORICAL_PLAN_SHA256 = '4a345187d9a8b22e371d9dff3c225d7a71c9244ea05c5911b6de3a539719a75a'
 CHANGED = frozenset({'MLF.Entry.Emlf', 'Bootstrap.Module',
                      'Bootstrap.CompilerCore', 'MLF.BuiltinPreludeData'})
 ADDITIONS = (
@@ -63,6 +64,46 @@ def exact_keys(value, keys, label):
     require(type(value) is dict and set(value) == set(keys), label + ' exact keys')
 
 
+HISTORICAL_MANIFEST_SHA256 = '9729306434730c32472762bd875e4ba17573b764a5eb86268703c4f8699e86fa'
+HISTORICAL_HELPER_SHA256 = '60ed6e6ce8b9b419dbff5be675d17b29d8bd9a87da5107c52551eabc63d8063d'
+PRELUDE_MANIFEST_SHA256 = '4acb3a90757a375a423fda9db6eda022597f350d34090ca8f4712a478fa594f5'
+PRELUDE_HELPER_SHA256 = '7d75d46eb2bd3193f220698b3aeecac6848d3f0aac6b45bfedf8cc1366aac3a9'
+
+
+def historical_transition():
+    """Replay frozen c592 custody without granting it live-source admission."""
+    path = HERE / 'resource_source_history/resource_source_migration.py'
+    raw = path.read_bytes()
+    require(sha(raw) == HISTORICAL_HELPER_SHA256, 'fixed historical resource helper')
+    module = types.ModuleType('historical_resource_source_transition')
+    module.__file__ = str(path)
+    exec(compile(raw, str(path), 'exec'), module.__dict__)
+    raw = (HERE / 'resource_source_migration.json').read_bytes()
+    require(sha(raw) == HISTORICAL_MANIFEST_SHA256, 'fixed historical resource manifest')
+    return module, module.parse_transition(raw)
+
+
+def target_from_history():
+    historical, value = historical_transition()
+    old = value['target_snapshot']
+    path = ROOT / 'tools/performance/crate-prelude/source_contract.py'
+    raw = path.read_bytes()
+    require(sha(raw) == PRELUDE_HELPER_SHA256, 'fixed crate Prelude helper')
+    adapter = types.ModuleType('resource_crate_prelude_transition')
+    adapter.__file__ = str(path)
+    exec(compile(raw, str(path), 'exec'), adapter.__dict__)
+    require(sha(adapter.MANIFEST.read_bytes()) == PRELUDE_MANIFEST_SHA256,
+            'fixed crate Prelude manifest')
+    registry = adapter.advance_registry({row['module']: row['sha256'] for row in old['modules']})
+    rows = [{**row, 'sha256': registry[row['module']]} for row in old['modules']]
+    expected = {**old, 'commit': TARGET_COMMIT, 'tree': TARGET_TREE, 'modules': rows}
+    raw = (HERE / 'resource_target_a250.json').read_bytes()
+    require(sha(raw) == TARGET_SNAPSHOT_SHA256, 'fixed exact target snapshot bytes')
+    require(json.loads(raw, object_pairs_hook=strict_object) == expected,
+            'target snapshot differs from immutable prior transition')
+    return expected
+
+
 def validate_transition(value):
     """Replay the declared delta; callers must first authenticate raw bytes.
 
@@ -70,10 +111,12 @@ def validate_transition(value):
     parse_transition() grants the immutable manifest's exact digest admission.
     """
     metadata = {
-        'format': 'resource-phase-a-current-source-migration-v1',
+        'format': 'resource-phase-a-crate-prelude-source-migration-v1',
+        'historical_transition_sha256': HISTORICAL_MANIFEST_SHA256,
+        'crate_prelude_transition_sha256': PRELUDE_MANIFEST_SHA256,
         'from_commit': TARGET_COMMIT, 'from_tree': TARGET_TREE,
         'target_snapshot_sha256': TARGET_SNAPSHOT_SHA256,
-        'integration_plan_sha256': PLAN_SHA256,
+        'historical_integration_plan_sha256': HISTORICAL_PLAN_SHA256,
         'module_count': 132, 'unchanged_shared_input_count': 124,
         'source_inventory_only': True,
     }
@@ -82,6 +125,7 @@ def validate_transition(value):
     require(all(type(value[key]) is type(wanted) and value[key] == wanted
                 for key, wanted in metadata.items()), 'exact transition metadata')
     target = value['target_snapshot']
+    require(target == target_from_history(), 'exact composed historical target transition')
     require(sha(canonical(target)) == TARGET_CANONICAL_SHA256,
             'exact independently authenticated current-target snapshot')
     exact_keys(target, {'schema', 'commit', 'tree', 'shared_manifest_sha256',

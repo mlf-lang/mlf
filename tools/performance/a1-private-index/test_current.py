@@ -488,6 +488,11 @@ class CurrentCompatibilityTests(unittest.TestCase):
                           if current.SHARED_HASHES[n] != current.BALANCE_SHARED_HASHES[n]},
                          {'Bootstrap.CrateSession'})
         owner = (ROOT / contract.OWNER).read_bytes()
+        path = ROOT / 'tools/performance/crate-prelude/source_contract.py'
+        spec = importlib.util.spec_from_file_location('crate_prelude_inverse', path)
+        prelude = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(prelude)
+        owner = prelude.restore_session(owner)
         if b'projectedOriginalNodes' in owner:
             path = ROOT / 'tools/performance/full-compiler/source_contract.py'
             spec = importlib.util.spec_from_file_location('projection_patch_adapter', path)

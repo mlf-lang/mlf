@@ -76,6 +76,12 @@ class CurrentProducer(unittest.TestCase):
             else:r['commands'].pop()
             shared=H.read(ROOT/'shared-sources.json');mapping={x['module']:x['path']for x in shared['modules']}
             with self.subTest(kind=kind),self.assertRaises(ValueError):H.authenticate_logs(ROOT,r,mapping,receipt['inputs'],shared,self.contract)
+    def test_receipt_binds_checked_prelude_transition_read_dependency(self):
+        receipt=H.read(BASE/'validation/compiler-build.json')
+        path='tools/performance/crate-prelude/source-migration.json'
+        self.assertEqual(receipt['inputs'][path],H.PRELUDE_MANIFEST_SHA256)
+        self.assertEqual(sha(ROOT/path),H.PRELUDE_MANIFEST_SHA256)
+
     def test_builder_launch_precedes_process_and_receipt_is_atomic(self):
         text=(BASE/'build_compiler.py').read_text();self.assertLess(text.index("report['commands'].append(entry);save()"),text.index('process=subprocess.Popen'))
         self.assertIn('temporary.replace(path)',text);self.assertIn("status='UNKNOWN'",text)
@@ -83,4 +89,20 @@ class CurrentProducer(unittest.TestCase):
     def test_input_path_scope(self):
         for p in ['../escape','/absolute','x/../y','x\\y','./x','']:
             with self.subTest(path=p),self.assertRaises(ValueError):H.relative(p)
+    def test_baseline_replays_exact_checked_prelude_step(self):
+        H.validate_baseline_lineage(ROOT,PROV,self.baseline)
+        old=H.read(PROV/'c592-history/current-target-source.json')
+        self.assertEqual(old['source_commit'],'c5928b5be73cd78d194405e734aa012415570e1a')
+        self.assertEqual(self.baseline['source_commit'],'a250ec334b70b0e587c2dd6e894d111bf879c024')
+        changed={p for p in old['files'] if old['files'][p]!=self.baseline['files'][p]}
+        self.assertEqual(changed,{'mlf.lock','bootstrap/MLF/BuiltinPreludeData.hs',
+            'bootstrap/MLF/Entry/BuiltinPrelude.hs','bootstrap/MLF/Entry/Emlf.hs',
+            'bootstrap/MLF/PreparedCompiler.hs','libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs',
+            'libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs','libraries/mlf-crates/Bootstrap/Crate.hs',
+            'libraries/mlf-crates/Bootstrap/CrateSession.hs'})
+        for path in sorted(changed):
+            wrong=copy.deepcopy(self.baseline);wrong['files'][path]=old['files'][path]
+            with self.subTest(path=path),self.assertRaises(ValueError):H.validate_baseline_lineage(ROOT,PROV,wrong)
+        with self.assertRaises(ValueError):H.validate_baseline_lineage(ROOT,PROV,old)
+
 if __name__=='__main__':unittest.main()
