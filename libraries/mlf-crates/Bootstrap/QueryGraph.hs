@@ -8,6 +8,7 @@ module Bootstrap.QueryGraph where {
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Host as Host;
@@ -123,21 +124,146 @@ module Bootstrap.QueryGraph where {
       (if persist then Just digest else Nothing) digest (if persist then Just bytes else Nothing) session) encoded)
   };
   recordDigest wanted reads location digest value (Session path config generation old current pending) =
-    let { node = QueryNode wanted digest reads location;
+    let { fresh = QueryNode wanted digest reads location;
+      node = case M.lookup compareString wanted old of {
+        Just previous -> if sameNode previous fresh then previous else fresh;
+        Nothing -> fresh
+      };
       queued = case value of { Nothing -> pending; Just payload -> M.insert compareString digest payload pending } }
-    in (,) node (Session path config generation old (M.insert compareString wanted node current) queued);
+    in (,) node (Session path config generation old (M.insert compareString (nodeKey node) node current) queued);
   forget wanted (Session p c g old current queued) = Session p c g old
     (M.delete compareString wanted current) queued;
   encodeNode (QueryNode wanted digest reads location) = W.VNode 410
     [W.VText wanted,W.VText digest,
      A.toList (A.toPair A.toText A.toText) reads,A.toMaybe A.toText location];
-  encodeIndex config nodes = W.VNode 411
-    [W.VText "MLF-CRATE-QUERY-GRAPH-1",W.VText config,A.toList encodeNode (M.elems nodes)];
+  -- Generation numbers are local to these four tables. A read must resolve
+  -- against its own generation before comparison to the new session's nodes.
+  data Address = Address Int String;
+  bindingTag :: Int;
+  bindingTag = 0;
+  inputBindingTag :: Int;
+  inputBindingTag = 415;
+  preparedTag :: Int;
+  preparedTag = 416;
+  inventoryTag :: Int;
+  inventoryTag = 417;
+  scopeTag :: Int;
+  scopeTag = 418;
+  inferTag :: Int;
+  inferTag = 419;
+  finishTag :: Int;
+  finishTag = 431;
+  evidenceTag :: Int;
+  evidenceTag = 432;
+  datatypeTag :: Int;
+  datatypeTag = 433;
+  inputDatatypeTag :: Int;
+  inputDatatypeTag = 434;
+  validDigest digest payload = validHash digest && case payload of {
+    Nothing -> True; Just hash -> eqString digest hash
+  };
+  addressId (Address _ identity) = identity;
+  addressTag (Address tag _) = tag;
+  isGroup tag = elem (\a b -> a == b) tag [preparedTag,inventoryTag,scopeTag,inferTag,finishTag];
+  canonicalFields text = do {
+    fields <- Separate.unpack text;
+    ensure (eqString (Separate.pack fields) text) "noncanonical query identity";
+    Right fields
+  };
+  parseAddress wanted = do {
+    fields <- canonicalFields wanted;
+    case fields of {
+      [kind,name] -> if eqString kind "Input" then do {
+        inner <- canonicalFields name;
+        case inner of {
+          [leaf,identity] -> if eqString leaf "Binding" then Right (Address inputBindingTag identity)
+            else if eqString leaf "Datatype" then Right (Address inputDatatypeTag identity)
+            else if eqString leaf "Prepared" then Right (Address preparedTag identity)
+            else if eqString leaf "ScopeInventory" then Right (Address inventoryTag identity)
+            else Left "unknown input query kind";
+          _ -> Left "invalid input query key"
+        }
+      } else if eqString kind "Binding" then Right (Address bindingTag name)
+        else if eqString kind "Datatype" then Right (Address datatypeTag name)
+        else if eqString kind "Scope" then Right (Address scopeTag name)
+        else if eqString kind "InferScc" then Right (Address inferTag name)
+        else if eqString kind "FinishScc" then Right (Address finishTag name)
+        else if eqString kind "Evidence" then Right (Address evidenceTag name)
+        else Left "unknown query kind";
+      _ -> Left "invalid query key"
+    }
+  };
+  validMembers members = not (null members) && all (\name -> not (eqString name "")) members &&
+    length members == S.size (S.fromList compareString members);
+  membersOf identity = do {
+    members <- canonicalFields identity;
+    ensure (validMembers members) "invalid query group members";
+    Right members
+  };
+  evidenceParts identity = do {
+    fields <- canonicalFields identity;
+    case fields of {
+      [group,site,goal] -> do {
+        ensure (stringLength site > 0 && stringLength site <= 19 &&
+          (stringLength site < 19 || compareString site "9223372036854775807" <= 0) &&
+          Separate.digitEnd site 0 == stringLength site && eqString (showInt (readInt site)) site &&
+          not (eqString goal "")) "invalid evidence descriptor";
+        Right ((,,) group (readInt site) goal)
+      };
+      _ -> Left "invalid evidence descriptor"
+    }
+  };
+  uniqueNames values = S.toList (S.fromList compareString values);
+  ranks names = M.fromDistinctAscList (zip names (range 0 (length names - 1)));
+  requireKey :: forall a. Map String a -> String -> Either String a;
+  requireKey table identity = case M.lookup compareString identity table of {
+    Nothing -> Left "unknown snapshot identity"; Just value -> Right value
+  };
+  encodeIndex config nodes = do {
+    let { rows = M.elems nodes };
+    addresses <- traverseEither (compose parseAddress nodeKey) rows;
+    let { select pred = map addressId (filter (compose pred addressTag) addresses);
+      evidence = uniqueNames (select (\tag -> tag == evidenceTag));
+      types = uniqueNames (select (\tag -> tag == datatypeTag || tag == inputDatatypeTag)) };
+    requests <- traverseEither evidenceParts evidence;
+    let { groups = uniqueNames (append (select isGroup) (map (\((,,) g _ _) -> g) requests)) };
+    members <- traverseEither membersOf groups;
+    let { declarations = uniqueNames (append (select (\tag -> tag == bindingTag || tag == inputBindingTag))
+              (concat members));
+      declIds = ranks declarations; groupIds = ranks groups; requestIds = ranks evidence; typeIds = ranks types;
+      encodeAddress (Address tag name) = do {
+        index <- requireKey (if isGroup tag then groupIds else if tag == evidenceTag then requestIds
+          else if tag == datatypeTag || tag == inputDatatypeTag then typeIds else declIds) name;
+        Right (if tag == bindingTag then W.VInt index else W.VNode tag [W.VInt index])
+      };
+      encodeGroup names = mapEither (A.toList W.VInt) (traverseEither (requireKey declIds) names);
+      encodeEvidence ((,,) group site goal) = mapEither
+        (\i -> W.VNode 414 [W.VInt i,W.VInt site,W.VText goal]) (requireKey groupIds group)
+    };
+    ensure (not (elem eqString "" declarations) && not (elem eqString "" types)) "empty snapshot identity";
+    ensure (not (eqString config "")) "empty query graph configuration";
+    traverseEither (checkIdentityBudget identityBudget) [declarations,groups,evidence,types,M.keys nodes];
+    encodedGroups <- traverseEither encodeGroup members;
+    encodedEvidence <- traverseEither encodeEvidence requests;
+    keys <- traverseEither encodeAddress addresses;
+    let { byKey = M.fromDistinctAscList (zip (M.keys nodes) keys);
+      encodeRow ((,) descriptor (QueryNode _ digest edges payload)) = do {
+        ensure (validDigest digest payload) "invalid query graph digest";
+        reads <- traverseEither (compose (requireKey byKey) fst) edges;
+        Right (W.VNode 413 [descriptor,W.VText digest,W.VNode 1 reads,A.toMaybe A.toText payload])
+      }
+    };
+    entries <- traverseEither encodeRow (zip keys rows);
+    Right (W.VNode 412 [W.VText "MLF-CRATE-QUERY-GRAPH-2",W.VText config,A.toList W.VText declarations,
+      W.VNode 1 encodedGroups,W.VNode 1 encodedEvidence,A.toList W.VText types,W.VNode 1 entries])
+  };
   decodeIndex configuration graph = mapEither fst (admitIndex configuration graph);
   admitIndex configuration graph = do {
     root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "query graph root count" };
     value <- W.lookupGraphNode graph root;
     case value of {
+      W.GNode 412 [format,config,declarations,groups,evidence,types,entries] ->
+        admitSnapshot configuration graph format config declarations groups evidence types entries;
       W.GNode 411 [format,config,entries] -> do {
         f <- A.fromGraphText graph format;
         c <- A.fromGraphText graph config;
@@ -151,10 +277,134 @@ module Bootstrap.QueryGraph where {
         let { names = map nodeKey nodes; table = M.fromList compareString (map (\n -> (,) (nodeKey n) n) nodes) };
         ensure (length names == M.size table) "duplicate query node";
         validateClosure table;
-        Right ((,) table (eqList eqString names (M.keys table)))
+        Right ((,) table False)
       };
       _ -> Left "unsupported query graph index"
     }
+  };
+  data SnapshotDeclaration = SnapshotDeclaration;
+  data SnapshotGroup = SnapshotGroup;
+  data SnapshotEvidence = SnapshotEvidence;
+  data SnapshotDatatype = SnapshotDatatype;
+  data SnapshotTables = SnapshotTables (V.IndexVec SnapshotDeclaration String) (V.IndexVec SnapshotGroup String)
+    (V.IndexVec SnapshotEvidence String) (V.IndexVec SnapshotDatatype String);
+  slot :: forall d. V.IndexVec d String -> Int -> Either String String;
+  slot table i = if i < 0 || i >= V.count table then Left "query snapshot slot out of bounds"
+    else Right (V.at table (V.fromInt i));
+  -- The wire-work budget is checked by Bitstream before admission. Also cap
+  -- identity expansion through our own table references before joining text.
+  identityBudget = W.maxExpandedWork W.defaultLimits;
+  chargeIdentity :: Int -> String -> Either String Int;
+  chargeIdentity remaining name = let { cost = stringLength name } in
+    if cost > 0 && cost <= remaining then Right (remaining - cost)
+      else Left "query snapshot identity work limit exceeded";
+  checkIdentityBudget limit names = mapEither (\_ -> ()) (foldM chargeIdentity limit names);
+  packLimited fields = do {
+    let { fieldSize field = let { n = stringLength field } in n + stringLength (showInt n) + 1 };
+    ensure (foldlStrict (\n field -> n + fieldSize field) 0 fields <= identityBudget)
+      "query snapshot identity work limit exceeded";
+    Right (Separate.pack fields)
+  };
+  decodeNameTable :: forall d. W.Graph -> Int -> (Int -> Either String String) ->
+    Either String (V.IndexVec d String);
+  decodeNameTable graph list decode = do {
+    entries <- listAt graph list;
+    let { collect ((,,) remaining seen names) entry = do {
+      name <- decode entry;
+      next <- chargeIdentity remaining name;
+      ensure (not (S.member compareString name seen)) "duplicate query snapshot identity";
+      Right ((,,) next (S.insert compareString name seen) ((:) name names))
+    } };
+    built <- foldM collect ((,,) identityBudget S.empty []) entries;
+    case built of { (,,) _ _ names -> Right (V.fromList (reverse names)) }
+  };
+  groupAt graph declarations index = do {
+    members <- listAt graph index;
+    names <- traverseEither (\i -> bindEither (A.fromGraphInt graph i) (slot declarations)) members;
+    ensure (validMembers names) "invalid query group members";
+    packLimited names
+  };
+  evidenceAt graph groups index = do {
+    node <- W.lookupGraphNode graph index;
+    case node of {
+      W.GNode 414 [g,s,t] -> do {
+        group <- bindEither (A.fromGraphInt graph g) (slot groups);
+        site <- A.fromGraphInt graph s;
+        goal <- A.fromGraphText graph t;
+        ensure (site >= 0 && not (eqString goal "")) "invalid evidence descriptor";
+        packLimited [group,showInt site,goal]
+      };
+      _ -> Left "invalid evidence descriptor"
+    }
+  };
+  descriptorAt graph (SnapshotTables declarations groups evidence types) index = do {
+    node <- W.lookupGraphNode graph index;
+    let { direct kind table n = bindEither (slot table n) (\name -> packLimited [kind,name]);
+      leaf kind table n = bindEither (direct kind table n) (\inner -> packLimited ["Input",inner]) };
+    case node of {
+      W.GInt n -> direct "Binding" declarations n;
+      W.GNode tag [child] -> do {
+        n <- A.fromGraphInt graph child;
+        if tag == inputBindingTag then leaf "Binding" declarations n
+          else if tag == preparedTag then leaf "Prepared" groups n
+          else if tag == inventoryTag then leaf "ScopeInventory" groups n
+          else if tag == scopeTag then direct "Scope" groups n
+          else if tag == inferTag then direct "InferScc" groups n
+          else if tag == finishTag then direct "FinishScc" groups n
+          else if tag == evidenceTag then direct "Evidence" evidence n
+          else if tag == datatypeTag then direct "Datatype" types n
+          else if tag == inputDatatypeTag then leaf "Datatype" types n
+          else Left "unknown query snapshot kind"
+      };
+      _ -> Left "invalid query snapshot descriptor"
+    }
+  };
+  data StoredRow = StoredRow Int String String ([] Int) (Maybe String);
+  storedAt graph tables index = do {
+    value <- W.lookupGraphNode graph index;
+    case value of {
+      W.GNode 413 [k,h,reads,location] -> do {
+        wanted <- descriptorAt graph tables k;
+        digest <- A.fromGraphText graph h;
+        edges <- listAt graph reads;
+        p <- A.decodeGraphValue (A.ShapeMaybe A.ShapeText) graph location;
+        payload <- A.expectMaybe A.expectText p;
+        ensure (validDigest digest payload) "invalid query graph digest";
+        Right (StoredRow k wanted digest edges payload)
+      };
+      _ -> Left "invalid query snapshot row"
+    }
+  };
+  admitSnapshot configuration graph format config declarations groups evidence types entries = do {
+    f <- A.fromGraphText graph format;
+    c <- A.fromGraphText graph config;
+    ensure (eqString f "MLF-CRATE-QUERY-GRAPH-2" && not (eqString c "") && eqString c configuration) "query graph version mismatch";
+    ds <- decodeNameTable graph declarations (A.fromGraphText graph);
+    gs <- decodeNameTable graph groups (groupAt graph ds);
+    es <- decodeNameTable graph evidence (evidenceAt graph gs);
+    ts <- decodeNameTable graph types (A.fromGraphText graph);
+    ids <- listAt graph entries;
+    let { collect ((,) budget previous) index = do {
+      row@(StoredRow _ name _ _ _) <- storedAt graph (SnapshotTables ds gs es ts) index;
+      next <- chargeIdentity budget name;
+      Right ((,) next ((:) row previous))
+    } };
+    saved <- foldM collect ((,) identityBudget []) ids;
+    let { rows = reverse (snd saved);
+      byDescriptor = IM.fromList (map (\(StoredRow k name digest _ _) -> (,) k ((,) name digest)) rows);
+      readEdge k = case IM.lookup k byDescriptor of {
+        Just edge -> Right edge; Nothing -> Left "unpublished query dependency"
+      };
+      restore (StoredRow _ name digest edges payload) = do {
+        reads <- traverseEither readEdge edges;
+        Right (QueryNode name digest reads payload)
+      }
+    };
+    nodes <- traverseEither restore rows;
+    let { names = map nodeKey nodes; table = M.fromList compareString (zip names nodes) };
+    ensure (length names == M.size table) "duplicate query node";
+    validateClosure table;
+    Right ((,) table (eqList eqString names (M.keys table)))
   };
   data WireNode = WireNode;
   decodeRead graph index = do {
@@ -175,8 +425,7 @@ module Bootstrap.QueryGraph where {
         reads <- traverseEither (\i -> V.at readTable (V.fromInt i)) ids;
         p <- A.decodeGraphValue (A.ShapeMaybe A.ShapeText) graph location;
         payload <- A.expectMaybe A.expectText p;
-        ensure (validHash digest &&
-          (case payload of { Nothing -> True; Just hash -> eqString digest hash })) "invalid query graph digest";
+        ensure (validDigest digest payload) "invalid query graph digest";
         Right (QueryNode wanted digest reads payload)
       };
       _ -> Left "malformed query graph node"
@@ -200,9 +449,11 @@ module Bootstrap.QueryGraph where {
     then ioReturn (Right Nothing)
     else case validateClosure nodes of {
       Left e -> ioReturn (Left e);
-      Right _ -> do {
-        encoded <- encodeHashed (encodeIndex config nodes);
-        ioReturn (mapEither Just encoded)
+      Right _ -> case encodeIndex config nodes of {
+        Left e -> ioReturn (Left e); Right index -> do {
+          encoded <- encodeHashed index;
+          ioReturn (mapEither Just encoded)
+        }
       }
     };
   publish session@(Session path config previous old nodes pending) = do {
@@ -303,16 +554,20 @@ module Bootstrap.QueryGraph where {
     let { edges = V.fromList rows } in runST (stBind (V.filled (V.count edges) Unseen) (\marks ->
       ST.mapE_ (visit edges marks 0) (V.indices edges)))
   };
-  data Colour = Unseen | Visiting | Done;
+  -- Memoize the longest suffix, since a previously visited short path can
+  -- also be reached from a longer prefix in a different lexical DFS root.
+  data Colour = Unseen | Visiting | Done Int;
   visit :: forall s. V.IndexVec QueryId ([] (V.Index QueryId)) -> V.Builder s QueryId Colour ->
-    Int -> V.Index QueryId -> ST s (Either String ());
+    Int -> V.Index QueryId -> ST s (Either String Int);
   visit rows marks depth i = stBind (V.get marks i) (\colour -> case colour of {
-    Done -> ST.pureE ();
+    Done height -> if depth + height <= 4096 then ST.pureE height else ST.failE "cyclic/deep query graph";
     Visiting -> ST.failE "cyclic/deep query graph";
     Unseen -> if depth >= 4096 then ST.failE "cyclic/deep query graph"
       else stBind (V.set marks i Visiting) (\_ ->
-        ST.bindE (ST.mapE_ (visit rows marks (depth + 1)) (V.at rows i)) (\_ ->
-          ST.liftE (V.set marks i Done)))
+        let { child longest target = ST.bindE (visit rows marks (depth + 1) target)
+               (\height -> let { next = max longest (height + 1) } in seq next (ST.pureE next)) }
+        in ST.bindE (ST.foldE child 1 (V.at rows i)) (\height ->
+          stBind (V.set marks i (Done height)) (\_ -> ST.pureE height)))
   });
   verifyPayloads :: Session -> [] QueryNode -> IO (Either String ());
   verifyPayloads session@(Session _ _ _ _ _ pending) nodes =

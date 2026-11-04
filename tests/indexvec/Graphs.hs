@@ -146,7 +146,7 @@ queryChecks = do
       shared = [("a",sha),("a",sha)]
       b = node "b" shared
       c = node "c" shared
-  check "ordered index" True (order [a,b,c])
+  check "ordered v1 input needs a v2 publication" False (order [a,b,c])
   check "unordered index still admitted" False (order [c,a,b])
   check "read multiplicity" False (Q.sameNode b (node "b" [("a",sha)]))
   check "read order" False (Q.sameNode (node "c" [("a",sha),("b",sha)])
@@ -157,8 +157,10 @@ queryChecks = do
          ([node "a" [("b",sha)],node "b" [("a",sha)]], "cyclic/deep query graph"),
          ([a,node "b" [("a","bad")]], "invalid query graph digest")] $ \(ns,err) ->
     check err (Left err) (result (admitted ns))
-  let generation previous ns = do
-        answer <- Q.publication "cfg" previous (table [a,b,c]) (table ns)
+  let stable (Q.QueryNode k h edges location) = Q.QueryNode (Q.key "Binding" k) h
+        [(Q.key "Binding" target, digest) | (target,digest) <- edges] location
+      generation previous ns = do
+        answer <- Q.publication "cfg" previous (table (map stable [a,b,c])) (table (map stable ns))
         pure $ case answer of
           T.Left err -> Left (H.unpack err)
           T.Right T.Nothing -> Right False
@@ -168,11 +170,73 @@ queryChecks = do
   check "changed reads, same value hash" (Right True) =<< generation sha [a,node "b" [],c]
   check "reject stale reads in edited generation" (Left "query publication has stale dependency version")
     =<< generation sha [a,node "b" [("a",other)],c]
+  -- Both generations describe A.f, although its declaration slot changes
+  -- when A.a is added. Edges refer to the producer generation's digest.
+  let l = W.VNode 1
+      absent = W.VNode 4 []
+      row desc h reads = W.VNode 413 [desc,W.VText h,l reads,absent]
+      binding = W.VInt
+      query tag i = W.VNode tag [W.VInt i]
+      group = l . map binding
+      snapshot names groups requests types rows = W.VNode 412
+        [W.VText "MLF-CRATE-QUERY-GRAPH-2",W.VText "cfg",l (map W.VText names),l groups,
+         l requests,l (map W.VText types),l rows]
+      admit value = case W.planGraph W.defaultLimits [value] of
+        T.Left err -> error (H.unpack err)
+        T.Right graph -> Q.admitIndex "cfg" graph
+      logical value k = case admit value of
+        T.Right (m,_) -> case M.lookup H.v_compareString k m of
+          T.Just n -> [(H.unpack target,H.unpack h) | (target,h) <- Q.nodeReads n]
+          T.Nothing -> error "missing restored row"
+        T.Left err -> error (H.unpack err)
+      generationAt names g i h = snapshot names [group [i]] [] []
+        [row (binding i) h [],row (query 419 g) sha [binding i,binding i]]
+      target = Q.key "Binding" "A.f"
+      groupKey = Q.key "InferScc" "3:A.f"
+      reads h = replicate 2 (H.unpack target,H.unpack h)
+  check "old generation resolves slot zero twice with its old version" (reads sha)
+    (logical (generationAt ["A.f"] 0 0 sha) groupKey)
+  check "new generation resolves slot one twice with its new version" (reads other)
+    (logical (generationAt ["A.a","A.f"] 0 1 other) groupKey)
+  let invalid label value = case result (admit value) of
+        Left _ -> pure ()
+        Right () -> error ("accepted " ++ label)
+      f = row (binding 0) sha []
+      fx = ["A.f","A.x"]
+      two = [group [0,1]]
+      e = W.VNode 414 [W.VInt 0,W.VInt 7,W.VText "Goal"]
+      scoped = snapshot fx two [e] ["A.f"]
+        [f,row (query 415 0) sha [],row (query 416 0) sha [],row (query 417 0) sha [],
+         row (query 418 0) sha [],row (query 419 0) sha [],row (query 431 0) sha [],
+         row (query 432 0) sha [binding 0,query 419 0,query 433 0],row (query 433 0) sha [],
+         row (query 434 0) sha []]
+      evKey = Q.key "Evidence" "10:3:A.f3:A.x1:74:Goal"
+  check "typed group, binding, evidence and datatype targets preserve order"
+    [(H.unpack k,H.unpack sha) | k <- [target,Q.key "InferScc" "3:A.f3:A.x",Q.key "Datatype" "A.f"]]
+    (logical scoped evKey)
+  mapM_ (uncurry invalid)
+    [("negative declaration",snapshot fx [] [] [] [row (binding (-1)) sha []]),
+     ("out of range declaration",snapshot fx [] [] [] [row (binding 2) sha []]),
+     ("duplicate declaration",snapshot ["A.f","A.f"] [] [] [] [f]),
+     ("duplicate group members",snapshot fx [group [1,1]] [] [] []),
+     ("empty group",snapshot fx [group []] [] [] []),
+     ("duplicate row",snapshot fx [] [] [] [f,f]),
+     ("dangling typed read",snapshot fx two [] [] [row (binding 0) sha [query 419 0]]),
+     ("cycle",snapshot fx [] [] [] [row (binding 0) sha [binding 0]]),
+     ("wrong evidence group",snapshot fx [] [e] [] []),
+     ("unknown edge kind",snapshot fx [] [] [] [row (query 410 0) sha []]),
+     ("wrong datatype domain",snapshot fx [] [] [] [row (query 433 0) sha []])]
+  check "exact logical identity budget" (Right ()) (result (Q.checkIdentityBudget 4 ["a","bcd"]))
+  check "reject oversize logical identity population" (Left "query snapshot identity work limit exceeded")
+    (result (Q.checkIdentityBudget 3 ["a","bcd"]))
   let chain n = [node (key i) [(key (i+1),sha) | i+1 < n] | i <- [0..n-1]]
       key i = H.literal (show (10000+i :: Int))
   check "last legal query DFS depth" (Right ()) (result (Q.validateClosure (table (chain 4096))))
   check "query DFS depth limit" (Left "cyclic/deep query graph")
     (result (Q.validateClosure (table (chain 4097))))
+  let reverseChain n = [node (key i) [(key (i-1),sha) | i > 0] | i <- [0..n-1]]
+  check "reaching an already-complete tail cannot hide excess depth" (Left "cyclic/deep query graph")
+    (result (Q.validateClosure (table (reverseChain 4097))))
 
 datatypeChecks = do
   let decl name constructor children = T.DataDecl name []

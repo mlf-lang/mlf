@@ -3,6 +3,7 @@
 
 import argparse
 from collections import Counter
+import gzip
 import hashlib
 import json
 import os
@@ -15,6 +16,28 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "foundation-query"))
 from compare import crate_spec
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from artifact_binary_reference import read_document
+from artifact_binary_typed import text
+from query_generation import Generation, cache_directory
+
+
+def retain_graph(cache, output, arm, state):
+    directory = cache_directory(cache)
+    address, = read_document((directory / "CURRENT").read_bytes(), 6).values()
+    address = text(address)
+    data = (directory / "generations" / (address + ".mlfqg")).read_bytes()
+    wire = Generation(data, expected_hash=address)
+    account = read_document(data, 6).accounting()
+    path = output / f"{arm}-{state}-query-rows.json.gz"
+    with gzip.open(path, "wt", encoding="utf-8") as stream:
+        json.dump(wire.nodes, stream, separators=(",", ":"))
+    return {"generation": address, "format": wire.version, "index": account,
+            "cache_bytes": sum(p.stat().st_size for p in cache.rglob("*") if p.is_file()),
+            "query_nodes": len(wire.nodes), "query_reads": sum(len(row["reads"]) for row in wire.nodes.values()),
+            "logical_rows": path.name}
+
 
 
 def sha256(path):
@@ -119,6 +142,7 @@ def main():
             seed = compile_crate(arm, output / ("seed-" + arm), False)
             if seed["counts"] != [504, 0]:
                 raise ValueError((arm, seed["counts"]))
+            seed["graph"] = retain_graph(cache, output, arm, "seed")
             result["seeds"][arm] = seed
             cache.rename(output / ("seed-cache-" + arm))
             builtin.rename(output / ("seed-builtin-" + arm))
@@ -146,6 +170,8 @@ def main():
             if stats["counts"] != expected:
                 raise ValueError((entry, stats["counts"]))
             key = (arm, state)
+            if key not in references:
+                stats["graph"] = retain_graph(cache, output, arm, state)
             if references.setdefault(key, stats["products"]) != stats["products"]:
                 raise ValueError(f"Repeated products differ: {entry}")
             inv = inventory()

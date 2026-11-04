@@ -4,6 +4,7 @@
 import hashlib
 import json
 
+from query_generation import Generation, cache_directory
 from artifact_binary_reference import read_document, tree_document
 from artifact_binary_typed import list_values, text, unpack, value_node
 
@@ -30,7 +31,7 @@ def binder_name(binder):
 
 def check_receipts(prefix, cache, nodes):
     """Rebuild the fragment commitment from the emitted object and actual dependency versions."""
-    results = cache / "query-graph-v1/results"
+    results = cache_directory(cache) / "results"
     groups = json.loads(prefix.with_suffix(".queries").read_text())["groups"]
     package = value_node(read(prefix.with_suffix(".mlfco"), 7), 430, 6)
     objects = {text(f[2][0]): value_node(f, 401, 7) for f in list_values(package[-1])}
@@ -87,9 +88,10 @@ def check_receipts(prefix, cache, nodes):
 
 def forge_generation(cache, current, mode):
     """Rehash the modified index and incoming edges so checksum checks alone cannot detect it."""
-    directory = cache / "query-graph-v1"
-    fmt, config, table = value_node(read(directory / "generations" / (current + ".mlfqg"), 6), 411, 3)
-    rows = [value_node(row, 410, 4) for row in list_values(table)]
+    directory = cache_directory(cache)
+    wire = Generation((directory / "generations" / (current + ".mlfqg")).read_bytes(), expected_hash=current)
+    config = wire.config
+    rows = [value_node(row, 410, 4) for row in wire.rows]
     finishes = [(key, h, payload) for key, h, _, payload in rows if unpack(text(key))[0] == "FinishScc"]
     (key, original, _), (_, donor, donor_payload) = finishes[:2]
     assert original != donor
@@ -120,7 +122,7 @@ def forge_generation(cache, current, mode):
         elif mode == "wrong-address" and k == key:
             payload = donor_payload
         changed.append(n(410, k, h, edges, payload))
-    raw = tree_document([n(411, fmt, config, n(1, *changed))], schema=6)
+    raw = wire.encode_rows(changed, config)
     digest = sha(raw)
     assert digest != current
     (directory / "generations" / (digest + ".mlfqg")).write_bytes(raw)

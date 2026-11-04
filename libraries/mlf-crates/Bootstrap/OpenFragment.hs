@@ -262,11 +262,17 @@ module Bootstrap.OpenFragment
     }) values;
     ioReturn (sequenceEither hashes)
   };
+  -- Keep the last key and lazy value, as Map.fromList does, while avoiding
+  -- persistent path copies for repeated fragment references.
+  referenceTable :: forall a. [] ((,) String a) -> Map String a;
+  referenceTable entries = foldlStrict (\table ((,) key value) ->
+    if M.member compareString key table then table
+    else M.insert compareString key value table) M.empty (reverse entries);
   makePackage compiler metadata fragments = do {
-    let { ps = M.toList (M.fromList compareString (concatMap
+    let { ps = M.toList (referenceTable (concatMap
       (\((,) _ f) -> map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty))
         (append (parameters f) (bindings f))) fragments));
-      ds = M.toList (M.fromList compareString (concatMap
+      ds = M.toList (referenceTable (concatMap
         (\((,) _ f) -> map (\d -> (,) (D.datatypeName d) d) (declarations (context f))) fragments)) };
     bh <- referenceHashes Structure.toXType ps;
     dh <- referenceHashes declarationValue ds;

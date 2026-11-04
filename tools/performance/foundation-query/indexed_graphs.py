@@ -20,18 +20,18 @@ ARMS = ('29', '43', 'optimized')
 
 
 def graph_identity(cache, compiler):
-    directory = cache / 'query-graph-v1'
+    directory = wire.cache_directory(cache)
     address = wire.text(wire.document((directory / 'CURRENT').read_bytes()))
     generation = directory / 'generations' / (address + '.mlfqg')
     assert digest(generation) == address
-    version, configuration, rows = wire.node(wire.document(generation.read_bytes()), 411, 3)
-    config = wire.unpack(wire.text(configuration))
+    snapshot = wire.Generation(generation.read_bytes(), expected_hash=address)
+    config = wire.unpack(wire.text(snapshot.config))
     assert config[1] == compiler
     payloads = []
     for path in sorted((directory / 'results').glob('*.mlfqr')):
         assert digest(path) == path.stem
         payloads.append(path.stem)
-    logical = [wire.text(version), config[:1] + config[2:], rows, payloads]
+    logical = [config[:1] + config[2:], snapshot.rows, payloads]
     return wire.digest(json.dumps(logical, separators=(',', ':')).encode())
 
 

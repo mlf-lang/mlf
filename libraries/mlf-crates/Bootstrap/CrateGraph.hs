@@ -156,7 +156,7 @@ module Bootstrap.CrateGraph where {
         statistics <- G.profile;
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
-        started <- G.begin (cacheDir ++ "/query-graph-v1")
+        started <- G.begin (cacheDir ++ "/query-graph-v2")
           (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1/finish-receipt-1",flavor]);
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           initial <- case contracts of { Source.CheckedContracts scope indexed _ ->
