@@ -7,8 +7,9 @@ The Stage05 guide gives reproducible host and native test commands.
 same-call duplicate validation while preserving the remaining checked readers,
 with portable O0/O2 reader regressions. [Stage15 auth-scan reuse](resource_ir_v8/README_STAGE15.md)
 reuses that directory only within one authentication call while preserving every
-preceding-row check. Its finite same-program timing and limits are documented
-separately. A separate
+preceding-row check. [Stage17 span/layout reuse](resource_ir_v8/README_STAGE17.md)
+also reuses only call-local facts while keeping every row safety check. Each
+stage documents its own finite same-program timing and limits. A separate
 [controlled shared-source fragment experiment](source_v8/README.md) connects a
 fresh ordinary compiler capture to independent replay, IR8 planning and the real
 runtime for a bounded scalar/callable fragment, now extended with closed

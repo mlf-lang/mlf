@@ -274,6 +274,18 @@ static void authentication_cases(uint32_t kind,uint32_t domain) {
     r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
     if(r.status!=RT8_STATUS_OK) ++failures;
     emit("freshness-restored",kind,domain,4,AUTH,&r);
+    /* A different registered object is still not this domain. In particular,
+     * descriptor domains 5/6 share FieldSpec layout but remain distinct. */
+    uint32_t other=kind==RT8_DOMAIN_KIND_PACKET_TABLE?domain%20u:20u+domain%6u;
+    span->object=other;
+    r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
+    if(r.status!=RT8_STATUS_REFERENCE || r.diagnostic.detail!=RT8_DETAIL_DOMAIN ||
+       r.diagnostic.row!=0 || r.diagnostic.object!=other) ++failures;
+    emit("freshness-span-object",kind,domain,4,AUTH,&r);
+    span->object=object;
+    r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
+    if(r.status!=RT8_STATUS_OK) ++failures;
+    emit("freshness-span-restored",kind,domain,4,AUTH,&r);
     ++root.directory[object].element_alignment;
     r=invoke(&v,kind,domain,4,AUTH,&original,last,original.element_bytes,RT8_MAX_GUARD_WORK);
     if(r.status!=RT8_STATUS_ALIGNMENT || r.diagnostic.detail!=RT8_DETAIL_ALIGNMENT ||
@@ -371,9 +383,15 @@ int main(void) {
     for(uint32_t domain=1;domain<=6;++domain) authentication_cases(RT8_DOMAIN_KIND_PACKET_DESCRIPTOR,domain);
     argument_cases();
     /* Independently sum the fixed nonempty directory predicate/copy charges:
-     * 97 predicate/range/dispatch units plus two complete directory copies. */
+     * 97 predicate/range/dispatch units plus two complete directory copies.
+     * Later auth rows also omit two span checks/copies (6 or 13 fixed units
+     * each) and one 40-unit layout dispatch. The remaining layout is retained. */
     printf("{\"summary\":true,\"failures\":%u,\"table_domains\":20,\"descriptor_domains\":6,"
-           "\"directory_work\":%zu}\n",failures,(size_t)97+2*sizeof(Ir8PacketObjectDirectoryEntry));
+           "\"directory_work\":%zu,\"span_bytes\":%zu,"
+           "\"auth_table_reuse_work\":%zu,\"auth_descriptor_reuse_work\":%zu}\n",
+           failures,(size_t)97+2*sizeof(Ir8PacketObjectDirectoryEntry),sizeof(Ir8PacketSpan),
+           2*((size_t)6+sizeof(Ir8PacketSpan))+40,
+           2*((size_t)13+sizeof(Ir8PacketSpan))+40);
     if(fflush(stdout)!=0) return 74;
     return failures?1:0;
 }

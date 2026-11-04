@@ -306,10 +306,14 @@ static uint32_t domain_ref_first(const Rt8ProgramView *v,uint32_t kind,uint32_t 
 }
 static uint32_t domain_ref_next(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
                            uint32_t row,const void **out,const Ir8PacketObjectDirectoryEntry *d,
-                           Rt8ReadState *s) {
-    Ir8PacketSpan span; uint32_t element; size_t bytes;
-    TRY(domain_ref_begin(v,kind,domain,row,out,&span,&element,&bytes,s));
-    return domain_ref_finish(v,kind,domain,row,out,&span,element,bytes,d,s);
+                           const Ir8PacketSpan *span,uint32_t element,Rt8ReadState *s) {
+    /* The first successful row proved this call-local span/element/directory
+     * agree. Reuse only those immutable facts; finish still checks the full
+     * domain, compiled layout, row range/alignment and preceding table ID. */
+    TRY(reader_begin(v,s,out)); location(s,RT8_REGION_PACKET,kind,domain,N,row,N);
+    location(s,RT8_REGION_PACKET,kind,domain,span->object,row,N);
+    REQUIRE(s,1,row<span->count,REFERENCE,UNREGISTERED);
+    return domain_ref_finish(v,kind,domain,row,out,span,element,d->element_bytes,d,s);
 }
 static uint32_t domain_ref(const Rt8ProgramView *v,uint32_t kind,uint32_t domain,
                            uint32_t row,const void **out,Rt8ReadState *s) {
@@ -342,7 +346,7 @@ static uint32_t domain_auth(const Rt8ProgramView *v,uint32_t kind,uint32_t domai
     for(i=1;;++i) {
         TRY(rt8_work_reserve(s,1)); if (i>=span.count) break;
         TRY(rt8_work_reserve(s,1));
-        TRY(domain_ref_next(v,kind,domain,i,&candidate,&d,s));
+        TRY(domain_ref_next(v,kind,domain,i,&candidate,&d,&span,element,s));
         TRY(rt8_work_reserve(s,1));
         if (reference==candidate) goto found;
     }
