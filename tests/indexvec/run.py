@@ -66,7 +66,7 @@ def main():
         run([*ghc, "-odir", obj, "-hidir", obj, HERE / (name + ".hs"), *host, "-o", obj / "probe"])
     run(
         [out / "Graphs/probe"],
-        expected=b"1032 ordered SCC comparisons and package/module graph controls passed\n",
+        expected=b"1032 ordered SCC and reach comparisons, query DAG and package controls passed\n",
     )
 
     source = HERE / "Vector.hs"

@@ -8,6 +8,8 @@ module Bootstrap.QueryGraph where {
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Bitstream as W;
@@ -58,8 +60,9 @@ module Bootstrap.QueryGraph where {
             Right digest -> if validHash digest then do {
               saved <- readValue (path ++ "/generations/" ++ digest ++ ".mlfqg") (Just digest);
               ioReturn (Right (case saved of {
-                Right graph -> case decodeIndex configuration graph of {
-                  Right nodes -> Session path configuration digest nodes M.empty M.empty;
+                Right graph -> case admitIndex configuration graph of {
+                  Right ((,) nodes canonical) -> Session path configuration
+                    (if canonical then digest else "") nodes M.empty M.empty;
                   Left _ -> empty };
                 Left _ -> empty }))
             } else ioReturn (Right empty);
@@ -130,7 +133,8 @@ module Bootstrap.QueryGraph where {
      A.toList (A.toPair A.toText A.toText) reads,A.toMaybe A.toText location];
   encodeIndex config nodes = W.VNode 411
     [W.VText "MLF-CRATE-QUERY-GRAPH-1",W.VText config,A.toList encodeNode (M.elems nodes)];
-  decodeIndex configuration graph = do {
+  decodeIndex configuration graph = mapEither fst (admitIndex configuration graph);
+  admitIndex configuration graph = do {
     root <- case W.graphRoots graph of { [r] -> Right r; _ -> Left "query graph root count" };
     value <- W.lookupGraphNode graph root;
     case value of {
@@ -139,26 +143,39 @@ module Bootstrap.QueryGraph where {
         c <- A.fromGraphText graph config;
         ensure (eqString f "MLF-CRATE-QUERY-GRAPH-1" && eqString c configuration) "query graph version mismatch";
         indices <- listAt graph entries;
-        nodes <- traverseEither (decodeNode graph) indices;
+        -- A physical edge can appear in many read lists. The wire reader has
+        -- already proved that every child ID belongs to this graph. Share one
+        -- checked pair per ID, keeping its positions in every owner's list.
+        let { reads = V.fromList (map (decodeRead graph) (range 0 (W.graphNodeCount graph - 1))) };
+        nodes <- traverseEither (decodeNode graph reads) indices;
         let { names = map nodeKey nodes; table = M.fromList compareString (map (\n -> (,) (nodeKey n) n) nodes) };
         ensure (length names == M.size table) "duplicate query node";
         validateClosure table;
-        Right table
+        Right ((,) table (eqList eqString names (M.keys table)))
       };
       _ -> Left "unsupported query graph index"
     }
   };
-  decodeNode graph index = do {
+  data WireNode = WireNode;
+  decodeRead graph index = do {
+    value <- A.decodeGraphValue (A.ShapePair A.ShapeText A.ShapeText) graph index;
+    pair <- A.expectPair A.expectText A.expectText value;
+    ensure (validHash (snd pair)) "invalid query graph digest";
+    Right pair
+  };
+  decodeNode :: W.Graph -> V.IndexVec WireNode (Either String ((,) String String)) -> Int ->
+    Either String QueryNode;
+  decodeNode graph readTable index = do {
     value <- W.lookupGraphNode graph index;
     case value of {
       W.GNode 410 [k,h,edges,location] -> do {
         wanted <- A.fromGraphText graph k;
         digest <- A.fromGraphText graph h;
-        values <- A.decodeGraphValue (A.ShapeList (A.ShapePair A.ShapeText A.ShapeText)) graph edges;
-        reads <- A.expectList (A.expectPair A.expectText A.expectText) values;
+        ids <- listAt graph edges;
+        reads <- traverseEither (\i -> V.at readTable (V.fromInt i)) ids;
         p <- A.decodeGraphValue (A.ShapeMaybe A.ShapeText) graph location;
         payload <- A.expectMaybe A.expectText p;
-        ensure (validHash digest && all (compose validHash snd) reads &&
+        ensure (validHash digest &&
           (case payload of { Nothing -> True; Just hash -> validHash hash })) "invalid query graph digest";
         Right (QueryNode wanted digest reads payload)
       };
@@ -169,30 +186,49 @@ module Bootstrap.QueryGraph where {
     value <- W.lookupGraphNode graph index;
     case value of { W.GNode 1 entries -> Right entries; _ -> Left "expected query graph list" }
   };
-  publish session@(Session path config previous _ nodes pending) = do {
-    failpoint <- getEnv "MLF_QUERY_FAILPOINT";
-    if eqString failpoint "before-results" then ioReturn (Left "query publication interrupted before results") else
-    case validateClosure nodes of { Left e -> ioReturn (Left e); Right _ -> do {
-    let { value = encodeIndex config nodes };
-    encoded <- encodeHashed value;
-    case encoded of { Left e -> ioReturn (Left e); Right ((,) digest bytes) -> do {
-      written <- publishValues failpoint session (M.toList pending);
-      closure <- case written of { Left e -> ioReturn (Left e); Right _ -> verifyPayloads session (M.elems nodes) };
-      case closure of { Left e -> ioReturn (Left e); Right _ ->
-        if eqString digest previous then ioReturn (Right False) else do {
-          if eqString failpoint "before-index" then ioReturn (Left "query publication interrupted before index") else do {
-          saved <- Storage.writeRawAtomic (path ++ "/generations/" ++ digest ++ ".mlfqg") bytes;
-          case saved of { Left e -> ioReturn (Left e); Right _ -> do {
-            if eqString failpoint "before-current" then ioReturn (Left "query publication interrupted before current") else do {
-            switched <- Storage.writeAtomic 6 (path ++ "/CURRENT") [W.VText digest];
-            ioReturn (mapEither (\_ -> True) switched)
-            }
-          } }
-          }
-        }
+  -- An admitted, canonically ordered generation is already a checked DAG.
+  -- Equality covers the full wire row (including read order and location).
+  -- Reuse its content address only if every row matches. Results still pass
+  -- the same staging and retained-payload checks on every publication.
+  sameNode left right = eqString (nodeKey left) (nodeKey right) &&
+    eqString (nodeHash left) (nodeHash right) &&
+    eqList (eqPair eqString eqString) (nodeReads left) (nodeReads right) &&
+    eqMaybe eqString (nodePayload left) (nodePayload right);
+  publication config previous old nodes =
+    if not (eqString previous "") && M.size old == M.size nodes &&
+       eqList sameNode (M.elems old) (M.elems nodes)
+    then ioReturn (Right Nothing)
+    else case validateClosure nodes of {
+      Left e -> ioReturn (Left e);
+      Right _ -> do {
+        encoded <- encodeHashed (encodeIndex config nodes);
+        ioReturn (mapEither Just encoded)
       }
-    } }
-    } }
+    };
+  publish session@(Session path config previous old nodes pending) = do {
+    failpoint <- getEnv "MLF_QUERY_FAILPOINT";
+    if eqString failpoint "before-results" then ioReturn (Left "query publication interrupted before results") else do {
+      encoded <- publication config previous old nodes;
+      case encoded of { Left e -> ioReturn (Left e); Right generation -> do {
+        written <- publishValues failpoint session (M.toList pending);
+        closure <- case written of { Left e -> ioReturn (Left e); Right _ -> verifyPayloads session (M.elems nodes) };
+        case closure of { Left e -> ioReturn (Left e); Right _ -> case generation of {
+          Nothing -> ioReturn (Right False);
+          Just ((,) digest bytes) -> if eqString digest previous then ioReturn (Right False)
+            else if eqString failpoint "before-index" then ioReturn (Left "query publication interrupted before index")
+            else do {
+              saved <- Storage.writeRawAtomic (path ++ "/generations/" ++ digest ++ ".mlfqg") bytes;
+              case saved of { Left e -> ioReturn (Left e); Right _ ->
+                if eqString failpoint "before-current" then ioReturn (Left "query publication interrupted before current")
+                else do {
+                  switched <- Storage.writeAtomic 6 (path ++ "/CURRENT") [W.VText digest];
+                  ioReturn (mapEither (\_ -> True) switched)
+                }
+              }
+            }
+        } }
+      } }
+    }
   };
   -- Staging starts only at the caller's successful crate-output boundary.
   -- Every result still enters results/ by same-filesystem rename. A partial
@@ -249,23 +285,35 @@ module Bootstrap.QueryGraph where {
           else moveResults failpoint session (snd batch)
     }
   };
+  data QueryId = QueryId;
+  -- Resolve and check each recorded version before cycle detection. Dense
+  -- ordinals follow the old lexical root order and never enter the index file.
   validateClosure nodes = do {
-    mapM_ (\node -> mapM_ (\((,) dependency digest) ->
-    case M.lookup compareString dependency nodes of {
-      Nothing -> Left "unpublished query dependency";
-      Just value -> ensure (eqString digest (nodeHash value)) "query publication has stale dependency version"
-    }) (nodeReads node)) (M.elems nodes);
-    _ <- foldM (acyclic nodes S.empty 0) S.empty (M.keys nodes);
-    Right ()
+    let { ordered = M.elems nodes;
+      bindings = M.fromDistinctAscList (zipWith (\entry n ->
+        (,) (fst entry) ((,) (V.fromInt n) (nodeHash (snd entry))))
+        (M.toList nodes) (range 0 (M.size nodes - 1)));
+      resolve ((,) key digest) = case M.lookup compareString key bindings of {
+        Nothing -> Left "unpublished query dependency";
+        Just ((,) i actual) -> if eqString digest actual then Right i
+          else Left "query publication has stale dependency version"
+      }
+    };
+    rows <- traverseEither (\node -> traverseEither resolve (nodeReads node)) ordered;
+    let { edges = V.fromList rows } in runST (stBind (V.filled (V.count edges) Unseen) (\marks ->
+      ST.mapE_ (visit edges marks 0) (V.indices edges)))
   };
-  acyclic nodes visiting depth done wanted = if S.member compareString wanted done then Right done else do {
-    ensure (depth < 4096 && not (S.member compareString wanted visiting)) "cyclic/deep query graph";
-    node <- case M.lookup compareString wanted nodes of {
-      Just node -> Right node; Nothing -> Left "dangling query graph edge" };
-    after <- foldM (acyclic nodes (S.insert compareString wanted visiting) (depth + 1)) done
-      (map fst (nodeReads node));
-    Right (S.insert compareString wanted after)
-  };
+  data Colour = Unseen | Visiting | Done;
+  visit :: forall s. V.IndexVec QueryId ([] (V.Index QueryId)) -> V.Builder s QueryId Colour ->
+    Int -> V.Index QueryId -> ST s (Either String ());
+  visit rows marks depth i = stBind (V.get marks i) (\colour -> case colour of {
+    Done -> ST.pureE ();
+    Visiting -> ST.failE "cyclic/deep query graph";
+    Unseen -> if depth >= 4096 then ST.failE "cyclic/deep query graph"
+      else stBind (V.set marks i Visiting) (\_ ->
+        ST.bindE (ST.mapE_ (visit rows marks (depth + 1)) (V.at rows i)) (\_ ->
+          ST.liftE (V.set marks i Done)))
+  });
   verifyPayloads :: Session -> [] QueryNode -> IO (Either String ());
   verifyPayloads session@(Session _ _ _ _ _ pending) nodes =
     verifyPayloadsAfter session (S.fromList compareString (M.keys pending)) nodes;

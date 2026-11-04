@@ -9,6 +9,7 @@ module Bootstrap.Dependency where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Desugar as Desugar;
   -- Edges point from a declaration to the declarations it needs. Namespace
@@ -207,43 +208,86 @@ module Bootstrap.Dependency where {
   finishOrder (Rows rows) roots = runST (stBind (V.filled (V.count rows) False) (\seen ->
     finish (Rows rows) seen (map Enter roots) []));
 
-  transposeRows :: forall d. Rows d -> Rows d;
-  transposeRows (Rows rows) = runST (stBind (V.filled (V.count rows) []) (\incoming ->
-    stBind (ST.map_ (\i -> ST.map_ (\j -> stBind (V.get incoming j) (\old ->
-      V.set incoming j ((:) i old))) (V.toList (V.at rows i))) (reverse (V.indices rows))) (\_ ->
-    stBind (V.freeze incoming) (\lists ->
-      stReturn (Rows (V.fromList (map V.fromList (V.toList lists))))))));
+  -- Path-based SCCs (Gabow). A positive mark is an open DFS preorder,
+  -- zero is unseen, and -1 is closed. Boundaries are candidate SCC roots.
+  -- An edge to an open vertex merges all boundaries discovered after it.
+  -- Closing a surviving root emits exactly one component, in finish order.
   data Declaration = Declaration;
   data ModuleVertex = ModuleVertex;
-  collectGroups :: forall s d. Rows d -> V.Builder s d Bool -> [] (V.Index d) -> [] ([] (V.Index d)) ->
-                   ST s ([] ([] (V.Index d)));
-  collectGroups rows seen ordered groups = case ordered of {
-    [] -> stReturn groups;
-    (:) i rest -> stBind (finish rows seen [Enter i] []) (\members ->
-      case members of {
-        [] -> collectGroups rows seen rest groups;
-        (:) _ _ -> collectGroups rows seen rest ((:) members groups)
-      })
+  componentsById :: forall d. Rows d -> [] (V.Index d) -> [] ([] (V.Index d));
+  componentsById (Rows rows) roots = runST (stBind (V.filled (V.count rows) 0) (\marks ->
+    scanComponents rows marks 1 (map Enter roots) [] [] []));
+  scanComponents :: forall s d. V.IndexVec d (V.IndexVec EdgeSlot (V.Index d)) ->
+    V.Builder s d Int -> Int -> [] (Visit d) -> [] (V.Index d) -> [] ((,) (V.Index d) Int) ->
+    [] ([] (V.Index d)) -> ST s ([] ([] (V.Index d)));
+  scanComponents rows marks serial pending open boundaries groups = case pending of {
+    [] -> stReturn (reverse groups);
+    (:) (Enter i) rest -> stBind (V.get marks i) (\mark ->
+      if mark == 0 then stBind (V.set marks i serial) (\_ ->
+        let { next = serial + 1;
+              tasks = foldr (\j more -> (:) (Enter j) more) ((:) (Leave i) rest)
+                (V.toList (V.at rows i)) } in
+        seq next (scanComponents rows marks next tasks ((:) i open) ((:) ((,) i serial) boundaries) groups))
+      else scanComponents rows marks serial rest open
+        (if mark < 0 then boundaries else dropWhile (\entry -> snd entry > mark) boundaries) groups);
+    (:) (Leave i) rest -> case boundaries of {
+      (:) ((,) root _) older -> if V.toInt root == V.toInt i
+        then stBind (closeComponent marks root open []) (\((,) members remaining) ->
+          scanComponents rows marks serial rest remaining older ((:) members groups))
+        else scanComponents rows marks serial rest open boundaries groups;
+      [] -> panic "missing SCC boundary"
+    }
   };
+  closeComponent :: forall s d. V.Builder s d Int -> V.Index d -> [] (V.Index d) ->
+    [] (V.Index d) -> ST s ((,) ([] (V.Index d)) ([] (V.Index d)));
+  closeComponent marks root open members = case open of {
+    [] -> panic "missing open SCC root";
+    (:) i rest -> stBind (V.set marks i (0 - 1)) (\_ ->
+      if V.toInt i == V.toInt root then stReturn ((,) ((:) i members) rest)
+      else closeComponent marks root rest ((:) i members))
+  };
+  -- SCCs close dependency-first. All members of a component share one
+  -- immutable reach set. Internal edges still point to empty slots until
+  -- the entire component is published; external successors are complete.
+  reachTable :: forall d. Rows d -> V.IndexVec d IntSet;
+  reachTable rows@(Rows table) = runST (stBind (V.filled (V.count table) IS.empty) (\closed ->
+    stBind (ST.map_ (closeReach rows closed) (componentsById rows (V.indices table))) (\_ ->
+      V.freeze closed)));
+  closeReach :: forall s d. Rows d -> V.Builder s d IntSet -> [] (V.Index d) -> ST s ();
+  closeReach rows closed group =
+    let { addEdge reached j = stBind (V.get closed j) (\child ->
+            let { next = IS.union reached child } in seq next (stReturn next));
+          addMember reached i = ST.fold addEdge (IS.insert (V.toInt i) reached) (neighbors rows i)
+    } in stBind (ST.fold addMember IS.empty group) (\reached ->
+      ST.map_ (\i -> V.set closed i reached) group);
   -- Repeated keys select the last entry. Roots, outgoing rows and group
   -- members are lexical, independently of source declaration order.
   nameGraph :: forall d. [] ((,) String ([] String)) -> NamedGraph d ((,) String ([] String));
-  nameGraph entries = buildGraph fst (\entry -> canonical (snd entry)) (\_ -> Nothing)
-                        (M.toList (M.fromList compareString entries));
+  nameGraph entries =
+    let { values = M.toList (M.fromList compareString entries);
+      nodes = V.fromList values;
+      names = M.fromDistinctAscList (zipWith (\entry i -> (,) (fst entry) i) values (V.indices nodes));
+      row entry = V.fromList (map V.fromInt (IS.toAscList (foldlStrict (\seen name ->
+        case M.lookup compareString name names of {
+          Nothing -> seen; Just j -> IS.insert (V.toInt j) seen
+        }) IS.empty (snd entry))))
+    } in NamedGraph names nodes (Rows (V.fromList (map row values)));
   declarationGraph :: [] ((,) String ([] String)) -> NamedGraph Declaration ((,) String ([] String));
   declarationGraph = nameGraph;
   moduleGraph :: [] ((,) String ([] String)) -> NamedGraph ModuleVertex ((,) String ([] String));
   moduleGraph = nameGraph;
   components :: [] ((,) String ([] String)) -> [] ([] String);
-  components entries = groupNames (declarationGraph entries);
+  components entries = case entries of {
+    [] -> [];
+    [(,) name _] -> [[name]];
+    _ -> groupNames (declarationGraph entries)
+  };
   groupNames :: forall d. NamedGraph d ((,) String ([] String)) -> [] ([] String);
   groupNames graph =
     let {
       nodes = graphNodes graph;
       rows = graphRows graph;
-      ordered = finishOrder rows (V.indices nodes);
-      groups = runST (stBind (V.filled (V.count nodes) False) (\seen ->
-                 collectGroups (transposeRows rows) seen ordered []))
+      groups = componentsById rows (V.indices nodes)
     } in map (\group -> sortBy compareString (map (\i -> fst (V.at nodes i)) group)) groups;
   declarationGroups :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
                        Either String ([] ([] String));

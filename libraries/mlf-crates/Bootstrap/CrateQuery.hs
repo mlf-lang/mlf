@@ -7,6 +7,8 @@ module Bootstrap.CrateQuery where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Desugar as Desugar;
@@ -633,25 +635,18 @@ module Bootstrap.CrateQuery where {
     } in
     (,,) n (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
       (canonicalExpression M.empty 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
-  data TypeInventory =
-    TypeInventory (Map String DataDecl) (Map String String) (Map String ([] String));
-  prepareData datatypes =
-    do {
-      D.validateDeclarations datatypes;
-      Right
-        (TypeInventory (M.fromList compareString (map (\d -> (,) (D.datatypeName d) d) datatypes))
-           (M.fromList compareString
-              (concatMap
-                 (\d ->
-                    map (\c -> (,) (D.constructorName c) (D.datatypeName d))
-                      (D.datatypeConstructors d))
-                 datatypes))
-           (M.fromList compareString
-              (map
-                 (\d ->
-                    (,) (D.datatypeName d) (Dependency.typeNames (Dependency.observeDatatype d)))
-                 datatypes)))
-    };
+  data DatatypeId = DatatypeId;
+  data TypeInventory = TypeInventory (Dependency.NamedGraph DatatypeId DataDecl)
+    (Map String String) (V.IndexVec DatatypeId IntSet);
+  prepareData datatypes = do {
+    D.validateDeclarations datatypes;
+    let { graph = Dependency.buildGraph D.datatypeName
+            (compose Dependency.typeNames Dependency.observeDatatype) (\_ -> Nothing)
+            (sortBy (\a b -> compareString (D.datatypeName a) (D.datatypeName b)) datatypes);
+          owners = M.fromList compareString (concatMap (\d ->
+            map (\c -> (,) (D.constructorName c) (D.datatypeName d)) (D.datatypeConstructors d)) datatypes)
+    } in Right (TypeInventory graph owners (Dependency.reachTable (Dependency.graphRows graph)))
+  };
   xTypeNames :: XType -> [] String;
   xTypeNames ty =
     case ty of {
@@ -661,7 +656,7 @@ module Bootstrap.CrateQuery where {
       XForall _ a b -> append (xTypeNames a) (xTypeNames b);
       _ -> []
     };
-  requiredDataIn (TypeInventory datatypes constructors edges) members schemes =
+  requiredDataIn (TypeInventory graph constructors closures) members schemes =
     let {
       observations = map Dependency.observeDeclaration members
     } in
@@ -678,9 +673,10 @@ module Bootstrap.CrateQuery where {
       roots = append direct (append owners (concatMap (\((,) _ ty) -> xTypeNames ty) schemes))
     } in
     let {
-      needed = Inference.closeDependencies edges S.empty roots
-    } in
-    map snd (filter (\entry -> S.member compareString (fst entry) needed) (M.toList datatypes));
+      ids = mapMaybe (Dependency.graphId graph) roots;
+      needed = IS.unions (map (V.at closures) ids);
+      nodes = Dependency.graphNodes graph
+    } in map (\i -> V.at nodes (V.fromInt i)) (IS.toAscList needed);
   requiredData :: [] DataDecl ->
                   [] ((,,) String (Maybe SAnnotation) SExpr) ->
                   [] ((,) String XType) -> Either String ([] DataDecl);

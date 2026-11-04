@@ -23,7 +23,7 @@ module Bootstrap.Bitstream (
   getNodes, getNodesAt, getRoots, getRootsAt, canonicalGraph, canonicalTasks,
   collectRoots, decode, decodeChecked, decodeTables,
   Graph, GraphNode(..), decodeGraph, decodeGraphWithText, decodeGraphWithGate,
-  firstShortTextMatches, graphRoots, lookupGraphNode,
+  firstShortTextMatches, graphRoots, graphNodeCount, lookupGraphNode,
   ResourceStats, planMeasured, planGraph, GraphPlan, prepareGraphPlan, realizeGraphPlan, graphNodeDepth, graphResourceStats,
   resourceBytes, resourceNodes, resourceEdges, resourceSymbols,
   resourceSymbolBytes, resourceDepth, resourceMaxSymbolBytes,
@@ -968,6 +968,8 @@ module Bootstrap.Bitstream (
   data GraphNode = GInt Int | GBits Int | GText String | GNode Int ([] Int);
   graphRoots :: Graph -> [] Int;
   graphRoots (Graph _ roots) = roots;
+  graphNodeCount :: Graph -> Int;
+  graphNodeCount (Graph nodes _) = IM.size nodes;
   lookupGraphNode :: Graph -> Int -> Either String GraphNode;
   lookupGraphNode (Graph nodes _) index = case IM.lookup index nodes of {
     Nothing -> Left "binary graph node index out of range";

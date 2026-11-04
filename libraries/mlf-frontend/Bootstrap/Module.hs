@@ -1582,10 +1582,11 @@ module Bootstrap.Module where {
       leaves = concatMap (\entry -> map (\name -> (,) name []) (snd entry)) entries;
       graph = Dependency.moduleGraph (append leaves entries);
       nodes = Dependency.graphNodes graph;
+      closed = Dependency.reachTable (Dependency.graphRows graph);
       reach name = case Dependency.graphId graph name of {
         Nothing -> panic "missing module reach owner";
-        Just i -> Set.fromList compareString
-          (map (\j -> fst (V.at nodes j)) (Dependency.finishOrder (Dependency.graphRows graph) [i]))
+        Just i -> Set.fromDistinctAscList
+          (map (\j -> fst (V.at nodes (V.fromInt j))) (IS.toAscList (V.at closed i)))
       }
     } in M.mapWithKey (\name _ -> reach name) direct;
   crateReach mode modules =
