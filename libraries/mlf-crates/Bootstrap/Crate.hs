@@ -355,17 +355,10 @@ module Bootstrap.Crate where {
                   (map (\((,) owner value) -> (,) owner (snd value)) instances)
             };
             let {
-              valueScopes =
-                M.fromList compareString
-                  (append
-                     (concatMap
-                        (\r ->
-                           map (\name -> (,) name (candidates (Modules.moduleIdentity (Modules.resolvedSource r))))
-                             (Modules.renamedValueNames (Modules.resolvedContents r)))
-                        resolved)
-                     (if eqString entry ""
-                      then []
-                      else (:) ((,) entry (candidates (specEntry spec))) []))
+              valueScopes = case bindings of { Dependency.BoundValues symbols rows ->
+                Dependency.indexedScopes symbols (append (Modules.resolvedScopeRows resolved candidates)
+                  (if eqString entry "" then [] else [(,) (Dependency.boundId (last rows)) (candidates (specEntry spec))]))
+              }
             };
             let {
               allData = append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData

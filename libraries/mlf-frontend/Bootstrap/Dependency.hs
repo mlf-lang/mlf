@@ -326,6 +326,44 @@ module Bootstrap.Dependency where {
          } in (,) (Symbols allNodes (mergeBy cmp order (sortBy cmp extra)) methods allKeys) extra
   };
   extendSymbols table names = fst (appendSymbols table names);
+  -- Visibility belongs to the defining declaration. Only active definitions
+  -- enter the adapter used by the named surface/class lowering boundary.
+  data ValueScopes a = NamedScopes (Map String a) |
+    IndexedScopes Bool Symbols (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe a));
+  indexedScopes symbols entries = let {
+    names = M.fromList compareString (map (\((,) i _) -> (,) (symbolName symbols i) i) entries);
+    table = runST (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
+      stBind (ST.map_ (\((,) i a) -> V.set rows i (Just a)) entries) (\_ -> V.freeze rows)))
+  } in IndexedScopes True symbols names table;
+  mapScopes f scopes = case scopes of {
+    NamedScopes named -> NamedScopes (M.map f named);
+    IndexedScopes top symbols names table -> IndexedScopes top symbols names
+      (V.fromList (map (mapOptional f) (V.toList table)))
+  };
+  namedScopes scopes = case scopes of {
+    NamedScopes named -> named;
+    IndexedScopes _ _ names table -> M.map (\i -> case V.at table i of {
+      Just a -> a; Nothing -> panic "inactive declaration scope"
+    }) names
+  };
+  lookupScope name scopes = case scopes of {
+    NamedScopes named -> M.lookup compareString name named;
+    IndexedScopes _ _ names table -> case M.lookup compareString name names of {
+      Nothing -> Nothing; Just i -> V.at table i
+    }
+  };
+  scopeAt scopes i = case scopes of {
+    IndexedScopes _ _ _ table -> V.at table i;
+    NamedScopes _ -> panic "named visibility has no declaration IDs"
+  };
+  nestedScopes scopes = case scopes of {
+    IndexedScopes _ symbols names table -> IndexedScopes False symbols names table;
+    NamedScopes _ -> scopes
+  };
+  bindingScope scopes name copied fallback = case scopes of {
+    IndexedScopes False _ _ _ -> if copied then fromMaybe fallback (lookupScope name scopes) else fallback;
+    _ -> fromMaybe fallback (lookupScope name scopes)
+  };
   data Bound = Bound (V.Index Declaration) (Maybe SAnnotation) (R.Expr Declaration);
   boundId (Bound i _ _) = i;
   boundValue symbols (Bound i annotation rhs) = let { name = symbolName symbols } in
@@ -358,7 +396,8 @@ module Bootstrap.Dependency where {
   -- declaration. Dense lexical ranks order DFS roots, siblings and members.
   resolvedGroups :: BoundValues -> [] ((,) String ([] String)) -> Map String ((,) String ([] String)) ->
     Map String ([] String) -> Either String ((,) Symbols ([] ([] ((,) (V.Index Declaration) Bool))));
-  resolvedGroups (BoundValues base bound) generated methods scopes = do {
+  resolvedGroups bindings generated methods scopes = resolvedGroupsInScopes bindings generated methods (NamedScopes scopes);
+  resolvedGroupsInScopes (BoundValues base bound) generated methods scopes = do {
     let { extended = appendSymbols base (map fst generated); symbols = fst extended;
           nodes = symbolNodes symbols; generatedIds = snd extended;
           present = append (map boundId bound) generatedIds;
@@ -386,7 +425,7 @@ module Bootstrap.Dependency where {
           edgeRow targets = V.fromList (map (\r -> V.at order (V.fromInt r))
             (IS.toAscList (IS.fromList (map V.toInt targets))));
           sourceRow (Bound i _ rhs) = (,) i (edgeRow (append (mapMaybe (V.at sourceRanks) (R.references rhs))
-            (mapMaybe byName (M.findWithDefault compareString [] (V.at nodes i) scopes))));
+            (mapMaybe byName (fromMaybe [] (case scopes of { NamedScopes values -> M.lookup compareString (V.at nodes i) values; IndexedScopes _ _ _ _ -> scopeAt scopes i })))));
           generatedRow i entry = (,) i (edgeRow (mapMaybe byName (snd entry)));
           rows = runST (stBind (V.filled (V.count nodes) (V.fromList [])) (\slots ->
             stBind (ST.map_ (\((,) i row) -> V.set slots i row)

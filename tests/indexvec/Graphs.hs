@@ -7,6 +7,7 @@ import Data.List (nub, sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Bootstrap.Bitstream as W
+import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
@@ -312,6 +313,27 @@ resolverChecks = do
     T.SLet n (T.SSourceDefinition (T.SIntLit 7)) (T.SVar ref) ->
       check "local method dependency copies its source definition" ("same","same") (H.unpack n,H.unpack ref)
     _ -> error "method failed to capture its referenced helper"
+  let visibility = D.indexedScopes slots [(own,"local scope"),(method,"method scope")]
+      nested = D.nestedScopes visibility
+  check "scope indexed by defining slot" (Just "local scope") (case D.scopeAt visibility own of
+    T.Just a -> Just a; T.Nothing -> Nothing)
+  check "equal spelling does not grant the external a local scope" True (case D.scopeAt visibility external of
+    T.Nothing -> True; _ -> False)
+  check "local shadow inherits lexical candidates" "lexical" (D.bindingScope nested "same" False "lexical")
+  check "copied global helper keeps its own candidates" "local scope" (D.bindingScope nested "same" True "lexical")
+  let primitive = T.SourceModule "<MLF.Primitive>" (T.Just "MLF.Primitive") T.Nothing [] [] [] [] [] T.Nothing T.LegacyEmlfV1
+  let runScoped imports = do
+        modules <- mapM parsed [("Inspect","module Inspect where\nclass Inspect a where { inspect : a -> Bool }\n"),
+          ("Inst","module Inst () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\n"),
+          ("A","module A (f) where\nimport Inspect\n" ++ imports ++ "f :: Bool\nf = inspect (1 :: Int)\n"),
+          ("Main","module Main where\nimport A\nimport Inst ()\nmain = f\n")]
+        pure (Compiler.compileLinked T.NoImplicitPrelude (primitive:modules))
+  visible <- runScoped "import Inst ()\n"
+  case visible of
+    T.Right _ -> pure (); T.Left e -> error ("defining module lost its instance: " ++ H.unpack (Compiler.prettyError e))
+  hidden <- runScoped ""
+  case hidden of
+    T.Left _ -> pure (); T.Right _ -> error "importer granted an instance to a different defining module"
   let fresh = D.symbols [("a",False),("b",False),("c",True)]
   let (appended, late) = D.appendSymbols fresh ["selector","dictionary"]
   check "generation appends slots in source order" [3,4] (map V.toInt late)

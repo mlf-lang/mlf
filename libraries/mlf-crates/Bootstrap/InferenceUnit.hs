@@ -109,10 +109,12 @@ module Bootstrap.InferenceUnit where {
       body <- Surface.bindValues members (SConstructor "()");
       lowerBoundDeclarations externals datatypes classes closedInstances valueScopes instanceScopes body
     };
-  lowerBoundDeclarations externals datatypes classes closedInstances valueScopes instanceScopes body =
+  lowerBoundDeclarations externals datatypes classes closedInstances valueScopes =
+    lowerBoundInScopes externals datatypes classes closedInstances (Dependency.NamedScopes valueScopes);
+  lowerBoundInScopes externals datatypes classes closedInstances valueScopes instanceScopes body =
     do {
       boundValueShared8 <-
-        Classes.lowerSeparateClassesWithScopes externals (map fst closedInstances) valueScopes
+        Classes.lowerSeparateClassesInScopes externals (map fst closedInstances) valueScopes
           instanceScopes
           (SClassProgram datatypes classes (map snd closedInstances) body);
       case boundValueShared8 of {

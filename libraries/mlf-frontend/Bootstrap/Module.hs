@@ -337,9 +337,11 @@ module Bootstrap.Module where {
     (resolvedCrateModules crate);
   instanceValue crate = R.namedInstance (Dependency.symbolName (bindingSymbols (resolvedCrateBindings crate)));
   resolvedCrateInstances crate = map (\((,) owner inst) -> (,) owner (instanceValue crate inst)) (resolvedInstanceRows crate);
-  resolvedCrateValueScopes (ResolvedCrate _ modules masks _) = M.fromList compareString
-    (concatMap (\entry -> let { r = resolvedContents entry; scope = M.get compareString (moduleIdentity (resolvedSource entry)) masks } in
-      map (\binding -> (,) (Dependency.symbolName (renamedSymbols r) (Dependency.boundId binding)) scope) (renamedBindings r)) modules);
+  resolvedScopeRows modules scopeOf = concatMap (\entry ->
+    let { scope = scopeOf (moduleIdentity (resolvedSource entry)) } in
+    map (\binding -> (,) (Dependency.boundId binding) scope) (renamedBindings (resolvedContents entry))) modules;
+  resolvedCrateValueScopes (ResolvedCrate bindings modules masks _) =
+    Dependency.indexedScopes (bindingSymbols bindings) (resolvedScopeRows modules (\name -> M.get compareString name masks));
   resolvedCrateInstanceScopes (ResolvedCrate _ modules masks _) = concatMap (\entry ->
     map (\_ -> M.get compareString (moduleIdentity (resolvedSource entry)) masks)
       (resolvedInstances (resolvedContents entry))) modules;
@@ -1627,7 +1629,8 @@ module Bootstrap.Module where {
            Right (ResolvedCrate bindings resolved scopes reach)
          };
   linkModules :: PreludeMode -> [] SourceModule -> Either String LinkedModule;
-  linkModules mode supplied =
+  linkModules mode supplied = mapEither fst (linkModulesInScopes mode supplied);
+  linkModulesInScopes mode supplied =
     do {
       crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
       let {
@@ -1662,7 +1665,7 @@ module Bootstrap.Module where {
           then SProgram ds body
           else SClassProgram ds cs instances' body
       };
-      Right (LinkedModule program publicNames scopes (resolvedCrateInstanceScopes crate))
+      Right ((,) (LinkedModule program publicNames (Dependency.namedScopes scopes) (resolvedCrateInstanceScopes crate)) scopes)
     };
   wordChar c = (U.isAlphaNum c || ((c == 95) || (c == 39)));
   wordEnd :: String -> Int -> Int;

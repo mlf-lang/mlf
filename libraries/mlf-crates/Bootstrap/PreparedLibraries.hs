@@ -403,7 +403,7 @@ module Bootstrap.PreparedLibraries
             (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
           externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
-    full <- sourcePhase Inference (Classes.lowerSeparateClassesWithScopes externals (map fst instances)
+    full <- sourcePhase Inference (Classes.lowerSeparateClassesInScopes externals (map fst instances)
       (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
     selected <- sourcePhase Verification (Parameters.select signatures full);
@@ -467,7 +467,7 @@ module Bootstrap.PreparedLibraries
             (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
           externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
-    full <- sourcePhase Inference (Classes.lowerSeparateClassesWithScopes externals (map fst instances)
+    full <- sourcePhase Inference (Classes.lowerSeparateClassesInScopes externals (map fst instances)
       (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
     selected <- sourcePhase Verification (Parameters.select signatures full);

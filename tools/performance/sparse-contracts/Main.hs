@@ -5,6 +5,7 @@ import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless, foldM)
 import Data.IORef
+import qualified Bootstrap.Dependency as Dependency
 import qualified Bootstrap.CrateQuery as Q
 import qualified FrozenCrateQuery as FQ
 import qualified Bootstrap.SourceInference as S
@@ -313,7 +314,7 @@ main = do
   let candidateScopes=mapOf [("root",[(T.InstanceEvidence,"candidateCollision")])]
       newCandidateInventory=case S.planInventory supportPlan of
         C.ClassInventory ds denv infos _ candidates methods supports names externals ->
-          C.ClassInventory ds denv infos candidateScopes candidates methods supports names externals
+          C.ClassInventory ds denv infos (Dependency.NamedScopes candidateScopes) candidates methods supports names externals
       oldCandidateInventory=case FS.planInventory supportOld of
         FC.ClassInventory ds denv infos _ candidates methods supports names externals ->
           FC.ClassInventory ds denv infos candidateScopes candidates methods supports names externals
