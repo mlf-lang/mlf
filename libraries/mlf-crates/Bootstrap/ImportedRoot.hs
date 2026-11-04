@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.ImportedRoot
-  (Compilation, finishCompilation, checkedWrapper, inferredType, sourceType,
+  (Compilation, finishCompilation, finishSelected, checkedWrapper, inferredType, sourceType,
    remove, finishLinked, materializeImports, materializeLinked, usedImportSignatures) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -20,6 +20,7 @@ module Bootstrap.ImportedRoot
   import qualified Bootstrap.Elaborate as E;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.CompilerCore as Core;
+  import qualified Bootstrap.ImportParameters as Parameters;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.X.Syntax as X;
   import qualified Bootstrap.X.Type as T;
@@ -140,7 +141,7 @@ module Bootstrap.ImportedRoot
       datatypes <- D.validateDeclarations declarations;
       lowered <- Surface.lowerExpression expression;
       C.validateAnnotations datatypes lowered;
-      if M.null signatures then do {
+      if null signatures then do {
         result <- C.runGenerate (C.build datatypes M.empty Nothing M.empty (C.desugar lowered))
           (C.Generation G.emptyGraph [] []);
         case result of { (,) typed (C.Generation graph equalities steps) -> do {
@@ -149,10 +150,10 @@ module Bootstrap.ImportedRoot
         } }
       } else case lowered of {
         SLetRec parameters inner -> do {
-          ensure (eqList eqString (map (\((,,) name _ _) -> name) parameters) (M.keys signatures))
+          ensure (eqList eqString (map (\((,,) name _ _) -> name) parameters) (map fst signatures))
             "direct import parameter inventory mismatch";
           traverseEither (\((,) _ ty) -> ensure (S.null (T.freeVars ty))
-            "direct import contract is not closed") (M.toList signatures);
+            "direct import contract is not closed") signatures;
           definitions <- traverseEither parameter parameters;
           result <- C.runGenerate (buildImported datatypes definitions inner)
             (C.Generation G.emptyGraph [] []);
@@ -169,7 +170,8 @@ module Bootstrap.ImportedRoot
   };
   finishCompilation :: Map String XType -> (,) SProgram (Map String String) ->
     Either CompileError Compilation;
-  finishCompilation signatures ((,) program names) = case program of {
+  finishCompilation signatures = finishSelected (Parameters.namedImports signatures);
+  finishSelected selected ((,) program names) = let { signatures = Parameters.namedEntries selected } in case program of {
     SClassProgram _ _ _ _ -> Left (CompileError Inference "class translation did not produce a core program");
     SProgram declarations _ -> do {
       generated <- Core.atPhase Inference (generate signatures program);
@@ -181,15 +183,15 @@ module Bootstrap.ImportedRoot
       -- Check each declaration, including unused parameters, against the exact
       -- authenticated target contract after solving. Poly is intentionally the
       -- same binding form as buildRecursive, not declared-field provenance.
-      parameters <- Core.atPhase Verification (traverseEither
-        (\((,,,) key name source _) -> case M.lookup compareString key signatures of {
-          Nothing -> Left "direct import contract disappeared";
-          Just expected -> do {
-            ensure (T.alphaEq (E.schemeTypeIn types source) expected)
-              ("direct import declaration changed its contract: " ++ key);
-            Right ((,) name expected)
-          }
-        }) imports);
+      parameters <- Core.atPhase Verification (do {
+        ensure (length imports == length signatures) "direct import contract disappeared";
+        traverseEither (\((,) ((,,,) key name source _) ((,) stable expected)) -> do {
+          ensure (eqString key stable) "direct import contract disappeared";
+          ensure (T.alphaEq (E.schemeTypeIn types source) expected)
+            ("direct import declaration changed its contract: " ++ key);
+          Right ((,) name expected)
+        }) (zip imports signatures)
+      });
       evidence <- Core.atPhase Resolution (E.resolveEvidenceIn types (C.skeleton constraints));
       body <- Core.atPhase Elaboration (E.elaboratePreparedIn types solved evidence (C.skeleton constraints));
       let { userType = E.schemeTypeIn types (C.generalization (C.skeleton constraints));

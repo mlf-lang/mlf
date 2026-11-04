@@ -2,38 +2,55 @@
 {-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
-module Bootstrap.ImportParameters (select, remove) where {
+module Bootstrap.ImportParameters (Signatures, admit, namedImports, entries, namedEntries, project, select, remove) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
-  import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Separate as Separate;
 
-  -- This operates only after the unchanged complete class lowering has
-  -- validated every class, instance and translated external scheme. It does
-  -- not select declarations or evidence candidates. Dependency observation
-  -- includes SWanted candidate names and every local RHS, including unused
-  -- bindings; Surface.freeNames does not include wanted candidates.
-  select :: Map String XType -> (,) SProgram (Map String String) ->
-    Either String ((,) ((,) SProgram (Map String String)) (Map String XType));
-  select signatures ((,) program dictionaries) = case program of {
+  -- Each external signature has a consumer-local declaration slot. Keep the
+  -- incoming stable-key order for the wrapper, independently of slot order.
+  data Signatures = Signatures Dependency.Symbols ([] ((,) (V.Index Declaration) XType));
+  entries (Signatures _ rows) = rows;
+  namedEntries (Signatures symbols rows) = map (\((,) i ty) -> (,) (Dependency.symbolName symbols i) ty) rows;
+  project imports = M.fromDistinctAscList (namedEntries imports);
+  -- Resolved imports use their original entity slot. Checked support such as
+  -- a dictionary absent from the source namespace extends the same domain.
+  admit base known signatures = let {
+    rows = M.toList signatures;
+    extra = filter (\key -> not (M.member compareString key known)) (map fst rows);
+    extended = Dependency.appendSymbols base extra; symbols = fst extended; ids = snd extended;
+    slots = M.union compareString known (M.fromDistinctAscList (zip extra ids));
+    bindings = map (\((,) key ty) -> (,) (M.get compareString key slots) ty) rows
+  } in Signatures symbols bindings;
+  namedImports = admit (Dependency.symbols []) M.empty;
+
+  -- Complete class lowering has already validated the input. Bind its free
+  -- references once at the named AST boundary. Observation includes SWanted
+  -- candidates and unused local RHSs, and respects lexical shadowing.
+  select :: Signatures -> (,) SProgram (Map String String) ->
+    Either String ((,) ((,) SProgram (Map String String)) Signatures);
+  select imports@(Signatures symbols rows) ((,) program dictionaries) = case program of {
     SClassProgram _ _ _ _ -> Left "prepared import selection requires lowered classes";
     SProgram ds expression ->
-      if M.null signatures then Right ((,) ((,) program dictionaries) signatures)
+      if null rows then Right ((,) ((,) program dictionaries) imports)
       else case expression of {
         SLetRec parameters inner -> do {
-          ensure (eqList eqString (map (\((,,) name _ _) -> name) parameters) (M.keys signatures))
+          let { keys = map (compose (Dependency.symbolName symbols) fst) rows };
+          ensure (eqList eqString (map (\((,,) name _ _) -> name) parameters) keys)
             "prepared import parameter inventory mismatch";
           let {
-            required = S.fromList compareString (Dependency.valueNames (Dependency.observeExpression inner));
-            keep = \name -> S.member compareString name required;
-            selected = filter (\((,,) name _ _) -> keep name) parameters;
-            selectedSignatures = M.fromList compareString (filter (\((,) name _) -> keep name) (M.toList signatures));
-            output = if null selected then inner else SLetRec selected inner
+            slots = M.fromDistinctAscList (zip keys (map fst rows));
+            needed = IS.fromList (map V.toInt (mapMaybe (\key -> M.lookup compareString key slots)
+              (Dependency.valueNames (Dependency.observeExpression inner))));
+            selected = filter (\((,) row _) -> IS.member (V.toInt (fst row)) needed) (zip rows parameters);
+            output = if null selected then inner else SLetRec (map snd selected) inner
           };
-          Right ((,) ((,) (SProgram ds output) dictionaries) selectedSignatures)
+          Right ((,) ((,) (SProgram ds output) dictionaries) (Signatures symbols (map fst selected)))
         };
         _ -> Left "prepared import parameters are missing from lowered root"
       }

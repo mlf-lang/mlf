@@ -385,7 +385,7 @@ module MLF.PreparedCompiler
     display = Modules.displayNames (Standalone.rewrittenDisplay root);
     diagnosticNames = M.union compareString (M.map display (snd lowered))
       (Standalone.rewrittenDisplay root)
-  } in case Imported.finishCompilation signatures lowered of {
+  } in case Imported.finishSelected signatures lowered of {
     Left (CompileError phase message) -> Left (CompileError phase (Modules.displayNames diagnosticNames message));
     Right compiled -> Right compiled
   };
@@ -440,9 +440,9 @@ module MLF.PreparedCompiler
           (SClassProgram (append builtinData ownData) (append builtinClasses ownClasses)
             (append (map snd builtinInstances) instances) body));
         selected <- Core.atPhase Verification
-          (Parameters.select signatures fullLowered);
-        let { lowered = fst selected; selectedSignatures = snd selected };
-        compiled <- finishImported root selectedSignatures lowered;
+          (Parameters.select (Parameters.namedImports signatures) fullLowered);
+        let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected) };
+        compiled <- finishImported root (snd selected) lowered;
         let {
           fresh = snd (Separate.freshObject (Artifact.fragmentSerial linked) (Checked.term (Imported.checkedWrapper compiled)));
           rootData = case fresh of { XWithData declarations _ -> declarations; _ -> [] }

@@ -66,7 +66,7 @@ def main():
         "-ibootstrap",
         *["-i" + str(d) for d in sorted((ROOT / "libraries").iterdir())],
     ]
-    for name in ["Graphs", "Vector", "World", "DeclQueryControls"]:
+    for name in ["Graphs", "Vector", "World", "DeclQueryControls", "ImportBindings", "PreparedImports"]:
         obj = out / name
         obj.mkdir()
         run([*ghc, "-odir", obj, "-hidir", obj, HERE / (name + ".hs"), *host, "-o", obj / "probe"])
@@ -76,6 +76,9 @@ def main():
     )
 
     run([out / "DeclQueryControls/probe", out / "decl-query-cache"])
+    run([out / "ImportBindings/probe"], expected=b"consumer import ID controls passed\n")
+    run([out / "PreparedImports/probe", out / "crates"],
+        expected=b"prepared source and native wrapper import controls passed\n")
 
     source = HERE / "Vector.hs"
     mlf = [emlf, "-i", ROOT / "libraries/mlf-foundation"]

@@ -28,6 +28,7 @@ module Bootstrap.PreparedLibraries
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.ImportParameters as Parameters;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.ImportedRoot as Imported;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Type as T;
@@ -163,6 +164,11 @@ module Bootstrap.PreparedLibraries
         (Artifact.definitionName identity entity) (fst state)) (snd state)
     }
   } in Modules.Names (fst (foldl allocate ((,) M.empty 0) (S.toList entities)));
+  mixedKey raw entity = case M.lookup compareString (Modules.owner entity) (owners raw) of {
+    Just identity -> Artifact.definitionName identity entity;
+    Nothing -> Modules.termIdentity entity
+  };
+  resolvePreparedPlan raw = Modules.resolvePlanWithKey (mixedNames raw) (mixedKey raw);
   collision raw sources = let { protected = rawProtected raw; selected = map sourceName (librarySources raw) } in
     any (\source -> not (elem eqString (Modules.moduleIdentity source) selected) &&
       any (\name -> S.member compareString name protected &&
@@ -192,7 +198,7 @@ module Bootstrap.PreparedLibraries
         -- cannot bypass ordinary namespace checking before artifact admission.
         Core.atPhase ModuleResolution resolution;
         if collision raw sources then fallback else
-          case bindEither planned (Modules.resolveCratePlan (mixedNames raw)) of {
+          case bindEither planned (resolvePreparedPlan raw) of {
             Left _ -> fallback;
             Right prepared -> case validatePrepared raw prepared of {
               Left _ -> fallback;
@@ -357,7 +363,7 @@ module Bootstrap.PreparedLibraries
       Core.atPhase Verification (ensure (not (collision raw sources)) "installed native library source identity collision");
       completed <- Core.atPhase Verification (completeNativeSources parseSource raw loaded);
       prepared <- Core.atPhase ModuleResolution
-        (Modules.resolveCrateWithAllocator mode M.empty (mixedNames raw) completed);
+        (bindEither (Modules.prepareCrateResolution mode M.empty completed) (resolvePreparedPlan raw));
       Core.atPhase Verification (validatePrepared raw prepared);
       Core.atPhase Verification (nativeHeaders raw);
       compileNativeResolvedRoot raw prepared
@@ -382,6 +388,11 @@ module Bootstrap.PreparedLibraries
     };
     _ -> Left "native library requires one canonical builtin implementation"
   };
+  -- Only entities owned by the imported interface may fill an existing
+  -- source slot. An equal printed name in the user crate is a different slot.
+  externalParameters resolution signatures = let {
+    symbols = Modules.bindingSymbols (Modules.resolvedCrateBindings resolution)
+  } in Parameters.admit symbols (Dependency.symbolKeyIndex symbols) signatures;
   compileNativeResolvedRootV1 raw resolution = do {
     let { display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
           sourcePhase phase result = Core.atPhase phase (mapLeft display result);
@@ -406,12 +417,12 @@ module Bootstrap.PreparedLibraries
     full <- sourcePhase Inference (Classes.lowerSeparateClassesInScopes externals (map fst instances)
       (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
-    selected <- sourcePhase Verification (Parameters.select signatures full);
-    let { lowered = fst selected; selectedSignatures = snd selected;
+    selected <- sourcePhase Verification (Parameters.select (externalParameters resolution signatures) full);
+    let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected);
           diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
             (Modules.resolvedCrateDisplayNames resolution)) };
     compiled <- mapLeft (\(CompileError phase message) -> CompileError phase (diagnostic message))
-      (Imported.finishCompilation selectedSignatures lowered);
+      (Imported.finishSelected (snd selected) lowered);
     let { wrapper = Imported.checkedWrapper compiled;
           declarations = case Checked.term wrapper of { XWithData ds _ -> ds; _ -> [] } };
     Core.atPhase Verification (do {
@@ -470,12 +481,12 @@ module Bootstrap.PreparedLibraries
     full <- sourcePhase Inference (Classes.lowerSeparateClassesInScopes externals (map fst instances)
       (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
-    selected <- sourcePhase Verification (Parameters.select signatures full);
-    let { lowered = fst selected; selectedSignatures = snd selected;
+    selected <- sourcePhase Verification (Parameters.select (externalParameters resolution signatures) full);
+    let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected);
           diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
             (Modules.resolvedCrateDisplayNames resolution)) };
     compiled <- mapLeft (\(CompileError phase message) -> CompileError phase (diagnostic message))
-      (Imported.finishCompilation selectedSignatures lowered);
+      (Imported.finishSelected (snd selected) lowered);
     let { fresh = snd (Separate.freshObject (Artifact.fragmentSerial linked)
             (Checked.term (Imported.checkedWrapper compiled)));
           rootData = case fresh of { XWithData declarations _ -> declarations; _ -> [] } };
