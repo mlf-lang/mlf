@@ -7,6 +7,7 @@ import shlex
 import subprocess
 
 from packages import compare_managers
+from crates import check_crates
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -37,12 +38,14 @@ def main():
     parser.add_argument(
         "--reference-manager", type=Path, help="optional pre-change manager for byte comparison"
     )
+    parser.add_argument("--reference-compiler", type=Path, help="compatible compiler for cross-crate byte comparison")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
     emlf = args.compiler.resolve(strict=True)
     compare_managers(out / "packages", emlf.with_name("mlfpkg"), args.reference_manager)
+    check_crates(run, out / "crates", emlf, args.reference_compiler)
     flags = shlex.split(
         subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp", "bdw-gc"], text=True)
     )

@@ -81,6 +81,10 @@ python3 -B tests/indexvec/run.py --compiler INSTALL/bin/emlf --output FRESH_DIR
 
 Pass `--reference-manager BEFORE/bin/mlfpkg` to check the actual plan and failure
 diagnostics byte for byte against the previous implementation. The graph
+fixture compiles a library and a client in separate declaration domains.
+With a wire-compatible previous compiler, pass
+`--reference-compiler BEFORE/bin/emlf` to check every producer/client pairing
+and run each linked program with both readers. The ordered SCC
 fixture independently derives SCC membership by mutual reachability and checks
 ordered output and reach for every three-node graph, deep chains and rings.
 It also checks query depth, corrupt dependencies and canonical generation reuse.

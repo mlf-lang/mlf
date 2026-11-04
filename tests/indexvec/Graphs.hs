@@ -7,6 +7,7 @@ import Data.List (nub, sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Bootstrap.Bitstream as W
+import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
 import qualified Bootstrap.Dependency as D
@@ -231,6 +232,23 @@ resolverChecks = do
     _ -> error ("missing colliding-name fixture edge " ++ show [(V.toInt i,map V.toInt (R.references rhs)) | D.Bound i _ rhs <- entries])
   (_,active) <- right (D.resolvedGroups matching [] M.empty M.empty)
   check "external reference cannot induce self recursion" [[False]] (map (map snd) active)
+  lib <- parsed ("ZLib","module ZLib (value) where\nvalue = 41\n")
+  client <- parsed ("Client","module Client where\nimport qualified ZLib as L\nanswer = L.value\n")
+  let entity = Modules.Entity "ZLib" "value" Modules.Value
+      abi e = Artifact.definitionName (if Modules.owner e == "ZLib" then "lib" else "client") e
+  producer <- right (Modules.resolveCrate T.NoImplicitPrelude M.empty abi [lib])
+  iface <- right (Modules.resolvedExports T.NoImplicitPrelude (last (Modules.resolvedCrateModules producer)))
+  consumer <- right (Modules.resolveCrate T.NoImplicitPrelude (M.singleton "ZLib" iface) abi [client])
+  producerId <- right (Modules.termId (Modules.resolvedCrateBindings producer) entity)
+  case Modules.boundIn consumer [last (Modules.resolvedCrateModules consumer)] of
+    D.BoundValues slots [D.Bound _ _ body] | [importedId] <- R.references body -> do
+      check "independent crates may assign different numeric slots" False (V.toInt producerId == V.toInt importedId)
+      let producerSlots = Modules.bindingSymbols (Modules.resolvedCrateBindings producer)
+      check "interface import preserves defining crate's ABI spelling" (H.unpack (abi entity))
+        (H.unpack (D.symbolName slots importedId))
+      check "two tables project the same exported identity" (H.unpack (D.symbolName producerSlots producerId))
+        (H.unpack (D.symbolName slots importedId))
+    _ -> error "client reference did not resolve to its own imported slot"
   both <- mapM parsed [("X","module X where\nf = 1\n"),("Y","module Y where\ng = 2\n")]
   let duplicated e | H.unpack (Modules.owner e) `elem` ["X","Y"] = "same"
                    | otherwise = mangle e
