@@ -9,6 +9,8 @@
  rt8_private_guard_seen((c),(n)); if(!(p)) \
  rt8_private_guard_fault((c),RT8_STATUS_##s,RT8_DETAIL_##d,(n),(t),(r),(f)); } while(0)
 
+static void instance_effect_frame(Rt8Context *c);
+
 static Rt8Diagnostic diagnostic(void) {
  Rt8Diagnostic d={0}; d.phase=RT8_PHASE_LOOKUP;
  d.domain=d.object=d.row=d.field=d.guard_index=N; return d;
@@ -58,6 +60,11 @@ void rt8_private_enter(Rt8Context *c,Rt8Operation op,int tick) {
    op==RT8_OP_RETAIN||op==RT8_OP_DROP||op==RT8_OP_BORROW||op==RT8_OP_END_BORROW||
    op==RT8_OP_ACCESSOR||(op==RT8_OP_SEAL&&c->frame->active_intro)||
    (op==RT8_OP_RETURN&&!c->frame->active_intro);
+  if(!permitted&&!c->frame->active_intro&&
+     c->frame->execution.kind==IR8_PACKET_ORIGIN_KIND_INSTANCE&&
+     (op==RT8_OP_FORCE||op==RT8_OP_PRIM2||op==RT8_OP_SELECT)){
+   instance_effect_frame(c);permitted=1;
+  }
   G(c,25,STATE,APPLICABILITY,N,N,N,permitted);
  }
 }
@@ -214,6 +221,36 @@ const Ir8PacketCodeExecution *rt8_private_code_execution(Rt8Context *c,const Rt8
  for(uint32_t i=0,n=table_count(c,6);i<n;++i){Ir8PacketCodeExecution e;rt8_private_charge(c,3);
   rt8_private_table(c,6,i,&e,sizeof(e));if(e.code==id&&e.env==eid){rt8_private_charge(c,sizeof(e));*execution=e;return rt8_private_table_ref(c,6,i);}}
  rt8_private_guard_fault(c,RT8_STATUS_ORIGIN,RT8_DETAIL_MISSING,10,5,id,N);
+}
+/* Only the three newly admitted operations pay this preflight. Neutral Code
+ * still has construction/type rows, not permission to execute these effects.
+ * The checked program proves closed-entry reachability; this is the native
+ * frame/operation safety boundary, not a serialized effect whitelist. */
+static void instance_effect_frame(Rt8Context *c) {
+ Rt8Frame *f=c->frame;Ir8PacketEnv env;Ir8PacketCodeTyping code;
+ Ir8PacketCodeExecution execution;
+ G(c,25,STATE,APPLICABILITY,N,N,N,!f->active_intro&&
+  f->execution.kind==IR8_PACKET_ORIGIN_KIND_INSTANCE&&
+  (f->kind==RT8_FRAME_FUNCTION||f->kind==RT8_FRAME_THUNK));
+ uint32_t eid=rt8_private_table_auth(c,4,f->execution.env);
+ rt8_private_table(c,4,eid,&env,sizeof(env));
+ const Ir8PacketCodeExecution *ref=rt8_private_code_execution(c,f->code,
+  f->execution.env,&code,&execution);
+ G(c,6,ORIGIN,EQUATION,4,eid,1,env.mode==IR8_PACKET_ENV_MODE_CLOSED&&
+  env.scheme!=N&&code.scope==env.scheme&&f->execution.capsule_id!=0&&
+  f->execution.capsule_id<=c->next_capsule&&f->id!=0&&f->id<=c->next_frame&&
+  f->execution.creation_activation==f->id&&c->activation_depth!=0&&
+  c->activation_depth<=RT8_MAX_ACTIVATION_DEPTH);
+ G(c,10,ORIGIN,EQUATION,5,code.id,1,ref==f->code_execution&&
+  execution.result==f->expected_result_type&&
+  ((f->kind==RT8_FRAME_FUNCTION&&code.kind==IR8_PACKET_CODE_KIND_FUNCTION)||
+   (f->kind==RT8_FRAME_THUNK&&code.kind==IR8_PACKET_CODE_KIND_THUNK)));
+ G(c,11,TYPE,EQUATION,5,code.id,10,f->result_identity==
+  (f->kind==RT8_FRAME_THUNK?N:(code.expected_identity_flag?
+   IR8_PACKET_RESULT_IDENTITY_ARGUMENT:IR8_PACKET_RESULT_IDENTITY_UNKNOWN)));
+ rt8_private_authority(c,f->home);
+ G(c,17,OWNERSHIP,OWNER,N,N,N,f->home->home&&f->home->scope==f->id&&
+  f->home->role==RT8_RC_KEY&&f->home->anchor!=NULL);
 }
 void rt8_private_site_facts(Rt8Context *c,const Rt8Site *site,uint32_t category,
  const Rt8Code *code,const Rt8Shape *shape,Rt8SiteFacts *out) {
@@ -413,6 +450,17 @@ static int capture_atom_equal(Rt8Context *c,const char *actual,const char *fixed
   unsigned a=(unsigned char)actual[i],b=(unsigned char)fixed[i];
   if(a!=b)return 0;
   if(!a)return 1;}
+}
+/* An intrinsic Type is independent of readiness. In particular a pending
+ * concrete or Instance scalar may be demanded without relabelling its Access. */
+uint32_t rt8_private_intrinsic_scalar_type(Rt8Context *c,uint32_t id) {
+ Ir8PacketType type;rt8_private_table(c,1,id,&type,sizeof(type));
+ G(c,3,TYPE,EQUATION,1,id,1,type.tag==IR8_PACKET_TYPE_TAG_CLOSED&&type.scheme==N&&
+  type.index==N&&type.argument==N&&type.result==N&&type.protocol==N&&type.result_identity==N);
+ const char *atom=rt8_private_string(c,type.atom);
+ int is_bool=capture_atom_equal(c,atom,"#bool"),is_i64=capture_atom_equal(c,atom,"#i64");
+ G(c,3,TYPE,EQUATION,1,id,2,is_bool||is_i64);
+ return is_bool?IR8_PACKET_SHAPE_KIND_BOOL:IR8_PACKET_SHAPE_KIND_I64;
 }
 /* A registered capture may retain a concrete intrinsic scalar without changing
  * its principal Access. This is a native safety rule, not a source-import

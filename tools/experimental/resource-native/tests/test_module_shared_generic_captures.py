@@ -153,10 +153,17 @@ class GenericCaptureTests(unittest.TestCase):
             f.tabs(101,f.lam(8,f.tv(101),f.var(1))), f.app(f.use(7,f.I),f.lit()))
         self.reject(raw, 'NESTED')
 
-    def test_generic_primitive_boundary_remains_rejected(self):
-        for body in (f.add(f.var(1),f.lit(0)), f.choose(f.boolean(),f.var(1),f.lit(0))):
+    def test_generic_partial_aliased_and_open_primitive_dependencies_reject(self):
+        for body in (f.app(f.prim(8,'addInt'),f.var(1)),
+                     f.let(8,f.prim(8,'addInt'),f.add(f.var(1),f.lit(0)))):
             raw = fixture(); raw['body']['value']['body']['body'] = body
-            self.reject(raw, 'FRAGMENT')
+            raw['body']['body'] = f.lit()
+            self.reject(raw, 'PRIMITIVE')
+        raw = fixture()
+        raw['body']['value']['body']['body'] = f.lam(7,f.arr(f.I,f.I),
+            f.add(f.app(f.var(7),f.lit(0)),f.var(1)))
+        raw['body']['body'] = f.lit()
+        self.reject(raw, 'CAPTURE')
 
     def test_forged_capture_inventory_is_not_replay_authority(self):
         raw = fixture(); checked = m.derive_shared_fragment(raw)
@@ -199,30 +206,27 @@ class GenericCaptureTests(unittest.TestCase):
             self.assertFalse(report['source_admitted'])
             self.assertFalse(report['native_admitted'])
 
-    def test_actual_mixed_alias_diagnostics_reach_unchanged_primitive_frontier(self):
+    def test_actual_mixed_alias_replay_admits_without_changing_original_refusals(self):
         root = os.environ.get('IR8_GENERIC_CAPTURE_ROOT')
         if root is None:
             self.skipTest('set IR8_GENERIC_CAPTURE_ROOT for retained original evidence')
         for case, (digest, types) in NEGATIVE_PINS.items():
-            data = (Path(root)/('capture-'+case+'01')/'capture.stdout').read_bytes()
+            directory = Path(root)/('capture-'+case+'01')
+            data = (directory/'capture.stdout').read_bytes()
             self.assertEqual(hashlib.sha256(data).hexdigest(), digest)
             original = json.loads(data)
-            inventories = []; implementation = m._generic_captures
-            def record(*args, **kwargs):
-                result = implementation(*args, **kwargs)
-                inventories.append(result)
-                return result
-            with mock.patch.object(m, '_generic_captures', record):
-                with self.assertRaises(m.SharedTransportError) as caught:
-                    m.derive_shared_fragment(original['projection']['projected_annotated'])
-            self.assertEqual(caught.exception.code, 'FRAGMENT')
-            self.assertIn('generic construction opcode', str(caught.exception))
-            rejected = m._get(original['normalization']['raw_normalized'], caught.exception.path)
-            self.assertEqual(rejected['tag'], 'primitive')
-            self.assertEqual(rejected['id'], 13 if case == 'mixed-scalar' else 8)
-            inventory, = inventories
+            historical = (directory/'verification.json').read_bytes()
+            refusal = json.loads(historical)
+            self.assertFalse(refusal['fragment_admitted'])
+            self.assertEqual(refusal['fragment_error']['code'], 'CAPTURE')
+            replay = m.derive_shared_fragment(original['projection']['projected_annotated'])
+            for key in ('policy', 'steps', 'raw_normalized'):
+                self.assertEqual(replay[key], original['normalization'][key])
+            definition, = replay['polymorphism']['definitions']
+            inventory = definition['captures']
             self.assertEqual([r['type'] for r in inventory['scalars']], types)
             self.assertEqual(len({r['binding'] for r in inventory['scalars']}), 2)
+            self.assertEqual((directory/'verification.json').read_bytes(), historical)
 
 
 if __name__ == '__main__':

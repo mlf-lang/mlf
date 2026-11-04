@@ -17,6 +17,8 @@ may be captured without changing existing support, origin or target Access.
 An ordinary callable owner may remain pending; its type predicts no Code.
 Top-level direct-lambda generalizations may explicitly import scalar owners;
 the independent resource checker must still prove their origin and support.
+Closed scalar computations retain this same Scheme scope in every deferred
+carrier. Their closed-entry/Instance-only premise is independently checked in IR.
 """
 from __future__ import annotations
 
@@ -624,10 +626,12 @@ class Planner:
                 spine.append((head,hp)); args.append((head['argument'],hp+('argument',)))
                 head = head['function']; hp += ('function',)
             if head['tag'] == 'primitive':
-                require(scope is None, 'generic primitive body unsupported')
+                if scope is not None:
+                    require(block.root in ('function', 'thunk') and block.scope == scope,
+                            'generic scalar computation must remain inside scoped callback Code')
                 for n,p in spine: self.term(n,p,'primitive-spine')
                 self.term(head,hp,'primitive')
-                return self.primitive(node,path,head,list(reversed(args)),env,views,home,block)
+                return self.primitive(node,path,head,list(reversed(args)),env,views,home,block,scope)
         self.term(node,path)
         if tag == 'case':
             if path in self.sum_case_rows:
@@ -1088,37 +1092,43 @@ class Planner:
             self.case_map[-1]['early_capture_releases'] = early_releases
         return Reference(out,typ)
 
-    def delayed(self,node,path,env,views,home,block,kind):
+    def delayed(self,node,path,env,views,home,block,kind,scope=None):
         name=self.code_name('C')
-        actual,contracts,inner,saved,temps,carrier=self.captures(node,path,env,views,block,None,kind,name)
-        cb=Block('thunk',name,[]); result=self.emit(node,path,inner,saved,'$home',cb,None)
+        actual,contracts,inner,saved,temps,carrier=self.captures(node,path,env,views,block,scope,kind,name)
+        if scope is not None:
+            require(not saved and all(ref.logical in SCALARS.values() for ref in inner.values()),
+                    'generic scalar branch requires closed scalar dependencies')
+        cb=Block('thunk',name,[],scope=scope); result=self.emit(node,path,inner,saved,'$home',cb,scope)
         require(result.logical==SCALARS['Int'], 'conditional branches require Int')
         for ref in list(inner.values())+list(saved.values()): self.release(ref,cb)
         self.add(cb,op='return',value=result.variable)
-        self.codes[name]={'result':self.layout(result.logical),'captures':contracts,'body':cb.body,'type_scope':None}
+        self.codes[name]={'result':self.layout(result.logical),'captures':contracts,'body':cb.body,'type_scope':scope}
         out=self.fresh(); publication=self.add(block,path,result.logical,op='thunk',out=out,**{'in':home},code=name,captures=actual)
         for row,ref in zip(carrier['view_captures'],temps):
             row['creation'].append(publication); row['creation'].append(self.add(block,op='drop',value=ref.variable))
         return Reference(out,result.logical)
 
-    def primitive(self,node,path,head,args,env,views,home,block):
+    def primitive(self,node,path,head,args,env,views,home,block,scope=None):
         conditional=head['id']==13
         require((conditional and head['name']=='ifThenElse' and len(args)==3) or
                 (head['id'] in PRIMITIVES and head['name']==PRIMITIVES[head['id']][0] and len(args)==2),
                 'primitive must be directly and fully saturated')
         name=self.code_name('C'); typ=SCALARS['Int'] if conditional else PRIMITIVES[head['id']][1]
-        actual,contracts,inner,saved,temps,carrier=self.captures(node,path,env,views,block,None,'conditional' if conditional else 'primitive',name)
-        cb=Block('thunk',name,[])
-        left=self.emit(*args[0],inner,saved,'$home',cb,None); ready=self.fresh()
+        actual,contracts,inner,saved,temps,carrier=self.captures(node,path,env,views,block,scope,'conditional' if conditional else 'primitive',name)
+        if scope is not None:
+            require(not saved and all(ref.logical in SCALARS.values() for ref in inner.values()),
+                    'generic scalar computation requires closed scalar dependencies')
+        cb=Block('thunk',name,[],scope=scope)
+        left=self.emit(*args[0],inner,saved,'$home',cb,scope); ready=self.fresh()
         require(left.logical==(SCALARS['Bool'] if conditional else SCALARS['Int']), 'primitive left type')
         self.add(cb,op='force',out=ready,value=left.variable)
         result=self.fresh()
         if conditional:
-            yes=self.delayed(*args[1],inner,saved,'$home',cb,'conditional-then')
-            no=self.delayed(*args[2],inner,saved,'$home',cb,'conditional-else')
+            yes=self.delayed(*args[1],inner,saved,'$home',cb,'conditional-then',scope)
+            no=self.delayed(*args[2],inner,saved,'$home',cb,'conditional-else',scope)
             self.add(cb,op='select_i64',out=result,**{'in':'$home'},condition=ready,**{'then':yes.variable,'else':no.variable})
         else:
-            right=self.emit(*args[1],inner,saved,'$home',cb,None); ready_right=self.fresh()
+            right=self.emit(*args[1],inner,saved,'$home',cb,scope); ready_right=self.fresh()
             require(right.logical==SCALARS['Int'], 'primitive right type')
             self.add(cb,op='force',out=ready_right,value=right.variable)
             self.add(cb,path,typ,op='prim2',out=result,**{'in':'$home'},primitive=head['name'],left=ready,right=ready_right)
@@ -1126,7 +1136,7 @@ class Planner:
         self.add(cb,op='drop',value=ready)
         for ref in list(inner.values())+list(saved.values()): self.release(ref,cb)
         self.add(cb,op='return',value=result)
-        self.codes[name]={'result':self.layout(typ),'captures':contracts,'body':cb.body,'type_scope':None}
+        self.codes[name]={'result':self.layout(typ),'captures':contracts,'body':cb.body,'type_scope':scope}
         out=self.fresh(); publication=self.add(block,path,typ,op='thunk',out=out,**{'in':home},code=name,captures=actual)
         for row,ref in zip(carrier['view_captures'],temps):
             row['creation'].append(publication); row['creation'].append(self.add(block,op='drop',value=ref.variable))

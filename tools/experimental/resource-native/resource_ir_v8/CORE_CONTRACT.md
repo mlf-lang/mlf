@@ -8,6 +8,45 @@ This contract implements neither code nor source recognizers. Its exact-hash ACK
 settle the bounded design only; the base-adoption, source-evidence and preregistration
 gates below remain mandatory before their corresponding semantic edits or probes.
 
+## Stage25 amendment: closed Instance scalar computation
+
+Stage25 narrowly extends the scoped-body opcode boundary, not the introduction
+body allowlist. See `README_STAGE25.md` for current qualification status. Closed
+intrinsic Int/Bool dependencies may be explicitly forced and used by the five
+existing saturated scalar primitives and an Int-result conditional in a direct
+generalized lambda. Open/rigid arithmetic and unsupported primitive forms reject.
+The source checker and planner preserve the original Scheme scope in every body,
+branch and allocation carrier. Original proof checking and graph sharing remain.
+
+An effectful Scheme requires a derived `instance-only-scoped-scalars/1` closed-entry
+proof: a unique introduction seals one direct closure, with an exact root Site/Code
+and the complete same-Scheme allocation/Code closure and effect inventory. Extra
+neutral allocations, pending application roots, unreachable scoped declarations
+and `new_below` in this introduction reject in this bounded slice. This proof is
+not inferred from observed reachability. The metadata layer independently checks
+raw and derived Code inventories and reconstructs the proof. It retains neutral
+CodeExecution/SiteExecution typing and representation rows; only lawful invocation
+coverage is Instance-only. No new packet table or native per-Code whitelist is
+introduced, and old no-effect programs retain their exact prior coverage.
+
+For the new scoped operation allowance, native FORCE/PRIM2/SELECT entry requires
+an authenticated Instance execution with
+its actual Code, closed Env, Scheme, capsule, activation, home and no active
+introduction. Public FORCE in that Instance execution additionally authenticates
+the actual operand's closed
+intrinsic scalar Type, principal Type and physical representation. This does not
+restrict the enclosing callable's full signature, alter private callable forcing,
+or permit evaluation in a neutral Generic frame. Construction stays non-evaluating.
+The original imported concrete node/Access/memo remains unchanged, while new body
+allocations use the selected closed Instance Env. Global publication, neutral memo
+and Fill rules, terminal policy and allocator ledger remain unchanged.
+
+Below, the original equal introduction/scoped-body opcode lists are historical:
+only a freshly proved closed-entry scoped body gets this scalar-operation extension.
+The Stage24 external scalar-import amendment otherwise remains in force. This is
+not general polymorphic effects, arbitrary captured values or a source-admission
+claim for fabricated diagnostic JSON.
+
 ## Stage24 amendment: explicit closed scalar imports
 
 The original contract below records the initial no-external-capture boundary.

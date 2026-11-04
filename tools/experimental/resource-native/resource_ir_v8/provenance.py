@@ -7,6 +7,7 @@ from __future__ import annotations
 from .program_schema import fail
 
 FORMAT = 'resource-ir-v8-resource-analysis/1'
+CLOSED_ENTRY_POLICY = 'instance-only-scoped-scalars/1'
 CAPTURE_ORIGIN_CASES = ('same-neutral-capsule/project', 'concrete-E0-intrinsic-scalar/identity')
 RULES = ('exact_mono_type', 'down_support', 'same_group', 'strict_below',
          'argument_identity', 'no_once_copy', 'live_exact_anchor',
@@ -159,6 +160,86 @@ class Analysis:
                 self.budget.append(stack, (current, True))
                 for target in reversed(adjacency.get(current, ())):
                     self.budget.append(stack, (target, False))
+
+    def closed_entry_proofs(self, program, effects, instruction_meta):
+        """Prove the only neutral entry is a directly sealed closure.
+
+        Conditional on new scoped effects. Complete same-S Code declarations,
+        including unused ones, must be in the root's finite allocation closure.
+        This proves Instance-only invocation, not removal of neutral type rows.
+        """
+        from .program_schema import diagnostic_path
+        b = self.budget
+        for scheme in b.ordered(effects):
+            b.charge(); matches = []
+            for item in self.intros:
+                b.examine()
+                if item['scheme'] == scheme: b.append(matches, item)
+            if len(matches) != 1:
+                fail('schemes.' + scheme, 'coverage', 'CLOSED_ENTRY', 'effectful scope requires one introduction')
+            intro = matches[0]
+            body = program['entry'] if intro['generalize_path']['root'] == 'entry' else program['functions' if intro['generalize_path']['root'] == 'function' else 'codes'][intro['generalize_path']['name']]['body']
+            actual = body
+            for part in intro['generalize_path']['segments']:
+                b.examine(); actual = actual[part]
+            p = diagnostic_path(intro['generalize_path'])
+            b.charge(3); indices, roots, aliases = [], [], set()
+            for index, meta in enumerate(instruction_meta):
+                b.examine()
+                if meta['intro'] == intro['id']:
+                    b.append(indices, index)
+                    row = self.instructions[index]
+                    if row['op'] not in ('closure', 'retain', 'drop', 'borrow', 'end_borrow', 'seal'):
+                        fail(diagnostic_path(row['path']), 'coverage', 'CLOSED_ENTRY', 'effectful neutral introduction permits only one closure and owner lifetime operations')
+                    if row['op'] == 'closure': b.append(roots, index)
+            if len(roots) != 1:
+                fail(p, 'coverage', 'CLOSED_ENTRY', 'effectful scope requires exactly one neutral closure allocation')
+            root = self.instructions[roots[0]]
+            site = root['sites'][0]
+            if intro['result_sites'] != [site] or self.sites[site]['category'] != 'CLOSURE':
+                fail(p, 'coverage', 'CLOSED_ENTRY', 'sealed value must be the unique direct closure')
+            root_code = self.sites[site]['code']
+            # Actual initial alias provenance comes only from checked intro imports.
+            parent = None
+            for record in self.instructions:
+                b.examine(1 + len(record['path']['segments']))
+                if record['path'] == intro['generalize_path']:
+                    parent = record; break
+            if parent is None: fail(p, 'coverage', 'CLOSED_ENTRY', 'missing actual introduction record')
+            for fact in parent['outputs'][1:]:
+                b.examine(); b.add(aliases, fact['provenance'])
+            for fact in root['inputs'][1:]:
+                b.examine()
+                ty = self.types[fact['type']]
+                if (fact['view'] != 'MONO' or fact['projection'] is not None or fact['provenance'] not in aliases
+                        or ty['tag'] != 'closed' or ty['atom'] not in ('#i64', '#bool')):
+                    fail(p, 'coverage', 'CLOSED_ENTRY', 'neutral root captures must preserve checked scalar import provenance')
+            b.charge(3); scoped, seen, pending = [], set(), [root_code]
+            for code in self.codes:
+                b.examine()
+                if code['type_scope'] == scheme: b.append(scoped, code['id'])
+            while pending:
+                b.examine(); code = pending.pop()
+                if code in seen: continue
+                b.add(seen, code)
+                if self.codes[code]['type_scope'] != scheme:
+                    fail(p, 'coverage', 'CLOSED_ENTRY', 'effectful allocation closure crosses Scheme scope')
+                for edge in self.edges:
+                    b.examine()
+                    if edge['from_code'] == code: b.append(pending, edge['to_code'])
+            b.examine(len(scoped))
+            if len(seen) != len(scoped) or any(code not in seen for code in scoped):
+                fail(p, 'coverage', 'CLOSED_ENTRY', 'all same-S Code, including dead declarations, must be reached from the sealed root')
+            for index, row in enumerate(self.instructions):
+                b.examine()
+                if row['type_scope'] != scheme or not row['sites']: continue
+                meta = instruction_meta[index]
+                if meta['intro'] == intro['id']:
+                    if index != roots[0]: fail(p, 'coverage', 'CLOSED_ENTRY', 'additional neutral allocation')
+                elif meta['intro'] is not None or meta['container'] not in seen:
+                    fail(p, 'coverage', 'CLOSED_ENTRY', 'unproved same-S allocation origin')
+            b.put(intro, 'closed_entry', b.row(policy=CLOSED_ENTRY_POLICY, root_site=site,
+                root_code=root_code, codes=scoped, effects=b.listing(effects[scheme])))
 
     def final_data(self, ir_sha256, declaration_sha256):
         # Immutable paths reused directly; copied sorted inventories are charged.

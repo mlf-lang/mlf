@@ -10,6 +10,9 @@ from __future__ import annotations
 from functools import cmp_to_key
 import json
 
+from .program_schema import INSTANCE_SCALAR_OPS
+from .provenance import CLOSED_ENTRY_POLICY
+
 from .metadata_budget import (fail, TYPE_LIMIT, TYPE_DEPTH, ENVIRONMENT_LIMIT,
                               _compare)
 
@@ -414,7 +417,7 @@ class TypeClosure:
     __slots__ = ('tables', 'type_map', 'env_map', 'scheme_map', 'references',
                  'contracts', 'contract_by_type', 'scopes', 'resolution_ids',
                  'resolution_results', '_budget', '_raw', '_derived', '_neutral',
-                 '_by_scope', '_path_contexts', '_roots', '_nodes', '_depths')
+                 '_by_scope', '_path_contexts', '_roots', '_nodes', '_depths', '_closed_entries')
 
     def old_type(self, source):
         self._budget.work()
@@ -509,6 +512,29 @@ class TypeClosure:
             fail('metadata.path', 'metadata-origin', 'PATH', 'path is not a freshly checked instruction/body')
         return b.row(**context)
 
+    def execution_envs(self, path):
+        """Invocation premises only; lawful_envs retains complete typing rows."""
+        if self._closed_entries is None:
+            return self.lawful_envs(path)
+        context = self.context_for_path(path)
+        if context['kind'] == 'execution' and context['scheme'] in self._closed_entries:
+            return self.closed_envs(context['scheme'])
+        return self.lawful_envs(path)
+
+    def instance_only_code(self, code):
+        if self._closed_entries is None:
+            return False
+        self._budget.work()
+        return code['scope'] in self._closed_entries
+
+    def executable_site_env(self, site, env):
+        if self._closed_entries is None:
+            return True
+        self._budget.work()
+        return not (site['context']['kind'] == 'execution'
+                    and site['scope'] in self._closed_entries
+                    and self.tables['environments'][env]['mode'] == 'NEUTRAL')
+
     def lawful_envs(self, path):
         context = self.context_for_path(path)
         if context['kind'] == 'introduction':
@@ -520,16 +546,19 @@ class TypeClosure:
         return (0,)
 
 
-def _contexts(raw, derived, scheme_map, budget):
+def _contexts(raw, derived, scheme_map, budget, closure):
     """Validate raw paths independently of the type/free-variable appearance."""
     budget.creation(4)
     code_lookup, intros, result, instruction_paths = {}, {}, {}, set()
+    effects = None
+    claimed = False
     for code in derived['code_typing']:
         budget.work()
         budget.creation()
         budget.put(code_lookup, (code['kind'], code['name']), code)
     for intro in derived['introductions']:
         budget.work()
+        claimed = claimed or 'closed_entry' in intro
         budget.put(intros, _path_key(intro['generalize_path'], budget), intro)
     # Explicit traversal checks every actual instruction path, including generalize
     # and its body. No printed SSA name is used as an allocation origin.
@@ -562,6 +591,12 @@ def _contexts(raw, derived, scheme_map, budget):
                 key = (kind, name, segments)
                 budget.put(result, key, active_context)
                 budget.add(instruction_paths, key)
+                if active_context['kind'] == 'execution' and instruction['op'] in INSTANCE_SCALAR_OPS:
+                    if effects is None:
+                        budget.creation(); effects = {}
+                    scope = active_context['scheme']
+                    if scope not in effects: budget.put(effects, scope, budget.listing(()))
+                    budget.append(effects[scope], key)
                 if instruction['op'] == 'generalize':
                     intro = intros.get(key)
                     if intro is None or intro['scheme'] != instruction['scheme'] or active_context['kind'] != 'concrete':
@@ -584,6 +619,131 @@ def _contexts(raw, derived, scheme_map, budget):
                     if context['kind'] == 'introduction' else derived['code_typing'][context['code']]['type_scope'])
         if instruction['type_scope'] != scope:
             fail('metadata.instructions', 'metadata-origin', 'SCOPE', 'instruction lexical scope differs from actual raw body')
+    if effects is None and claimed:
+        _error('metadata.closed_entry', 'CLOSED_ENTRY', 'unexpected effect proof on an old scope')
+    closure._closed_entries = effects
+    return result
+
+
+def _closed_entry_proofs(raw, derived, closure, effects, b):
+    """Independently rebuild raw lexical allocation reachability and owner flow.
+
+    Resource proof fields are compared only after this derivation. They do not
+    authorize operations. Native typing tables remain complete, including rows
+    that this static proof excludes from executable invocation coverage.
+    """
+    if effects is None:
+        return None
+    b.creation(4)
+    result, records, lookup, raw_codes = {}, {}, {}, {}
+    for i, rec in enumerate(derived['instructions']):
+        b.work(); b.put(records, _path_key(rec['path'], b), (i, rec))
+    for code in derived['code_typing']:
+        b.work(); b.put(lookup, (code['kind'], code['name']), code['id'])
+        b.put(raw_codes, code['id'], raw['functions' if code['kind'] == 'function' else 'codes'][code['name']])
+    # Do not let a forged lower inventory hide an unused raw declaration.
+    b.work(len(raw['functions']) + len(raw['codes']))
+    if len(lookup) != len(raw['functions']) + len(raw['codes']):
+        _error('metadata.closed_entry', 'CLOSED_ENTRY', 'raw and derived Code census differ')
+    for kind, bank in (('function', raw['functions']), ('thunk', raw['codes'])):
+        for name, spec in bank.items():
+            b.reserve(creation=1, work=1)
+            code_id = lookup.get((kind, name))
+            if code_id is None:
+                _error('metadata.closed_entry', 'CLOSED_ENTRY', 'raw Code declaration omitted')
+            row = derived['code_typing'][_integer(code_id, len(derived['code_typing']), 'metadata.closed_entry')]
+            if row['type_scope'] != spec['type_scope']:
+                _error('metadata.closed_entry', 'CLOSED_ENTRY', 'raw Code scope differs from proof inventory')
+    for intro in derived['introductions']:
+        b.work()
+        scope = closure.scheme_map[intro['scheme']]
+        if scope not in effects:
+            if 'closed_entry' in intro: _error('metadata.closed_entry', 'CLOSED_ENTRY', 'proof on effect-free scope')
+            continue
+        p = 'metadata.closed_entry'
+        path = intro['generalize_path']
+        current = raw['entry'] if path['root'] == 'entry' else raw['functions' if path['root'] == 'function' else 'codes'][path['name']]['body']
+        for part in path['segments']:
+            b.work(); current = current[part]
+        if current['op'] != 'generalize' or current['scheme'] != intro['scheme']:
+            _error(p, 'CLOSED_ENTRY', 'raw introduction identity differs')
+        b.creation(5)
+        owners, edges, scoped, root_site, root_code = {}, {}, [], None, None
+        for name in current.get('imports', {}):
+            b.work(); b.put(owners, name, 'import')
+        for index, inst in enumerate(current['body']):
+            b.work()
+            b.creation(2 + len(path['segments']))
+            key = (path['root'], path['name'], tuple(path['segments']) + ('body', index))
+            _, rec = records[key]
+            op = inst['op']
+            if op in ('retain', 'borrow'):
+                if inst['value'] not in owners: _error(p, 'CLOSED_ENTRY', 'owner lifetime source is not imported/root')
+                b.put(owners, inst['out'], owners[inst['value']])
+            elif op in ('drop', 'end_borrow'):
+                if inst['value'] not in owners: _error(p, 'CLOSED_ENTRY', 'owner lifetime target is not imported/root')
+                del owners[inst['value']]
+            elif op == 'closure':
+                if root_site is not None or len(rec['sites']) != 1:
+                    _error(p, 'CLOSED_ENTRY', 'more than one neutral root allocation')
+                root_site = rec['sites'][0]
+                root_code = lookup[('function', inst['function'])]
+                if raw_codes[root_code]['type_scope'] != intro['scheme']:
+                    _error(p, 'CLOSED_ENTRY', 'root code crosses Scheme scope')
+                if derived['sites'][root_site]['code'] != root_code:
+                    _error(p, 'CLOSED_ENTRY', 'root allocation Code identity differs')
+                for name, value in inst['captures'].items():
+                    b.work()
+                    if owners.get(value) != 'import':
+                        _error(p, 'CLOSED_ENTRY', 'root capture is not an actual import alias')
+                    ty = closure.reference(raw_codes[root_code]['captures'][name]['layout'], scope)
+                    row = closure.tables['types'][ty]
+                    if row['tag'] != 'closed' or row['atom'] not in ('#i64', '#bool'):
+                        _error(p, 'CLOSED_ENTRY', 'root capture must be intrinsic scalar')
+                b.put(owners, inst['out'], 'root')
+            elif op == 'seal':
+                if root_site is None or owners.get(inst['value']) != 'root' or intro['result_sites'] != [root_site]:
+                    _error(p, 'CLOSED_ENTRY', 'seal is not the exact direct root owner')
+                # Bind actual checked owner/provenance, not only the raw name.
+                fact = rec['inputs'][0]
+                prov = derived['provenance'][fact['provenance']]['value']
+                b.reserve(creation=2, work=8)
+                if prov != {'kind':'allocated', 'site':root_site, 'context':{'kind':'introduction','intro':intro['id']}}:
+                    _error(p, 'CLOSED_ENTRY', 'sealed actual allocation provenance differs')
+            else:
+                _error(p, 'CLOSED_ENTRY', 'neutral allocation or computation outside direct closure discipline')
+        for code in derived['code_typing']:
+            b.work()
+            spec = raw_codes[code['id']]
+            if spec['type_scope'] != intro['scheme']: continue
+            b.append(scoped, code['id']); b.put(edges, code['id'], b.listing(()))
+            for inst in spec['body']:
+                b.work()
+                if inst['op'] in ('closure', 'thunk'):
+                    kind = 'function' if inst['op'] == 'closure' else 'thunk'
+                    target = lookup[(kind, inst['function' if kind == 'function' else 'code'])]
+                    if raw_codes[target]['type_scope'] != intro['scheme']:
+                        _error(p, 'CLOSED_ENTRY', 'raw allocation edge crosses Scheme scope')
+                    b.append(edges[code['id']], target)
+        b.creation(2); reached, pending = set(), b.listing((root_code,))
+        while pending:
+            b.work(); code = pending.pop()
+            if code in reached: continue
+            if code not in edges: _error(p, 'CLOSED_ENTRY', 'unregistered scoped root/edge')
+            b.add(reached, code)
+            for target in edges[code]: b.work(); b.append(pending, target)
+        b.work(len(scoped))
+        if len(scoped) != len(reached) or any(code not in reached for code in scoped):
+            _error(p, 'CLOSED_ENTRY', 'unreachable same-S Code, including dead declarations')
+        ids = b.listing(())
+        for key in effects[scope]:
+            b.work(); b.append(ids, records[key][0])
+        proof = b.row(policy=CLOSED_ENTRY_POLICY, root_site=root_site, root_code=root_code,
+                      codes=scoped, effects=b.ordered(ids))
+        if 'closed_entry' not in intro: _error(p, 'CLOSED_ENTRY', 'missing independently derived effect proof')
+        _equal_tree(intro['closed_entry'], proof, b, p)
+        b.put(result, scope, proof)
+    if len(result) != len(effects): _error('metadata.closed_entry', 'CLOSED_ENTRY', 'effectful Scheme has no unique proof')
     return result
 
 
@@ -913,7 +1073,8 @@ def build_types(raw, derived, budget):
     closure.scopes = budget.tuple(final_scopes)
     closure._nodes, closure._depths = budget.tuple(final_nodes), budget.tuple(final_depths)
     closure.resolution_ids, closure.resolution_results = resolution_ids, resolution_results
-    closure._path_contexts = _contexts(raw, derived, scheme_map, budget)
+    closure._path_contexts = _contexts(raw, derived, scheme_map, budget, closure)
+    closure._closed_entries = _closed_entry_proofs(raw, derived, closure, closure._closed_entries, budget)
     budget.creation(1 + 2 * len(roots))
     closure._roots = tuple((remap[type_id], env) for type_id, env, _ in roots)
     # Required forward pass is not replaced by success of the builder worklist.

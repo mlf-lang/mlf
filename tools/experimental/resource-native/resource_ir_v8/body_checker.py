@@ -7,7 +7,7 @@ identity, and Scheme VALUE admission is separate from group authority.
 from __future__ import annotations
 
 from .program_schema import (fail, exact, mapping, sequence, name, diagnostic_path,
-    SCHEMAS, GENERIC_OPS, PRIMITIVES, INSTRUCTION_LIMIT, SITE_CODE_LIMIT, CAPTURE_LIMIT, instruction_schema)
+    SCHEMAS, GENERIC_OPS, INSTANCE_SCALAR_OPS, PRIMITIVES, INSTRUCTION_LIMIT, SITE_CODE_LIMIT, CAPTURE_LIMIT, instruction_schema)
 from .ownership import Symbols, State
 from .provenance import Analysis, CAPTURE_ORIGIN_CASES
 
@@ -25,6 +25,7 @@ class BodyChecker:
         self.instruction_meta, self.intro_lookup, self.use_lookup = [], {}, {}
         self.int_type, self.bool_type = self.resolve('#i64', None, 'program'), self.resolve('#bool', None, 'program')
         self.concrete_context = budget.row(kind='concrete')
+        self.effect_scopes = None  # conditional only: old programs pay no new work
         self.imported_scopes = None  # allocated/charged only on the new import path
 
     def resolve(self, reference, scope, path):
@@ -180,7 +181,7 @@ class BodyChecker:
                 allowed = op in GENERIC_OPS or op == 'seal'
                 terminal = op == 'seal'
             elif scope is not None:
-                allowed = op in GENERIC_OPS or op == 'return'
+                allowed = op in GENERIC_OPS or op in INSTANCE_SCALAR_OPS or op == 'return'
                 terminal = op == 'return'
             else:
                 allowed = op != 'seal' and (op != 'return' if root == 'entry' else op not in ('finish', 'finish_scalar'))
@@ -208,6 +209,12 @@ class BodyChecker:
             self.b.put(self.instruction_lookup, id(instruction), ir_index)
             self.b.record_append(self.instruction_meta, container=container, intro=intro)
             self.a.counts['instructions'] += 1
+            if scope is not None and intro is None and op in INSTANCE_SCALAR_OPS:
+                if self.effect_scopes is None:
+                    self.b.charge(); self.effect_scopes = {}
+                if scope not in self.effect_scopes:
+                    self.b.put(self.effect_scopes, scope, [])
+                self.b.append(self.effect_scopes[scope], ir_index)
             if op == 'generalize':
                 scheme = name(instruction['scheme'], p + '.scheme')
                 if 'imports' in instruction:
@@ -570,6 +577,8 @@ class BodyChecker:
                     (('inputs', vi), ('outputs', 0)), field_type, scope, self.rules(scope, anchor=True))
             elif op == 'force':
                 value, vi = self.value(state, ir_index, i['value'], ('value',), p + '.value')
+                if scope is not None and value.type not in (self.int_type, self.bool_type):
+                    fail(p, 'type', 'INSTANCE_SCALAR', 'scoped Force requires an exact intrinsic scalar principal')
                 if self.once(value.type):
                     fail(p, 'resource', 'ONCE_CARRIER', 'Once cannot be forced/memoized')
                 state.consume(i['value'], p)
@@ -808,4 +817,6 @@ class BodyChecker:
             self.check_block(spec['body'], state, context, code=code_id)
         entry = State(self.b, finish_allowed=True)
         self.check_block(self.program['entry'], entry, self.concrete_context)
+        if self.effect_scopes is not None:
+            self.a.closed_entry_proofs(self.program, self.effect_scopes, self.instruction_meta)
         return self.a

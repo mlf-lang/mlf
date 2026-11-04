@@ -316,9 +316,9 @@ class ReplayTests(unittest.TestCase):
         tree = {'tag': 'letrec', 'bindings': [{'name': name(1), 'type': forall(100, arr(tv(100), tv(100))), 'value': identity()}], 'body': lit()}
         self.reject(tree, 'RECURSION')
 
-    def test_generic_scalar_primitive_rejected(self):
-        rhs = tabs(100, lam(2, tv(100), add(lit(20), lit(22))))
-        self.reject(let(1, rhs, app(use(1, I), lit())), 'FRAGMENT')
+    def test_generic_partial_scalar_primitive_rejected(self):
+        rhs = tabs(100, lam(2, tv(100), app(prim(8, 'addInt'), lit(20))))
+        self.reject(let(1, rhs, app(app(use(1, I), lit()), lit(22))), 'PRIMITIVE')
 
     def test_unknown_nominal_operation_rejected(self):
         self.reject({'tag': 'constructor', 'name': '()', 'arguments': []}, 'FRAGMENT')

@@ -64,7 +64,7 @@ PACKAGE_FILES = (
 )
 PRODUCTION_PINS = {
     'runtime_emit.py': (8606, '1a470b8a1962f0f98f2c6ba29bbe2c12eba22e0a98831e185065745dd1cf4fee'),
-    'runtime_emit_body.py': (58938, 'a47424423c55984ca1b64f50d2152f4ea3f271c838b5ff77bc2bc8e9929d7df3'),
+    'runtime_emit_body.py': (62808, '039b3331e4adf993cbc3831c9e4ea0800eab34f8bab09859e4452439dfdbd529'),
     'runtime_emit_budget.py': (20006, 'b214480e3daa9d49cdd1e5ab5e77fdfa1f12433ca692700ad59a98c753653867'),
 }
 ABI_SHA256 = 'c6e3a34ea54b7f7224f94ece8a24a821d74e32d60db0a0fb16933252a2623500'
@@ -918,7 +918,8 @@ class HostState:
         allowed = {
             'runtime_emit.py': {('__future__', 0), ('dataclasses', 0), ('packet', 1),
                 ('checker', 1), ('program_schema', 1), ('runtime_emit_budget', 1), ('runtime_emit_body', 1)},
-            'runtime_emit_body.py': {('__future__', 0), ('runtime_emit_budget', 1), ('hashlib', 0)},
+            'runtime_emit_body.py': {('__future__', 0), ('runtime_emit_budget', 1), ('hashlib', 0),
+                ('program_schema', 1), ('provenance', 1)},
             'runtime_emit_budget.py': {('__future__', 0), ('functools', 0), ('hashlib', 0), ('json', 0)},
         }
         denied = {'eval', 'exec', 'compile', '__import__', 'open', 'breakpoint'}

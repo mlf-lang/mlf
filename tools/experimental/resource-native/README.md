@@ -57,8 +57,13 @@ pending; these results do not establish general GC replacement or a speedup.
 [Closed scalar generic captures](resource_ir_v8/README_STAGE24.md) extend a
 top-level generalized direct lambda with explicit authenticated ordinary Int/Bool
 imports, preserving pending owners, Access and shared memo identity. Finite native,
-sanitizer and fresh-source checks pass; generic primitive bodies and broader
-captures remain excluded, and exact-commit CI remains separate.
+sanitizer and fresh-source checks pass; broader captures remain excluded. Its
+original generic-primitive refusals are historical after the next stage.
+[Closed Instance scalar computations](resource_ir_v8/README_STAGE25.md) extend
+the shared direct lambda with checked closed scalar operations and an Int-result
+conditional, preserving original imports and memo identity. Finite local native
+and fresh-source qualification also passes after the checked-Prelude target
+integration. Exact-commit CI remains separate. No default is enabled.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general

@@ -18,6 +18,9 @@ Every lowered arrow remains Repeat/unknown. This does not admit nominal atoms in
 or parameterized/higher-rank data. A separate conditional inventory permits
 closed ordinary Int/Bool imports into a top-level direct-lambda generalization.
 It establishes lexical types/occurrences only, not runtime provenance or Access.
+Exact saturated scalar primitives may occur inside these direct generic lambdas,
+with closed scalar dependencies only. Their Instance-only execution still needs
+the independent resource checker's raw closed-entry proof; syntax is not authority.
 At most one retained recursive group globally
 is admitted, containing one concrete closed monomorphic function. Its optional
 capture policies permit closed Int/Bool owners, exact full-vector lexical
@@ -1020,6 +1023,46 @@ def _generic_captures(cursor, cursor_path, free, inferred, schemes, top_level, b
     return {'policy': GENERIC_CAPTURE_POLICY, 'scalars': rows}
 
 
+def _generic_primitive(root, head, path, context, inferred, budget):
+    """Validate a complete original spine, without reducing or moving its work."""
+    definition, top_level = context
+    cursor_path = tuple(definition['rhs_cursor']['path'])
+    budget.tick(1 + len(cursor_path))
+    if not top_level or _get(root, cursor_path)['tag'] != 'lambda':
+        _fail('FRAGMENT', 'generic scalar computation requires a top-level direct lambda', path)
+    current, arguments = path, []
+    while current and current[-1] == 'function':
+        parent_path = current[:-1]
+        budget.tick(1 + len(parent_path))
+        parent = _get(root, parent_path)
+        if parent['tag'] != 'application':
+            break
+        arguments.append(parent_path + ('argument',))
+        current = parent_path
+    conditional = head['id'] == 13
+    expected = (BOOL, INT, INT) if conditional else (INT, INT)
+    if len(arguments) != len(expected):
+        _fail('PRIMITIVE', 'generic primitive requires its complete direct application spine', path)
+    if conditional and head['arguments'] != [INT]:
+        _fail('PRIMITIVE', 'retained conditional must be instantiated at Int', path)
+    for argument_path, typ in zip(arguments, expected):
+        budget.tick()
+        if not _same(inferred.types[argument_path], typ):
+            _fail('PRIMITIVE', 'generic primitive requires exact closed scalar operands', argument_path)
+    budget.tick(1 + len(current))
+    computation = _get(root, current)
+    # Precharge the bounded syntax traversal before the existing lexical helper.
+    for _ in _walk(computation):
+        budget.tick()
+    free = _free_terms(computation)
+    for suffix, node in _walk(computation):
+        budget.tick()
+        if node['tag'] == 'var' and node['name']['id'] in free:
+            occurrence = current + suffix
+            if not _scalar(inferred.types[occurrence]):
+                _fail('CAPTURE', 'generic scalar computation dependencies must be closed Int/Bool', occurrence)
+
+
 def _inventory(original, normalized, original_infer, normalized_infer, origins, removed, touched, budget, obligations, dialect):
     original_paths = [p for p, n in _walk(original) if n['tag'] == 'type_application']
     if len(original_paths) > MAX_PROOFS:
@@ -1071,7 +1114,7 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
                 budget.record(row)
                 definitions.append(row)
                 use_counts[ident] = 0
-                go(cursor, cursor_path, {}, True, False)
+                go(cursor, cursor_path, {}, (row, top_level), False)
                 go(node['body'], path + ('body',), schemes | {node['name']['id']: row}, generic, top_level)
             else:
                 if normalized_infer.types[value_path]['tag'] == 'forall':
@@ -1132,7 +1175,9 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
             _fail('USE', 'bare or escaping Scheme occurrence', path)
         if tag == 'type_lambda':
             _fail('SCHEME', 'type abstraction outside a supported let prefix', path)
-        if generic and tag not in ('var', 'lambda', 'application', 'let', 'int64', 'bool'):
+        if generic and tag == 'primitive':
+            _generic_primitive(normalized, node, path, generic, normalized_infer, budget)
+        elif generic and tag not in ('var', 'lambda', 'application', 'let', 'int64', 'bool'):
             _fail('FRAGMENT', 'generic construction opcode outside exact allowlist', path)
         if tag == 'primitive' and node['id'] == 13 and node['arguments'] != [INT]:
             _fail('PRIMITIVE', 'retained conditional must be instantiated at Int', path)

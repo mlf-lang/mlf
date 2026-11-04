@@ -30,6 +30,7 @@ SCHEMAS = {
 }
 GENERIC_OPS = frozenset(('new_below', 'scalar', 'closure', 'thunk', 'application',
                          'application_borrow', 'retain', 'drop', 'borrow', 'end_borrow'))
+INSTANCE_SCALAR_OPS = frozenset(('force', 'prim2', 'select_i64'))
 PRIMITIVES = {'addInt': '#i64', 'subInt': '#i64', 'mulInt': '#i64',
               'eqInt': '#bool', 'ltInt': '#bool'}
 
@@ -293,7 +294,7 @@ def preflight(program, budget):
             if introduction:
                 permitted, terminal = op in GENERIC_OPS or op == 'seal', op == 'seal'
             elif generic:
-                permitted, terminal = op in GENERIC_OPS or op == 'return', op == 'return'
+                permitted, terminal = op in GENERIC_OPS or op in INSTANCE_SCALAR_OPS or op == 'return', op == 'return'
             else:
                 permitted = op != 'seal' and (op != 'return' if entry else op not in ('finish', 'finish_scalar'))
                 terminal = op in ('return', 'finish', 'finish_scalar')

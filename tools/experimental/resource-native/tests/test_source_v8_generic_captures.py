@@ -39,12 +39,15 @@ SOURCES = {
  'generic-closed-scalar': 'import SharedPoly\nlet bonus = addInt 20 1 in\nlet k = \\x -> bonus in\naddInt (k true) (k 0)\n',
  'bool-scalar': 'import SharedPoly\nlet flag = ltInt 20 21 in\nlet k = \\x -> flag in\nif k 0 then if k true then 42 else 0 else 0\n',
 }
-NEGATIVES = {
+HISTORICAL_STAGE24_NEGATIVES = {
  'mixed-scalar': ('import SharedPoly\nlet bonus = addInt 20 1 in\nlet flag = ltInt bonus 22 in\nlet k = \\x -> if flag then bonus else 0 in\naddInt (k true) (k 0)\n',
                  ['body','body','body','value','body','body','function','function','function']),
  'alias-scalar': ('import SharedPoly\nlet bonus = addInt 5 5 in\nlet other = bonus in\nlet k = \\x -> addInt bonus other in\naddInt 2 (addInt (k true) (k 0))\n',
                  ['body','body','body','value','body','body','function','function']),
 }
+# Stage25 admits the two historical primitive bodies above. Active refusal
+# coverage uses these separately captured, still-forbidden source cases.
+NEGATIVES = {'bool-result-conditional': ('import SharedPoly\nlet flag = ltInt 20 21 in\nlet k = \\x -> if flag then true else false in\nif k 0 then 42 else 0\n', 'PRIMITIVE', ['body', 'body', 'value', 'body', 'body', 'function', 'function', 'function'], 'retained conditional must be instantiated at Int'), 'callable-import': ('import SharedPoly\nlet helper = \\n -> addInt 21 n in\nlet k = \\x -> helper 0 in\naddInt (k true) (k 0)\n', 'CAPTURE', ['body', 'body', 'value', 'body', 'body', 'function'], 'generic imports require ordinary closed Int/Bool bindings')}
 ACCESS_SCOPE = ('The actual capture node and full metadata identity transport are checked; '
                 'public events do not expose each acquired owner Access or callback Env. '
                 'Post-begin retain and discharge are checked in emitted C and fresh resource facts.')
@@ -401,20 +404,20 @@ def run_case(args,output,env,case):
 
 
 def rejected_source(capture,verified,case):
-    _,path=NEGATIVES[case]
-    diagnostic='FRAGMENT at '+repr(path)+': generic construction opcode outside exact allowlist'
+    _,code,path,detail=NEGATIVES[case]
+    diagnostic=code+' at '+repr(path)+': '+detail
     require(verified['status']=='diagnostic-custody-pass-fragment-rejected' and
             verified['fragment_admitted'] is False and not verified['source_admitted'] and not verified['native_admitted'] and
-            verified['fragment_error']=={'code':'FRAGMENT','path':path,'message':diagnostic} and
+            verified['fragment_error']=={'code':code,'path':path,'message':diagnostic} and
             verified['normalization_replay']=='not completed; retained fragment rejected' and
-            capture['checked_type']==INT, 'exact checked-source FRAGMENT refusal differs')
+            capture['checked_type']==INT, 'exact checked-source refusal differs')
     return {'status':'rejected-before-native','diagnostic':diagnostic,'source_hash':build.sha(NEGATIVES[case][0].encode()),
             'normalization_replay':verified['normalization_replay']}
 
 
 def rejection_controls(capture,verified,case):
     rejected_source(capture,verified,case);rows=[]
-    for name,key,value in [('wrong-code','code','CAPTURE'),('wrong-path','path',[]),('wrong-message','message','unrelated refusal')]:
+    for name,key,value in [('wrong-code','code','FRAGMENT'),('wrong-path','path',[]),('wrong-message','message','unrelated refusal')]:
         v=copy.deepcopy(verified);v['fragment_error'][key]=value
         try:rejected_source(capture,v,case)
         except AssertionError:rows.append({'control':name,'status':'rejected'})
@@ -423,7 +426,7 @@ def rejection_controls(capture,verified,case):
 
 
 def negative(args,output,env,case):
-    text,path=NEGATIVES[case];inputs=output/'inputs';inputs.mkdir()
+    text,code,path,_=NEGATIVES[case];inputs=output/'inputs';inputs.mkdir()
     (inputs/'main.emlf').write_text(text,encoding='utf-8');(inputs/'SharedPoly.emlf').write_text(SHARED,encoding='utf-8')
     target=output/case
     build.run([sys.executable,'-B',str(BASE/'run_source_v8.py'),str(inputs/'main.emlf'),'--module-root',str(inputs),
@@ -432,12 +435,12 @@ def negative(args,output,env,case):
     failure=read_json(target/'failure.json')
     capture=read_json(target/'capture.stdout');verified=read_json(target/'verification.json')
     row=rejected_source(capture,verified,case)
-    expected='AssertionError: source outside supported shared fragment: '+repr({'code':'FRAGMENT','path':path,'message':row['diagnostic']})
+    expected='AssertionError: source outside supported shared fragment: '+repr({'code':code,'path':path,'message':row['diagnostic']})
     require(failure.get('error')==expected and failure['source_recheck_errors']==[] and
             not (target/'native').exists() and not (target/'planned.json').exists(),
-            'exact unsupported generic operation must reject before planning/native')
+            'exact unsupported source must reject before planning/native')
     row['copied_refusal_controls']=rejection_controls(capture,verified,case)
-    build.save(target/'generic-capture-rejection.json',row);print(case+': EXPECTED FRAGMENT',flush=True);return row
+    build.save(target/'generic-capture-rejection.json',row);print(case+': EXPECTED '+code,flush=True);return row
 
 
 def main():

@@ -265,6 +265,12 @@ static Rt8Handle *force_engine(Rt8Context *c,Rt8Handle *cursor,const char *out,c
 Rt8Handle *rt8_private_force(Rt8Context *c,Rt8Handle *h) { return force_engine(c,h,NULL,NULL); }
 Rt8Handle *rt8_force(Rt8Context *c,Rt8Handle *h,const char *out,const char *source) {
  rt8_private_enter(c,RT8_OP_FORCE,1);rt8_private_label(c,out);rt8_private_label(c,source);
+ if(c->frame->execution.kind==IR8_PACKET_ORIGIN_KIND_INSTANCE){
+  Rt8ValueFacts value;rt8_private_value(c,h,MOVE_VALUE,&value);
+  uint32_t kind=rt8_private_intrinsic_scalar_type(c,value.row.type);
+  G(c,3,TYPE,EQUATION,17,value.row.id,5,value.execution.principal_type==value.row.type);
+  G(c,2,TYPE,EQUATION,14,value.site.id,7,value.shape.kind==kind);
+ }
  return force_engine(c,h,out,source);
 }
 Rt8Handle *rt8_return(Rt8Context *c,Rt8Handle *h) {

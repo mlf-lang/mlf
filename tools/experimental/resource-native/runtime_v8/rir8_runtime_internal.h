@@ -250,6 +250,7 @@ const Rt8Access *rt8_private_capture_transport(Rt8Context *, Rt8Node *host,
 const Ir8PacketCodeExecution *rt8_private_code_execution(Rt8Context *, const Rt8Code *,
  const Rt8Env *, Ir8PacketCodeTyping *, Ir8PacketCodeExecution *);
 void rt8_private_result_check(Rt8Context *, const Rt8Frame *, const Rt8ValueFacts *);
+uint32_t rt8_private_intrinsic_scalar_type(Rt8Context *, uint32_t);
 void rt8_private_node_state(Rt8Context *, Rt8Node *, const Rt8ValueFacts *);
 
 /* Operational kernel. Prepared primitives require all typed guard/charge work

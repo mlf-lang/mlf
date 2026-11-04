@@ -1,5 +1,9 @@
 # Stage24: closed scalar captures in a generalized local let
 
+Historical Stage24 qualification follows. [Stage25](README_STAGE25.md) extends the
+generic primitive boundary and replaces the active suite's two old refusal slots;
+the original inputs and results below remain historical evidence.
+
 **Finite local qualification complete.** The two genuine Int/Bool source cases
 pass the native matrix, sanitizers and final fresh-source suite. Focused native
 guards, host checks and legacy reports also pass. The two unchanged generic

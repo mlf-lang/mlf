@@ -5,6 +5,9 @@ All declarations live in the enclosing C function. No existing emitter is used.
 """
 from __future__ import annotations
 
+from .program_schema import INSTANCE_SCALAR_OPS
+from .provenance import CLOSED_ENTRY_POLICY
+
 from .runtime_emit_budget import (LIMITS, Writer, encode, exact, fail,
                                   plain_index, same, text_equal)
 
@@ -248,6 +251,7 @@ class Planner:
     def inventory(self):
         b = self.b
         resource_paths = b.mapping()
+        effects = None
         for row in self.resource['instructions']:
             key = path_key(row['path'], b)
             if b.contains(resource_paths, key): fail('PATH', 'duplicate fresh resource instruction path')
@@ -267,6 +271,11 @@ class Planner:
                 inst = body[index]
                 derived = b.get(resource_paths, key, 'PATH')
                 text_equal(inst['op'], derived['op'], b, 'PATH')
+                if derived['type_scope'] is not None and inst['op'] in INSTANCE_SCALAR_OPS:
+                    if effects is None: effects = b.mapping()
+                    scope = derived['type_scope']
+                    if scope not in effects: b.put(effects, scope, b.listing())
+                    b.append(effects[scope], derived['path'])
                 same(raw_at(self.raw, path, b), inst, b, 'PATH')
                 roles = expected_roles(inst, self.code_names, self.raw, b)
                 if len(roles) != len(derived['inputs']): fail('OPERAND', 'input census differs')
@@ -328,6 +337,65 @@ class Planner:
                         fail('SNAPSHOT_DEPTH', 'raw traversal exceeds depth64')
                     b.creation(5); stack.append((inst['body'], 0, child))
         if len(self.by_path) != len(resource_paths): fail('PATH', 'extra fresh resource instruction')
+        if effects is not None: self.closed_entries(effects)
+
+    def closed_entries(self, effects):
+        """Consume independently rederived host proof, never a source hint."""
+        b = self.b
+        covered = b.mapping()
+        for row in self.meta['coverage']:
+            b.work()
+            source = row['source']
+            if source['kind'] != 'closed-entry': continue
+            exact(source, ('kind', 'intro', 'proof'), b, 'INTRO')
+            intro = plain_index(source['intro'], len(self.resource['introductions']), 'INTRO')
+            if intro in covered: fail('INTRO', 'duplicate closed-entry coverage')
+            b.put(covered, intro, source['proof'])
+        expected = 0
+        for intro in self.resource['introductions']:
+            b.work()
+            scope = intro['scheme']
+            if scope not in effects:
+                if 'closed_entry' in intro: fail('INTRO', 'unexpected effect proof')
+                continue
+            expected += 1
+            proof = b.get(intro, 'closed_entry', 'INTRO')
+            exact(proof, ('policy', 'root_site', 'root_code', 'codes', 'effects'), b, 'INTRO')
+            text_equal(proof['policy'], CLOSED_ENTRY_POLICY, b, 'INTRO')
+            same(proof, b.get(covered, intro['id'], 'INTRO'), b, 'INTRO')
+            codes = b.listing()
+            for code in self.resource['code_typing']:
+                b.work()
+                if code['type_scope'] == scope: b.append(codes, code['id'])
+            same(proof['codes'], codes, b, 'INTRO')
+            actual_effects = b.listing()
+            for index, rec in enumerate(self.resource['instructions']):
+                b.work()
+                if rec['type_scope'] == scope and rec['op'] in INSTANCE_SCALAR_OPS:
+                    b.append(actual_effects, index)
+                    if rec['path']['root'] not in ('function', 'thunk'):
+                        fail('INTRO', 'effect outside callback execution')
+            same(proof['effects'], actual_effects, b, 'INTRO')
+            site = self.resource['sites'][plain_index(proof['root_site'], len(self.resource['sites']), 'INTRO')]
+            if site['category'] != 'CLOSURE' or site['type_scope'] != scope or site['code'] != proof['root_code']:
+                fail('INTRO', 'closed-entry root Site/Code identity differs')
+            same(intro['result_sites'], b.listing((site['id'],)), b, 'INTRO')
+            raw = raw_at(self.raw, intro['generalize_path'], b)
+            closure = None
+            for inst in raw['body']:
+                b.work()
+                if inst['op'] == 'closure':
+                    if closure is not None: fail('INTRO', 'extra neutral closure')
+                    closure = inst
+                elif inst['op'] not in ('retain', 'drop', 'borrow', 'end_borrow', 'seal'):
+                    fail('INTRO', 'forbidden neutral allocation/computation')
+            if closure is None: fail('INTRO', 'missing direct neutral closure')
+            root_code = self.resource['code_typing'][plain_index(proof['root_code'], len(self.resource['code_typing']), 'INTRO')]
+            text_equal(closure['function'], root_code['name'], b, 'INTRO')
+            for code in codes:
+                b.put(self.code_mapping[code], 'invocation_policy', CLOSED_ENTRY_POLICY)
+        if expected != len(covered) or expected != len(effects):
+            fail('INTRO', 'closed-entry proof census differs')
 
     def sites(self):
         b, m = self.b, self.meta

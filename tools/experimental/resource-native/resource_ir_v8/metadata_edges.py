@@ -281,7 +281,7 @@ class EdgeClosure:
             b.put(self.obligation_slots, index, slots)
             b.creation()
             ids = []
-            for env in t.lawful_envs(obligation['path']):
+            for env in t.execution_envs(obligation['path']):
                 b.work()
                 kind = obligation['kind']
                 if kind == 'publish':
@@ -291,7 +291,7 @@ class EdgeClosure:
                         # N and C are mutually exclusive actual-origin cases.
                         rule = 'capture-neutral-or-concrete-scalar'
                         guards |= N | C
-                    if env not in t.lawful_envs(site['path']):
+                    if env not in t.execution_envs(site['path']):
                         fail('metadata.boundaries', 'metadata-origin', 'CONTEXT', 'publication environment cannot allocate its host')
                 elif kind == 'application_argument':
                     rule, guards = 'invoke-callee-origin', M | L | _mask(('code-association', 'application-slots'))
@@ -377,7 +377,7 @@ class EdgeClosure:
             b.put(self.instruction_boundaries, index, boundary)
 
     def slot_boundaries(self):
-        b, r = self.b, self.r
+        b, r, t = self.b, self.r, self.t
         for site in r.tables['sites']:
             b.put(self.site_boundaries, site['id'], b.listing(()))
         for slot in self.tables['slots']:
@@ -386,6 +386,8 @@ class EdgeClosure:
                 b.work()
                 execution = r.tables['site_executions'][execution_id]
                 env = execution['env']
+                if not t.executable_site_env(r.tables['sites'][slot['site']], env):
+                    continue
                 rule, guards = 'publish-by-host-origin', M | self.origin_guards(env) | L | Q
                 site = r.tables['sites'][slot['site']]
                 if slot['role']['kind'] == 'capture' and self.imported_capture(site['scope'], slot['type']) and self.t.tables['environments'][env]['mode'] == 'NEUTRAL':
@@ -403,6 +405,10 @@ class EdgeClosure:
             code, env = r.tables['codes'][execution['code']], execution['env']
             mode = t.tables['environments'][env]['mode']
             cases = ('CONCRETE',) if mode == 'CONCRETE' else ('GENERIC_NEUTRAL',) if mode == 'NEUTRAL' else ('GENERIC_PROJECTED', 'INSTANCE') if code['kind'] == 'function' else ('INSTANCE',)
+            if t.instance_only_code(code):
+                if mode == 'NEUTRAL': continue
+                proof = t._closed_entries[code['scope']]
+                cases = ('GENERIC_PROJECTED',) if code['id'] == proof['root_code'] else ('INSTANCE',)
             for origin in cases:
                 b.work()
                 if code['kind'] == 'function':
@@ -428,15 +434,37 @@ class EdgeClosure:
         for execution in r.tables['code_executions']:
             b.work()
             code, env = r.tables['codes'][execution['code']], execution['env']
+            if t.instance_only_code(code) and t.tables['environments'][env]['mode'] == 'NEUTRAL':
+                continue
             boundary = self.boundary(b.row(kind='return', code_execution=execution['id']), code['result'], env,
                 'return-by-execution-origin', M | self.origin_guards(env) | L | RETURN | self.identity_guards(code))
             b.append(self.code_boundaries[code['id']], boundary)
+
+    def closed_entry_rows(self):
+        """Static premise closure, not a native whitelist or execution trace."""
+        b, r, t = self.b, self.r, self.t
+        if t._closed_entries is None: return
+        for scope in b.ordered(t._closed_entries):
+            proof = t._closed_entries[scope]
+            intro = t.tables['schemes'][scope]['intro']
+            boundaries = b.listing(())
+            for code in proof['codes']:
+                b.work()
+                key = b.row(kind='closed-entry', intro=intro, code=code)
+                boundary = self.boundary(key, None, None,
+                    'neutral-typing-only/instance-invocation',
+                    M | C | _mask(('code-association', 'complete-vector', 'scope-token')))
+                b.append(self.code_boundaries[code], boundary)
+                b.append(boundaries, boundary)
+            self.coverage(b.row(kind='closed-entry', intro=intro, proof=b.clone(proof)),
+                          boundaries, (), ())
 
     def deferred_rows(self):
         b, r, t = self.b, self.r, self.t
         for execution in r.tables['site_executions']:
             b.work()
             site, env = r.tables['sites'][execution['site']], execution['env']
+            if not t.executable_site_env(site, env): continue
             if site['category'] not in DEFERRED:
                 continue
             for access_id in self.accesses_by_origin[key2(b, site['id'], env)]:
@@ -498,7 +526,7 @@ class EdgeClosure:
             b.work()
             b.creation()
             dependencies = []
-            for env in t.lawful_envs(obligation['path']):
+            for env in t.execution_envs(obligation['path']):
                 self.dependency(dependencies, t.old(obligation['expected_type']), env)
             self.coverage(b.row(kind='obligation', index=index), self.obligation_boundaries[index], dependencies, self.obligation_slots[index])
         for index, boundary_id in self.instruction_boundaries.items():
@@ -591,6 +619,7 @@ def build_edges(representations):
     result.instruction_rows()
     result.slot_boundaries()
     result.entry_return_rows()
+    result.closed_entry_rows()
     result.deferred_rows()
     result.coverage_rows()
     return result
