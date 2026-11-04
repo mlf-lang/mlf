@@ -133,7 +133,7 @@ class NominalArgumentReplayTests(unittest.TestCase):
 
     def test_foreign_parameterized_open_arrow_and_forall_coordinates_reject(self):
         bad=[f.nominal_type('Foreign'),{'tag':'constructor','name':'Chain','arguments':[f.I]},
-             f.tv(999),f.arr(f.I,f.I),f.forall(700,f.arr(f.tv(700),f.tv(700)))]
+             f.tv(999),f.arr(f.I,f.tv(999)),f.forall(700,f.arr(f.tv(700),f.tv(700)))]
         for argument in bad:
             for direct in (False,True):
                 with self.subTest(argument=argument,direct=direct):

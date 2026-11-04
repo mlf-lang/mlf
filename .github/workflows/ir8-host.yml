@@ -29,6 +29,12 @@ jobs:
           mkdir -m 700 "$RUNNER_TEMP/ir8-nominal-arguments-host"
           python3 -B -S tools/experimental/resource-native/tests/test_ir8_nominal_arguments.py \
             2>&1 | tee "$RUNNER_TEMP/ir8-nominal-arguments-host/checks.log"
+      - name: Check closed arrow type arguments and canonical metadata
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$RUNNER_TEMP/ir8-arrow-arguments-host"
+          python3 -B -S tools/experimental/resource-native/tests/test_ir8_arrow_arguments.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-arrow-arguments-host/checks.log"
       - name: Retain host-only evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -37,6 +43,7 @@ jobs:
           path: |
             ${{ runner.temp }}/ir8-host
             ${{ runner.temp }}/ir8-nominal-arguments-host
+            ${{ runner.temp }}/ir8-arrow-arguments-host
           if-no-files-found: warn
           retention-days: 14
   ir8-runtime-host:
@@ -63,6 +70,17 @@ jobs:
         run: |
           python3 -B tools/experimental/resource-native/tests/test_binding_readers.py \
             --cc cc --output "$RUNNER_TEMP/ir8-binding-readers"
+      - name: Prepare a host-checked nested arrow and nominal-leaf guard pair
+        run: |
+          timeout --signal=TERM --kill-after=5s 180s \
+            python3 -B tools/experimental/resource-native/tests/prepare_nested_arrow_guard_fixture.py \
+              --output "$RUNNER_TEMP/ir8-nested-arrow-fixture"
+      - name: Check nested arrow packet and real-instantiation guards
+        run: |
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 -B tools/experimental/resource-native/tests/test_arrow_argument_guards.py \
+              --generated "$RUNNER_TEMP/ir8-nested-arrow-fixture" \
+              --cc cc --output "$RUNNER_TEMP/ir8-nested-arrow-guards"
       - name: Retain emitter and reader evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -71,6 +89,8 @@ jobs:
           path: |
             ${{ runner.temp }}/ir8-runtime-emit
             ${{ runner.temp }}/ir8-binding-readers
+            ${{ runner.temp }}/ir8-nested-arrow-fixture
+            ${{ runner.temp }}/ir8-nested-arrow-guards
           if-no-files-found: warn
           retention-days: 14
   ir8-native-runtime:
@@ -179,6 +199,16 @@ jobs:
           set -euo pipefail
           python3 -B tools/experimental/resource-native/tests/test_planner_v8_shared_nominal_arguments.py \
             2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/nominal-shared-planner.log"
+      - name: Replay closed arrow arguments and outer-first arrow beta
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_module_shared_arrow_arguments.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/arrow-arguments-replay.log"
+      - name: Check arrow shared-view planning and original callable identity
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_planner_v8_arrow_arguments.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/arrow-arguments-planner.log"
       - name: Retain fragment evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -444,5 +474,58 @@ jobs:
           path: |
             ${{ runner.temp }}/ir8-higher-order-shared-setup
             ${{ runner.temp }}/ir8-source-higher-order-shared
+          if-no-files-found: warn
+          retention-days: 14
+
+  ir8-arrow-arguments-source:
+    name: IR8 closed arrow shared arguments from fresh source
+    runs-on: ubuntu-24.04
+    # Four unannotated cases, separate from all prior source jobs.
+    # Preserve the 20-minute job ceiling and every existing process limit.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned direct-host GHC 9.14.1
+        run: |
+          set -euo pipefail
+          setup="$RUNNER_TEMP/ir8-arrow-arguments-setup"
+          mkdir -m 700 "$setup"
+          sudo apt-get update 2>&1 | tee "$setup/apt-update.log"
+          sudo apt-get install -y build-essential clang libgc-dev libgmp-dev libnuma-dev libncurses-dev pkg-config xz-utils \
+            2>&1 | tee "$setup/apt-install.log"
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          curl --fail --location --connect-timeout 30 --max-time 600 \
+            https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz \
+            -o "$archive" 2>&1 | tee "$setup/download.log"
+          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" \
+            | sha256sum -c - | tee "$setup/checksum.log"
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && \
+            ./configure --prefix="$RUNNER_TEMP/ghc" && make -j1 install) \
+            2>&1 | tee "$setup/install.log"
+          "$RUNNER_TEMP/ghc/bin/ghc" --numeric-version | tee "$setup/version.log"
+          test "$(cat "$setup/version.log")" = 9.14.1
+      - name: Run four fresh closed-arrow and returned-INSTANCE source cases
+        run: |
+          python3 -B tools/experimental/resource-native/tests/test_source_v8_arrow_arguments.py \
+            --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
+            --output "$RUNNER_TEMP/ir8-source-arrow-arguments"
+      - name: Check the genuine A arrow packet and real-instantiation guards
+        run: |
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 -B tools/experimental/resource-native/tests/test_arrow_argument_guards.py \
+              --generated "$RUNNER_TEMP/ir8-source-arrow-arguments/shared-id-arrow/shared-id-arrow/native" \
+              --cc gcc --output "$RUNNER_TEMP/ir8-source-arrow-guards"
+      - name: Retain arrow source and guard evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-arrow-arguments-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ir8-arrow-arguments-setup
+            ${{ runner.temp }}/ir8-source-arrow-arguments
+            ${{ runner.temp }}/ir8-source-arrow-guards
           if-no-files-found: warn
           retention-days: 14

@@ -48,6 +48,12 @@ exercises already-admitted `sharedApply` with pending callable arguments and a
 reused partial, without production or type-argument changes. Both equal- and
 opposite-coordinate cases pass finite local native and fresh-source checks;
 exact Stage22 CI remains separate.
+[Closed arrow shared type arguments](resource_ir_v8/README_STAGE23.md) add finite
+Repeat/unknown arrows over scalars and exact registered nominal atoms, preserving
+complete vectors and original returned callable identities. Four unannotated
+sources pass the finite native matrix, sanitizers and fresh four-case suite;
+focused arrow guards and a fixed C fault pair also pass. Exact-commit CI remains
+pending; these results do not establish general GC replacement or a speedup.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general

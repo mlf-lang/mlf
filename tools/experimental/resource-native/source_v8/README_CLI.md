@@ -35,7 +35,8 @@ sharedId x = x
 
 The current fragment admits Int, Bool and arrows, supported scalar primitives,
 Int conditionals and bounded rank-1 shared callable uses with complete closed
-Int/Bool or exact registered parameter-free DATA/SUM atom vectors, plus
+Int/Bool, exact registered parameter-free DATA/SUM atoms or finite closed
+Repeat/unknown arrows over those leaves, plus
 referenced closed DATA and scalar/self-field SUMs.
 DATA fields are Int, Bool or recursively closed arrows over those scalars; exact
 nominal identities are not merged by equal field layouts. It preserves the
@@ -77,6 +78,15 @@ beta step. Generic nominal principal code, arrow/open/parameterized arguments
 and recursive generic definitions remain rejected. DATA field arrows still have
 only Int/Bool leaves and SUM cases still return Int. No CLI flag or default changes.
 The finite Stage21 local source/native checks pass; exact-commit CI is separate.
+[Stage23](../resource_ir_v8/README_STAGE23.md) subsequently adds those finite
+closed-arrow type arguments and outer-first arrow beta `/3`, preserving full
+vectors, actual returned INSTANCE origins and existing scalar/nominal paths.
+Open/higher-rank, Once and argument-identity coordinates still reject. Generic
+nominal operations, field rules, ABI, limits, coarse placement and retain-on-fault
+defaults are unchanged. Its finite four-source native matrix, sanitizers,
+fresh default four-case suite, focused arrow guards and fixed C fault pair pass
+locally. Exact-commit CI remains pending. The stage guide gives the separate
+portable test command and the finite coverage limits.
 See the [fragment contract](README.md) for its limits.
 
 For example, a closed callable field can use the same `SharedPoly.emlf` above:

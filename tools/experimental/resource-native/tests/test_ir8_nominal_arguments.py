@@ -221,7 +221,7 @@ class NominalMetadata(unittest.TestCase):
             reordered[key] = dict(reversed(list(reordered[key].items())))
         self.assertEqual(check_metadata(program).metadata_sha256, check_metadata(reordered).metadata_sha256)
 
-    def test_independent_domains_reject_unregistered_closed_atom_and_arrow(self):
+    def test_independent_domains_reject_unregistered_closed_atom_and_open_arrow(self):
         for mutation in ('unknown', 'arrow'):
             with self.subTest(mutation=mutation):
                 program = view_program([['N']]); nominal(program)
@@ -231,11 +231,24 @@ class NominalMetadata(unittest.TestCase):
                 if mutation == 'unknown':
                     closure.tables['types'][env['arguments'][0]]['atom'] = 'Unregistered'
                 else:
-                    env['arguments'][0] = next(row['id'] for row in closure.tables['types'] if row['tag'] == 'arrow')
+                    env['arguments'][0] = next(row['id'] for row in closure.tables['types']
+                        if row['tag'] == 'arrow' and closure.scopes[row['id']])
                 with self.assertRaises(MetadataError) as caught:
                     _verify_domains(owned, derived, closure, budget)
                 self.assertEqual((caught.exception.layer, caught.exception.code, caught.exception.path),
                                  ('metadata-type', 'VECTOR', 'metadata.environments'))
+
+    def test_full_verifier_rejects_eligible_arrow_in_wrong_complete_vector(self):
+        # Stage23 admits this closed domain but never trusts a substituted Env
+        # coordinate in place of the exact registered raw complete vector.
+        program = view_program([['N']]); nominal(program)
+        data = document(program)
+        env = next(row for row in data['environments'] if row['mode'] == 'CLOSED')
+        env['arguments'][0] = next(row['id'] for row in data['types']
+            if row['tag'] == 'arrow' and
+            all(data['types'][row[side]]['tag'] == 'closed' for side in ('argument', 'result')))
+        with self.assertRaises(MetadataError):
+            _verify_derived(program, data)
 
     def test_full_verifier_rejects_nominal_table_forgeries(self):
         program, atom = nominal_application(family=True, curried=True)

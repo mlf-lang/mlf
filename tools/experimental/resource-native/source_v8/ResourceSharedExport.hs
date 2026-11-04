@@ -39,17 +39,26 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
     };
     _ -> False
   };
-  sharedArgument declarations argument = E.closedArgument argument || nominalArgument declarations argument;
-  applyNominalPrefix declarations term arguments = case arguments of {
-    [] -> do { L.ensure (L.null (E.closedPrefix term)) "partial shared nominal forall elimination"; Right term };
+  arrowArgument argument = case argument of { XArrow _ _ -> True; _ -> False };
+  -- Only finite monomorphic arrows; nominal leaves stay exact closed atoms.
+  -- Raw XMLF arrows carry no Once/result-identity refinements. The independent
+  -- backend still checks recursively Repeat/unknown before runtime admission.
+  sharedArgument declarations argument = sharedArgumentAt declarations 1 argument;
+  sharedArgumentAt declarations depth argument = depth <= 32 && (case argument of {
+    XArrow a b -> sharedArgumentAt declarations (depth + 1) a &&
+      sharedArgumentAt declarations (depth + 1) b;
+    _ -> E.closedArgument argument || nominalArgument declarations argument
+  });
+  applySharedPrefix declarations term arguments = case arguments of {
+    [] -> do { L.ensure (L.null (E.closedPrefix term)) "partial shared closed forall elimination"; Right term };
     (:) argument rest -> case term of {
       XTypeAbs binder bound body -> do {
         L.ensure (E.bottomStar bound && sharedArgument declarations argument)
-          "shared nominal substitution requires a checked closed atom and bottom Star";
+          "shared substitution requires a checked closed type and bottom Star";
         substituted <- E.closedSubstituteTerm binder argument body;
-        applyNominalPrefix declarations substituted rest
+        applySharedPrefix declarations substituted rest
       };
-      _ -> Left "extra shared nominal forall elimination"
+      _ -> Left "extra shared closed forall elimination"
     }
   };
 
@@ -60,14 +69,15 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
       actions <- E.closedActions proofs;
       let { arguments = E.closedActionArguments actions; prefix = E.closedPrefix base;
         scalar = L.all E.closedArgument arguments;
-        nominal = L.not scalar && L.all (sharedArgument nominals) arguments };
-      if L.not (L.null prefix) && L.not (L.null arguments) && (scalar || nominal)
+        extended = L.not scalar && L.all (sharedArgument nominals) arguments;
+        dialect = if scalar then 1 else if L.any arrowArgument arguments then 3 else 2 };
+      if L.not (L.null prefix) && L.not (L.null arguments) && (scalar || extended)
       then do {
         E.closedValidatePrefix prefix;
         L.ensure (L.length prefix == L.length arguments)
           "shared diagnostic: partial or extra immediate closed vector";
         output <- if scalar then E.closedApplyPrefix base arguments
-          else applyNominalPrefix nominals base arguments;
+          else applySharedPrefix nominals base arguments;
         let { step = J.Object [
           ("rule", J.String "instantiate_direct_closed"),
           ("input", stateNode state path term),
@@ -76,13 +86,13 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
           ("witnesses", J.Array (L.map E.computationNode proofs)),
           ("substitutions", J.Array (L.map substitutionNode (L.zip prefix arguments))),
           ("output", stateNode (state + 1) path output)] };
-        Right (Just ((,) output ((,) step nominal)))
+        Right (Just ((,) output ((,) step dialect)))
       } else do {
         outer <- E.closedProofActions witness;
         if L.all identity outer then Right (Just ((,) value ((,) (J.Object [
           ("rule", J.String "erase_refl"), ("input", stateNode state path term),
           ("witness", E.computationNode witness),
-          ("output", stateNode (state + 1) path value)]) False)))
+          ("output", stateNode (state + 1) path value)]) 1)))
         else Right Nothing
       }
     } };
@@ -249,8 +259,8 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
     original <- K.check (K.term supplied);
     L.ensure (T.alphaEq (K.typeOf supplied) (K.typeOf original))
       "shared diagnostic: supplied checked root changed";
-    result <- loop (E.closedDeclarations (K.term original)) 0 (K.term original) [] 2 False;
-    case result of { (,,) term steps nominal -> do {
+    result <- loop (E.closedDeclarations (K.term original)) 0 (K.term original) [] 2 1;
+    case result of { (,,) term steps dialect -> do {
       checked <- K.check term;
       L.ensure (T.alphaEq (K.typeOf original) (K.typeOf checked))
         "shared diagnostic: normalized root type changed";
@@ -258,21 +268,22 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
         "shared diagnostic: ordinary erasure/sharing changed";
       L.ensure (J.equal (J.Array (declarations (K.term original))) (J.Array (declarations term)))
         "shared diagnostic: declaration syntax changed";
-      Right ((,,,) original checked steps nominal)
+      Right ((,,,) original checked steps dialect)
     } }
   };
-  loop nominals state term reversedSteps stepBytes usedNominal = do {
+  loop nominals state term reversedSteps stepBytes usedDialect = do {
     next <- visit nominals state [] term;
     case next of {
-      Nothing -> Right ((,,) term (L.reverse reversedSteps) usedNominal);
-      Just ((,) output ((,) step nominal)) -> do {
+      Nothing -> Right ((,,) term (L.reverse reversedSteps) usedDialect);
+      Just ((,) output ((,) step dialect)) -> do {
         L.ensure (state < 2048) "shared diagnostic: normalization exceeds2048 rewrites";
         boundRetained (Modules.rawTerm output);
         L.ensure (X.equalErased (X.erase term) (X.erase output))
           "shared diagnostic: a type rewrite changed ordinary erasure";
         let { separator = if state == 0 then 0 else 1 };
         width <- boundedUTF8 (4194304 - stepBytes - separator) (J.render step);
-        loop nominals (state + 1) output ((:) step reversedSteps) (stepBytes + separator + width) (usedNominal || nominal)
+        loop nominals (state + 1) output ((:) step reversedSteps) (stepBytes + separator + width)
+          (if dialect > usedDialect then dialect else usedDialect)
       }
     }
   };
@@ -280,10 +291,11 @@ module ResourceSharedExport (main, exportCaptured, normalizeSharedChecked) where
   exportCaptured captured = do {
     projected <- Projection.projectChecked (Modules.checkedTerm captured);
     normalized <- normalizeSharedDialect (Projection.projected projected);
-    case normalized of { (,,,) before after steps nominal -> do {
+    case normalized of { (,,,) before after steps dialect -> do {
       let { original = Projection.original projected;
         normalization = J.Object [
-          ("policy", J.String (if nominal then "shared-rank1-callable/2" else "shared-rank1-callable/1")),
+          ("policy", J.String (if dialect == 3 then "shared-rank1-callable/3"
+            else if dialect == 2 then "shared-rank1-callable/2" else "shared-rank1-callable/1")),
           ("input_checked_type", Modules.rawType (K.typeOf before)),
           ("input_annotated", Modules.rawTerm (K.term before)),
           ("input_erased", Modules.rawErased (X.erase (K.term before))),

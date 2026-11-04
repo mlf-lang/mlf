@@ -557,6 +557,66 @@ static int nominal_argument(Rt8Context *c,const Ir8PacketType *t,const char *ato
  const char *name=rt8_private_string(c,f.name);
  G(c,15,TYPE,EQUATION,11,f.id,1,literal_equal(c,atom+1,name));return 1;
 }
+/* Fresh bounded lookup in the admitted immutable Shape table. This helper is
+ * exclusive to arrow-coordinate validation; old atom paths keep their work. */
+static uint32_t argument_shape(Rt8Context *c,const Ir8PacketType *t) {
+ uint32_t lo=0,hi,tag,key;Ir8PacketShapeBinding s;
+ rt8_private_charge(c,5);hi=c->program.typed_header.table[6].count;
+ tag=t->tag==IR8_PACKET_TYPE_TAG_ARROW?IR8_PACKET_SHAPE_SOURCE_CANONICAL_ARROW:IR8_PACKET_SHAPE_SOURCE_LEGACY;
+ key=t->tag==IR8_PACKET_TYPE_TAG_ARROW?t->id:t->atom;
+ while(lo<hi){uint32_t m=lo+(hi-lo)/2;rt8_private_table(c,7,m,&s,sizeof(s));
+  rt8_private_charge(c,7);uint32_t value=tag==IR8_PACKET_SHAPE_SOURCE_LEGACY?s.source_reference:s.source_type;
+  if(s.source_tag<tag||(s.source_tag==tag&&value<key))lo=m+1;else hi=m;}
+ G(c,15,TYPE,MISSING,1,t->id,1,lo<c->program.typed_header.table[6].count);
+ rt8_private_table(c,7,lo,&s,sizeof(s));
+ G(c,15,TYPE,MISSING,7,lo,1,s.source_tag==tag&&
+  (tag==IR8_PACKET_SHAPE_SOURCE_LEGACY?s.source_reference:s.source_type)==key);
+ return lo;
+}
+static int arrow_argument(Rt8Context *c,uint32_t root) {
+ uint32_t stack[RT8_MAX_WALK_DEPTH][3],sp=1;
+ rt8_private_charge(c,sizeof(stack[0])+1);stack[0][0]=root;stack[0][1]=N;stack[0][2]=1;
+ while(sp){uint32_t type,expected,depth,id;Ir8PacketType t;Ir8PacketShapeBinding s;
+  Ir8PacketShapeTyping st;Ir8PacketRepresentation rep;Ir8PacketShapeSpec spec;
+  rt8_private_charge(c,sizeof(stack[0])+4);--sp;
+  type=stack[sp][0];expected=stack[sp][1];depth=stack[sp][2];rt8_private_table(c,1,type,&t,sizeof(t));
+  G(c,15,TYPE,EQUATION,1,type,1,depth<=RT8_MAX_WALK_DEPTH&&
+   (t.tag==IR8_PACKET_TYPE_TAG_CLOSED||t.tag==IR8_PACKET_TYPE_TAG_ARROW));
+  id=argument_shape(c,&t);
+  G(c,15,TYPE,EQUATION,1,type,1,(expected==N&&depth==1)||(expected!=N&&expected==id));
+  rt8_private_table(c,7,id,&s,sizeof(s));rt8_private_table(c,8,id,&st,sizeof(st));
+  rt8_private_table(c,9,id,&rep,sizeof(rep));rt8_private_descriptor(c,1,id,&spec,sizeof(spec));
+  G(c,15,TYPE,EQUATION,8,id,2,st.shape==id&&st.type==t.id&&st.scope==N&&rep.shape==id&&rep.typing==id&&
+   spec.shape==id&&spec.typing==id&&spec.representation==id&&spec.kind==s.kind&&
+   spec.argument_rep==s.argument_rep&&spec.result_rep==s.result_rep);
+  if(t.tag==IR8_PACKET_TYPE_TAG_ARROW){Ir8PacketCallableContract contract;
+   G(c,15,TYPE,EQUATION,1,type,5,t.atom==N&&t.scheme==N&&t.index==N&&t.argument<t.id&&t.result<t.id&&
+    t.protocol==IR8_PACKET_PROTOCOL_REPEAT&&t.result_identity==IR8_PACKET_RESULT_IDENTITY_UNKNOWN);
+   G(c,15,TYPE,EQUATION,7,id,1,s.source_tag==IR8_PACKET_SHAPE_SOURCE_CANONICAL_ARROW&&s.source_type==t.id&&
+    s.source_reference==N&&s.source_scheme==N&&s.kind==IR8_PACKET_SHAPE_KIND_REPEAT&&
+    rep.ready_kind==IR8_PACKET_READY_KIND_FUNCTION&&s.argument_rep!=N&&s.result_rep!=N&&
+    spec.fields_object==N&&spec.field_first==0&&spec.field_count==0);
+   rt8_private_table(c,2,st.contract,&contract,sizeof(contract));
+   G(c,15,TYPE,EQUATION,2,contract.id,1,contract.type==t.id&&contract.argument==t.argument&&
+    contract.result==t.result&&contract.protocol==t.protocol&&contract.result_identity==t.result_identity);
+   G(c,15,TYPE,COUNT,1,type,N,depth<RT8_MAX_WALK_DEPTH&&sp<=RT8_MAX_WALK_DEPTH-2);
+   rt8_private_charge(c,2*sizeof(stack[0])+8);
+   stack[sp][0]=t.result;stack[sp][1]=s.result_rep;stack[sp][2]=depth+1;++sp;
+   stack[sp][0]=t.argument;stack[sp][1]=s.argument_rep;stack[sp][2]=depth+1;++sp;
+  }else{const char *atom=rt8_private_string(c,t.atom);int b,i;
+   G(c,15,TYPE,EQUATION,1,type,1,t.scheme==N&&t.index==N&&t.argument==N&&t.result==N&&t.protocol==N&&t.result_identity==N);
+   b=literal_equal(c,atom,"#bool");i=literal_equal(c,atom,"#i64");
+   if(b||i){
+    G(c,15,TYPE,EQUATION,7,id,1,s.source_tag==IR8_PACKET_SHAPE_SOURCE_LEGACY&&s.source_reference==t.atom&&
+     s.source_type==N&&s.source_scheme==N&&s.kind==(b?IR8_PACKET_SHAPE_KIND_BOOL:IR8_PACKET_SHAPE_KIND_I64)&&
+     st.contract==N&&rep.ready_kind==IR8_PACKET_READY_KIND_SCALAR&&s.argument_rep==N&&s.result_rep==N&&
+     spec.fields_object==N&&spec.field_first==0&&spec.field_count==0);
+   }else (void)nominal_argument(c,&t,atom);
+  }
+ }
+ return 1;
+}
+
 Rt8Handle *rt8_instantiate(Rt8Context *c,Rt8Handle *h,const Rt8Instantiation *ref,const char *out,const char *source) {
  Rt8ValueFacts v;Ir8PacketUse use;Ir8PacketScheme scheme;Ir8PacketEnv env;
  rt8_private_enter(c,RT8_OP_INSTANTIATE,1);rt8_private_label(c,out);rt8_private_label(c,source);
@@ -568,8 +628,9 @@ Rt8Handle *rt8_instantiate(Rt8Context *c,Rt8Handle *h,const Rt8Instantiation *re
  for(uint32_t i=0;i<scheme.parameters;++i){Ir8PacketTypeRef a,b;Ir8PacketType t;
   rt8_private_vector(c,use.arguments.object,IR8_PACKET_ELEMENT_TYPE_REF,i,&a,sizeof(a));rt8_private_vector(c,env.arguments.object,IR8_PACKET_ELEMENT_TYPE_REF,i,&b,sizeof(b));
   G(c,15,TYPE,EQUATION,19,uid,3,a.row==b.row);rt8_private_table(c,1,a.row,&t,sizeof(t));
-  G(c,15,TYPE,EQUATION,1,t.id,1,t.tag==IR8_PACKET_TYPE_TAG_CLOSED);const char *atom=rt8_private_string(c,t.atom);
-  G(c,15,TYPE,EQUATION,1,t.id,2,literal_equal(c,atom,"#i64")||literal_equal(c,atom,"#bool")||nominal_argument(c,&t,atom));}
+  if(t.tag==IR8_PACKET_TYPE_TAG_ARROW){(void)arrow_argument(c,t.id);}
+  else {G(c,15,TYPE,EQUATION,1,t.id,1,t.tag==IR8_PACKET_TYPE_TAG_CLOSED);const char *atom=rt8_private_string(c,t.atom);
+   G(c,15,TYPE,EQUATION,1,t.id,2,literal_equal(c,atom,"#i64")||literal_equal(c,atom,"#bool")||nominal_argument(c,&t,atom));}}
  G(c,25,STATE,STATE,14,v.site.id,5,v.node->state!=RT8_NS_HOLE);
  const Rt8Access *next=rt8_private_access(c,v.site.id,v.row.origin_env,IR8_PACKET_ACCESS_MODE_MONO,use.env,N);uint32_t nextid=rt8_private_table_auth(c,17,next);Ir8PacketAccess access;
  rt8_private_table(c,17,nextid,&access,sizeof(access));G(c,15,TYPE,EQUATION,19,uid,5,access.type==use.result_type);

@@ -28,6 +28,7 @@ MAX_WORK = 1_000_000
 MAX_INSTRUCTIONS = 10_000
 MAX_CODES = 2048
 MAX_TYPES = 4096
+MAX_TYPE_DEPTH = 32
 MAX_CAPTURES = 64
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 SCALARS = {'Int': ('scalar', '#i64'), 'Bool': ('scalar', '#bool')}
@@ -91,6 +92,11 @@ class Planner:
         self.knot_depth = 0
         self.fragment = fragment
         self.root = fragment['raw_normalized']
+        # Only the new coordinate domain needs expanded structural-work guards.
+        # Keep old scalar/nominal plans, including their work counters, exact.
+        self.arrow_coordinates = any(t['tag'] == 'arrow'
+            for u in fragment['polymorphism']['uses'] for t in u['arguments'])
+        self._type_costs = {}  # id -> (retained object, height, expanded weight)
         recursion = fragment.get('recursion')
         self.recursion_rows = {}
         if recursion is not None:
@@ -173,11 +179,11 @@ class Planner:
             require(len(vector) == len(d['prefix']) and
                     (all(t[0] == 'scalar' for t in vector) or
                      all(self.closed_argument(t) for t in vector)),
-                    'complete closed intrinsic/admitted nominal vector required')
+                    'complete closed intrinsic/admitted nominal/Repeat-unknown arrow vector required')
             pair = (d['binding']['id'], vector)
             self.use_pairs[path] = pair
             typ = self.substitute(self.definition_types[d['id']], 'S' + str(d['id']), vector)
-            require(typ == self.logical(u['instantiated_type'], None), 'replayed use result differs')
+            require(self.same_type(typ, self.logical(u['instantiated_type'], None)), 'replayed use result differs')
             self.use_types[path] = typ
 
     def tick(self, amount=1):
@@ -201,7 +207,7 @@ class Planner:
         return node
 
     def logical(self, raw, scope, depth=0):
-        self.tick(); require(depth < 32, 'logical type depth limit')
+        self.tick(); require(depth < MAX_TYPE_DEPTH, 'logical type depth limit')
         if raw['tag'] == 'constructor':
             require(raw['arguments'] == [], 'parameterized nominal type unsupported')
             if raw['name'] in SCALARS:
@@ -217,19 +223,137 @@ class Planner:
 
     def closed_argument(self, typ):
         self.tick()
+        if typ[0] == 'arrow':
+            # No registry insertion, nominal unfolding or desired-Code lookup.
+            self.structural_work(typ)
+            pending = [typ]; seen = set()
+            while pending:
+                part = pending.pop(); ident = id(part)
+                if ident in seen:
+                    continue
+                seen.add(ident); self.tick()
+                if part[0] == 'arrow':
+                    require(part[3:] == ('repeat', 'unknown'), 'closed coordinate callable contract')
+                    pending.extend(part[1:3])
+                elif not (part in SCALARS.values() or
+                          (part[0] == 'nominal' and part in self.nominal_layouts)):
+                    return False
+            return True
         return typ in SCALARS.values() or (typ[0] == 'nominal' and typ in self.nominal_layouts)
 
+    def type_cost(self, typ):
+        """Bound a tuple DAG before hashing/equality can expand its sharing.
+
+        Cache keys are object IDs, not structural tuples. Retaining each object
+        prevents ID reuse. Weight counts the expanded tuple slots, saturating
+        before arithmetic can grow; it is not the canonical Type-row count.
+        """
+        pending = [(typ, False)]; active = set()
+        while pending:
+            node, finish = pending.pop(); ident = id(node)
+            cached = self._type_costs.get(ident)
+            if cached is not None:
+                require(cached[0] is node, 'type-cost identity differs')
+                continue
+            self.tick()
+            require(type(node) is tuple and node, 'invalid logical type tuple')
+            if not finish:
+                require(ident not in active, 'cyclic logical type')
+                tag = node[0]
+                if tag == 'arrow':
+                    require(len(node) == 5 and node[3:] == ('repeat', 'unknown'),
+                            'unsupported callable contract')
+                    active.add(ident); pending.append((node, True))
+                    pending.extend(((node[2], False), (node[1], False)))
+                    continue
+                require((tag == 'scalar' and len(node) == 2) or
+                        (tag == 'rigid' and len(node) == 3) or
+                        (tag == 'nominal' and len(node) == 4 and type(node[3]) is tuple),
+                        'invalid logical atom')
+                height = 1; weight = 1 + len(node)
+                if tag == 'nominal':
+                    weight += len(node[3])
+            else:
+                left = self._type_costs[id(node[1])]; right = self._type_costs[id(node[2])]
+                height = 1 + max(left[1], right[1])
+                weight = min(MAX_WORK + 1, 6 + left[2] + right[2])
+                active.remove(ident)
+            require(height <= MAX_TYPE_DEPTH, 'logical type depth limit')
+            self._type_costs[ident] = (node, height, weight)
+        return self._type_costs[id(typ)][1:]
+
+    def structural_work(self, *types, multiplier=1):
+        if self.arrow_coordinates:
+            weight = sum(self.type_cost(t)[1] for t in types)
+            self.tick(min(MAX_WORK + 1, multiplier * weight))
+
+    def same_type(self, left, right):
+        self.structural_work(left, right)
+        return left == right
+
+    def pair_work(self, pair, multiplier=1):
+        if self.arrow_coordinates:
+            weight = 3 + sum(self.type_cost(t)[1] for t in pair[1])
+            self.tick(min(MAX_WORK + 1, multiplier * weight))
+
+    def sorted_pairs(self, pairs):
+        if self.arrow_coordinates:
+            # A conservative quadratic comparison allowance, charged before
+            # Python's sort sees any nested vector. No abbreviated vector key.
+            for pair in pairs:
+                self.pair_work(pair, multiplier=max(1, len(pairs)))
+        return sorted(pairs)
+
+    def same_pairs(self, left, right):
+        if self.arrow_coordinates:
+            for pair in list(left) + list(right):
+                self.pair_work(pair)
+        return left == right
+
+    def substitution_work(self, typ, scope, vector):
+        """Measure a result before constructing it or comparing its tuples."""
+        metrics = {}; pending = [(typ, False)]
+        for argument in vector:
+            self.type_cost(argument)
+        while pending:
+            node, finish = pending.pop(); ident = id(node)
+            if ident in metrics:
+                continue
+            self.tick()
+            if node[0] == 'rigid':
+                require(node[1] == scope and type(node[2]) is int and 0 <= node[2] < len(vector),
+                        'foreign Scheme rigid')
+                metrics[ident] = self.type_cost(vector[node[2]])
+            elif node[0] != 'arrow':
+                metrics[ident] = self.type_cost(node)
+            elif not finish:
+                pending.append((node, True))
+                pending.extend(((node[2], False), (node[1], False)))
+            else:
+                left, right = metrics[id(node[1])], metrics[id(node[2])]
+                height = 1 + max(left[0], right[0])
+                require(height <= MAX_TYPE_DEPTH, 'substituted logical type depth limit')
+                metrics[ident] = (height, min(MAX_WORK + 1, 6 + left[1] + right[1]))
+        self.tick(metrics[id(typ)][1])
+
     def substitute(self, typ, scope, vector):
+        if self.arrow_coordinates:
+            self.type_cost(typ)
+            self.substitution_work(typ, scope, vector)
+        return self._substitute(typ, scope, vector)
+
+    def _substitute(self, typ, scope, vector):
         self.tick()
         if typ[0] == 'rigid':
             require(typ[1] == scope, 'foreign Scheme rigid')
             return vector[typ[2]]
         if typ[0] == 'arrow':
-            return ('arrow', self.substitute(typ[1], scope, vector), self.substitute(typ[2], scope, vector), typ[3], typ[4])
+            return ('arrow', self._substitute(typ[1], scope, vector), self._substitute(typ[2], scope, vector), typ[3], typ[4])
         return typ
 
     def type_name(self, typ):
         self.tick()
+        self.structural_work(typ, multiplier=3)
         if typ in self.type_names:
             return self.type_names[typ]
         if typ[0] == 'scalar': row = {'tag': 'closed', 'layout': typ[1]}
@@ -248,6 +372,7 @@ class Planner:
 
     def signature(self, typ):
         self.tick(); require(typ[0] == 'arrow', 'callable required')
+        self.structural_work(typ, multiplier=3)
         if typ not in self.signature_names:
             name = 'A' + str(len(self.signatures)); self.signature_names[typ] = name
             self.signatures[name] = {'argument': self.layout(typ[1]), 'result': self.layout(typ[2]),
@@ -308,6 +433,7 @@ class Planner:
         self.term_map[path] = row
 
     def instantiation(self, pair):
+        self.pair_work(pair, multiplier=3)
         if pair not in self.instantiation_names:
             require(len(self.instantiations) < 1024, 'complete-vector instantiation limit')
             d = self.def_by_binder[pair[0]]
@@ -318,6 +444,7 @@ class Planner:
 
     def acquire_view(self, pair, env, views, block):
         self.tick(); paths = []
+        self.pair_work(pair)
         source = views.get(pair)
         if source is not None:
             ref = Reference(self.fresh(), source.logical, strict=source.strict)
@@ -345,7 +472,9 @@ class Planner:
             if tag == 'type_application':
                 require(p in self.uses, 'unmapped type application')
                 key = self.use_pairs[p]
-                if key[0] not in local: pairs.setdefault(key, []).append(self.uses[p]['id'])
+                if key[0] not in local:
+                    self.pair_work(key)
+                    pairs.setdefault(key, []).append(self.uses[p]['id'])
                 return
             if tag == 'var':
                 if n['name']['id'] not in local: mono.add(n['name']['id'])
@@ -397,11 +526,12 @@ class Planner:
                                'relation': 'below' if ref.strict else 'down'}
             inner[ident] = Reference(name, ref.logical, strict=ref.strict)
             carrier['mono_captures'].append({'binder': ident, 'capture': name, **contracts[name]})
-        for pair in sorted(pairs):
+        for pair in self.sorted_pairs(pairs):
             ref, creation, source = self.acquire_view(pair, env, views, block); temps.append(ref)
             name = self.fresh('view'); actual[name] = ref.variable
             contracts[name] = {'layout': self.layout(ref.logical),
                                'relation': 'below' if ref.strict else 'down'}
+            self.pair_work(pair, multiplier=2)
             saved[pair] = Reference(name, ref.logical, carrier['carrier'], ref.strict)
             d = self.def_by_binder[pair[0]]
             carrier['view_captures'].append({'definition': d['id'], 'binder': pair[0],
@@ -427,7 +557,7 @@ class Planner:
             self.use_map.append({'use': u['id'], 'source': address(path), 'definition': u['definition'],
                                  'arguments': [self.type_name(t) for t in self.use_pairs[path][1]],
                                  'creation': creation, 'source_view': source})
-            require(ref.logical == self.use_types[path], 'captured full-vector view mismatch')
+            require(self.same_type(ref.logical, self.use_types[path]), 'captured full-vector view mismatch')
             return ref
         if path in self.constructor_rows:
             return self.constructor(node, path, env, views, home, block, scope)
@@ -471,7 +601,7 @@ class Planner:
                 child=Block(block.root,block.name,[],block.prefix+(len(block.body),'body'),scheme)
                 cursor=self.node_at(d['rhs_cursor']['path'])
                 result=self.emit(cursor,tuple(d['rhs_cursor']['path']),{}, {}, '$home',child,scheme)
-                require(result.logical==self.definition_types[d['id']], 'generic RHS actual result type differs')
+                require(self.same_type(result.logical, self.definition_types[d['id']]), 'generic RHS actual result type differs')
                 seal=self.add(child,op='seal',value=result.variable)
                 intro=self.add(block,op='generalize',out=out,**{'in':key},scheme=scheme,body=child.body)
                 self.close_builder(key,split,placement,block)
@@ -506,7 +636,7 @@ class Planner:
         if tag == 'application':
             fn=self.emit(node['function'],path+('function',),env,views,home,block,scope)
             arg=self.emit(node['argument'],path+('argument',),env,views,home,block,scope)
-            require(fn.logical[0]=='arrow' and fn.logical[1]==arg.logical, 'complete ordinary callable argument mismatch')
+            require(fn.logical[0]=='arrow' and self.same_type(fn.logical[1], arg.logical), 'complete ordinary callable argument mismatch')
             out=self.fresh(); typ=fn.logical[2]
             key,split,placement = self.allocation(home,[fn,arg],block,path,'application',scope)
             self.add(block,path,typ,op='application',out=out,**{'in':key},function=fn.variable,argument=arg.variable)
@@ -559,7 +689,7 @@ class Planner:
             rhs = self.emit(binding['value'],rhs_path,inner,saved,home,block,None)
         finally:
             self.knot_depth -= 1
-        require(rhs.logical == typ, 'recursive RHS differs from its full annotation')
+        require(self.same_type(rhs.logical, typ), 'recursive RHS differs from its full annotation')
         row['rhs_owner'] = rhs.variable
         row['fill'] = self.add(block,op='fill',hole=hole,value=rhs.variable)
         row['drop_rhs'] = self.add(block,op='drop',value=rhs.variable)
@@ -621,7 +751,7 @@ class Planner:
         for row in captures['scalars']:
             ident = row['binding']['id']; typ = self.logical(row['type'],None)
             source = env.get(ident)
-            require(typ in SCALARS.values() and isinstance(source,Reference) and source.logical == typ,
+            require(typ in SCALARS.values() and isinstance(source,Reference) and self.same_type(source.logical, typ),
                     'recursive ordinary capture must be an available closed scalar owner')
             inner[ident] = source
         nominal_callable = False
@@ -642,7 +772,7 @@ class Planner:
                         'recursive callable capture requires exact closed scalar-arrow structure')
                 work.extend((part[1],part[2]))
             source = env.get(ident)
-            require(isinstance(source,Reference) and source.logical == typ,
+            require(isinstance(source,Reference) and self.same_type(source.logical, typ),
                     'recursive callable capture must be an available exact ordinary owner')
             # In particular, do not acquire a Scheme view or inspect readiness
             # here. A pending owner may eventually resolve to a shared Instance.
@@ -654,7 +784,7 @@ class Planner:
             require(typ[0] == 'nominal' and type(row['declaration']) is int and
                     row['declaration'] == typ[1], 'recursive nominal declaration identity differs')
             source = env.get(ident)
-            require(isinstance(source,Reference) and source.logical == typ,
+            require(isinstance(source,Reference) and self.same_type(source.logical, typ),
                     'recursive nominal capture must be an available exact ordinary owner')
             # The logical atom includes the replayed declaration index, name,
             # and source path. Keep this owner's support and Access untouched;
@@ -665,25 +795,28 @@ class Planner:
             vector = tuple(self.logical(t,None) for t in row['arguments'])
             require(all(t in SCALARS.values() for t in vector) or
                     all(self.closed_argument(t) for t in vector),
-                    'recursive view vector must be closed intrinsic/admitted nominal atoms')
+                    'recursive view vector must be closed intrinsic/admitted nominal/Repeat-unknown types')
             pair = (row['binding']['id'],vector); keys.append(pair)
+            self.pair_work(pair, multiplier=2)
             definition = self.def_by_binder.get(pair[0])
             require(definition is not None and row['definition'] == definition['id'] and
                     row['binding'] == definition['binding'] and len(vector) == len(definition['prefix']) and
                     pair in pairs and row['uses'] == pairs[pair], 'recursive shared-view inventory differs')
             typ = self.substitute(self.definition_types[definition['id']], 'S'+str(definition['id']),vector)
-            require(self.logical(row['instantiated_type'],None) == typ, 'recursive shared-view full type differs')
+            require(self.same_type(self.logical(row['instantiated_type'],None), typ), 'recursive shared-view full type differs')
+            self.pair_work(pair)
             source = views.get(pair)
             if source is not None:
-                require(isinstance(source,Reference) and source.logical == typ and source.carrier is not None,
+                require(isinstance(source,Reference) and self.same_type(source.logical, typ) and source.carrier is not None,
                         'recursive saved view is unavailable or has a different type')
+                self.pair_work(pair)
                 saved[pair] = source
             else:
                 source = env.get(pair[0])
                 require(isinstance(source,SchemeReference) and source.definition == definition['id'],
                         'recursive shared view lacks its lexical Scheme owner')
                 inner[pair[0]] = source
-        require(keys == sorted(pairs), 'recursive complete-vector capture inventory differs')
+        require(self.same_pairs(keys, self.sorted_pairs(pairs)), 'recursive complete-vector capture inventory differs')
         return inner,saved
 
     def constructor(self, node, path, env, views, home, block, scope):
@@ -702,10 +835,10 @@ class Planner:
         fields = []
         for source,typ in zip(row['arguments'], expected):
             ap = tuple(source['path']); ref = self.emit(self.node_at(ap), ap, env, views, home, block, None)
-            require(ref.logical == typ, 'exact constructor field type differs')
+            require(self.same_type(ref.logical, typ), 'exact constructor field type differs')
             fields.append(ref)
         typ = self.logical(row['result_type'], None); out = self.fresh('data')
-        require(typ == self.logical(declaration['type'], None), 'constructor nominal identity differs')
+        require(self.same_type(typ, self.logical(declaration['type'], None)), 'constructor nominal identity differs')
         key,split,placement = self.allocation(home,fields,block,path,'data',scope)
         publication = self.add(block, path, typ, op='alloc', out=out, **{'in':key},
                                layout=self.nominal_layouts[typ],
@@ -734,12 +867,12 @@ class Planner:
         fields = []
         for source,typ in zip(row['arguments'], expected):
             ap = tuple(source['path']); ref = self.emit(self.node_at(ap), ap, env, views, home, block, None)
-            require(ref.logical == typ and (typ in SCALARS.values() or
-                    typ == self.logical(declaration['type'], None)),
+            require(self.same_type(ref.logical, typ) and (typ in SCALARS.values() or
+                    self.same_type(typ, self.logical(declaration['type'], None))),
                     'SUM field exact scalar/self type differs')
             fields.append(ref)
         typ = self.logical(row['result_type'], None)
-        require(typ == self.logical(declaration['type'], None), 'SUM nominal identity differs')
+        require(self.same_type(typ, self.logical(declaration['type'], None)), 'SUM nominal identity differs')
         out = self.fresh('sum'); family = self.sum_families[row['declaration']]
         instruction = {'op':'construct_sum' if fields else 'construct_nullary', 'out':out,
                        'in':home, 'family':family, 'variant':'V'+str(row['variant'])}
@@ -763,7 +896,7 @@ class Planner:
         cb = Block('thunk',name,[])
         sp = tuple(row['scrutinee']['path'])
         raw = self.emit(self.node_at(sp),sp,inner,saved,'$home',cb,None)
-        require(raw.logical == self.logical(declaration['type'],None), 'SUM case nominal identity differs')
+        require(self.same_type(raw.logical, self.logical(declaration['type'],None)), 'SUM case nominal identity differs')
         ready = self.fresh('sumready'); self.add(cb,op='force',out=ready,value=raw.variable)
         factory = {}; arm_maps = []; arm_temps = []
         require(len(row['arms']) == len(declaration['variants']), 'SUM case must be exhaustive')
@@ -799,7 +932,7 @@ class Planner:
             arm_carrier['field_captures'] = field_map
             ab = Block('thunk',code,[])
             result = self.emit(body,bp,arm_env,arm_views,'$home',ab,None)
-            require(result.logical == typ, 'SUM arm result exact Int type differs')
+            require(self.same_type(result.logical, typ), 'SUM arm result exact Int type differs')
             for ref in list(arm_env.values())+list(arm_views.values()): self.release(ref,ab)
             self.add(ab,op='return',value=result.variable)
             self.codes[code] = {'result':self.layout(typ),'captures':captures,'body':ab.body,'type_scope':None}
@@ -847,7 +980,7 @@ class Planner:
         cb = Block('thunk',name,[])
         sp = tuple(row['scrutinee']['path'])
         raw = self.emit(self.node_at(sp),sp,inner,saved,'$home',cb,None)
-        require(raw.logical == self.logical(declaration['type'],None), 'case nominal identity differs')
+        require(self.same_type(raw.logical, self.logical(declaration['type'],None)), 'case nominal identity differs')
         ready = self.fresh('container'); self.add(cb,op='force',out=ready,value=raw.variable)
         fields = {}; projections = []
         for f in row['fields']:
@@ -874,12 +1007,13 @@ class Planner:
                     early_releases.append(self.add(cb,op='drop',value=ref.variable))
                     del inner[ident]
             for pair,ref in list(saved.items()):
+                self.pair_work(pair, multiplier=2)
                 self.tick()
                 if pair not in needed_pairs:
                     early_releases.append(self.add(cb,op='drop',value=ref.variable))
                     del saved[pair]
         result = self.emit(self.node_at(bp),bp,inner|fields,saved,'$home',cb,None)
-        require(result.logical == typ, 'case result full type differs')
+        require(self.same_type(result.logical, typ), 'case result full type differs')
         for ref in list(inner.values())+list(saved.values())+list(fields.values()): self.release(ref,cb)
         self.add(cb,op='return',value=result.variable)
         self.codes[name] = {'result':self.layout(typ),'captures':contracts,'body':cb.body,'type_scope':None}
@@ -944,7 +1078,7 @@ class Planner:
         block=Block('entry',None,[]); self.add(block,op='new_root',out='root',imports=[])
         result=self.emit(self.root,(),{}, {},'root',block,None)
         require(result.logical in SCALARS.values(), 'entry requires closed scalar result')
-        require(result.logical==self.logical(self.fragment['checked_type'],None), 'fragment root result differs')
+        require(self.same_type(result.logical, self.logical(self.fragment['checked_type'],None)), 'fragment root result differs')
         ready=self.fresh(); self.add(block,op='force',out=ready,value=result.variable)
         self.add(block,op='drop',value='root'); self.add(block,op='finish_scalar',value=ready)
         expected={tuple(r['normalized']['path']):r['tag'] for r in self.fragment['term_correspondence']}

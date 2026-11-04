@@ -730,6 +730,56 @@ static int nominal_argument(Check *c,const Ir8PacketType *t) {
     return 1;
 }
 
+/* Only the new arrow-coordinate path uses this walk. It follows Type IDs, not
+ * nominal fields, and rechecks shared DAG children on every visit. Each child
+ * must use the exact canonical representation named by its parent. */
+static int arrow_argument(Check *c,uint32_t root) {
+    uint32_t stack[32][3],sp=1;
+    TRY(charge(c,sizeof(stack[0])+1));stack[0][0]=root;stack[0][1]=N;stack[0][2]=1;
+    while(sp){
+        uint32_t type,expected,depth,id;Ir8PacketType t;Ir8PacketShapeBinding s;
+        Ir8PacketShapeTyping st;Ir8PacketRepresentation rep;Ir8PacketShapeSpec spec;
+        TRY(charge(c,sizeof(stack[0])+4));--sp;
+        type=stack[sp][0];expected=stack[sp][1];depth=stack[sp][2];
+        at(c,1,c->t.table[0].object,type,N);TRY(row(c,1,type,&t));
+        REQUIRE_N(depth<=32&&(t.tag==IR8_PACKET_TYPE_TAG_CLOSED||t.tag==IR8_PACKET_TYPE_TAG_ARROW),TYPE_EQUATION,EQUATION,3);
+        TRY(shape_find(c,t.tag==IR8_PACKET_TYPE_TAG_ARROW?IR8_PACKET_SHAPE_SOURCE_CANONICAL_ARROW:IR8_PACKET_SHAPE_SOURCE_LEGACY,
+            t.tag==IR8_PACKET_TYPE_TAG_ARROW?t.id:t.atom,N,&id));
+        REQUIRE_N((expected==N&&depth==1)||(expected!=N&&expected==id),REPRESENTATION_EQUATION,EQUATION,4);
+        TRY(row(c,7,id,&s));TRY(row(c,8,id,&st));TRY(row(c,9,id,&rep));TRY(descriptor(c,1,id,&spec));
+        REQUIRE_N(st.shape==id&&st.type==t.id&&st.scope==N&&rep.shape==id&&rep.typing==id&&
+            spec.shape==id&&spec.typing==id&&spec.representation==id&&spec.kind==s.kind&&
+            spec.argument_rep==s.argument_rep&&spec.result_rep==s.result_rep,REPRESENTATION_EQUATION,EQUATION,11);
+        if(t.tag==IR8_PACKET_TYPE_TAG_ARROW){Ir8PacketCallableContract contract;
+            REQUIRE_N(t.atom==N&&t.scheme==N&&t.index==N&&t.argument<t.id&&t.result<t.id&&
+                t.protocol==IR8_PACKET_PROTOCOL_REPEAT&&t.result_identity==IR8_PACKET_RESULT_IDENTITY_UNKNOWN,
+                TYPE_EQUATION,EQUATION,7);
+            REQUIRE_N(s.source_tag==IR8_PACKET_SHAPE_SOURCE_CANONICAL_ARROW&&s.source_type==t.id&&
+                s.source_reference==N&&s.source_scheme==N&&s.kind==IR8_PACKET_SHAPE_KIND_REPEAT&&
+                rep.ready_kind==IR8_PACKET_READY_KIND_FUNCTION&&s.argument_rep!=N&&s.result_rep!=N&&spec.fields_object==N&&
+                spec.field_first==0&&spec.field_count==0,REPRESENTATION_EQUATION,EQUATION,11);
+            TRY(row(c,2,st.contract,&contract));
+            REQUIRE_N(contract.type==t.id&&contract.argument==t.argument&&contract.result==t.result&&
+                contract.protocol==t.protocol&&contract.result_identity==t.result_identity,TYPE_EQUATION,EQUATION,5);
+            REQUIRE_N(depth<32&&sp<=30,TYPE_EQUATION,LIMIT,2);
+            TRY(charge(c,2*sizeof(stack[0])+8));
+            stack[sp][0]=t.result;stack[sp][1]=s.result_rep;stack[sp][2]=depth+1;++sp;
+            stack[sp][0]=t.argument;stack[sp][1]=s.argument_rep;stack[sp][2]=depth+1;++sp;
+        }else{int b,i;
+            REQUIRE_N(t.scheme==N&&t.index==N&&t.argument==N&&t.result==N&&t.protocol==N&&t.result_identity==N,
+                TYPE_EQUATION,EQUATION,6);
+            TRY(string_is(c,t.atom,"#bool",&b));TRY(string_is(c,t.atom,"#i64",&i));
+            if(b||i){
+                REQUIRE_N(s.source_tag==IR8_PACKET_SHAPE_SOURCE_LEGACY&&s.source_reference==t.atom&&
+                    s.source_type==N&&s.source_scheme==N&&s.kind==(b?IR8_PACKET_SHAPE_KIND_BOOL:IR8_PACKET_SHAPE_KIND_I64)&&
+                    st.contract==N&&rep.ready_kind==IR8_PACKET_READY_KIND_SCALAR&&s.argument_rep==N&&s.result_rep==N&&
+                    spec.fields_object==N&&spec.field_first==0&&spec.field_count==0,REPRESENTATION_EQUATION,EQUATION,12);
+            }else{TRY(nominal_argument(c,&t));}
+        }
+    }
+    return 1;
+}
+
 static int check_environments(Check *c) {
     uint32_t i,eid=1,j;int cmp;
     for(i=0;i<c->t.table[2].count;++i){Ir8PacketScheme s;Ir8PacketEnv e;Ir8PacketType b;
@@ -744,10 +794,12 @@ static int check_environments(Check *c) {
             TRY(row(c,4,eid,&cur));if(cur.scheme!=i){ break; }
             REQUIRE_N(cur.mode==3&&cur.arguments.count==s.parameters,TYPE_EQUATION,EQUATION,2);TRY(row(c,4,eid-1,&prev));
             for(j=0;j<s.parameters;++j){Ir8PacketTypeRef r,p;Ir8PacketType t;int b1,b2;
-                TRY(vector_read(c,cur.arguments,23,j,&r));TRY(row(c,1,r.row,&t));REQUIRE(t.tag==1,TYPE_EQUATION,EQUATION);
-                TRY(string_is(c,t.atom,"#bool",&b1));TRY(string_is(c,t.atom,"#i64",&b2));
-                if(b1||b2){REQUIRE(1,TYPE_EQUATION,EQUATION);}
-                else {TRY(charge(c,1));TRY(nominal_argument(c,&t));}
+                TRY(vector_read(c,cur.arguments,23,j,&r));TRY(row(c,1,r.row,&t));
+                if(t.tag==IR8_PACKET_TYPE_TAG_ARROW){TRY(arrow_argument(c,t.id));}
+                else {REQUIRE(t.tag==1,TYPE_EQUATION,EQUATION);
+                    TRY(string_is(c,t.atom,"#bool",&b1));TRY(string_is(c,t.atom,"#i64",&b2));
+                    if(b1||b2){REQUIRE(1,TYPE_EQUATION,EQUATION);}
+                    else {TRY(charge(c,1));TRY(nominal_argument(c,&t));}}
                 if(prev.mode==3&&!order){TRY(vector_read(c,prev.arguments,23,j,&p));TRY(charge(c,1));order=p.row<r.row?-1:p.row>r.row?1:0;}}
             if(prev.mode==3){ REQUIRE(order<0,TYPE_EQUATION,ORDER); }++eid;
         }

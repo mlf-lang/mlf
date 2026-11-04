@@ -51,6 +51,73 @@ def _registered_nominal_atom(raw, atom, budget):
     return atom in raw['layouts']
 
 
+def _closed_arrow_argument(bank, root, checked, budget):
+    """Check a new arrow coordinate through flat IDs, once per reachable node.
+
+    The bank already checked child topology, depth and physical identities.
+    This additional admission rule forbids rigids and argument-identity arrows
+    at every depth. The local set is allocated only for an arrow-vector path.
+    """
+    budget.work()
+    if root in checked:
+        return
+    budget.creation()
+    pending = []
+    budget.add(checked, root)
+    budget.append(pending, root)
+    while pending:
+        value = pending.pop()
+        budget.work()
+        node = bank.nodes[value]
+        if node[0] == 'closed':
+            if node[1] not in ('#bool', '#i64') and not _registered_nominal_atom(bank.raw, node[1], budget):
+                _error('metadata.uses', 'VECTOR', 'arrow argument leaf has no exact physical declaration')
+        elif node[0] == 'arrow' and node[3] == 'repeat' and node[4] == 'unknown' and bank.scopes[value] == 0:
+            for offset in range(1, 3):
+                budget.work()
+                child = node[offset]
+                if child not in checked:
+                    budget.add(checked, child)
+                    budget.append(pending, child)
+        else:
+            _error('metadata.uses', 'VECTOR', 'arrow arguments require recursively closed Repeat/unknown contracts')
+
+
+def _verify_arrow_argument(raw, types, root, checked, budget):
+    """Independent row-based admission; check each child before dereferencing.
+
+    Do not use the builder's scope/contract facts or its retained flat nodes.
+    Strictly earlier child IDs establish acyclicity before the subsequent
+    forward pass independently verifies depth, null domains and all equations.
+    """
+    budget.work()
+    if root in checked:
+        return
+    budget.creation()
+    pending = []
+    budget.add(checked, root)
+    budget.append(pending, root)
+    while pending:
+        value = pending.pop()
+        budget.work()
+        row = types[value]
+        _exact(row, TYPE_FIELDS, 'metadata.types')
+        if type(row['id']) is not int or row['id'] != value:
+            _error('metadata.types', 'REFERENCE', 'argument Type ID differs from its position')
+        if row['tag'] == 'closed':
+            if row['atom'] not in ('#bool', '#i64') and not _registered_nominal_atom(raw, row['atom'], budget):
+                _error('metadata.environments', 'VECTOR', 'arrow argument leaf has no exact physical declaration')
+        elif row['tag'] == 'arrow' and row['protocol'] == 'repeat' and row['result_identity'] == 'unknown':
+            for field in ('argument', 'result'):
+                budget.work()
+                child = _integer(row[field], value, 'metadata.environments')
+                if child not in checked:
+                    budget.add(checked, child)
+                    budget.append(pending, child)
+        else:
+            _error('metadata.environments', 'VECTOR', 'arrow arguments require recursively closed Repeat/unknown contracts')
+
+
 def _node(row, scheme_names, path):
     _exact(row, TYPE_FIELDS, path)
     tag = row['tag']
@@ -237,6 +304,7 @@ def _environment_rows(raw, derived, bank, references, scheme_map, budget):
     budget.record_append(rows, id=0, scheme=None, mode='CONCRETE', arguments=[])
     budget.creation()  # E0 empty argument vector
     budget.put(remap, 'E0', 0)
+    checked_arguments = None
     for name in budget.ordered(raw['schemes']):
         scheme = scheme_map[name]
         spec = raw['schemes'][name]
@@ -261,6 +329,7 @@ def _environment_rows(raw, derived, bank, references, scheme_map, budget):
         budget.creation()
         vectors = set()
         nominal_vectors = False
+        arrow_vectors = False
         for use in derived['uses']:
             budget.work()
             if use['scheme'] == name:
@@ -274,6 +343,13 @@ def _environment_rows(raw, derived, bank, references, scheme_map, budget):
                 for value in exact:
                     budget.work()
                     node = bank.nodes[value]
+                    if node[0] == 'arrow':
+                        if checked_arguments is None:
+                            budget.creation()
+                            checked_arguments = set()
+                        _closed_arrow_argument(bank, value, checked_arguments, budget)
+                        arrow_vectors = True
+                        continue
                     if node[0] != 'closed':
                         _error('metadata.uses', 'VECTOR', 'closed vectors require registered intrinsic, DATA or SUM atoms')
                     if node[1] not in ('#bool', '#i64'):
@@ -281,7 +357,13 @@ def _environment_rows(raw, derived, bank, references, scheme_map, budget):
                             _error('metadata.uses', 'VECTOR', 'closed vector atom has no exact physical declaration')
                         nominal_vectors = True
                 budget.add(vectors, exact)
-        if nominal_vectors:
+        if arrow_vectors:
+            # These are original freshly checked canonical Type IDs, before
+            # substitution appends any nodes. They are whole-Type ranks, not
+            # arbitrary child-ID structural keys. Later canonical insertion
+            # preserves their relative order and therefore the exact Env IDs.
+            ordered = budget.ordered(vectors)
+        elif nominal_vectors:
             # Every admitted coordinate is an atomic depth-one closed Type.
             # Canonical Type order compares JSON-encoded atom strings, not raw
             # strings (which disagree for escaped/control names). Cache only
@@ -1018,6 +1100,8 @@ def _verify_domains(raw, derived, closure, budget):
             _error('metadata.schemes', 'INTRODUCTION', 'scheme introduction association differs')
     if not 1 <= len(tables['environments']) <= ENVIRONMENT_LIMIT:
         _error('metadata.environments', 'COUNT', 'environment count outside bounds')
+    checked_arguments = None
+    arrow_schemes = 0
     for index, env in enumerate(tables['environments']):
         budget.work()
         _exact(env, ('id', 'scheme', 'mode', 'arguments'), 'metadata.environments')
@@ -1041,10 +1125,29 @@ def _verify_domains(raw, derived, closure, budget):
             if env['mode'] == 'NEUTRAL':
                 if node['tag'] != 'rigid' or type(node['scheme']) is not int or node['scheme'] != sid or type(node['index']) is not int or node['index'] != position:
                     _error('metadata.environments', 'VECTOR', 'neutral vector is not the exact ordered own-rigid prefix')
+            elif node['tag'] == 'arrow':
+                if checked_arguments is None:
+                    budget.creation()
+                    checked_arguments = set()
+                _verify_arrow_argument(raw, tables['types'], type_id, checked_arguments, budget)
+                arrow_schemes |= 1 << sid
             elif (node['tag'] != 'closed' or
                   (node['atom'] not in ('#bool', '#i64') and
                    not _registered_nominal_atom(raw, node['atom'], budget))):
                 _error('metadata.environments', 'VECTOR', 'closed vector requires an exact registered intrinsic, DATA or SUM atom')
+    if arrow_schemes:
+        # Check the WHOLE ordered vector inventory for each newly admitted
+        # scheme, including atomic and dead coordinates, after Type-ID remap.
+        # Scalar/nominal-only invocations retain their exact prior work path.
+        budget.creation()
+        previous = {}
+        for env in tables['environments']:
+            budget.work()
+            if env['mode'] == 'CLOSED' and arrow_schemes & (1 << env['scheme']):
+                before = previous.get(env['scheme'])
+                if before is not None and _compare(before, env['arguments'], budget) >= 0:
+                    _error('metadata.environments', 'ORDER', 'complete closed vectors are not in strict canonical Type-ID order')
+                budget.put(previous, env['scheme'], env['arguments'])
     if len(tables['environment_remap']) != len(tables['environments']):
         _error('metadata.environment_remap', 'REMAP', 'environment remap is not total')
     for index, row in enumerate(tables['environment_remap']):

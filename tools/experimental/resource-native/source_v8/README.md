@@ -38,8 +38,8 @@ entrypoint. It is not yet a general shared-polymorphic source bridge.
    driver. It does not use dummy callbacks or an older runtime fallback.
 
 The supported fragment is deliberately narrow: Int, Bool and arrows; complete
-closed Int/Bool or exact registered parameter-free DATA/SUM atom vectors at
-shared rank-1 callable uses; supported scalar
+closed Int/Bool, exact registered parameter-free DATA/SUM atoms or finite
+Repeat/unknown arrows over those leaves at shared rank-1 callable uses; supported scalar
 primitives and an Int conditional. Pending shared RHSs, captured callable views,
 dead type parameters and curried callable values have separate regression
 cases. Bare, partial or open shared uses, recursive/nested generic definitions,
@@ -79,6 +79,17 @@ production code or type-argument boundary. Equal- and opposite-coordinate cases
 pass local native, sanitizer and the final default two-case fresh-source suite.
 The fixed-fuel retain/terminal pair covers the equal-coordinate case only.
 Exact Stage22 CI remains separate.
+
+[Stage23](../resource_ir_v8/README_STAGE23.md) adds those finite closed-arrow
+coordinates, not new generic nominal operations or field rules. Actual direct
+arrow beta selects outer-first normalization `/3`; an arrow shared use alone
+does not. The original ordinary helper or INSTANCE keeps its owner/origin when
+returned through the same or another Scheme. Four unannotated sources pass the
+finite native matrix, source/metadata/event checks, sanitizers and fresh default
+four-case suite. Focused A and synthetic nested-nominal arrow guards pass O0/O2;
+a fixed C fault pair preserves the evaluation and retires its ledger only on
+explicit terminal surrender. Exact-commit CI remains pending. Earlier stage
+exclusions below describe their historical scope, not a fallback admission path.
 
 ## Stage08: closed DATA and callable fields
 

@@ -13,7 +13,8 @@ arrows recursively over those scalars. Multi-constructor SUM families permit
 Int/Bool fields and exact zero-argument self-family atoms, with exhaustive
 Int-result cases. The optional self_recursive marker records that extension;
 nominal types are never unfolded. Complete shared-use vectors may additionally
-contain these exact published nominal atoms. This does not admit nominal atoms in generic code, callable SUM fields, cross-family recursion,
+contain these exact published nominal atoms or finite closed arrows over them.
+Every lowered arrow remains Repeat/unknown. This does not admit nominal atoms in generic code, callable SUM fields, cross-family recursion,
 or parameterized/higher-rank data. At most one retained recursive group globally
 is admitted, containing one concrete closed monomorphic function. Its optional
 capture policies permit closed Int/Bool owners, exact full-vector lexical
@@ -42,6 +43,8 @@ import transport as fragment
 FORMAT = 'mlf-shared-fragment-replay/1'
 POLICY = 'shared-rank1-callable/1'
 NOMINAL_BETA_POLICY = 'shared-rank1-callable/2'
+ARROW_BETA_POLICY = 'shared-rank1-callable/3'
+MAX_TYPE_DEPTH = 32  # Existing IR8 logical type bound, not raw JSON depth.
 MAX_CELLS = 10_000
 MAX_DEPTH = 100
 MAX_BYTES = 32 * 1024 * 1024
@@ -151,10 +154,11 @@ def _bounded(value, *, cells=MAX_CELLS, depth=MAX_DEPTH, byte_limit=MAX_BYTES):
 
 
 class _Budget:
-    def __init__(self):
+    def __init__(self, *, arrow_arguments=False):
         self.work = 0
         self.metadata = 0
         self.rows = 0
+        self.arrow_arguments = arrow_arguments
 
     def tick(self, count=1):
         self.work += count
@@ -176,6 +180,87 @@ class _Budget:
 
 def _address(stage, path):
     return {'stage': stage, 'path': list(path)}
+
+
+def _has_arrow_arguments(value):
+    """Only enable the additional source guards for a real raw arrow witness.
+
+    The input has already passed the finite JSON guard. This discovery does not
+    change old scalar/nominal replay work, rows, or evidence.
+    """
+    pending = [value]
+    while pending:
+        node = pending.pop()
+        if type(node) is dict:
+            if (node.get('tag') == 'bottom' and type(node.get('type')) is dict
+                    and node['type'].get('tag') == 'arrow'):
+                return True
+            pending.extend(node.values())
+        elif type(node) is list:
+            pending.extend(node)
+    return False
+
+
+def _type_bounds(typ, budget, substitution=None):
+    """Preflight logical height and expanded work without expanding a type DAG.
+
+    Optional substitution models the existing capture-avoiding type operation
+    before it allocates or any alpha comparison walks its result. Forall is a
+    source prefix, not an IR8 type node; each bound/body has its own monotype
+    height. Memoization uses object identity plus shadow state, never recursive
+    hashing/equality. The local cache and expanded tree weight are both bounded
+    by the existing retained-cell limit, with all traversal/work charged.
+    """
+    memo, active = {}, set()
+    pending = [(False, typ, substitution is not None)]
+    while pending:
+        leaving, node, replace = pending.pop()
+        budget.tick()
+        key = (id(node), replace)
+        if key in memo:
+            continue
+        if type(node) is not dict:
+            _fail('SCHEMA', 'type bound requires a raw type')
+        tag = node.get('tag')
+        replaced = replace and tag == 'var' and node['id'] == substitution[0]
+        if replaced:
+            children, adds_depth = [(substitution[1], False)], False
+        elif tag == 'arrow':
+            children, adds_depth = [(node['from'], replace), (node['to'], replace)], True
+        elif tag == 'forall':
+            children = [(node['bound'], replace),
+                        (node['body'], replace and node['id'] != substitution[0])]
+            adds_depth = False
+        elif tag == 'constructor':
+            children, adds_depth = [(part, replace) for part in node['arguments']], True
+        elif tag == 'apply':
+            children, adds_depth = [(node['function'], replace), (node['argument'], replace)], True
+        elif tag in ('var', 'bottom', 'bottom_kind'):
+            children, adds_depth = [], False
+        else:
+            _fail('SCHEMA', 'unsupported raw type in bound preflight')
+        if not leaving:
+            if key in active:
+                _fail('SCHEMA', 'cyclic raw type')
+            if len(memo) + len(active) >= MAX_CELLS:
+                _fail('LIMIT', 'type preflight cell bound')
+            active.add(key)
+            pending.append((True, node, replace))
+            pending.extend((False, part, mode) for part, mode in reversed(children))
+            continue
+        active.remove(key)
+        metrics = [memo[(id(part), mode)] for part, mode in children]
+        height = max((h for h, _ in metrics), default=0) + int(adds_depth)
+        height = max(1, height)
+        weight = (0 if replaced else 1) + sum(w for _, w in metrics)
+        if height > MAX_TYPE_DEPTH:
+            _fail('LIMIT', 'coordinate or substituted logical type depth exceeds 32')
+        if weight > MAX_CELLS:
+            _fail('LIMIT', 'expanded type exceeds retained-cell work bound')
+        memo[key] = (height, weight)
+    result = memo[(id(typ), substitution is not None)]
+    budget.tick(result[1])  # Reserve the ensuing expanded type walk/copy.
+    return result
 
 
 def _children(node):
@@ -362,6 +447,12 @@ class _Nominals:
 
 def _wf(typ, scope, budget, *, mono=False, nominals=None):
     """Star-kinded types with lexical rigids and exact optional nominal scope."""
+    if budget.arrow_arguments:
+        _type_bounds(typ, budget)
+    return _wf_inner(typ, scope, budget, mono=mono, nominals=nominals)
+
+
+def _wf_inner(typ, scope, budget, *, mono=False, nominals=None):
     budget.tick()
     tag = typ['tag']
     if tag == 'var':
@@ -373,14 +464,14 @@ def _wf(typ, scope, budget, *, mono=False, nominals=None):
                 _fail('TYPE', 'only intrinsic Int/Bool are in this fragment')
             nominals.type_row(typ)
     elif tag == 'arrow':
-        _wf(typ['from'], scope, budget, mono=True, nominals=nominals)
-        _wf(typ['to'], scope, budget, mono=True, nominals=nominals)
+        _wf_inner(typ['from'], scope, budget, mono=True, nominals=nominals)
+        _wf_inner(typ['to'], scope, budget, mono=True, nominals=nominals)
     elif tag == 'forall' and not mono:
         # The binder is NOT in scope over its own bound.
-        _wf(typ['bound'], scope, budget, nominals=nominals)
+        _wf_inner(typ['bound'], scope, budget, nominals=nominals)
         if typ['id'] in scope:
             _fail('TYPE_SCOPE', 'repeated active type binder')
-        _wf(typ['body'], scope | {typ['id']: typ['bound']}, budget, nominals=nominals)
+        _wf_inner(typ['body'], scope | {typ['id']: typ['bound']}, budget, nominals=nominals)
     elif _bottom(typ) and not mono:
         pass
     else:
@@ -462,6 +553,8 @@ def _compute(proof, source, scope, scope_ref, budget, *, nominals=None):
             # The admitted scope is fresh through every forall. A well-formed
             # bound cannot contain this or a nested active binder, so this use of
             # existing substitution is capture-avoiding even for raw outer vars.
+            if budget.arrow_arguments:
+                _type_bounds(typ['body'], budget, (typ['id'], typ['bound']))
             result = fragment.substitute_closed_type(typ['body'], typ['id'], typ['bound'])
             _bounded(result)
         else:
@@ -490,7 +583,7 @@ def replay_type_computation(witness, source_type, *, scope=()):
         witness, source_type, bindings = json.loads(_json([witness, source_type, list(scope)]))
         fragment.validate_computation(witness)
         fragment.validate_type(source_type)
-        budget = _Budget()
+        budget = _Budget(arrow_arguments=_has_arrow_arguments(witness))
         env = _scope_bindings(bindings, budget)
         result, rows = _compute(witness, source_type, env, bindings, budget)
         output = {'result_type': result, 'proof_intermediates': rows}
@@ -639,6 +732,8 @@ class _Inference:
             typ = self.infer(node['body'], path + ('body',), terms, types, scope_ref)
         else:
             _fail('FRAGMENT', 'unsupported retained term constructor: ' + tag, path)
+        if self.budget.arrow_arguments:
+            _type_bounds(typ, self.budget)
         self.types[path] = typ
         return typ
 
@@ -711,6 +806,28 @@ def _selected_argument(typ, registry, budget, code, path):
     return owner
 
 
+def _arrow_argument(typ, registry, budget, code, path):
+    """Validate a finite closed arrow and return all nominal-leaf obligations.
+
+    Raw arrows have no ownership-contract fields. Exact raw schema plus the
+    unchanged planner lowering supplies Repeat/unknown at every arrow. Never
+    select/unfold a family or treat an arrow's leaves as physical captures.
+    """
+    _type_bounds(typ, budget)
+    obligations, pending = [], [(typ, path)]
+    while pending:
+        node, location = pending.pop()
+        budget.tick()
+        if _scalar(node):
+            continue
+        if type(node) is dict and set(node) == {'tag', 'from', 'to'} and node['tag'] == 'arrow':
+            pending.extend(((node['to'], location + ('to',)), (node['from'], location + ('from',))))
+        else:
+            owner = _selected_argument(node, registry, budget, code, location)
+            obligations.append((node, owner, location))
+    return obligations
+
+
 def _reconcile_arguments(obligations, registry, published, budget):
     """Bind nominal coordinate obligations to the exact published row objects."""
     for typ, owner, path in obligations:
@@ -750,12 +867,21 @@ def _normalize(root, budget, registry):
                 if len(prefix) > MAX_PARAMETERS or len(arguments) != len(prefix):
                     _fail('DIRECT', 'immediate type spine requires the entire prefix', path)
                 if not all(_scalar(arg) for arg in arguments):
+                    arrow = False
                     for arg in arguments:
-                        if not _scalar(arg):
+                        if arg['tag'] == 'arrow':
+                            _arrow_argument(arg, registry, budget, 'DIRECT', path)
+                            arrow = True
+                        elif not _scalar(arg):
                             _selected_argument(arg, registry, budget, 'DIRECT', path)
-                    dialect = NOMINAL_BETA_POLICY
+                    if arrow:
+                        dialect = ARROW_BETA_POLICY
+                    elif dialect != ARROW_BETA_POLICY:
+                        dialect = NOMINAL_BETA_POLICY
                 after = cursor
                 for (_, formal), arg in zip(prefix, arguments):
+                    if budget.arrow_arguments:
+                        budget.tick(_bounded(after))
                     after = fragment.substitute_closed_term(after, formal['id'], arg)
                     _bounded(after)
                 detail = {'rule': 'instantiate_direct_closed',
@@ -927,12 +1053,16 @@ def _inventory(original, normalized, original_infer, normalized_infer, origins, 
                 _fail('USE', 'bare, partial, or extra Scheme elimination', path)
             if not all(_scalar(arg) for arg in arguments):
                 for arg in arguments:
-                    if not _scalar(arg):
+                    if arg['tag'] == 'arrow':
+                        obligations.extend(_arrow_argument(arg, original_infer.nominals, budget, 'USE', path))
+                    elif not _scalar(arg):
                         owner = _selected_argument(arg, original_infer.nominals, budget, 'USE', path)
                         budget.tick()
                         obligations.append((arg, owner, path))
             expected = definition['body_type']
             for formal, argument in zip(definition['prefix'], arguments):
+                if budget.arrow_arguments:
+                    _type_bounds(expected, budget, (formal['id'], argument))
                 expected = fragment.substitute_closed_type(expected, formal['id'], argument)
             actual = normalized_infer.types[path]
             if not fragment.alpha_type_equal(actual, expected):
@@ -1145,6 +1275,23 @@ def _closed_admitted_callable(typ, path, registry, published, budget):
     return nominal
 
 
+def _view_argument_key(typ, registry, budget, path):
+    """Full closed logical identity/order for the new saved-arrow-view branch.
+
+    Caller preflights depth and expanded weight before tuple construction and
+    hashing. Nominal identity is the already selected declaration, not layout
+    equality; the order agrees with the planner's complete logical tuples.
+    """
+    budget.tick()
+    if _scalar(typ):
+        return ('scalar', '#i64' if typ == INT else '#bool')
+    if typ['tag'] == 'arrow':
+        return ('arrow', _view_argument_key(typ['from'], registry, budget, path),
+                _view_argument_key(typ['to'], registry, budget, path), 'repeat', 'unknown')
+    owner = _selected_argument(typ, registry, budget, 'RECURSION', path)
+    return ('nominal', owner['index'], owner['name'], tuple(owner['source']['path']))
+
+
 def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, published, budget):
     """Partition all external raw variables using checked lexical use evidence.
 
@@ -1164,6 +1311,8 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, pub
             if path in uses:
                 _fail('RECURSION', 'shared view occurrence is not unique', path)
             uses[path] = use
+    structural_views = any(typ['tag'] == 'arrow' for use in uses.values() for typ in use['arguments'])
+    max_view_weight = 1
     scalars, callables, nominals, views, accounted = {}, {}, {}, {}, set()
     admitted_callable = False
     for relative, node in _walk(rhs):
@@ -1208,7 +1357,14 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, pub
             definition = definitions[use['definition']]
             if definition['binding']['id'] != ident:
                 _fail('RECURSION', 'shared capture binder differs from its lexical definition', path)
-            key = (ident, tuple(t['name'] for t in use['arguments']))
+            if structural_views:
+                weight = sum(_type_bounds(t, budget)[1] for t in use['arguments'])
+                budget.tick(weight * 2)  # Tuple hashing and full-vector matching.
+                max_view_weight = max(max_view_weight, weight)
+                key = (ident, tuple(_view_argument_key(t, inferred.nominals, budget, path)
+                                    for t in use['arguments']))
+            else:
+                key = (ident, tuple(t['name'] for t in use['arguments']))
             row = views.setdefault(key, {'definition': use['definition'], 'binding': definition['binding'],
                 'arguments': use['arguments'], 'instantiated_type': use['instantiated_type'], 'uses': []})
             if (row['definition'] != use['definition'] or not _same(row['arguments'], use['arguments'])
@@ -1219,6 +1375,10 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, pub
             _fail('LIMIT', 'recursive carrier exceeds 64 captures including self', path)
     if accounted != free or uses:
         _fail('RECURSION', 'recursive free-term inventory is not completely classified', rhs_path)
+    if structural_views:
+        # At most64 keys. Reserve even an all-pairs comparison bound rather than
+        # allow recursive tuple sorting to do uncharged expanded type work.
+        budget.tick(len(views) * len(views) * max_view_weight)
     result = {'policy': RECURSIVE_CAPTURE_POLICY,
               'scalars': [scalars[key] for key in sorted(scalars)],
               'views': [views[key] for key in sorted(views)]}
@@ -1304,7 +1464,7 @@ def derive_shared_fragment(projected_annotated):
         _bounded(projected_annotated)
         root = json.loads(_json(projected_annotated))
         projection.validate_raw_term(root, require_closed=True)
-        budget = _Budget()
+        budget = _Budget(arrow_arguments=_has_arrow_arguments(root))
         nominals = _Nominals(root, budget)
         raw = _Inference(root, 'projected', budget, nominals=nominals)
         normal, steps, origins, removed, touched, dialect = _normalize(root, budget, nominals)

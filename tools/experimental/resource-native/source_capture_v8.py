@@ -214,7 +214,7 @@ def verify_capture(capture_path, *, fixture_root, entry, expected_source_hashes,
     transport.exact(projected, module_transport.PROJECTION_KEYS, 'capture projection')
     transport.exact(normal, NORMAL, 'capture normalization')
     equal(projected['policy'], 'outer-lazy-spine/1', 'projection policy')
-    require(normal['policy'] in (shared.POLICY, shared.NOMINAL_BETA_POLICY),
+    require(normal['policy'] in (shared.POLICY, shared.NOMINAL_BETA_POLICY, shared.ARROW_BETA_POLICY),
             'unknown normalization policy')
     # A supported label grants nothing. Successful independent replay below
     # must derive the exact dialect, tree and complete ordered certificate.

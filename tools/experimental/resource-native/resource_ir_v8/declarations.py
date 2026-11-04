@@ -541,15 +541,18 @@ class _Builder:
         for use, spec in d["instantiations"].items():
             path = "instantiations." + use
             vector = tuple(self.normalized[("type", name)] for name in spec["arguments"])
-            # A closed tag alone is not an admission rule. Nominal atoms must
-            # name these exact checked physical declarations, never an arrow,
-            # a structural-layout equivalent, or an unregistered family name.
-            if any(self.nodes[row][0] != "closed" or
-                   (self.nodes[row][1] not in _INTRINSICS and
-                    self.nodes[row][1] not in d["layouts"] and
-                    not (self.nodes[row][1].startswith("%") and
-                         self.nodes[row][1][1:] in d["families"])) for row in vector):
-                _fail(path + ".arguments", "USE_ARGUMENT", "every complete vector entry must name a registered closed intrinsic, DATA or SUM atom")
+            # The atom branch retains its exact physical identity checks.
+            # Closed arrows reuse the interned DAG's recursive scope/contract
+            # facts, not expanded tuple traversal or generic_atoms (which
+            # intentionally excludes nominal leaves from generic principals).
+            if any((self.scopes[row] or not self.generic_contracts[row])
+                   if self.nodes[row][0] == "arrow" else
+                   (self.nodes[row][0] != "closed" or
+                    (self.nodes[row][1] not in _INTRINSICS and
+                     self.nodes[row][1] not in d["layouts"] and
+                     not (self.nodes[row][1].startswith("%") and
+                          self.nodes[row][1][1:] in d["families"]))) for row in vector):
+                _fail(path + ".arguments", "USE_ARGUMENT", "complete vectors require registered closed atoms or recursively closed Repeat/unknown arrows")
             key = (spec["scheme"], vector)
             environments.add(key)
             if 1 + len(d["schemes"]) + len(environments) > MAX_ENVIRONMENTS:
