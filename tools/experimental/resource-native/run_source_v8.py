@@ -49,6 +49,8 @@ def parser():
     p.add_argument('--output', required=True, type=Path, help='new external output directory')
     p.add_argument('--fuel', type=fuel, default=1_000_000)
     p.add_argument('--failure-policy', choices=('retain', 'destroy-terminal'), default='retain')
+    p.add_argument('--data-groups', action='store_true',
+                   help='experimental strict-support group placement; default keeps coarse groups')
     return p
 
 
@@ -132,7 +134,8 @@ def execute(args, output):
         capture_data = json.loads(raw_bytes.decode('utf-8'), object_pairs_hook=transport.strict_pairs)
         build.require(build.sha(bounded_read(capture, 32 << 20)) == build.sha(raw_bytes),
                       'fresh capture changed after replay')
-        plan = plan_fragment(capture_data['projection']['projected_annotated'])
+        plan = plan_fragment(capture_data['projection']['projected_annotated'],
+                             data_groups=args.data_groups)
         checked = check_resources(plan['program'])
         build.save(output / 'planned.json', plan)
         build.save(output / 'resources.json', checked.report())

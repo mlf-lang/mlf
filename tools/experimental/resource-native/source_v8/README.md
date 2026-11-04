@@ -76,10 +76,68 @@ ownership sequence is checked in IR and generated C. Runtime field/case/return,
 memo and invocation events plus balanced owner/loan counters provide separate
 observations; there is no individual event trace for every retain/end-borrow/drop.
 
-Physical reclamation is still coarse and group-based. In the observed callable
-case the same-home group closes **after** the extracted callable is invoked.
+With the default coarse placement, reclamation is group-based. In the Stage08
+callable cases the same-home group closes **after** the extracted callable is invoked.
 Releasing a container handle does not prove that its node was freed earlier,
-nor does this stage establish lower peak memory or a performance gain.
+nor did Stage08 establish lower peak memory or a performance gain. The separate
+Stage09 opt-in strategy below changes placement, not the runtime or this default.
+
+## Stage09: opt-in DATA group placement
+
+The source CLI's explicit `--data-groups` flag selects
+`plan_fragment(..., data_groups=True)`. Without it, the planner keeps the exact
+coarse output, including its correspondence and work counters. There is no
+automatic strategy selection. `planned.json` records `binding.mode` as
+`data-groups-prototype` and adds the placement `group_map` only for the opt-in;
+the default mode remains `coarse-owned`. CLI result and stdout fields are unchanged.
+
+The prototype separates eligible allocations only when all of their supports
+are proven strictly below the enclosing home. It uses the existing `new_below`
+operation with live owner imports, releases each new builder, and releases case
+captures that are no longer needed by the arm. This also places supporting
+scalars, applications, capture-free closures and closed shared-RHS wrappers;
+it is not just a different allocation call for the DATA node. Captured closures,
+generic bodies, case thunks and conditional thunks remain coarse. If strict
+support cannot be proved, allocation stays in the existing home.
+
+This does not extend the admitted DATA or generic fragment. The node graph,
+shared callable/body identities, complete type vectors, lazy field/case behavior
+and full callable Access/Env contracts are preserved. The runtime, ABI and
+default routes are unchanged.
+
+Twelve local real-runtime comparisons used genuine capture replay, the seven
+production C translation units, three sources, both coarse/opt-in plans and
+both `-O0`/`-O2`. All returned 42 with seven balanced empty ledger categories.
+For the two callable-field sources, DATA group closure and field-slot removal
+preceded demand of the still-pending payload and its later call. Unlike the
+Stage08 handle-order observation alone, this demonstrates earlier physical
+container retirement in those finite runs.
+
+The reported peak is the runtime's tracked allocation ledger, not process RSS:
+
+- Shared callable field: 7,744 to 7,216 bytes.
+- Curried callable field: 9,512 to 8,544 bytes.
+- Scalar Box: **4,088 to 4,248 bytes**, a regression from the extra groups.
+
+Both optimization levels gave those same counts. Total allocated bytes,
+allocation counts and reference-count work increased in all three cases. This
+is an experimental memory/overhead tradeoff, not an end-to-end timing result,
+a general memory improvement, Perceus equivalence or full GC replacement.
+
+Run the fresh source CLI suite separately with this strategy:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal.py \
+  --data-groups --ghc /absolute/path/to/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /tmp/ir8-source-data-groups-fresh
+```
+
+The fresh three-case opt-in CLI run passed locally on 2026-11-04: all 24 recorded
+subprocesses returned zero, each native result was Int 42 with fault zero and
+seven balanced empty ledger categories, and DATA retirement preceded later
+field use. This is separate from the twelve comparisons; exact-commit CI is
+still pending. CI retains both coarse and opt-in fresh source suites
+separately, reuses the same GHC install and keeps the 60-minute job ceiling.
 
 ## Fragment and planner tests
 
@@ -88,6 +146,8 @@ compiler:
 
 ```sh
 python3 -B tools/experimental/resource-native/tests/test_module_shared_transport.py
+
+python3 -B tools/experimental/resource-native/tests/test_planner_v8_placement.py
 
 CC=gcc IR8_PLANNER_NATIVE=1 \
 IR8_PLANNER_NATIVE_OUTPUT=/tmp/ir8-planner-native-fresh \
@@ -105,6 +165,9 @@ Set `CC` explicitly if `gcc-14` is not installed; the planner's default is
 These tests use synthetic/raw fragments. They check replay, lowering and native
 behavior, but do not claim genuine source inference or K-checker acceptance.
 The CI fragment job sets the native opt-in and retains logs/generated programs.
+It also runs the placement tests explicitly. Their optional historical-capture
+test requires `IR8_PLACEMENT_CAPTURE_ROOT` and is skipped in CI; it is not
+credited as a fresh source build or as part of the fresh three-case CLI run.
 
 ## Fresh controlled source-to-native test
 

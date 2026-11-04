@@ -52,12 +52,14 @@ class Reference:
     variable: str
     logical: tuple
     carrier: int | None = None
+    strict: bool = False  # Actual proof: group < the current invocation home.
 
 
 @dataclass(frozen=True)
 class SchemeReference:
     variable: str
     definition: int
+    strict: bool = False
 
 
 @dataclass
@@ -73,7 +75,10 @@ class Block:
 
 
 class Planner:
-    def __init__(self, fragment):
+    def __init__(self, fragment, *, data_groups=False):
+        require(type(data_groups) is bool, 'data_groups must be a boolean')
+        self.data_groups = data_groups
+        self.group_map = []
         self.fragment = fragment
         self.root = fragment['raw_normalized']
         self.work = self.instructions = self.variables = self.code_count = 0
@@ -205,6 +210,36 @@ class Planner:
     def release(self, ref, block):
         self.add(block, op='drop', value=ref.variable)
 
+    def allocation(self, home, support, block, path, kind, scope, *, eligible=True):
+        """Optional separation only above complete, proven-strict supports.
+
+        Generic bodies and captured closures initially stay coarse. A fresh
+        group surrounding a closed generalize block still proves its entire
+        sealed result strictly below the enclosing home, without cloning it.
+        Imports are live owner authorities, not guessed transitive heap edges.
+        """
+        if not self.data_groups:
+            return home, False, None
+        self.tick(1 + len(support))
+        split = scope is None and eligible and all(r.strict for r in support)
+        row = {'source': address(path), 'kind': kind, 'home': home,
+               'strategy': 'fresh-below' if split else 'same-home',
+               'reason': ('all-support-strict' if split else 'generic-body-coarse' if scope is not None
+                          else 'captured-closure-coarse' if not eligible else 'support-only-down'),
+               'support': [{'reference': r.variable, 'strict': r.strict} for r in support]}
+        key = home
+        if split:
+            key = self.fresh('group')
+            row['create'] = self.add(block,op='new_below',out=key,ceiling=home,
+                                     imports=list(dict.fromkeys(r.variable for r in support)))
+        row['allocation_key'] = key
+        self.group_map.append(row)
+        return key, split, row
+
+    def close_builder(self, key, split, row, block):
+        if split:
+            row['drop_builder'] = self.add(block,op='drop',value=key)
+
     def term(self, node, path, role='ordinary'):
         self.tick(); require(path not in self.term_map, 'ordinary source occurrence emitted more than once')
         row = {'source': address(path), 'tag': node['tag'], 'role': role}
@@ -225,7 +260,7 @@ class Planner:
         self.tick(); paths = []
         source = views.get(pair)
         if source is not None:
-            ref = Reference(self.fresh(), source.logical)
+            ref = Reference(self.fresh(), source.logical, strict=source.strict)
             paths.append(self.add(block, op='retain', out=ref.variable, value=source.variable))
             require(source.carrier is not None, 'saved view lacks its lexical carrier')
             return ref, paths, {'kind': 'captured', 'carrier': source.carrier, 'capture': source.variable}
@@ -235,7 +270,7 @@ class Planner:
         paths.append(self.add(block, op='retain', out=owned, value=source.variable))
         paths.append(self.add(block, op='instantiate', out=result, value=owned, instantiation=self.instantiation(pair)))
         logical = self.substitute(self.definition_types[d['id']], 'S' + str(d['id']), pair[1])
-        return Reference(result, logical), paths, {'kind': 'scheme', 'definition': d['id']}
+        return Reference(result, logical, strict=source.strict), paths, {'kind': 'scheme', 'definition': d['id']}
 
     def needed(self, node, path, bound=frozenset()):
         """Transitive free lexical binders AND complete-vector shared views.
@@ -284,14 +319,16 @@ class Planner:
         for ident in sorted(mono):
             ref = env.get(ident); require(isinstance(ref, Reference), 'Scheme/bare or unavailable ordinary capture')
             name = self.fresh('capture'); actual[name] = ref.variable
-            contracts[name] = {'layout': self.layout(ref.logical), 'relation': 'down'}
-            inner[ident] = Reference(name, ref.logical)
+            contracts[name] = {'layout': self.layout(ref.logical),
+                               'relation': 'below' if ref.strict else 'down'}
+            inner[ident] = Reference(name, ref.logical, strict=ref.strict)
             carrier['mono_captures'].append({'binder': ident, 'capture': name, **contracts[name]})
         for pair in sorted(pairs):
             ref, creation, source = self.acquire_view(pair, env, views, block); temps.append(ref)
             name = self.fresh('view'); actual[name] = ref.variable
-            contracts[name] = {'layout': self.layout(ref.logical), 'relation': 'down'}
-            saved[pair] = Reference(name, ref.logical, carrier['carrier'])
+            contracts[name] = {'layout': self.layout(ref.logical),
+                               'relation': 'below' if ref.strict else 'down'}
+            saved[pair] = Reference(name, ref.logical, carrier['carrier'], ref.strict)
             d = self.def_by_binder[pair[0]]
             carrier['view_captures'].append({'definition': d['id'], 'binder': pair[0],
                 'arguments': [self.type_name(t) for t in pair[1]], 'occurrences': pairs[pair],
@@ -337,24 +374,28 @@ class Planner:
             return self.data_case(node, path, env, views, home, block, scope)
         if tag in ('int64','bool'):
             typ = SCALARS['Int' if tag=='int64' else 'Bool']; out = self.fresh()
-            self.add(block,path,typ,op='scalar',out=out,**{'in':home},kind='i64' if tag=='int64' else 'bool',value=node['value'])
-            return Reference(out,typ)
+            key,split,placement = self.allocation(home,[],block,path,'scalar',scope)
+            self.add(block,path,typ,op='scalar',out=out,**{'in':key},kind='i64' if tag=='int64' else 'bool',value=node['value'])
+            self.close_builder(key,split,placement,block)
+            return Reference(out,typ,strict=split)
         if tag == 'var':
             ref = env.get(node['name']['id']); require(isinstance(ref,Reference), 'ordinary variable cannot be Scheme')
             out=self.fresh(); self.add(block,op='retain',out=out,value=ref.variable)
-            return Reference(out,ref.logical)
+            return Reference(out,ref.logical,strict=ref.strict)
         if tag == 'let':
             d = self.def_by_path.get(path)
             if d is not None:
                 require(scope is None and d['free_term_bindings']==[], 'nested/external generic definition')
                 scheme='S'+str(d['id']); out=self.fresh('shared')
+                key,split,placement = self.allocation(home,[],block,path,'shared-rhs',scope)
                 child=Block(block.root,block.name,[],block.prefix+(len(block.body),'body'),scheme)
                 cursor=self.node_at(d['rhs_cursor']['path'])
                 result=self.emit(cursor,tuple(d['rhs_cursor']['path']),{}, {}, '$home',child,scheme)
                 require(result.logical==self.definition_types[d['id']], 'generic RHS actual result type differs')
                 seal=self.add(child,op='seal',value=result.variable)
-                intro=self.add(block,op='generalize',out=out,**{'in':home},scheme=scheme,body=child.body)
-                ref=SchemeReference(out,d['id'])
+                intro=self.add(block,op='generalize',out=out,**{'in':key},scheme=scheme,body=child.body)
+                self.close_builder(key,split,placement,block)
+                ref=SchemeReference(out,d['id'],strict=split)
                 self.scheme_map.append({'definition':d['id'],'binder':d['binding']['id'],'scheme':scheme,
                     'generalize':intro,'seal':seal,'rhs_cursor':d['rhs_cursor'],'result_owner':result.variable})
             else:
@@ -373,20 +414,25 @@ class Planner:
             typ=arrow(parameter_type,result.logical)
             self.functions[name]={'signature':self.signature(typ),'parameter':parameter,'captures':contracts,
                                   'body':callback.body,'type_scope':scope}
-            out=self.fresh(); publication=self.add(block,path,typ,op='closure',out=out,**{'in':home},function=name,captures=actual)
+            key,split,placement = self.allocation(home,[],block,path,'closure',scope,eligible=not actual)
+            out=self.fresh(); publication=self.add(block,path,typ,op='closure',out=out,**{'in':key},function=name,captures=actual)
             for row in carrier['view_captures']: row['creation'].append(publication)
             for row,ref in zip(carrier['view_captures'],temps):
                 release=self.add(block,op='drop',value=ref.variable)
                 # One pair temp per view capture, in deterministic pair order.
                 row['creation'].append(release)
-            return Reference(out,typ)
+            self.close_builder(key,split,placement,block)
+            return Reference(out,typ,strict=split)
         if tag == 'application':
             fn=self.emit(node['function'],path+('function',),env,views,home,block,scope)
             arg=self.emit(node['argument'],path+('argument',),env,views,home,block,scope)
             require(fn.logical[0]=='arrow' and fn.logical[1]==arg.logical, 'complete ordinary callable argument mismatch')
             out=self.fresh(); typ=fn.logical[2]
-            self.add(block,path,typ,op='application',out=out,**{'in':home},function=fn.variable,argument=arg.variable)
-            self.release(fn,block); self.release(arg,block); return Reference(out,typ)
+            key,split,placement = self.allocation(home,[fn,arg],block,path,'application',scope)
+            self.add(block,path,typ,op='application',out=out,**{'in':key},function=fn.variable,argument=arg.variable)
+            self.release(fn,block); self.release(arg,block)
+            self.close_builder(key,split,placement,block)
+            return Reference(out,typ,strict=split)
         raise PlanningError('unsupported planning constructor: '+tag)
 
     def constructor(self, node, path, env, views, home, block, scope):
@@ -409,14 +455,16 @@ class Planner:
             fields.append(ref)
         typ = self.logical(row['result_type'], None); out = self.fresh('data')
         require(typ == self.logical(declaration['type'], None), 'constructor nominal identity differs')
-        publication = self.add(block, path, typ, op='alloc', out=out, **{'in':home},
+        key,split,placement = self.allocation(home,fields,block,path,'data',scope)
+        publication = self.add(block, path, typ, op='alloc', out=out, **{'in':key},
                                layout=self.nominal_layouts[typ],
                                fields={'f'+str(i): ref.variable for i,ref in enumerate(fields)})
         for ref in fields: self.release(ref, block)
+        self.close_builder(key,split,placement,block)
         self.constructor_map.append({'source': address(path), 'declaration': row['declaration'],
                                      'head': row['head'], 'arguments': row['arguments'],
                                      'allocation': publication})
-        return Reference(out, typ)
+        return Reference(out, typ, strict=split)
 
     def data_case(self, node, path, env, views, home, block, scope):
         require(scope is None and path in self.case_rows, 'unmapped or generic DATA case')
@@ -437,11 +485,27 @@ class Planner:
             acquire = self.add(cb,op='field',out=loan,value=ready,field='f'+str(f['index']))
             retain = self.add(cb,op='retain',out=owned,value=loan)
             end = self.add(cb,op='end_borrow',value=loan)
-            fields[f['binding']['id']] = Reference(owned,self.logical(f['type'],None))
+            fields[f['binding']['id']] = Reference(owned,self.logical(f['type'],None),strict=raw.strict)
             projections.append({'index':f['index'],'binder':f['binding']['id'],
                                 'loan':acquire,'retain':retain,'end_borrow':end})
         drop_container = self.add(cb,op='drop',value=ready)
         bp = tuple(row['body']['path'])
+        early_releases = []
+        if self.data_groups:
+            # A capture used only to reach the scrutinee need not remain an
+            # owner during arm construction. Keep every transitive arm use,
+            # including nested lambdas and complete-vector view occurrences.
+            needed_mono,needed_pairs = self.needed(self.node_at(bp),bp,frozenset(fields))
+            for ident,ref in list(inner.items()):
+                self.tick()
+                if ident not in needed_mono:
+                    early_releases.append(self.add(cb,op='drop',value=ref.variable))
+                    del inner[ident]
+            for pair,ref in list(saved.items()):
+                self.tick()
+                if pair not in needed_pairs:
+                    early_releases.append(self.add(cb,op='drop',value=ref.variable))
+                    del saved[pair]
         result = self.emit(self.node_at(bp),bp,inner|fields,saved,'$home',cb,None)
         require(result.logical == typ, 'case result full type differs')
         for ref in list(inner.values())+list(saved.values())+list(fields.values()): self.release(ref,cb)
@@ -456,6 +520,8 @@ class Planner:
                               'code':name,'result_type':self.type_name(typ),
                               'projections':projections,'drop_container':drop_container,
                               'allocation':publication})
+        if self.data_groups:
+            self.case_map[-1]['early_capture_releases'] = early_releases
         return Reference(out,typ)
 
     def delayed(self,node,path,env,views,home,block,kind):
@@ -521,9 +587,12 @@ class Planner:
             require(len(self.constructor_map)==len(self.constructor_rows) and len(self.case_map)==len(self.case_rows),
                     'missing/repeated nominal source occurrence')
             source_map.update(nominal_map=self.nominal_map, constructor_map=self.constructor_map, case_map=self.case_map)
+        if self.data_groups:
+            source_map['group_map'] = self.group_map
         encoded=json.dumps(program,sort_keys=True,separators=(',',':'),ensure_ascii=False)
         result={'program':program,'binding':{'status':'candidate-not-resource-checked','fragment_only':True,
-                'source_admitted':False,'ordinary_K_checked':False,'mode':'coarse-owned',
+                'source_admitted':False,'ordinary_K_checked':False,
+                'mode':'data-groups-prototype' if self.data_groups else 'coarse-owned',
                 'input_sha256':hashlib.sha256(json.dumps(self.fragment['input_annotated'],sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest(),
                 'candidate_sha256':hashlib.sha256(encoded.encode()).hexdigest(),'source_map':source_map,
                 'work':self.work,'instructions':self.instructions}}
@@ -531,7 +600,7 @@ class Planner:
         return result
 
 
-def plan_fragment(projected_annotated, *, fragment=None):
+def plan_fragment(projected_annotated, *, fragment=None, data_groups=False):
     """Fresh proof replay, then isolated candidate lowering, never source custody.
 
     Supplying a fragment is not an authority shortcut: all fields are recomputed
@@ -540,4 +609,4 @@ def plan_fragment(projected_annotated, *, fragment=None):
     """
     checked = (transport.derive_shared_fragment(projected_annotated) if fragment is None else
                transport.validate_shared_fragment(projected_annotated, fragment))
-    return Planner(checked).finish()
+    return Planner(checked,data_groups=data_groups).finish()

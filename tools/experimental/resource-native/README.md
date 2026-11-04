@@ -11,8 +11,12 @@ adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general
 source-admission format. The full source bridge, comprehensive guard coverage,
 general nominal support, GC replacement and performance remain unqualified.
-Container-handle release is not a claim of early physical deallocation or lower
-peak memory. This does not enable mixed-type shared-term execution in the
+The explicit [experimental `--data-groups` strategy](source_v8/README.md#stage09-opt-in-data-group-placement)
+can retire eligible DATA containers earlier. Finite comparisons reduced peak
+tracked bytes in two callable-field cases but increased them in a scalar case,
+with extra allocation and reference-count work. This is a memory/overhead
+tradeoff, not a speedup or GC-replacement claim; the default remains coarse.
+This does not enable mixed-type shared-term execution in the
 maintained v7 source route below or
 change default behavior. Earlier integration records retain their historical
 scope.

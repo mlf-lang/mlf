@@ -6,6 +6,7 @@ POSIX; trusted GHC 9.14.1 and C11 compiler required. Example:
       --output /path/to/new-output
 No cached capture, original evaluator, alternate runtime, or default change.
 Each case independently builds the real producer through run_source_v8.py.
+Add --data-groups to test explicit strict-support placement; default stays coarse.
 Physical node reclamation is group-based: dropping a container handle is NOT
 claimed to deallocate its node. Retain/end-borrow/drop order is checked in IR
 and actual generated C, with runtime projection/return events and aggregate
@@ -229,6 +230,94 @@ def observe(case, evaluation, structure, graph):
     return detail
 
 
+def observe_data_groups(case, evaluation, structure, graph):
+    e = evaluation
+    require(e['fault'] == 0 and e['result'] == {'kind': 'i64', 'value': 42} and e['events_omitted'] == 0,
+            'native result/event history differs')
+    metrics = e['metrics']
+    require(metrics['entries_completed'] == 1 and metrics['groups_allocated'] == metrics['groups_closed'] and
+            metrics['nodes_allocated'] == metrics['nodes_freed'], 'incomplete group/node cleanup')
+    for prefix in ('owner', 'loan'):
+        require(metrics[prefix + '_handle_acquisitions'] == metrics[prefix + '_handle_releases'],
+                'unbalanced ' + prefix + ' handles')
+    require(metrics['ir_end_borrow_ops'] == 1, 'sole case loan was not ended')
+    require(set(e['memory_categories']) == {'context', 'groups', 'nodes', 'slots', 'handles', 'captures', 'pending'},
+            'seven-category ledger changed')
+    for row in [e['memory']] + list(e['memory_categories'].values()):
+        require(row['live_bytes'] == row['live_blocks'] == 0 and row['allocated_bytes'] == row['freed_bytes'] and
+                row['allocations'] == row['frees'], 'runtime-owned allocation imbalance')
+    events = e['events']
+    selected = lambda event: [(i, x) for i, x in enumerate(events) if x['event'] == event]
+    allocations = selected('allocate')
+    data_i, data = only([(i,x) for i,x in allocations if x['out'] == structure['constructor']['out']],
+                        'DATA allocation event differs')
+    thunk_i, thunk = only([(i,x) for i,x in allocations if x['code'] == structure['case']['code']],
+                          'case thunk event differs')
+    nodes = {x['node']: x for _,x in allocations}
+    target = data['slots']['f0']
+    project_i, project = only(selected('field_project'), 'projection event count differs')
+    require(project['host'] == data['node'] and project['target'] == target and project['field'] == 'f0' and
+            project['out'] == structure['projection']['out'] and
+            project['source_variable'] == structure['projection']['value'], 'wrong actual field projection')
+    force_i, force = only([(i,x) for i,x in selected('ir_force_result') if x['owner'] == project['anchor']],
+                          'missing actual container anchor')
+    require(force['result'] == data['node'] and force['frame'] == project['frame'] and force_i < project_i,
+            'field anchor/container frame mismatch')
+    return_i, returned = only([(i,x) for i,x in selected('raw_return') if x['source'] == thunk['node']],
+                              'case did not return the observed field')
+    require(returned['result'] == target and data_i < thunk_i < project_i < return_i,
+            'case return/laziness order differs')
+    close_i, close = only([(i,x) for i,x in selected('close_group') if x['group'] == data['group']],
+                          'container group retirement missing')
+    require(project_i < close_i, 'DATA group retired before its field was retained')
+    require(data['group'] != nodes[target]['group'], 'DATA and payload still share one group')
+    slot_i, slot = only([(i,x) for i,x in selected('slot_remove')
+                        if x['host'] == data['node'] and x['field'] == 'f0'],
+                       'DATA field slot was not removed exactly once')
+    require(slot['target'] == target and slot['reason'] == 'group_close' and close_i < slot_i,
+            'DATA field slot removal was not part of group destruction')
+    detail = {'container_node': data['node'], 'field_node': target, 'case_node': thunk['node'],
+              'field_event': project_i, 'case_return_event': return_i, 'group_close_event': close_i,
+              'ownership_order': 'IR and generated-C sequence; runtime projection/return plus balanced counters',
+              'physical_container_retirement_before_field_call_claimed': bool(case['vectors']),
+              'physical_DATA_retirement_before_field_use': True,
+              'container_group': data['group'], 'payload_group': nodes[target]['group'],
+              'field_slot_removal_event': slot_i}
+    if case['vectors']:
+        require(nodes[target]['state'] == returned['result_state'] == 'APPLICATION',
+                'callable payload was eagerly evaluated or substituted')
+        target_i = only([i for i,x in allocations if x['node'] == target], 'pending allocation missing')
+        force_target = [i for i,x in selected('update_pin') if x['node'] == target]
+        demand_i = only(force_target, 'pending payload demand count differs')
+        require(target_i < data_i and return_i < demand_i and slot_i < demand_i,
+                'DATA was not physically retired before pending field demand')
+        require(not any(i < demand_i and x['group'] == nodes[target]['group']
+                        for i,x in selected('close_group')),
+                'pending payload group retired before field use')
+        memo_i, memo = only([(i,x) for i,x in selected('memo_publish') if x['destination'] == target],
+                            'field application memo count differs')
+        calls = [(i,x) for i,x in selected('invoke_enter') if x['closure'] == memo['result'] and i > memo_i]
+        call_i, call = only(calls, 'extracted callable was not invoked exactly once later')
+        scalars = {x['node']: (x['kind'], x['value']) for _,x in selected('scalar_value')}
+        require(scalars[call['argument']] == (('bool', False) if case['curried'] else ('i64', 42)) and
+                return_i < demand_i < memo_i < call_i, 'extracted invocation/order differs')
+        require(not any(i < call_i and x['group'] == call['closure_group']
+                        for i,x in selected('close_group')),
+                'extracted callable group retired before invocation')
+        detail.update(field_demand_event=demand_i, field_memo_event=memo_i,
+                      later_call_event=call_i, callable_node=memo['result'])
+    else:
+        done_i, _ = only([(i,x) for i,x in selected('force_return')
+                          if x['result'] == target and i > return_i],
+                         'scalar field final demand completion differs')
+        require(slot_i < done_i, 'scalar DATA did not retire before final field use completed')
+        require(not any(i < done_i and x['group'] == nodes[target]['group']
+                        for i,x in selected('close_group')),
+                'scalar payload group retired before result use')
+        detail['scalar_completion_event'] = done_i
+    return detail
+
+
 def run_case(case, args, output, env):
     name = case['name']
     inputs = output / (name + '-inputs')
@@ -240,6 +329,8 @@ def run_case(case, args, output, env):
     command = [sys.executable, '-B', str(BASE / 'run_source_v8.py'), str(entry),
                '--module-root', str(inputs), '--ghc', args.ghc, '--cc', args.cc,
                '--output', str(target)]
+    if args.data_groups:
+        command.append('--data-groups')
     build.run(command, output, name, cwd=BASE, env=env, wall=1200, cpu=900, memory=16 << 30,
               termination_grace=15, stdout_limit=1 << 20, stderr_limit=1 << 20, file_limit=64 << 20)
     require(not bounded_read(output / (name + '.stderr'), 1 << 20), 'successful CLI stderr')
@@ -261,12 +352,21 @@ def run_case(case, args, output, env):
     if graph:
         shared = check_native({'evaluation': evaluation}, plan, graph,
                               [('bool', True), ('i64', 42)], case['curried'])
-    observation = observe(case, evaluation, structure, graph)
+    if args.data_groups:
+        require('placement' not in result and plan['binding']['mode'] == 'data-groups-prototype',
+                'explicit plan placement/default CLI result contract not honored')
+        observation = observe_data_groups(case, evaluation, structure, graph)
+    else:
+        require('placement' not in result and plan['binding']['mode'] == 'coarse-owned',
+                'default coarse result acquired a placement change')
+        observation = observe(case, evaluation, structure, graph)
     row = {'case': name, 'status': 'passed', 'source_hashes': {
         'main.emlf': build.sha(case['source'].encode()),
         case['module']: build.sha(case['module_text'].encode())},
         'observation': observation, 'shared': shared,
         'memory_categories': evaluation['memory_categories']}
+    if args.data_groups:
+        row['placement'] = 'data-groups-prototype'
     build.save(target / 'nominal-observations.json', row)
     print(name + ': PASS (fresh checked source, lazy DATA field, Int42, balanced seven-category ledger)', flush=True)
     return row
@@ -277,6 +377,8 @@ def main():
     parser.add_argument('--ghc', required=True)
     parser.add_argument('--cc', default='cc')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--data-groups', action='store_true',
+                        help='explicit experimental strict-support placement and early DATA retirement checks')
     args = parser.parse_args()
     output = args.output.absolute()
     require(output.resolve() == output and output != BASE.parents[2] and BASE.parents[2] not in output.parents,

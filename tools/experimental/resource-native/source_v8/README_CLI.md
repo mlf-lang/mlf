@@ -59,9 +59,39 @@ if sharedId true then extracted 42 else 0
 ```
 
 The field payload and whole case remain lazy. The case releases its container
-handle after retaining the projected field and ending the loan. The owning group
-may remain alive until after the field is called; this is not early physical node
-deallocation or a peak-memory improvement claim.
+handle after retaining the projected field and ending the loan. With default
+coarse placement, the owning group may remain alive until after the field is
+called; handle release alone is not early physical node deallocation.
+
+## Experimental DATA group placement
+
+Add `--data-groups` explicitly to try strict-support group placement:
+
+```sh
+python3 -B tools/experimental/resource-native/run_source_v8.py \
+  /absolute/project/main.emlf --module-root /absolute/project \
+  --ghc /absolute/ghc-9.14.1/bin/ghc --cc gcc \
+  --data-groups --output /absolute/new-data-groups-run
+```
+
+The flag defaults to false and is forwarded to the planner, not the producer or
+runtime. Without it, the complete coarse plan and CLI result fields are unchanged.
+`planned.json` identifies the selected strategy in `binding.mode`: `coarse-owned`
+or `data-groups-prototype`. The latter also records `binding.source_map.group_map`.
+There is no automatic selection based on the source or a promised memory win.
+
+Eligible allocations use separate groups only when their supports are proven
+strictly below the current home; otherwise the planner falls back to that home.
+Captured closures, generic internals, case and conditional thunks remain coarse.
+The admitted fragment, lazy payloads, sharing, full callable contracts, Access/Env,
+runtime ABI and fault policies do not change.
+
+Finite real-C comparisons retired callable-field DATA containers before pending
+payload demand and the later call. Peak tracked bytes fell from 7,744 to 7,216
+for a shared callable field and from 9,512 to 8,544 for a curried field, but rose
+from 4,088 to 4,248 for scalar Box. Total allocation and reference-count work
+increased. These are ledger measurements, not RSS or elapsed-time improvements.
+See the [Stage09 tradeoff and evidence](README.md#stage09-opt-in-data-group-placement).
 
 ## Source and toolchain custody
 
@@ -164,6 +194,20 @@ Int 42, and all seven ledger categories were balanced and empty. This does not
 claim exact-commit CI success or physical container deallocation before a field
 call. The Box/FnBox observations and exact ownership/event distinctions are documented in
 the [Stage08 fragment section](README.md#stage08-closed-data-and-callable-fields).
+
+Stage09 runs those same three source cases through a separate fresh invocation:
+
+```sh
+python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal.py \
+  --data-groups --ghc /absolute/ghc-9.14.1/bin/ghc --cc gcc \
+  --output /absolute/new-data-groups-suite-directory
+```
+
+The fresh opt-in suite passed locally on 2026-11-04: all three cases returned
+Int 42 with fault zero, seven balanced empty ledger categories and DATA
+retirement before later field use. All 24 recorded subprocesses returned zero.
+The earlier O0/O2 comparisons are separate evidence, and exact-head CI remains
+pending; these complete-build runs are not a performance benchmark.
 
 This remains a bounded opt-in experiment. It does not establish arbitrary MLF
 source support, general nominal or callable-SUM coverage, all runtime guards,

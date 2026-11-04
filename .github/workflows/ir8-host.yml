@@ -115,6 +115,11 @@ jobs:
           set -euo pipefail
           python3 -B tools/experimental/resource-native/tests/test_source_v8_cli.py \
             2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/source-cli-host.log"
+      - name: Check opt-in DATA placement and coarse fallback
+        run: |
+          set -euo pipefail
+          python3 -B tools/experimental/resource-native/tests/test_planner_v8_placement.py \
+            2>&1 | tee "$RUNNER_TEMP/ir8-source-fragments/placement.log"
       - name: Retain fragment evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -126,8 +131,8 @@ jobs:
   ir8-controlled-source:
     name: Controlled IR8 shared-source integration
     runs-on: ubuntu-24.04
-    # Reuse one GHC install for 15 fresh source cases (4 portable + 8 CLI + 3 nominal).
-    # Only the job wall budget increases; per-process and memory limits are unchanged.
+    # Reuse one GHC install for 18 fresh source cases (4 portable + 8 CLI + 3 coarse + 3 groups).
+    # Keep the 60-minute job ceiling and all per-process and memory limits unchanged.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -169,6 +174,11 @@ jobs:
           python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal.py \
             --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
             --output "$RUNNER_TEMP/ir8-source-nominal"
+      - name: Run fresh nominal sources with opt-in DATA groups
+        run: |
+          python3 -B tools/experimental/resource-native/tests/test_source_v8_nominal.py \
+            --data-groups --ghc "$RUNNER_TEMP/ghc/bin/ghc" --cc gcc \
+            --output "$RUNNER_TEMP/ir8-source-data-groups"
       - name: Retain source evidence, including failures
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -179,5 +189,6 @@ jobs:
             ${{ runner.temp }}/ir8-shared-source-setup
             ${{ runner.temp }}/ir8-source-cli
             ${{ runner.temp }}/ir8-source-nominal
+            ${{ runner.temp }}/ir8-source-data-groups
           if-no-files-found: warn
           retention-days: 14
