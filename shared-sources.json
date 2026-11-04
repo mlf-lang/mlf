@@ -2,7 +2,7 @@
   "format": 1,
   "source_syntax": "shared-haskell-v1",
   "frontend_semantics": "mlf-frontend/shared-haskell-v1/8",
-  "primitive_abi": "mlf-primitive-132-v7",
+  "primitive_abi": "mlf-primitive-133-v8",
   "source_roots": [
     "libraries/mlf-async",
     "libraries/mlf-crates",
@@ -191,6 +191,11 @@
     {
       "module": "Bootstrap.ImportedRoot",
       "path": "libraries/mlf-crates/Bootstrap/ImportedRoot.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.IndexVec",
+      "path": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
       "role": "implementation"
     },
     {
@@ -795,5 +800,5 @@
     "host/ghc/app/source-smoke/Main.hs",
     "host/ghc/app/builtin-prelude/Main.hs"
   ],
-  "builtin_interface": "mlf-primitive/shared-haskell-v1/11"
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/12"
 }

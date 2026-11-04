@@ -1444,6 +1444,10 @@
     [
       "PByteArrayDigest",
       131
+    ],
+    [
+      "PFreezeSTArray",
+      132
     ]
   ],
   "schema_fields": [

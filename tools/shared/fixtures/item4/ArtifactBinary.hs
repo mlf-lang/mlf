@@ -430,7 +430,8 @@ constructorTests = sequence [
   checkCase "PUnsignedLtInt" A.toPrimitive A.fromPrimitive T.PUnsignedLtInt (W.VNode 32 [W.VInt 128]),
   checkCase "PReadByteFileOrError" A.toPrimitive A.fromPrimitive T.PReadByteFileOrError (W.VNode 32 [W.VInt 129]),
   checkCase "PWriteByteFileOrError" A.toPrimitive A.fromPrimitive T.PWriteByteFileOrError (W.VNode 32 [W.VInt 130]),
-  checkCase "PByteArrayDigest" A.toPrimitive A.fromPrimitive T.PByteArrayDigest (W.VNode 32 [W.VInt 131])
+  checkCase "PByteArrayDigest" A.toPrimitive A.fromPrimitive T.PByteArrayDigest (W.VNode 32 [W.VInt 131]),
+  checkCase "PFreezeSTArray" A.toPrimitive A.fromPrimitive T.PFreezeSTArray (W.VNode 32 [W.VInt 132])
   ]
 
 graphChecks = [
@@ -698,7 +699,8 @@ graphChecks = [
   \g root -> checkGraph "PUnsignedLtInt" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 128]),
   \g root -> checkGraph "PReadByteFileOrError" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 129]),
   \g root -> checkGraph "PWriteByteFileOrError" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 130]),
-  \g root -> checkGraph "PByteArrayDigest" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 131])
+  \g root -> checkGraph "PByteArrayDigest" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 131]),
+  \g root -> checkGraph "PFreezeSTArray" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 132])
   ]
 
 checkGraph label encode decode graph root expected = do
@@ -738,7 +740,7 @@ semanticEdges directory = do
     need "IEEE exact signed bits; not numeric equality" (P.doubleToBits value == bits && same (A.toDouble value) (W.VBits bits))
     term <- expect "IEEE term decode" (A.fromXTerm (W.VNode 78 [W.VBits bits]))
     case term of T.XDoubleTerm d -> need "IEEE term exact" (P.doubleToBits d == bits); _ -> error "IEEE wrong constructor"
-  forM_ [-1,132,2147483647] $ \code -> do
+  forM_ [-1,133,2147483647] $ \code -> do
     let value=W.VNode 32 [W.VInt code]
     reject "unknown primitive ABI code" (A.fromPrimitive value)
     bytes <- W.encode W.defaultLimits 7 [value] >>= expect "unknown primitive is valid wire"
@@ -1083,10 +1085,10 @@ distributionSeed directory = do
     (CrateArtifact.encodeInterface builtinIface == CrateArtifact.encodeInterface (CrateArtifact.objectInterface canonicalBuiltin) &&
      CrateArtifact.encodeObject builtinObject == CrateArtifact.encodeObject canonicalBuiltin)
   need "release fixture exact builtin dependency and no entry"
-    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:11",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
+    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:12",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
      CrateArtifact.crateEntry iface == "")
   need "builtin leaf has no dependencies or entry"
-    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:11" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
+    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:12" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
   need "release fixture exact identity/module" (CrateArtifact.crateId iface == "binary-package/1/library" && CrateArtifact.crateModules iface == ["BinaryPackage"])
   writeFile (directory ++ "/legacy.mlfci") (B.unpack (CrateArtifact.encodeInterface iface))
   writeFile (directory ++ "/legacy.mlfco") (B.unpack (CrateArtifact.encodeObject object))
@@ -1103,10 +1105,10 @@ distributionSeed directory = do
   legacyMetadata <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfci"))
   legacyBody <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfco"))
   let legacyPath = Release.virtualPath (Release.pairKey legacyMetadata legacyBody)
-  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:11",legacyPath)] object)
+  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:12",legacyPath)] object)
   need "legacy closure exact relocated dependency"
     (CrateArtifact.crateDependencies (CrateArtifact.objectInterface portableLegacy) ==
-      [("mlf:builtin-shared-haskell-v1:11",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
+      [("mlf:builtin-shared-haskell-v1:12",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
   writeFile (directory ++ "/release-legacy-root.mlfci") (B.unpack (CrateArtifact.encodeInterface (CrateArtifact.objectInterface portableLegacy)))
   writeFile (directory ++ "/release-legacy-root.mlfco") (B.unpack (CrateArtifact.encodeObject portableLegacy))
   putStrLn "PASS actual-binary-library-and-legacy-formal"
@@ -1409,7 +1411,7 @@ releaseBuiltinBranches directory = do
       ownership label identity modules expected = case CrateArtifact.validateBuiltinOwnership (replaceIdentityModules identity modules builtin) of
         T.Left message -> need label (message == expected)
         T.Right _ -> error ("accepted ownership regression: " ++ label)
-  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:11")
+  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:12")
   need "builtin localPrefix uses canonical compiler cache"
     (Release.localPrefix "/cache" compiler (row current) == ("/cache/.queries/builtin-prelude/" P.++ compiler P.++ "/unit"))
   need "ordinary localPrefix keeps release key cache"
@@ -1419,6 +1421,7 @@ releaseBuiltinBranches directory = do
   Release.verifyPrelude root
   ownership "obsolete prelude owner" "mlf:builtin-prelude:1" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
   ownership "stale shared ABI owner" "mlf:builtin-shared-haskell-v1:10" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
+  ownership "preceding shared ABI owner" "mlf:builtin-shared-haskell-v1:11" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
   ownership "ordinary forged owner" "other/library" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
   ownership "missing primitive ownership" current ["Prelude"] "builtin crate must own exactly Prelude and MLF.Primitive"
   ownership "extra builtin module" current ["Extra","MLF.Primitive","Prelude"] "builtin crate must own exactly Prelude and MLF.Primitive"
@@ -1439,7 +1442,7 @@ releaseForgedCurrent directory = do
   let forged = CrateArtifact.makeObject (CrateArtifact.objectInterface canonical) fragments
       iface = CrateArtifact.objectInterface forged
   need "forged control retains exact current identity and ownership"
-    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:11" &&
+    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:12" &&
      CrateArtifact.crateModules iface == CrateArtifact.crateModules (CrateArtifact.objectInterface canonical))
   _ <- expect "forged control passes complete ordinary typed linking" (CrateArtifact.linkCheckedObjects [forged] (CrateArtifact.crateId iface))
   need "forged control is genuinely noncanonical" (CrateArtifact.encodeObject forged /= CrateArtifact.encodeObject canonical)

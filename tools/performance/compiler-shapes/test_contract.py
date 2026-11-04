@@ -109,7 +109,8 @@ class ScheduleTests(unittest.TestCase):
         _, chosen, _, _ = bench.resolve('default', ['local_functions'], [512])
         self.assertEqual(chosen, ['local_functions'])
 
-    def test_unmeasured_endpoint_is_rejected(self):
+    def test_installed_endpoint_is_separate_from_crate_runner(self):
+        self.assertIn('emlf-source-v1', bench.registry()['paired_endpoints'])
         with self.assertRaises(SystemExit):
             bench.measured_endpoint('emlf-source-v1')
 

@@ -7,7 +7,8 @@
 #include <gc/gc.h>
 
 enum { IO_RETURN = 0, IO_BIND = 1, ST_RETURN = 66, ST_BIND = 67, RUN_ST = 68,
-       NEW_ST_ARRAY = 69, READ_ST_ARRAY = 70, WRITE_ST_ARRAY = 71, LENGTH_ST_ARRAY = 72 };
+       NEW_ST_ARRAY = 69, READ_ST_ARRAY = 70, WRITE_ST_ARRAY = 71, LENGTH_ST_ARRAY = 72,
+       FREEZE_ST_ARRAY = 132 };
 static unsigned calls;
 static void require(int test, const char *message) {
     if (!test) { fprintf(stderr,"runtime ST: %s\n",message); exit(90); }
@@ -81,6 +82,7 @@ static void semantic_cases(void) {
     (void)mlf_prim2(READ_ST_ARRAY,lazy,lazy);
     (void)mlf_prim3(WRITE_ST_ARRAY,lazy,lazy,lazy);
     (void)mlf_prim1(LENGTH_ST_ARRAY,lazy);
+    (void)mlf_prim1(FREEZE_ST_ARRAY,lazy);
     MlfValue *a=run(mlf_prim2(NEW_ST_ARRAY,integer("2"),lazy));
     number(run(mlf_prim1(LENGTH_ST_ARRAY,a)),"2");
     run(write_at(a,"0",integer("42")));
@@ -185,6 +187,13 @@ static MlfValue *return_io(MlfEnv *env, MlfValue *argument) {
 static void direct_cases(void) {
     MlfValue *lazy=bad();
     MlfValue *zero=mlf_st_new_array(integer("0"),lazy);
+    (void)mlf_st_freeze_array(zero);
+    MlfValue *source = mlf_st_new_array(integer("2"), lazy);
+    mlf_st_write_array(source, integer("0"), integer("71"));
+    MlfValue *frozen = run(mlf_prim1(FREEZE_ST_ARRAY, source));
+    mlf_st_write_array(source, integer("0"), integer("72"));
+    GC_gcollect();
+    number(mlf_application(frozen, integer("0")), "71");
     number(mlf_st_length_array(zero),"0");
     MlfValue *array=mlf_st_new_array(integer("1"),lazy);
     require(mlf_st_read_array(array,integer("0"))==lazy,"direct read forced a stored thunk");

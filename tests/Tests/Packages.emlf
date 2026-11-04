@@ -67,7 +67,7 @@ isolatedActionResults directory = do
  let cache = O.normalize directory ++ "/isolated-cache"
  O.mkdir (cache ++ "/.locks")
  let p = M.Package (directory ++ "/mlf-package.json") J.empty []
- let graph = M.PackageGraph p ((:) p []) []
+ let graph = M.buildPackageGraph (M.packageName p) ((:) p []) []
  let base = B.Builder graph (B.obj1 "cache-dir" (J.str cache)) directory J.empty J.empty
  coordinator <- B.isolate base (directory ++ "/coordinator")
  first <- B.isolate coordinator (directory ++ "/worker-first")

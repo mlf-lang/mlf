@@ -18,6 +18,7 @@ module Bootstrap.Module where {
   import qualified Bootstrap.Unicode as U;
   import qualified Bootstrap.Lexer as Lexer;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.IndexVec as V;
   sourcePath (SourceModule path _ _ _ _ _ _ _ _ _) = path;
   sourceModuleName (SourceModule _ name _ _ _ _ _ _ _ _) = name;
   sourceExports (SourceModule _ _ exports _ _ _ _ _ _ _) = exports;
@@ -1562,23 +1563,21 @@ module Bootstrap.Module where {
           (renameModule names local env source);
       Right (Resolved source env renamed)
     };
-  settleReach :: Map String (Set String) -> Map String (Set String) -> Map String (Set String);
-  settleReach direct current =
+  -- External-only modules are leaf vertices. Publish only owners from the
+  -- input table, using the existing name sets required by crate interfaces.
+  moduleReach :: Map String (Set String) -> Map String (Set String);
+  moduleReach direct =
     let {
-      next =
-        M.mapWithKey
-          (\name dependencies ->
-             Set.insert compareString name
-               (Set.unions compareString
-                  ((:) dependencies
-                     (map
-                        (\dependency ->
-                           M.findWithDefault compareString (Set.singleton dependency) dependency
-                             current)
-                        (Set.toList dependencies)))))
-          direct
-    } in
-    if M.eqMap eqString (Set.eqSet eqString) current next then next else settleReach direct next;
+      entries = M.toList (M.map Set.toList direct);
+      leaves = concatMap (\entry -> map (\name -> (,) name []) (snd entry)) entries;
+      graph = Dependency.moduleGraph (append leaves entries);
+      nodes = Dependency.graphNodes graph;
+      reach name = case Dependency.graphId graph name of {
+        Nothing -> panic "missing module reach owner";
+        Just i -> Set.fromList compareString
+          (map (\j -> fst (V.at nodes j)) (Dependency.finishOrder (Dependency.graphRows graph) [i]))
+      }
+    } in M.mapWithKey (\name _ -> reach name) direct;
   crateReach mode modules =
     let {
       direct =
@@ -1589,7 +1588,7 @@ module Bootstrap.Module where {
                   (Set.fromList compareString (append (if Lexer.isSharedSyntax (sourceSyntax source) then (:) "MLF.Primitive" [] else []) (map importedModule (importsFor mode source)))))
              modules)
     } in
-    settleReach direct direct;
+    moduleReach direct;
   candidateScope reach instances ownerName =
     let {
       reachable = M.findWithDefault compareString Set.empty ownerName reach
@@ -1875,9 +1874,9 @@ module Bootstrap.Module where {
   validateSharedModuleCycles sources =
     let {
       groups =
-        Dependency.components
+        Dependency.groupNames (Dependency.moduleGraph
           (map (\source -> (,) (moduleIdentity source) (map importedModule (sourceImports source)))
-             sources)
+             sources))
     } in
     mapM_
       (\group ->

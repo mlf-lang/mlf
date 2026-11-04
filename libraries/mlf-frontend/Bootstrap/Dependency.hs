@@ -8,6 +8,8 @@ module Bootstrap.Dependency where {
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Desugar as Desugar;
   -- Edges point from a declaration to the declarations it needs. Namespace
   -- imports and type observations deliberately do not become value SCC edges.
@@ -161,80 +163,88 @@ module Bootstrap.Dependency where {
       (merge (observePredicate (SPredicate name head))
          (merge (mergeMany (map observePredicate context))
             (mergeMany (map (\((,) _ expression) -> observeExpression expression) methods))));
-  data Visit = Enter String | Leave String;
-  -- Kosaraju with indexed adjacency maps and explicit work lists. Each vertex
-  -- and edge is visited a constant number of times; map/set work is logarithmic.
-  -- Sorting roots, edges and component members makes source ordering irrelevant.
-  adjacency :: [] ((,) String ([] String)) -> Map String ([] String);
-  adjacency entries =
+  -- Names are resolved once at the graph boundary. Both the row table and
+  -- each edge row are dense immutable vectors. IDs live only in this graph.
+  data EdgeSlot = EdgeSlot;
+  data Rows d = Rows (V.IndexVec d (V.IndexVec EdgeSlot (V.Index d)));
+  data NamedGraph d a = NamedGraph (Map String (V.Index d)) (V.IndexVec d a) (Rows d);
+  buildGraph :: forall d a. (a -> String) -> (a -> [] String) ->
+                (String -> Maybe (V.Index d)) -> [] a -> NamedGraph d a;
+  buildGraph name dependencies missing values =
     let {
-      names = S.fromList compareString (map fst entries)
-    } in
-    M.fromList compareString
-      (map
-         (\((,) n deps) -> (,) n (canonical (filter (\d -> S.member compareString d names) deps)))
-         entries);
-  transpose :: Map String ([] String) -> Map String ([] String);
-  transpose graph =
-    M.map canonical
-      (foldlStrict
-         (\acc entry ->
-            foldlStrict
-              (\state dependency ->
-                 M.insertWith compareString append dependency ((:) (fst entry) []) state)
-              acc
-              (snd entry))
-         (M.map (\_ -> []) graph)
-         (M.toList graph));
-  finish :: Map String ([] String) ->
-            Set String -> [] Visit -> [] String -> (,) (Set String) ([] String);
-  finish graph seen pending ordered =
-    case pending of {
-      [] -> (,) seen ordered;
-      (:) (Leave n) rest -> finish graph seen rest ((:) n ordered);
-      (:) (Enter n) rest ->
-        if S.member compareString n seen
-        then finish graph seen rest ordered
-        else let {
-               dependencies = M.findWithDefault compareString [] n graph
-             } in
-             finish graph (S.insert compareString n seen)
-               (foldr (\d next -> (:) (Enter d) next) ((:) (Leave n) rest) dependencies)
-               ordered
-    };
-  collect :: Map String ([] String) ->
-             Set String -> [] String -> [] String -> (,) (Set String) ([] String);
-  collect graph seen pending members =
-    case pending of {
-      [] -> (,) seen (sortBy compareString members);
-      (:) n rest ->
-        if S.member compareString n seen
-        then collect graph seen rest members
-        else collect graph (S.insert compareString n seen)
-               (append (M.findWithDefault compareString [] n graph) rest)
-               ((:) n members)
-    };
-  collectGroups :: Map String ([] String) ->
-                   Set String -> [] String -> [] ([] String) -> [] ([] String);
-  collectGroups graph seen ordered groups =
-    case ordered of {
-      [] -> groups;
-      (:) n rest ->
-        if S.member compareString n seen
-        then collectGroups graph seen rest groups
-        else case collect graph seen ((:) n []) [] of {
-               (,) next members -> collectGroups graph next rest ((:) members groups)
-             }
-    };
+      nodes = V.fromList values;
+      names = M.fromList compareString (zipWith (\node i -> (,) (name node) i) values (V.indices nodes));
+      resolve key = case M.lookup compareString key names of {
+        Just i -> Just i;
+        Nothing -> missing key
+      };
+      rows = V.fromList (map (\node -> V.fromList (mapMaybe resolve (dependencies node))) values)
+    } in NamedGraph names nodes (Rows rows);
+  graphNodes :: forall d a. NamedGraph d a -> V.IndexVec d a;
+  graphNodes (NamedGraph _ nodes _) = nodes;
+  graphRows :: forall d a. NamedGraph d a -> Rows d;
+  graphRows (NamedGraph _ _ rows) = rows;
+  graphId :: forall d a. NamedGraph d a -> String -> Maybe (V.Index d);
+  graphId (NamedGraph names _ _) name = M.lookup compareString name names;
+  neighbors :: forall d. Rows d -> V.Index d -> [] (V.Index d);
+  neighbors (Rows rows) i = V.toList (V.at rows i);
+
+  -- Roots and rows have a specified order. The explicit stack avoids native
+  -- call-stack growth on deep import chains. Leave prepends to finish order.
+  data Visit d = Enter (V.Index d) | Leave (V.Index d);
+  finish :: forall s d. Rows d -> V.Builder s d Bool -> [] (Visit d) -> [] (V.Index d) ->
+                        ST s ([] (V.Index d));
+  finish rows seen pending ordered = case pending of {
+    [] -> stReturn ordered;
+    (:) (Leave i) rest -> finish rows seen rest ((:) i ordered);
+    (:) (Enter i) rest -> stBind (V.get seen i) (\marked ->
+      if marked then finish rows seen rest ordered
+      else stBind (V.set seen i True) (\_ ->
+        finish rows seen (foldr (\j next -> (:) (Enter j) next) ((:) (Leave i) rest)
+                            (neighbors rows i)) ordered))
+  };
+  finishOrder :: forall d. Rows d -> [] (V.Index d) -> [] (V.Index d);
+  finishOrder (Rows rows) roots = runST (stBind (V.filled (V.count rows) False) (\seen ->
+    finish (Rows rows) seen (map Enter roots) []));
+
+  transposeRows :: forall d. Rows d -> Rows d;
+  transposeRows (Rows rows) = runST (stBind (V.filled (V.count rows) []) (\incoming ->
+    stBind (ST.map_ (\i -> ST.map_ (\j -> stBind (V.get incoming j) (\old ->
+      V.set incoming j ((:) i old))) (V.toList (V.at rows i))) (reverse (V.indices rows))) (\_ ->
+    stBind (V.freeze incoming) (\lists ->
+      stReturn (Rows (V.fromList (map V.fromList (V.toList lists))))))));
+  data Declaration = Declaration;
+  data ModuleVertex = ModuleVertex;
+  collectGroups :: forall s d. Rows d -> V.Builder s d Bool -> [] (V.Index d) -> [] ([] (V.Index d)) ->
+                   ST s ([] ([] (V.Index d)));
+  collectGroups rows seen ordered groups = case ordered of {
+    [] -> stReturn groups;
+    (:) i rest -> stBind (finish rows seen [Enter i] []) (\members ->
+      case members of {
+        [] -> collectGroups rows seen rest groups;
+        (:) _ _ -> collectGroups rows seen rest ((:) members groups)
+      })
+  };
+  -- Repeated keys select the last entry. Roots, outgoing rows and group
+  -- members are lexical, independently of source declaration order.
+  nameGraph :: forall d. [] ((,) String ([] String)) -> NamedGraph d ((,) String ([] String));
+  nameGraph entries = buildGraph fst (\entry -> canonical (snd entry)) (\_ -> Nothing)
+                        (M.toList (M.fromList compareString entries));
+  declarationGraph :: [] ((,) String ([] String)) -> NamedGraph Declaration ((,) String ([] String));
+  declarationGraph = nameGraph;
+  moduleGraph :: [] ((,) String ([] String)) -> NamedGraph ModuleVertex ((,) String ([] String));
+  moduleGraph = nameGraph;
   components :: [] ((,) String ([] String)) -> [] ([] String);
-  components entries =
+  components entries = groupNames (declarationGraph entries);
+  groupNames :: forall d. NamedGraph d ((,) String ([] String)) -> [] ([] String);
+  groupNames graph =
     let {
-      graph = adjacency entries
-    } in
-    let {
-      ordered = snd (finish graph S.empty (map Enter (M.keys graph)) [])
-    } in
-    collectGroups (transpose graph) S.empty ordered [];
+      nodes = graphNodes graph;
+      rows = graphRows graph;
+      ordered = finishOrder rows (V.indices nodes);
+      groups = runST (stBind (V.filled (V.count nodes) False) (\seen ->
+                 collectGroups (transposeRows rows) seen ordered []))
+    } in map (\group -> sortBy compareString (map (\i -> fst (V.at nodes i)) group)) groups;
   declarationGroups :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
                        Either String ([] ([] String));
   declarationGroups values =

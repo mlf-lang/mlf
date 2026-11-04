@@ -1230,6 +1230,7 @@ module Bootstrap.LLVM.Codegen where {
   stateHelper :: Primitive -> Maybe ((,) String ([] Bool));
   stateHelper primitive =
     case primitive of {
+      PFreezeSTArray -> Just ((,) "@mlf_st_freeze_array" (args1 True));
       PNewSTArray -> Just ((,) "@mlf_st_new_array" (args2 True False));
       PReadSTArray -> Just ((,) "@mlf_st_read_array" (args2 True True));
       PWriteSTArray -> Just ((,) "@mlf_st_write_array" (args3 True True False));
@@ -1753,7 +1754,7 @@ module Bootstrap.LLVM.Codegen where {
             ((:) "!3 = !{!1, !1, i64 0}" ((:) "!4 = !{!2, !2, i64 0}" []))));
   runtimeDeclarations :: [] String;
   runtimeDeclarations =
-    L.append ["@mlf_ascii_string_indices = external global i64",
+    L.append ["declare ptr @mlf_st_freeze_array(ptr)", "@mlf_ascii_string_indices = external global i64",
       "declare ptr @mlf_string_length(ptr)", "declare ptr @mlf_string_code_at(ptr, ptr)",
       "declare ptr @mlf_concat_string_list(ptr)"]
       runtimeBaseDeclarations;

@@ -109,6 +109,10 @@ jobs:
         timeout-minutes: 16
         run: |
           python3 -B tools/shared/resource_watchdog.py --seconds 900 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard python3 -B tools/shared/generate_builtin_evidence.py --root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/builtin-generation-guard/results --timeout 600
+      - name: Check typed dependency graphs across the host, interpreter and LLVM
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tests/indexvec/run.py --compiler .mlf-build/shared-ghc/bin/emlf --output .mlf-build/indexvec-controls
       # The CLI writes query graphs; retained legacy .mlfq API controls remain below.
       - name: Check query graph fingerprints and publication recovery
         if: matrix.optimization == '2'

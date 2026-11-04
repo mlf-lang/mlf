@@ -374,7 +374,7 @@ module Bootstrap.Crate where {
               direct = M.union compareString (Modules.resolvedCrateReach resolution) externalReach
             };
             let {
-              reach = Modules.settleReach direct direct
+              reach = Modules.moduleReach direct
             };
             let {
               candidates =

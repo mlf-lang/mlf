@@ -6,7 +6,7 @@ module MLF.Host.Base
   , literal, unpack, utf8, fromUtf8, matchString, neInt, leInt, gtInt, geInt
   , v_textToChars, v_textFromChars, v_charCode, v_charFromCode
   , v_ioReturn, v_ioBind, v_stReturn, v_stBind, v_runST
-  , v_newSTArray, v_readSTArray, v_writeSTArray, v_lengthSTArray
+  , v_newSTArray, v_readSTArray, v_writeSTArray, v_lengthSTArray, v_freezeSTArray
   , v_addInt, v_subInt, v_mulInt, v_quotInt, v_remInt, v_eqInt, v_ltInt, v_andInt
   , v_orInt, v_xorInt, v_shiftLInt, v_shiftRInt, v_unsignedShiftRInt
   , v_countLeadingZerosInt, v_countTrailingZerosInt, v_popCountInt, v_unsignedLtInt
@@ -37,6 +37,7 @@ import qualified Data.Word as Word
 import Data.Typeable (Typeable)
 import Control.Exception (Exception, throw)
 import qualified Control.Monad.ST as S
+import qualified Data.Array as Boxed
 import qualified Data.Array.ST as A
 import qualified Data.Array.Base as AB
 import GHC.Float (castDoubleToWord64, castWord64ToDouble)
@@ -180,6 +181,12 @@ v_writeSTArray a n value = pure a >>= \(STArray size cells) ->
   AB.unsafeWrite cells (stIndex size (a `pseq` n)) value
 v_lengthSTArray :: STArray s a -> ST s Int
 v_lengthSTArray a = pure a >>= \(STArray size _) -> pure size
+
+-- freeze copies the boxed cells in this action, without evaluating their contents.
+v_freezeSTArray :: STArray s a -> ST s (Int -> a)
+v_freezeSTArray array = pure array >>= \(STArray size cells) -> do
+  snapshot <- A.freeze cells
+  pure (\index -> snapshot Boxed.! stIndex size index)
 
 strict2 :: (a -> b -> c) -> a -> b -> c
 strict2 f a b = a `pseq` b `pseq` f a b

@@ -39,6 +39,7 @@ module Bootstrap.Runtime where {
     RAction Primitive ([] (Either String RValue)) |
     RSTAction Primitive ([] (Either String RValue)) |
     RSTArrayHandle Int |
+    RFrozenArray RSTArrayState |
     RAsyncScopeHandle Int |
     RCompletionHandle Int Int |
     RAsyncSubscriptionHandle Int Int Int;
@@ -277,6 +278,10 @@ module Bootstrap.Runtime where {
                  then Right (RConstructor name (snoc fields argument))
                  else Left "runtime constructor overapplication"
              });
+      RFrozenArray (RSTArrayState n initial cells) -> do {
+        index <- arrayIndex n argument;
+        IM.findWithDefault initial index cells
+      };
       RPrimitive primitive arguments -> runtimePrimitive ds primitive (snoc arguments argument);
       _ -> Left "runtime application of a non-function"
     };
@@ -578,6 +583,7 @@ module Bootstrap.Runtime where {
       PReadSTArray -> True;
       PWriteSTArray -> True;
       PLengthSTArray -> True;
+      PFreezeSTArray -> True;
       _ -> False
     };
   runtimePrimitive :: DataEnv -> Primitive -> [] (Either String RValue) -> Either String RValue;
@@ -862,6 +868,15 @@ module Bootstrap.Runtime where {
               resumeState ds updated (Right (RSTArrayHandle next)) continuations
           }
         };
+      PFreezeSTArray -> do {
+        handle <- stateArrayHandle a;
+        case store of {
+          RSTStore _ arrays -> do {
+            snapshot <- stateArrayLookup handle arrays;
+            resumeState ds store (Right (RFrozenArray snapshot)) continuations
+          }
+        }
+      };
       PReadSTArray ->
         do {
           handle <- stateArrayHandle a;

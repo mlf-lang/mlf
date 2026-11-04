@@ -33,7 +33,7 @@ def validate_type(document, root, family):
         seen.add((index,typ)); node = document.nodes[index]
         if typ in ('Int','PrimitiveCode'):
             require(node.kind == 0, 'typed integer leaf')
-            if typ=='PrimitiveCode': require(0 <= node.data <= 131, 'closed primitive ABI')
+            if typ=='PrimitiveCode': require(0 <= node.data <= 132, 'closed primitive ABI')
         elif typ=='String': require(node.kind == 2, 'typed text leaf')
         elif typ=='Double': require(node.kind == 1, 'typed IEEE bits leaf')
         else:

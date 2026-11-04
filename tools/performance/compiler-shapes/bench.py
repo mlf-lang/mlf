@@ -6,6 +6,7 @@ Subcommands:
   prepare  build the fixed dependencies once (private GHC package DB, runtime,
            builtin checked pair) and write setup.json
   run      execute one frozen cohort (filters: --family, --size, --repeats)
+  installed  compare two public installations with GHC using fresh and warm targets
   analyze  write summary.json, summary.csv, samples.csv and summary.md
   all      prepare if needed, then run, then analyze
 
@@ -41,7 +42,7 @@ def run(argv):
 def measured_endpoint(name):
     endpoints = registry()['endpoints']
     if name not in endpoints:
-        raise SystemExit('unknown or unmeasured endpoint profile: ' + name
+        raise SystemExit('profile unavailable to the crate runner: ' + name
                          + '; measured profiles are ' + ', '.join(sorted(endpoints)))
     return endpoints[name]
 
@@ -87,8 +88,8 @@ def command_list(args):
     print('cells:    ' + str(cells) + ', timed compilations: '
           + str(compile_count(cells, matrix['repeats'])))
     print('')
-    print('declared but not measured here:')
-    for name, endpoint in data['unmeasured_endpoints'].items():
+    print('separate paired comparison (bench.py installed):')
+    for name, endpoint in data['paired_endpoints'].items():
         print('  ' + name + ': ' + endpoint['summary'])
     print('')
     print('claim limits:')
@@ -160,6 +161,9 @@ def command_analyze(args):
 
 
 def main():
+    if sys.argv[1:2] == ['installed']:
+        run([sys.executable, '-B', HERE / 'installed.py', *sys.argv[2:]])
+        return
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest='command', required=True)

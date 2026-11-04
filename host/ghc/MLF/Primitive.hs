@@ -21,7 +21,7 @@ module MLF.Primitive
   , readByteFileOrError, writeByteFileOrError, byteArrayDigest
   , readFile, writeFile, fileExists, canonicalPath, getArgCount, getArg, putErr
   , exitWith, getExecutablePath, getContents, stReturn, stBind, runST, newSTArray
-  , readSTArray, writeSTArray, lengthSTArray, getEnv, setEnv, unsetEnv, runProcess
+  , readSTArray, writeSTArray, lengthSTArray, freezeSTArray, getEnv, setEnv, unsetEnv, runProcess
   , listDirectory, directoryExists, fileDigest, acquireFileLock, releaseFileLock, processSupervisor, asyncScopeNew
   , asyncScopeClose, asyncNewCompletion, asyncResolveCompletion, asyncReadCompletion, asyncSubscribeCompletion, asyncSubscriptionStatus, asyncCancelSubscription
   , asyncStep, asyncEnqueue, asyncDelay, asyncWait
@@ -303,6 +303,9 @@ writeSTArray = Base.v_writeSTArray
 
 lengthSTArray :: STArray s a -> ST s Int
 lengthSTArray = Base.v_lengthSTArray
+
+freezeSTArray :: STArray s a -> ST s (Int -> a)
+freezeSTArray = Base.v_freezeSTArray
 
 getEnv :: String -> IO String
 getEnv = IO.v_getEnv

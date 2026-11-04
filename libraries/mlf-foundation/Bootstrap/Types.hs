@@ -164,7 +164,8 @@ module Bootstrap.Types where {
     PUnsignedLtInt |
     PReadByteFileOrError |
     PWriteByteFileOrError |
-    PByteArrayDigest;
+    PByteArrayDigest |
+    PFreezeSTArray;
   data SType =
     STVar String |
     SBottom |

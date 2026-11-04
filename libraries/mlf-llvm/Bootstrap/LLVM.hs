@@ -341,9 +341,9 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
     let {
       abi = "mlf_require_haskell_boundary_v4_abi"
     } in
-    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()"))
+    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()"))
       ((:) "define ptr @mlf_entry() {"
-         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()"))
+         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()"))
             ((:) ("  %root = call ptr " ++ (entry ++ "(ptr null, ptr null)"))
                ((:) "  ret ptr %root"
                   ((:) "}"

@@ -25,10 +25,28 @@ This is the low-level crate route over a **bootstrap-only** producer
 installed `emlf SOURCE -o OUTPUT` driver with its native standard library, so its
 absolute times must not be presented as the installed compiler's performance.
 
-`matrix.json` also declares `emlf-source-v1` for that installed driver. It is
-declared and unmeasured: this revision has no preparation path for it, so the entry
-point refuses to select it. Once it exists, it is a **separate profile and a
-separate cohort**; the analyzer rejects reports that mix endpoint profiles.
+The separate `emlf-source-v1` runner compares two authenticated public
+installations with GHC. It measures the installed `emlf SOURCE -o OUTPUT`
+command and verifies the executable for every leg. Run it on POSIX from the
+repository root, with fresh installation and output directories.
+
+```sh
+# In each of the before and after worktrees
+python3 -B tools/shared/build.py --build-dir "$PWD/.mlf-build/install"
+# From the implementation worktree
+python3 -B tools/performance/compiler-shapes/bench.py installed \
+  --before /absolute/before/.mlf-build/install --after "$PWD/.mlf-build/install" \
+  --output "$PWD/.mlf-build/installed-pairs"
+```
+
+This command records the compiler's own host identity. The public build
+produces a GHC-hosted compiler with an installed native standard library. The
+paired runner uses a separate schema and analyzer. Five workloads cover a
+chain, wide fan-out, a recursive SCC, a four-module diamond and the compiler's
+Unicode classifier. The latter uses its production source with a renamed module
+so both compilers compile it as user code. Each sample starts with empty target
+outputs or is a no-edit repeat of that lane's preceding build. GHC can reuse
+user objects on the repeat. The installed MLF command recompiles user code.
 
 `prepare.py` additionally requires the producer's own receipt to carry
 `prepared_verification.kind == "empty"`, which is what a bootstrap-only build has.

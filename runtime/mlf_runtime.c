@@ -132,6 +132,7 @@ static void gc_free(void *memory) {
 /* Canonical source constructor tags and Char/typed-IOError primitives 95..102 and managed stack/context 103..106. */
 void mlf_require_haskell_boundary_v4_abi(void) {}
 void mlf_require_byte_file_v2_abi(void) {}
+void mlf_require_freeze_st_array_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
@@ -171,7 +172,7 @@ typedef enum {
     EMPTY_CALL_STACK, PUSH_CALL_STACK, PRETTY_CALL_STACK, IO_ERROR_WITH_STACK,
     CONCAT_STRING_LIST,
     OR_INT, XOR_INT, SHIFT_LINT, SHIFT_RINT, UNSIGNED_SHIFT_RINT, COUNT_LEADING_ZEROS_INT, COUNT_TRAILING_ZEROS_INT, POP_COUNT_INT, INT_TO_INTEGER, INTEGER_TO_INT, ADD_INTEGER, SUB_INTEGER, MUL_INTEGER, QUOT_INTEGER, REM_INTEGER, EQ_INTEGER, LT_INTEGER, SHOW_INTEGER, READ_INTEGER, INTEGER_TO_DOUBLE, UNSIGNED_LT_INT,
-    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST,
+    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST, FREEZE_ST_ARRAY,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -1401,7 +1402,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case ASYNC_SCOPE_NEW: case ASYNC_RESOLVE_COMPLETION: case ASYNC_SUBSCRIBE_COMPLETION:
     case ASYNC_ENQUEUE: case ASYNC_WAIT: return async_action(p,2,a,b,NULL);
     case ASYNC_NEW_COMPLETION: case ASYNC_READ_COMPLETION: case ASYNC_DELAY: return async_action(p,3,a,b,c);
-    case ST_RETURN: case LENGTH_ST_ARRAY: return st_action(p,1,a,NULL,NULL);
+    case ST_RETURN: case LENGTH_ST_ARRAY: case FREEZE_ST_ARRAY: return st_action(p,1,a,NULL,NULL);
     case ST_BIND: case NEW_ST_ARRAY: case READ_ST_ARRAY: return st_action(p,2,a,b,NULL);
     case WRITE_ST_ARRAY: return st_action(p,3,a,b,c);
     /* Codegen.evaluate promises canonical WHNF for a saturated pure result.
@@ -1518,7 +1519,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
         1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2, 1,1,1,1,1,1,2,1, 0,2,1,2, 1,
-        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1
+        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1,1
     };
     _Static_assert(sizeof(arities) / sizeof(arities[0]) == PRIMITIVE_COUNT,
                    "primitive arity inventory mismatch");
@@ -1635,7 +1636,7 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     case PANIC: case READ_FILE: case FILE_EXISTS: case CANONICAL_PATH: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK: case PROCESS_SUPERVISOR:
     case ASYNC_SCOPE_CLOSE: case ASYNC_SUBSCRIPTION_STATUS: case ASYNC_CANCEL_SUBSCRIPTION: case ASYNC_STEP:
-    case ST_RETURN: case RUN_ST: case LENGTH_ST_ARRAY:
+    case ST_RETURN: case RUN_ST: case LENGTH_ST_ARRAY: case FREEZE_ST_ARRAY:
         return primitive_result((Primitive)p,a,NULL,NULL);
     default: fail("unary primitive arity mismatch");
     }
@@ -2078,6 +2079,18 @@ MlfValue *mlf_st_length_array(MlfValue *array) {
     return small((int64_t)expect(array,ST_ARRAY)->as.int_array.length);
 }
 
+static MlfValue *snapshot_lookup(MlfEnv *cells, MlfValue *index) {
+    return cells->slots[array_index(index, cells->count)];
+}
+
+MlfValue *mlf_st_freeze_array(MlfValue *array) {
+    array = expect(array, ST_ARRAY);
+    size_t count = array->as.int_array.length;
+    MlfEnv *cells = mlf_env_new(count);
+    memcpy(cells->slots, array->as.int_array.cells, count * sizeof(MlfValue *));
+    return mlf_closure(snapshot_lookup, cells);
+}
+
 /* ST has no process-global current action or mutable store: each call owns
  * its continuation stack, while boxed arrays keep ordinary heap reachability.
  * Do not explicitly collect here. Pure generated frames do not register every
@@ -2105,6 +2118,9 @@ static MlfValue *run_st(MlfValue *root) {
             break;
         case WRITE_ST_ARRAY:
             result = mlf_st_write_array(mlf_env_get(arguments,0),mlf_env_get(arguments,1),mlf_env_get(arguments,2));
+            break;
+        case FREEZE_ST_ARRAY:
+            result = mlf_st_freeze_array(mlf_env_get(arguments,0));
             break;
         case LENGTH_ST_ARRAY:
             result = mlf_st_length_array(mlf_env_get(arguments,0));
