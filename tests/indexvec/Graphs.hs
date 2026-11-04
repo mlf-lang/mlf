@@ -238,10 +238,12 @@ resolverChecks = do
   let colliding e | H.unpack (Modules.owner e) `elem` ["Foreign","Local"] = "same"
                   | otherwise = mangle e
   collision <- right (Modules.resolveCrate T.NoImplicitPrelude remote colliding [clash])
-  let matching@(D.BoundValues _ entries) = Modules.boundIn collision
+  let matching@(D.BoundValues localSymbols entries) = Modules.boundIn collision
         (filter ((=="Local") . H.unpack . Modules.moduleIdentity . Modules.resolvedSource) (Modules.resolvedCrateModules collision))
   case entries of
-    [D.Bound owner _ rhs] | [ref] <- R.references rhs -> check "distinct entity despite equal printed name" False (V.toInt owner == V.toInt ref)
+    [D.Bound owner _ rhs] | [ref] <- R.references rhs -> do
+      check "distinct entity despite equal printed name" False (V.toInt owner == V.toInt ref)
+      check "printed collision preserves distinct stable identities" False (D.symbolKey localSymbols owner == D.symbolKey localSymbols ref)
     _ -> error ("missing colliding-name fixture edge " ++ show [(V.toInt i,map V.toInt (R.references rhs)) | D.Bound i _ rhs <- entries])
   (_,active) <- right (D.resolvedGroups matching [] M.empty M.empty)
   check "external reference cannot induce self recursion" [[False]] (map (map snd) active)
@@ -249,14 +251,19 @@ resolverChecks = do
   client <- parsed ("Client","module Client where\nimport qualified ZLib as L\nanswer = L.value\n")
   let entity = Modules.Entity "ZLib" "value" Modules.Value
       abi e = Artifact.definitionName (if Modules.owner e == "ZLib" then "lib" else "client") e
-  producer <- right (Modules.resolveCrate T.NoImplicitPrelude M.empty abi [lib])
+  producer <- right (Modules.resolveCrateDefinitions T.NoImplicitPrelude M.empty abi [lib])
   iface <- right (Modules.resolvedExports T.NoImplicitPrelude (last (Modules.resolvedCrateModules producer)))
-  consumer <- right (Modules.resolveCrate T.NoImplicitPrelude (M.singleton "ZLib" iface) abi [client])
+  consumer <- right (Modules.resolveCrateDefinitions T.NoImplicitPrelude (M.singleton "ZLib" iface) abi [client])
   producerId <- right (Modules.termId (Modules.resolvedCrateBindings producer) entity)
   case Modules.boundIn consumer [last (Modules.resolvedCrateModules consumer)] of
     D.BoundValues slots [D.Bound _ _ body] | [importedId] <- R.references body -> do
       check "independent crates may assign different numeric slots" False (V.toInt producerId == V.toInt importedId)
       let producerSlots = Modules.bindingSymbols (Modules.resolvedCrateBindings producer)
+      let oldKey = D.symbolKey producerSlots producerId
+      check "stable definition remaps between two snapshots" (Just (V.toInt importedId))
+        (case M.lookup H.v_compareString oldKey (D.symbolKeyIndex slots) of
+          T.Just i -> Just (V.toInt i)
+          T.Nothing -> Nothing)
       check "interface import preserves defining crate's ABI spelling" (H.unpack (abi entity))
         (H.unpack (D.symbolName slots importedId))
       check "two tables project the same exported identity" (H.unpack (D.symbolName producerSlots producerId))
@@ -297,6 +304,17 @@ resolverChecks = do
       check "local method dependency copies its source definition" ("same","same") (H.unpack n,H.unpack ref)
     _ -> error "method failed to capture its referenced helper"
   let fresh = D.symbols [("a",False),("b",False),("c",True)]
+  let (appended, late) = D.appendSymbols fresh ["selector","dictionary"]
+  check "generation appends slots in source order" [3,4] (map V.toInt late)
+  check "appending preserves existing slot names and keys" [("a","a"),("b","b"),("c","c")]
+    [(H.unpack (D.symbolName appended i),H.unpack (D.symbolKey appended i)) | i <- V.indices (D.symbolNodes fresh)]
+  forM_ [-1,3] $ \number -> case D.checkedDeclId fresh number of
+    T.Left why -> check "reject out-of-table slot" "declaration slot out of bounds" (H.unpack why)
+    T.Right _ -> error "invalid serialized slot admitted"
+  let forged = D.BoundValues fresh [D.Bound own T.Nothing (R.Global (V.fromInt 3))]
+  case D.resolvedGroups forged [] M.empty M.empty of
+    T.Left why -> check "reject global from another slot domain" "declaration slot out of bounds" (H.unpack why)
+    T.Right _ -> error "out-of-bounds global admitted"
   case R.namedExpr (D.symbolName fresh) (R.Global external) of
     T.SVar n -> check "the same slot projects the updated spelling" "b" (H.unpack n)
     _ -> error "global projected as another kind of expression"

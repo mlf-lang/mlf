@@ -937,12 +937,12 @@ module Bootstrap.SourceInference where {
   -- The legacy recipe is lazy and is used only by the explicit whole-path
   -- fallback or compatibility diagnostics, never to prepare source queries.
   data PlanInput = NamedInput ([] ((,,) String (Maybe SAnnotation) SExpr)) | ResolvedInput Dependency.BoundValues;
-  data PlannedBinding = PlannedSource Int (Maybe SAnnotation) (R.Expr Dependency.Declaration) |
+  data PlannedBinding = PlannedSource Int (Maybe SAnnotation) (R.Expr Declaration) |
     PlannedSupport Int (Maybe SAnnotation) SExpr;
   data PlanGraph = NamedPlan ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,,) String (Maybe SAnnotation) SExpr)) ([] ([] String)) |
-    IndexedPlan Dependency.Symbols (V.IndexVec Dependency.Declaration PlannedBinding)
-      ([] (V.Index Dependency.Declaration)) ([] (V.Index Dependency.Declaration)) ([] ([] (V.Index Dependency.Declaration)));
+    IndexedPlan Dependency.Symbols (V.IndexVec Declaration PlannedBinding)
+      ([] (V.Index Declaration)) ([] (V.Index Declaration)) ([] ([] (V.Index Declaration)));
   data SourcePlan = SourcePlan Classes.ClassInventory PlanGraph
     Int (Set String) (Map String SType) (Either String Inference.LoweredDeclarations)
     ([] ((,) String SInstanceDecl)) (Map String Bool);

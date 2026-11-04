@@ -164,7 +164,7 @@ module Bootstrap.Surface where {
   };
   -- Instance methods copy only source helpers reachable from their resolved
   -- bodies. Imported IDs stay outside this table even if a local prints alike.
-  data HelperScope = HelperScope Dependency.Symbols (V.IndexVec Dependency.Declaration (Maybe Dependency.Bound));
+  data HelperScope = HelperScope Dependency.Symbols (V.IndexVec Declaration (Maybe Dependency.Bound));
   helperScope values@(Dependency.BoundValues symbols _) = HelperScope symbols (Dependency.boundTable values);
   helperBindings table seen pending result = case pending of {
     [] -> result;
