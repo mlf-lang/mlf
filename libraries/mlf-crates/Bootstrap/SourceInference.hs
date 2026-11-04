@@ -12,6 +12,7 @@ module Bootstrap.SourceInference where {
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.EvidenceBoundary as Boundary;
+  import qualified Bootstrap.Evidence as Evidence;
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.Dependency as Dependency;
@@ -950,7 +951,8 @@ module Bootstrap.SourceInference where {
   planGraph (SourcePlan _ graph _ _ _ _ _ _) = graph;
   -- The inventory and persisted query envelopes consume named syntax. Select
   -- by ID first, projecting only the rows demanded by that consumer.
-  namedBinding symbols rows i = let { name = Dependency.symbolName symbols } in case V.at rows i of {
+  namedBinding symbols = projectBinding (Dependency.symbolName symbols);
+  projectBinding name rows i = case V.at rows i of {
     PlannedSource ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation (R.namedExpr name rhs));
     PlannedSupport ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation rhs)
   };
@@ -1094,26 +1096,40 @@ module Bootstrap.SourceInference where {
   -- Resolved IDs survive preparation. The name index is used only to admit
   -- named lowering output, interface inventories and checked xMLF binders.
   -- Locals override inactive imports, even when both print the same spelling.
-  data DeclScope = DeclScope Dependency.Symbols (Map String (V.Index Declaration));
+  data DeclScope = DeclScope Dependency.Symbols (Map String (V.Index Declaration))
+    (Map String (V.Index Declaration)) (Set String) (Maybe Classes.ClassInventory);
   compareDecl left right = compareInt (V.toInt left) (V.toInt right);
-  declSymbols (DeclScope symbols _) = symbols;
-  declName scope = Dependency.symbolName (declSymbols scope);
-  lookupDecl (DeclScope _ names) name = M.lookup compareString name names;
+  declSymbols (DeclScope symbols _ _ _ _) = symbols;
+  declStable scope = Dependency.symbolKey (declSymbols scope);
+  -- Distinct global entities may share a presentation spelling. Only in that
+  -- case pass their defining key into the named lowering/fragment adapter.
+  declName scope@(DeclScope symbols _ _ ambiguous _) i = let { n = Dependency.symbolName symbols i } in
+    if Set.member compareString n ambiguous then declStable scope i else n;
+  lookupDecl (DeclScope _ names keys _ _) name = case M.lookup compareString name keys of {
+    Just i -> Just i; Nothing -> M.lookup compareString name names
+  };
   requireDecl scope name = case lookupDecl scope name of {
     Just i -> Right i; Nothing -> Left ("missing declaration slot: " ++ name)
   };
   declarationScope base localIds localNames imported = let {
-    known = M.fromList compareString (map (\i -> (,) (Dependency.symbolName base i) i)
-      (V.indices (Dependency.symbolNodes base)));
+    known = Dependency.symbolKeyIndex base;
     extra = filter (\name -> not (M.member compareString name known))
       (Set.toList (Set.fromList compareString (append localNames imported)));
     symbols = Dependency.extendSymbols base extra;
     all = M.fromList compareString (map (\i -> (,) (Dependency.symbolName symbols i) i)
       (V.indices (Dependency.symbolNodes symbols)));
-    locals = M.fromList compareString (map (\i -> (,) (Dependency.symbolName symbols i) i) localIds)
-  } in DeclScope symbols (M.union compareString locals all);
+    locals = M.fromList compareString (map (\i -> (,) (Dependency.symbolName symbols i) i) localIds);
+    counts = M.fromListWith compareString addInt (map (\name -> (,) name 1) (V.toList (Dependency.symbolNodes symbols)));
+    ambiguous = Set.fromList compareString (M.keys (M.filterWithKey (\_ n -> n > 1) counts))
+  } in DeclScope symbols (M.union compareString locals all) (Dependency.symbolKeyIndex symbols) ambiguous Nothing;
   planScope plan imported = case planGraph plan of {
-    IndexedPlan symbols _ source support _ -> declarationScope symbols (append source support) [] imported;
+    IndexedPlan symbols _ source support _ -> case declarationScope symbols (append source support) [] imported of {
+      DeclScope table names keys ambiguous _ -> case Classes.inventoryDeclarations (planInventory plan) of {
+        Nothing -> DeclScope table names keys ambiguous Nothing;
+        Just (Dependency.GeneratedTable _ _ active _ _) ->
+          DeclScope table (M.union compareString active names) keys ambiguous (Just (planInventory plan))
+      }
+    };
     NamedPlan members support _ -> let { names = map sourceName (append members support);
       base = Dependency.symbols (map (\name -> (,) name False) names)
     } in declarationScope base (V.indices (Dependency.symbolNodes base)) [] imported
@@ -1124,6 +1140,7 @@ module Bootstrap.SourceInference where {
     (Map (V.Index Declaration) SourceContract) (Map String SourceContract);
   checkedScope (CheckedContracts scope _ _) = scope;
   checkedNamed (CheckedContracts _ _ contracts) = contracts;
+  contractSymbols = compose declSymbols checkedScope;
   checkedBinding (CheckedContracts scope byId _) i = case M.lookup compareDecl i byId of {
     Just value -> Right value;
     Nothing -> Left ("query dependency is not available: " ++ declName scope i)
@@ -1145,14 +1162,13 @@ module Bootstrap.SourceInference where {
   -- Lowered terms may introduce selector and dictionary uses. Admit these
   -- against the current declaration table; a recognized but unfinished read
   -- is an error, including a forward edge to a later SCC.
+  expressionDeclarations scope body = mapMaybe (lookupDecl scope)
+    (Dependency.valueNames (Dependency.observeExpression body));
   selectedContractIds scope owners members = let {
-    refs = Set.toList (Set.fromList compareString
-      (concatMap (compose Dependency.valueNames Dependency.observeDeclaration) members));
-    selected name = case lookupDecl scope name of {
-      Nothing -> Nothing;
-      Just i -> if elem (\a b -> compareDecl a b == 0) i owners then Nothing else Just i
-    }
-  } in mapMaybe selected refs;
+    ordered = M.fromList compareString (concatMap (\member ->
+      map (\i -> (,) (declName scope i) i) (expressionDeclarations scope (sourceRhs member))) members)
+  } in filter (\i -> not (elem (\a b -> compareDecl a b == 0) i owners)) (M.elems ordered);
+  slotPrepared checked owners (SlotPrepared _ named) = slotPrepared checked owners named;
   slotPrepared checked owners (PreparedGroup original members _ registry specs authority _) = do {
     let { scope = checkedScope checked; parameters = selectedContractIds scope owners members;
       materialize i = mapEither ((,) (declName scope i)) (checkedBinding checked i) };
@@ -1165,7 +1181,19 @@ module Bootstrap.SourceInference where {
     (,) ids activeAuthority <- case authority of {
       Nothing -> Right ((,) [] Nothing);
       Just (RootAuthority owner labels protected candidates _) -> do {
-        resolved <- traverseEither resolveCandidate candidates;
+        resolved <- case (,) scope owners of {
+          (,) (DeclScope _ _ _ _ (Just inventory)) [ownerId] -> do {
+            let { entries = Classes.inventoryCandidateIds inventory ownerId };
+            ensure (length entries == length candidates) "definition candidate inventory changed";
+            traverseEither (\((,) ((,) role i) ((,,) expected name _)) -> do {
+              ensure (Evidence.sameRole role expected &&
+                eqString (Dependency.symbolName (declSymbols scope) i) name) "definition candidate identity changed";
+              contract <- checkedBinding checked i;
+              Right ((,) i ((,,) role (declName scope i) (contractType contract)))
+            }) (zip entries candidates)
+          };
+          _ -> traverseEither resolveCandidate candidates
+        };
         flags <- traverseEither (\((,) i candidate) -> mapEither (\c ->
           if contractProtected c then Just (case candidate of { (,,) _ n _ -> n }) else Nothing)
           (checkedBinding checked i)) resolved;
@@ -1173,9 +1201,10 @@ module Bootstrap.SourceInference where {
           (mapMaybe (\x -> x) flags))))
       }
     };
-    Right ((,) (GroupSlots scope owners parameters ids) (PreparedGroup original members
+    let { slots = GroupSlots scope owners parameters ids };
+    Right ((,) slots (SlotPrepared slots (PreparedGroup original members
       (map (\((,) n c) -> (,) n (contractType c)) values) registry specs activeAuthority
-      (map (\((,) n c) -> (,) n (contractProtected c)) values)))
+      (map (\((,) n c) -> (,) n (contractProtected c)) values))))
   };
 
   -- A sealed prepared query contains raw input and all finalization authority.
@@ -1184,15 +1213,25 @@ module Bootstrap.SourceInference where {
     ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,,) String (Maybe SAnnotation) SExpr))
     ([] ((,) String XType)) (Map String String)
-    ([] ((,,) String ([] String) Bool)) (Maybe RootAuthority) ([] ((,) String Bool));
+    ([] ((,,) String ([] String) Bool)) (Maybe RootAuthority) ([] ((,) String Bool)) |
+    SlotPrepared GroupSlots PreparedGroup;
+  preparedSlots (SlotPrepared slots _) = Just slots;
+  preparedSlots _ = Nothing;
   data RootAuthority = RootAuthority String ([] ((,,) String String String)) Bool
     ([] ((,,) EvidenceRole String XType)) ([] String);
+  groupOriginal (SlotPrepared _ named) = groupOriginal named;
   groupOriginal (PreparedGroup original _ _ _ _ _ _) = original;
+  groupMembers (SlotPrepared _ named) = groupMembers named;
   groupMembers (PreparedGroup _ members _ _ _ _ _) = members;
+  groupBindings (SlotPrepared _ named) = groupBindings named;
   groupBindings (PreparedGroup _ _ bindings _ _ _ _) = bindings;
+  groupRegistry (SlotPrepared _ named) = groupRegistry named;
   groupRegistry (PreparedGroup _ _ _ registry _ _ _) = registry;
+  groupContracts (SlotPrepared _ named) = groupContracts named;
   groupContracts (PreparedGroup _ _ _ _ contracts _ _) = contracts;
+  groupAuthority (SlotPrepared _ named) = groupAuthority named;
   groupAuthority (PreparedGroup _ _ _ _ _ authority _) = authority;
+  groupParameterProtection (SlotPrepared _ named) = groupParameterProtection named;
   groupParameterProtection (PreparedGroup _ _ _ _ _ _ flags) = flags;
   groupCandidateBindings group = case groupAuthority group of {
     Nothing -> [];
@@ -1233,14 +1272,13 @@ module Bootstrap.SourceInference where {
   prepareGroupSparse = prepareGroupUsing selectedContractBindings;
   -- The file query driver keeps the group's IDs through selection. The
   -- printable names belong to the query key and the named inference boundary.
-  planSteps = planStepsUsing selectedContractBindings;
-  planStepsUsing selectBindings plan = case planGraph plan of {
+  planSteps = planStepsUsing selectedContractBindings Dependency.symbolName;
+  planStepsUsing selectBindings projection plan = case planGraph plan of {
     NamedPlan _ _ groups -> map (\names -> (,) names (\contracts -> prepareGroupUsing selectBindings plan contracts names)) groups;
     IndexedPlan symbols rows _ _ groups -> let {
       step group = let {
-        ids = map fst group;
-        names = map (Dependency.symbolName symbols) ids;
-        entries = sortBy (\a b -> compareInt (fst a) (fst b)) (map (namedBinding symbols rows) ids);
+        ids = map fst group; name = projection symbols; names = map name ids;
+        entries = sortBy (\a b -> compareInt (fst a) (fst b)) (map (projectBinding name rows) ids);
         members = map snd entries;
         support = case ids of { (:) i _ -> case V.at rows i of { PlannedSupport _ _ _ -> True; _ -> False }; [] -> False };
         prepare contracts = prepareGroupWithReservation selectBindings Nothing (case ids of { [i] -> Just i; _ -> Nothing })
@@ -1252,7 +1290,7 @@ module Bootstrap.SourceInference where {
   };
   -- Executable query plans select members from the resolver's IDs. Only the
   -- compatibility named plan needs to admit its requested group by spelling.
-  querySteps plan scope = let { steps = planStepsUsing (\_ _ -> []) plan } in case planGraph plan of {
+  querySteps plan scope = let { steps = planStepsUsing (\_ _ -> []) (\_ -> declName scope) plan } in case planGraph plan of {
     IndexedPlan _ _ _ _ groups -> Right (zipWith (\group step -> (,) (map fst group) (snd step)) groups steps);
     NamedPlan _ _ _ -> traverseEither (\((,) names prepare) ->
       mapEither (\ids -> (,) ids prepare) (traverseEither (requireDecl scope) names)) steps
@@ -1267,11 +1305,21 @@ module Bootstrap.SourceInference where {
     (Map String ((,) Int ((,,) String (Maybe SAnnotation) SExpr)))
     (Map String ((,) Int ((,,) String (Maybe SAnnotation) SExpr)))
     (Map String ((,) String ([] String))) (Map String Bool) (Set String) |
-    FileSourceContext OwnedSourceContext (Either String CheckedContracts);
+    FileSourceContext OwnedSourceContext (Either String CheckedContracts) (Either String FileGroups);
+  data FileGroups = FileGroups ([] ([] String)) (Map String FileGroup);
+  data FileGroup = FileGroup ([] (V.Index Declaration)) (Map String SourceContract -> Either String PreparedGroup);
   ownedSourceUsed (OwnedSourceContext _ _ _ _ used) = used;
-  ownedSourceUsed (FileSourceContext inner _) = ownedSourceUsed inner;
-  fileSourceContext plan contracts = FileSourceContext (prepareOwnedSourceContext plan contracts)
-    (installContracts (planScope plan (M.keys contracts)) contracts);
+  ownedSourceUsed (FileSourceContext inner _ _) = ownedSourceUsed inner;
+  fileSourceContext plan contracts = let { scope = planScope plan (M.keys contracts);
+    groups = mapEither (\steps -> let {
+      names = map (compose (map (declName scope)) fst) steps;
+      rows = zipWith (\ns ((,) ids prepare) -> (,) (Separate.pack ns) (FileGroup ids prepare)) names steps
+    } in FileGroups names (M.fromList compareString rows)) (querySteps plan scope)
+  } in FileSourceContext (prepareOwnedSourceContext plan contracts) (installContracts scope contracts) groups;
+  filePlanGroups plan context = case context of {
+    Just (FileSourceContext _ _ (Right (FileGroups names _))) -> names;
+    _ -> planGroups plan
+  };
   reserveContractKeys contracts used = M.foldlWithKeyStrict
     (\reserved name _ -> Set.insert compareString name reserved) used contracts;
   indexSourceDeclarations members = M.fromList compareString (numberSourceDeclarations 0 members);
@@ -1286,13 +1334,13 @@ module Bootstrap.SourceInference where {
     (contractOverloads contracts) (M.map contractProtected contracts)
     (reserveContractKeys contracts used);
   extendOwnedSourceContext :: Map String SourceContract -> OwnedSourceContext -> OwnedSourceContext;
-  extendOwnedSourceContext contracts (FileSourceContext inner previous) =
+  extendOwnedSourceContext contracts (FileSourceContext inner previous groups) =
     FileSourceContext (extendOwnedSourceContext contracts inner) (do {
       checked <- previous;
       entries <- traverseEither (\((,) n c) -> mapEither (\i -> (,) i c)
         (requireDecl (checkedScope checked) n)) (M.toList contracts);
       Right (publishContracts checked entries)
-    });
+    }) groups;
   extendOwnedSourceContext contracts (OwnedSourceContext sources supports overloads protected used) =
     OwnedSourceContext sources supports
       (M.union compareString (contractOverloads contracts) overloads)
@@ -1306,15 +1354,20 @@ module Bootstrap.SourceInference where {
     in map snd (sortBy (\left right -> compareInt (fst left) (fst right)) selected);
   prepareGroupOwned :: OwnedSourceContext -> SourcePlan -> Map String SourceContract ->
     [] String -> Either String PreparedGroup;
-  prepareGroupOwned (FileSourceContext inner checked) plan contracts names = do {
+  prepareGroupOwned (FileSourceContext _ checked groups) _ _ names = do {
     current <- checked;
-    owners <- traverseEither (requireDecl (checkedScope current)) names;
-    prepared <- prepareOwnedUsing (\_ _ -> []) inner plan contracts names;
-    mapEither snd (slotPrepared current owners prepared)
+    FileGroups _ index <- groups;
+    case M.lookup compareString (Separate.pack names) index of {
+      Nothing -> Left "source SCC ownership mismatch";
+      Just (FileGroup owners prepare) -> do {
+        prepared <- prepare (checkedNamed current);
+        mapEither snd (slotPrepared current owners prepared)
+      }
+    }
   };
   prepareGroupOwned context plan contracts names =
     prepareOwnedUsing selectedContractBindings context plan contracts names;
-  prepareOwnedUsing selectBindings (FileSourceContext inner _) = prepareOwnedUsing selectBindings inner;
+  prepareOwnedUsing selectBindings (FileSourceContext inner _ _) = prepareOwnedUsing selectBindings inner;
   prepareOwnedUsing selectBindings (OwnedSourceContext sources supports overloads protected used) =
     \plan contracts names -> prepareGroupWithReservation selectBindings (Just used) Nothing eligibleSource plan contracts names
       (indexedSourceDeclarations sources names) (indexedSourceDeclarations supports names)

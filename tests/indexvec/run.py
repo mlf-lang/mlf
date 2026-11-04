@@ -66,7 +66,7 @@ def main():
         "-ibootstrap",
         *["-i" + str(d) for d in sorted((ROOT / "libraries").iterdir())],
     ]
-    for name in ["Graphs", "Vector", "World"]:
+    for name in ["Graphs", "Vector", "World", "DeclQueryControls"]:
         obj = out / name
         obj.mkdir()
         run([*ghc, "-odir", obj, "-hidir", obj, HERE / (name + ".hs"), *host, "-o", obj / "probe"])
@@ -74,6 +74,8 @@ def main():
         [out / "Graphs/probe"],
         expected=b"1032 ordered SCC and reach comparisons, query DAG and package controls passed\n",
     )
+
+    run([out / "DeclQueryControls/probe", out / "decl-query-cache"])
 
     source = HERE / "Vector.hs"
     mlf = [emlf, "-i", ROOT / "libraries/mlf-foundation"]

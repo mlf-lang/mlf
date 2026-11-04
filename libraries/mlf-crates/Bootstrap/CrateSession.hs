@@ -470,7 +470,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                 lock <- acquireFileLock (cacheDir ++ "/.lock");
                 executable <- getExecutablePath;
                 compilerHash <- fileDigest executable;
-                let { encodings = if shareEncoding
+                let { owned = if shareEncoding then Just (Source.fileSourceContext plan contracts) else Nothing;
+                      encodings = if shareEncoding
                       then Just (Query.prepareSourceEncodings (Source.planData plan)) else Nothing };
                 result <- if not (Query.validSourceContextDigest compilerHash)
                   then ioReturn (Left "cannot fingerprint source query compiler")
@@ -478,8 +479,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                   Nothing -> Nothing;
                   Just pool -> Just (Query.emptyDatatypeContextEncoding pool)
                 }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)
-                  (if shareEncoding then Just (Source.fileSourceContext plan contracts) else Nothing) []
-                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 []);
+                  owned []
+                  crateId compilerHash cacheDir inventory plan (Source.filePlanGroups plan owned) contracts [] 0 0 []);
                 cleaned <- Query.cleanupQueryKey cacheDir result;
                 releaseFileLock lock;
                 ioReturn cleaned

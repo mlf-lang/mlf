@@ -27,7 +27,7 @@ module Bootstrap.CrateGraph where {
 
   data State = State G.Session Source.CheckedContracts
     (Map String Open.Environment) ([] ((,) String Open.Fragment)) Int Int ([] Q.GroupResult) (Maybe IntArray);
-  bindingKey scope i = G.key "Binding" (Source.declName scope i);
+  bindingKey scope i = G.key "Binding" (Source.declStable scope i);
   requireBindings scope ids = requireNodes (map (bindingKey scope) ids);
   -- In-memory SCC queries use the full ordered member list. Packing its
   -- stable definitions is the boundary to the generation and receipt formats.
@@ -37,7 +37,7 @@ module Bootstrap.CrateGraph where {
     PreparedQuery -> "Prepared"; ScopeInventoryQuery -> "ScopeInventory";
     ScopeQuery -> "Scope"; InferQuery -> "InferScc"; FinishQuery -> "FinishScc"
   };
-  groupIdentity slots = Separate.pack (map (Source.declName (Source.slotScope slots)) (Source.memberIds slots));
+  groupIdentity slots = Separate.pack (map (Source.declStable (Source.slotScope slots)) (Source.memberIds slots));
   groupKey kind slots = G.key (groupQueryKind kind) (groupIdentity slots);
   datatypeKey name = G.key "Datatype" name;
   contractValue contract = W.VNode 420
@@ -73,10 +73,14 @@ module Bootstrap.CrateGraph where {
     }) wanted;
   candidateMetadata protected ((,,) role name _) = Q.node "candidate"
     [Q.encodeRole role,name,Q.boolean (elem eqString name protected)];
-  preparedValue prepared = W.VNode 421
-    [W.VText (Q.list (compose Q.encodeMember Q.canonicalMember) (Source.groupOriginal prepared)),
-     W.VText (Q.list (compose Q.encodeMember Q.canonicalMember) (Source.groupMembers prepared)),
-     A.toList A.toText (Q.sourceGroupMetadataUsing candidateMetadata prepared)];
+  preparedValue slots prepared = let {
+    table = Q.referenceTable slots prepared; member = compose Q.encodeMember (Q.referenceMember table);
+    token = Q.referenceToken table;
+    candidate protected ((,,) role n _) = Q.node "candidate"
+      [Q.encodeRole role,token n,Q.boolean (elem eqString n protected)]
+  } in W.VNode 421 [W.VText "prepared-declarations-1", A.toList A.toText (Q.referenceDefinitions table),
+    W.VText (Q.list member (Source.groupOriginal prepared)), W.VText (Q.list member (Source.groupMembers prepared)),
+    A.toList A.toText (Q.sourceGroupMetadataWith token candidate prepared)];
   scopeInventory prepared = case Source.groupAuthority prepared of {
     Nothing -> W.VNode 422 [];
     Just (Source.RootAuthority _ _ _ candidates protected) -> W.VNode 422
@@ -171,7 +175,7 @@ module Bootstrap.CrateGraph where {
               group = Q.groupName crateId names;
               rawKey = groupKey InferQuery slots };
             graphStarted <- G.clock statistics;
-            source <- input (groupKey PreparedQuery slots) (preparedValue prepared) session;
+            source <- input (groupKey PreparedQuery slots) (preparedValue slots prepared) session;
             case source of { Left e -> ioReturn (Left e); Right ((,) sourceNode first) -> do {
               scopeInput <- input (groupKey ScopeInventoryQuery slots) (scopeInventory prepared) first;
               case scopeInput of { Left e -> ioReturn (Left e); Right ((,) scopeLeaf second) ->
@@ -345,8 +349,8 @@ module Bootstrap.CrateGraph where {
     let { ids = Source.candidateIds slots; scope = Source.slotScope slots };
     ensure (length ids == length candidates) "evidence candidate inventory changed";
     traverseEither (\((,) index ((,) i candidate)) -> do {
-      let { name = Boundary.candidateName candidate; stable = Source.declName scope i };
-      ensure (eqString (X.nameHint name) stable) "evidence candidate declaration mismatch";
+      let { name = Boundary.candidateName candidate; stable = Source.declStable scope i };
+      ensure (eqString (X.nameHint name) (Source.declName scope i)) "evidence candidate declaration mismatch";
       Right ((,) name (XName (0 - index - 1) stable))
     }) (zip (range 0 (length ids - 1)) (zip ids candidates))
   };

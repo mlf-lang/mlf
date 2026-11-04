@@ -626,15 +626,32 @@ module Bootstrap.CrateQuery where {
              (typeDepth + length names)
              body)
     };
-  canonicalMember ((,,) n annotation body) =
+  canonicalMember = canonicalMemberIn M.empty (\n -> n);
+  canonicalMemberIn globals owner ((,,) n annotation body) =
     let {
       names = case annotation of {
         Just (SAnnotation [] ty) -> leadingTypes ty;
         _ -> []
       }
     } in
-    (,,) n (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
-      (canonicalExpression M.empty 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
+    (,,) (owner n) (Separate.mapMaybeValue (canonicalAnnotation M.empty 0) annotation)
+      (canonicalExpression globals 0 (canonicalScope "type:" M.empty 0 names) (length names) body);
+  -- The table is ordered by defining identity. Its ordinals belong only
+  -- to this Prepared value, independently of resolver slot order or crate.
+  data ReferenceTable = ReferenceTable ([] String) (Map String String);
+  referenceDefinitions (ReferenceTable keys _) = keys;
+  referenceToken (ReferenceTable _ names) name = M.findWithDefault compareString name name names;
+  referenceMember table@(ReferenceTable _ names) = canonicalMemberIn names (referenceToken table);
+  referenceTable slots prepared = let {
+    scope = Source.slotScope slots;
+    observed = concatMap (compose (Source.expressionDeclarations scope) Source.sourceRhs)
+      (append (Source.groupOriginal prepared) (Source.groupMembers prepared));
+    ids = append (Source.memberIds slots) (append (Source.parameterIds slots)
+      (append (Source.candidateIds slots) observed));
+    definitions = M.toList (M.fromList compareString (map (\i -> (,) (Source.declStable scope i) i) ids));
+    names = zipWith (\ordinal ((,) _ i) -> (,) (Source.declName scope i) ("ref:" ++ showInt ordinal))
+      (range 0 (length definitions - 1)) definitions
+  } in ReferenceTable (map fst definitions) (M.fromList compareString names);
   data DatatypeId = DatatypeId;
   data TypeInventory = TypeInventory (Dependency.NamedGraph DatatypeId DataDecl)
     (Map String String) (V.IndexVec DatatypeId IntSet);
@@ -2125,20 +2142,21 @@ module Bootstrap.CrateQuery where {
   cachedTypedCandidate encodings protectedCandidates ((,,) role name ty) =
     encodeTypedCandidateBinding role name protectedCandidates
       (cachedBinding encodings ((,) name ty));
-  sourceGroupMetadataUsing candidateEncoding prepared =
+  sourceGroupMetadataUsing = sourceGroupMetadataWith (\n -> n);
+  sourceGroupMetadataWith token candidateEncoding prepared =
       ((:) (list (\((,) name dictionary) -> node "class-dictionary" ((:) name ((:) dictionary [])))
         (M.toList (Source.groupRegistry prepared)))
       ((:) (list (\((,,) name classes protected) -> node "result-contract"
-        ((:) name ((:) (list (\x -> x) classes) ((:) (boolean protected) []))))
+        ((:) (token name) ((:) (list (\x -> x) classes) ((:) (boolean protected) []))))
         (Source.groupContracts prepared))
       ((:) (case Source.groupAuthority prepared of {
         Nothing -> node "unchanged-source-or-support" [];
         Just (Source.RootAuthority name labels protected candidates protectedCandidates) -> node "unsigned-source-root"
-          ((:) name ((:) (list (\((,,) binder cls dictionary) -> node "exact-slot"
+          ((:) (token name) ((:) (list (\((,,) binder cls dictionary) -> node "exact-slot"
             ((:) binder ((:) cls ((:) dictionary [])))) labels)
           ((:) (boolean protected) ((:) (list (candidateEncoding protectedCandidates) candidates) []))))
       }) ((:) (list (\((,) name flag) -> node "raw-parameter-protection"
-        ((:) name ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) []))));
+        ((:) (token name) ((:) (boolean flag) []))) (Source.groupParameterProtection prepared)) []))));
   sourceGroupKey :: Source.PreparedGroup -> SourceKey;
   sourceGroupKey = sourceGroupKeyUsing encodeTypedCandidate;
   sourceGroupKeyUsing candidateEncoding prepared = keyNode "prepared-source-group"
@@ -2171,11 +2189,18 @@ module Bootstrap.CrateQuery where {
         (append (map fst (Source.groupCandidateBindings prepared))
           (concatMap (\member -> Dependency.valueNames (Dependency.observeDeclaration member))
             (Source.groupOriginal prepared)))) } in
-    pooledSourceKey
-      [KeyText sourceQueryFormat, KeyText crateId, KeyText compilerHash,
-       keyList (\member -> memberKey KeyScope (canonicalMember member)) (Source.groupMembers prepared),
+    let { fields member group = [KeyText sourceQueryFormat, KeyText crateId, KeyText compilerHash,
+       keyList (\value -> memberKey KeyScope (member value)) (Source.groupMembers prepared),
        KeyText (list bindingEncoding (Source.groupBindings prepared)), KeyText datatypeContext,
-       sourceGroupKeyUsing candidateEncoding prepared, KeyText (observedContractEncoding observed contracts)];
+       group, KeyText (observedContractEncoding observed contracts)] } in case Source.preparedSlots prepared of {
+      Nothing -> pooledSourceKey (fields canonicalMember (sourceGroupKeyUsing candidateEncoding prepared));
+      Just slots -> let { table = referenceTable slots prepared; member = referenceMember table;
+        group = keyNode "prepared-declarations-1" (append
+          [keyList KeyText (referenceDefinitions table),keyList (\value -> memberKey KeyScope (member value))
+            (Source.groupOriginal prepared)]
+          (map KeyText (sourceGroupMetadataWith (referenceToken table) candidateEncoding prepared)))
+      } in pooledSourceKey (fields member group)
+    };
   sourceQueryKeyWithContractEncodings encodings =
     sourceQueryKeyWithSelection (cachedBinding encodings) (cachedTypedCandidate encodings) (cachedObservedContracts encodings);
   -- Raw checked inference payloads retain their established validator.
@@ -2341,7 +2366,8 @@ module Bootstrap.CrateQuery where {
                 lock <- acquireFileLock (cacheDir ++ "/.lock");
                 executable <- getExecutablePath;
                 compilerHash <- fileDigest executable;
-                let { encodings = if shareEncoding
+                let { owned = if shareEncoding then Just (Source.fileSourceContext plan contracts) else Nothing;
+                      encodings = if shareEncoding
                       then Just (prepareSourceEncodings (Source.planData plan)) else Nothing };
                 result <- if not (validSourceContextDigest compilerHash)
                   then ioReturn (Left "cannot fingerprint source query compiler")
@@ -2349,8 +2375,8 @@ module Bootstrap.CrateQuery where {
                   Nothing -> Nothing;
                   Just pool -> Just (emptyDatatypeContextEncoding pool)
                 }) (if shareEncoding then Just (prepareSourceContractEncodings contracts) else Nothing)
-                  (if shareEncoding then Just (Source.fileSourceContext plan contracts) else Nothing) []
-                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 []);
+                  owned []
+                  crateId compilerHash cacheDir inventory plan (Source.filePlanGroups plan owned) contracts [] 0 0 []);
                 cleaned <- cleanupQueryKey cacheDir result;
                 releaseFileLock lock;
                 ioReturn cleaned
