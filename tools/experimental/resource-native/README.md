@@ -1,11 +1,12 @@
-# Additive IR8 static experiment
+# Additive IR8 experiment
 
-The opt-in [IR8 static checkers and native metadata packets](resource_ir_v8/README_STAGE04.md)
-are separate from the maintained v7 source/runtime route below. They do not enable
-mixed-type shared-term source execution or change default behavior. The linked
-guide describes the available APIs, explicit host-only test runner and remaining
-runtime/source/GC/performance gates. Earlier integration records below retain their
-historical scope.
+The opt-in IR8 route now includes [static checks and metadata packets](resource_ir_v8/README_STAGE04.md)
+and a [real C body emitter and experimental native runtime](resource_ir_v8/README_STAGE05.md).
+The Stage05 guide gives reproducible host and native test commands and separates
+the finite runtime results from the remaining source-bridge, guard-coverage, GC
+and performance work. This does not enable mixed-type shared-term execution in
+the maintained v7 source route below or change default behavior. Earlier
+integration records below retain their historical scope.
 
 ---
 

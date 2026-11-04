@@ -31,3 +31,58 @@ jobs:
           path: ${{ runner.temp }}/ir8-host
           if-no-files-found: warn
           retention-days: 14
+  ir8-runtime-host:
+    name: IR8 Stage05 emitter host checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Run the standalone emitter suite
+        run: |
+          python=$(command -v python3)
+          work="$RUNNER_TEMP/ir8-runtime-emit"
+          mkdir -m 700 "$work" "$work/home" "$work/tmp"
+          timeout --signal=TERM --kill-after=5s 180s env -i \
+            PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC \
+            PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0 \
+            HOME="$work/home" TMPDIR="$work/tmp" \
+            "$python" -B -S \
+            "$GITHUB_WORKSPACE/tools/experimental/resource-native/tests/test_stage05_runtime_emit.py" \
+            --evidence-root "$work/results"
+      - name: Retain emitter evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-runtime-emit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ir8-runtime-emit
+          if-no-files-found: warn
+          retention-days: 14
+  ir8-native-runtime:
+    name: Opt-in IR8 native runtime (${{ matrix.optimization }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        optimization: [O0, O2]
+    env:
+      CC: gcc
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Compile, link and test the real runtime
+        run: |
+          python3 -B tools/experimental/resource-native/tests/test_stage05_runtime_native.py \
+            --output "$RUNNER_TEMP/ir8-native-runtime-${{ matrix.optimization }}" \
+            --optimization "${{ matrix.optimization }}" --stress
+      - name: Retain native evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-native-runtime-${{ matrix.optimization }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ir8-native-runtime-${{ matrix.optimization }}
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,5 +1,9 @@
 # Experimental IR8: static checks and native metadata packets
 
+For the later opt-in body emitter, real native runtime and their separate tests,
+see [README_STAGE05.md](README_STAGE05.md). This page describes the Stage04 layer;
+its packet-only status fields and historical qualification remain unchanged.
+
 This additive experiment is separate from the maintained resource IR v7 frontend
 and runtime. No default command, compiler exporter, v7 dispatcher, evaluator or
 allocator imports this package. The existing source path still rejects a shared
@@ -94,6 +98,11 @@ reruns require their own exact tool/source/command/evidence plan; this host runn
 does not perform or silently substitute one.
 
 ## Still unsupported or unqualified
+
+The list below records the Stage04 boundary. Stage05 supplies runtime bodies and
+helpers with finite native tests; its guide states what that does and does not
+qualify. The packet-only APIs and host runner described here still do not execute
+those bodies.
 
 - Real runtime body binding, complete typed-static runtime storage and dynamic
   origin/Access/transport/pending/memo/capture/curried-instance guards.
