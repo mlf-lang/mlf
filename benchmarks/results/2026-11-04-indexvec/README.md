@@ -67,6 +67,32 @@ whole-command wall time.
 | Module diamond | 0.230 | 0.032 | 0.053 |
 | Compiler Unicode | 0.319 | 0.048 | 0.052 |
 
+## Native-MLF bootstrap
+
+Both installations attempted the ordinary offline, single-job package build
+of `emlf` and `mlfpkg` from their owned source trees. Both completed the
+Foundation, language-core, frontend, xMLF, inference and LLVM library jobs.
+The `mlf-crates` job then exited 1 with `binary expanded-work limit exceeded`.
+The compiler had written its interface, object and a local 1,682-group report.
+Publication of the query graph follows that report. Its bitstream has a
+67,108,864-unit expanded-work bound. Both package build reports have
+`complete: false`.
+
+Of the 1,682 reported SCCs, 1,681 had byte-identical member names in the same
+positions. The remaining SCC contained the three `Bootstrap.Bitstream` instance
+dictionaries. Decoding the two interfaces and formatting the stripped instances
+showed identical text after substituting only the encoded builtin owner `:11`
+with `:12`. This comparison concerns the compiler's own crate with the new ABI.
+The five unchanged user programs produced identical xMLF without substitutions.
+
+A second attempt used the public source-to-executable driver on the compiler
+entry module. It was stopped on this 32 GiB host when macOS reported physical
+footprints of 51 GB for #29 and 28 GB for the candidate. The sampled RSS
+guard did not capture the compressed and swapped pages. The full native-MLF
+compiler comparison and the next-generation fixed-point check remain open.
+The times above measure the installations identified in the first paragraph.
+[Native bootstrap commands, identities, diagnostics and resource observations](selfhost.json).
+
 ## Receipts and reproduction
 
 The plans record the schedule, all source and tool hashes, exact commands,
