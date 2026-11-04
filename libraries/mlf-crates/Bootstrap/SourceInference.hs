@@ -15,6 +15,9 @@ module Bootstrap.SourceInference where {
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Resolved as R;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.Data as Data;
@@ -933,22 +936,43 @@ module Bootstrap.SourceInference where {
   -- Source planning retains original annotations/ownership until after routing.
   -- The legacy recipe is lazy and is used only by the explicit whole-path
   -- fallback or compatibility diagnostics, never to prepare source queries.
-  data SourcePlan = SourcePlan Classes.ClassInventory
-    ([] ((,,) String (Maybe SAnnotation) SExpr))
-    ([] ((,,) String (Maybe SAnnotation) SExpr)) ([] ([] String))
+  data PlanInput = NamedInput ([] ((,,) String (Maybe SAnnotation) SExpr)) | ResolvedInput Dependency.BoundValues;
+  data PlannedBinding = PlannedSource Int (Maybe SAnnotation) (R.Expr Dependency.Declaration) |
+    PlannedSupport Int (Maybe SAnnotation) SExpr;
+  data PlanGraph = NamedPlan ([] ((,,) String (Maybe SAnnotation) SExpr))
+    ([] ((,,) String (Maybe SAnnotation) SExpr)) ([] ([] String)) |
+    IndexedPlan Dependency.Symbols (V.IndexVec Dependency.Declaration PlannedBinding)
+      ([] (V.Index Dependency.Declaration)) ([] (V.Index Dependency.Declaration)) ([] ([] (V.Index Dependency.Declaration)));
+  data SourcePlan = SourcePlan Classes.ClassInventory PlanGraph
     Int (Set String) (Map String SType) (Either String Inference.LoweredDeclarations)
     ([] ((,) String SInstanceDecl)) (Map String Bool);
-  planInventory (SourcePlan inventory _ _ _ _ _ _ _ _ _) = inventory;
-  planSources (SourcePlan _ values _ _ _ _ _ _ _ _) = values;
-  planSupports (SourcePlan _ _ values _ _ _ _ _ _ _) = values;
-  planGroups (SourcePlan _ _ _ groups _ _ _ _ _ _) = groups;
+  planInventory (SourcePlan inventory _ _ _ _ _ _ _) = inventory;
+  planGraph (SourcePlan _ graph _ _ _ _ _ _) = graph;
+  -- The inventory and persisted query envelopes consume named syntax. Select
+  -- by ID first, projecting only the rows demanded by that consumer.
+  namedBinding symbols rows i = let { name = Dependency.symbolName symbols } in case V.at rows i of {
+    PlannedSource ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation (R.namedExpr name rhs));
+    PlannedSupport ordinal annotation rhs -> (,) ordinal ((,,) (name i) annotation rhs)
+  };
+  planSources plan = case planGraph plan of {
+    NamedPlan sources _ _ -> sources;
+    IndexedPlan symbols rows ids _ _ -> map (compose snd (namedBinding symbols rows)) ids
+  };
+  planSupports plan = case planGraph plan of {
+    NamedPlan _ supports _ -> supports;
+    IndexedPlan symbols rows _ ids _ -> map (compose snd (namedBinding symbols rows)) ids
+  };
+  planGroups plan = case planGraph plan of {
+    NamedPlan _ _ groups -> groups;
+    IndexedPlan symbols _ _ _ groups -> map (map (Dependency.symbolName symbols)) groups
+  };
   planData plan = case planInventory plan of {
     Classes.ClassInventory ds _ _ _ _ _ _ _ _ -> ds
   };
   planNames plan = case planInventory plan of {
     Classes.ClassInventory _ _ _ _ _ _ _ names _ -> names
   };
-  planLegacy (SourcePlan _ _ _ _ _ _ _ legacy _ _) = legacy;
+  planLegacy (SourcePlan _ _ _ _ _ legacy _ _) = legacy;
   sourceName ((,,) name _ _) = name;
   sourceRhs ((,,) _ _ rhs) = rhs;
   isCopied :: SExpr -> Bool;
@@ -961,61 +985,80 @@ module Bootstrap.SourceInference where {
   prepareSourcePlan :: Map String SType -> [] DataDecl -> [] SClassDecl ->
     [] ((,) String SInstanceDecl) -> Map String IntSet -> [] IntSet ->
     [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String (Maybe SourcePlan);
-  prepareSourcePlan externals datatypes classes instances valueScopes instanceScopes members =
-    mapEither fst (sourcePlanWith Nothing externals datatypes classes instances valueScopes instanceScopes members);
-  prepareResolvedSourcePlan bindings externals datatypes classes instances valueScopes instanceScopes =
-    sourcePlanWith (Just bindings) externals datatypes classes instances valueScopes instanceScopes
-      (Dependency.boundValues bindings);
-  sourcePlanWith resolved externals datatypes classes instances valueScopes instanceScopes members = do {
-    closedInstances <- traverseEither
-      (\((,) name inst) -> mapEither ((,) name) (Separate.closeInstance members inst)) instances;
-    body <- case resolved of {
-      Nothing -> Surface.bindValues members (SConstructor "()");
-      Just bindings -> Surface.bindResolved bindings (SConstructor "()")
+  prepareSourcePlan externals datatypes classes instances valueScopes instanceScopes members = do {
+    closed <- traverseEither (\((,) name inst) -> mapEither ((,) name) (Separate.closeInstance members inst)) instances;
+    mapEither fst (sourcePlanWith (NamedInput members) externals datatypes classes instances closed valueScopes instanceScopes)
+  };
+  prepareResolvedSourcePlan bindings = sourcePlanWith (ResolvedInput bindings);
+  sourcePlanWith input externals datatypes classes instances closedInstances valueScopes instanceScopes = do {
+    body <- case input of {
+      NamedInput members -> Surface.bindValues members (SConstructor "()");
+      ResolvedInput bindings -> Surface.bindResolved bindings (SConstructor "()")
     };
     prepared <- Classes.withScopedClassInventory externals (map fst closedInstances)
       valueScopes instanceScopes
       (SClassProgram datatypes classes (map snd closedInstances) body)
       (\inventory -> Fresh (\count used -> Right ((,,) ((,,) inventory count used) count used)));
     case prepared of { (,,) inventory count used -> do {
-      let { supports = case inventory of {
-        Classes.ClassInventory _ _ _ _ _ _ definitions _ _ ->
-          map (\((,,) name annotation rhs) -> (,,) name (Just annotation) rhs) definitions
-      } };
-      let { allMembers = append supports members };
-      ensure (length allMembers == Set.size (Set.fromList compareString (map sourceName allMembers)))
-        "duplicate source/support binding";
-      let { sourceNames = Set.fromList compareString (map sourceName members) };
-      let { supportNames = Set.fromList compareString (map sourceName supports) };
-      groups <- case inventory of { Classes.ClassInventory _ _ _ scopes _ methods _ _ _ -> case resolved of {
-        Just bindings -> mapEither Dependency.groupSpellings
-          (Dependency.resolvedGroups bindings (Dependency.declarationEdges supports) methods (M.map (map snd) scopes));
-        Nothing -> let { sourceEdges member =
-          let { name = sourceName member; refs = Dependency.valueNames (Dependency.observeDeclaration member);
-                target ref = case M.lookup compareString ref methods of { Nothing -> ref; Just ((,) n _) -> n }
-          } in (,) name (append (map target refs) (map snd (M.findWithDefault compareString [] name scopes)))
-        } in Right (Dependency.components (append (Dependency.declarationEdges supports) (map sourceEdges members)))
-      } };
-      let { unsupported = any (\names ->
-        (any (\name -> Set.member compareString name sourceNames) names &&
-         any (\name -> Set.member compareString name supportNames) names) ||
-        any (\name -> case find (\member -> eqString (sourceName member) name) members of {
-          Nothing -> False;
-          Just member -> isCopied (sourceRhs member)
-        }) names) groups };
       let { legacy = Inference.lowerBoundDeclarations externals datatypes classes closedInstances valueScopes instanceScopes body };
-      Right ((,) (if unsupported then Nothing else
-        Just (SourcePlan inventory members supports groups count used externals legacy instances M.empty)) legacy)
+      graph <- case inventory of { Classes.ClassInventory _ _ _ scopes _ methods definitions _ _ ->
+        let { supports = map (\((,,) name annotation rhs) -> (,,) name (Just annotation) rhs) definitions;
+              targets = M.map (map snd) scopes
+        } in case input of {
+          NamedInput members -> namedPlan members supports methods targets;
+          ResolvedInput bindings -> indexedPlan bindings supports methods targets
+        }
+      };
+      Right ((,) (mapOptional (\g -> SourcePlan inventory g count used externals legacy instances M.empty) graph) legacy)
     } }
   };
+  namedPlan members supports methods scopes = do {
+    let { allMembers = append supports members;
+          sourceNames = Set.fromList compareString (map sourceName members);
+          supportNames = Set.fromList compareString (map sourceName supports);
+          sourceEdges member =
+            let { name = sourceName member; refs = Dependency.valueNames (Dependency.observeDeclaration member);
+                  target ref = case M.lookup compareString ref methods of { Nothing -> ref; Just ((,) n _) -> n }
+            } in (,) name (append (map target refs) (M.findWithDefault compareString [] name scopes));
+          groups = Dependency.components (append (Dependency.declarationEdges supports) (map sourceEdges members));
+          mixed names = any (\n -> Set.member compareString n sourceNames) names &&
+                        any (\n -> Set.member compareString n supportNames) names
+    };
+    ensure (length allMembers == Set.size (Set.fromList compareString (map sourceName allMembers)))
+      "duplicate source/support binding";
+    Right (if any mixed groups || any (compose isCopied sourceRhs) members then Nothing else
+      Just (NamedPlan members supports groups))
+  };
+  indexedPlan bindings@(Dependency.BoundValues base members) supports methods scopes = do {
+    (,) symbols groups <- Dependency.resolvedGroups bindings (Dependency.declarationEdges supports) methods scopes;
+    let { baseCount = V.count (Dependency.symbolNodes base); count = V.count (Dependency.symbolNodes symbols);
+          sources = map Dependency.boundId members; generated = map V.fromInt (range baseCount (count - 1));
+          source i = V.toInt i < baseCount;
+          -- Groups are in lexical SCC order. Each input's ordinal recovers
+          -- its original declaration order when preparing a multi-member SCC.
+          ids = map (map fst) groups;
+          mixed group = any source group && any (compose not source) group;
+          sourceRow ordinal (Dependency.Bound i annotation rhs) = (,) i (PlannedSource ordinal annotation rhs);
+          supportRow i ((,,) _ annotation rhs) = (,) i (PlannedSupport (V.toInt i - baseCount) annotation rhs);
+          entries = append (mapIndexed sourceRow members) (zipWith supportRow generated supports);
+          rows = runST (stBind (V.filled count (panic "inactive source plan slot")) (\table ->
+            stBind (ST.map_ (\((,) i row) -> V.set table i row) entries) (\_ -> V.freeze table)));
+          copied (Dependency.Bound _ _ rhs) = copiedSource rhs
+    };
+    Right (if any mixed ids || any copied members then Nothing else Just (IndexedPlan symbols rows sources generated ids))
+  };
+  copiedSource term = case term of {
+    R.SourceDefinition _ -> True; R.CallSite _ _ b -> copiedSource b;
+    R.Ann b _ -> copiedSource b; R.Signature b _ -> copiedSource b; _ -> False
+  };
   initializeProtection :: SourcePlan -> Map String Bool -> Either String SourcePlan;
-  initializeProtection (SourcePlan inventory sources supports groups count used externals legacy instances _) imported = do {
-    flags <- Classes.inventoryProtection inventory imported instances sources;
-    Right (SourcePlan inventory sources supports groups count used externals legacy instances flags)
+  initializeProtection plan@(SourcePlan inventory graph count used externals legacy instances _) imported = do {
+    flags <- Classes.inventoryProtection inventory imported instances (planSources plan);
+    Right (SourcePlan inventory graph count used externals legacy instances flags)
   };
   initialContracts :: SourcePlan -> Map String XType -> Map String Bool ->
     Either String (Map String SourceContract);
-  initialContracts (SourcePlan _ _ _ _ _ _ externals _ _ _) types protected =
+  initialContracts (SourcePlan _ _ _ _ externals _ _ _) types protected =
     mapEither (M.fromList compareString) (traverseEither
       (\((,) name ty) -> do {
         source <- case M.lookup compareString name externals of {
@@ -1078,6 +1121,22 @@ module Bootstrap.SourceInference where {
   -- declarations and their current checked predecessor contracts.
   prepareGroupSparse :: SourcePlan -> Map String SourceContract -> [] String -> Either String PreparedGroup;
   prepareGroupSparse = prepareGroupUsing selectedContractBindings;
+  -- The file query driver keeps the group's IDs through selection. The
+  -- printable names belong to the query key and the named inference boundary.
+  planSteps plan = case planGraph plan of {
+    NamedPlan _ _ groups -> map (\names -> (,) names (\contracts -> prepareGroupSparse plan contracts names)) groups;
+    IndexedPlan symbols rows _ _ groups -> let {
+      step ids = let {
+        names = map (Dependency.symbolName symbols) ids;
+        entries = sortBy (\a b -> compareInt (fst a) (fst b)) (map (namedBinding symbols rows) ids);
+        members = map snd entries;
+        support = case ids of { (:) i _ -> case V.at rows i of { PlannedSupport _ _ _ -> True; _ -> False }; [] -> False };
+        prepare contracts = prepareGroupWithViews selectedContractBindings plan contracts names
+          (if support then [] else members) (if support then members else [])
+          (contractOverloads contracts) (M.map contractProtected contracts)
+      } in (,) names prepare
+    } in map step groups
+  };
   -- This context belongs to one finite parsed file and its checked predecessor
   -- map. Ordinals retain declaration order independently of SCC name order.
   -- Index values and projected contract fields remain lazy. Finalized deltas
@@ -1098,7 +1157,7 @@ module Bootstrap.SourceInference where {
       (numberSourceDeclarations (ordinal + 1) rest)
   };
   prepareOwnedSourceContext :: SourcePlan -> Map String SourceContract -> OwnedSourceContext;
-  prepareOwnedSourceContext plan@(SourcePlan _ _ _ _ _ used _ _ _ _) contracts = OwnedSourceContext
+  prepareOwnedSourceContext plan@(SourcePlan _ _ _ used _ _ _ _) contracts = OwnedSourceContext
     (indexSourceDeclarations (planSources plan)) (indexSourceDeclarations (planSupports plan))
     (contractOverloads contracts) (M.map contractProtected contracts)
     (reserveContractKeys contracts used);
@@ -1126,7 +1185,7 @@ module Bootstrap.SourceInference where {
       (filter (\member -> elem eqString (sourceName member) names) (planSupports plan))
       (contractOverloads contracts) (M.map contractProtected contracts);
   prepareGroupWithViews selectBindings = prepareGroupWithReservation selectBindings Nothing;
-  prepareGroupWithReservation selectBindings reserved (SourcePlan inventory _ _ _ count used _ _ _ supportProtection)
+  prepareGroupWithReservation selectBindings reserved (SourcePlan inventory _ count used _ _ _ supportProtection)
     contracts names original support overloads protected = do {
     ensure (length original + length support == length names) "source SCC ownership mismatch";
     traverseEither (\name -> ensure (not (M.member compareString name contracts))

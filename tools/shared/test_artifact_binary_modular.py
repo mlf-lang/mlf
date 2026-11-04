@@ -38,7 +38,7 @@ class ModularControls(unittest.TestCase):
         cls.rows = M.native_source_closure(SOURCE, cls.fixture, cls.manifest)
 
     def test_complete_source_closure(self):
-        self.assertEqual(len(self.rows), 50)
+        self.assertEqual(len(self.rows), 51)
         self.assertEqual({r['module'] for r in self.rows}, M.NATIVE_MODULES)
         self.assertIn('Bootstrap.CrateArtifact', M.NATIVE_MODULES)
         self.assertEqual(next(r['path'] for r in self.rows if r['module'] == 'Main'), str(self.fixture))

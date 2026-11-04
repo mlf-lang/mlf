@@ -28,13 +28,18 @@ a trie search. `fromList` uses exact allocation when the input is enumerable.
 
 | Path | Representation and ordering |
 | --- | --- |
-| Declaration SCCs | Module resolution assigns each visible value or method entity a typed declaration ID. Resolving a top-level RHS records its free declaration IDs in the same scope walk. The SCC builder consumes these IDs directly. One path-based DFS tracks discovery and closure in an indexed mark table. An edge to an open vertex merges candidate roots. Closing a surviving root emits its whole component in the historical finish order. Roots, outgoing edges and members keep their lexical ordering. Duplicate declarations still fail before SCC construction. Only local value references become declaration edges. |
+| Declaration SCCs | Module resolution assigns each visible value or method entity a typed declaration ID. Each resolved global expression contains that ID. The SCC builder walks the expression to read its edges. One path-based DFS tracks discovery and closure in an indexed mark table. An edge to an open vertex merges candidate roots. Closing a surviving root emits its whole component in the historical finish order. Roots, outgoing edges and members keep their lexical ordering. Duplicate declarations still fail before SCC construction. Only references to active declarations contribute local SCC edges. |
 | Module imports and instance reach | `Bootstrap.Module` uses module IDs for the shared-module cycle check and transitive visibility. All modules in an SCC share one reach set. In dependency-first order each component unions its member IDs with the previously computed sets of its successors. External-only names are leaf vertices. It returns the named owner/reach sets consumed by resolution and crate interfaces. Aliases, source positions, import selectors and instance ownership stay on the source and interface records. |
 | Datatypes used by crate queries | `Bootstrap.CrateQuery` indexes validated declarations in lexical order. Each SCC query unions the precomputed reach sets for its observed type names, constructor owners and binding schemes, then reads just those declarations by ID. |
 | Persistent query graph | During admission, physical wire IDs share decoded and hash-checked read pairs across owners. Closure validation resolves dependency versions and walks typed ordinals with three DFS colours. An exactly equal, previously admitted canonical generation retains its content address. Publication still verifies the retained payloads. |
 | Package DAG and scheduling | `Package.Manifest` builds separate typed tables for packages and modules after validating names and canonical paths. Module discovery retains dependency-first order, including cycles inside a crate. `Package.Scheduler.libraryJobs` takes the closure of selected direct dependencies by ID and emits jobs in the original package order. Worker JSON is name-based and reconstructs the index on read. |
 
-Re-exports and qualified imports retain the defining entity's ID. A local
+The resolver stores the canonical name for each value or method in its declaration
+slot. A top-level reference is a `Bootstrap.Resolved.Global (Index Declaration)`.
+An overloaded string pattern stores the method IDs for equality and conversion.
+Each binding owns its indexed RHS, and both SCC construction and instance helper
+capture read that expression directly. Re-exports and qualified imports retain
+the defining entity's ID. A local
 binder masks a top-level spelling before an edge can be recorded. Distinct
 entities can even share an emitted spelling. An inactive external entity never
 adds a local edge, and duplicate emitted names among active declarations still
@@ -45,7 +50,11 @@ resolution. They receive new slots without moving the source IDs. Class
 lowering connects resolved method slots to selectors and adds the generated
 evidence dependencies. DFS ordering uses separate lexical ranks. Consumers
 that start with generated or independently lowered syntax can still build a
-graph from names. Only stable names and digests enter artifacts and cache keys.
+graph from names. The file query driver selects the members of each source SCC
+from the indexed declaration table, preserving source order within the group.
+Named class lowering, xMLF generation and the artifact writer project the
+spellings they consume from the table. Only stable names and digests enter
+artifacts and cache keys.
 
 Initial manifest discovery works in IO and identifies local packages by
 canonical path, releases by digest, and conflicts by their names. This phase

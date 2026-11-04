@@ -242,13 +242,15 @@ module Bootstrap.PreparedLibraries
       (Artifact.sourceMetadata [] (concatMap Artifact.crateClasses (interfaces raw)) []))
       "prepared library source class mismatch"
   };
-  instanceRows raw resolution values = let {
+  instanceRows raw resolution bindings = let {
+    closeLocal = Surface.closeResolvedInstance (Surface.helperScope bindings);
+    rows = Modules.resolvedInstanceRows resolution;
     ownership = owners raw;
     imported = M.fromList compareString (concatMap Artifact.crateInstances (interfaces raw));
     protected = S.union compareString (rawProtected raw)
       (S.fromList compareString (concatMap (compose Modules.sourceUsed Modules.resolvedSource)
         (Modules.resolvedCrateModules resolution)))
-  } in traverseEither (\((,) index ((,) owner instanceValue)) ->
+  } in traverseEither (\((,) index ((,) owner inst)) -> let { instanceValue = Modules.instanceValue resolution inst } in
     case M.lookup compareString owner ownership of {
       Just identity -> let { name = Artifact.instanceName identity owner instanceValue } in
         case M.lookup compareString name imported of {
@@ -260,12 +262,11 @@ module Bootstrap.PreparedLibraries
           }
         };
       Nothing -> do {
-        closed <- Separate.closeInstance values instanceValue;
+        closed <- closeLocal inst;
         let { name = fst (Modules.chooseName protected ("preparedUserInstance" ++ showInt index ++ "_") 0) };
         Right ((,) name closed)
       }
-    }) (zip (range 0 (length (Modules.resolvedCrateInstances resolution) - 1))
-      (Modules.resolvedCrateInstances resolution));
+    }) (zip (range 0 (length rows - 1)) rows);
   -- This value authenticates the freshly checked user wrapper only. Installed
   -- native code identity and file pins are enforced by the compiler consumer.
   -- Raw library metadata does not manufacture a checked library implementation.
@@ -388,17 +389,17 @@ module Bootstrap.PreparedLibraries
           ownership = owners raw;
           own = filter (\entry -> not (M.member compareString
             (Modules.moduleIdentity (Modules.resolvedSource entry)) ownership)) resolved;
-          values = concatMap (compose Modules.renamedValues Modules.resolvedContents) own;
+          bindings = Modules.boundIn resolution own;
           entryModule = last resolved };
-    entry <- sourcePhase ModuleResolution (mapEither fst (Modules.entryUses resolution entryModule));
-    body <- sourcePhase ModuleResolution (Surface.bindResolved (Modules.boundIn resolution own) entry);
+    entry <- sourcePhase ModuleResolution (Modules.entryExpr resolution entryModule);
+    body <- sourcePhase ModuleResolution (Surface.bindResolvedExpr bindings entry);
     parts <- sourcePhase Inference (canonicalParts resolution);
-    instances <- sourcePhase Inference (instanceRows raw resolution values);
+    instances <- sourcePhase Inference (instanceRows raw resolution bindings);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
           dictionaries = M.fromList compareString
             (map (\klass -> (,) ("Dict_" ++ Modules.className klass) (Modules.className klass)) (snd parts));
           sourceValues = S.fromList compareString (concatMap
-            (\entry -> map (\((,,) name _ _) -> name) (Modules.renamedValues (Modules.resolvedContents entry)))
+            (compose Modules.renamedValueNames Modules.resolvedContents)
             (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
           externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
@@ -452,17 +453,17 @@ module Bootstrap.PreparedLibraries
           ownership = owners raw;
           own = filter (\entry -> not (M.member compareString
             (Modules.moduleIdentity (Modules.resolvedSource entry)) ownership)) resolved;
-          values = concatMap (compose Modules.renamedValues Modules.resolvedContents) own;
+          bindings = Modules.boundIn resolution own;
           entryModule = last resolved };
-    entry <- sourcePhase ModuleResolution (mapEither fst (Modules.entryUses resolution entryModule));
-    body <- sourcePhase ModuleResolution (Surface.bindResolved (Modules.boundIn resolution own) entry);
+    entry <- sourcePhase ModuleResolution (Modules.entryExpr resolution entryModule);
+    body <- sourcePhase ModuleResolution (Surface.bindResolvedExpr bindings entry);
     parts <- sourcePhase Inference (canonicalParts resolution);
-    instances <- sourcePhase Inference (instanceRows raw resolution values);
+    instances <- sourcePhase Inference (instanceRows raw resolution bindings);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
           dictionaries = M.fromList compareString
             (map (\klass -> (,) ("Dict_" ++ Modules.className klass) (Modules.className klass)) (snd parts));
           sourceValues = S.fromList compareString (concatMap
-            (\entry -> map (\((,,) name _ _) -> name) (Modules.renamedValues (Modules.resolvedContents entry)))
+            (compose Modules.renamedValueNames Modules.resolvedContents)
             (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
           externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };

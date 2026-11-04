@@ -9,6 +9,7 @@ module Bootstrap.Dependency where {
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.Resolved as R;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Desugar as Desugar;
@@ -291,33 +292,50 @@ module Bootstrap.Dependency where {
     } in map (\group -> sortBy compareString (map (\i -> fst (V.at nodes i)) group)) groups;
   -- Semantic declaration IDs belong to one resolution. Source occurrences
   -- already carry them. Later class-support bindings extend the same domain.
-  data Symbols = Symbols (V.IndexVec Declaration String) (Map String ([] (V.Index Declaration))) IntSet;
+  data DeclOrder = DeclOrder;
+  data Symbols = Symbols (V.IndexVec Declaration String) ([] (V.Index Declaration)) IntSet;
   symbolNodes (Symbols nodes _ _) = nodes;
-  symbolIds (Symbols _ ids _) = ids;
+  symbolName symbols = V.at (symbolNodes symbols);
+  compareSlots nodes i j = compareString (V.at nodes i) (V.at nodes j);
   symbols entries =
     let { nodes = V.fromList (map fst entries); indices = V.indices nodes;
-          buckets = zipWith (\entry i -> (,) (fst entry) [i]) entries indices;
           methods = mapMaybe (\((,) entry i) -> if snd entry then Just (V.toInt i) else Nothing) (zip entries indices)
-    } in Symbols nodes (M.fromListWith compareString append buckets) (IS.fromList methods);
-  -- Generated bindings get fresh IDs, including when an inactive external
-  -- entity has the same emitted spelling. Source IDs never move.
-  extendSymbols original@(Symbols nodes ids methods) names = case names of {
+    } in Symbols nodes (sortBy (compareSlots nodes) indices) (IS.fromList methods);
+  -- The spelling is held in the declaration slot. The lexical index contains
+  -- only IDs. A generated binding may share a name with an inactive import.
+  extendSymbols original@(Symbols nodes order methods) names = case names of {
     [] -> original;
-    _ -> let { extra = zipWith (\name n -> (,) name [V.fromInt n]) names
-                 (range (V.count nodes) (V.count nodes + length names - 1)) } in
-         Symbols (V.fromList (append (V.toList nodes) names))
-           (foldlStrict (\table entry -> M.insertWith compareString append (fst entry) (snd entry) table) ids extra) methods
+    _ -> let { allNodes = V.fromList (append (V.toList nodes) names);
+               extra = map V.fromInt (range (V.count nodes) (V.count allNodes - 1));
+               cmp = compareSlots allNodes
+         } in Symbols allNodes (mergeBy cmp order (sortBy cmp extra)) methods
   };
-  data Bound = Bound (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr) ([] (V.Index Declaration));
-  boundValue (Bound _ value _) = value;
+  data Bound = Bound (V.Index Declaration) (Maybe SAnnotation) (R.Expr Declaration);
+  boundId (Bound i _ _) = i;
+  boundValue symbols (Bound i annotation rhs) = let { name = symbolName symbols } in
+    (,,) (name i) annotation (R.namedExpr name rhs);
   data BoundValues = BoundValues Symbols ([] Bound);
-  boundValues (BoundValues _ rows) = map boundValue rows;
-  appendBound (BoundValues old rows) value@((,,) name _ _) refs =
-    let { symbols = extendSymbols old [name] } in
-    BoundValues symbols (append rows [Bound (V.fromInt (V.count (symbolNodes old))) value refs]);
-  data DeclOrder = DeclOrder;
-  lexicalIds :: [] (Maybe (V.Index Declaration)) -> V.IndexVec DeclOrder (V.Index Declaration);
-  lexicalIds entries = V.fromList (catMaybes entries);
+  boundValues (BoundValues symbols rows) = map (boundValue symbols) rows;
+  boundTable (BoundValues symbols bindings) = runST
+    (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\slots ->
+      stBind (ST.map_ (\b -> V.set slots (boundId b) (Just b)) bindings) (\_ -> V.freeze slots)));
+  appendBound (BoundValues old rows) name rhs =
+    let { i = V.fromInt (V.count (symbolNodes old)) } in
+    BoundValues (extendSymbols old [name]) (append rows [Bound i Nothing rhs]);
+  -- Only later-generated syntax arrives by spelling. Source edges use the
+  -- Global leaf of the resolved expression directly.
+  namedRank :: V.IndexVec Declaration String -> V.IndexVec DeclOrder (V.Index Declaration) ->
+    String -> Maybe (V.Index DeclOrder);
+  namedRank nodes order name =
+    let { search lo hi = if lo >= hi then Nothing else
+            let { mid = lo + quotInt (hi - lo) 2; rank = V.fromInt mid;
+                  cmp = compareString name (V.at nodes (V.at order rank)) } in
+            if cmp < 0 then search lo mid else if cmp > 0 then search (mid + 1) hi else Just rank
+    } in search 0 (V.count order);
+  uniqueSlots nodes ordered = case ordered of {
+    (:) i rest@((:) j _) -> compareSlots nodes i j /= 0 && uniqueSlots nodes rest;
+    _ -> True
+  };
   -- Keep the resolver's IDs even when a later selector sorts before a source
   -- declaration. Dense lexical ranks order DFS roots, siblings and members.
   resolvedGroups :: BoundValues -> [] ((,) String ([] String)) -> Map String ((,) String ([] String)) ->
@@ -325,29 +343,28 @@ module Bootstrap.Dependency where {
   resolvedGroups (BoundValues base bound) generated methods scopes = do {
     let { symbols = extendSymbols base (map fst generated); nodes = symbolNodes symbols;
           generatedIds = map V.fromInt (range (V.count (symbolNodes base)) (V.count nodes - 1));
-          present = append (map (\(Bound i _ _) -> i) bound) generatedIds;
+          present = append (map boundId bound) generatedIds;
           active = IS.fromList (map V.toInt present);
           presentId i = IS.member (V.toInt i) active;
           duplicate = if null generated then "duplicate value declaration" else "duplicate source/support binding";
-          pick bucket = case filter presentId bucket of { [] -> Right Nothing; [i] -> Right (Just i); _ -> Left duplicate }
+          orderedIds = case symbols of { Symbols _ indices _ -> filter presentId indices }
     };
-    ensure (IS.size active == length present) duplicate;
-    selected <- traverseEither pick (M.elems (symbolIds symbols));
-    let { order = lexicalIds selected;
+    ensure (IS.size active == length present && uniqueSlots nodes orderedIds) duplicate;
+    let { order = V.fromList orderedIds;
           ranks edits = runST (stBind (V.filled (V.count nodes) Nothing) (\slots ->
             stBind (ST.map_ (\r -> V.set slots (V.at order r) (Just r)) (V.indices order)) (\_ ->
             stBind (ST.map_ (\((,) i target) -> V.set slots i target) edits) (\_ -> V.freeze slots))));
           direct = ranks [];
-          byName name = case find presentId (M.findWithDefault compareString [] name (symbolIds symbols)) of {
-            Just i -> V.at direct i; Nothing -> Nothing
+          byName = namedRank nodes order;
+          redirect n = let { i = V.fromInt n } in case M.lookup compareString (V.at nodes i) methods of {
+            Nothing -> Nothing; Just ((,) target _) -> Just ((,) i (byName target))
           };
-          redirect ((,) name ((,) target _)) = case symbols of { Symbols _ ids methodIds ->
-            map (\i -> (,) i (byName target)) (filter (\i -> IS.member (V.toInt i) methodIds)
-              (M.findWithDefault compareString [] name ids)) };
-          sourceRanks = if M.null methods then direct else ranks (concatMap redirect (M.toList methods));
+          sourceRanks = if M.null methods then direct else case symbols of {
+            Symbols _ _ methodIds -> ranks (mapMaybe redirect (IS.toAscList methodIds))
+          };
           edgeRow targets = V.fromList (map (\r -> V.at order (V.fromInt r))
             (IS.toAscList (IS.fromList (map V.toInt targets))));
-          sourceRow (Bound i _ refs) = (,) i (edgeRow (append (mapMaybe (V.at sourceRanks) refs)
+          sourceRow (Bound i _ rhs) = (,) i (edgeRow (append (mapMaybe (V.at sourceRanks) (R.references rhs))
             (mapMaybe byName (M.findWithDefault compareString [] (V.at nodes i) scopes))));
           generatedRow i entry = (,) i (edgeRow (mapMaybe byName (snd entry)));
           rows = runST (stBind (V.filled (V.count nodes) (V.fromList [])) (\slots ->

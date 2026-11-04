@@ -84,7 +84,7 @@ module Bootstrap.CrateGraph where {
     } of {
       Left e -> ioReturn (Left e);
       Right ((,,) plan inventory contracts) -> start verify crateId compilerHash cacheDir
-        "source" inventory (Source.planData plan) contracts (Source.prepareGroupSparse plan) (Source.planGroups plan)
+        "source" inventory (Source.planData plan) contracts (Source.planSteps plan)
     };
   -- The already-lowered fallback has no unsigned-root evidence finalization.
   -- It still uses the same open bodies, dependency graph and crate transaction.
@@ -101,7 +101,8 @@ module Bootstrap.CrateGraph where {
     } of {
       Left e -> ioReturn (Left e);
       Right ((,,,) groups inventory contracts values) -> start verify crateId compilerHash cacheDir
-        "lowered" inventory datatypes contracts (prepareLowered values) groups
+        "lowered" inventory datatypes contracts
+        (map (\names -> (,) names (\current -> prepareLowered values current names)) groups)
     };
   prepareLowered :: Map String ((,,) String (Maybe SAnnotation) SExpr) ->
     Map String Source.SourceContract -> [] String -> Either String Source.PreparedGroup;
@@ -114,7 +115,7 @@ module Bootstrap.CrateGraph where {
       (map (\name -> (,,) name [] True) names) Nothing
       (map (\((,) name _) -> (,) name True) bindings))
   };
-  start verify crateId compilerHash cacheDir flavor inventory datatypes contracts prepare groups = do {
+  start verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
         statistics <- G.profile;
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
@@ -126,17 +127,17 @@ module Bootstrap.CrateGraph where {
             loaded <- recordDatatypes datatypes first;
             case loaded of { Left e -> ioReturn (Left e); Right ready -> do {
               G.elapsed statistics 0 graphStarted;
-              runGroups verify (eqString auditSetting "1") crateId inventory prepare groups
+              runGroups verify (eqString auditSetting "1") crateId inventory groups
                 (State ready contracts M.empty [] 0 0 [] statistics)
             } }
           } }
         } }
     };
-  runGroups verify audit crateId inventory prepare groups state = case groups of {
+  runGroups verify audit crateId inventory groups state = case groups of {
     [] -> ioReturn (Right state);
-    (:) names rest -> case state of {
+    (:) ((,) names prepare) rest -> case state of {
       State session contracts contexts objects inferred reused reports statistics ->
-        case prepare contracts names of {
+        case prepare contracts of {
           Left e -> ioReturn (Left e);
           Right prepared -> do {
             let { declarations = Q.requiredDataIn inventory (Source.groupMembers prepared)
@@ -244,7 +245,7 @@ module Bootstrap.CrateGraph where {
                                   supplied <- recordBindings (G.edge finishNode) (M.toList delta) fifth;
                                   case supplied of { Left e -> ioReturn (Left e); Right next -> do {
                                     G.elapsed statistics 3 finishStarted;
-                                    runGroups verify audit crateId inventory prepare rest
+                                    runGroups verify audit crateId inventory rest
                                       (State next (M.union compareString delta contracts) currentContexts
                                         ((:) ((,) group final) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)

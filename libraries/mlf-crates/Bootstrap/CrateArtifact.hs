@@ -716,15 +716,16 @@ module Bootstrap.CrateArtifact where {
       let {
         values = concatMap (\r -> Modules.renamedValues (Modules.resolvedContents r)) modules
       };
+      let { bindings = Modules.boundIn resolution modules; closeLocal = Surface.closeResolvedInstance (Surface.helperScope bindings) };
       instances <-
         traverseEither
           (\((,) owner inst) ->
              do {
-               closed <- Separate.closeInstance values inst;
-               Right ((,) (instanceName identity owner inst) closed)
+               closed <- closeLocal inst;
+               Right ((,) (instanceName identity owner (Modules.instanceValue resolution inst)) closed)
              })
-          (Modules.resolvedCrateInstances resolution);
-      body <- Surface.bindValues values (SConstructor "()");
+          (Modules.resolvedInstanceRows resolution);
+      body <- Surface.bindResolved bindings (SConstructor "()");
       let { protectionConfig = Just ((,) M.empty (map fst instances)) };
       protection <- Classes.withValidatedClasses protectionConfig Set.empty M.empty Nothing
         sourceData classes (map snd instances) body

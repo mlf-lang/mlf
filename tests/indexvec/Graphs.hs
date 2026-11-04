@@ -10,6 +10,9 @@ import qualified Bootstrap.Bitstream as W
 import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
 import qualified Bootstrap.Dependency as D
+import qualified Bootstrap.Resolved as R
+import qualified Bootstrap.SourceInference as Source
+import qualified Bootstrap.Surface as Surface
 import qualified Bootstrap.QueryGraph as Q
 import qualified Bootstrap.IndexVec as V
 import qualified Bootstrap.Parser as Parser
@@ -183,7 +186,7 @@ resolverChecks = do
       allBindings@(D.BoundValues symbols bindings) = Modules.boundIn crate allModules
       names = D.symbolNodes symbols
       ids = Map.fromList [(H.unpack (V.at names i),V.toInt i) | D.Bound i _ _ <- bindings]
-      uses = Map.fromList [(H.unpack (V.at names i),map V.toInt refs) | D.Bound i _ refs <- bindings]
+      uses = Map.fromList [(H.unpack (V.at names i),map V.toInt (R.references rhs)) | D.Bound i _ rhs <- bindings]
       target k = ids Map.! k
   check "qualified alias" [target "A.value"] (uses Map.! "Main.first")
   check "re-export keeps its defining ID" (uses Map.! "Main.first") (uses Map.! "Main.again")
@@ -192,16 +195,28 @@ resolverChecks = do
   check "local shadow has no top-level edge" [] (uses Map.! "Main.shadow")
   check "lambda shadow has no top-level edge" [] (uses Map.! "Main.lambda")
   check "nonrecursive let resolves RHS outside binder" [target "A.value"] (uses Map.! "Main.local")
-  (_,entryRefs) <- right (Modules.entryUses crate (last allModules))
-  check "synthetic entry refers to the resolved main" [target "Main.main"] (map V.toInt entryRefs)
+  entry <- right (Modules.entryExpr crate (last allModules))
+  case entry of
+    R.Global i -> check "synthetic entry is a global leaf" (target "Main.main") (V.toInt i)
+    _ -> error "main entry lost its declaration ID"
   check "self-edge retains binder ID" [target "Main.self"] (uses Map.! "Main.self")
   forM_ [allBindings, Modules.boundIn crate (filter ((=="Main") . H.unpack . Modules.moduleIdentity . Modules.resolvedSource) allModules)] $
-    \b@(D.BoundValues universe rows) -> do
+    \b -> do
       expected <- right (D.declarationGroups (D.boundValues b))
-      -- A rebuilt graph that re-observes any source RHS fails this check.
-      let sealed = D.BoundValues universe [D.Bound i (error "rescanned source declaration") r | D.Bound i _ r <- rows]
-      groups <- right (D.resolvedGroups sealed [] M.empty M.empty)
+      groups <- right (D.resolvedGroups b [] M.empty M.empty)
       check "resolved SCC ordering" (map (map H.unpack) expected) (map (map H.unpack) (D.groupSpellings groups))
+  -- Rewrite the actual RHS. The SCC and the projected named syntax must both
+  -- follow the new leaf, with no separate edge list to update.
+  let same = H.literal "Main.left"
+      change row@(D.Bound i a _) | V.at names i == same = D.Bound i a (R.Global i)
+                                 | otherwise = row
+      edited = D.BoundValues symbols (map change bindings)
+  (_,editedGroups) <- right (D.resolvedGroups edited [] M.empty M.empty)
+  let leftGroup = [ [(V.toInt i,rec) | (i,rec) <- g] | g <- editedGroups, any ((==target "Main.left") . V.toInt . fst) g ]
+  check "replacing a global changes SCC membership and self-edge" [[(target "Main.left",True)]] leftGroup
+  case [rhs | (n,_,rhs) <- D.boundValues edited, n == same] of
+    [T.SVar printed] -> check "projection reads the same edited ID" "Main.left" (H.unpack printed)
+    _ -> error "edited global projected as a different expression"
   clash <- parsed ("Local","module Local where\nimport qualified Remote as R\nf = R.x\n")
   -- An embedding may choose the same printed spelling for an external and
   -- a local. The remote occurrence must retain its own, inactive vertex.
@@ -212,8 +227,8 @@ resolverChecks = do
   let matching@(D.BoundValues _ entries) = Modules.boundIn collision
         (filter ((=="Local") . H.unpack . Modules.moduleIdentity . Modules.resolvedSource) (Modules.resolvedCrateModules collision))
   case entries of
-    [D.Bound owner _ [ref]] -> check "distinct entity despite equal printed name" False (V.toInt owner == V.toInt ref)
-    _ -> error ("missing colliding-name fixture edge " ++ show [(V.toInt i,map V.toInt rs) | D.Bound i _ rs <- entries])
+    [D.Bound owner _ rhs] | [ref] <- R.references rhs -> check "distinct entity despite equal printed name" False (V.toInt owner == V.toInt ref)
+    _ -> error ("missing colliding-name fixture edge " ++ show [(V.toInt i,map V.toInt (R.references rhs)) | D.Bound i _ rhs <- entries])
   (_,active) <- right (D.resolvedGroups matching [] M.empty M.empty)
   check "external reference cannot induce self recursion" [[False]] (map (map snd) active)
   both <- mapM parsed [("X","module X where\nf = 1\n"),("Y","module Y where\ng = 2\n")]
@@ -226,15 +241,47 @@ resolverChecks = do
   let eq = Modules.Entity "MLF.Primitive" "==" (Modules.Method "Eq")
       convert = Modules.Entity "MLF.Primitive" "fromString" (Modules.Method "IsString")
       named = Modules.Names (M.fromList Modules.compareEntity [(eq,"eq"),(convert,"convert")])
-      terms = Modules.termIds named
+      terms = Modules.resolveNames named
       pat = T.SOverloadedStringPattern (T.ScalarString "x") "ignored" "ignored"
       expr = T.SCase (T.SIntLit 0) [T.SAlternative pat (T.SIntLit 1)]
-  (_,patterns) <- right (Modules.resolveUses terms named (Modules.interface []) expr)
+  resolved <- right (Modules.resolveExpr terms (Modules.interface []) expr)
   patternIds <- mapM (right . Modules.termId terms) [eq,convert]
-  check "implicit pattern operations retain both method IDs" (map V.toInt patternIds) (map V.toInt patterns)
+  case resolved of
+    R.Case _ [(R.OverloadedStringPattern _ i j,_)] ->
+      check "pattern stores both method IDs on the node" (map V.toInt patternIds) (map V.toInt [i,j])
+    _ -> error "lost resolved string pattern"
+  check "implicit edges come from the pattern" (map V.toInt patternIds) (map V.toInt (R.references resolved))
+  let slots = D.symbols [("same",False),("same",False),("method",True)]
+      [own,external,method] = V.indices (D.symbolNodes slots)
+      helper = D.Bound own T.Nothing (R.IntLit 7)
+      helpers = Surface.helperScope (D.BoundValues slots [helper])
+      close i = right (Surface.closeResolvedInstance helpers (R.Instance [] [] "C" [] [(method,R.Global i)]))
+  T.SInstanceDecl _ _ _ _ [(_,remoteBody)] <- close external
+  case remoteBody of
+    T.SVar n -> check "inactive import stays free in a method" "same" (H.unpack n)
+    _ -> error "method captured a local helper with the import's printed name"
+  T.SInstanceDecl _ _ _ _ [(_,localBody)] <- close own
+  case localBody of
+    T.SLet n (T.SSourceDefinition (T.SIntLit 7)) (T.SVar ref) ->
+      check "local method dependency copies its source definition" ("same","same") (H.unpack n,H.unpack ref)
+    _ -> error "method failed to capture its referenced helper"
+  let fresh = D.symbols [("a",False),("b",False),("c",True)]
+  case R.namedExpr (D.symbolName fresh) (R.Global external) of
+    T.SVar n -> check "the same slot projects the updated spelling" "b" (H.unpack n)
+    _ -> error "global projected as another kind of expression"
+  let nested = R.AsPattern "x" (R.LazyPattern (R.NestedPattern "K"
+                 [R.OverloadedStringPattern (T.ScalarString "p") method external]))
+      exprTree = R.SharedBind nested (R.Global own)
+        (R.Equations [([nested],R.LetRec [("x",T.InferRecursive,R.Global own)] (R.Local "x"))])
+        (R.Global method) (R.Global external)
+  check "nested, recursive and implicit edges read the actual leaves"
+    (map V.toInt [method,external,own,method,external,own,method,external])
+    (map V.toInt (R.references exprTree))
   let scope = D.symbols [("Z",False),("B",False),("external",False),("method",True)]
-      ix n = case M.get H.v_compareString n (D.symbolIds scope) of { [i] -> i; _ -> error "bad fixture symbol" }
-      bound n ns = D.Bound (ix n) (error "late binding rescanned a source RHS") (map ix ns)
+      ix n = case [i | i <- V.indices (D.symbolNodes scope), D.symbolName scope i == n] of
+               [i] -> i
+               _ -> error "bad fixture symbol"
+      bound n ns = D.Bound (ix n) T.Nothing (foldr (R.App . R.Global . ix) (R.Constructor "()") ns)
       values = D.BoundValues scope [bound "Z" ["B","method","external"],bound "B" ["B"]]
       generated = [("0selector",["Z"]),("Cdict",["B"])]
       methods = M.singleton "method" ("0selector",[] :: [H.String])
@@ -242,6 +289,20 @@ resolverChecks = do
       oracle = reference [("Z",["B","0selector"]),("B",["B","Cdict"]),("0selector",["Z"]),("Cdict",["B"])]
   groups <- right (D.resolvedGroups values generated methods scopes)
   check "late selector and dictionary retain lexical DFS order" oracle (map (map H.unpack) (D.groupSpellings groups))
+  let support = [("0selector",T.Nothing,T.SVar "Z"),("Cdict",T.Nothing,T.SVar "B")]
+  mixed <- right (Source.indexedPlan values support methods scopes)
+  case mixed of
+    T.Nothing -> pure ()
+    _ -> error "mixed generated/source SCC lost its whole-path fallback"
+  plan <- right (Source.indexedPlan (D.BoundValues scope [bound "Z" ["B"],bound "B" ["Z"]]) [] M.empty M.empty)
+  case plan of
+    T.Just (Source.IndexedPlan symbols table ids [] [members]) -> do
+      check "plan source order" ["Z","B"] (map (H.unpack . D.symbolName symbols) ids)
+      check "plan SCC lexical order" ["B","Z"] (map (H.unpack . D.symbolName symbols) members)
+      let rows = map (Source.namedBinding symbols table) members
+      check "selected rows retain original ordinals" [(1,"B"),(0,"Z")]
+        [(ordinal,H.unpack n) | (ordinal,(n,_,_)) <- rows]
+    _ -> error "resolved query plan lost its indexed rows"
 
 main = do
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]

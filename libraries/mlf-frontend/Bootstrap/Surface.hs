@@ -9,8 +9,9 @@ module Bootstrap.Surface where {
   import Bootstrap.Fresh;
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Resolved as R;
   import qualified Bootstrap.IndexVec as V;
-  import qualified Bootstrap.ST as ST;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Data as D;
@@ -146,13 +147,39 @@ module Bootstrap.Surface where {
       Left error -> Left error;
       Right groups -> wrapGroups values (Dependency.declarationEdges values) groups body
     };
-  bindResolved values@(Dependency.BoundValues symbols bindings) body = do {
-    (,) _ groups <- Dependency.resolvedGroups values [] M.empty M.empty;
-    let { table = runST (stBind (V.filled (V.count (Dependency.symbolNodes symbols)) (panic "unbound declaration ID")) (\slots ->
-            stBind (ST.map_ (\(Dependency.Bound i value _) -> V.set slots i value) bindings) (\_ -> V.freeze slots)));
-          wrap group continuation = wrapValueGroup (map (compose (V.at table) fst) group)
-            (length group > 1 || any snd group) continuation
-    } in foldM (\continuation group -> wrap group continuation) body (reverse groups)
+  bindResolvedExpr values@(Dependency.BoundValues symbols _) body =
+    bindResolved values (R.namedExpr (Dependency.symbolName symbols) body);
+  bindResolved values@(Dependency.BoundValues symbols bindings) body = case bindings of {
+    [] -> Right body;
+    (:) _ _ -> do {
+      (,) _ groups <- Dependency.resolvedGroups values [] M.empty M.empty;
+      let { table = Dependency.boundTable values;
+            member ((,) i _) = case V.at table i of {
+              Just binding -> Dependency.boundValue symbols binding; Nothing -> panic "unbound declaration ID"
+            };
+            wrap continuation group = wrapValueGroup (map member group)
+              (length group > 1 || any snd group) continuation
+      } in foldM wrap body (reverse groups)
+    }
+  };
+  -- Instance methods copy only source helpers reachable from their resolved
+  -- bodies. Imported IDs stay outside this table even if a local prints alike.
+  data HelperScope = HelperScope Dependency.Symbols (V.IndexVec Dependency.Declaration (Maybe Dependency.Bound));
+  helperScope values@(Dependency.BoundValues symbols _) = HelperScope symbols (Dependency.boundTable values);
+  helperBindings table seen pending result = case pending of {
+    [] -> result;
+    (:) i rest -> if IS.member (V.toInt i) seen then helperBindings table seen rest result
+      else let { next = IS.insert (V.toInt i) seen } in case V.at table i of {
+        Nothing -> helperBindings table next rest result;
+        Just (Dependency.Bound j annotation rhs) -> helperBindings table next (append (R.references rhs) rest)
+          ((:) (Dependency.Bound j annotation (R.SourceDefinition rhs)) result)
+      }
+  };
+  closeResolvedInstance (HelperScope symbols table) (R.Instance vars context klass head methods) = do {
+    closed <- mapM (\((,) i rhs) ->
+      let { needed = helperBindings table IS.empty (R.references rhs) [] } in
+      mapEither ((,) (Dependency.symbolName symbols i)) (bindResolvedExpr (Dependency.BoundValues symbols needed) rhs)) methods;
+    Right (SInstanceDecl vars context klass head closed)
   };
   wrapGroups :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
                 [] ((,) String ([] String)) ->

@@ -181,7 +181,7 @@ def dependency_parser_controls():
 NATIVE_MODULES = frozenset("""
 Bootstrap.ArtifactStorage Bootstrap.ArtifactStructure Bootstrap.Bitstream
 Bootstrap.ClassDemand Bootstrap.Classes Bootstrap.CompilerCore Bootstrap.Constraint
-Bootstrap.CrateArtifact Bootstrap.Data Bootstrap.Dependency Bootstrap.Desugar
+Bootstrap.CrateArtifact Bootstrap.Data Bootstrap.Dependency Bootstrap.Resolved Bootstrap.Desugar
 Bootstrap.Elaborate Bootstrap.Evidence Bootstrap.EvidenceBoundary Bootstrap.Fresh Bootstrap.Graph
 Bootstrap.Graph.Solver Bootstrap.Host Bootstrap.IndexVec Bootstrap.IntMap Bootstrap.IntRank
 Bootstrap.IntSet Bootstrap.IntTree Bootstrap.Kind Bootstrap.Kinding Bootstrap.Layout
@@ -219,8 +219,8 @@ def native_source_closure(source, fixture, manifest):
         found[name] = {'module': name, 'path': str(path), 'bytes': path.stat().st_size,
                        'sha256': sha(path), 'imports': imports}
         pending.extend(imports)
-    require(set(found) == NATIVE_MODULES and len(found) == 50,
-            'native fixture must retain exact reviewed 50-module closure')
+    require(set(found) == NATIVE_MODULES and len(found) == 51,
+            'native fixture must retain exact reviewed 51-module closure')
     return [found[name] for name in sorted(found)]
 
 

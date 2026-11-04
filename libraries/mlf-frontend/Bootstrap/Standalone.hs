@@ -12,6 +12,7 @@ module Bootstrap.Standalone where {
   import qualified Bootstrap.Prelude as Prelude;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Resolved as R;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Lexer as Lexer;
@@ -42,7 +43,7 @@ module Bootstrap.Standalone where {
   checked result = Rewrite (mapEither ((,) False) result);
   reject :: forall a. String -> Rewrite a;
   reject message = checked (Left message);
-  data Scope = Scope PreludeMode Modules.Names Modules.Interface (Set String) (Set String) (Map String String) (Map String String);
+  data Scope = Scope PreludeMode Modules.Bindings Modules.Interface (Set String) (Set String) (Map String String) (Map String String);
   scopeNames (Scope _ names _ _ _ _ _) = names;
   scopeInterface (Scope _ _ env _ _ _ _) = env;
   localTypes (Scope _ _ _ types _ _ _) = types;
@@ -66,7 +67,8 @@ module Bootstrap.Standalone where {
     Scope _ names _ _ _ types constructors -> displayMap names types constructors
   };
   rewriteRootWithNames :: PreludeMode -> Modules.Names -> Modules.Interface -> SProgram -> Either String RewrittenRoot;
-  rewriteRootWithNames mode names env original = do {
+  rewriteRootWithNames mode names = rewriteRootWithBindings mode (Modules.resolveNames names);
+  rewriteRootWithBindings mode names env original = do {
     let {
       parts = Prelude.programParts original;
       datatypes = case parts of { (,,,) value _ _ _ -> value };
@@ -76,7 +78,7 @@ module Bootstrap.Standalone where {
                                   (concatMap (\declaration -> map fst (Modules.classMethods declaration)) classes));
       privateNames = (:) "MLFHasCallStack" ((:) "MLFCallStack" ((:) "MLFStackEvidence" ((:) "MLFStackFrame" ((:) "MLFLegacyUnit" []))));
       used = Set.fromList compareString (append (programNames original)
-        (case names of { Modules.Names entries -> M.elems entries }));
+        (M.elems (Modules.canonicalEntries names)));
       typeRenames = collisionNames used "StandaloneType" (filter (\name -> elem eqString name privateNames) (Set.toList types));
       constructorNames = concatMap (\declaration -> map D.constructorName (D.datatypeConstructors declaration)) datatypes;
       constructorRenames = collisionNames used "StandaloneConstructor" (filter (\name -> elem eqString name ((:) "True" ((:) "False" privateNames))) constructorNames);
@@ -92,7 +94,7 @@ module Bootstrap.Standalone where {
   normalizeWithScope :: Bool -> PreludeMode -> SProgram -> Either String (Maybe ((,,) (Set String) SProgram (Map String String)));
   normalizeWithScope wholeScope mode original = do {
     (,,) names env builtin <- Modules.standaloneBuiltinScope (programNames original);
-    root <- rewriteRootWithNames mode names env original;
+    root <- rewriteRootWithBindings mode names env original;
     if not (rewrittenNeeded root) then Right Nothing else do {
       let {
         rewritten = rewrittenProgram root;
@@ -102,16 +104,18 @@ module Bootstrap.Standalone where {
         ins = case parts of { (,,,) _ _ value _ -> value };
         expression = case parts of { (,,,) _ _ _ value -> value };
         selected = if wholeScope then builtin else demandedBuiltin builtin (Set.fromList compareString (programNames rewritten));
-        values = filter (\((,,) name _ _) -> not (eqString name "mlfCallStack")) (Modules.renamedValues selected)
+        symbols = Modules.renamedSymbols selected;
+        values = filter (\b -> not (eqString (Dependency.symbolName symbols (Dependency.boundId b)) "mlfCallStack"))
+          (Modules.renamedBindings selected)
       };
-      bound <- Surface.bindValues values expression;
+      bound <- Surface.bindResolved (Dependency.BoundValues symbols values) expression;
       Right (Just ((,,) (Set.fromList compareString (map Modules.className (Modules.renamedClasses selected)))
         (SClassProgram (append (Modules.renamedDatatypes selected) ds)
           (append (Modules.renamedClasses selected) cs)
           (append (Modules.renamedInstances selected) ins) bound) (rewrittenDisplay root)))
     }
   };
-  displayMap (Modules.Names names) typeRenames constructorRenames =
+  displayMap bindings typeRenames constructorRenames = let { names = Modules.canonicalEntries bindings } in
     M.union compareString
       (M.fromList compareString (map (\((,) original renamed) -> (,) renamed original)
         (append (M.toList typeRenames) (M.toList constructorRenames))))
@@ -123,19 +127,20 @@ module Bootstrap.Standalone where {
   -- fixed point also includes superclass, context and implementation needs.
   demandedBuiltin :: Modules.Renamed -> Set String -> Modules.Renamed;
   demandedBuiltin builtin needed = let {
-    classes = filter (\declaration -> hasName (Modules.className declaration) needed ||
-      any (\method -> hasName (fst method) needed) (Modules.classMethods declaration)) (Modules.renamedClasses builtin);
-    classSet = Set.fromList compareString (map Modules.className classes);
-    instances = filter (\instanceDecl -> hasName (Modules.instanceClass instanceDecl) classSet) (Modules.renamedInstances builtin);
-    bindings = filter (\b -> hasName (Modules.valueName (Dependency.boundValue b)) needed) (Modules.renamedBindings builtin);
-    values = map Dependency.boundValue bindings;
-    references = append (concatMap classNames classes)
-      (append (concatMap instanceNames instances)
+    symbols = Modules.renamedSymbols builtin; name = Dependency.symbolName symbols;
+    classes = filter (\(R.Class c _ _ methods) -> hasName c needed ||
+      any (\method -> hasName (name (fst method)) needed) methods) (Modules.resolvedClasses builtin);
+    classSet = Set.fromList compareString (map (\(R.Class c _ _ _) -> c) classes);
+    instances = filter (\(R.Instance _ _ c _ _) -> hasName c classSet) (Modules.resolvedInstances builtin);
+    bindings = filter (\b -> hasName (name (Dependency.boundId b)) needed) (Modules.renamedBindings builtin);
+    values = map (Dependency.boundValue symbols) bindings;
+    references = append (concatMap (compose classNames (R.namedClass name)) classes)
+      (append (concatMap (compose instanceNames (R.namedInstance name)) instances)
         (concatMap (\((,,) name annotation body) -> (:) name
           (append (maybe [] annotationNames annotation) (expressionNames body))) values));
     expanded = addBound needed references
   } in if Set.size needed == Set.size expanded
-    then Modules.Renamed (Modules.renamedDatatypes builtin) classes instances bindings Nothing
+    then Modules.Renamed symbols (Modules.renamedDatatypes builtin) classes instances bindings Nothing
     else demandedBuiltin builtin expanded;
   -- Only declarations, not unknown nominal annotations or arbitrary basenames,
   -- receive these local identities. Their references use the same explicit map.
@@ -232,7 +237,7 @@ module Bootstrap.Standalone where {
       Just entity -> if Modules.isRole Modules.Class entity || Modules.isRole Modules.ManagedConstraint entity
         then reject ("class used as a type constructor: " ++ name)
         else do {
-          renamed <- checked (Modules.resolvedName (scopeNames scope) entity);
+          renamed <- checked (Modules.bindingSpelling (scopeNames scope) entity);
           if eqString name renamed then unchanged name else changed renamed
         }
     };
@@ -241,7 +246,7 @@ module Bootstrap.Standalone where {
     else case facadeEntity scope Modules.Types name of {
       Nothing -> unchanged name;
       Just entity -> if Modules.isRole Modules.Class entity || Modules.isRole Modules.ManagedConstraint entity
-        then do { renamed <- checked (Modules.resolvedName (scopeNames scope) entity); changed renamed }
+        then do { renamed <- checked (Modules.bindingSpelling (scopeNames scope) entity); changed renamed }
         else reject ("not a class: " ++ name)
     };
   rewriteType :: Scope -> SType -> Rewrite SType;
@@ -302,7 +307,7 @@ module Bootstrap.Standalone where {
       Just entity -> if Modules.isRole Modules.Class entity then do {
         defaults <- checked (Prelude.standardDefaults (Modules.spelling entity) methods);
         mapM (\((,) method body) -> do {
-          method' <- checked (Modules.resolvedName (scopeNames scope)
+          method' <- checked (Modules.bindingSpelling (scopeNames scope)
             (Modules.Entity (Modules.owner entity) method (Modules.Method (Modules.spelling entity))));
           body' <- rewriteExpr scope (localTerms scope) body;
           unchanged ((,) method' body')

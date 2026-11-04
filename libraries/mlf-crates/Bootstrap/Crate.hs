@@ -19,6 +19,7 @@ module Bootstrap.Crate where {
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.SourceInference as Source;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.BuiltinPreludeContext as Builtin;
   import qualified Bootstrap.BuiltinPreludeLiteral as Literal;
@@ -269,10 +270,10 @@ module Bootstrap.Crate where {
     entry <- case find (\r -> eqString (Modules.moduleIdentity (Modules.resolvedSource r)) (specEntry spec)) modules of {
       Nothing -> Left "crate entry module was not resolved"; Just r -> Right r
     };
-    (,) expression refs <- Modules.entryUses resolution entry;
+    expression <- Modules.entryExpr resolution entry;
     let { symbol = Artifact.definitionName (specIdentity spec)
             (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value) };
-    Right ((,) symbol (Dependency.appendBound bindings ((,,) symbol Nothing expression) refs))
+    Right ((,) symbol (Dependency.appendBound bindings symbol expression))
   };
   externalInstanceOwners interfaces =
     concatMap
@@ -324,11 +325,10 @@ module Bootstrap.Crate where {
         (,) entry bindings ->
           do {
             let {
-              localInstances =
-                map
-                  (\((,) owner inst) ->
-                     (,) owner ((,) (Artifact.instanceName (specIdentity spec) owner inst) inst))
-                  (Modules.resolvedCrateInstances resolution)
+              localRows = Modules.resolvedInstanceRows resolution;
+              describe ((,) owner row) = let { inst = Modules.instanceValue resolution row } in
+                (,) owner ((,) (Artifact.instanceName (specIdentity spec) owner inst) inst);
+              localInstances = map describe localRows
             };
             inheritedInstances <- sequenceEither (externalInstanceOwners interfaces);
             let {
@@ -360,11 +360,8 @@ module Bootstrap.Crate where {
                   (append
                      (concatMap
                         (\r ->
-                           map
-                             (\((,,) name _ _) ->
-                                (,) name
-                                  (candidates (Modules.moduleIdentity (Modules.resolvedSource r))))
-                             (Modules.renamedValues (Modules.resolvedContents r)))
+                           map (\name -> (,) name (candidates (Modules.moduleIdentity (Modules.resolvedSource r))))
+                             (Modules.renamedValueNames (Modules.resolvedContents r)))
                         resolved)
                      (if eqString entry ""
                       then []
@@ -405,9 +402,17 @@ module Bootstrap.Crate where {
                 M.union compareString (M.map (Modules.displayNames sourceNames) dictionaries)
                   sourceNames
             };
-            (,) sourcePlan legacy <- mapLeft (Modules.displayNames diagnosticNames)
-              (Source.prepareResolvedSourcePlan bindings imported allData allClasses (map snd instances)
-                valueScopes (map (\((,) owner _) -> candidates owner) instances));
+            (,) sourcePlan legacy <- mapLeft (Modules.displayNames diagnosticNames) (do {
+              let { members = Dependency.boundValues bindings;
+                    memberMap = M.fromList compareString (map (\m -> (,) (Modules.valueName m) m) members) };
+              importedInstances <- traverseEither (\((,) _ ((,) name inst)) ->
+                mapEither ((,) name) (Surface.closeSourceInstance members memberMap inst)) inheritedInstances;
+              let { closeLocal = Surface.closeResolvedInstance (Surface.helperScope bindings) };
+              local <- traverseEither (\((,) metadata row) -> mapEither ((,) (fst (snd metadata))) (closeLocal (snd row)))
+                (zip localInstances localRows);
+              Source.prepareResolvedSourcePlan bindings imported allData allClasses (map snd instances)
+                (append importedInstances local) valueScopes (map (\((,) owner _) -> candidates owner) instances)
+            });
             lowered <- case sourcePlan of {
               Nothing -> mapLeft (Modules.displayNames diagnosticNames) legacy;
               Just plan -> Right (case Source.planLegacy plan of {
