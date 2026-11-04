@@ -1656,10 +1656,12 @@ class RecursiveCaptureReplayTests(unittest.TestCase):
             self.assertEqual(caps['policy'],'closed-scalar-callable-shared-view-captures/1')
             self.assertEqual(caps['callables'][0]['binding'],name(20));self.assertEqual(caps['views'],[])
 
-    def test_nominal_owner_is_not_an_admitted_external_capture(self):
+    def test_nominal_owner_requires_explicit_declared_capture_policy(self):
         rhs=lam(11,I,sum_case(var(20),[sum_arm('Nil',(),lit()),sum_arm('Cons',(21,22),var(21))]))
-        self.reject(with_data(let(20,ctor('Nil'),rec_binding(10,arr(I,I),rhs,lit())),recursive_decl()),
-                    'RECURSION')
+        out=m.derive_shared_fragment(with_data(let(20,ctor('Nil'),rec_binding(10,arr(I,I),rhs,lit())),recursive_decl()))
+        caps=out['recursion']['bindings'][0]['captures']
+        self.assertEqual(caps['policy'],'closed-scalar-callable-nominal-shared-view-captures/1')
+        self.assertEqual(caps['callables'],[]);self.assertEqual(caps['nominals'][0]['declaration'],0)
 
     def test_bare_partial_extra_and_open_shared_uses_remain_rejected(self):
         generic=tabs(100,tabs(101,lam(2,tv(100),var(2))))
@@ -1972,6 +1974,9 @@ class RetainedRecursiveCallableCaptureTests(unittest.TestCase):
                 self.assertTrue(report['fragment_admitted']);self.assertFalse(report['source_admitted'])
                 self.assertFalse(report['native_admitted'])
                 capture=json.loads(path.read_bytes());out=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+                self.assertEqual(hashlib.sha256(m._json(out).encode()).hexdigest(),{
+                    'pending-step':'7a45694ca2650bbf48b60c50ae3f94f83247968a8b0e43f4c1c0f66ba2821070',
+                    'view-alias':'89b344f88a241ba26d8686d3e8ee142e837589a219142bb93786ab47f5b2747f'}[label])
                 self.assertEqual(out['steps'],capture['normalization']['steps'])
                 self.assertEqual(out['raw_normalized'],capture['normalization']['raw_normalized'])
                 self.assertEqual(len(out['steps']),2);self.assertEqual(out['checked_type'],I)
@@ -2013,6 +2018,273 @@ class RetainedRecursiveCallableCaptureTests(unittest.TestCase):
                 for occurrence in ordinary['occurrences']:
                     self.assertEqual(occurrence['path'][:len(cons['body']['path'])],cons['body']['path'])
                 # Static occurrence/graph facts do not predict eventual Code or runtime demand.
+                self.assertEqual(old_path.read_bytes(),old_bytes)
+                old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
+                self.assertEqual(old['fragment_error']['code'],'RECURSION')
+
+
+def nominal_capture(data_owner=True):
+    """Synthetic pending nominal owner; original captures are tested separately."""
+    tree=monomorphic_recursion();rec=tree['body']['body']
+    if data_owner:
+        typ=nominal_type('Payload')
+        tree['declarations'].append(data_decl('Payload','Payload',(I,arr(I,I))))
+        payload=ctor('Payload',add(lit(20),lit(1)),app(lam(72,arr(I,I),var(72)),use(1,I)))
+        demand=case(var(70),'Payload',(80,81),app(var(81),var(80)))
+    else:
+        typ=nominal_type('Chain')
+        tail=app(lam(72,I,ctor('Cons',var(72),ctor('Nil'))),lit(123))
+        payload=ctor('Cons',add(lit(20),lit(1)),tail)
+        demand=sum_case(var(70),[sum_arm('Nil',(),lit(0)),sum_arm('Cons',(80,None),app(use(1,I),var(80)))])
+    rec['bindings'][0]['value']['argument']['body']['alternatives'][1]['body']=add(demand,app(var(30),var(33)))
+    rec['body']=choose(app(use(1,B),boolean()),
+        add(app(var(30),ctor('Nil')),app(var(30),ctor('Cons',lit(0),ctor('Cons',lit(0),ctor('Nil'))))),lit(0))
+    tree['body']['body']=let(70,app(lam(71,typ,var(71)),payload),rec)
+    return tree
+
+
+class RecursiveNominalCaptureReplayTests(unittest.TestCase):
+    reject=ReplayTests.reject
+
+    def test_pending_DATA_and_SUM_owners_keep_whole_graph_and_exact_declarations(self):
+        for data_owner in (True,False):
+            with self.subTest(data_owner=data_owner):
+                tree=nominal_capture(data_owner);out=m.derive_shared_fragment(tree)
+                self.assertEqual(out['raw_normalized'],tree);self.assertEqual(out['input_erased'],p.erase_total(tree))
+                self.assertEqual(len(out['term_correspondence']),len(m._ordinary(tree)))
+                row,=out['recursion']['bindings'];caps=row['captures'];owner,=caps['nominals']
+                self.assertEqual(caps['policy'],'closed-scalar-callable-nominal-shared-view-captures/1')
+                self.assertEqual(caps['scalars'],[]);self.assertEqual(caps['callables'],[])
+                self.assertEqual(owner['binding'],name(70))
+                table=out['nominal_data' if data_owner else 'nominal_sum']
+                declaration=next(d for d in table['declarations'] if d['index']==owner['declaration'])
+                self.assertEqual(owner['type'],declaration['type'])
+                self.assertEqual(owner['declaration'],1 if data_owner else 0)
+                self.assertEqual([m._get(tree,a['path']) for a in owner['occurrences']],[var(70)])
+                self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I],[B]])
+                self.assertEqual([v['arguments'] for v in caps['views']],[] if data_owner else [[I]])
+                self.assertEqual(m.validate_shared_fragment(tree,out),out)
+
+    def test_nominal_metadata_never_invents_node_variant_origin_or_readiness(self):
+        caps=m.derive_shared_fragment(nominal_capture())['recursion']['bindings'][0]['captures']
+        self.assertEqual(set(caps),{'policy','scalars','callables','nominals','views'})
+        self.assertEqual(set(caps['nominals'][0]),{'binding','type','declaration','occurrences'})
+
+    def test_same_shaped_families_remain_different_and_owners_sort_by_ID(self):
+        body=add(case(var(30),'A',(22,),var(22)),case(var(20),'B',(23,),var(23)))
+        raw=with_data(let(30,ctor('A',lit()),let(20,ctor('B',lit()),
+            rec_binding(10,arr(I,I),lam(11,I,body),lit()))),
+            data_decl('First','A'),data_decl('Second','B'))
+        rows=m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']['nominals']
+        self.assertEqual([(r['binding']['id'],r['declaration'],r['type']) for r in rows],
+                         [(20,1,nominal_type('Second')),(30,0,nominal_type('First'))])
+
+    def test_same_type_different_owners_are_not_collapsed(self):
+        body=add(case(var(20),'Pack',(22,),var(22)),case(var(30),'Pack',(23,),var(23)))
+        raw=with_data(let(20,ctor('Pack',lit()),let(30,ctor('Pack',lit()),
+            rec_binding(10,arr(I,I),lam(11,I,body),lit()))))
+        rows=m.derive_shared_fragment(raw)['recursion']['bindings'][0]['captures']['nominals']
+        self.assertEqual([r['binding']['id'] for r in rows],[20,30])
+        self.assertEqual([r['declaration'] for r in rows],[0,0])
+
+    def test_nested_and_unselected_occurrences_are_complete(self):
+        tree=nominal_capture();rec=tree['body']['body']['body']
+        arms=rec['bindings'][0]['value']['argument']['body']['alternatives']
+        arms[0]['body']=app(lam(90,I,case(var(70),'Payload',(91,92),var(91))),lit())
+        row=m.derive_shared_fragment(tree)['recursion']['bindings'][0]['captures']['nominals'][0]
+        self.assertEqual(len(row['occurrences']),2)
+        self.assertEqual([m._get(tree,a['path']) for a in row['occurrences']],[var(70),var(70)])
+        self.assertEqual(len({tuple(a['path']) for a in row['occurrences']}),2)
+
+    def test_all_capture_categories_are_disjoint_and_count_together(self):
+        tree=nominal_capture(False);rec=tree['body']['body']['body']
+        arm=rec['bindings'][0]['value']['argument']['body']['alternatives'][1]
+        arm['body']=add(app(var(60),var(50)),arm['body'])
+        tree['body']['body']['body']=let(50,lit(),let(60,lam(61,I,var(61)),rec))
+        row=m.derive_shared_fragment(tree)['recursion']['bindings'][0];caps=row['captures']
+        self.assertEqual(row['free_term_bindings'],[1,50,60,70])
+        self.assertEqual([r['binding']['id'] for r in caps['scalars']],[50])
+        self.assertEqual([r['binding']['id'] for r in caps['callables']],[60])
+        self.assertEqual([r['binding']['id'] for r in caps['nominals']],[70])
+        self.assertEqual([r['binding']['id'] for r in caps['views']],[1])
+        with mock.patch.object(m,'MAX_RECURSIVE_CAPTURES',4):self.reject(tree,'LIMIT')
+
+    def test_nominal_parameter_owner_is_allowed_without_constructor_origin_guess(self):
+        raw=with_data(lam(20,nominal_type('Box'),rec_binding(10,arr(I,I),
+            lam(11,I,case(var(20),'Pack',(21,),var(21))),lit())))
+        out=m.derive_shared_fragment(raw);owner,=out['recursion']['bindings'][0]['captures']['nominals']
+        self.assertEqual(owner['binding'],name(20));self.assertEqual(owner['declaration'],0)
+        self.assertEqual(out['nominal_data']['constructors'],[])
+
+    def test_missing_published_declaration_rejects_before_returning_evidence(self):
+        original=m._nominal_inventory
+        def omit_data(*args):
+            data,sums=original(*args)
+            return None,sums
+        with mock.patch.object(m,'_nominal_inventory',side_effect=omit_data):
+            self.reject(nominal_capture(),'RECURSION')
+
+    def test_family_cannot_be_selected_silently_after_publication(self):
+        original=m._nominal_inventory
+        def remove_selected(*args):
+            data,sums=original(*args)
+            args[2].selected.pop(1)
+            return data,sums
+        with mock.patch.object(m,'_nominal_inventory',side_effect=remove_selected):
+            self.reject(nominal_capture(),'RECURSION')
+
+    def test_equal_copy_is_not_the_freshly_published_canonical_declaration(self):
+        original=m._nominal_inventory
+        def copy_row(*args):
+            data,sums=original(*args)
+            data=copy.deepcopy(data)
+            return data,sums
+        with mock.patch.object(m,'_nominal_inventory',side_effect=copy_row):
+            self.reject(nominal_capture(),'RECURSION')
+
+    def test_64_nominal_owners_including_used_self_boundary(self):
+        def tree(count,self_use):
+            terms=[case(var(1000+i),'Pack',(2000+i,),var(2000+i)) for i in range(count)]
+            if self_use:terms.append(app(var(10),var(11)))
+            while len(terms)>1:
+                terms=[add(terms[i],terms[i+1]) if i+1<len(terms) else terms[i]
+                       for i in range(0,len(terms),2)]
+            raw=rec_binding(10,arr(I,I),lam(11,I,terms[0]),lit())
+            for i in reversed(range(count)):raw=let(1000+i,var(20),raw)
+            return with_data(let(20,ctor('Pack',lit()),raw))
+        for count,self_use in ((63,True),(64,False)):
+            with self.subTest(count=count,self_use=self_use):
+                row=m.derive_shared_fragment(tree(count,self_use))['recursion']['bindings'][0]
+                self.assertEqual(len(row['captures']['nominals']),count)
+                self.assertEqual(bool(row['self_uses']),self_use)
+        self.reject(tree(64,True),'LIMIT')
+
+    def test_foreign_open_parameterized_recursive_DATA_and_bad_SUM_still_reject(self):
+        self.reject(lam(20,nominal_type('Unknown'),rec_binding(10,arr(I,I),lam(11,I,lit()),lit())))
+        typ=nominal_type('Box');typ['arguments']=[I]
+        self.reject(with_data(lam(20,typ,rec_binding(10,arr(I,I),lam(11,I,lit()),lit()))))
+        invalid=[data_decl('Box','Pack',(nominal_type('Box'),)),
+                 sum_decl('Box',(('Empty',()),('Pack',(arr(I,I),)))),
+                 sum_decl('Box',(('Empty',()),('Pack',(nominal_type('Other'),))))]
+        for declaration in invalid:
+            with self.subTest(declaration=declaration):
+                self.reject(with_data(lam(20,nominal_type('Box'),
+                    rec_binding(10,arr(I,I),lam(11,I,let(21,var(20),lit())),lit())),declaration))
+        declaration=data_decl();declaration['parameters']=[{'name':'a','kind':{'tag':'star'}}]
+        self.reject(with_data(lam(20,nominal_type('Box'),rec_binding(10,arr(I,I),lam(11,I,lit()),lit())),declaration))
+
+    def test_nominal_arrows_generic_recursion_and_nominal_scheme_arguments_stay_out(self):
+        raw=with_data(let(20,lam(21,nominal_type('Box'),lit()),
+            rec_binding(10,arr(I,I),lam(11,I,app(var(20),ctor('Pack',lit()))),lit())))
+        self.reject(raw,'RECURSION')
+        raw=with_data(tapp(tabs(100,lam(20,nominal_type('Box'),
+            rec_binding(10,arr(I,I),lam(11,I,lit()),lit()))),inst(I)))
+        self.reject(raw,'RECURSION')
+        self.reject(with_data(shared(app(use(1,nominal_type('Box')),ctor('Pack',lit())))),'USE')
+
+    def test_wrong_family_pattern_and_same_shape_argument_do_not_match(self):
+        raw=with_data(let(20,ctor('A',lit()),rec_binding(10,arr(I,I),
+            lam(11,I,case(var(20),'B',(21,),var(21))),lit())),
+            data_decl('First','A'),data_decl('Second','B'))
+        self.reject(raw,'CASE')
+        raw=with_data(let(20,ctor('A',lit()),rec_binding(10,arr(I,I),
+            lam(11,I,app(lam(21,nominal_type('Second'),lit()),var(20))),lit())),
+            data_decl('First','A'),data_decl('Second','B'))
+        self.reject(raw,'TYPE')
+
+    def test_forged_nominal_policy_declaration_type_owner_or_occurrences_rejected(self):
+        tree=nominal_capture();out=m.derive_shared_fragment(tree)
+        mutations=[lambda c:c.update(policy=m.RECURSIVE_CALLABLE_CAPTURE_POLICY),lambda c:c.pop('callables'),
+            lambda c:c['nominals'].clear(),lambda c:c['nominals'][0].update(binding=name(999)),
+            lambda c:c['nominals'][0].update(declaration=0),lambda c:c['nominals'][0].update(type=nominal_type('Chain')),
+            lambda c:c['nominals'][0]['occurrences'].clear(),lambda c:c['nominals'][0].update(origin='E0'),
+            lambda c:c['nominals'].append(copy.deepcopy(c['nominals'][0])),
+            lambda c:c['scalars'].append({'binding':name(70),'type':I,'occurrences':[]})]
+        for index,mutate in enumerate(mutations):
+            forged=copy.deepcopy(out);mutate(forged['recursion']['bindings'][0]['captures'])
+            with self.subTest(index=index),self.assertRaises(m.SharedTransportError) as caught:
+                m.validate_shared_fragment(tree,forged)
+            self.assertEqual(caught.exception.code,'EVIDENCE')
+
+    def test_old_callable_evidence_goldens_are_unchanged_without_nominals(self):
+        expected={False:'beeee839ce3873c9bcae505f8a1ed05984882f7305728bcfa37d2357bcde6552',
+                  True:'772dbe7bd350a23b1397d1fcf0c205b1c439e8614012d6cc473839bc0726ff90'}
+        for alias,pin in expected.items():
+            out=m.derive_shared_fragment(callable_capture(alias))
+            self.assertEqual(hashlib.sha256(m._json(out).encode()).hexdigest(),pin)
+            self.assertNotIn('nominals',out['recursion']['bindings'][0]['captures'])
+
+
+RECURSIVE_NOMINAL_CAPTURE_ROOT=os.environ.get('IR8_RECURSIVE_NOMINAL_CAPTURE_ROOT')
+
+
+@unittest.skipUnless(RECURSIVE_NOMINAL_CAPTURE_ROOT,
+                    'set IR8_RECURSIVE_NOMINAL_CAPTURE_ROOT for completed nominal-owner captures')
+class RetainedRecursiveNominalCaptureTests(unittest.TestCase):
+    def test_both_original_captures_exact_declaration_owner_and_proof_replay(self):
+        from source_capture_v8 import verify_capture
+        root=Path(RECURSIVE_NOMINAL_CAPTURE_ROOT).resolve()
+        pins={
+            'data-owner':('248174cce063da15ecd8560c72df9a22b06ca3003e41a385cd2523da576c0413',
+                          '178a56e23219b9e51e9bceb9d26555c2eb13fa54a84a16c7995fe94395fe1dab'),
+            'sum-owner':('dd03eee615c2d78e49050d3123442f3c1ec166c2b008abb1741f9b075a1eb19c',
+                         '3eb612053a5a2c892ab0564d5ff505023958c6c04782383ed6034b509876ec01')}
+        for label,(capture_hash,source_hash) in pins.items():
+            with self.subTest(label=label):
+                path=root/('capture-'+label+'01')/'capture.stdout'
+                old_path=path.parent/'verification.json';old_bytes=old_path.read_bytes()
+                report=verify_capture(path,fixture_root=root/'inputs'/label,entry='main.emlf',
+                    expected_source_hashes={'main.emlf':source_hash,
+                        'SharedPoly.emlf':'50fd7fa662c9290a61b0a69012cd2e886a44075de9827dff4edd3f0c839573a7'},
+                    expected_capture_sha256=capture_hash)
+                self.assertTrue(report['fragment_admitted']);self.assertFalse(report['source_admitted'])
+                self.assertFalse(report['native_admitted'])
+                capture=json.loads(path.read_bytes());out=m.derive_shared_fragment(capture['projection']['projected_annotated'])
+                self.assertEqual(out['steps'],capture['normalization']['steps'])
+                self.assertEqual(out['raw_normalized'],capture['normalization']['raw_normalized'])
+                self.assertEqual(out['checked_type'],I);self.assertEqual(len(out['steps']),2)
+                definition,=out['polymorphism']['definitions'];join,=report['retained_prefix_binding_joins']
+                self.assertEqual(definition['binding'],join['binding'])
+                self.assertEqual(join['resolver_allocation']['entity'],
+                    {'namespace':'terms','owner':'SharedPoly','role':{'tag':'value'},'spelling':'sharedId'})
+                self.assertEqual([u['arguments'] for u in out['polymorphism']['uses']],[[I],[B]])
+                raw=out['raw_normalized'];shared_let=m._get(raw,definition['binding_source']['path'])
+                binding=shared_let['body'];rec=binding['body'];row,=out['recursion']['bindings'];caps=row['captures']
+                self.assertEqual(row['binding'],rec['bindings'][0]['name'])
+                owner,=caps['nominals'];self.assertEqual(owner['binding'],binding['name'])
+                self.assertEqual(caps['policy'],m.RECURSIVE_NOMINAL_CAPTURE_POLICY)
+                self.assertEqual(caps['callables'],[]);self.assertEqual(caps['scalars'],[])
+                self.assertEqual([m._get(raw,a['path']) for a in owner['occurrences']],
+                                 [{'tag':'var','name':binding['name']}])
+                data_owner=label=='data-owner';table=out['nominal_data' if data_owner else 'nominal_sum']
+                declaration=next(d for d in table['declarations'] if d['index']==owner['declaration'])
+                self.assertEqual(owner['type'],declaration['type'])
+                entities={e['allocated']:e['entity'] for e in capture['module_custody']['resolution']['entities']}
+                self.assertEqual(entities[declaration['name']],{'namespace':'types','owner':'Main',
+                    'role':{'tag':'datatype'},'spelling':'Payload' if data_owner else 'IntList'})
+                pending=binding['value'];self.assertEqual(pending['tag'],'application')
+                self.assertEqual(pending['function']['parameter_type'],owner['type'])
+                self.assertEqual(pending['function']['body'],{'tag':'var','name':pending['function']['parameter']})
+                payload=pending['argument'];self.assertEqual(payload['tag'],'application')
+                # Constructor applications, not eager field values, remain in the pending owner.
+                self.assertEqual(payload['function']['argument']['tag'],'application')
+                if data_owner:
+                    self.assertEqual(caps['views'],[]);self.assertEqual(row['free_term_bindings'],[binding['name']['id']])
+                    self.assertEqual(declaration['field_types'],[I,arr(I,I)])
+                    self.assertEqual(payload['argument']['tag'],'application')
+                    self.assertEqual(payload['argument']['argument']['tag'],'type_application')
+                    data_case,=out['nominal_data']['cases']
+                    self.assertEqual(data_case['declaration'],owner['declaration'])
+                    self.assertEqual(m._get(raw,data_case['scrutinee']['path']),{'tag':'var','name':binding['name']})
+                else:
+                    self.assertEqual([v['arguments'] for v in caps['views']],[[I]])
+                    self.assertEqual(row['free_term_bindings'],sorted([binding['name']['id'],definition['binding']['id']]))
+                    self.assertEqual(declaration['variants'][1]['field_types'],[I,owner['type']])
+                    tail=payload['argument'];self.assertEqual(tail['tag'],'application')
+                    self.assertEqual(tail['function']['tag'],'lambda');self.assertEqual(tail['function']['parameter_type'],I)
+                    seed_case=next(c for c in out['nominal_sum']['cases']
+                                   if m._get(raw,c['scrutinee']['path'])=={'tag':'var','name':binding['name']})
+                    self.assertIsNone(seed_case['arms'][1]['fields'][1]['binding'])
                 self.assertEqual(old_path.read_bytes(),old_bytes)
                 old=json.loads(old_bytes);self.assertFalse(old['fragment_admitted'])
                 self.assertEqual(old['fragment_error']['code'],'RECURSION')

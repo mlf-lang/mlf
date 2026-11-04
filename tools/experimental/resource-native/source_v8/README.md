@@ -54,8 +54,11 @@ shared views, preserving each capture's own Access/origin.
 [Stage16](../resource_ir_v8/README_STAGE16.md) also accepts ordinary lexical
 callables whose full arrow type contains only Int/Bool leaves and arrows. Pending
 owners stay lazy; their eventual concrete closure or shared callable target is
-not inferred from the type. Nominal-valued captures, bare Schemes and generic or
-mutual recursion remain outside this slice. Historical stage sections retain
+not inferred from the type. [Stage18](../resource_ir_v8/README_STAGE18.md) adds
+ordinary owners of exact already-admitted closed DATA/SUM declarations, retaining
+their full Reference and support without field projection or eager demand.
+Bare Schemes, nominal generic arguments, arrows with nominal leaves and generic
+or mutual recursion remain outside this slice. Historical stage sections retain
 their earlier scope below.
 
 ## Stage08: closed DATA and callable fields
@@ -326,22 +329,27 @@ python3 -B tools/experimental/resource-native/tests/test_planner_v8_recursive_ca
 
 python3 -B tools/experimental/resource-native/tests/test_planner_v8_callable_captures.py
 
+python3 -B tools/experimental/resource-native/tests/test_planner_v8_nominal_captures.py
+
 CC=gcc IR8_PLANNER_NATIVE=1 \
 IR8_PLANNER_NATIVE_OUTPUT=/tmp/ir8-planner-native-fresh \
 python3 -B tools/experimental/resource-native/tests/test_planner_v8.py
 ```
 
-The fragment suite now has 173 unittest cases, including five optional retained
+The fragment suite now has 190 unittest cases, including six optional retained
 capture tests. They use `IR8_SUM_CAPTURE_ROOT`,
 `IR8_RECURSIVE_SUM_CAPTURE_ROOT`, `IR8_MONOMORPHIC_RECURSION_CAPTURE_ROOT`,
-`IR8_RECURSIVE_CAPTURE_ROOT` and `IR8_RECURSIVE_CALLABLE_CAPTURE_ROOT`.
-These five are skipped in CI, which separately runs fresh source suites.
+`IR8_RECURSIVE_CAPTURE_ROOT`, `IR8_RECURSIVE_CALLABLE_CAPTURE_ROOT` and
+`IR8_RECURSIVE_NOMINAL_CAPTURE_ROOT`. These six are skipped in CI, which separately runs fresh source suites.
 The monomorphic-recursion planner suite has eight checks, including one optional
 check using `IR8_MONOMORPHIC_RECURSION_CAPTURE_ROOT`. The recursive-captures
 planner suite has 11 checks, with two optional checks using that variable and
 `IR8_RECURSIVE_CAPTURES_ROOT`. The callable-captures planner suite also has 11
 checks, with two optional checks using `IR8_RECURSIVE_CAPTURES_ROOT` for prior
 Stage14 preservation and `IR8_CALLABLE_CAPTURES_ROOT` for the two Stage16 sources.
+The nominal-captures planner suite has 14 checks, with two optional checks using
+`IR8_CALLABLE_CAPTURES_ROOT` for Stage16 preservation and
+`IR8_NOMINAL_CAPTURES_ROOT` for the two Stage18 sources.
 Note the distinct transport and planner environment-variable names. These
 optional host checks do not build a new compiler or source target.
 The original planner suite has 20 unittest
@@ -450,12 +458,14 @@ Still unqualified:
 - A complete public source-admission/export/3 interface and the full
   polymorphism/representation/runtime-inventory correspondence join.
 - Parameterized types, cross-family/mutual recursion, recursive DATA,
-  callable-valued SUM storage, recursive source functions/generic programs, arbitrary
+  callable-valued SUM storage, arbitrary recursive source functions and generic
+  recursion, arbitrary
   imported libraries, higher-rank use and broader MLF.
 - Complete independent observation of every Access/Env/Transport transition and
   positive/negative coverage of all 27 runtime guard families.
 - Whole-program source/model/runtime equivalence, complete GC replacement,
-  maximal resource bounds or a measured performance improvement.
+  maximal resource bounds or general performance superiority. Finite runtime
+  A/B observations are separate from source-language qualification.
 
 See [Stage05](../resource_ir_v8/README_STAGE05.md) for the raw-IR runtime scope and
 [Stage04](../resource_ir_v8/README_STAGE04.md) for the unchanged packet/static

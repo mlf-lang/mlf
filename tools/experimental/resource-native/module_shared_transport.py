@@ -18,7 +18,9 @@ or parameterized/higher-rank data. At most one retained recursive group globally
 is admitted, containing one concrete closed monomorphic function. Its optional
 capture policies permit closed Int/Bool owners, exact full-vector lexical
 shared views, and ordinary owners of recursively closed scalar-arrow types.
-Nominal owners, open/higher-rank callables and bare Schemes remain excluded. Its
+Already admitted closed DATA/SUM nominal owners have a separate capture policy;
+arrows containing nominal leaves, open/higher-rank callables and bare Schemes
+remain excluded. Its
 introduction spine has at most eight exact typed passthrough
 wrappers. This is not a termination proof or generic/value-recursion permission.
 The complete RHS, including ordinary annotation applications, remains unchanged.
@@ -59,6 +61,7 @@ SUM_SELF_POLICY = 'closed-self-atom/1'
 RECURSION_POLICY = 'closed-single-function-recursion/1'
 RECURSIVE_CAPTURE_POLICY = 'closed-scalar-shared-view-captures/1'
 RECURSIVE_CALLABLE_CAPTURE_POLICY = 'closed-scalar-callable-shared-view-captures/1'
+RECURSIVE_NOMINAL_CAPTURE_POLICY = 'closed-scalar-callable-nominal-shared-view-captures/1'
 NOMINAL_POLICY = 'closed-single-constructor-data/1'
 INT = {'tag': 'constructor', 'name': 'Int', 'arguments': []}
 BOOL = {'tag': 'constructor', 'name': 'Bool', 'arguments': []}
@@ -1047,7 +1050,28 @@ def _closed_scalar_callable(typ, budget):
     return True
 
 
-def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, budget):
+def _published_nominal_capture(typ, path, registry, published, budget):
+    """Use an admitted canonical declaration, never select a new family here.
+
+    _nominal_inventory publishes the freshly checked registry rows themselves.
+    Their local identity proves the entire declaration is already represented;
+    neither caller-supplied evidence nor equal-looking field shapes are used.
+    """
+    index = registry.by_name.get(typ['name'])
+    if index not in registry.selected:
+        _fail('RECURSION', 'nominal capture lacks an already admitted declaration', path)
+    owner = registry.type_row(typ, path)
+    for table in published:
+        if table is None:
+            continue
+        for row in table['declarations']:
+            budget.tick()
+            if row is owner:
+                return owner['index']
+    _fail('RECURSION', 'nominal capture declaration is absent from published DATA/SUM evidence', path)
+
+
+def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, published, budget):
     """Partition all external raw variables using checked lexical use evidence.
 
     A Scheme's raw free binder ID is not a physical capture. Each occurrence
@@ -1066,7 +1090,7 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, bud
             if path in uses:
                 _fail('RECURSION', 'shared view occurrence is not unique', path)
             uses[path] = use
-    scalars, callables, views, accounted = {}, {}, {}, set()
+    scalars, callables, nominals, views, accounted = {}, {}, {}, {}, set()
     for relative, node in _walk(rhs):
         budget.tick()
         if node['tag'] != 'var' or node['name']['id'] not in free:
@@ -1086,10 +1110,17 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, bud
             if not _same(row['type'], typ):
                 _fail('RECURSION', 'callable capture has inconsistent complete lexical types', path)
             row['occurrences'].append(_address('normalized', path))
+        elif typ['tag'] == 'constructor' and not typ['arguments']:
+            declaration = _published_nominal_capture(typ, path, inferred.nominals, published, budget)
+            row = nominals.setdefault(ident, {'binding': node['name'], 'type': typ,
+                                             'declaration': declaration, 'occurrences': []})
+            if row['declaration'] != declaration or not _same(row['type'], typ):
+                _fail('RECURSION', 'nominal capture has inconsistent exact declaration/type', path)
+            row['occurrences'].append(_address('normalized', path))
         else:
             use = uses.pop(path, None)
             if use is None:
-                _fail('RECURSION', 'external capture is not a closed scalar/callable or exact shared view', path)
+                _fail('RECURSION', 'external capture lacks an admitted ordinary type or exact shared view', path)
             definition = definitions[use['definition']]
             if definition['binding']['id'] != ident:
                 _fail('RECURSION', 'shared capture binder differs from its lexical definition', path)
@@ -1100,7 +1131,7 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, bud
                     or not _same(row['instantiated_type'], use['instantiated_type'])):
                 _fail('RECURSION', 'shared capture full-vector type differs', path)
             row['uses'].append(use['id'])
-        if len(scalars) + len(callables) + len(views) + bool(self_uses) > MAX_RECURSIVE_CAPTURES:
+        if len(scalars) + len(callables) + len(nominals) + len(views) + bool(self_uses) > MAX_RECURSIVE_CAPTURES:
             _fail('LIMIT', 'recursive carrier exceeds 64 captures including self', path)
     if accounted != free or uses:
         _fail('RECURSION', 'recursive free-term inventory is not completely classified', rhs_path)
@@ -1108,13 +1139,15 @@ def _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, bud
               'scalars': [scalars[key] for key in sorted(scalars)],
               'views': [views[key] for key in sorted(views)]}
     # No new key or policy for existing scalar/shared-only or capture-free code.
-    if callables:
-        result['policy'] = RECURSIVE_CALLABLE_CAPTURE_POLICY
+    if callables or nominals:
+        result['policy'] = RECURSIVE_NOMINAL_CAPTURE_POLICY if nominals else RECURSIVE_CALLABLE_CAPTURE_POLICY
         result['callables'] = [callables[key] for key in sorted(callables)]
+    if nominals:
+        result['nominals'] = [nominals[key] for key in sorted(nominals)]
     return result
 
 
-def _recursion_inventory(root, inferred, inventory, budget):
+def _recursion_inventory(root, inferred, inventory, published, budget):
     """Return admission evidence only; NEVER a replacement term or RHS.
 
     A concrete function introduction may have the compiler's ordinary typed
@@ -1166,7 +1199,7 @@ def _recursion_inventory(root, inferred, inventory, budget):
            'function_source': _address('normalized', cursor_path), 'wrappers': wrappers,
            'self_uses': self_uses, 'free_term_bindings': free}
     if free:
-        row['captures'] = _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, budget)
+        row['captures'] = _recursive_captures(rhs, rhs_path, free, self_uses, inferred, inventory, published, budget)
     result = {'policy': RECURSION_POLICY, 'bindings': [row]}
     budget.record(result)
     return result
@@ -1212,7 +1245,8 @@ def derive_shared_fragment(projected_annotated):
             correspondence.append(row)
         inventory = _inventory(root, normal, raw, normalized, origins, removed, touched, budget)
         nominal_inventory, sum_inventory = _nominal_inventory(normal, normalized, nominals, budget)
-        recursion_inventory = _recursion_inventory(normal, normalized, inventory, budget)
+        recursion_inventory = _recursion_inventory(normal, normalized, inventory,
+                                                   (nominal_inventory, sum_inventory), budget)
         result = {'format': FORMAT, 'status': 'independent-fragment-replay-only', 'policy': POLICY,
                   'input_checked_type': raw.type, 'checked_type': normalized.type,
                   'input_annotated': root, 'input_erased': before_erased,

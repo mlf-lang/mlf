@@ -584,12 +584,13 @@ class Planner:
         captures = evidence.get('captures')
         require(captures is not None, 'recursive capture evidence missing')
         callables = captures.get('callables', [])
+        nominals = captures.get('nominals', [])
         if captures['policy'] == 'closed-scalar-shared-view-captures/1':
-            require('callables' not in captures and
+            require('callables' not in captures and 'nominals' not in captures and
                     [row['binding']['id'] for row in captures['scalars']] == sorted(mono),
                     'recursive scalar capture inventory differs')
-        else:
-            require(captures['policy'] == 'closed-scalar-callable-shared-view-captures/1' and callables,
+        elif captures['policy'] == 'closed-scalar-callable-shared-view-captures/1':
+            require(callables and 'nominals' not in captures,
                     'recursive capture policy differs')
             self.tick(len(callables)+len(captures['scalars']))
             scalar_ids = [row['binding']['id'] for row in captures['scalars']]
@@ -597,6 +598,16 @@ class Planner:
             require(scalar_ids == sorted(set(scalar_ids)) and callable_ids == sorted(set(callable_ids)) and
                     not set(scalar_ids).intersection(callable_ids) and
                     set(scalar_ids)|set(callable_ids) == mono, 'recursive ordinary capture partition differs')
+        else:
+            require(captures['policy'] == 'closed-scalar-callable-nominal-shared-view-captures/1' and
+                    nominals and 'callables' in captures, 'recursive capture policy differs')
+            self.tick(len(captures['scalars'])+len(callables)+len(nominals))
+            categories = [[row['binding']['id'] for row in rows]
+                          for rows in (captures['scalars'],callables,nominals)]
+            ordinary = [ident for ids in categories for ident in ids]
+            require(all(ids == sorted(set(ids)) for ids in categories) and
+                    len(ordinary) == len(set(ordinary)) and set(ordinary) == mono,
+                    'recursive ordinary capture partition differs')
         for row in captures['scalars']:
             ident = row['binding']['id']; typ = self.logical(row['type'],None)
             source = env.get(ident)
@@ -619,6 +630,17 @@ class Planner:
                     'recursive callable capture must be an available exact ordinary owner')
             # In particular, do not acquire a Scheme view or inspect readiness
             # here. A pending owner may eventually resolve to a shared Instance.
+            inner[ident] = source
+        for row in nominals:
+            ident = row['binding']['id']; typ = self.logical(row['type'],None)
+            require(typ[0] == 'nominal' and type(row['declaration']) is int and
+                    row['declaration'] == typ[1], 'recursive nominal declaration identity differs')
+            source = env.get(ident)
+            require(isinstance(source,Reference) and source.logical == typ,
+                    'recursive nominal capture must be an available exact ordinary owner')
+            # The logical atom includes the replayed declaration index, name,
+            # and source path. Keep this owner's support and Access untouched;
+            # its fields are not captures to reconstruct or eagerly project.
             inner[ident] = source
         keys = []
         for row in captures['views']:

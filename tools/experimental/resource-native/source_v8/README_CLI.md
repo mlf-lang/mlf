@@ -60,8 +60,12 @@ nominal captures, bare Schemes, partial vectors or additional recursive groups.
 [Stage16](../resource_ir_v8/README_STAGE16.md) additionally permits ordinary
 lexical callable captures with complete closed arrows over Int/Bool. Such owners
 may remain pending and resolve to a concrete closure or a full shared callable
-view without a new CLI option. Nominal-valued captures and recursive generic
-definitions remain rejected.
+view without a new CLI option. [Stage18](../resource_ir_v8/README_STAGE18.md)
+also admits ordinary owners of exact already-supported closed DATA/SUM types.
+It preserves their pending annotations, complete Reference and capture support;
+it does not reconstruct fields or views. Nominal generic arguments, arrows with
+nominal leaves, recursive generic definitions and other existing family
+restrictions remain rejected. No CLI flag or default changes.
 See the [fragment contract](README.md) for its limits.
 
 For example, a closed callable field can use the same `SharedPoly.emlf` above:

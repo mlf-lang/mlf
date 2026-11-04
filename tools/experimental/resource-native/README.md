@@ -25,6 +25,9 @@ retain their own Access/origin through that concrete recursive closure.
 [Ordinary closed callable captures](resource_ir_v8/README_STAGE16.md) now retain
 their complete scalar-arrow contracts and pending owners too, whether the actual
 value becomes a concrete closure or a complete shared callable view.
+[Exact nominal owner captures](resource_ir_v8/README_STAGE18.md) add already
+admitted DATA/SUM owners without flattening their fields or changing runtime
+representation, capture support or default behavior.
 The [source-only CLI](source_v8/README_CLI.md)
 adds fresh bounded module snapshots and an explicit native fault policy; it
 does not import diagnostic JSON. Its diagnostic capture is not a general
