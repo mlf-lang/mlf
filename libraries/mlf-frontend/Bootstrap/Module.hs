@@ -322,8 +322,8 @@ module Bootstrap.Module where {
   data Entity = Entity String String Role;
   data Interface = Interface (Map ((,) ModuleSpace String) (Set Entity));
   data Names = Names (Map Entity String);
-  data Renamed = Renamed Dependency.Symbols ([] DataDecl) ([] (R.Class Dependency.Declaration))
-    ([] (R.Instance Dependency.Declaration)) ([] Dependency.Bound) (Maybe (R.Expr Dependency.Declaration));
+  data Renamed = Renamed Dependency.Symbols ([] DataDecl) ([] (R.Class Declaration))
+    ([] (R.Instance Declaration)) ([] Dependency.Bound) (Maybe (R.Expr Declaration));
   data Resolved = Resolved SourceModule Interface Renamed;
   data ResolvedCrate = ResolvedCrate Bindings ([] Resolved) (Map String IntSet) (Map String (Set String));
   resolvedCrateBindings (ResolvedCrate bindings _ _ _) = bindings;
@@ -1121,12 +1121,18 @@ module Bootstrap.Module where {
     };
   -- Names is the name-based allocator/ABI interface. Only Bindings is retained
   -- by resolution. A term entity owns a slot; its spelling lives in Symbols.
-  data BindingName = TermSlot (V.Index Dependency.Declaration) | OtherName String;
+  data BindingName = TermSlot (V.Index Declaration) | OtherName String;
   data Bindings = Bindings Dependency.Symbols (Map Entity BindingName);
-  resolveNames (Names allocated) = let {
+  -- Standalone source has no crate ABI. Use the defining module, spelling
+  -- and method owner regardless of allocation order or display spelling.
+  termIdentity entity = let { field n = showInt (stringLength n) ++ (":" ++ n);
+    member = case role entity of { Method klass -> "m" ++ field klass; _ -> "v" }
+  } in member ++ (field (owner entity) ++ field (spelling entity));
+  resolveNames = resolveNamesWithKey termIdentity;
+  resolveNamesWithKey stable (Names allocated) = let {
     isTerm entry = case role (fst entry) of { Value -> True; Method _ -> True; _ -> False };
     parts = partition isTerm (M.toList allocated); terms = fst parts;
-    symbols = Dependency.symbols (map (\((,) e n) -> (,) n (case role e of { Method _ -> True; _ -> False })) terms);
+    symbols = Dependency.symbolsWithKeys (map (\((,) e n) -> (,,) n (stable e) (case role e of { Method _ -> True; _ -> False })) terms);
     slots = M.fromDistinctAscList (zipWith (\entry i -> (,) (fst entry) (TermSlot i)) terms
       (V.indices (Dependency.symbolNodes symbols)));
     others = M.fromDistinctAscList (map (\((,) e n) -> (,) e (OtherName n)) (snd parts))
@@ -1203,7 +1209,7 @@ module Bootstrap.Module where {
     SAnn _ (SAnnotation _ ty) -> managedAnnotationType ty;
     _ -> False
   };
-  managedResolved :: R.Expr Dependency.Declaration -> Bool;
+  managedResolved :: R.Expr Declaration -> Bool;
   managedResolved expression = case expression of {
     R.Ann _ (SAnnotation _ ty) -> managedAnnotationType ty;
     _ -> False
@@ -1213,7 +1219,7 @@ module Bootstrap.Module where {
     SQualified predicates body -> any (\(SPredicate name _) -> eqString name "MLFHasCallStack") predicates || managedAnnotationType body;
     _ -> False
   };
-  resolveBound :: Bindings -> Interface -> Set String -> SExpr -> Either String (R.Expr Dependency.Declaration);
+  resolveBound :: Bindings -> Interface -> Set String -> SExpr -> Either String (R.Expr Declaration);
   resolveBound bindings env bound expression = let {
     walk = resolveBound bindings env; child = walk bound; pat = resolvePattern bindings env;
     under ps = Set.union compareString bound (Set.fromList compareString (concatMap Surface.patternVariables ps))
@@ -1473,12 +1479,16 @@ module Bootstrap.Module where {
                   Map String Interface ->
                   (Entity -> String) -> [] SourceModule -> Either String ResolvedCrate;
   resolveCrate mode external mangle supplied =
-    resolveCrateWithAllocator mode external
-      (\_ entities ->
-         Names
-           (M.fromList compareEntity
-              (map (\entity -> (,) entity (mangle entity)) (Set.toList entities))))
-      supplied;
+    resolveWithTermKey mode external mangle termIdentity supplied;
+  -- The artifact producer supplies the defining crate/module/role encoding.
+  -- Source-only clients can choose colliding display names independently.
+  resolveCrateDefinitions mode external definition supplied =
+    resolveWithTermKey mode external definition definition supplied;
+  resolveWithTermKey mode external mangle stable supplied = do {
+    plan <- prepareCrateResolution mode external supplied;
+    resolvePlanWithKey (\_ entities -> Names (M.fromList compareEntity
+      (map (\entity -> (,) entity (mangle entity)) (Set.toList entities)))) stable plan
+  };
   data CrateResolution = CrateResolution PreludeMode ([] SourceModule)
     (Map String Interface) (Map String Interface) (Set Entity);
   resolveCrateWithAllocator :: PreludeMode ->
@@ -1602,8 +1612,12 @@ module Bootstrap.Module where {
            };
            Right (CrateResolution mode modules localMap exports allEntities)
          };
-  resolveCratePlan allocate (CrateResolution mode modules localMap exports allEntities) = do {
-           let { bindings = resolveNames (allocate modules allEntities) };
+  resolveCratePlan allocate = resolvePlanWithKey allocate termIdentity;
+  resolvePlanWithKey allocate stable (CrateResolution mode modules localMap exports allEntities) = do {
+           let { bindings = resolveNamesWithKey stable (allocate modules allEntities);
+                 symbols = bindingSymbols bindings };
+           ensure (M.size (Dependency.symbolKeyIndex symbols) == V.count (Dependency.symbolNodes symbols))
+             "duplicate stable declaration identity";
            resolved <- mapM (resolveOneWith mode bindings localMap exports) modules;
            let { instances = concatMap (\entry -> map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst)
                     (resolvedInstances (resolvedContents entry))) resolved;

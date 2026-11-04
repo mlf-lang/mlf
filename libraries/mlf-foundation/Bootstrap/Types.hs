@@ -9,6 +9,8 @@ module Bootstrap.Types where {
 
 
 
+  -- Resolver, Core and native layout use this domain for top-level value slots.
+  data Declaration = Declaration;
   data Maybe a = Nothing | Just a;
   data Either e a = Left e | Right a;
   data Map k v = MapEmpty | MapNode Int k v (Map k v) (Map k v);

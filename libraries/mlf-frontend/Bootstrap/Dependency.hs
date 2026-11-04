@@ -213,7 +213,6 @@ module Bootstrap.Dependency where {
   -- zero is unseen, and -1 is closed. Boundaries are candidate SCC roots.
   -- An edge to an open vertex merges all boundaries discovered after it.
   -- Closing a surviving root emits exactly one component, in finish order.
-  data Declaration = Declaration;
   data ModuleVertex = ModuleVertex;
   componentsById :: forall d. Rows d -> [] (V.Index d) -> [] ([] (V.Index d));
   componentsById (Rows rows) roots = runST (stBind (V.filled (V.count rows) 0) (\marks ->
@@ -293,23 +292,40 @@ module Bootstrap.Dependency where {
   -- Semantic declaration IDs belong to one resolution. Source occurrences
   -- already carry them. Later class-support bindings extend the same domain.
   data DeclOrder = DeclOrder;
-  data Symbols = Symbols (V.IndexVec Declaration String) ([] (V.Index Declaration)) IntSet;
-  symbolNodes (Symbols nodes _ _) = nodes;
+  -- Each slot owns its canonical spelling and stable definition key. A
+  -- resolved entity can share its *printed* name with an inactive import.
+  -- Only the stable keys cross a resolution or link-session boundary.
+  data Symbols = Symbols (V.IndexVec Declaration String) ([] (V.Index Declaration)) IntSet
+                         (V.IndexVec Declaration String);
+  symbolNodes (Symbols nodes _ _ _) = nodes;
   symbolName symbols = V.at (symbolNodes symbols);
+  symbolKey (Symbols _ _ _ keys) = V.at keys;
+  symbolKeyIndex table = M.fromList compareString
+    (map (\i -> (,) (symbolKey table i) i) (V.indices (symbolNodes table)));
+  checkedDeclId :: Symbols -> Int -> Either String (V.Index Declaration);
+  checkedDeclId table number =
+    if number >= 0 && number < V.count (symbolNodes table) then Right (V.fromInt number)
+    else Left "declaration slot out of bounds";
   compareSlots nodes i j = compareString (V.at nodes i) (V.at nodes j);
-  symbols entries =
-    let { nodes = V.fromList (map fst entries); indices = V.indices nodes;
-          methods = mapMaybe (\((,) entry i) -> if snd entry then Just (V.toInt i) else Nothing) (zip entries indices)
-    } in Symbols nodes (sortBy (compareSlots nodes) indices) (IS.fromList methods);
-  -- The spelling is held in the declaration slot. The lexical index contains
-  -- only IDs. A generated binding may share a name with an inactive import.
-  extendSymbols original@(Symbols nodes order methods) names = case names of {
-    [] -> original;
+  symbolsWithKeys entries =
+    let { nodes = V.fromList (map (\((,,) name _ _) -> name) entries); indices = V.indices nodes;
+          methods = mapMaybe (\((,) ((,,) _ _ method) i) -> if method then Just (V.toInt i) else Nothing)
+                      (zip entries indices);
+          keys = V.fromList (map (\((,,) _ key _) -> key) entries)
+    } in Symbols nodes (sortBy (compareSlots nodes) indices) (IS.fromList methods) keys;
+  -- Named adapters and standalone link sessions already have stable names.
+  symbols entries = symbolsWithKeys (map (\((,) n m) -> (,,) n n m) entries);
+  -- Generated names are qualified by their owner at the lowering boundary.
+  -- The returned slots belong to the new snapshot, in the caller's order.
+  appendSymbols original@(Symbols nodes order methods keys) names = case names of {
+    [] -> (,) original [];
     _ -> let { allNodes = V.fromList (append (V.toList nodes) names);
+               allKeys = V.fromList (append (V.toList keys) names);
                extra = map V.fromInt (range (V.count nodes) (V.count allNodes - 1));
                cmp = compareSlots allNodes
-         } in Symbols allNodes (mergeBy cmp order (sortBy cmp extra)) methods
+         } in (,) (Symbols allNodes (mergeBy cmp order (sortBy cmp extra)) methods allKeys) extra
   };
+  extendSymbols table names = fst (appendSymbols table names);
   data Bound = Bound (V.Index Declaration) (Maybe SAnnotation) (R.Expr Declaration);
   boundId (Bound i _ _) = i;
   boundValue symbols (Bound i annotation rhs) = let { name = symbolName symbols } in
@@ -320,8 +336,10 @@ module Bootstrap.Dependency where {
     (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\slots ->
       stBind (ST.map_ (\b -> V.set slots (boundId b) (Just b)) bindings) (\_ -> V.freeze slots)));
   appendBound (BoundValues old rows) name rhs =
-    let { i = V.fromInt (V.count (symbolNodes old)) } in
-    BoundValues (extendSymbols old [name]) (append rows [Bound i Nothing rhs]);
+    case appendSymbols old [name] of {
+      (,) table [i] -> BoundValues table (append rows [Bound i Nothing rhs]);
+      _ -> panic "missing appended declaration slot"
+    };
   -- Only later-generated syntax arrives by spelling. Source edges use the
   -- Global leaf of the resolved expression directly.
   namedRank :: V.IndexVec Declaration String -> V.IndexVec DeclOrder (V.Index Declaration) ->
@@ -341,14 +359,17 @@ module Bootstrap.Dependency where {
   resolvedGroups :: BoundValues -> [] ((,) String ([] String)) -> Map String ((,) String ([] String)) ->
     Map String ([] String) -> Either String ((,) Symbols ([] ([] ((,) (V.Index Declaration) Bool))));
   resolvedGroups (BoundValues base bound) generated methods scopes = do {
-    let { symbols = extendSymbols base (map fst generated); nodes = symbolNodes symbols;
-          generatedIds = map V.fromInt (range (V.count (symbolNodes base)) (V.count nodes - 1));
+    let { extended = appendSymbols base (map fst generated); symbols = fst extended;
+          nodes = symbolNodes symbols; generatedIds = snd extended;
           present = append (map boundId bound) generatedIds;
           active = IS.fromList (map V.toInt present);
           presentId i = IS.member (V.toInt i) active;
           duplicate = if null generated then "duplicate value declaration" else "duplicate source/support binding";
-          orderedIds = case symbols of { Symbols _ indices _ -> filter presentId indices }
+          orderedIds = case symbols of { Symbols _ indices _ _ -> filter presentId indices }
     };
+    let { valid i = V.toInt i >= 0 && V.toInt i < V.count (symbolNodes base);
+          referencesInRange (Bound i _ rhs) = valid i && all valid (R.references rhs) };
+    ensure (all referencesInRange bound) "declaration slot out of bounds";
     ensure (IS.size active == length present && uniqueSlots nodes orderedIds) duplicate;
     let { order = V.fromList orderedIds;
           ranks edits = runST (stBind (V.filled (V.count nodes) Nothing) (\slots ->
@@ -360,7 +381,7 @@ module Bootstrap.Dependency where {
             Nothing -> Nothing; Just ((,) target _) -> Just ((,) i (byName target))
           };
           sourceRanks = if M.null methods then direct else case symbols of {
-            Symbols _ _ methodIds -> ranks (mapMaybe redirect (IS.toAscList methodIds))
+            Symbols _ _ methodIds _ -> ranks (mapMaybe redirect (IS.toAscList methodIds))
           };
           edgeRow targets = V.fromList (map (\r -> V.at order (V.fromInt r))
             (IS.toAscList (IS.fromList (map V.toInt targets))));

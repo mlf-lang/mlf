@@ -304,7 +304,7 @@ module Bootstrap.Crate where {
               (M.findWithDefault compareString (specIdentity spec) (Modules.owner entity) owners)
               entity
       };
-      resolution <- Modules.resolveCrate (specMode spec) external mangle sources;
+      resolution <- Modules.resolveCrateDefinitions (specMode spec) external mangle sources;
       let {
         resolved = Modules.resolvedCrateModules resolution
       };

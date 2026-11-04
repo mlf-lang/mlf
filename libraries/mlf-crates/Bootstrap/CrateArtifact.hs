@@ -704,7 +704,7 @@ module Bootstrap.CrateArtifact where {
         identity = builtinCrateIdentity
       };
       resolution <-
-        Modules.resolveCrate NoImplicitPrelude M.empty (definitionName identity)
+        Modules.resolveCrateDefinitions NoImplicitPrelude M.empty (definitionName identity)
           ((:) Modules.preludeSource ((:) Modules.primitiveSource []));
       let {
         modules = Modules.resolvedCrateModules resolution
