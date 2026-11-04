@@ -176,7 +176,7 @@ module Bootstrap.QueryGraph where {
         p <- A.decodeGraphValue (A.ShapeMaybe A.ShapeText) graph location;
         payload <- A.expectMaybe A.expectText p;
         ensure (validHash digest &&
-          (case payload of { Nothing -> True; Just hash -> validHash hash })) "invalid query graph digest";
+          (case payload of { Nothing -> True; Just hash -> eqString digest hash })) "invalid query graph digest";
         Right (QueryNode wanted digest reads payload)
       };
       _ -> Left "malformed query graph node"

@@ -1292,9 +1292,11 @@ module Bootstrap.SourceInference where {
     }
   };
 
-  data OpenFinalGroup = OpenFinalGroup Open.Fragment (Map String SourceContract);
-  openFinalObject (OpenFinalGroup object _) = object;
-  openFinalContracts (OpenFinalGroup _ contracts) = contracts;
+  -- Only the checked adapter path can supply a replacement fragment.
+  data FinalBody = KeepRawBody | AdaptedBody Open.Fragment;
+  data OpenFinalGroup = OpenFinalGroup FinalBody (Map String SourceContract);
+  openFinalObject raw KeepRawBody = raw;
+  openFinalObject _ (AdaptedBody checked) = checked;
   openRootParts object = case (,) (Open.body object) (Open.bindings object) of {
     (,) (XLet binder rhs (XConstructor "()" [])) [(,) owned ty] -> do {
       ensure (X.equalName binder owned) "open root member identity mismatch";
@@ -1340,12 +1342,12 @@ module Bootstrap.SourceInference where {
             Nothing -> Left "final source group lacks calling-convention metadata";
             Just ((,,) name classes protected) -> Right ((,) name (SourceContract ty classes (protected || usedProtected)))
           }) (Open.bindings object);
-        Right (ReadyOpenFinish (OpenFinalGroup object (M.fromList compareString contracts)))
+        Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody (M.fromList compareString contracts)))
       };
       Just (RootAuthority name labels protected candidates protectedCandidates) -> do {
         parts <- openRootParts object;
         case parts of { (,,) binder ty rhs -> let {
-          unchanged = \flag -> Right (ReadyOpenFinish (OpenFinalGroup object
+          unchanged = \flag -> Right (ReadyOpenFinish (OpenFinalGroup KeepRawBody
             (M.fromList compareString [(,) name (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)])));
           isProtected = protected || usedProtected
         } in if isProtected || null labels then unchanged isProtected else do {
@@ -1380,7 +1382,7 @@ module Bootstrap.SourceInference where {
     ReadyOpenFinish group -> Right group;
     PendingOpenFinish object name binder ty labels protected protectedCandidates plan -> do {
       recipe <- Boundary.finishCheckedPlan plan answers;
-      let { unchanged = \flag -> Right (OpenFinalGroup object (M.fromList compareString
+      let { unchanged = \flag -> Right (OpenFinalGroup KeepRawBody (M.fromList compareString
         [(,) name (SourceContract ty (map (\((,,) _ cls _) -> cls) labels) flag)])) };
       case recipe of {
         Boundary.KeepRecipe -> unchanged protected;
@@ -1391,7 +1393,7 @@ module Bootstrap.SourceInference where {
               [(,) actual actualType] -> X.equalName actual binder && Type.alphaEq actualType result;
               _ -> False }) "checked evidence adapter type mismatch";
             canonical <- canonicalOpen final;
-            Right (OpenFinalGroup canonical (M.fromList compareString [(,) name (SourceContract result [] False)]))
+            Right (OpenFinalGroup (AdaptedBody canonical) (M.fromList compareString [(,) name (SourceContract result [] False)]))
           }
       }
     }

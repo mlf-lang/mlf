@@ -350,6 +350,17 @@ Binding tag 420，Scope tag 423，Evidence tag 426。图配置包含 crate 身�
 Binding 与 datatype 的权威值来自本次 checked metadata/收尾，并在内存共享；
 已保存的小结果不必为了验证图而重新读盘。raw 和稳定 evidence 只有实际使用时才读入。
 
+查询配置中的 `finish-receipt-1` 使用 tag 427 保存 `FinishScc` 的组名、最终片段的
+SHA-256，以及按名字排序的导出 binding 和 contract SHA-256。代际索引的 tag 410 行将完整
+SCC 身份、有序读取边及其版本、收尾记录的 SHA-256 一并绑定。下游仍按结果值判断版本，
+即便读取边改变，等价的结果也可以保持同一版本。
+
+片段的内容地址统一取组身份、片段和有序环境引用的 tag 425/400 编码。收尾保留原片段且
+环境引用相同时，`InferScc` 已验证的 SHA-256 就是这个地址。evidence 改写片段或环境
+改变时，对实际 checked 结果按同一方式求摘要。ICH 和语义审计也会重算保留原片段的地址。
+每次编译用当次结果重建小记录。交换记录或索引行、文件缺失或损坏都走原有事务修复。
+导出 contract 与 `Binding` 节点共用一次编码，正式对象仍接收最终片段本身。
+
 新 `.mlfco` 使用 schema 7、对象 tag 430、final 片段 tag 401；`.mlfci` 保持 schema 3。
 对象只保存 body 与引用，类型和声明从本地及外部配对接口恢复。对象内的兼容身份覆盖
 artifact ABI、checker 规则版本和实际 builtin 字典；它与 query 缓存的编译器可执行文件身份分开。

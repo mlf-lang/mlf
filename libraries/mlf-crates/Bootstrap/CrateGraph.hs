@@ -120,7 +120,7 @@ module Bootstrap.CrateGraph where {
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
         started <- G.begin (cacheDir ++ "/query-graph-v1")
-          (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1",flavor]);
+          (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1/finish-receipt-1",flavor]);
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           initial <- recordInitialBindings (M.toList contracts) session;
           case initial of { Left e -> ioReturn (Left e); Right first -> do {
@@ -228,22 +228,20 @@ module Bootstrap.CrateGraph where {
                                 case evidence of { Left e -> ioReturn (Left e); Right ((,,) answers evidenceReads afterEvidence) ->
                                 case Source.completeOpenFinish finish answers of {
                                 Left e -> ioReturn (Left e);
-                                Right finished -> do {
-                                let { final = Source.openFinalObject finished; delta = Source.openFinalContracts finished };
+                                Right (Source.OpenFinalGroup body delta) -> do {
+                                let { final = Source.openFinalObject fragment body };
                                 case requireNodes (map (compose bindingKey (compose X.nameHint fst))
                                   (Open.parameters final)) afterEvidence of {
                                 Left e -> ioReturn (Left e);
                                 Right finalBindings -> do {
-                                completed <- G.record (G.key "FinishScc" identity)
-                                  (append [G.edge rawNode,G.edge sourceNode,G.edge scopeNode]
-                                    (append evidenceReads (map G.edge finalBindings))) False
-                                  (W.VNode 424 [Open.encodeBody "final" group final,
-                                    A.toList (A.toPair A.toText A.toText)
-                                      (append (map G.edge finalBindings) (map G.edge dataNodes)),
-                                    A.toList (A.toPair A.toText contractValue) (M.toList delta)]) afterEvidence;
-                                case completed of { Left e -> ioReturn (Left e); Right ((,) finishNode fifth) -> do {
-                                  supplied <- recordBindings (G.edge finishNode) (M.toList delta) fifth;
-                                  case supplied of { Left e -> ioReturn (Left e); Right next -> do {
+                                let { bindingEdges = map G.edge finalBindings;
+                                  finalRefs = append bindingEdges (map G.edge dataNodes);
+                                  reads = append [G.edge rawNode,G.edge sourceNode,G.edge scopeNode]
+                                    (append evidenceReads bindingEdges) };
+                                content <- finishContentHash (verify || audit) group body final rawNode references finalRefs;
+                                supplied <- case content of { Left e -> ioReturn (Left e); Right hash ->
+                                  recordFinish group identity hash delta reads afterEvidence };
+                                case supplied of { Left e -> ioReturn (Left e); Right next -> do {
                                     G.elapsed statistics 3 finishStarted;
                                     runGroups verify audit crateId inventory rest
                                       (State next (M.union compareString delta contracts) currentContexts
@@ -253,7 +251,6 @@ module Bootstrap.CrateGraph where {
                                           (Separate.fingerprint (Q.list Q.encodeSourceContract (M.toList delta)))
                                           (G.nodeHash rawNode)) reports) statistics)
                                   } }
-                                } }
                                 }
                                 }
                                 }
@@ -272,12 +269,37 @@ module Bootstrap.CrateGraph where {
         }
     }
   };
-  recordBindings dependency values session = case values of {
-    [] -> ioReturn (Right session);
-    (:) ((,) name contract) rest -> do {
-      recorded <- G.record (bindingKey name) [dependency] True (contractValue contract) session;
-      case recorded of { Left e -> ioReturn (Left e); Right ((,) _ next) -> recordBindings dependency rest next }
-    }
+  -- One canonical content address for a fragment and its ordered environment,
+  -- regardless of how it was produced. KeepRawBody proves the body is exactly
+  -- the one obtained from InferScc. A changed environment invalidates reuse.
+  finishContentHash recheck group body final rawNode rawRefs finalRefs =
+    let { same = case body of {
+      Source.KeepRawBody -> eqList (eqPair eqString eqString) rawRefs finalRefs;
+      Source.AdaptedBody _ -> False
+    }; rawHash = G.nodeHash rawNode } in
+    if same && not recheck then ioReturn (Right rawHash) else do {
+      hashed <- G.hashValue (rawValue finalRefs group final);
+      ioReturn (do { digest <- hashed;
+        ensure (not same || eqString digest rawHash) "retained final fragment SHA mismatch";
+        Right digest })
+    };
+  -- The generation binds the FinishScc key and ordered reads to this small
+  -- value. Reconstruct it from current checked results, so neither a swapped
+  -- receipt nor a stale index row can supply a result hash. Exported contracts
+  -- share the very bytes subsequently published by their Binding nodes.
+  recordFinish group identity fragmentHash delta reads session = do {
+    encoded <- mapM (\((,) name contract) -> do {
+      result <- G.encodeHashed (contractValue contract);
+      ioReturn (mapEither (\((,) digest bytes) -> (,,) name digest bytes) result)
+    }) (M.toList delta);
+    case sequenceEither encoded of { Left e -> ioReturn (Left e); Right entries -> do {
+      let { contracts = map (\((,,) name digest _) -> (,) name digest) entries;
+        receipt = W.VNode 427 [W.VText group,W.VText fragmentHash,A.toList (A.toPair A.toText A.toText) contracts];
+        binding dependency current ((,,) name digest bytes) = snd (G.recordDigest (bindingKey name)
+          [dependency] (Just digest) digest (Just bytes) current) };
+      recorded <- G.record (G.key "FinishScc" identity) reads True receipt session;
+      ioReturn (mapEither (\((,) finish next) -> foldlStrict (binding (G.edge finish)) next entries) recorded)
+    } }
   };
   result (State session contracts _ objects inferred reused reports _) =
     (,,,) (reverse objects) (Q.QueryReport inferred reused (reverse reports)) contracts session;

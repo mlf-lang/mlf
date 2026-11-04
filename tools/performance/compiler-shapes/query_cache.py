@@ -131,7 +131,8 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
             'query graph index format/configuration')
     config = unpack(text(configuration))
     require(len(config) == 5 and config[0] == crate and config[1] == compiler_sha and
-            valid_hash(compiler_sha) and config[2] and config[3] == 'open-fragment-checker-1' and
+            valid_hash(compiler_sha) and config[2] and config[3] in
+            ('open-fragment-checker-1', 'open-fragment-checker-1/finish-receipt-1') and
             config[4] in ('source', 'lowered'), 'query graph crate/compiler configuration')
     nodes = {}
     for entry in node(entries, 1):
