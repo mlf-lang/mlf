@@ -38,6 +38,10 @@ jobs:
         run: |
           python3 -B tools/release/test-ghc-install-cleanup.py
           python3 -O -B tools/release/test-ghc-install-cleanup.py
+      - name: Test builtin generation evidence boundaries
+        run: |
+          python3 -B tools/shared/test_generate_builtin_evidence.py
+          python3 -O -B tools/shared/test_generate_builtin_evidence.py
       - name: Verify unit evidence with jq 1.8.2
         run: |
           set -euo pipefail
@@ -96,9 +100,15 @@ jobs:
       # Authentication binds absolute toolchain, host, object, and command-log
       # paths; copying/rebasing receipts would weaken that provenance contract.
       - name: Build exact committed shared sources and direct test runners
+        id: shared_build
         run: |
           python3 tools/shared/build.py --bootstrap-only --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
+      - name: Preserve actual builtin generation after freshness failure
+        if: failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))
+        timeout-minutes: 16
+        run: |
+          python3 -B tools/shared/resource_watchdog.py --seconds 900 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard python3 -B tools/shared/generate_builtin_evidence.py --root "$PWD" --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/builtin-generation-guard/results --timeout 600
       # The CLI writes query graphs; retained legacy .mlfq API controls remain below.
       - name: Check query graph fingerprints and publication recovery
         if: matrix.optimization == '2'
@@ -318,6 +328,9 @@ jobs:
             .mlf-build/shared-ghc/receipt.json
             .mlf-build/shared-ghc/*.log
             .mlf-build/shared-ghc/packages.txt
+            .mlf-build/shared-ghc/ghc-info.txt
+            .mlf-build/shared-ghc/builtin-verification/
+            .mlf-build/builtin-generation-guard/
             .mlf-build/artifact-binary-guard/bounded-receipt.json
             .mlf-build/artifact-binary-guard/build.log
             .mlf-build/artifact-binary-guard/results/**/*.json

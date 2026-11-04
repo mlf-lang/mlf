@@ -60,6 +60,28 @@ const validate = text => {
   assert.doesNotMatch(producer, /^        if:/m, 'Every shard builds its own authenticated producer');
   assert.match(producer, /python3 tools\/shared\/build.py --bootstrap-only --optimization '\$\{\{ matrix.optimization \}\}' --build-dir \.mlf-build\/shared-ghc\n/);
   assert.match(producer, /jq -e '\.complete == true and \.producer_host == "GHC" and \.typecheck_only == false' \.mlf-build\/shared-ghc\/receipt.json/);
+
+  assert.match(producer, /^        id: shared_build$/m);
+  const regeneration = commandStep('tools/shared/generate_builtin_evidence.py');
+  assert.equal(regeneration.match(/^        if: (.+)$/m)?.[1], "failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))",
+    'Only failed builds in one O0 and the O2 leg collect actual generation evidence');
+  assert.match(regeneration, /^        timeout-minutes: 16$/m);
+  const regenerationExpression = regeneration.match(/^        if: (.+)$/m)[1];
+  const regenerationSelected = Function('matrix', 'failure', 'steps', `return (${regenerationExpression});`);
+  for (const leg of legs) {
+    for (const failed of [false, true]) for (const outcome of ['success', 'failure', 'skipped']) {
+      assert.equal(regenerationSelected(leg, () => failed, {shared_build: {outcome}}),
+        failed && outcome === 'failure' && (leg.suite === 'default' || leg.suite === 'all'));
+    }
+  }
+  assert.match(regeneration, /resource_watchdog.py --seconds 900 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 \.mlf-build\/builtin-generation-guard python3 -B tools\/shared\/generate_builtin_evidence.py --root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/builtin-generation-guard\/results --timeout 600\n/);
+  assert.ok(steps.indexOf(producer) < steps.indexOf(regeneration), 'Generation follows the failed build');
+  assert.ok(steps.indexOf(regeneration) < steps.indexOf(commandStep('tools/performance/crate-query-graph/verify.py')),
+    'Generation does not replace or wrap later qualification gates');
+  for (const flags of ['-B', '-O -B']) {
+    assert.ok(job(text, 'metadata').includes('python3 ' + flags + ' tools/shared/test_generate_builtin_evidence.py\n'),
+      'Keep normal and optimized generation refusal controls');
+  }
   const toolchain = commandStep('https://downloads.haskell.org/~ghc/9.14.1/');
   assert.doesNotMatch(toolchain, /^        if:/m, 'Every producer has its own verified toolchain');
   assert.ok(toolchain.includes('python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json\n'),
@@ -178,6 +200,9 @@ const validate = text => {
   assert.ok(upload.includes('            .mlf-build/ghc-install-cleanup.json\n'),
     'Retain exact cleanup scope, validation and refusal receipts');
 
+  assert.ok(upload.includes('            .mlf-build/shared-ghc/ghc-info.txt\n'), 'Preserve the compiled toolchain metadata');
+  assert.ok(upload.includes('            .mlf-build/shared-ghc/builtin-verification/\n'), 'Preserve the original failed builtin evidence');
+  assert.ok(upload.includes('            .mlf-build/builtin-generation-guard/\n'), 'Preserve actual generator output and guards');
   const artifact = upload.match(/^          name: (.+)$/m)?.[1];
   assert.ok(artifact);
   const artifactNames = legs.map(leg => artifact.replaceAll('${{ matrix.optimization }}', leg.optimization).replaceAll('${{ matrix.suite }}', leg.suite));
@@ -192,6 +217,18 @@ const validate = text => {
 
 validate(workflow);
 const controls = [
+  ['generation compiler metadata omitted', '            .mlf-build/shared-ghc/ghc-info.txt\n', ''],
+  ["producer diagnostic id omitted","        id: shared_build\n",""],
+  ["generation failure condition relaxed","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))"],
+  ["generation O0 coverage changed","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'direct') || (matrix.optimization == '2' && matrix.suite == 'all'))"],
+  ["generation O2 omitted","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'framework'))"],
+  ["generation command omitted","tools/shared/generate_builtin_evidence.py","tools/shared/omitted_builtin_evidence.py"],
+  ["generation resource guard relaxed","--rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard","--rss-mib 6144 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard"],
+  ["generation time allowance widened","--timeout 600\n","--timeout 601\n"],
+  ["generation original evidence omitted","            .mlf-build/shared-ghc/builtin-verification/\n",""],
+  ["generation real output omitted","            .mlf-build/builtin-generation-guard/\n",""],
+  ["generation normal refusal controls omitted","          python3 -B tools/shared/test_generate_builtin_evidence.py\n",""],
+  ["generation optimized refusal controls omitted","          python3 -O -B tools/shared/test_generate_builtin_evidence.py\n",""],
   ['missing shard', "          - optimization: '0'\n            suite: default\n", ''],
   ['duplicate shard', '            suite: default\n', '            suite: framework\n'],
   ['missing O2', "          - optimization: '2'\n", "          - optimization: '0'\n"],
