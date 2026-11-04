@@ -1158,6 +1158,8 @@ module Bootstrap.SourceInference where {
   slotScope (GroupSlots scope _ _ _) = scope;
   memberIds (GroupSlots _ members _ _) = members;
   parameterIds (GroupSlots _ _ parameters _) = parameters;
+  expectedParameters slots prepared = zipWith (\i ((,) name ty) -> (,,) i name ty)
+    (parameterIds slots) (groupBindings prepared);
   candidateIds (GroupSlots _ _ _ candidates) = candidates;
   -- Lowered terms may introduce selector and dictionary uses. Admit these
   -- against the current declaration table; a recognized but unfinished read

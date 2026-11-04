@@ -3805,8 +3805,12 @@ module Bootstrap.CrateArtifact where {
           package <- loaded;
           let { actual = concatMap (\((,) _ fragment) -> map
             (\((,) n ty) -> (,) (X.nameHint n) ty) (Open.bindings fragment)) (Open.packageFragments package) };
+          mapM_ (\((,) owner fragment) -> let {
+            keys = sortStrings (map (compose X.nameHint fst) (Open.bindings fragment))
+          } in ensure (not (null keys) && eqString owner (Separate.queryGroupName (crateId iface) keys))
+            "open crate fragment owner mismatch") (Open.packageFragments package);
           uniqueNames "open crate binding" (map fst actual);
-          ensure (sameSchemes actual (crateBindings iface)) "open crate ownership/type inventory mismatch";
+          ensure (eqList Separate.sameSignature actual (crateBindings iface)) "open crate ownership/type inventory mismatch";
           Right (OpenCrateObject iface package)
         })
       }

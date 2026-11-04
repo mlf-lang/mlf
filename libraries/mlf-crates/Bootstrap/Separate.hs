@@ -66,6 +66,7 @@ module Bootstrap.Separate where {
   encodedFrom text i = concatStringList (encodedChunks text i);
   encodedChunks text i = if i >= stringLength text then []
     else (:) (showInt (stringCodeAt text i)) ((:) "_" (encodedChunks text (i + 1)));
+  queryGroupName crateId members = "Query_" ++ encoded crateId ++ "z_" ++ encoded (head members);
   encoded text = encodedFrom text 0;
   canonicalPreludeConstructor entity =
     (eqString (Modules.owner entity) "Prelude" &&

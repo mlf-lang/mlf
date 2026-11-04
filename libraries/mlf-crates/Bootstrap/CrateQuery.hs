@@ -754,8 +754,7 @@ module Bootstrap.CrateQuery where {
     QueryState (Map String XType) ([] Separate.UnitObject) Int Int ([] GroupResult);
   -- SCCs are disjoint and their members sorted. Their minimum stable identity
   -- is unique within a crate; the full member inventory remains in the key.
-  groupName crateId names =
-    ("Query_" ++ (Separate.encoded crateId ++ ("z_" ++ Separate.encoded (head names))));
+  groupName = Separate.queryGroupName;
   selectedBindings members available =
     let {
       used =

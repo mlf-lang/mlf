@@ -207,8 +207,8 @@ module Bootstrap.CrateGraph where {
                           Just node -> case G.nodePayload node of {
                             Nothing -> ioReturn (Left "query result is absent");
                             Just digest -> do {
-                              loaded <- Open.decodeTrusted (G.payloadPath active digest) digest references "raw" group env
-                                (Source.groupBindings prepared) names;
+                              loaded <- Open.decodeTrustedIds (G.payloadPath active digest) digest references "raw" group env
+                                (Source.expectedParameters slots prepared) (zip owners names);
                               case loaded of {
                                 Left e -> ioReturn (Left e);
                                 Right fragment -> do {
