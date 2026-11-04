@@ -9,6 +9,8 @@ module Bootstrap.Surface where {
   import Bootstrap.Fresh;
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Data as D;
@@ -144,6 +146,14 @@ module Bootstrap.Surface where {
       Left error -> Left error;
       Right groups -> wrapGroups values (Dependency.declarationEdges values) groups body
     };
+  bindResolved values@(Dependency.BoundValues symbols bindings) body = do {
+    (,) _ groups <- Dependency.resolvedGroups values [] M.empty M.empty;
+    let { table = runST (stBind (V.filled (V.count (Dependency.symbolNodes symbols)) (panic "unbound declaration ID")) (\slots ->
+            stBind (ST.map_ (\(Dependency.Bound i value _) -> V.set slots i value) bindings) (\_ -> V.freeze slots)));
+          wrap group continuation = wrapValueGroup (map (compose (V.at table) fst) group)
+            (length group > 1 || any snd group) continuation
+    } in foldM (\continuation group -> wrap group continuation) body (reverse groups)
+  };
   wrapGroups :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
                 [] ((,) String ([] String)) ->
                 [] ([] String) -> SExpr -> Either String SExpr;
@@ -170,20 +180,15 @@ module Bootstrap.Surface where {
                  any (\n -> elem eqString n (M.findWithDefault compareString [] n dependencies))
                    group)
             } in
-            if cyclic
-            then mapEither (\ds -> SLetRec ds continuation) (recursiveValues local)
-            else case local of {
-                   (:) ((,,) n a e) [] ->
-                     Right
-                       (SLet n
-                          (case a of {
-                             Nothing -> e;
-                             Just t -> SSignature e t
-                           })
-                          continuation);
-                   _ -> Left "invalid declaration group"
-                 }
+            wrapValueGroup local cyclic continuation
         }
+    };
+  wrapValueGroup local cyclic continuation =
+    if cyclic then mapEither (\ds -> SLetRec ds continuation) (recursiveValues local)
+    else case local of {
+      [(,,) n annotation rhs] -> Right (SLet n (case annotation of {
+        Nothing -> rhs; Just t -> SSignature rhs t }) continuation);
+      _ -> Left "invalid declaration group"
     };
   lowerSurface :: SProgram -> Either String SProgram;
   lowerSurface program = do {

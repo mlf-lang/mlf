@@ -389,16 +389,9 @@ module Bootstrap.PreparedLibraries
           own = filter (\entry -> not (M.member compareString
             (Modules.moduleIdentity (Modules.resolvedSource entry)) ownership)) resolved;
           values = concatMap (compose Modules.renamedValues Modules.resolvedContents) own;
-          entryModule = last resolved;
-          source = Modules.resolvedSource entryModule };
-    entry <- sourcePhase ModuleResolution (case Modules.renamedBody (Modules.resolvedContents entryModule) of {
-      Just expression -> Right expression;
-      Nothing -> if any (\value -> eqString (Modules.valueName value) "main") (Modules.sourceValues source)
-        then mapEither SVar (Modules.resolvedName (Modules.resolvedCrateNames resolution)
-          (Modules.Entity (Modules.moduleIdentity source) "main" Modules.Value))
-        else Modules.resolveExpr (Modules.resolvedCrateNames resolution) (Modules.resolvedScope entryModule) (SVar "main")
-    });
-    body <- sourcePhase ModuleResolution (Surface.bindValues values entry);
+          entryModule = last resolved };
+    entry <- sourcePhase ModuleResolution (mapEither fst (Modules.entryUses resolution entryModule));
+    body <- sourcePhase ModuleResolution (Surface.bindResolved (Modules.boundIn resolution own) entry);
     parts <- sourcePhase Inference (canonicalParts resolution);
     instances <- sourcePhase Inference (instanceRows raw resolution values);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
@@ -460,16 +453,9 @@ module Bootstrap.PreparedLibraries
           own = filter (\entry -> not (M.member compareString
             (Modules.moduleIdentity (Modules.resolvedSource entry)) ownership)) resolved;
           values = concatMap (compose Modules.renamedValues Modules.resolvedContents) own;
-          entryModule = last resolved;
-          source = Modules.resolvedSource entryModule };
-    entry <- sourcePhase ModuleResolution (case Modules.renamedBody (Modules.resolvedContents entryModule) of {
-      Just expression -> Right expression;
-      Nothing -> if any (\value -> eqString (Modules.valueName value) "main") (Modules.sourceValues source)
-        then mapEither SVar (Modules.resolvedName (Modules.resolvedCrateNames resolution)
-          (Modules.Entity (Modules.moduleIdentity source) "main" Modules.Value))
-        else Modules.resolveExpr (Modules.resolvedCrateNames resolution) (Modules.resolvedScope entryModule) (SVar "main")
-    });
-    body <- sourcePhase ModuleResolution (Surface.bindValues values entry);
+          entryModule = last resolved };
+    entry <- sourcePhase ModuleResolution (mapEither fst (Modules.entryUses resolution entryModule));
+    body <- sourcePhase ModuleResolution (Surface.bindResolved (Modules.boundIn resolution own) entry);
     parts <- sourcePhase Inference (canonicalParts resolution);
     instances <- sourcePhase Inference (instanceRows raw resolution values);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));

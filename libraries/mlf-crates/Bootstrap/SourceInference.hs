@@ -961,10 +961,18 @@ module Bootstrap.SourceInference where {
   prepareSourcePlan :: Map String SType -> [] DataDecl -> [] SClassDecl ->
     [] ((,) String SInstanceDecl) -> Map String IntSet -> [] IntSet ->
     [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String (Maybe SourcePlan);
-  prepareSourcePlan externals datatypes classes instances valueScopes instanceScopes members = do {
+  prepareSourcePlan externals datatypes classes instances valueScopes instanceScopes members =
+    mapEither fst (sourcePlanWith Nothing externals datatypes classes instances valueScopes instanceScopes members);
+  prepareResolvedSourcePlan bindings externals datatypes classes instances valueScopes instanceScopes =
+    sourcePlanWith (Just bindings) externals datatypes classes instances valueScopes instanceScopes
+      (Dependency.boundValues bindings);
+  sourcePlanWith resolved externals datatypes classes instances valueScopes instanceScopes members = do {
     closedInstances <- traverseEither
       (\((,) name inst) -> mapEither ((,) name) (Separate.closeInstance members inst)) instances;
-    body <- Surface.bindValues members (SConstructor "()");
+    body <- case resolved of {
+      Nothing -> Surface.bindValues members (SConstructor "()");
+      Just bindings -> Surface.bindResolved bindings (SConstructor "()")
+    };
     prepared <- Classes.withScopedClassInventory externals (map fst closedInstances)
       valueScopes instanceScopes
       (SClassProgram datatypes classes (map snd closedInstances) body)
@@ -979,19 +987,15 @@ module Bootstrap.SourceInference where {
         "duplicate source/support binding";
       let { sourceNames = Set.fromList compareString (map sourceName members) };
       let { supportNames = Set.fromList compareString (map sourceName supports) };
-      let { edges = case inventory of {
-        Classes.ClassInventory _ _ _ scopes _ methods _ _ _ ->
-          append (Dependency.declarationEdges supports)
-            (map (\member ->
-              let { name = sourceName member } in
-              let { references = Dependency.valueNames (Dependency.observeDeclaration member) } in
-              (,) name (append
-                (map (\reference -> case M.lookup compareString reference methods of {
-                  Nothing -> reference; Just ((,) target _) -> target
-                }) references)
-                (map snd (M.findWithDefault compareString [] name scopes)))) members)
+      groups <- case inventory of { Classes.ClassInventory _ _ _ scopes _ methods _ _ _ -> case resolved of {
+        Just bindings -> mapEither Dependency.groupSpellings
+          (Dependency.resolvedGroups bindings (Dependency.declarationEdges supports) methods (M.map (map snd) scopes));
+        Nothing -> let { sourceEdges member =
+          let { name = sourceName member; refs = Dependency.valueNames (Dependency.observeDeclaration member);
+                target ref = case M.lookup compareString ref methods of { Nothing -> ref; Just ((,) n _) -> n }
+          } in (,) name (append (map target refs) (map snd (M.findWithDefault compareString [] name scopes)))
+        } in Right (Dependency.components (append (Dependency.declarationEdges supports) (map sourceEdges members)))
       } };
-      let { groups = Dependency.components edges };
       let { unsupported = any (\names ->
         (any (\name -> Set.member compareString name sourceNames) names &&
          any (\name -> Set.member compareString name supportNames) names) ||
@@ -999,10 +1003,9 @@ module Bootstrap.SourceInference where {
           Nothing -> False;
           Just member -> isCopied (sourceRhs member)
         }) names) groups };
-      if unsupported then Right Nothing else
-        Right (Just (SourcePlan inventory members supports groups count used externals
-          (Inference.lowerDeclarationsWithImports externals datatypes classes instances
-            valueScopes instanceScopes members) instances M.empty))
+      let { legacy = Inference.lowerBoundDeclarations externals datatypes classes closedInstances valueScopes instanceScopes body };
+      Right ((,) (if unsupported then Nothing else
+        Just (SourcePlan inventory members supports groups count used externals legacy instances M.empty)) legacy)
     } }
   };
   initializeProtection :: SourcePlan -> Map String Bool -> Either String SourcePlan;

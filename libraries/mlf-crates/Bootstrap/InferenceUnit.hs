@@ -107,6 +107,10 @@ module Bootstrap.InferenceUnit where {
         traverseEither (\((,) n inst) -> mapEither ((,) n) (Separate.closeInstance members inst))
           instances;
       body <- Surface.bindValues members (SConstructor "()");
+      lowerBoundDeclarations externals datatypes classes closedInstances valueScopes instanceScopes body
+    };
+  lowerBoundDeclarations externals datatypes classes closedInstances valueScopes instanceScopes body =
+    do {
       boundValueShared8 <-
         Classes.lowerSeparateClassesWithScopes externals (map fst closedInstances) valueScopes
           instanceScopes

@@ -322,29 +322,24 @@ module Bootstrap.Module where {
   data Interface = Interface (Map ((,) ModuleSpace String) (Set Entity));
   data Names = Names (Map Entity String);
   data Renamed =
-    Renamed ([] DataDecl) ([] SClassDecl) ([] SInstanceDecl) ([]
-                                                                    ((,,) String
-                                                                     (Maybe SAnnotation)
-                                                                     SExpr)) (Maybe SExpr);
+    Renamed ([] DataDecl) ([] SClassDecl) ([] SInstanceDecl) ([] Dependency.Bound)
+      (Maybe ((,) SExpr ([] (V.Index Dependency.Declaration))));
   data Resolved = Resolved SourceModule Interface Renamed;
   -- Namespace resolution retains declaration identities and defining scopes. It
   -- neither binds declaration groups nor invokes inference; consumers choose
   -- declaration SCCs and artifact boundaries after this stage.
-  data ResolvedCrate =
-    ResolvedCrate Names (Map String String) ([] Resolved) ([] ((,) String SInstanceDecl)) (Map
-                                                                                                String
-                                                                                                IntSet) ([]
-                                                                                                         IntSet) (Map
-                                                                                                                  String
-                                                                                                                  (Set
-                                                                                                                   String));
-  resolvedCrateNames (ResolvedCrate names _ _ _ _ _ _) = names;
-  resolvedCrateDisplayNames (ResolvedCrate _ names _ _ _ _ _) = names;
-  resolvedCrateModules (ResolvedCrate _ _ modules _ _ _ _) = modules;
-  resolvedCrateInstances (ResolvedCrate _ _ _ instances _ _ _) = instances;
-  resolvedCrateValueScopes (ResolvedCrate _ _ _ _ scopes _ _) = scopes;
-  resolvedCrateInstanceScopes (ResolvedCrate _ _ _ _ _ scopes _) = scopes;
-  resolvedCrateReach (ResolvedCrate _ _ _ _ _ _ reach) = reach;
+  data ResolvedCrate = ResolvedCrate Names TermIds (Map String String) ([] Resolved)
+    ([] ((,) String SInstanceDecl)) (Map String IntSet) ([] IntSet) (Map String (Set String));
+  resolvedCrateNames (ResolvedCrate names _ _ _ _ _ _ _) = names;
+  resolvedCrateTerms (ResolvedCrate _ terms _ _ _ _ _ _) = terms;
+  resolvedCrateDisplayNames (ResolvedCrate _ _ names _ _ _ _ _) = names;
+  resolvedCrateModules (ResolvedCrate _ _ _ modules _ _ _ _) = modules;
+  resolvedCrateInstances (ResolvedCrate _ _ _ _ instances _ _ _) = instances;
+  resolvedCrateValueScopes (ResolvedCrate _ _ _ _ _ scopes _ _) = scopes;
+  resolvedCrateInstanceScopes (ResolvedCrate _ _ _ _ _ _ scopes _) = scopes;
+  resolvedCrateReach (ResolvedCrate _ _ _ _ _ _ _ reach) = reach;
+  boundIn crate modules = Dependency.BoundValues (termSymbols (resolvedCrateTerms crate))
+    (concatMap (compose renamedBindings resolvedContents) modules);
   owner (Entity name _ _) = name;
   spelling (Entity _ name _) = name;
   role (Entity _ _ category) = category;
@@ -1117,89 +1112,103 @@ module Bootstrap.Module where {
       CheckRecursive annotation ->
         mapEither CheckRecursive (resolveAnnotation names env annotation)
     };
-  resolveVariable names entity =
-    case role entity of {
-      Primitive p -> Right (SPrimitive p);
-      Value -> if eqString (owner entity) "MLF.Primitive" && eqString (spelling entity) "callStack"
-               then Right (SVar "$MLF.Stack.callStack")
-               else mapEither SVar (resolvedName names entity);
-      Method _ -> mapEither SVar (resolvedName names entity);
-      _ -> Left ("not a function or value: " ++ label entity)
-    };
+  -- Carry the checked expression and its top-level uses out of the same
+  -- lexical scope walk. Local binders never issue a use. A difference list
+  -- appends child observations without copying the left subtree.
+  data Uses a = Uses (Either String ((,) a (([] (V.Index Dependency.Declaration)) ->
+                                            [] (V.Index Dependency.Declaration))));
+  liftUse :: forall a. Either String a -> Uses a;
+  liftUse result = Uses (mapEither (\a -> (,) a id) result);
+  bindUse :: forall a b. Uses a -> (a -> Uses b) -> Uses b;
+  bindUse (Uses first) next = Uses (do {
+    (,) a left <- first;
+    case next a of { Uses second -> mapEither (\((,) b right) -> (,) b (compose left right)) second }
+  });
+  instance Functor Uses where {
+    fmap f (Uses result) = Uses (mapEither (\((,) a refs) -> (,) (f a) refs) result)
+  };
+  instance Applicative Uses where {
+    pure a = Uses (Right ((,) a id));
+    (<*>) action arg = bindUse action (\f -> fmap f arg)
+  };
+  instance Monad Uses where { (>>=) = bindUse };
+  uses (Uses result) = mapEither (\((,) value refs) -> (,) value (refs [])) result;
+  data TermIds = TermIds Dependency.Symbols (Map Entity (V.Index Dependency.Declaration));
+  termIds (Names names) = let {
+    terms = filter (\entry -> case role (fst entry) of {
+      Value -> True; Method _ -> True; _ -> False }) (M.toList names);
+    symbols = Dependency.symbols (map (\((,) entity name) ->
+      (,) name (case role entity of { Method _ -> True; _ -> False })) terms)
+  } in TermIds symbols (M.fromDistinctAscList (zipWith (\entry i -> (,) (fst entry) i) terms
+    (V.indices (Dependency.symbolNodes symbols))));
+  termSymbols (TermIds symbols _) = symbols;
+  termId (TermIds _ ids) entity = case M.lookup compareEntity entity ids of {
+    Just i -> Right i; Nothing -> Left ("missing module identity: " ++ label entity)
+  };
+  termUse terms@(TermIds (Dependency.Symbols nodes _ _) _) entity =
+    Uses (mapEither (\i -> (,) (V.at nodes i) ((:) i)) (termId terms entity));
+  resolveVariable names entity = mapEither fst (uses (variableWith (compose liftUse (resolvedName names)) entity));
+  variableWith nameOf entity = case role entity of {
+    Primitive p -> pure (SPrimitive p);
+    Value -> if eqString (owner entity) "MLF.Primitive" && eqString (spelling entity) "callStack"
+             then pure (SVar "$MLF.Stack.callStack") else fmap SVar (nameOf entity);
+    Method _ -> fmap SVar (nameOf entity);
+    _ -> liftUse (Left ("not a function or value: " ++ label entity))
+  };
   resolveConstructor names entity =
     case role entity of {
       Constructor _ -> mapEither SConstructor (resolvedName names entity);
       Boolean b -> Right (SBoolLit b);
       _ -> Left ("not a data constructor: " ++ label entity)
     };
-  resolvePattern :: Names -> Interface -> SPattern -> Either String SPattern;
   resolvePattern names env pattern =
-    case pattern of {
-      SAsPattern name inner -> mapEither (SAsPattern name) (resolvePattern names env inner);
-      SLazyPattern inner -> mapEither SLazyPattern (resolvePattern names env inner);
-      SOverloadedStringPattern text _ _ -> do {
-        equality <- resolvedName names (Entity "MLF.Primitive" "==" (Method "Eq"));
-        conversion <- resolvedName names (Entity "MLF.Primitive" "fromString" (Method "IsString"));
-        Right (SOverloadedStringPattern text equality conversion)
-      };
-      SConstructorPattern name fields ->
-        if D.sourceBuiltinConstructor name then Right pattern
-        else resolveOrdinaryPattern names env pattern;
-      SNestedPattern name patterns ->
-        if D.sourceBuiltinConstructor name
-        then mapEither (SNestedPattern name) (mapM (resolvePattern names env) patterns)
-        else resolveOrdinaryPattern names env pattern;
-      _ -> resolveOrdinaryPattern names env pattern
+    mapEither fst (uses (patternWith (compose liftUse (resolvedName names)) names env pattern));
+  patternWith :: (Entity -> Uses String) -> Names -> Interface -> SPattern -> Uses SPattern;
+  patternWith nameOf names env pattern = case pattern of {
+    SAsPattern name inner -> fmap (SAsPattern name) (patternWith nameOf names env inner);
+    SLazyPattern inner -> fmap SLazyPattern (patternWith nameOf names env inner);
+    SOverloadedStringPattern text _ _ -> do {
+      equality <- nameOf (Entity "MLF.Primitive" "==" (Method "Eq"));
+      conversion <- nameOf (Entity "MLF.Primitive" "fromString" (Method "IsString"));
+      pure (SOverloadedStringPattern text equality conversion)
     };
-  resolveOrdinaryPattern :: Names -> Interface -> SPattern -> Either String SPattern;
-  resolveOrdinaryPattern names env pattern =
-    let {
-      matchValueShared1 = pattern
-    } in
-    case matchValueShared1 of {
-      SConstructorPattern constructor fields -> do {
-        entity <- lookupEntity Terms constructor env;
-        case role entity of {
+    SConstructorPattern constructor fields ->
+      if D.sourceBuiltinConstructor constructor then pure pattern else do {
+        entity <- liftUse (lookupEntity Terms constructor env);
+        liftUse (case role entity of {
           Constructor _ -> mapEither (\name -> SConstructorPattern name fields) (resolvedName names entity);
           Boolean b -> if null fields then Right (SBoolPattern b)
                        else Left ("not a constructor pattern: " ++ constructor);
           _ -> Left ("not a constructor pattern: " ++ constructor)
-        }
+        })
       };
-      SNestedPattern matchValueShared4 matchValueShared5 ->
-        let {
-          constructor = matchValueShared4
-        } in
-        let {
-          patterns = matchValueShared5
-        } in
-        do {
-          entity <- lookupEntity Terms constructor env;
-          case role entity of {
-            Constructor _ ->
-              do {
-                name <- resolvedName names entity;
-                patterns' <- mapM (resolvePattern names env) patterns;
-                Right (SNestedPattern name patterns')
-              };
-            _ -> Left ("not a constructor pattern: " ++ constructor)
-          }
-        };
-      SAnnotatedPattern matchValueShared6 matchValueShared7 ->
-        let {
-          variable = matchValueShared6
-        } in
-        let {
-          annotation = matchValueShared7
-        } in
-        do {
-          annotation' <- resolveAnnotation names env annotation;
-          Right (SAnnotatedPattern variable annotation')
-        };
-      _ -> Right pattern
+    SNestedPattern constructor patterns -> do {
+      name <- liftUse (if D.sourceBuiltinConstructor constructor then Right constructor else do {
+        entity <- lookupEntity Terms constructor env;
+        case role entity of {
+          Constructor _ -> resolvedName names entity;
+          _ -> Left ("not a constructor pattern: " ++ constructor)
+        }
+      });
+      fmap (SNestedPattern name) (mapM (patternWith nameOf names env) patterns)
     };
-  resolveExpr names env expression =
-    resolveBound names env Set.empty (Desugar.desugarDo expression);
+    SAnnotatedPattern variable annotation ->
+      liftUse (mapEither (SAnnotatedPattern variable) (resolveAnnotation names env annotation));
+    _ -> pure pattern
+  };
+  resolveExpr names env expression = resolveBound names env Set.empty (Desugar.desugarDo expression);
+  entryUses crate entry = let {
+    source = resolvedSource entry; names = resolvedCrateNames crate; terms = resolvedCrateTerms crate
+  } in case renamedBodyUses (resolvedContents entry) of {
+    Just body -> Right body;
+    Nothing -> if any (\value -> eqString (valueName value) "main") (sourceValues source)
+      then uses (fmap SVar (termUse terms (Entity (moduleIdentity source) "main" Value)))
+      else resolveUses terms names (resolvedScope entry) (SVar "main")
+  };
+  resolveBound names env bound expression = mapEither fst (uses
+    (boundWith (compose liftUse (resolvedName names)) names env bound expression));
+  resolveUses terms names env expression = uses
+    (boundWith (termUse terms) names env Set.empty (Desugar.desugarDo expression));
   managedAnnotation :: SExpr -> Bool;
   managedAnnotation expression = case expression of {
     SAnn _ (SAnnotation _ ty) -> managedAnnotationType ty;
@@ -1211,58 +1220,58 @@ module Bootstrap.Module where {
     SQualified predicates body -> any (\(SPredicate name _) -> eqString name "MLFHasCallStack") predicates || managedAnnotationType body;
     _ -> False
   };
-  resolveBound :: Names -> Interface -> Set String -> SExpr -> Either String SExpr;
-  resolveBound names env bound expression =
+  boundWith :: (Entity -> Uses String) -> Names -> Interface -> Set String -> SExpr -> Uses SExpr;
+  boundWith nameOf names env bound expression =
     let {
       matchValueShared8 = expression
     } in
     case matchValueShared8 of {
-      SSourceDefinition body -> mapEither SSourceDefinition (resolveBound names env bound body);
+      SSourceDefinition body -> fmap SSourceDefinition (boundWith nameOf names env bound body);
       SCallSite display location body -> do {
-        resolved <- resolveBound names env bound body;
-        Right (if eqString display "an expression type signature" && not (managedAnnotation resolved)
+        resolved <- boundWith nameOf names env bound body;
+        pure (if eqString display "an expression type signature" && not (managedAnnotation resolved)
           then resolved else SCallSite display location resolved)
       };
       SSharedBind pattern action continuation binding failure -> do {
-        pattern' <- resolvePattern names env pattern;
-        action' <- resolveBound names env bound action;
-        continuation' <- resolveBound names env
+        pattern' <- patternWith nameOf names env pattern;
+        action' <- boundWith nameOf names env bound action;
+        continuation' <- boundWith nameOf names env
           (Set.union compareString bound (Set.fromList compareString (Surface.patternVariables pattern))) continuation;
-        binding' <- resolveBound names env bound binding;
-        failure' <- resolveBound names env bound failure;
-        Right (SSharedBind pattern' action' continuation' binding' failure')
+        binding' <- boundWith nameOf names env bound binding;
+        failure' <- boundWith nameOf names env bound failure;
+        pure (SSharedBind pattern' action' continuation' binding' failure')
       };
       SVar matchValueShared9 ->
         let {
           name = matchValueShared9
         } in
         if eqString name "$MLF.Stack.callStack"
-        then Right (SVar "$MLF.Stack.callStack")
+        then pure (SVar "$MLF.Stack.callStack")
         else if Lexer.textStartsAt name 0 "$MLF.Primitive."
         then let { method = stringSlice name 15 (stringLength name - 15) } in
-             resolveVariable names (Entity "MLF.Primitive" method (Method (Prelude.standardMethodClass method)))
+             variableWith nameOf (Entity "MLF.Primitive" method (Method (Prelude.standardMethodClass method)))
         else if Lexer.textStartsAt name 0 "$MLF.Infix." then do {
           let { operator = stringSlice name 11 (stringLength name - 11) };
-          when (Set.member compareString operator bound) (Left "shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form");
-          entity <- lookupEntity Terms operator env;
-          unless (eqString (owner entity) "MLF.Primitive") (Left "shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form");
-          resolveVariable names entity
+          liftUse (when (Set.member compareString operator bound) (Left "shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form"));
+          entity <- liftUse (lookupEntity Terms operator env);
+          liftUse (unless (eqString (owner entity) "MLF.Primitive") (Left "shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form"));
+          variableWith nameOf entity
         }
         else if Set.member compareString name bound
-             then Right expression
+             then pure expression
              else do {
-                    entity <- lookupEntity Terms name env;
-                    resolveVariable names entity
+                    entity <- liftUse (lookupEntity Terms name env);
+                    variableWith nameOf entity
                   };
       SConstructor matchValueShared10 ->
         if D.sourceBuiltinConstructor matchValueShared10
-        then Right expression
+        then pure expression
         else let {
                name = matchValueShared10
              } in
              do {
-               entity <- lookupEntity Terms name env;
-               resolveConstructor names entity
+               entity <- liftUse (lookupEntity Terms name env);
+               liftUse (resolveConstructor names entity)
              };
       SLam matchValueShared11 matchValueShared12 matchValueShared13 ->
         let {
@@ -1275,9 +1284,9 @@ module Bootstrap.Module where {
           body = matchValueShared13
         } in
         do {
-          annotation' <- resolveOptionalAnnotation names env annotation;
-          body' <- resolveBound names env (Set.insert compareString variable bound) body;
-          Right (SLam variable annotation' body')
+          annotation' <- liftUse (resolveOptionalAnnotation names env annotation);
+          body' <- boundWith nameOf names env (Set.insert compareString variable bound) body;
+          pure (SLam variable annotation' body')
         };
       SApp matchValueShared14 matchValueShared15 ->
         let {
@@ -1287,9 +1296,9 @@ module Bootstrap.Module where {
           b = matchValueShared15
         } in
         do {
-          a' <- resolveBound names env bound a;
-          b' <- resolveBound names env bound b;
-          Right (SApp a' b')
+          a' <- boundWith nameOf names env bound a;
+          b' <- boundWith nameOf names env bound b;
+          pure (SApp a' b')
         };
       SLet matchValueShared16 matchValueShared17 matchValueShared18 ->
         let {
@@ -1302,15 +1311,15 @@ module Bootstrap.Module where {
           b = matchValueShared18
         } in
         do {
-          a' <- resolveBound names env bound a;
-          b' <- resolveBound names env (Set.insert compareString variable bound) b;
-          Right (SLet variable a' b')
+          a' <- boundWith nameOf names env bound a;
+          b' <- boundWith nameOf names env (Set.insert compareString variable bound) b;
+          pure (SLet variable a' b')
         };
       SSignature a annotation ->
         do {
-          a' <- resolveBound names env bound a;
-          annotation' <- resolveAnnotation names env annotation;
-          Right (SSignature a' annotation')
+          a' <- boundWith nameOf names env bound a;
+          annotation' <- liftUse (resolveAnnotation names env annotation);
+          pure (SSignature a' annotation')
         };
       SAnn matchValueShared19 matchValueShared20 ->
         let {
@@ -1320,9 +1329,9 @@ module Bootstrap.Module where {
           annotation = matchValueShared20
         } in
         do {
-          a' <- resolveBound names env bound a;
-          annotation' <- resolveAnnotation names env annotation;
-          Right (SAnn a' annotation')
+          a' <- boundWith nameOf names env bound a;
+          annotation' <- liftUse (resolveAnnotation names env annotation);
+          pure (SAnn a' annotation')
         };
       SLetRec matchValueShared21 matchValueShared22 ->
         let {
@@ -1349,14 +1358,14 @@ module Bootstrap.Module where {
                  case definition of {
                    (,,) variable mode value ->
                      do {
-                       mode' <- resolveRecursiveMode names env mode;
-                       value' <- resolveBound names env local value;
-                       Right ((,,) variable mode' value')
+                       mode' <- liftUse (resolveRecursiveMode names env mode);
+                       value' <- boundWith nameOf names env local value;
+                       pure ((,,) variable mode' value')
                      }
                  })
               definitions;
-          body' <- resolveBound names env local body;
-          Right (SLetRec definitions' body')
+          body' <- boundWith nameOf names env local body;
+          pure (SLetRec definitions' body')
         };
       SCase matchValueShared23 matchValueShared24 ->
         let {
@@ -1366,24 +1375,24 @@ module Bootstrap.Module where {
           alternatives = matchValueShared24
         } in
         do {
-          a' <- resolveBound names env bound a;
+          a' <- boundWith nameOf names env bound a;
           alternatives' <-
             mapM
               (\alternative ->
                  case alternative of {
                    SAlternative pattern body ->
                      do {
-                       pattern' <- resolvePattern names env pattern;
+                       pattern' <- patternWith nameOf names env pattern;
                        body' <-
-                         resolveBound names env
+                         boundWith nameOf names env
                            (Set.union compareString bound
                               (Set.fromList compareString (Surface.patternVariables pattern)))
                            body;
-                       Right (SAlternative pattern' body')
+                       pure (SAlternative pattern' body')
                      }
                  })
               alternatives;
-          Right (SCase a' alternatives')
+          pure (SCase a' alternatives')
         };
       SEquations matchValueShared25 ->
         let {
@@ -1396,26 +1405,26 @@ module Bootstrap.Module where {
                  case equation of {
                    (,) patterns body ->
                      do {
-                       patterns' <- mapM (resolvePattern names env) patterns;
+                       patterns' <- mapM (patternWith nameOf names env) patterns;
                        body' <-
-                         resolveBound names env
+                         boundWith nameOf names env
                            (Set.union compareString bound
                               (Set.fromList compareString
                                  (concatMap Surface.patternVariables patterns)))
                            body;
-                       Right ((,) patterns' body')
+                       pure ((,) patterns' body')
                      }
                  })
               equations;
-          Right (SEquations equations')
+          pure (SEquations equations')
         };
       SDo matchValueShared26 matchValueShared27 ->
-        resolveBound names env bound (Desugar.desugarDo expression);
+        boundWith nameOf names env bound (Desugar.desugarDo expression);
       SChecked matchValueShared28 matchValueShared29 ->
-        Left "checked source forms are reserved for dictionary translation";
+        liftUse (Left "checked source forms are reserved for dictionary translation");
       SWanted matchValueShared30 matchValueShared31 ->
-        Left "dictionary holes are reserved for dictionary translation";
-      _ -> Right expression
+        liftUse (Left "dictionary holes are reserved for dictionary translation");
+      _ -> pure expression
     };
   ownName names local namespace name =
     do {
@@ -1506,36 +1515,31 @@ module Bootstrap.Module where {
       head <- mapM (resolveType names env) (instanceHead inst);
       Right (SInstanceDecl (instanceVariables inst) context name head methods)
     };
-  renameModule names local env source =
-    do {
-      ds <- mapM (renameDatatype names local env) (sourceDatatypes source);
-      cs <- mapM (renameClass names local env) (sourceClasses source);
-      instances <- mapM (renameInstance (Lexer.isSharedSyntax (sourceSyntax source)) names env) (sourceInstances source);
-      values <-
-        mapM
-          (\value ->
-             case value of {
-               (,,) original annotation expression ->
-                 do {
-                   name <- ownName names local Terms original;
-                   annotation' <- resolveOptionalAnnotation names env annotation;
-                   expression' <- resolveExpr names env expression;
-                   Right ((,,) name annotation' expression')
-                 }
-             })
-          (sourceValues source);
-      body <-
-        case sourceBody source of {
-          Nothing -> Right Nothing;
-          Just expression -> mapEither Just (resolveExpr names env expression)
-        };
-      Right (Renamed ds cs instances values body)
+  renameModule names local env source = renameModuleWith (termIds names) names local env source;
+  renameModuleWith terms names local env source = do {
+    ds <- mapM (renameDatatype names local env) (sourceDatatypes source);
+    cs <- mapM (renameClass names local env) (sourceClasses source);
+    instances <- mapM (renameInstance (Lexer.isSharedSyntax (sourceSyntax source)) names env) (sourceInstances source);
+    values <- mapM (\((,,) original annotation expression) -> do {
+      entity <- lookupEntity Terms original local;
+      i <- termId terms entity;
+      let { nodes = Dependency.symbolNodes (termSymbols terms) };
+      annotation' <- resolveOptionalAnnotation names env annotation;
+      (,) rhs refs <- resolveUses terms names env expression;
+      Right (Dependency.Bound i ((,,) (V.at nodes i) annotation' rhs) refs)
+    }) (sourceValues source);
+    body <- case sourceBody source of {
+      Nothing -> Right Nothing; Just expression -> mapEither Just (resolveUses terms names env expression)
     };
+    Right (Renamed ds cs instances values body)
+  };
   renamedDatatypes (Renamed ds _ _ _ _) = ds;
   renamedClasses (Renamed _ cs _ _ _) = cs;
   renamedInstances (Renamed _ _ instances _ _) = instances;
-  renamedValues (Renamed _ _ _ values _) = values;
-  renamedBody (Renamed _ _ _ _ body) = body;
+  renamedBindings (Renamed _ _ _ bindings _) = bindings;
+  renamedValues content = map Dependency.boundValue (renamedBindings content);
+  renamedBodyUses (Renamed _ _ _ _ body) = body;
+  renamedBody content = mapOptional fst (renamedBodyUses content);
   resolvedSource (Resolved source _ _) = source;
   resolvedScope (Resolved _ env _) = env;
   resolvedContents (Resolved _ _ content) = content;
@@ -1555,7 +1559,7 @@ module Bootstrap.Module where {
     };
   -- Run the original strict selectors after the namespace fixed point. This
   -- preserves private-name, missing-member and conflicting-export diagnostics.
-  resolveOneWith mode names localMap exports source =
+  resolveOneWith mode terms names localMap exports source =
     do {
       local <-
         case M.lookup compareString (moduleIdentity source) localMap of {
@@ -1570,7 +1574,7 @@ module Bootstrap.Module where {
       validateSharedIdentities source env exported;
       renamed <-
         mapLeft (\message -> (sourcePath source ++ (": " ++ message)))
-          (renameModule names local env source);
+          (renameModuleWith terms names local env source);
       Right (Resolved source env renamed)
     };
   -- External-only modules are leaf vertices. Publish only owners from the
@@ -1768,7 +1772,8 @@ module Bootstrap.Module where {
                           else label (fst entry)))
                     (M.toList entries))
            };
-           resolved <- mapM (resolveOneWith mode names localMap exports) modules;
+           let { terms = termIds names };
+           resolved <- mapM (resolveOneWith mode terms names localMap exports) modules;
            let {
              instances =
                concatMap
@@ -1796,7 +1801,7 @@ module Bootstrap.Module where {
                     resolved)
            };
            Right
-             (ResolvedCrate names publicNames resolved instances scopes
+             (ResolvedCrate names terms publicNames resolved instances scopes
                 (map (\inst -> candidates (fst inst)) instances)
                 reach)
          };
@@ -1804,9 +1809,6 @@ module Bootstrap.Module where {
   linkModules mode supplied =
     do {
       crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
-      let {
-        names = resolvedCrateNames crate
-      };
       let {
         publicNames = resolvedCrateDisplayNames crate
       };
@@ -1831,18 +1833,8 @@ module Bootstrap.Module where {
       let {
         entryModule = last resolved
       };
-      let {
-        source = resolvedSource entryModule
-      };
-      entry <-
-        case renamedBody (resolvedContents entryModule) of {
-          Just expression -> Right expression;
-          Nothing ->
-            if any (\value -> eqString (valueName value) "main") (sourceValues source)
-            then mapEither SVar (resolvedName names (Entity (moduleIdentity source) "main" Value))
-            else resolveExpr names (resolvedScope entryModule) (SVar "main")
-        };
-      body <- bindValues publicNames values entry;
+      entry <- mapEither fst (entryUses crate entryModule);
+      body <- mapLeft (displayNames publicNames) (Surface.bindResolved (boundIn crate resolved) entry);
       let {
         valueMap = M.fromList compareString (map (\value -> (,) (valueName value) value) values)
       };

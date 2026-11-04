@@ -11,6 +11,8 @@ import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
 import qualified Bootstrap.Dependency as D
 import qualified Bootstrap.QueryGraph as Q
+import qualified Bootstrap.IndexVec as V
+import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Types as T
@@ -162,6 +164,85 @@ datatypeChecks = do
         (names (CQ.requiredDataIn inventory [] [("x",T.XCon "Z" []),("y",T.XCon "B" [])]))
       check "unrelated datatype roots" [] (names (CQ.requiredDataIn inventory [] [("x",T.XCon "External" [])]))
 
+-- Inspect the resolver's actual numeric edges before any graph is built.
+-- Two aliases reach one declaration, an identically spelled import reaches
+-- another, and locals do not contribute a crate edge.
+resolverChecks = do
+  let parsed (file,src) = right (Parser.parseModule (H.literal (file ++ ".emlf")) (H.literal src))
+      right (T.Right value) = pure value
+      right (T.Left msg) = error (H.unpack msg)
+      mangle e = H.literal (H.unpack (Modules.owner e) ++ "." ++ H.unpack (Modules.spelling e))
+  mods <- mapM parsed [("A","module A where\nvalue = 1\n"),("B","module B where\nvalue = 2\n"),
+    ("Via","module Via (module A) where\nimport A\n"),
+    ("Main",unlines ["module Main where","import qualified A as First","import qualified B as Second",
+       "import qualified Via as Again","value = 3","first = First.value","again = Again.value",
+       "second = Second.value","shadow value = value","lambda = \\value -> value",
+       "local = let value = First.value in value","self x = self x","left = right","right = left","main = first"])]
+  crate <- right (Modules.resolveCrate T.NoImplicitPrelude M.empty mangle mods)
+  let allModules = Modules.resolvedCrateModules crate
+      allBindings@(D.BoundValues symbols bindings) = Modules.boundIn crate allModules
+      names = D.symbolNodes symbols
+      ids = Map.fromList [(H.unpack (V.at names i),V.toInt i) | D.Bound i _ _ <- bindings]
+      uses = Map.fromList [(H.unpack (V.at names i),map V.toInt refs) | D.Bound i _ refs <- bindings]
+      target k = ids Map.! k
+  check "qualified alias" [target "A.value"] (uses Map.! "Main.first")
+  check "re-export keeps its defining ID" (uses Map.! "Main.first") (uses Map.! "Main.again")
+  check "same spelling, different defining module" [target "B.value"] (uses Map.! "Main.second")
+  check "source IDs differ" False (target "A.value" == target "B.value")
+  check "local shadow has no top-level edge" [] (uses Map.! "Main.shadow")
+  check "lambda shadow has no top-level edge" [] (uses Map.! "Main.lambda")
+  check "nonrecursive let resolves RHS outside binder" [target "A.value"] (uses Map.! "Main.local")
+  (_,entryRefs) <- right (Modules.entryUses crate (last allModules))
+  check "synthetic entry refers to the resolved main" [target "Main.main"] (map V.toInt entryRefs)
+  check "self-edge retains binder ID" [target "Main.self"] (uses Map.! "Main.self")
+  forM_ [allBindings, Modules.boundIn crate (filter ((=="Main") . H.unpack . Modules.moduleIdentity . Modules.resolvedSource) allModules)] $
+    \b@(D.BoundValues universe rows) -> do
+      expected <- right (D.declarationGroups (D.boundValues b))
+      -- A rebuilt graph that re-observes any source RHS fails this check.
+      let sealed = D.BoundValues universe [D.Bound i (error "rescanned source declaration") r | D.Bound i _ r <- rows]
+      groups <- right (D.resolvedGroups sealed [] M.empty M.empty)
+      check "resolved SCC ordering" (map (map H.unpack) expected) (map (map H.unpack) (D.groupSpellings groups))
+  clash <- parsed ("Local","module Local where\nimport qualified Remote as R\nf = R.x\n")
+  -- An embedding may choose the same printed spelling for an external and
+  -- a local. The remote occurrence must retain its own, inactive vertex.
+  let remote = M.singleton "Remote" (Modules.interface [Modules.Entity "Foreign" "x" Modules.Value])
+  let colliding e | H.unpack (Modules.owner e) `elem` ["Foreign","Local"] = "same"
+                  | otherwise = mangle e
+  collision <- right (Modules.resolveCrate T.NoImplicitPrelude remote colliding [clash])
+  let matching@(D.BoundValues _ entries) = Modules.boundIn collision
+        (filter ((=="Local") . H.unpack . Modules.moduleIdentity . Modules.resolvedSource) (Modules.resolvedCrateModules collision))
+  case entries of
+    [D.Bound owner _ [ref]] -> check "distinct entity despite equal printed name" False (V.toInt owner == V.toInt ref)
+    _ -> error ("missing colliding-name fixture edge " ++ show [(V.toInt i,map V.toInt rs) | D.Bound i _ rs <- entries])
+  (_,active) <- right (D.resolvedGroups matching [] M.empty M.empty)
+  check "external reference cannot induce self recursion" [[False]] (map (map snd) active)
+  both <- mapM parsed [("X","module X where\nf = 1\n"),("Y","module Y where\ng = 2\n")]
+  let duplicated e | H.unpack (Modules.owner e) `elem` ["X","Y"] = "same"
+                   | otherwise = mangle e
+  duplicate <- right (Modules.resolveCrate T.NoImplicitPrelude M.empty duplicated both)
+  case D.resolvedGroups (Modules.boundIn duplicate (Modules.resolvedCrateModules duplicate)) [] M.empty M.empty of
+    T.Left reason -> check "duplicate emitted declarations" "duplicate value declaration" (H.unpack reason)
+    T.Right _ -> error "two active definitions with equal spelling admitted"
+  let eq = Modules.Entity "MLF.Primitive" "==" (Modules.Method "Eq")
+      convert = Modules.Entity "MLF.Primitive" "fromString" (Modules.Method "IsString")
+      named = Modules.Names (M.fromList Modules.compareEntity [(eq,"eq"),(convert,"convert")])
+      terms = Modules.termIds named
+      pat = T.SOverloadedStringPattern (T.ScalarString "x") "ignored" "ignored"
+      expr = T.SCase (T.SIntLit 0) [T.SAlternative pat (T.SIntLit 1)]
+  (_,patterns) <- right (Modules.resolveUses terms named (Modules.interface []) expr)
+  patternIds <- mapM (right . Modules.termId terms) [eq,convert]
+  check "implicit pattern operations retain both method IDs" (map V.toInt patternIds) (map V.toInt patterns)
+  let scope = D.symbols [("Z",False),("B",False),("external",False),("method",True)]
+      ix n = case M.get H.v_compareString n (D.symbolIds scope) of { [i] -> i; _ -> error "bad fixture symbol" }
+      bound n ns = D.Bound (ix n) (error "late binding rescanned a source RHS") (map ix ns)
+      values = D.BoundValues scope [bound "Z" ["B","method","external"],bound "B" ["B"]]
+      generated = [("0selector",["Z"]),("Cdict",["B"])]
+      methods = M.singleton "method" ("0selector",[] :: [H.String])
+      scopes = M.singleton "B" ["Cdict"]
+      oracle = reference [("Z",["B","0selector"]),("B",["B","Cdict"]),("0selector",["Z"]),("Cdict",["B"])]
+  groups <- right (D.resolvedGroups values generated methods scopes)
+  check "late selector and dictionary retain lexical DFS order" oracle (map (map H.unpack) (D.groupSpellings groups))
+
 main = do
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
       wide = [("top",map fst chain)] ++ chain
@@ -179,4 +260,5 @@ main = do
   packageChecks
   queryChecks
   datatypeChecks
+  resolverChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

@@ -18,6 +18,7 @@ module Bootstrap.Crate where {
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.SourceInference as Source;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.BuiltinPreludeContext as Builtin;
   import qualified Bootstrap.BuiltinPreludeLiteral as Literal;
@@ -262,39 +263,17 @@ module Bootstrap.Crate where {
     Just plan -> Source.planNames plan;
     Nothing -> Inference.loweredNames (preparedLowered prepared)
   };
-  entryDeclaration spec resolution =
-    if eqString (specEntry spec) ""
-    then Right ((,) "" [])
-    else do {
-           entry <-
-             case find
-                    (\r ->
-                       eqString (Modules.moduleIdentity (Modules.resolvedSource r))
-                         (specEntry spec))
-                    (Modules.resolvedCrateModules resolution) of {
-               Nothing -> Left "crate entry module was not resolved";
-               Just r -> Right r
-             };
-           expression <-
-             case Modules.renamedBody (Modules.resolvedContents entry) of {
-               Just body -> Right body;
-               Nothing ->
-                 if any (\value -> eqString (Modules.valueName value) "main")
-                      (Modules.sourceValues (Modules.resolvedSource entry))
-                 then mapEither SVar
-                        (Modules.resolvedName (Modules.resolvedCrateNames resolution)
-                           (Modules.Entity (specEntry spec) "main" Modules.Value))
-                 else Modules.resolveExpr (Modules.resolvedCrateNames resolution)
-                        (Modules.resolvedScope entry)
-                        (SVar "main")
-             };
-           let {
-             symbol =
-               Artifact.definitionName (specIdentity spec)
-                 (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value)
-           };
-           Right ((,) symbol ((:) ((,,) symbol Nothing expression) []))
-         };
+  entryBindings spec resolution = let {
+    modules = Modules.resolvedCrateModules resolution; bindings = Modules.boundIn resolution modules
+  } in if eqString (specEntry spec) "" then Right ((,) "" bindings) else do {
+    entry <- case find (\r -> eqString (Modules.moduleIdentity (Modules.resolvedSource r)) (specEntry spec)) modules of {
+      Nothing -> Left "crate entry module was not resolved"; Just r -> Right r
+    };
+    (,) expression refs <- Modules.entryUses resolution entry;
+    let { symbol = Artifact.definitionName (specIdentity spec)
+            (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value) };
+    Right ((,) symbol (Dependency.appendBound bindings ((,,) symbol Nothing expression) refs))
+  };
   externalInstanceOwners interfaces =
     concatMap
       (\((,) _ iface) ->
@@ -340,16 +319,10 @@ module Bootstrap.Crate where {
         (append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData)
         (concatMap (\p -> Artifact.crateClasses (snd p)) interfaces)
         (concatMap (\r -> Modules.renamedClasses (Modules.resolvedContents r)) resolved);
-      let {
-        ownValues = concatMap (\r -> Modules.renamedValues (Modules.resolvedContents r)) resolved
-      };
-      boundValueShared19 <- entryDeclaration spec resolution;
-      case boundValueShared19 of {
-        (,) entry extra ->
+      entryAndBindings <- entryBindings spec resolution;
+      case entryAndBindings of {
+        (,) entry bindings ->
           do {
-            let {
-              values = append ownValues extra
-            };
             let {
               localInstances =
                 map
@@ -432,14 +405,11 @@ module Bootstrap.Crate where {
                 M.union compareString (M.map (Modules.displayNames sourceNames) dictionaries)
                   sourceNames
             };
-            sourcePlan <- mapLeft (Modules.displayNames diagnosticNames)
-              (Source.prepareSourcePlan imported allData allClasses (map snd instances)
-                valueScopes (map (\((,) owner _) -> candidates owner) instances) values);
+            (,) sourcePlan legacy <- mapLeft (Modules.displayNames diagnosticNames)
+              (Source.prepareResolvedSourcePlan bindings imported allData allClasses (map snd instances)
+                valueScopes (map (\((,) owner _) -> candidates owner) instances));
             lowered <- case sourcePlan of {
-              Nothing -> mapLeft (Modules.displayNames diagnosticNames)
-                (Inference.lowerDeclarationsWithImports imported allData allClasses
-                  (map snd instances) valueScopes
-                  (map (\((,) owner _) -> candidates owner) instances) values);
+              Nothing -> mapLeft (Modules.displayNames diagnosticNames) legacy;
               Just plan -> Right (case Source.planLegacy plan of {
                 Right legacy -> legacy;
                 Left message -> panic message

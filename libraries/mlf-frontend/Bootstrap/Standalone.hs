@@ -11,6 +11,7 @@ module Bootstrap.Standalone where {
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Prelude as Prelude;
   import qualified Bootstrap.Surface as Surface;
+  import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Lexer as Lexer;
@@ -126,14 +127,15 @@ module Bootstrap.Standalone where {
       any (\method -> hasName (fst method) needed) (Modules.classMethods declaration)) (Modules.renamedClasses builtin);
     classSet = Set.fromList compareString (map Modules.className classes);
     instances = filter (\instanceDecl -> hasName (Modules.instanceClass instanceDecl) classSet) (Modules.renamedInstances builtin);
-    values = filter (\((,,) name _ _) -> hasName name needed) (Modules.renamedValues builtin);
+    bindings = filter (\b -> hasName (Modules.valueName (Dependency.boundValue b)) needed) (Modules.renamedBindings builtin);
+    values = map Dependency.boundValue bindings;
     references = append (concatMap classNames classes)
       (append (concatMap instanceNames instances)
         (concatMap (\((,,) name annotation body) -> (:) name
           (append (maybe [] annotationNames annotation) (expressionNames body))) values));
     expanded = addBound needed references
   } in if Set.size needed == Set.size expanded
-    then Modules.Renamed (Modules.renamedDatatypes builtin) classes instances values Nothing
+    then Modules.Renamed (Modules.renamedDatatypes builtin) classes instances bindings Nothing
     else demandedBuiltin builtin expanded;
   -- Only declarations, not unknown nominal annotations or arbitrary basenames,
   -- receive these local identities. Their references use the same explicit map.

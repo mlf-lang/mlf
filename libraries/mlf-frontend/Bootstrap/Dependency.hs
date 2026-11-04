@@ -289,6 +289,77 @@ module Bootstrap.Dependency where {
       rows = graphRows graph;
       groups = componentsById rows (V.indices nodes)
     } in map (\group -> sortBy compareString (map (\i -> fst (V.at nodes i)) group)) groups;
+  -- Semantic declaration IDs belong to one resolution. Source occurrences
+  -- already carry them. Later class-support bindings extend the same domain.
+  data Symbols = Symbols (V.IndexVec Declaration String) (Map String ([] (V.Index Declaration))) IntSet;
+  symbolNodes (Symbols nodes _ _) = nodes;
+  symbolIds (Symbols _ ids _) = ids;
+  symbols entries =
+    let { nodes = V.fromList (map fst entries); indices = V.indices nodes;
+          buckets = zipWith (\entry i -> (,) (fst entry) [i]) entries indices;
+          methods = mapMaybe (\((,) entry i) -> if snd entry then Just (V.toInt i) else Nothing) (zip entries indices)
+    } in Symbols nodes (M.fromListWith compareString append buckets) (IS.fromList methods);
+  -- Generated bindings get fresh IDs, including when an inactive external
+  -- entity has the same emitted spelling. Source IDs never move.
+  extendSymbols original@(Symbols nodes ids methods) names = case names of {
+    [] -> original;
+    _ -> let { extra = zipWith (\name n -> (,) name [V.fromInt n]) names
+                 (range (V.count nodes) (V.count nodes + length names - 1)) } in
+         Symbols (V.fromList (append (V.toList nodes) names))
+           (foldlStrict (\table entry -> M.insertWith compareString append (fst entry) (snd entry) table) ids extra) methods
+  };
+  data Bound = Bound (V.Index Declaration) ((,,) String (Maybe SAnnotation) SExpr) ([] (V.Index Declaration));
+  boundValue (Bound _ value _) = value;
+  data BoundValues = BoundValues Symbols ([] Bound);
+  boundValues (BoundValues _ rows) = map boundValue rows;
+  appendBound (BoundValues old rows) value@((,,) name _ _) refs =
+    let { symbols = extendSymbols old [name] } in
+    BoundValues symbols (append rows [Bound (V.fromInt (V.count (symbolNodes old))) value refs]);
+  data DeclOrder = DeclOrder;
+  lexicalIds :: [] (Maybe (V.Index Declaration)) -> V.IndexVec DeclOrder (V.Index Declaration);
+  lexicalIds entries = V.fromList (catMaybes entries);
+  -- Keep the resolver's IDs even when a later selector sorts before a source
+  -- declaration. Dense lexical ranks order DFS roots, siblings and members.
+  resolvedGroups :: BoundValues -> [] ((,) String ([] String)) -> Map String ((,) String ([] String)) ->
+    Map String ([] String) -> Either String ((,) Symbols ([] ([] ((,) (V.Index Declaration) Bool))));
+  resolvedGroups (BoundValues base bound) generated methods scopes = do {
+    let { symbols = extendSymbols base (map fst generated); nodes = symbolNodes symbols;
+          generatedIds = map V.fromInt (range (V.count (symbolNodes base)) (V.count nodes - 1));
+          present = append (map (\(Bound i _ _) -> i) bound) generatedIds;
+          active = IS.fromList (map V.toInt present);
+          presentId i = IS.member (V.toInt i) active;
+          duplicate = if null generated then "duplicate value declaration" else "duplicate source/support binding";
+          pick bucket = case filter presentId bucket of { [] -> Right Nothing; [i] -> Right (Just i); _ -> Left duplicate }
+    };
+    ensure (IS.size active == length present) duplicate;
+    selected <- traverseEither pick (M.elems (symbolIds symbols));
+    let { order = lexicalIds selected;
+          ranks edits = runST (stBind (V.filled (V.count nodes) Nothing) (\slots ->
+            stBind (ST.map_ (\r -> V.set slots (V.at order r) (Just r)) (V.indices order)) (\_ ->
+            stBind (ST.map_ (\((,) i target) -> V.set slots i target) edits) (\_ -> V.freeze slots))));
+          direct = ranks [];
+          byName name = case find presentId (M.findWithDefault compareString [] name (symbolIds symbols)) of {
+            Just i -> V.at direct i; Nothing -> Nothing
+          };
+          redirect ((,) name ((,) target _)) = case symbols of { Symbols _ ids methodIds ->
+            map (\i -> (,) i (byName target)) (filter (\i -> IS.member (V.toInt i) methodIds)
+              (M.findWithDefault compareString [] name ids)) };
+          sourceRanks = if M.null methods then direct else ranks (concatMap redirect (M.toList methods));
+          edgeRow targets = V.fromList (map (\r -> V.at order (V.fromInt r))
+            (IS.toAscList (IS.fromList (map V.toInt targets))));
+          sourceRow (Bound i _ refs) = (,) i (edgeRow (append (mapMaybe (V.at sourceRanks) refs)
+            (mapMaybe byName (M.findWithDefault compareString [] (V.at nodes i) scopes))));
+          generatedRow i entry = (,) i (edgeRow (mapMaybe byName (snd entry)));
+          rows = runST (stBind (V.filled (V.count nodes) (V.fromList [])) (\slots ->
+            stBind (ST.map_ (\((,) i row) -> V.set slots i row)
+              (append (map sourceRow bound) (zipWith generatedRow generatedIds generated))) (\_ ->
+                stBind (V.freeze slots) (\table -> stReturn (Rows table)))));
+          member i = (,) i (any (\j -> V.toInt i == V.toInt j) (neighbors rows i));
+          ordered group = map member (sortBy (\i j -> compareString (V.at nodes i) (V.at nodes j)) group)
+    };
+    Right ((,) symbols (map ordered (componentsById rows (V.toList order))))
+  };
+  groupSpellings ((,) symbols groups) = map (map (compose (V.at (symbolNodes symbols)) fst)) groups;
   declarationGroups :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
                        Either String ([] ([] String));
   declarationGroups values =
