@@ -12,6 +12,7 @@ from packages import compare_managers
 from crates import check_crates
 from interfaces import check_interfaces
 from link_fragments import check_diamond
+from diagnostics import check_diagnostics
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -53,6 +54,7 @@ def main():
     check_crates(run, out / "crates", emlf, args.reference_compiler)
     check_interfaces(run, out / "interfaces", emlf, args.reference_compiler)
     check_diamond(run, out / "link-diamond", emlf)
+    check_diagnostics(out / "diagnostics", emlf, args.reference_compiler)
     flags = shlex.split(
         subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp", "bdw-gc"], text=True)
     )

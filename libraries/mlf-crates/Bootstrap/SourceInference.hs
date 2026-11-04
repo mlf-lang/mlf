@@ -1161,7 +1161,7 @@ module Bootstrap.SourceInference where {
   contractSymbols = compose declSymbols checkedScope;
   checkedBinding (CheckedContracts scope byId _) i = case M.lookup compareDecl i byId of {
     Just value -> Right value;
-    Nothing -> Left ("query dependency is not available: " ++ declName scope i)
+    Nothing -> Left ("query dependency is not available: " ++ Dependency.symbolDisplay (declSymbols scope) i)
   };
   installContracts scope named = do {
     entries <- traverseEither (\((,) name contract) ->

@@ -252,6 +252,10 @@ resolverChecks = do
     [D.Bound owner _ rhs] | [ref] <- R.references rhs -> do
       check "distinct entity despite equal printed name" False (V.toInt owner == V.toInt ref)
       check "printed collision preserves distinct stable identities" False (D.symbolKey localSymbols owner == D.symbolKey localSymbols ref)
+      check "same-spelled local diagnostic" "Local.f" (H.unpack (D.symbolDisplay localSymbols owner))
+      check "same-spelled imported diagnostic" "Foreign.x" (H.unpack (D.symbolDisplay localSymbols ref))
+      check "named diagnostic chooses active definition" "Local.f"
+        (H.unpack (Modules.displayNames (Modules.resolvedCrateDisplayNames collision) "same"))
     _ -> error ("missing colliding-name fixture edge " ++ show [(V.toInt i,map V.toInt (R.references rhs)) | D.Bound i _ rhs <- entries])
   (_,active) <- right (D.resolvedGroups matching [] M.empty M.empty)
   check "external reference cannot induce self recursion" [[False]] (map (map snd) active)

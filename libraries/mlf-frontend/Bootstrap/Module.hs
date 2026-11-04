@@ -328,9 +328,23 @@ module Bootstrap.Module where {
   data ResolvedCrate = ResolvedCrate Bindings ([] Resolved) (Map String IntSet) (Map String (Set String));
   resolvedCrateBindings (ResolvedCrate bindings _ _ _) = bindings;
   resolvedCrateNames crate = bindingNames (resolvedCrateBindings crate);
-  resolvedCrateDisplayNames crate = M.fromList compareString (map (\((,) entity name) ->
-    (,) name (if eqString (owner entity) "Prelude" then spelling entity else label entity))
-    (M.toList (canonicalEntries (resolvedCrateBindings crate))));
+  displayEntity entity = if eqString (owner entity) "Prelude" then spelling entity else label entity;
+  -- Named consumers (including type and dictionary errors) format their
+  -- messages at this boundary. Both the emitted spelling and stable key may
+  -- appear in serialized/query diagnostics. An identified term has its own
+  -- display label independent of either spelling.
+  resolvedCrateDisplayNames crate = case resolvedCrateBindings crate of { Bindings symbols table -> let {
+    entries ((,) entity binding) = case binding of {
+      OtherName name -> [(,) name (displayEntity entity)];
+      TermSlot i -> let { display = Dependency.symbolDisplay symbols i; key = Dependency.symbolKey symbols i;
+        name = Dependency.symbolName symbols i
+      } in if eqString key name then [(,) name display] else [(,) name display,(,) key display]
+    };
+    local = M.fromList compareString (concatMap (\r ->
+        map (\b -> let { i = Dependency.boundId b } in
+          (,) (Dependency.symbolName symbols i) (Dependency.symbolDisplay symbols i))
+          (renamedBindings (resolvedContents r))) (resolvedCrateModules crate))
+  } in M.union compareString local (M.fromList compareString (concatMap entries (M.toList table))) };
   resolvedCrateModules (ResolvedCrate _ modules _ _) = modules;
   resolvedInstanceRows crate = concatMap (\entry ->
     map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst) (resolvedInstances (resolvedContents entry)))
@@ -1135,7 +1149,7 @@ module Bootstrap.Module where {
   resolveNamesWithKey stable (Names allocated) = let {
     isTerm entry = case role (fst entry) of { Value -> True; Method _ -> True; _ -> False };
     parts = partition isTerm (M.toList allocated); terms = fst parts;
-    base = Dependency.symbolsWithKeys (map (\((,) e n) -> (,,) n (stable e) (case role e of { Method _ -> True; _ -> False })) terms);
+    base = Dependency.symbolsWithLabels (map (\((,) e n) -> (,,,) n (stable e) (displayEntity e) (case role e of { Method _ -> True; _ -> False })) terms);
     methodOwner ((,) ((,) entity _) i) = case role entity of {
       Method className -> let { klass = Entity (owner entity) className Class } in
         Just ((,) i (M.findWithDefault compareEntity (stable klass) klass allocated));

@@ -339,10 +339,11 @@ module Bootstrap.Dependency where {
   -- resolved entity can share its *printed* name with an inactive import.
   -- Only the stable keys cross a resolution or link-session boundary.
   data Symbols = Symbols (V.IndexVec Declaration String) ([] (V.Index Declaration)) (IntMap (Maybe String))
-                         (V.IndexVec Declaration String);
+                         (V.IndexVec Declaration ((,) String String));
   symbolNodes (Symbols nodes _ _ _) = nodes;
   symbolName symbols = V.at (symbolNodes symbols);
-  symbolKey (Symbols _ _ _ keys) = V.at keys;
+  symbolKey (Symbols _ _ _ labels) i = fst (V.at labels i);
+  symbolDisplay (Symbols _ _ _ labels) i = snd (V.at labels i);
   symbolKeyIndex table = M.fromList compareString
     (map (\i -> (,) (symbolKey table i) i) (V.indices (symbolNodes table)));
   checkedDeclId :: Symbols -> Int -> Either String (V.Index Declaration);
@@ -350,12 +351,13 @@ module Bootstrap.Dependency where {
     if number >= 0 && number < V.count (symbolNodes table) then Right (V.fromInt number)
     else Left "declaration slot out of bounds";
   compareSlots nodes i j = compareString (V.at nodes i) (V.at nodes j);
-  symbolsWithKeys entries =
-    let { nodes = V.fromList (map (\((,,) name _ _) -> name) entries); indices = V.indices nodes;
-          methods = mapMaybe (\((,) ((,,) _ _ method) i) -> if method then Just ((,) (V.toInt i) Nothing) else Nothing)
+  symbolsWithLabels entries =
+    let { nodes = V.fromList (map (\((,,,) name _ _ _) -> name) entries); indices = V.indices nodes;
+          methods = mapMaybe (\((,) ((,,,) _ _ _ method) i) -> if method then Just ((,) (V.toInt i) Nothing) else Nothing)
                       (zip entries indices);
-          keys = V.fromList (map (\((,,) _ key _) -> key) entries)
-    } in Symbols nodes (sortBy (compareSlots nodes) indices) (IM.fromList methods) keys;
+          labels = V.fromList (map (\((,,,) _ key display _) -> (,) key display) entries)
+    } in Symbols nodes (sortBy (compareSlots nodes) indices) (IM.fromList methods) labels;
+  symbolsWithKeys entries = symbolsWithLabels (map (\((,,) name key method) -> (,,,) name key name method) entries);
   withMethodOwners (Symbols nodes order methods keys) owners =
     Symbols nodes order (foldlStrict (\table ((,) i owner) -> IM.insert (V.toInt i) (Just owner) table) methods owners) keys;
   methodOwner (Symbols _ _ methods _) i = case IM.lookup (V.toInt i) methods of {
@@ -369,7 +371,7 @@ module Bootstrap.Dependency where {
   appendSymbols original@(Symbols nodes order methods keys) names = case names of {
     [] -> (,) original [];
     _ -> let { allNodes = V.fromList (append (V.toList nodes) names);
-               allKeys = V.fromList (append (V.toList keys) names);
+               allKeys = V.fromList (append (V.toList keys) (map (\name -> (,) name name) names));
                extra = map V.fromInt (range (V.count nodes) (V.count allNodes - 1));
                cmp = compareSlots allNodes
          } in (,) (Symbols allNodes (mergeBy cmp order (sortBy cmp extra)) methods allKeys) extra
