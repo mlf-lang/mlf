@@ -951,6 +951,8 @@ main = do
       need "actual release asset SHA pin" (actual == (expected == "valid"))
       putStrLn "PASS distribution-asset-pin"
     ["formal-check",prefix,expected] -> formalCheck prefix expected
+    ["formal-error",prefix,message] -> formalError prefix message
+    ["formal-bundle",directory,digest] -> formalBundle directory digest
     ["typed-bounds",directory] -> typedBounds directory
     ["wire-corpus",manifest] -> wireCorpus manifest
     ["raw-io",directory] -> rawIO directory
@@ -1063,6 +1065,25 @@ formalCheck prefix expected = do
       putStrLn "PASS formal-object-version-reject"
     _ -> error "actual formal artifact reader disagrees with fixed expectation"
 
+-- Portable objects are admitted with the exact authenticated bundle context.
+-- Never fabricate their virtual dependency paths or turn open objects closed.
+formalBundle directory digest = do
+  manifest <- Release.readPinnedManifest (B.literal directory) (B.literal digest)
+  interfaces <- Release.bundleInterfaces (B.literal directory) manifest
+  objects <- Release.readObjects (B.literal directory) manifest interfaces
+  _ <- expect "complete checked portable closure"
+    (CrateArtifact.linkCheckedObjects objects (Release.libraryIdentity manifest))
+  putStrLn "PASS formal-accept"
+
+formalError prefix message = do
+  iface <- CrateArtifact.readInterface (B.literal (prefix ++ ".mlfci")) >>= expect "negative interface"
+  result <- CrateArtifact.readObject (B.literal (prefix ++ ".mlfco")) iface
+  case result of
+    T.Left actual -> need "exact open rejection, not fallback"
+      (actual == B.literal (prefix ++ ".mlfco: " ++ message))
+    T.Right _ -> error "invalid open object accepted"
+  putStrLn "PASS formal-open-reject"
+
 distributionSeed directory = do
   exists <- doesPathExist directory; need "fresh distribution seed" (not exists); createDirectory directory
   let sourcePath=directory ++ "/BinaryPackage.hs"
@@ -1088,8 +1109,35 @@ distributionSeed directory = do
   need "builtin leaf has no dependencies or entry"
     (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:11" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
   need "release fixture exact identity/module" (CrateArtifact.crateId iface == "binary-package/1/library" && CrateArtifact.crateModules iface == ["BinaryPackage"])
-  writeFile (directory ++ "/legacy.mlfci") (B.unpack (CrateArtifact.encodeInterface iface))
-  writeFile (directory ++ "/legacy.mlfco") (B.unpack (CrateArtifact.encodeObject object))
+  need "actual Session keeps the open primary" (CrateArtifact.openMarked object)
+  -- The explicit companion adds old-format coverage. The original Session
+  -- object remains the public-storage and binary-distribution primary.
+  let closed = CrateArtifact.legacyObject object
+      closedIface = CrateArtifact.objectInterface closed
+  need "ordinary compatibility object is closed" (not (CrateArtifact.openMarked closed))
+  _ <- expect "complete primary open linking"
+    (CrateArtifact.linkCheckedObjects [builtinObject,object] (CrateArtifact.crateId iface))
+  _ <- expect "complete closed companion linking"
+    (CrateArtifact.linkCheckedObjects [builtinObject,closed] (CrateArtifact.crateId closedIface))
+  CrateArtifact.writeObjectEither (B.literal (directory ++ "/closed")) closed
+    >>= expect "ordinary closed binary companion"
+  closedReadIface <- CrateArtifact.readInterface (B.literal (directory ++ "/closed.mlfci"))
+    >>= expect "closed companion interface reader"
+  closedRead <- CrateArtifact.readObject (B.literal (directory ++ "/closed.mlfco")) closedReadIface
+    >>= expect "closed companion checked reader"
+  need "closed public pair complete roundtrip"
+    (CrateArtifact.encodeInterface closedIface == CrateArtifact.encodeInterface closedReadIface &&
+     CrateArtifact.encodeObject closed == CrateArtifact.encodeObject closedRead)
+  writeFile (directory ++ "/legacy.mlfci") (B.unpack (CrateArtifact.encodeInterface closedIface))
+  writeFile (directory ++ "/legacy.mlfco") (B.unpack (CrateArtifact.encodeObject closed))
+  legacyIface <- CrateArtifact.readInterface (B.literal (directory ++ "/legacy.mlfci"))
+    >>= expect "genuine legacy interface reader"
+  legacy <- CrateArtifact.readObject (B.literal (directory ++ "/legacy.mlfco")) legacyIface
+    >>= expect "genuine legacy complete payload reader"
+  _ <- expect "genuine legacy checked linking"
+    (CrateArtifact.linkCheckedObjects [builtinObject,legacy] (CrateArtifact.crateId legacyIface))
+  need "legacy text retains complete closed payload"
+    (CrateArtifact.encodeObject legacy == CrateArtifact.encodeObject closed)
   -- Keep the original Session pair for the formal/public-pair oracles. Real
   -- Release.publish separately writes the complete binary portable closure.
   executable <- getExecutablePath
@@ -1103,7 +1151,7 @@ distributionSeed directory = do
   legacyMetadata <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfci"))
   legacyBody <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfco"))
   let legacyPath = Release.virtualPath (Release.pairKey legacyMetadata legacyBody)
-  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:11",legacyPath)] object)
+  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:11",legacyPath)] closed)
   need "legacy closure exact relocated dependency"
     (CrateArtifact.crateDependencies (CrateArtifact.objectInterface portableLegacy) ==
       [("mlf:builtin-shared-haskell-v1:11",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])

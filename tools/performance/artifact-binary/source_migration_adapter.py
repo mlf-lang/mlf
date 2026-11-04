@@ -1,4 +1,4 @@
-"""Reviewed builtin-regeneration source loader; graph135 and frozen132 evidence are unchanged.
+"""Reviewed open-release source loader; graph135 and frozen132 evidence are unchanged.
 
 Install beside source_contract.py and the future frozen metadata bundle at
  tools/performance/artifact-binary/. The historical source chain is unchanged.
@@ -10,8 +10,8 @@ import types
 import os
 import stat
 
-FINAL_MANIFEST_SHA256 = 'fb8335e198e463d3a25b336f124d56dac141c6ad2063df531c09ade8e7411559'
-CONTRACT_SOURCE_SHA256 = '80ab586aed593698fc60f1644e8f0b4b24fc5d33140e7da60675ee5cf6677c19'
+FINAL_MANIFEST_SHA256 = 'e08b52ca94682a5e4343d47a9f5e1e4c158f337f129013ec14dfa24412abe48d'
+CONTRACT_SOURCE_SHA256 = '7089b03465e76728c4a7d33411687a10014acbd8cdd0b6350685c93cc4904d17'
 
 
 def read_implementation(path):
@@ -40,10 +40,10 @@ def live_contract(history_root, source_root=None):
     if FINAL_MANIFEST_SHA256 is None:
         raise ValueError('binary source migration is not frozen; live135 admission is unavailable')
     directory = Path(__file__).resolve().parent
-    path = directory / 'builtin_regeneration_contract.py'
+    path = directory / 'open_release_contract.py'
     raw = read_implementation(path)
     if hashlib.sha256(raw).hexdigest() != CONTRACT_SOURCE_SHA256:
-        raise ValueError('fixed builtin-regeneration source contract implementation SHA')
+        raise ValueError('fixed open-release source contract implementation SHA')
     module = types.ModuleType('fixed_binary_source_contract')
     module.__file__ = str(path)
     # Execute only this separately author-pinned maintenance implementation;

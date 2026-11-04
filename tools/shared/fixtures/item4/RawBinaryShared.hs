@@ -10,6 +10,8 @@ module Main where {
   import qualified Bootstrap.ArtifactStorage as Storage;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.CrateArtifact as Crate;
+  import qualified Bootstrap.OpenFragment as Open;
+  import qualified Bootstrap.Std as Std;
   import qualified Bootstrap.X.Pretty as Pretty;
   require :: String -> Bool -> IO ();
   require label okay = if okay then return () else panic label;
@@ -195,7 +197,41 @@ module Main where {
     rebuilt <- Crate.readObject (output ++ ".mlfco") reread >>= right;
     require "public interface semantic identity" (Crate.encodeInterface iface == Crate.encodeInterface reread);
     require "public object semantic identity" (Crate.encodeObject object == Crate.encodeObject rebuilt);
+    case object of {
+      Crate.OpenCrateObject original package -> do {
+        imported <- Crate.loadInterfaces (Std.map Crate.dependencyPath (Crate.crateDependencies original)) >>= right;
+        audited <- right (Std.traverseEither (\((,) name fragment) ->
+          Std.mapEither ((,) name) (Open.audit fragment)) (Open.packageFragments package));
+        checked <- Crate.makeOpenObject original (Std.map Std.snd imported) audited >>= right;
+        Crate.writeObjectEither (output ++ "-audited") checked >>= right;
+        require "retained checked fragment rebuild identity"
+          (Crate.encodeInterface (Crate.objectInterface checked) == Crate.encodeInterface original &&
+           Crate.encodeObject checked == Crate.encodeObject object)
+      };
+      _ -> return ()
+    };
     putStrLn "PASS shared-public-binary-pair"
+  };
+  rejectMain :: String -> String -> Bool -> IO ();
+  rejectMain input expected auditing = do {
+    iface <- Crate.readInterface (input ++ ".mlfci") >>= right;
+    result <- Crate.readObject (input ++ ".mlfco") iface;
+    let { observed = case result of {
+      Left message -> Left message;
+      Right object -> if auditing then case object of {
+        Crate.OpenCrateObject _ package ->
+          Std.mapLeft (\message -> input ++ ".mlfco: " ++ message)
+            (Std.mapEither (\_ -> ()) (Std.traverseEither
+              (\entry -> Open.audit (Std.snd entry)) (Open.packageFragments package)));
+        _ -> Left "audit negative requires an open object"
+      } else Right ()
+    } };
+    case observed of {
+      Left message -> require "exact open rejection, no fallback"
+        (message == input ++ ".mlfco: " ++ expected);
+      Right _ -> panic "invalid open object accepted"
+    };
+    putStrLn "PASS shared-public-reject"
   };
   main :: IO ();
   main = do {
@@ -204,6 +240,10 @@ module Main where {
       root <- getLine; typedMain root
     } else if mode == "formal" then do {
       input <- getLine; output <- getLine; formalMain input output
+    } else if mode == "reject" then do {
+      input <- getLine; expected <- getLine; rejectMain input expected False
+    } else if mode == "audit-reject" then do {
+      input <- getLine; expected <- getLine; rejectMain input expected True
     } else panic "unknown shared binary fixture mode"
   }
 }

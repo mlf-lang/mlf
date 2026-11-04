@@ -6,6 +6,7 @@ import base64
 import copy
 import hashlib
 import json
+import artifact_binary_open as opened
 from pathlib import Path
 
 
@@ -67,45 +68,96 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
     require(invoke('distribution-seed','distribution-seed',seed)==b'PASS actual-binary-library-and-legacy-formal\n','real Session binary library producer')
     binary_pair=((seed/'seed.mlfci').read_bytes(),(seed/'seed.mlfco').read_bytes())
     legacy_pair=((seed/'legacy.mlfci').read_bytes(),(seed/'legacy.mlfco').read_bytes())
-    for schema,data in zip((3,4),binary_pair):typed.inspect_artifact(data,schema)
+    closed_pair=((seed/'closed.mlfci').read_bytes(),(seed/'closed.mlfco').read_bytes())
+    dependency_interfaces=[(seed/'builtin.mlfci').read_bytes()]
+    opened.inspect_pair(binary_pair,dependency_interfaces)
+    for schema,data in zip((3,4),closed_pair):typed.inspect_artifact(data,schema)
     require(not any(raw.startswith(ref.MAGIC) for raw in legacy_pair),'explicit old formal serialization really text')
-    for variant in ('seed','legacy'):
+    require(typed.unpack(legacy_pair[1].decode('utf-8'))[0]=='MLFCO-2',
+            'legacy companion contains a complete ordinary payload, not an open summary')
+    for variant in ('seed','closed','legacy'):
         require(invoke('formal-'+variant,'formal-check',seed/variant,'accept')==b'PASS formal-accept\n','actual formal reader '+variant)
-    # Same source compiled by GHC and the actual native compiler reads the
-    # real Session-produced pair and republishes it through public storage APIs.
+    # The real Session pair remains primary. Separate closed and text inputs
+    # retain old-format coverage without replacing current production artifacts.
     public_pairs={}
     for backend in ('shared-ghc','shared-native'):
-        destination=output/(backend+'-public-pair');destination.mkdir();prefix=destination/'unit'
-        result=run(backend+'-public-pair',[shared_fixtures[backend]],
-                   ('formal\n'+str(seed/'seed')+'\n'+str(prefix)+'\n').encode())
-        require(result==b'PASS shared-public-binary-pair\n','public pair exact completion')
-        require({p.name for p in destination.iterdir()}=={'unit.mlfci','unit.mlfco'},'public pair exact publication inventory/no staging')
-        rows={}
-        for schema,suffix,expected in zip((3,4),('.mlfci','.mlfco'),binary_pair):
-            raw=prefix.with_suffix(suffix).read_bytes();doc=typed.inspect_artifact(raw,schema)
-            require(raw==expected,'public native/GHC pair equals independently inspected Session artifact bytes')
-            rows[suffix]={'sha256':sha(raw),**doc.accounting()}
-        public_pairs[backend]=rows
-    require(public_pairs['shared-ghc']==public_pairs['shared-native'],'cross-host public pair identity')
+        backend_rows={}
+        legacy_rebuilt_pair=None
+        # Bind genuine text to complete binary bytes before checksum comparison.
+        for variant,expected_pair in (('closed',closed_pair),('legacy',closed_pair),('seed',binary_pair)):
+            label=backend+'-public-pair'+('' if variant=='seed' else '-'+variant)
+            destination=output/label;destination.mkdir();prefix=destination/'unit'
+            result=run(label,[shared_fixtures[backend]],
+                       ('formal\n'+str(seed/variant)+'\n'+str(prefix)+'\n').encode())
+            require(result==b'PASS shared-public-binary-pair\n','public pair exact completion')
+            expected_files={'unit.mlfci','unit.mlfco'}
+            if variant=='seed':expected_files|={'unit-audited.mlfci','unit-audited.mlfco'}
+            require({p.name for p in destination.iterdir()}==expected_files,'public exact publication inventory/no staging')
+            actual_pair=tuple(prefix.with_suffix(suffix).read_bytes() for suffix in ('.mlfci','.mlfco'))
+            require(actual_pair==expected_pair,'cross-backend full pair exact bytes')
+            if variant=='legacy':legacy_rebuilt_pair=actual_pair
+            if variant=='seed':
+                audited_pair=tuple((destination/('unit-audited'+suffix)).read_bytes() for suffix in ('.mlfci','.mlfco'))
+                comparison=opened.compare_companion(closed_pair,binary_pair,dependency_interfaces,audited_pair,
+                                                    legacy_pair,legacy_rebuilt_pair)
+                controls=opened.independent_controls(binary_pair,closed_pair,dependency_interfaces,audited_pair,
+                                                     legacy_pair,legacy_rebuilt_pair)
+                backend_rows[variant]={'comparison':comparison,'independent_controls':controls}
+            else:
+                docs=[typed.inspect_artifact(raw,schema) for raw,schema in zip(actual_pair,(3,4))]
+                backend_rows[variant]=[{'sha256':sha(raw),**doc.accounting()} for raw,doc in zip(actual_pair,docs)]
+        public_pairs[backend]=backend_rows
+    require(public_pairs['shared-ghc']==public_pairs['shared-native'],'cross-host complete public pair identity')
     record['shared_public_pairs']=public_pairs
-    record['native_scope']='raw bytes, wire, typed Graph/raw admission, public full artifact pair; not native Session or Distribution'
-    # A recognized new magic cannot be interpreted by a legacy parser on error.
+    record['native_scope']='raw bytes, wire, typed Graph/admission, full open/closed/legacy public pairs and retained audit; not native Session or Distribution'
+    # Preserve the existing schema3/schema4 recognized-family no-fallback tests
+    # on the genuine ordinary closed companion.
     for schema,suffix in ((3,'.mlfci'),(4,'.mlfco')):
         bad=output/('formal-corrupt-'+str(schema));bad.mkdir()
-        for extension,data in zip(('.mlfci','.mlfco'),binary_pair):(bad/('unit'+extension)).write_bytes(data)
+        for extension,data in zip(('.mlfci','.mlfco'),closed_pair):(bad/('unit'+extension)).write_bytes(data)
         damaged=bytearray((bad/('unit'+suffix)).read_bytes());damaged[8:12]=(2).to_bytes(4,'little')
         (bad/('unit'+suffix)).write_bytes(ref.repair_crc(damaged))
         family='interface' if schema==3 else 'object'
         require(invoke('formal-corrupt-'+str(schema),'formal-check',bad/'unit','reject-'+family+'-version')==('PASS formal-'+family+'-version-reject\n').encode(),'formal exact binary-version diagnostic; no legacy fallback')
+    open_negatives=[]
+    for label,pair,diagnostic in opened.mutation_cases(binary_pair):
+        bad=output/label;bad.mkdir();prefix=bad/'unit'
+        for suffix,data in zip(('.mlfci','.mlfco'),pair):prefix.with_suffix(suffix).write_bytes(data)
+        require(invoke('formal-'+label,'formal-error',prefix,diagnostic)==b'PASS formal-open-reject\n',
+                'GHC exact open-family rejection')
+        for backend in ('shared-ghc','shared-native'):
+            result=run(backend+'-'+label,[shared_fixtures[backend]],
+                       ('reject\n'+str(prefix)+'\n'+diagnostic+'\n').encode())
+            require(result==b'PASS shared-public-reject\n','both hosts exact open-family rejection')
+        open_negatives.append({'name':label,'expected_diagnostic':diagnostic,
+                               'pair_sha256':[sha(data) for data in pair]})
+    record['open_public_negatives']=open_negatives
+    audit_negatives=[]
+    for label,pair,diagnostic in opened.audit_mutation_cases(binary_pair):
+        bad=output/label;bad.mkdir();prefix=bad/'unit'
+        for suffix,data in zip(('.mlfci','.mlfco'),pair):prefix.with_suffix(suffix).write_bytes(data)
+        # The independent parser does not manufacture checker evidence. A
+        # self-consistent raw receipt still needs the actual semantic audit.
+        opened.inspect_pair(pair,dependency_interfaces)
+        for backend in ('shared-ghc','shared-native'):
+            result=run(backend+'-'+label,[shared_fixtures[backend]],
+                       ('audit-reject\n'+str(prefix)+'\n'+diagnostic+'\n').encode())
+            require(result==b'PASS shared-public-reject\n','both actual hosts reject changed checked receipt')
+        audit_negatives.append({'name':label,'expected_diagnostic':diagnostic})
+    record['open_audit_negatives']=audit_negatives
 
     distro=output/'distribution';distro.mkdir();distribution=[]
     builtin_id='mlf:builtin-shared-haskell-v1:11';root_id='binary-package/1/library'
     identities=(builtin_id,root_id)
     def pair_at(prefix):return tuple(prefix.with_suffix(suffix).read_bytes() for suffix in ('.mlfci','.mlfco'))
-    def interface_summary(pair):
+    def interface_summary(pair,dependencies=()):
         metadata,body=pair
         if metadata.startswith(ref.MAGIC):
             fields=typed.value_node(typed.inspect_artifact(metadata,3).values()[0],242,13)
+            schema=int.from_bytes(body[16:20],'little')
+            if schema==7:
+                return opened.inspect_pair(pair,list(dependencies))['summary']
+            require(schema==4,'explicit ordinary closed or current open object family')
             object_fields=typed.value_node(typed.inspect_artifact(body,4).values()[0],243,3)
             require(object_fields[1]==('node',242,fields),'binary full object/interface exact metadata')
             dependencies=[tuple(typed.text(x) for x in typed.value_node(row,3,3)) for row in typed.list_values(fields[1])]
@@ -117,7 +169,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         dependencies=[tuple(typed.unpack(row)) for row in typed.unpack(fields[2])]
         require(all(len(row)==3 for row in dependencies),'legacy dependency triples')
         return {'identity':fields[1],'dependencies':dependencies,'modules':typed.unpack(fields[3]),'entry':fields[10]}
-    original_summary=interface_summary(binary_pair)
+    original_summary=interface_summary(binary_pair,dependency_interfaces)
     require(original_summary['identity']==root_id and original_summary['modules']==['BinaryPackage'] and original_summary['entry']=='',
             'original real Session root identity/modules/no entry')
     original_dependencies=original_summary['dependencies']
@@ -140,7 +192,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         require(len(pairs)==2,'complete two-crate closure')
         keys=[sha(pair[0])+sha(pair[1]) for pair in pairs]
         require(len(set(keys))==2,'distinct leaf/root keys')
-        summaries=[interface_summary(pair) for pair in pairs]
+        summaries=[interface_summary(pairs[0]),interface_summary(pairs[1],[pairs[0][0]])]
         require([item['identity'] for item in summaries]==list(identities),'exact closure crate identities')
         require(summaries[0]==original_builtin_summary,'canonical builtin leaf full summary unchanged')
         require(summaries[1]==dict(original_summary,dependencies=[(builtin_id,'/__mlf_release__/'+keys[0]+'/unit.mlfci',semantic)]),
@@ -199,8 +251,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
             manifest_for(actual_pairs,legacy)
             actual={str(p.relative_to(destination)) for p in destination.rglob('*') if p.is_file()}
             require(actual=={'release.json',*('crates/'+k+'/unit'+suffix for k in wanted_keys for suffix in ('.mlfci','.mlfco'))},'unpack exact five-file two-crate physical inventory')
-            prefix=destination/'crates'/wanted['root']/'unit'
-            require(invoke('distribution-'+name+'-formal','formal-check',prefix,'accept')==b'PASS formal-accept\n','unpacked full root interface/object checked reader')
+            require(invoke('distribution-'+name+'-formal','formal-bundle',destination,expected_digest)==b'PASS formal-accept\n','unpacked complete authenticated bundle-context checked reader')
         distribution.append({'name':name,'asset_sha256':sha(source.read_bytes()),'expected_manifest_sha256':expected_digest,
                              'expected_outcome':'reject' if error else 'accept','error_oracle':error})
     unpack_case('format2-roundtrip',envelope,sha(manifest_raw),binary_closure)
@@ -268,7 +319,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         actual_pairs=[pair_at(prefix) for prefix in installed_prefixes]
         require(actual_pairs[0]==binary_closure[0],'materialize installs exact canonical builtin into dedicated compiler cache')
         expected_installed_root=dict(original_summary,dependencies=[(builtin_id,str(installed_prefixes[0])+'.mlfci',semantic)])
-        require(interface_summary(actual_pairs[1])==expected_installed_root,'materialized root relocates exact local dependency and remains typed')
+        require(interface_summary(actual_pairs[1],[actual_pairs[0][0]])==expected_installed_root,'materialized root relocates exact local dependency and remains typed')
         expected_files={str(prefix)+suffix:sha(data) for prefix,pair in zip(installed_prefixes,actual_pairs) for suffix,data in zip(('.mlfci','.mlfco'),pair)}
         saved=json.loads(receipt_path.read_bytes())
         require(saved=={'format':1,'release':sha(manifest_raw),'validator_sha256':compiler_digest,'files':expected_files},

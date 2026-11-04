@@ -3643,14 +3643,27 @@ module Bootstrap.CrateArtifact where {
   };
   -- A complete new-family match commits to the envelope parser. Legacy/v1
   -- decode receives the same immutable snapshot, never a second path read.
-  readObject path iface = do {
+  readObject :: String -> CrateInterface -> IO (Either String CrateObject);
+  readObject path iface = readObjectWithOpenReader readOpenObject path iface;
+  -- A portable release supplies verified interfaces, not filesystem locations.
+  -- Only open objects use this context; closed-family admission is unchanged.
+  readObjectWithDependencies :: String -> CrateInterface -> [] CrateInterface ->
+    IO (Either String CrateObject);
+  readObjectWithDependencies path iface dependencies =
+    readObjectWithOpenReader
+      (\bytes expected -> decodeOpenObject bytes expected
+        (validateOpenDependencies expected dependencies)) path iface;
+  readObjectWithOpenReader ::
+    (ByteArray -> CrateInterface -> IO (Either String CrateObject)) ->
+    String -> CrateInterface -> IO (Either String CrateObject);
+  readObjectWithOpenReader openReader path iface = do {
     raw <- Storage.readRaw path;
     result <- case raw of {
       Left message -> ioReturn (Left message);
       Right bytes -> do {
         open <- Open.packageFamily bytes;
         recognized <- envelopeHasFamily bytes;
-        if open then readOpenObject bytes iface
+        if open then openReader bytes iface
         else if recognized then envelopeDecode crateEnvelopeLimits iface bytes else do {
           input <- Storage.decode 4 bytes;
           ioReturn (bindEither input (\decoded -> case decoded of {
@@ -3781,15 +3794,41 @@ module Bootstrap.CrateArtifact where {
       }
     }
   };
+  -- Reject ambiguous or overbroad supplied contexts before building their map.
+  -- The root in the initial trail also rejects dependency cycles through it.
+  validateOpenDependencies :: CrateInterface -> [] CrateInterface ->
+    Either String ([] CrateInterface);
+  validateOpenDependencies iface dependencies = do {
+    uniqueNames "open dependency identity" (map crateId dependencies);
+    ensure (not (any (\dependency -> eqString (crateId dependency) (crateId iface)) dependencies))
+      "open crate dependency context contains its root";
+    validateInterface iface;
+    _ <- traverseEither validateInterface dependencies;
+    let { byName = interfaceMap dependencies };
+    closure <- dependencyClosure byName [crateId iface] []
+      (map dependencyId (crateDependencies iface));
+    ensure (length closure == length dependencies)
+      "open crate dependency context contains unreachable crates";
+    _ <- traverseEither (validateDependencies byName) ((:) iface closure);
+    _ <- traverseEither (validateExportBoundary byName) ((:) iface closure);
+    Right closure
+  };
+  readOpenObject :: ByteArray -> CrateInterface -> IO (Either String CrateObject);
   readOpenObject bytes iface = do {
     dependencies <- loadInterfaces (map dependencyPath (crateDependencies iface));
+    decodeOpenObject bytes iface (mapEither (map snd) dependencies)
+  };
+  -- Keep load errors and compatibility lookup in the ordinary reader's order.
+  decodeOpenObject :: ByteArray -> CrateInterface -> Either String ([] CrateInterface) ->
+    IO (Either String CrateObject);
+  decodeOpenObject bytes iface dependencies = do {
     compatibility <- Open.compatibilityIdentity;
     case do {
       imported <- dependencies;
       compiler <- compatibility;
       validateInterface iface;
-      validateDependencies (interfaceMap (map snd imported)) iface;
-      Right ((,) compiler ((:) iface (map snd imported)))
+      validateDependencies (interfaceMap imported) iface;
+      Right ((,) compiler ((:) iface imported))
     } of {
       Left e -> ioReturn (Left e);
       Right ((,) compiler interfaces) -> do {

@@ -21,7 +21,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 HELPERS = ('artifact_binary_reference.py', 'artifact_binary_cases.py',
-           'artifact_binary_typed.py', 'artifact_binary_integration.py',
+           'artifact_binary_typed.py', 'artifact_binary_integration.py', 'artifact_binary_open.py',
            'artifact_structure_contract.json', 'artifact_binary_golden.json')
 
 
@@ -182,11 +182,11 @@ NATIVE_MODULES = frozenset("""
 Bootstrap.ArtifactStorage Bootstrap.ArtifactStructure Bootstrap.Bitstream
 Bootstrap.ClassDemand Bootstrap.Classes Bootstrap.CompilerCore Bootstrap.Constraint
 Bootstrap.CrateArtifact Bootstrap.Data Bootstrap.Dependency Bootstrap.Desugar
-Bootstrap.Elaborate Bootstrap.Evidence Bootstrap.Fresh Bootstrap.Graph
+Bootstrap.Elaborate Bootstrap.Evidence Bootstrap.EvidenceBoundary Bootstrap.Fresh Bootstrap.Graph
 Bootstrap.Graph.Solver Bootstrap.Host Bootstrap.IntMap Bootstrap.IntRank
 Bootstrap.IntSet Bootstrap.IntTree Bootstrap.Kind Bootstrap.Kinding Bootstrap.Layout
-Bootstrap.Lexer Bootstrap.Map Bootstrap.Module Bootstrap.Parsec Bootstrap.Parser
-Bootstrap.Prelude Bootstrap.Primitive Bootstrap.ST Bootstrap.Separate Bootstrap.Set
+Bootstrap.Lexer Bootstrap.Map Bootstrap.Module Bootstrap.OpenFragment Bootstrap.Parsec Bootstrap.Parser
+Bootstrap.Prelude Bootstrap.Primitive Bootstrap.QueryGraph Bootstrap.ST Bootstrap.Separate Bootstrap.Set
 Bootstrap.SourceEquality Bootstrap.Std Bootstrap.Surface Bootstrap.Types
 Bootstrap.Unicode Bootstrap.X.Check Bootstrap.X.Checked Bootstrap.X.Parser
 Bootstrap.X.Pretty Bootstrap.X.Syntax Bootstrap.X.Type Main
@@ -219,8 +219,8 @@ def native_source_closure(source, fixture, manifest):
         found[name] = {'module': name, 'path': str(path), 'bytes': path.stat().st_size,
                        'sha256': sha(path), 'imports': imports}
         pending.extend(imports)
-    require(set(found) == NATIVE_MODULES and len(found) == 46,
-            'native fixture must retain exact reviewed 46-module closure')
+    require(set(found) == NATIVE_MODULES and len(found) == 49,
+            'native fixture must retain exact reviewed 49-module closure')
     return [found[name] for name in sorted(found)]
 
 
@@ -310,7 +310,7 @@ def main():
               'commands': [], 'source_root': str(source), 'inputs': inputs,
               'partial_write_sink': sink_identity,
               'producer_receipt': str(receipt_path), 'producer_receipt_sha256': sha(receipt_path),
-              'native_mode': 'fresh exact46 modular crate, standalone LLVM and current runtime; no installed stdlib',
+              'native_mode': 'fresh exact49 modular crate, standalone LLVM and current runtime; no installed stdlib',
               'limits': {'compile_link_seconds_each': 120, 'native_compile_crate_seconds': 900,
                          'native_crate_to_llvm_seconds': 300, 'aggregate_output_bytes': 640 * 1024**2,
                          'whole_controls_seconds': 900, 'fixture_seconds_each': 180,

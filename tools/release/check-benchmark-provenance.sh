@@ -27,10 +27,10 @@ python3 -B tools/release/check_benchmark_transition.py
 python3 -B tools/release/test_benchmark_transition.py
 python3 -B tools/performance/artifact-binary/test_query_graph_migration.py
 python3 -B -O tools/performance/artifact-binary/test_query_graph_migration.py
-# Current physical builtin tests also replay the unchanged writer suite on a
-# separately authenticated physical predecessor, never the new live view.
-python3 -B tools/performance/artifact-binary/test_builtin_regeneration_migration.py
-python3 -B -O tools/performance/artifact-binary/test_builtin_regeneration_migration.py
+# Current physical open-release tests replay the unchanged builtin and writer
+# suites on their authenticated physical predecessors, never the new live view.
+python3 -B tools/performance/artifact-binary/test_open_release_migration.py
+python3 -B -O tools/performance/artifact-binary/test_open_release_migration.py
 jq -r '.workloads[].provenance[] | select(.original_source != .build_source) | [.original_source,.build_source] | @tsv' "$manifest" > "$work/adaptations.tsv"
 
 count=0

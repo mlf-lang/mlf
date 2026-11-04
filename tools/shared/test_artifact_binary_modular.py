@@ -16,6 +16,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--source-root', type=Path, default=HERE.parents[1])
 args, rest = parser.parse_known_args()
 SOURCE = args.source_root.resolve(strict=True)
+REQUIRED_NATIVE_ADDITIONS = ('Bootstrap.EvidenceBoundary', 'Bootstrap.OpenFragment',
+                             'Bootstrap.QueryGraph')
 
 
 def unpack(text):
@@ -38,8 +40,11 @@ class ModularControls(unittest.TestCase):
         cls.rows = M.native_source_closure(SOURCE, cls.fixture, cls.manifest)
 
     def test_complete_source_closure(self):
-        self.assertEqual(len(self.rows), 46)
+        self.assertEqual(len(self.rows), 49)
         self.assertEqual({r['module'] for r in self.rows}, M.NATIVE_MODULES)
+        self.assertEqual([r['module'] for r in self.rows], sorted(M.NATIVE_MODULES))
+        for name in REQUIRED_NATIVE_ADDITIONS:
+            self.assertIn(name, {r['module'] for r in self.rows})
         self.assertIn('Bootstrap.CrateArtifact', M.NATIVE_MODULES)
         self.assertEqual(next(r['path'] for r in self.rows if r['module'] == 'Main'), str(self.fixture))
         for row in self.rows:
@@ -89,6 +94,58 @@ class ModularControls(unittest.TestCase):
         m = copy.deepcopy(self.manifest)
         m['modules'] = [r for r in m['modules'] if r['module'] != 'Bootstrap.CrateArtifact']
         with self.assertRaises(ValueError): M.native_source_closure(SOURCE, self.fixture, m)
+
+    def test_manifest_rejects_each_required_new_module(self):
+        for name in REQUIRED_NATIVE_ADDITIONS:
+            with self.subTest(module=name):
+                m = copy.deepcopy(self.manifest)
+                m['modules'] = [r for r in m['modules'] if r['module'] != name]
+                self.assertEqual(len(m['modules']), len(self.manifest['modules']) - 1)
+                with self.assertRaises(ValueError) as error:
+                    M.native_source_closure(SOURCE, self.fixture, m)
+                self.assertEqual(str(error.exception), 'native source import absent from manifest: ' + name)
+
+    def test_spec_rejects_each_required_module(self):
+        for row in self.rows:
+            with self.subTest(module=row['module']):
+                reduced = [r for r in self.rows if r['module'] != row['module']]
+                self.assertEqual(len(reduced), 48)
+                with self.assertRaisesRegex(ValueError, '^native crate inventory order/identity mismatch$'):
+                    M.native_crate_spec(reduced, Path('/fresh'))
+
+    def extra_module_row(self):
+        name = 'Bootstrap.Version'
+        self.assertNotIn(name, M.NATIVE_MODULES)
+        matches = [r for r in self.manifest['modules'] if r['module'] == name]
+        self.assertEqual(len(matches), 1)
+        return {'module': name, 'path': str(M.regular(SOURCE / matches[0]['path']))}
+
+    def test_fixture_rejects_manifested_extra_module(self):
+        extra = self.extra_module_row()
+        text = self.fixture.read_text()
+        anchor = '  import MLF.Primitive;'
+        self.assertEqual(text.count(anchor), 1)
+        text = text.replace(anchor, anchor + '\n  import ' + extra['module'] + ';', 1)
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / 'Main.hs'; p.write_text(text)
+            with self.assertRaisesRegex(ValueError, '^native fixture must retain exact reviewed 49-module closure$'):
+                M.native_source_closure(SOURCE, p, self.manifest)
+
+    def test_spec_rejects_extra_module(self):
+        rows = sorted([*self.rows, self.extra_module_row()], key=lambda r: r['module'])
+        self.assertEqual(len(rows), 50)
+        with self.assertRaisesRegex(ValueError, '^native crate inventory order/identity mismatch$'):
+            M.native_crate_spec(rows, Path('/fresh'))
+
+    def test_spec_rejects_same_size_substitution(self):
+        extra = self.extra_module_row()
+        for name in REQUIRED_NATIVE_ADDITIONS:
+            with self.subTest(module=name):
+                rows = sorted([extra if r['module'] == name else r for r in self.rows],
+                              key=lambda r: r['module'])
+                self.assertEqual(len(rows), 49)
+                with self.assertRaisesRegex(ValueError, '^native crate inventory order/identity mismatch$'):
+                    M.native_crate_spec(rows, Path('/fresh'))
 
     def bad_fixture(self, text):
         with tempfile.TemporaryDirectory() as d:

@@ -246,11 +246,17 @@ module Package.Release where {
           Right (Artifact.EnvelopeCrateObject legacy iface fragments)
       }
     };
+  readObjects :: String -> J.Json -> [] ((,) String Artifact.CrateInterface) ->
+    IO ([] Artifact.CrateObject);
   readObjects directory manifest interfaces =
+    let { byName = Artifact.interfaceMap (S.map S.snd interfaces) } in
     S.mapM
       (\((,) key iface) ->
          do {
-           decoded <- Artifact.readObject (bundlePrefix directory key ++ ".mlfco") iface;
+           dependencies <- checked (Artifact.dependencyClosure byName [Artifact.crateId iface] []
+             (S.map Artifact.dependencyId (Artifact.crateDependencies iface)));
+           decoded <- Artifact.readObjectWithDependencies
+             (bundlePrefix directory key ++ ".mlfco") iface dependencies;
            object <- checked decoded;
            ioReturn object
          })

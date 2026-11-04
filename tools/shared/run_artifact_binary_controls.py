@@ -70,7 +70,7 @@ def main():
         require(not path.is_relative_to(output),'input inside output')
     inputs=[regular(Path(__file__)),build_receipt,*fixtures.values(),
             *[regular(HERE/(name+suffix)) for name,suffix in [
-              ('artifact_binary_reference','.py'),('artifact_binary_cases','.py'),('artifact_binary_typed','.py'),('artifact_binary_integration','.py'),
+              ('artifact_binary_reference','.py'),('artifact_binary_cases','.py'),('artifact_binary_typed','.py'),('artifact_binary_integration','.py'),('artifact_binary_open','.py'),
               ('artifact_structure_contract','.json'),('artifact_binary_golden','.json')]]]
     fingerprints={str(p):sha(p) for p in inputs}
     output.mkdir()
@@ -192,6 +192,7 @@ def main():
             shared_results[backend]={path.name:sha(path) for path in directory.iterdir()}
         require(shared_results['shared-ghc']==shared_results['shared-native'],'GHC/native byte-for-byte file parity')
         record['shared_backend_outputs']=shared_results
+        load('artifact_binary_open')
         integration=load('artifact_binary_integration')
         integration.run_integration(fixtures['ghc'],output,run,record,typed,ref,
                                     {name:fixtures[name] for name in ('shared-ghc','shared-native')})
