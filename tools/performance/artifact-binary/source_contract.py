@@ -1,4 +1,4 @@
-"""Strict, parameterized L128 <-> binary131 source migration.
+"""Strict, parameterized L128 <-> binary132 source migration.
 
 This is source/metadata plumbing, not artifact compatibility or qualification.
 The external caller must pin the final manifest SHA after genuine generation.
@@ -22,6 +22,7 @@ ADDED_MODULES = {
     'Bootstrap.ArtifactStorage': 'libraries/mlf-crates/Bootstrap/ArtifactStorage.hs',
     'Bootstrap.ArtifactStructure': 'libraries/mlf-crates/Bootstrap/ArtifactStructure.hs',
     'Bootstrap.Bitstream': 'libraries/mlf-crates/Bootstrap/Bitstream.hs',
+    'Bootstrap.SourceUnit': 'libraries/mlf-crates/Bootstrap/SourceUnit.hs',
 }
 CANONICAL = 'bootstrap/MLF/BuiltinPreludeData.hs'
 LITERAL = 'libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs'
@@ -184,7 +185,7 @@ def validate_shared_transition(old_raw, new_raw):
     expected['primitive_abi'] = 'mlf-primitive-132-v7'
     expected['builtin_interface'] = 'mlf-primitive/shared-haskell-v1/11'
     require(new == expected and len(module_paths(old)) == 128 and
-            len(module_paths(new)) == 131, 'shared manifest changed beyond exact binary transition')
+            len(module_paths(new)) == 132, 'shared manifest changed beyond exact binary transition')
 
 
 def lock_path(package_path, name):
@@ -307,17 +308,19 @@ class Contract:
         require(value['format'] == 'binary-source-migration-v1' and
                 value['parent_inventory_sha256'] == PARENT_INVENTORY_SHA and
                 value['parent_registry_sha256'] == PARENT_REGISTRY_SHA and
-                value['module_count'] == 131 and value['primitive_count'] == 132,
+                value['module_count'] == 132 and value['primitive_count'] == 132,
                 'manifest identity / counts')
         require(value['module_paths'] == {**parent['module_paths'], **ADDED_MODULES},
-                'exact added three modules')
+                'exact added modules')
         hash_map(value['current_registry'], 'current registry')
         hash_map(value['current_files'], 'current files')
         require(set(value['current_registry']) == set(value['module_paths']) and
                 canonical_sha(value['current_registry']) == value['current_registry_sha256'],
                 'complete current registry identity')
         files = value['current_files']
-        require(set(files) == set(parent['files']) | set(parent['expected_added_paths']) and
+        # The pinned historical inventory predates the locally issued source-unit receipt.
+        added_paths = sorted([*parent['expected_added_paths'], ADDED_MODULES['Bootstrap.SourceUnit']])
+        require(set(files) == set(parent['files']) | set(added_paths) and
                 canonical_sha(files) == value['current_inventory_sha256'], 'complete current file inventory')
         require(all(files[path] == value['current_registry'][name]
                     for name, path in value['module_paths'].items()), 'registry / file hash mismatch')
@@ -326,9 +329,13 @@ class Contract:
         changed_paths = sorted([*parent['expected_changed_paths'], 'bootstrap/MLF/Entry/Emlf.hs',
                                 'libraries/mlf-language-core/Bootstrap/Data.hs',
                                 'libraries/mlf-crates/Bootstrap/InferenceUnit.hs',
-                                'bootstrap/MLF/Entry/BuiltinPrelude.hs'])
+                                'bootstrap/MLF/Entry/BuiltinPrelude.hs',
+                                'host/ghc/MLF/Host/Base.hs',
+                                'libraries/mlf-crates/Bootstrap/Separate.hs',
+                                'libraries/mlf-frontend/Bootstrap/Parser.hs',
+                                'libraries/mlf-foundation/Bootstrap/Unicode.hs'])
         require(value['changed_paths'] == changed_paths and
-                value['added_paths'] == parent['expected_added_paths'] and
+                value['added_paths'] == added_paths and
                 sorted(path for path in parent['files'] if parent['files'][path] != files[path]) ==
                 value['changed_paths'], 'unexpected / missing changed source path')
         require(type(value['deltas']) is dict and set(value['deltas']) == set(value['changed_paths']),
@@ -475,7 +482,7 @@ class Contract:
                     'complete raw ' + label + ' SHA: ' + path)
 
     def project_tree_bytes(self, current):
-        """All 192 production files -> 188 L+explicit old runtime base files."""
+        """All 193 production files -> 188 L+explicit old runtime base files."""
         self._require_raw_map(current, self.value['current_files'], 'current')
         result = {}
         for path, raw in current.items():
@@ -523,7 +530,7 @@ class Contract:
         return {name: after[name] for name in names}
 
     def live_registry(self, current_root):
-        """Read all 131 actual module bytes, never infer live status from counts."""
+        """Read all 132 actual module bytes, never infer live status from counts."""
         result = {name: sha(read_file(current_root, path))
                   for name, path in self.value['module_paths'].items()}
         self.require_registry(result, 'current')

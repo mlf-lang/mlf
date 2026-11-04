@@ -15,24 +15,38 @@ record. Use a fresh private cache for untrusted input caches.
 
 ## Format and checks
 
-The wire stays at MLFBIN v1, schema 2. New local records have two ordered
-roots, the input SHA text followed by the raw query record. The input text is
-interned with the corresponding field of the second root. Its payload tag 302 is
-`[input SHA, result SHA, raw unit]`. Tag 303 is
-`[context SHA, input SHA, result SHA, contextual header, body]`. Each SHA is
-64 lowercase hexadecimal characters. The format discriminators are separate
-from old exact-key roots 300/301. The source **key material version** stays at
-v7 so existing producers' input descriptions can be independently replayed.
-Old compilers reject the new roots. Current compilers on their default path
-can use an old, matching record only through its original full-key and object
-checks. A compiler executable change changes the input and normally produces a
-cold miss. Unknown or damaged records miss and are replaced through the normal
-atomic writer after successful inference.
+The wire stays at MLFBIN v1, schema 2. Local source records have two ordered
+roots, the input SHA text followed by the raw query record. The same input
+text occurs in the second root. Each SHA has 64 lowercase hexadecimal digits.
 
-On publication the result SHA covers a domain-separated canonical MLFBIN
-encoding (schema 2, root 304) of the expected input SHA and the raw value.
-For a shared result its fields are the context SHA, contextual interface and
-body. For an inline result the field is the complete raw unit. On verification
+| Tag | Fields of the payload root | Result fingerprint |
+|---|---|---|
+| 302 | input SHA, result SHA, raw unit | canonical root 304 |
+| 303 | context SHA, input SHA, result SHA, contextual header, body | canonical root 304 |
+| 305 | input SHA, result SHA, raw unit | template of this addressed record |
+| 306 | input SHA, result SHA, context SHA, contextual header, body | template of this addressed record |
+
+The ordinary compiler writes 305/306. To hash the result, it encodes both
+roots with 64 ASCII tildes in place of the result SHA. The SHA-256 covers the
+complete canonical template, including its CRC and the input SHA. In these
+layouts the result is symbol 1. Before patching the 64 bytes in the private
+buffer, the writer proves the structural text node has a single incoming
+edge from the result field and the new digest differs from every symbol.
+It then computes the CRC over the finished bytes. This produces exactly the
+bytes of an ordinary canonical encoding with the actual digest. If the
+reserved spelling appears in the user's term, a digest equals another symbol,
+or the template exceeds a limit, the writer uses the independently encoded
+302/303 layout and its existing limit fallback.
+
+The key material stays at v7. A compiler executable change changes the input
+and normally causes a cold miss. Older compilers reject the new tags. Current
+compilers retain the original checks for matching 300/301 full-key records and
+302/303 records, including the original single-root representation. A 305/306
+record must have the separate address root. An unsupported tag or damaged
+record misses and is replaced after successful inference.
+
+For 302/303 the SHA covers the bounded canonical root 304 with the expected
+input and raw value. For 305/306 it covers the template described above. On verification
 the reader re-encodes the **admitted object** under the same bounds and compares
 the SHA with the stored result. This checks the decoded value, not just the
 integrity of the on-disk byte buffer. A mismatch discards the record and
@@ -63,8 +77,9 @@ normal absent-file miss still uses the initial address lookup.
 
 On a matching prefix the same byte snapshot goes through CRC, canonical graph
 validation and checked raw admission. The first root must be the same text as
-the input field of the 302/303 payload. The result ICH still covers the input
-and raw value using the existing canonical single root 304. A forged prefix
+the input field in the payload. The 302/303 result ICH uses canonical root
+304. For 305/306 the reader independently reconstructs the addressed template
+from the admitted raw value when verifying the ICH. A forged prefix
 cannot turn a differently addressed payload into a hit. With a damaged body,
 a wrong address can now be reported before a CRC failure. A matching address
 preserves the full integrity checks and their errors.

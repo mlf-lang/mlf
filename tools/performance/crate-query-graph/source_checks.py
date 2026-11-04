@@ -53,7 +53,7 @@ with (out / 'build.log').open('w') as log:
     subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True)
 with (out / 'checks.log').open('w') as log:
     subprocess.run([out / 'source-checks', out / 'cache', *([a.interface.resolve()] if a.interface else [])], cwd=root,
-                   stdout=log, stderr=subprocess.STDOUT, check=True)
+                   stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
 (out / 'receipt.json').write_text(json.dumps(dict(complete=True,
     producer_receipt_sha256=sha(a.receipt), fixture_sha256=sha(main),
     command=command, binary_sha256=sha(out / 'source-checks')), indent=2) + '\n')

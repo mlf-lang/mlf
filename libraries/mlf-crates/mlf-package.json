@@ -44,7 +44,8 @@
       "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs",
       "Bootstrap.OpenFragment": "Bootstrap/OpenFragment.hs",
       "Bootstrap.QueryGraph": "Bootstrap/QueryGraph.hs",
-      "Bootstrap.CrateGraph": "Bootstrap/CrateGraph.hs"
+      "Bootstrap.CrateGraph": "Bootstrap/CrateGraph.hs",
+      "Bootstrap.SourceUnit": "Bootstrap/SourceUnit.hs"
     }
   },
   "source-syntax": "shared-haskell-v1"

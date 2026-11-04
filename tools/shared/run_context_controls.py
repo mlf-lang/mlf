@@ -65,8 +65,12 @@ def binary_query(raw, shared=True):
     document = binary_artifact(raw, 2)
     root = binary_helpers()[1].query_payload_root(document)
     if shared:
-        if document.nodes[root].data[0] == 303:
-            reference, key, result, header, body = graph_node(document, root, 303, 5)
+        tag = document.nodes[root].data[0]
+        if tag in (303,306):
+            if tag == 306:
+                key, result, reference, header, body = graph_node(document, root, tag, 5)
+            else:
+                reference, key, result, header, body = graph_node(document, root, tag, 5)
             fingerprint = binary_helpers()[1].verify_source_result(document)
             return {'document': document, 'reference': graph_text(document, reference),
                     'fingerprint': fingerprint, 'header': header, 'body': body}
@@ -975,11 +979,13 @@ def session_window_audit(root, leaf, cold_snapshot):
             'scope': 'four actual Session compileSpecFile calls plus one all-hit public Query support call. Wholesale final is an envelope-negative witness; alpha-only real raw provenance poison is dual generic Right then actual PreparedRaw Left. No fake PreparedGroup or direct observed multi-entry worker reset count'}
 
 
-def run_added_window_controls(fixture, out, record, save):
+def run_added_window_controls(fixture, out, record, save, include_session=True):
     window_cache = out / 'window-helper-cache'
     session_root = out / 'window-session-raw'
     session_cache = session_root / 'cache'
-    evidence = {'helper': {}, 'session_prepared_raw': {}}
+    evidence = {'helper': {}}
+    if include_session:
+        evidence['session_prepared_raw'] = {}
     record['context_read_window'] = evidence
     hidden_markers = b''.join(('PASS window ' + label + '\n').encode('ascii') for label in WINDOW_HIDDEN_MARKERS)
     restored_markers = b''.join(('PASS window ' + label + '\n').encode('ascii') for label in WINDOW_RESTORED_MARKERS)
@@ -1019,6 +1025,8 @@ def run_added_window_controls(fixture, out, record, save):
         save(); ack(b'WINDOW-RELEASED-ACK\n')
         return released_output + b'PASS window helper complete\n'
     run_window_owned(fixture, out, record, save, 'window-helper', ['window-helper', window_cache], window_dialogue)
+    if not include_session:
+        return window_cache, None
     def session_dialogue(owner, wait_marker, ack, row, started):
         # Both computations and both10s parent audits share the absolute case60.
         _, cold_output = wait_marker(b'SESSION-RAW-COLD', rb'SESSION-RAW-COLD\n', phase_seconds=60)
@@ -1123,13 +1131,18 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--fixture", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument('--legacy-query-only', action='store_true',
+                        help='Retain all legacy Query/codec controls; the graph CLI has its own session controls.')
     args = parser.parse_args()
+    drivers = ['query'] if args.legacy_query_only else ['query', 'session']
+    left_modes = ['legacy', 'source'] if args.legacy_query_only else ['legacy', 'source', 'session']
     fixture, out = args.fixture.absolute(), args.output.absolute()
     require(fixture.is_file() and fixture.resolve() == fixture, "qualified regular fixture path")
     require(not out.exists() and out.parent.is_dir() and out.parent.resolve() == out.parent, "fresh real output")
     inspector_inputs = binary_helpers()[2]
     out.mkdir()
     record = {"complete": False, "fixture_sha256": digest(fixture.read_bytes()), "commands": [], "drivers": {},
+              "legacy_query_only": args.legacy_query_only,
               "binary_inspector_inputs": inspector_inputs,
               "format_migration": {
                   "default_query_context_schemas": [2, 1], "formal_interface_object_schemas": [3, 4],
@@ -1228,7 +1241,7 @@ def main():
         require(helper.endswith(b"PASS helper CACHE1/CACHE2/CACHE3, complete-key and corrupt-input controls\n"), "helper terminal marker")
         raw_final = run("raw-final", ["raw-final", out / "raw-final-cache"])
         require(raw_final == b"PASS final payload cannot masquerade as raw source cache\n", "raw/final terminal marker")
-        for kind in ["query", "session"]:
+        for kind in drivers:
             root = out / kind
             root.mkdir()
             cache = root / "cache"
@@ -1283,7 +1296,7 @@ def main():
                         target.write_bytes(b"broken-context")
                 else:
                     target = cache / next(n for n, f in current["active_records"].items()
-                                          if f == "MLFBIN-QUERY-SHARED-3")
+                                          if f in ("MLFBIN-QUERY-SHARED-3", "MLFBIN-QUERY-SHARED-4"))
                     reference_reader, _, _ = binary_helpers()
                     document = binary_artifact(target.read_bytes(), 2)
                     value = document.values()[-1]
@@ -1291,8 +1304,8 @@ def main():
                     # valid CRC; only the typed body becomes an invalid text
                     # leaf. This is a real typed-payload miss, not old text
                     # smuggled into a file whose magic happens to be binary.
-                    require(value[1] == 303, 'fingerprinted source record')
-                    malformed = ('node', 303, (*value[2][:-1], ('text', '')))
+                    require(value[1] in (303,306), 'fingerprinted source record')
+                    malformed = ('node', value[1], (*value[2][:-1], ('text', '')))
                     target.write_bytes(reference_reader.tree_document([*document.values()[:-1],malformed], schema=2))
                 repaired = driver(kind, cache, root, "42", kind + "-" + mutation)
                 require(repaired["query_report"]["inferred_groups"] >= 1 and repaired["artifact_sha256"] == changed["artifact_sha256"], "corruption miss + exact reconstruction")
@@ -1392,7 +1405,7 @@ def main():
             row["state"] = "passed"
             save()
             return raw
-        for mode in ["legacy", "source", "session"]:
+        for mode in left_modes:
             root = out / ("left-" + mode)
             root.mkdir()
             cache = root / "cache"
@@ -1648,7 +1661,7 @@ def main():
         run_memo_helper()
         phases = ["cold", "warm", "mixed", "restored-warm", "corrupt-repair", "missing-repair"]
         expected_counts = [(2, 0), (0, 2), (0, 2), (0, 2), (1, 1), (1, 1)]
-        for kind in ["query", "session"]:
+        for kind in drivers:
             root = out / ("memo-" + kind)
             cache = root / "cache"
             raw = run("memo-" + kind, ["memo-" + kind, cache, root], timeout=60)
@@ -1676,7 +1689,7 @@ def main():
                              "report_sha256": digest(report_path.read_bytes())})
             no_query_scratch(cache)
             final_snapshot = snapshot(cache, keys)
-            require(set(final_snapshot["active_records"].values()) == {"MLFBIN-QUERY-SHARED-3"},
+            require(set(final_snapshot["active_records"].values()) == {"MLFBIN-QUERY-SHARED-4"},
                     "all records restored to binary shared source queries")
             require(len(final_snapshot["reachable_contexts"]) == 1, "one shared context after both repairs")
             context = cache / final_snapshot["reachable_contexts"][0]
@@ -1806,30 +1819,33 @@ def main():
         differential["complete"] = True
         save()
 
-        window_cache, session_raw_cache = run_added_window_controls(fixture, out, record, save)
+        window_cache, session_raw_cache = run_added_window_controls(fixture, out, record, save,
+                                                                   include_session=not args.legacy_query_only)
 
-        cache_roots = [out / "helper-cache", out / "raw-final-cache", out / "raw-final-cache-inputs", out / "query/cache", out / "session/cache",
-                       *[out / ("left-" + mode) / "cache" for mode in ["legacy", "source", "session"]],
+        cache_roots = [out / "helper-cache", out / "raw-final-cache", out / "raw-final-cache-inputs",
+                       *[out / kind / 'cache' for kind in drivers],
+                       *[out / ("left-" + mode) / "cache" for mode in left_modes],
                        *[out / name / "cache" for name in ["empty-success", "empty-directory-failure", "cleanup-dual-failure", "concurrent"]]]
-        cache_roots += [out / "memo-helper-cache", out / "memo-query/cache", out / "memo-session/cache"]
+        cache_roots += [out / "memo-helper-cache", *[out / ('memo-' + kind) / 'cache' for kind in drivers]]
         cache_roots += [collision_cache, stage_cache]
-        cache_roots += [window_cache, session_raw_cache]
+        cache_roots += [window_cache, *([session_raw_cache] if session_raw_cache is not None else [])]
         record["all_cache_inventory"] = {str(root.relative_to(out)): physical_inventory(root) for root in cache_roots}
         allocated = sum(value["all_pathname_conservative_allocated_bytes"] for value in record["all_cache_inventory"].values())
         logical = sum(value["all_file_logical_bytes"] for value in record["all_cache_inventory"].values())
         record["all_cache_totals"] = {"logical": logical, "allocated": allocated, "cache_roots": len(cache_roots),
-                                      "scope": "all eighteen private cache trees, retaining all original sixteen plus window-helper and actual Session PreparedRaw; includes every retained raw/backup/lock/rejected directory; build/capture evidence remains in outer root accounting"}
+                                      "scope": "all selected private cache trees; includes every retained raw/backup/lock/rejected directory; build/capture evidence remains in outer root accounting"}
         require(logical <= 16 * 1024**2 and allocated <= 16 * 1024**2, "16 MiB complete cache budget")
-        require(len(record["commands"]) == 40, "fixed original K38 plus window and actual Session PreparedRaw commands")
+        require(len(record["commands"]) == (29 if args.legacy_query_only else 40), "fixed selected command inventory")
         require(all(digest(Path(path).read_bytes()) == expected for path, expected in inspector_inputs.items()),
                 'independent binary inspector input changed during controls')
-        dependency = record["left_session_builtin_dependency"]
-        dependency["terminal_pair"] = canonical_session_builtin_pair(out / "session/builtin")
-        require(dependency["terminal_pair"] == dependency["cold_pair"] == dependency["before_live_probe"] == dependency["after_live_probe"],
-                "explicit builtin dependency retained unchanged through all original forty controls")
+        if not args.legacy_query_only:
+            dependency = record["left_session_builtin_dependency"]
+            dependency["terminal_pair"] = canonical_session_builtin_pair(out / "session/builtin")
+            require(dependency["terminal_pair"] == dependency["cold_pair"] == dependency["before_live_probe"] == dependency["after_live_probe"],
+                    "explicit builtin dependency retained unchanged through all original forty controls")
         record["complete"] = True
         save()
-        print(json.dumps({"complete": True, "commands": len(record["commands"]), "drivers": ["query", "session"]}))
+        print(json.dumps({"complete": True, "commands": len(record["commands"]), "drivers": drivers}))
     except BaseException as error:
         record["error"] = type(error).__name__ + ": " + str(error)
         save()

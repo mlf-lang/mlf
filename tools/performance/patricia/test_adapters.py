@@ -1712,13 +1712,14 @@ class CoreProofTests(unittest.TestCase):
 
 
 class BinarySourceBoundaryTests(unittest.TestCase):
-    def test_actual_live131_then_exact_historical128(self):
+    def test_actual_live132_then_exact_historical128(self):
         binary = migration.binary_contract()
         manifest = json.loads((ROOT / 'shared-sources.json').read_bytes())
         actual = {row['module']: hashlib.sha256((ROOT / row['path']).read_bytes()).hexdigest()
                   for row in manifest['modules']}
         binary.require_registry(actual, 'current')
-        self.assertEqual(len(actual), 131)
+        self.assertEqual(len(actual), 132)
+        self.assertIn('Bootstrap.SourceUnit', actual)
         # Fixture preparation must not replace coverage of public live gates.
         historical = json.loads((migration.HERE / 'source-migration.json').read_bytes())
         self.assertEqual(migration.migrate(historical['old_sources']), actual)

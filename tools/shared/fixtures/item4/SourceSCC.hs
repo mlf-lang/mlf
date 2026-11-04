@@ -80,19 +80,20 @@ decodeRawSourceCache keys cache digest final=do
  input<-Storage.read 2 file >>= expect "raw record wire"
  graph<-case input of Storage.BinaryInput g->pure g; _->error "expected binary source record"
  query<-expect "shared source record"(Q.binaryQuery graph)
- case query of
-  Q.LocalQuery stored result (Q.SharedPayload ref _ bodyIndex)->do
-   assert "source context reference is a safe SHA"(Q.validSourceContextDigest ref)
-   actual<-Prim.fileDigest(Q.sourceContextPath(B.literal cache)ref)
-   assert "actual source context SHA"(actual==ref)
-   key<-fullKey keys digest
-   assert "stored input and result fingerprints" (stored==digest && Q.validSourceContextDigest result)
-   body<-expect "raw parameter spine"(Structure.fromGraphXTerm graph bodyIndex)
-   let parameters=[(X.nameHint n,ty)|(n,ty)<-fst(U.splitParameters body)]
-   (_,_,decoded)<-Q.readBinarySourceGraph [] (B.literal cache) key name parameters ds (map fst(U.unitBindings iface)) graph
-   raw<-expect "checked raw record and complete datatype context" decoded
-   pure(key,raw)
+ (stored,result,ref,bodyIndex)<-case query of
+  Q.LocalQuery key hash (Q.SharedPayload context _ body)->pure(key,hash,context,body)
+  Q.SlotQuery key hash (Q.SharedPayload context _ body)->pure(key,hash,context,body)
   _->error "expected a shared source context"
+ assert "source context reference is a safe SHA"(Q.validSourceContextDigest ref)
+ actual<-Prim.fileDigest(Q.sourceContextPath(B.literal cache)ref)
+ assert "actual source context SHA"(actual==ref)
+ key<-fullKey keys digest
+ assert "stored input and result fingerprints" (stored==digest && Q.validSourceContextDigest result)
+ body<-expect "raw parameter spine"(Structure.fromGraphXTerm graph bodyIndex)
+ let parameters=[(X.nameHint n,ty)|(n,ty)<-fst(U.splitParameters body)]
+ (_,_,decoded)<-Q.readBinarySourceGraph [] (B.literal cache) key name parameters ds (map fst(U.unitBindings iface)) graph
+ raw<-expect "checked raw record and complete datatype context" decoded
+ pure(key,raw)
 
 -- Compare the checked receipt directly to the former independent spine walk.
 checkBindingInventory raw = do

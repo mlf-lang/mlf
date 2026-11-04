@@ -24,7 +24,7 @@ module Bootstrap.SourceInference where {
   import qualified Bootstrap.X.Pretty as Pretty;
   import qualified Bootstrap.Bitstream as Wire;
   import qualified Bootstrap.ArtifactStructure as Structure;
-  import qualified Bootstrap.ArtifactStorage as Storage;
+  import qualified Bootstrap.SourceUnit as Unit;
 
   -- Source-finalization representation policy, never a lossless codec rule.
   -- Keep exact original fields and opaque checking receipts separate from the
@@ -542,19 +542,128 @@ module Bootstrap.SourceInference where {
   canonicalFinalSourceObject object = do { prepared <- prepareFinalSourceObject object; snd prepared };
   -- Keep the delayed canonical result attached to the exact admitted object.
   -- The graph is demanded only on the paths that normalize this object.
-  prepareFinalSourceObject object = do {
-    plan <- Wire.prepareGraphPlan Wire.defaultLimits [Structure.toRawUnitObject object];
+  -- Only XThen chains with three or more atoms can change shape. On a
+  -- small unshared tree we can prove both identity and all wire bounds in
+  -- one bounded scan. Shared/deep inputs still use the exact DAG planner.
+  smallFinalValue :: Wire.Value -> Maybe Bool;
+  smallFinalValue raw = let {
+    limits = Wire.defaultLimits;
+    count = min (Wire.maxSymbols limits) (min (Wire.maxSymbolBytes limits)
+      (min (Wire.maxTotalSymbolBytes limits) (min (Wire.maxNodes limits / 4)
+        (min (Wire.maxEdges limits / 4) (Wire.maxExpandedWork limits / 4)))));
+    -- At most 32 bytes per expanded node/edge/text byte, even with maximal
+    -- varints. Header, root reference and final padding fit in 96 bytes.
+    allowance = min 1048576 (min count ((Wire.maxBytes limits - 96) / 32))
+  } in smallFinalTasks [(,,) 1 False [raw]] allowance (min 256 (Wire.maxDepth limits)) False;
+  smallFinalTasks pending remaining maxDepth nested = case pending of {
+    [] -> Just nested;
+    (:) ((,,) depth parentThen values) rest -> case values of {
+      [] -> smallFinalTasks rest remaining maxDepth nested;
+      (:) value more -> if remaining <= 0 || depth > maxDepth then Nothing else let {
+        tail = (:) ((,,) depth parentThen more) rest; next = remaining - 1
+      } in case value of {
+        Wire.VText text -> let { count = stringLength text } in
+          if count > next / 4 then Nothing else smallFinalTasks tail (next - 4 * count) maxDepth nested;
+        Wire.VNode tag children -> if tag < 0 || tag > 2147483647 then Nothing else let { changed = nested || (parentThen && tag == 58) } in
+          seq changed (smallFinalTasks ((:) ((,,) (depth + 1) (tag == 58) children) tail)
+            next maxDepth changed);
+        _ -> smallFinalTasks tail next maxDepth nested
+      }
+    }
+  };
+  -- On the certified small domain the only rewriting operation is still the
+  -- same depth-aware XThen forest. Atom heights and child identities are local
+  -- to each computation; header, datatype and unrelated term nodes cannot
+  -- affect any join. Reuse the original tree wherever the forest was unchanged.
+  data FinalSourcePlan = AlreadyNormal | LocalProofs | FullPlan Wire.GraphPlan;
+  nestedComposition computation = case computation of {
+    XThen a b -> isComposition a || isComposition b || nestedComposition a || nestedComposition b;
+    XInner a -> nestedComposition a; XOuter _ a -> nestedComposition a;
+    _ -> False
+  };
+  isComposition computation = case computation of { XThen _ _ -> True; _ -> False };
+  rewriteProof computation =
+    if not (nestedComposition computation) then Right Nothing else do {
+      graph <- Wire.planGraph Wire.defaultLimits [Structure.toXComputation computation];
+      root <- case Wire.graphRoots graph of {
+        [identity] -> Right identity; _ -> Left "source finalization computation root mismatch"
+      };
+      result <- finalSyntaxRun graph [FinalVisit root (FinalComputation computation)] []
+        (FinalSyntaxState M.empty M.empty 0 0 0);
+      if finalSyntaxUnchanged root result then Right Nothing else mapEither Just (finalSyntaxComputation result)
+    };
+  combineEdits build a b left right = case (,) left right of {
+    (,) Nothing Nothing -> Nothing; _ -> Just (build (fromMaybe a left) (fromMaybe b right))
+  };
+  editItems edit values = editItemsFrom edit values [] False;
+  editItemsFrom edit values acc changed = case values of {
+    [] -> Right (if changed then Just (reverse acc) else Nothing);
+    (:) x xs -> do {
+      replacement <- edit x;
+      case replacement of {
+        Nothing -> editItemsFrom edit xs ((:) x acc) changed;
+        Just new -> editItemsFrom edit xs ((:) new acc) True
+      }
+    }
+  };
+  editBinding ((,,) n ty body) = mapEither (mapOptional (\t -> (,,) n ty t)) (editProofs body);
+  editAlternative (XAlternative pattern body) = mapEither (mapOptional (XAlternative pattern)) (editProofs body);
+  editProofs term = let {
+    pair = \build a b -> do {
+      x <- editProofs a; y <- editProofs b; Right (combineEdits build a b x y)
+    }; one = \build a -> mapEither (mapOptional build) (editProofs a)
+  } in case term of {
+    XAbs n ty b -> one (XAbs n ty) b; XApp a b -> pair XApp a b;
+    XTypeAbs n ty b -> one (XTypeAbs n ty) b;
+    XTypeApp a phi -> do {
+      x <- editProofs a; y <- rewriteProof phi; Right (combineEdits XTypeApp a phi x y)
+    };
+    XLet n a b -> pair (XLet n) a b;
+    XLetRec bs b -> do {
+      x <- editItems editBinding bs; y <- editProofs b; Right (combineEdits XLetRec bs b x y)
+    };
+    XCase a ty bs -> do {
+      x <- editProofs a; y <- editItems editAlternative bs;
+      Right (combineEdits (\t alts -> XCase t ty alts) a bs x y)
+    };
+    XWithData ds b -> one (XWithData ds) b;
+    XVarTerm _ -> Right Nothing; XIntTerm _ -> Right Nothing; XDoubleTerm _ -> Right Nothing;
+    XBoolTerm _ -> Right Nothing; XStringTerm _ -> Right Nothing; XPrimitive _ _ -> Right Nothing;
+    XConstructor _ _ -> Right Nothing
+  };
+  prepareFinalSourceObject object = prepareSourceUnit (Unit.pending object);
+  prepareSourceUnit input = do {
+    let { object = Unit.object input; raw = Structure.toRawUnitObject object };
+    plan <- case smallFinalValue raw of {
+      Just False -> Right AlreadyNormal; Just True -> Right LocalProofs;
+      Nothing -> mapEither FullPlan (Wire.prepareGraphPlan Wire.defaultLimits [raw])
+    };
     let { iface = Separate.objectInterface object; term = Separate.objectTerm object };
-    Storage.validateUnitInterface iface;
-    Storage.admit [Storage.AdmitTerm term];
-    ensure (eqString (Separate.fingerprint (Pretty.prettyTerm term))
-      (Separate.unitObjectFingerprint iface)) "module object checksum mismatch";
-    -- CheckedTerm's constructor is private. objectTerm of a checked object is
-    -- exactly that receipt's term; a raw UnitObject still invokes Checked.check.
-    checked <- Separate.objectChecked object;
-    let { admitted = Separate.CheckedUnitObject iface checked };
-    Right ((,) admitted (do {
-      graph <- Wire.realizeGraphPlan plan;
+    admitted <- Unit.admit input;
+    let { finish = \replacement -> case replacement of {
+      Nothing -> Right admitted;
+      Just result -> do {
+        -- The replacement is independently bounded before checking or rendering.
+        let { value = Structure.toRawUnitObject (Separate.UnitObject iface result) };
+        _ <- case smallFinalValue value of {
+          Just _ -> Right ();
+          Nothing -> do {
+            tables <- Wire.plan Wire.defaultLimits [value];
+            _ <- Wire.layout Wire.defaultLimits tables;
+            Right ()
+          }
+        };
+        proof <- Checked.check result;
+        ensure (eqString (Separate.fingerprint (Pretty.prettyTerm result))
+          (Separate.unitObjectFingerprint iface)) "source finalization changed object checksum";
+        Right (Separate.CheckedUnitObject iface proof)
+      }
+    } };
+    Right ((,) admitted (case plan of {
+      AlreadyNormal -> Right admitted;
+      LocalProofs -> bindEither (editProofs term) finish;
+      FullPlan tables -> do {
+      graph <- Wire.realizeGraphPlan tables;
       root <- case Wire.graphRoots graph of {
         [identity] -> Right identity;
         _ -> Left "source finalization graph root mismatch"
@@ -569,17 +678,8 @@ module Bootstrap.SourceInference where {
       normalized <- finalSyntaxRun graph [FinalVisit termIdentity (FinalTerm term)] []
         (FinalSyntaxState M.empty M.empty 0 0 0);
       result <- finalSyntaxTerm normalized;
-      if finalSyntaxUnchanged termIdentity normalized then Right admitted else do {
-        -- Re-admit exact output geometry BEFORE recursive checker/pretty passes.
-        tables <- Wire.plan Wire.defaultLimits
-          [Structure.toRawUnitObject (Separate.UnitObject iface result)];
-        _ <- Wire.layout Wire.defaultLimits tables;
-        checked <- Checked.check result;
-        ensure (eqString (Separate.fingerprint (Pretty.prettyTerm result))
-          (Separate.unitObjectFingerprint iface)) "source finalization changed object checksum";
-        Right (Separate.CheckedUnitObject iface checked)
-      }
-    }))
+      finish (if finalSyntaxUnchanged termIdentity normalized then Nothing else Just result)
+    } }))
   };
 
 
@@ -1101,8 +1201,10 @@ module Bootstrap.SourceInference where {
   finalGroupObject (FinalGroup object _) = object;
   finalGroupContracts (FinalGroup _ contracts) = contracts;
   finishGroup :: PreparedGroup -> Separate.UnitObject -> Either String FinalGroup;
-  finishGroup prepared object = do {
-    admitted <- prepareFinalSourceObject object;
+  finishGroup prepared object = finishSourceUnit prepared (Unit.pending object);
+  finishSourceUnit prepared input = do {
+    let { object = Unit.object input };
+    admitted <- prepareSourceUnit input;
     validatePreparedRaw prepared object;
     usedProtected <- checkedDependencyProtected (groupParameterProtection prepared) object;
     let { expected = sortBy compareString (map sourceName (groupMembers prepared)) };

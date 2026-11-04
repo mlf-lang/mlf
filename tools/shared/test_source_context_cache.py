@@ -41,6 +41,9 @@ EXPECTED_COMMANDS += ["context-directory-setup", "context-directory-reject", "co
 EXPECTED_COMMANDS += ["decoder-differential"]
 
 EXPECTED_COMMANDS += ["window-helper", "session-window-raw-final"]
+LEGACY_QUERY_COMMANDS = [name for name in EXPECTED_COMMANDS
+                         if not (name.startswith('session-') or name in
+                                 ('left-session', 'lock-after-session', 'memo-session'))]
 
 def require(ok, message):
     if not ok:
@@ -84,16 +87,18 @@ def closed_tree(root):
     return result
 
 
-def verify_control_receipt(path, binary, python, controls, inspector_hashes):
+def verify_control_receipt(path, binary, python, controls, inspector_hashes, legacy_query_only=False):
     receipt = json.loads(path.read_text())
     require(receipt.get('complete') is True and receipt.get('fixture_sha256') == sha(binary),
             'controls did not complete against this fixture')
     require(receipt.get('binary_inspector_inputs') == inspector_hashes,
             'controls did not use the pinned independent binary/typed inspectors')
     rows = receipt.get('commands', [])
-    require([r.get('name') for r in rows] == EXPECTED_COMMANDS,
-            'fixed original K38 plus window and actual Session PreparedRaw command inventory differs')
-    require(set(receipt.get('drivers', {})) == {'query', 'session'}, 'both actual drivers required')
+    expected = LEGACY_QUERY_COMMANDS if legacy_query_only else EXPECTED_COMMANDS
+    require(receipt.get('legacy_query_only') is legacy_query_only, 'control scope mismatch')
+    require([r.get('name') for r in rows] == expected, 'fixed selected command inventory differs')
+    require(set(receipt.get('drivers', {})) == ({'query'} if legacy_query_only else {'query', 'session'}),
+            'selected actual drivers required')
     for row in rows:
         require(row.get('state') == 'passed' and row.get('exit_code') == 0,
                 'nonpassing inner command: ' + str(row.get('name')))
@@ -122,6 +127,8 @@ def main():
     parser.add_argument('--fixture', type=Path)
     parser.add_argument('--controls', type=Path)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--legacy-query-only', action='store_true',
+                        help='Run the 29 retained legacy Query/codec commands; graph CLI controls run separately.')
     parser.add_argument('--controls-timeout', type=int, default=900,
                         help='One bound for the whole 40-command runner; not a guarantee of each per-command ceiling.')
     args = parser.parse_args()
@@ -164,6 +171,7 @@ def main():
     output.mkdir()
     record = {'format': 1, 'complete': False, 'commands': [],
               'mode': 'authenticated-production-source-context', 'source_root': str(source),
+              'legacy_query_only': args.legacy_query_only,
               'inputs': input_hashes, 'producer_receipt': str(receipt_path),
               'binary_inspector_inputs': inspector_hashes,
               'python_invocation': sys.executable, 'canonical_python': str(python),
@@ -252,13 +260,16 @@ def main():
         record['artifacts'] = artifacts
         save()
         inner = output / 'controls'
+        selected = LEGACY_QUERY_COMMANDS if args.legacy_query_only else EXPECTED_COMMANDS
         result = runner.run('source-context-controls', [python, '-I', '-B', controls,
-                            '--fixture', binary, '--output', inner], timeout=args.controls_timeout)
-        require(json.loads(result.stdout) == {'complete': True, 'commands': 40, 'drivers': ['query', 'session']},
+                            '--fixture', binary, '--output', inner,
+                            *(['--legacy-query-only'] if args.legacy_query_only else [])], timeout=args.controls_timeout)
+        require(json.loads(result.stdout) == {'complete': True, 'commands': len(selected),
+                                             'drivers': ['query'] if args.legacy_query_only else ['query', 'session']},
                 'controls completion summary differs')
-        verify_control_receipt(inner / 'receipt.json', binary, python, controls, inspector_hashes)
+        verify_control_receipt(inner / 'receipt.json', binary, python, controls, inspector_hashes, args.legacy_query_only)
         record['controls_receipt'] = {'path': str(inner / 'receipt.json'), 'sha256': sha(inner / 'receipt.json')}
-        record['controls_commands'] = EXPECTED_COMMANDS
+        record['controls_commands'] = selected
         postcheck()
         record.update(complete=True, producer_objects_verified_after=True, post_integrity=True)
     except BaseException as error:

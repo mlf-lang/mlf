@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module MLF.PreparedCompiler
   (Compilation, compileFileWithPrelude, compileSourceWithImports, compileProgramWithPrelude,
-   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, cratePrelude,
+   checkedTerm, compiledTerm, sourceType, reused, dictionaryIdentities, verifyBuiltin, verifyBuiltinImages, installCompilerPrelude, cratePrelude,
    emitNativeFileChunks, emitNativeSourceChunks, nativeInstallInfo,
    NativeCompilation, compileNativeFile, compileNativeSource,
    nativeChunks, nativeManifest, nativeExportCount, nativeInlineCount, nativeFallback, nativeInputs,
@@ -23,6 +23,9 @@ module MLF.PreparedCompiler
   import qualified Bootstrap.Compiler as Compiler;
   import qualified Bootstrap.CompilerCore as Core;
   import qualified Bootstrap.CrateArtifact as Artifact;
+  import qualified Bootstrap.Crate as Crate;
+  import qualified Bootstrap.CrateQuery as Query;
+  import qualified Bootstrap.ArtifactStorage as Storage;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.X.Checked as Checked;
   import qualified Bootstrap.X.Type as T;
@@ -261,6 +264,70 @@ module MLF.PreparedCompiler
   original mode program = mapEither ordinary (Compiler.compileProgramWithPrelude mode program);
   prepared = Context.checkCompilerPrelude Builtin.builtin;
   cratePrelude = case prepared of { Right witness -> Just ((,) witness Builtin.builtinObject); Left _ -> Nothing };
+  verifyBuiltinImages = case Artifact.builtinPrelude of {
+    Left message -> ioReturn (Left message);
+    Right object -> do {
+      images <- Literal.imageTexts object;
+      ioReturn (do {
+        pair <- images;
+        ensure (eqString (fst pair) Builtin.interfaceImage && eqString (snd pair) Builtin.objectImage)
+          "prepared Prelude binary images differ from fresh complete preparation"
+      })
+    }
+  };
+  -- Only the fixed generator's physically verified images enter this route.
+  -- The build compares both byte encodings against fresh ordinary preparation.
+  -- At runtime a hit requires every byte of both bounded files to match.
+  -- Caller-provided witnesses and differing installed formats use full admission.
+  installCompilerPrelude prefix = let { fallback = \_ -> Crate.ensureBuiltinWith cratePrelude prefix } in
+    case prepared of {
+      Left _ -> fallback ();
+      Right _ -> do {
+        images <- compilerPreludeImages;
+        case images of {
+          Left _ -> fallback ();
+          Right ((,) iface body) -> do {
+            code <- Query.cacheCommand ["/bin/mkdir", "-p", Crate.parentDirectory prefix];
+            if code /= 0 then ioReturn (Left "cannot create shared Prelude directory") else do {
+              lock <- acquireFileLock (prefix ++ ".lock");
+              result <- installedImages prefix iface body;
+              releaseFileLock lock;
+              case result of { Nothing -> fallback (); Just outcome -> ioReturn outcome }
+            }
+          }
+        }
+      }
+    };
+  compilerPreludeImages = do {
+    first <- decodeCompilerImage Builtin.interfaceImage; second <- decodeCompilerImage Builtin.objectImage;
+    ioReturn (do { meta <- first; body <- second; Right ((,) meta body) })
+  };
+  decodeCompilerImage text = if stringLength text > 2796204
+    then ioReturn (Left "prepared Prelude binary image exceeds its limit") else Storage.decodeBase64 text;
+  installedImages prefix iface body = do {
+    let { metadata = prefix ++ ".mlfci"; executable = prefix ++ ".mlfco" };
+    hasInterface <- fileExists metadata; hasObject <- fileExists executable;
+    if not hasInterface && not hasObject then do {
+      written <- Storage.writeRawAtomic executable body;
+      case written of {
+        Left message -> ioReturn (Just (Left message));
+        Right () -> do {
+          published <- Storage.writeRawAtomic metadata iface;
+          ioReturn (Just (mapEither (\_ -> metadata) published))
+        }
+      }
+    } else if not (hasInterface && hasObject) then ioReturn Nothing else do {
+      sameInterface <- exactImage metadata iface;
+      sameObject <- if sameInterface then exactImage executable body else ioReturn False;
+      ioReturn (if sameInterface && sameObject then Just (Right metadata) else Nothing)
+    }
+  };
+  exactImage path expected = do {
+    limit <- lengthByteArray expected;
+    acquired <- readByteFileOrError path limit;
+    case acquired of { (,) message bytes -> if eqString message ""
+      then Storage.sameBytes bytes expected else ioReturn False }
+  };
   rawNames = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ value _ _ _ _ _ -> value };
   rawEnvironment = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ _ value _ _ _ _ -> value };
   rawProtected = case Builtin.builtin of { Context.RawPrelude _ _ _ _ _ _ _ _ _ value _ _ -> value };

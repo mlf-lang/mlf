@@ -366,12 +366,19 @@ crate CLI 调用不发布的 `compile/result`，由外层控制提交。旧 `Cra
 `MLF_QUERY_PROFILE=1` 另写 `.query-profile`，不改变 query 身份或正式产物。
 发布时先将缺失或损坏结果写入同一缓存目录下的 `staging/`，再按最多 64 个路径、
 约 32 KiB 的 UTF-8 参数预算分批 rename 到 `results/`。每批只启动一次 `mv`；
+Windows 文件助手只接受单个源文件和完整目标文件名，因此该平台逐文件移动；暂存和最后切代的边界相同。
 全部结果就绪后才写图索引并切换 `CURRENT`。正常旧结果不重写，批次中断只产生尚不可达的新结果。
 
 测试故障注入 `MLF_QUERY_FAILPOINT=before-results|after-result-staging|after-result-batch|before-index|before-current`
 在对应边界返回失败，不切换当前指针；验收包含跨批次发布到一半时旧代仍可完整读取。
 旧代和未发布的结果或暂存文件暂不回收；当前未实现磁盘 GC、并行 SCC、
 断电持久性保证或 raw/final 分类型的堆驻留剖析。
+
+CI 的实际 CLI 查询指纹/发布检查使用 `tools/performance/crate-query-graph/verify.py`，
+source/fallback 及同进程 Session 失败重试使用 `source_checks.py`。保留的旧查询 API
+通过 `test_source_context_cache.py --legacy-query-only` 运行 29 项原有 codec/context/锁检查，
+包括 63 个冻结的 decoder 差分子例。旧格式专用的 Session 用例不用于判断新查询图；
+新验收验证 crate 失败后不发布成功前置 SCC、保留旧代，并在同一进程内释放锁后重试。
 
 ## 验收
 
@@ -445,3 +452,9 @@ raw 对照覆盖开放 body、成员与外部引用映射、依赖类型和 data
 特别记录待发布 raw 的累计大小、收尾对象驻留及两者重叠的峰值，验证延迟写盘是否增加内存成本。
 确认全暖路径确实没有重写缓存，单次修改的 `1/503` 也没有被整代结果重写抵消。
 性能结论以这些固定配对实测为准；图结构、共享字节或命中计数本身不构成加速证据。
+
+实现及合入 PR #29 后的验收、配对测量记录见
+[集成报告](../tools/performance/crate-query-graph/pr29-integration.md)；
+完整源码身份、控制结果和全部样本见
+[evidence.json](../tools/performance/crate-query-graph/evidence.json)。
+该报告将包含 PR #36 的合并版本与原始 `3283899e` 基线比较，不将整体收益归因于单项修改。

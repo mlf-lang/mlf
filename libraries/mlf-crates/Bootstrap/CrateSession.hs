@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 -- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
-module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification) where {
+module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -28,6 +28,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.SourceInference as Source;
+  import qualified Bootstrap.SourceUnit as Unit;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Constraint as C;
   import qualified Bootstrap.Elaborate as E;
@@ -169,9 +170,10 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
 
   compileSourcesWithEncoding :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> Bool -> CrateSpec -> [] SourceModule ->
     [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
-  compileSourcesWithEncoding verifyAll witness shareEncoding spec sources interfaces prefix =
+  compileSourcesWithEncoding verifyAll witness = compileSourcesUsingInstaller verifyAll (ensureBuiltinWith witness);
+  compileSourcesUsingInstaller verifyAll install shareEncoding spec sources interfaces prefix =
     do {
-      dependencies <- withPreludeUsing (ensureBuiltinWith witness) spec sources interfaces;
+      dependencies <- withPreludeUsing install spec sources interfaces;
       case do {
              boundValueShared20 <- dependencies;
              case boundValueShared20 of {
@@ -286,7 +288,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   compileSpecFileWithPrelude :: Maybe ((,) Builtin.PreparedPrelude String) -> String -> String -> IO (Either String ());
   compileSpecFileWithPrelude = compileSpecFileWithVerification False;
   compileSpecFileWithVerification :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> String -> String -> IO (Either String ());
-  compileSpecFileWithVerification verifyAll witness file prefix =
+  compileSpecFileWithVerification verifyAll witness = compileSpecFileUsingInstaller verifyAll (ensureBuiltinWith witness);
+  compileSpecFileUsingInstaller verifyAll install file prefix =
     do {
       present <- fileExists file;
       if not present
@@ -312,7 +315,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                      Right ((,) sources interfaces) ->
                        -- Both source and dependency values originate in the
                        -- parsers/decoders above, not caller-supplied lazy ASTs.
-                       compileSourcesWithEncoding verifyAll witness True normalized sources interfaces prefix
+                       compileSourcesUsingInstaller verifyAll install True normalized sources interfaces prefix
                    }
                  }
              }
@@ -340,6 +343,10 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       runSourceGroupsWithReadContext verifyAll encodings datatypeContext contractEncodings ownedContext []
         crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
   runSourceGroupsWithReadContext verifyAll encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsPublishing Query.DirectRecords verifyAll encodings datatypeContext contractEncodings ownedContext readWindow
+      crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
+  runSourceGroupsPublishing publisher verifyAll encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (Query.QueryReport inferred reused (reverse results)) contracts));
@@ -369,19 +376,19 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
           Nothing -> Query.sourceQueryKeyWithContext crateId compilerHash prepared contracts (fst context);
           Just pool -> Query.sourceQueryKeyWithContractEncodings pool crateId compilerHash prepared contracts (fst context)
         } };
-        writeFile (cacheDir ++ "/query-key.new") key;
-        digest <- fileDigest (cacheDir ++ "/query-key.new");
+        digest <- Query.sourceLookupHash cacheDir key;
         if not (Query.validSourceContextDigest digest) then ioReturn (Left "cannot fingerprint source inference inputs")
         else do {
         let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
         present <- fileExists destination;
         cachedRead <- if present then do {
-          observed <- Query.readLocalSourceFile verifyAll readWindow cacheDir key digest (fst context) name
+          observed <- Query.readLocalSourceUnit verifyAll readWindow cacheDir key digest (fst context) name
             bindings datatypes names destination;
           ioReturn (case observed of {
             (,,) next _ decoded -> case (do {
-              object <- decoded;
-              Source.validatePreparedRaw prepared object
+              unit <- decoded;
+              Source.validatePreparedRaw prepared (Unit.object unit);
+              Right unit
             }) of {
               Left error -> (,) [] (Left error);
               Right object -> (,) next (Right object)
@@ -391,7 +398,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
         let { cached = snd cachedRead };
         let { raw = case cached of {
           Right object -> Right ((,) True object);
-          Left _ -> mapEither ((,) False) (case encodings of {
+          Left _ -> mapEither (\object -> (,) False (Unit.pending object)) (case encodings of {
             Nothing -> compileLoweredGroup name
               ((:) (Query.dependencyInterface bindings) []) datatypes members;
             Just (Query.SourceEncodings pool _) -> compileLoweredGroupWithDatatypes pool name
@@ -400,11 +407,11 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
         } };
         case raw of {
           Left error -> ioReturn (Left error);
-          Right ((,) hit object) -> case Source.finishGroup prepared object of {
+          Right ((,) hit unit) -> case Source.finishSourceUnit prepared unit of {
             Left error -> ioReturn (Left error);
             Right finalized -> do {
               saved <- if hit then ioReturn (Right ())
-                else Query.writeLocalSourceRecord encodings cacheDir destination digest (fst context) object;
+                else Query.writeSourceRecordWith publisher encodings cacheDir destination digest (fst context) (Unit.object unit);
               case saved of {
                 Left error -> ioReturn (Left error);
                 Right _ -> do {
@@ -412,7 +419,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (Query.list Query.encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsWithReadContext verifyAll encodings (snd context) (case contractEncodings of {
+                  runSourceGroupsPublishing publisher verifyAll encodings (snd context) (case contractEncodings of {
                     Nothing -> Nothing;
                     Just pool -> Just (Query.extendSourceContractEncodings finalContracts pool)
                   }) (case ownedContext of {
@@ -465,12 +472,12 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                       then Just (Query.prepareSourceEncodings (Source.planData plan)) else Nothing };
                 result <- if not (Query.validSourceContextDigest compilerHash)
                   then ioReturn (Left "cannot fingerprint source query compiler")
-                  else runSourceGroupsWithOwnedContext verifyAll encodings (case encodings of {
+                  else Query.withSourcePublisher cacheDir (\publisher -> runSourceGroupsPublishing publisher verifyAll encodings (case encodings of {
                   Nothing -> Nothing;
                   Just pool -> Just (Query.emptyDatatypeContextEncoding pool)
                 }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)
-                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing)
-                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];
+                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing) []
+                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 []);
                 cleaned <- Query.cleanupQueryKey cacheDir result;
                 releaseFileLock lock;
                 ioReturn cleaned

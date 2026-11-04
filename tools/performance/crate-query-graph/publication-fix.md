@@ -1,4 +1,4 @@
-# Query publication correction: 2026-11-04
+# Query publication correction: 2026-11-04 (before PR 36 integration)
 
 The corrected implementation is **11.4% faster cold**, **36.6% faster warm**, and
 **35.7% faster after the fixed single-definition edit** than PR 29 in the new
@@ -96,8 +96,10 @@ RSS is a process peak, not a per-type heap-retainer or GC-time measurement.
 
 ## Evidence
 
-Current qualification, controls, samples and independent artifact comparisons are
-pinned in [`evidence.json`](evidence.json). Initial measurements are preserved in
+This correction was committed as `2f046d28` on baseline `3283899e`, before merging
+PR 29 head `5ee8f67a` (PR 36). Its qualification, controls, samples and independent
+artifact comparisons are pinned in
+[`evidence-before-pr36-merge.json`](evidence-before-pr36-merge.json). Initial measurements are preserved in
 [`evidence-before-publication-fix.json`](evidence-before-publication-fix.json).
 Use the commands in [`README.md`](README.md) to reproduce with fresh directories.
 

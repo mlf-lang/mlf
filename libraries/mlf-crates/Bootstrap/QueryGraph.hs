@@ -217,7 +217,7 @@ module Bootstrap.QueryGraph where {
           let { destination = stagingPath session digest };
           saved <- Storage.writeRaw destination bytes;
           case saved of { Left e -> ioReturn (Left e);
-            Right _ -> stageValues session rest ((:) destination staged) }
+            Right _ -> stageValues session rest ((:) ((,) destination path) staged) }
         }
       }
     }
@@ -226,19 +226,23 @@ module Bootstrap.QueryGraph where {
   -- long first path forms a one-file batch, so the split always makes progress.
   moveBatch remaining count paths = case paths of {
     [] -> (,) [] [];
-    (:) path rest -> let { cost = 4 * (stringLength path + 1) } in
+    (:) path rest -> let { cost = 4 * (stringLength (fst path) + 1) } in
       if count == 0 || (count < 64 && cost > remaining) then (,) [] paths else
         let { next = moveBatch (remaining - cost) (count - 1) rest }
         in (,) ((:) path (fst next)) (snd next)
   };
-  moveResults :: String -> Session -> [] String -> IO (Either String ());
+  moveResults :: String -> Session -> [] ((,) String String) -> IO (Either String ());
   moveResults failpoint session paths = case paths of {
     [] -> ioReturn (Right ());
-    _ -> do {
-      let { batch = moveBatch 32768 64 paths;
-        absolute path = if Host.absolutePath path then path else "./" ++ path };
+    (:) first rest -> do {
+      -- The native Windows helper accepts one source and an exact target file;
+      -- POSIX mv also accepts multiple sources followed by their target directory.
+      windows <- Host.isWindows;
+      let { batch = if windows then (,) [first] rest else moveBatch 32768 64 paths;
+        absolute path = if Host.absolutePath path then path else "./" ++ path;
+        destinations = if windows then [absolute (snd first)] else [absolute (directory session ++ "/results")] };
       code <- command (append ["/bin/mv","-f"]
-        (append (map absolute (fst batch)) [absolute (directory session ++ "/results")]));
+        (append (map (compose absolute fst) (fst batch)) destinations));
       if code /= 0 then ioReturn (Left "cannot publish query result batch") else
         if eqString failpoint "after-result-batch"
           then ioReturn (Left "query publication interrupted after a result batch")

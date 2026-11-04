@@ -1,11 +1,15 @@
 # Crate query graph implementation and comparison with PR 29
 
-The publication correction improves cold compilation by **11.4%**, warm compilation
-by **36.6%**, and the fixed single-definition edit by **35.7%** against PR 29 in
-a fresh paired run. Peak RSS and query storage remain higher than PR 29. See
-[`publication-fix.md`](publication-fix.md) for the correction and current results;
-full source/build pins and samples are in [`evidence.json`](evidence.json).
-The initial implementation's slower cold-build measurements are retained below.
+After integrating PR 29's subsequent PR 36 changes, the combined implementation
+improves cold compilation by **20.1%**, warm compilation by **48.7%**, and the
+fixed single-definition edit by **47.9%** against the pinned `3283899e` baseline
+in a fresh paired run. Peak RSS and query storage remain higher than the baseline.
+See [`pr29-integration.md`](pr29-integration.md) for the combined result and its
+limits; full source/build pins and samples are in [`evidence.json`](evidence.json).
+This is not an isolated measurement of the graph's effect relative to PR 36.
+The earlier publication correction is retained in
+[`publication-fix.md`](publication-fix.md); the initial implementation's slower
+cold-build measurements are retained below.
 
 The baseline is exactly `3283899e8ab03af048a674ee41988e454dca813a`.
 The candidate adds a persistent per-crate dependency graph, checked open SCC
@@ -32,6 +36,7 @@ The publication correction queues the immutable encoded bytes used for each
 result's SHA, allowing the expanded wire trees to be released. Index publication
 also reuses its first encoding. Missing results are staged after successful crate
 output, then renamed in batches bounded by 64 paths and a 32 KiB argument budget.
+The Windows file helper retains single-file moves with exact destination paths.
 Only the final `CURRENT` switch makes the new generation visible. Good existing
 results keep their bytes and modification times. The disk format is unchanged.
 
@@ -113,6 +118,13 @@ An actual `SSourceDefinition` marker must select the whole lowered fallback;
 that route also uses the graph and is checked against the legacy driver and
 an independent runtime result. Both CLI branches share the final publication
 transaction; the lowered route retains its existing conservative protection.
+The actual `CrateSession.compileSpecFile` API is also exercised repeatedly in one
+process: a failed crate must not publish its successful prerequisite, retries
+must release the lock, and a failed replacement must preserve the previous
+generation and its exact final artifacts. Retained legacy Query/codec controls
+run separately with `test_source_context_cache.py --legacy-query-only`; their
+29 commands include all 63 frozen decoder differential cases. The new graph CLI
+and same-process controls replace the old-format Session tests for this route.
 `external_checks.py` covers old-cache migration without modifying old files,
 mixed old/new object formats, cross-crate body reuse/type invalidation, and
 relocation without caches.

@@ -44,7 +44,10 @@ module MLF.Entry.Emlf where {
           if eqString command "--verify-builtin-prelude" then
             case Prepared.verifyBuiltin identity of {
               Left message -> fatal message;
-              Right () -> putStrLn "builtin Prelude verified"
+              Right () -> do {
+                images <- Prepared.verifyBuiltinImages;
+                case images of { Left message -> fatal message; Right () -> putStrLn "builtin Prelude verified" }
+              }
             }
           else options ImplicitPrelude [] arguments;
         _ -> options ImplicitPrelude [] arguments
@@ -111,7 +114,8 @@ module MLF.Entry.Emlf where {
     ["-Zincremental-verify-ich", file, "-o", prefix] -> compileCrateCommand True [file, "-o", prefix];
     [file, "-o", prefix, "-Zincremental-verify-ich"] -> compileCrateCommand True [file, "-o", prefix];
     [file, "-o", prefix] -> do {
-      result <- CrateSession.compileSpecFileWithVerification verifyAll Prepared.cratePrelude file prefix;
+      result <- if verifyAll then CrateSession.compileSpecFileWithVerification True Prepared.cratePrelude file prefix
+        else CrateSession.compileSpecFileUsingInstaller False Prepared.installCompilerPrelude file prefix;
       case result of { Left message -> fatal message; Right () -> ioReturn () }
     };
     _ -> fatal crateUsage

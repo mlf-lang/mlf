@@ -97,11 +97,11 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_131_modules_13_executables(self):
+    def test_closed_corpus_has_matching_135_modules_13_executables(self):
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 131)
+        self.assertEqual(len(manifest['modules']), 135)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 131)
+        self.assertEqual(len(modules), 135)
         for name, path, role in (
             ('Bootstrap.Bitstream', 'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'implementation'),
             ('Bootstrap.ArtifactStorage', 'libraries/mlf-crates/Bootstrap/ArtifactStorage.hs', 'implementation'),
@@ -115,6 +115,10 @@ class ManifestParity(unittest.TestCase):
             ('Bootstrap.Standalone', 'libraries/mlf-frontend/Bootstrap/Standalone.hs', 'implementation'),
             ('Bootstrap.EvidenceBoundary', 'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs', 'implementation'),
             ('Bootstrap.SourceInference', 'libraries/mlf-crates/Bootstrap/SourceInference.hs', 'implementation'),
+            ('Bootstrap.SourceUnit', 'libraries/mlf-crates/Bootstrap/SourceUnit.hs', 'implementation'),
+            ('Bootstrap.OpenFragment', 'libraries/mlf-crates/Bootstrap/OpenFragment.hs', 'implementation'),
+            ('Bootstrap.QueryGraph', 'libraries/mlf-crates/Bootstrap/QueryGraph.hs', 'implementation'),
+            ('Bootstrap.CrateGraph', 'libraries/mlf-crates/Bootstrap/CrateGraph.hs', 'implementation'),
             ('Bootstrap.BuiltinPreludeContext', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs', 'implementation'),
             ('Bootstrap.BuiltinPreludeLiteral', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs', 'implementation'),
             ('Bootstrap.ImportParameters', 'libraries/mlf-crates/Bootstrap/ImportParameters.hs', 'implementation'),

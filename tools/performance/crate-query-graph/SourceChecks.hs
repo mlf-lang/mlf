@@ -3,7 +3,9 @@ module Main where
 import Prelude
 import Control.Monad (unless, foldM)
 import System.Environment (getArgs)
-import System.Directory (createDirectoryIfMissing)
+import System.Directory (createDirectoryIfMissing, doesFileExist)
+import Data.List (isInfixOf)
+import qualified Data.ByteString as BS
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Map as M
@@ -15,6 +17,7 @@ import qualified Bootstrap.QueryGraph as G
 import qualified Bootstrap.OpenFragment as O
 import qualified Bootstrap.ArtifactStructure as A
 import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.CrateSession as Session
 import qualified Bootstrap.PreparedLibraries as Libraries
 import qualified Bootstrap.PreparedLibraryLiteral as Literal
 import qualified Bootstrap.Parser as Parser
@@ -231,6 +234,43 @@ loweredChecks root = do
  assert "lowered warm parity"(Old.inferredCount warmReport==0 && Old.reusedCount warmReport==2 && map(view.snd) objects==map(view.snd) reused)
  putStrLn "PASS actual copied-definition fallback, legacy parity, runtime result, and warm graph reuse"
 
+sessionTransactionChecks root = do
+ let folder=root++"/session-transaction"
+     source=folder++"/Tx.hs"; spec=folder++"/crate.spec"; cache=folder++"/cache"
+     pointer=cache++"/query-graph-v1/CURRENT"
+     header="-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule Tx where { import MLF.Primitive; "
+     program value rhs=header++"ok :: Int; ok = "++value++"; bad :: Int; bad = "++rhs++" }\n"
+     compile label=Session.compileSpecFile (B.literal spec) (B.literal(folder++"/"++label))
+     failed label=do
+       result<-compile label
+       case result of
+        T.Left e->assert "actual type failure reached inference" ("mismatch" `isInfixOf` B.unpack e)
+        T.Right _->error "invalid SCC accepted"
+ createDirectoryIfMissing True folder
+ writeFile spec (B.unpack(U.pack ["MLF-CRATE-1","session-transaction","","true",
+   U.pack[U.pack["Tx",B.literal source]],"",B.literal cache,B.literal(folder++"/builtin/unit")]))
+ writeFile source (program "1" "if ok then 2 else 3")
+ failed "cold-failure"
+ exists<-doesFileExist pointer
+ assert "failed crate does not publish its successful prerequisite" (not exists)
+ writeFile source (program "1" "ok")
+ _<-compile "good" >>= expect "same-process retry releases session lock"
+ firstReport<-readFile(folder++"/good.queries")
+ assert "retry infers both unpublished groups" ("\"inferred_groups\":2" `isInfixOf` firstReport)
+ before<-BS.readFile pointer
+ original<-mapM (BS.readFile . ((folder++"/good")++)) [".mlfci",".mlfco"]
+ writeFile source (program "2" "if ok then 2 else 3")
+ failed "warm-failure"
+ after<-BS.readFile pointer
+ assert "failed replacement retains current generation" (before==after)
+ writeFile source (program "1" "ok")
+ _<-compile "restored" >>= expect "same-process warm retry releases session lock"
+ restoredReport<-readFile(folder++"/restored.queries")
+ restored<-mapM (BS.readFile . ((folder++"/restored")++)) [".mlfci",".mlfco"]
+ assert "restored generation fully reuses both groups" ("\"inferred_groups\":0" `isInfixOf` restoredReport && "\"reused_groups\":2" `isInfixOf` restoredReport)
+ assert "restored final artifacts are exact" (original==restored)
+ putStrLn "PASS actual Session same-process failure/retry, lock release, whole-crate publication and retained generation"
+
 main = do
  arguments <- getArgs
  let directory=head arguments
@@ -239,4 +279,5 @@ main = do
  sourceChecks directory
  sourceChanges directory
  loweredChecks directory
+ sessionTransactionChecks directory
  case tail arguments of []->pure (); [file]->formalChecks file; _->error "expected directory [formal-interface]"

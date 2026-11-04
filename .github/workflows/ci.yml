@@ -94,14 +94,19 @@ jobs:
         run: |
           python3 tools/shared/build.py --bootstrap-only --optimization '${{ matrix.optimization }}' --build-dir .mlf-build/shared-ghc
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false' .mlf-build/shared-ghc/receipt.json
-      - name: Check source input fingerprints and loaded-value verification
+      # The CLI writes query graphs; retained legacy .mlfq API controls remain below.
+      - name: Check query graph fingerprints and publication recovery
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard python3 -B tools/shared/test_source_fingerprints.py .mlf-build/shared-ghc/bin/emlf .mlf-build/source-ich-guard/results
-      - name: Check shared source-query contexts and legacy cache compatibility
+          python3 -B tools/shared/resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard python3 -B tools/performance/crate-query-graph/verify.py .mlf-build/shared-ghc/bin/emlf .mlf-build/source-ich-guard/results
+      - name: Check source query graph and lowered fallback
         if: matrix.optimization == '2'
         run: |
-          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-context-cache-guard python3 -B tools/shared/test_source_context_cache.py --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-context-cache-guard/results
+          python3 -B tools/shared/resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard python3 -B tools/performance/crate-query-graph/source_checks.py .mlf-build/shared-ghc/receipt.json .mlf-build/source-graph-guard/results
+      - name: Check retained legacy query API contexts and codecs
+        if: matrix.optimization == '2'
+        run: |
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-context-cache-guard python3 -B tools/shared/test_source_context_cache.py --legacy-query-only --build-receipt .mlf-build/shared-ghc/receipt.json --output .mlf-build/source-context-cache-guard/results
       # Low-cost coverage for the compiler shape benchmark, placed directly after
       # the producer so it runs before the long suites: the contract test proves
       # the analyzer refuses bad data, and the smoke matrix performs real

@@ -394,6 +394,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.SourceUnit",
+      "path": "libraries/mlf-crates/Bootstrap/SourceUnit.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Standalone",
       "path": "libraries/mlf-frontend/Bootstrap/Standalone.hs",
       "role": "implementation"
