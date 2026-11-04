@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 -- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
-module Bootstrap.CrateSession (compileSpecFile) where {
+module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -14,7 +14,8 @@ module Bootstrap.CrateSession (compileSpecFile) where {
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntRank as Rank;
-  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPrelude, prepareCrate,
+  import qualified Bootstrap.BuiltinPreludeContext as Builtin;
+  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate,
     withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
     specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
     preparedResolution, preparedNames, preparedLayouts, preparedReach,
@@ -163,11 +164,11 @@ module Bootstrap.CrateSession (compileSpecFile) where {
       }
     };
 
-  compileSourcesWithEncoding :: Bool -> CrateSpec -> [] SourceModule ->
+  compileSourcesWithEncoding :: Maybe ((,) Builtin.PreparedPrelude String) -> Bool -> CrateSpec -> [] SourceModule ->
     [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
-  compileSourcesWithEncoding shareEncoding spec sources interfaces prefix =
+  compileSourcesWithEncoding witness shareEncoding spec sources interfaces prefix =
     do {
-      dependencies <- withPrelude spec sources interfaces;
+      dependencies <- withPreludeUsing (ensureBuiltinWith witness) spec sources interfaces;
       case do {
              boundValueShared20 <- dependencies;
              case boundValueShared20 of {
@@ -211,7 +212,9 @@ module Bootstrap.CrateSession (compileSpecFile) where {
     };
 
   compileSpecFile :: String -> String -> IO (Either String ());
-  compileSpecFile file prefix =
+  compileSpecFile = compileSpecFileWithPrelude Nothing;
+  compileSpecFileWithPrelude :: Maybe ((,) Builtin.PreparedPrelude String) -> String -> String -> IO (Either String ());
+  compileSpecFileWithPrelude witness file prefix =
     do {
       present <- fileExists file;
       if not present
@@ -237,7 +240,7 @@ module Bootstrap.CrateSession (compileSpecFile) where {
                      Right ((,) sources interfaces) ->
                        -- Both source and dependency values originate in the
                        -- parsers/decoders above, not caller-supplied lazy ASTs.
-                       compileSourcesWithEncoding True normalized sources interfaces prefix
+                       compileSourcesWithEncoding witness True normalized sources interfaces prefix
                    }
                  }
              }

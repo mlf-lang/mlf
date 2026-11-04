@@ -8,17 +8,29 @@ import qualified MLF.Host.Base as B
 import qualified Bootstrap.Module as M
 import qualified Bootstrap.Std as S
 import qualified MLF.Primitive as P
+import qualified Bootstrap.BuiltinPreludeContext as Context
+import qualified Bootstrap.BuiltinPreludeLiteral as Literal
+import qualified MLF.BuiltinPreludeData as Builtin
 import qualified Bootstrap.Crate as C
 import qualified Bootstrap.Parser as Parser
 expect label result = case result of
   T.Left err -> error (label ++ ": " ++ B.unpack err)
   T.Right x -> putStrLn ("PASS " ++ label) >> pure x
+check label ok = if ok then putStrLn ("PASS " ++ label) else error label
 main = do
   object <- expect "compile builtin Prelude" A.builtinPrelude
+  witness <- expect "prepare checked compiler witness" (Context.checkCompilerPrelude Builtin.builtin)
+  split <- expect "admit compiler split object" (Literal.checkedCrateObject witness Builtin.builtinObject)
+  check "split object equals fresh canonical object" (A.encodeObject split == A.encodeObject object)
+  check "damaged split encoding is rejected" (case Literal.checkedCrateObject witness "broken" of
+    T.Left _ -> True; T.Right _ -> False)
+  modified <- expect "well typed witness with same identity and interface"
+    (Context.checkCompilerPrelude (alterWitness Builtin.builtin))
+  check "installed object must match the complete linked witness" (case Literal.checkedCrateObject modified Builtin.builtinObject of
+    T.Left message -> message == "prepared Prelude object differs from its checked linked witness"; T.Right _ -> False)
   iface <- expect "decode builtin interface" (A.decodeInterface (A.encodeInterface (A.objectInterface object)))
   let exports name = S.fromMaybe [] (S.lookup P.eqString name (A.crateExports iface))
       reach name = S.fromMaybe [] (S.lookup P.eqString name (A.crateImports iface))
-      check label ok = if ok then putStrLn ("PASS " ++ label) else error label
   check "decoded Prelude exports exact canonical facade entities" (not (null (exports "Prelude")) && S.eqList (\a b -> M.compareEntity a b == 0) (exports "Prelude") (exports "MLF.Primitive"))
   check "decoded Prelude reach includes canonical instance owner" (S.elem P.eqString "MLF.Primitive" (reach "Prelude"))
   check "decoded Prelude carries canonical public class identities" (all (\name -> any (\entity -> P.eqString (M.owner entity) "MLF.Primitive" && P.eqString (M.spelling entity) name && M.isRole M.Class entity) (exports "Prelude")) ["Eq", "IsString", "Monad"])
@@ -38,3 +50,10 @@ main = do
   restored <- expect "decode builtin object" (A.decodeObject iface (A.encodeObject object))
   _ <- expect "link restored builtin object" (A.linkCheckedObjects ((:) restored []) (A.crateId iface))
   putStrLn "item4 builtin artifact end-to-end: passed"
+
+
+-- Preserve the compiler identity and exports, but change the closed target.
+alterWitness (Context.RawPrelude identity count iface (T.XWithData ds body) available serial names env values protected contracts sources) =
+  let changed = T.XLet (T.XName serial "unused-checked-binding") (T.XIntTerm 41) body
+  in Context.RawPrelude identity count iface (T.XWithData ds changed) available (serial+1) names env values protected contracts sources
+alterWitness _ = error "missing Prelude datatype context"

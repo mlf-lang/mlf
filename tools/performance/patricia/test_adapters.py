@@ -41,7 +41,7 @@ full=importlib.util.module_from_spec(full_spec)
 full_spec.loader.exec_module(full)
 
 def before_full_registry(base):
-    return migration.apply_changes(migration.migrate(base),
+    return migration.apply_changes(migration.through_full_compiler(base),
         {name: {'old': row['new'], 'new': row['old'], 'reviewed_change': 'inverse test'}
          for name,row in migration.full_delta()['changed_sources'].items()})
 
@@ -304,7 +304,8 @@ class AdapterTests(unittest.TestCase):
         for name,row in delta['changed_sources'].items():
             self.assertEqual(previous[name],row['old'])
             self.assertEqual(result[name],row['new'])
-            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),row['new'])
+            self.assertEqual(migration.through_full_compiler(base)[name],row['new'])
+            self.assertEqual(hashlib.sha256((ROOT/paths[name]).read_bytes()).hexdigest(),migration.migrate(base)[name])
 
     def test_canonical_carry_wrong_predecessors_and_registry_pollution_rejected(self):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
@@ -412,7 +413,7 @@ class AdapterTests(unittest.TestCase):
         delta=migration.c3_delta()
         parent=before_c3_registry(base)
         self.assertEqual(delta['parent_manifest_sha256'],migration.CANONICAL_CARRY_MANIFEST_SHA)
-        self.assertEqual({n for n in result if result[n]!=parent[n]}, {'Bootstrap.CrateSession'})
+        self.assertEqual({n for n,v in migration.through_full_compiler(base).items() if v!=parent[n]}, {'Bootstrap.CrateSession'})
         owner=delta['changed_sources']['Bootstrap.CrateSession']
         self.assertEqual(owner['old'],c3.OLD_SHA)
         self.assertEqual(owner['new'],c3.NEW_SHA)
@@ -533,7 +534,7 @@ class AdapterTests(unittest.TestCase):
 
     def test_projection_layer_has_exact_parent_and_one_current_owner(self):
         base=json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
-        delta=migration.full_delta();result=migration.migrate(base);previous=before_full_registry(base)
+        delta=migration.full_delta();result=migration.through_full_compiler(base);previous=before_full_registry(base)
         self.assertEqual(delta['parent_manifest_sha256'],migration.SURVIVORS_MANIFEST_SHA)
         self.assertEqual(len(result),128)
         self.assertEqual({n for n in result if result[n]!=previous[n]}, {'Bootstrap.CrateSession'})
@@ -544,8 +545,26 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(previous['Bootstrap.CrateSession'],row['old'])
         self.assertEqual(result['Bootstrap.CrateSession'],row['new'])
 
+    def test_crate_prelude_transition_rejects_partial_sources(self):
+        prelude = migration.crate_prelude()
+        base = json.loads((migration.HERE/'source-migration.json').read_bytes())['old_sources']
+        parent = migration.through_full_compiler(base)
+        current = prelude.advance_registry(parent)
+        changes = prelude.manifest()['changed_sources']
+        self.assertEqual({name for name in current if parent[name] != current[name]}, set(changes))
+        mixed = dict(parent)
+        mixed['MLF.BuiltinPreludeData'] = current['MLF.BuiltinPreludeData']
+        for invalid in (mixed, current):
+            with self.assertRaises(ValueError):
+                prelude.advance_registry(invalid)
+        actual = (ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        self.assertEqual(hashlib.sha256(prelude.restore_session(actual)).hexdigest(), parent['Bootstrap.CrateSession'])
+        with self.assertRaises(ValueError):
+            prelude.restore_session(actual + b' ')
+
     def test_projection_inverse_recovers_complete_accepted_owner(self):
         source=(ROOT/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_bytes()
+        source=migration.crate_prelude().restore_session(source)
         previous=full.restore_previous_owner(source)
         self.assertEqual(hashlib.sha256(previous).hexdigest(),
             '51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9')
