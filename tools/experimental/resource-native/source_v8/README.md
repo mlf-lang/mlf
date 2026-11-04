@@ -1,5 +1,9 @@
 # Controlled shared-source fragment experiment
 
+The separate [source-only CLI](README_CLI.md) builds and runs this bounded route
+from an actual module snapshot. The diagnostic capture itself remains
+non-importable as native authority.
+
 This opt-in experiment connects a freshly built ordinary source compiler to
 independent shared-fragment replay, IR8 planning and the real Stage05 runtime.
 It does not change the maintained export/2 frontend, v7 route or any default

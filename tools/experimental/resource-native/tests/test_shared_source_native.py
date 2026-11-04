@@ -32,8 +32,10 @@ from planner_v8 import plan_fragment
 from resource_ir_v8.checker import check_resources
 from resource_ir_v8.runtime_emit import emit_runtime
 from validate_shared_capture import verify_capture
+import source_build_v8 as build_tools
+from source_build_v8 import (MIB, PACKAGES, SOURCE_ROOTS, RUNTIME_SOURCES,
+                             require, save, sha, executable, run, build_producer)
 
-MIB = 1024 * 1024
 SUITE_DEADLINE = None
 SCOPE = 'local controlled-source test; not arbitrary diagnostic JSON or export/3 admission'
 SHARED_ID = ('module SharedPoly (sharedId) where\n'
@@ -54,144 +56,18 @@ CASES = (
      [['#bool', '#i64'], ['#i64', '#bool']], [('bool', True), ('i64', 42)]),
 )
 NEGATIVE = 'import SharedPoly\nlet bad = addInt true 1 in sharedId 42\n'
-PACKAGES = ('base', 'array', 'bytestring', 'text', 'containers', 'directory')
-SOURCE_ROOTS = ('tools/experimental/resource-native/source_v8',
-                'libraries/mlf-async', 'libraries/mlf-crates',
-                'libraries/mlf-developer-tools', 'libraries/mlf-foundation',
-                'libraries/mlf-frontend', 'libraries/mlf-inference',
-                'libraries/mlf-interpreter', 'libraries/mlf-language-core',
-                'libraries/mlf-llvm', 'libraries/mlf-package-core',
-                'libraries/mlf-xmlf', 'bootstrap', 'package', 'tests',
-                'tests/shared', 'testing', 'host/ghc')
-RUNTIME_SOURCES = ('rir8_binding.c', 'rir8_guard.c', 'rir8_memory.c',
-                   'rir8_runtime.c', 'rir8_force.c', 'rir8_session.c')
 
 
-def require(condition, message):
-    if not condition:
-        raise AssertionError(message)
 
 
-def save(path, value):
-    with Path(path).open('x', encoding='utf-8') as stream:
-        json.dump(value, stream, indent=2, sort_keys=True)
-        stream.write('\n')
 
 
-def sha(data):
-    return hashlib.sha256(data).hexdigest()
 
 
-def executable(value):
-    found = shutil.which(value)
-    require(found is not None, 'executable not found: ' + value)
-    # Preserve a supplied official installation wrapper's original path.
-    return os.path.abspath(found)
 
 
-def run(argv, directory, stem, *, cwd, env, wall, cpu, memory, stdin=None,
-        stdout_limit=16*MIB, stderr_limit=16*MIB, expected=0):
-    """Ordinary bounded subprocess with retained streams, no automatic retry."""
-    directory = Path(directory)
-    if SUITE_DEADLINE is not None:
-        wall = min(wall, SUITE_DEADLINE - time.monotonic())
-        require(wall > 0, '20-minute suite deadline exceeded before ' + stem)
-    save(directory / (stem + '.argv.json'), argv)
-    started = time.monotonic()
-    result = {'argv': argv, 'cwd': str(cwd), 'scope': SCOPE,
-              'cleanup_errors': [],
-              'limits': {'wall_seconds': wall, 'cpu_seconds': cpu,
-                         'address_space_bytes': memory,
-                         'stdout_bytes': stdout_limit, 'stderr_bytes': stderr_limit}}
-
-    def limits():
-        resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
-        resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
-        ceiling = max(stdout_limit, stderr_limit)
-        resource.setrlimit(resource.RLIMIT_FSIZE, (ceiling, ceiling))
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-
-    out_path, err_path = directory / (stem + '.stdout'), directory / (stem + '.stderr')
-    process = None
-    primary_error = None
-    try:
-        with out_path.open('xb') as out, err_path.open('xb') as err:
-            process = subprocess.Popen(argv, cwd=cwd, env=env,
-                stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
-                stdout=out, stderr=err, start_new_session=True, preexec_fn=limits)
-            result['pid'] = process.pid
-            process.communicate(input=stdin, timeout=wall)
-            result['returncode'] = process.returncode
-        result['stdout_bytes'] = out_path.stat().st_size
-        result['stderr_bytes'] = err_path.stat().st_size
-        require(result['stdout_bytes'] <= stdout_limit, stem + ': stdout cap exceeded')
-        require(result['stderr_bytes'] <= stderr_limit, stem + ': stderr cap exceeded')
-        require(process.returncode == expected,
-                '%s: rc %s, expected %s; see %s' % (stem, process.returncode, expected, err_path))
-    except BaseException as exc:
-        primary_error = exc
-        result['error'] = '%s: %s' % (type(exc).__name__, exc)
-        result['timeout'] = isinstance(exc, subprocess.TimeoutExpired)
-    finally:
-        # Never retry the command, and never let cleanup replace its primary failure.
-        if process is not None and process.poll() is None:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            except BaseException as exc:
-                result['cleanup_errors'].append('kill: ' + repr(exc))
-            try:
-                process.wait(timeout=5)
-            except BaseException as exc:
-                result['cleanup_errors'].append('reap: ' + repr(exc))
-        if process is not None:
-            result['returncode'] = process.returncode
-            if process.stdin is not None and not process.stdin.closed:
-                try:
-                    process.stdin.close()
-                except BaseException as exc:
-                    result['cleanup_errors'].append('stdin close: ' + repr(exc))
-        result['elapsed_seconds'] = time.monotonic() - started
-        save(directory / (stem + '.result.json'), result)
-    if primary_error is not None:
-        raise primary_error
-    require(not result['cleanup_errors'], 'child cleanup failed: ' + repr(result['cleanup_errors']))
-    return out_path, err_path
 
 
-def build_producer(ghc, cc, output, env):
-    build = output / 'producer-build'
-    build.mkdir()
-    objects = build / 'objects'
-    objects.mkdir()
-    # Limit only the short version probe's RTS virtual reservation, not RSS.
-    # GHC's default 1TiB reservation can crowd thread startup under RLIMIT_AS.
-    version, err = run([ghc, '--numeric-version', '+RTS', '-xr32m', '-RTS'],
-                      build, 'version', cwd=REPO,
-                      env=env, wall=10, cpu=10, memory=1 << 30)
-    require(version.read_text().strip() == '9.14.1', 'GHC 9.14.1 is required')
-    require(not err.read_bytes(), 'unexpected GHC version diagnostic')
-    for name, source in (('host', REPO / 'host/ghc/cbits/host.c'),
-                         ('supervisor', REPO / 'runtime/mlf_process_supervisor.c')):
-        run([cc, '-O0', '-std=c11', '-I' + str(REPO / 'runtime'), '-c',
-             str(source), '-o', str(objects / (name + '.o'))], build, name,
-            cwd=REPO, env=env, wall=60, cpu=30, memory=1 << 30)
-    binary = build / 'shared-source-capture'
-    argv = [ghc, '--make', '-j1', '-fforce-recomp', '-XHaskell2010', '-O0',
-            '-fpedantic-bottoms', '-fno-state-hack', '-Werror=incomplete-patterns',
-            '-Werror=incomplete-uni-patterns', '-Wno-star-is-type',
-            '-Wno-overlapping-patterns', '-Wno-deprecations', '-package-env', '-',
-            '-clear-package-db', '-global-package-db', '-no-user-package-db',
-            '-hide-all-packages', '-i']
-    argv += ['-i' + str(REPO / root) for root in SOURCE_ROOTS]
-    for package in PACKAGES:
-        argv += ['-package', package]
-    argv += ['-odir', str(objects), '-hidir', str(objects), '-rtsopts=ignoreAll',
-             str(BASE / 'source_v8/Main.hs'), str(objects / 'host.o'),
-             str(objects / 'supervisor.o'), '-o', str(binary)]
-    run(argv, build, 'ghc', cwd=REPO, env=env, wall=600, cpu=480, memory=8 << 30)
-    return binary
 
 
 def at(root, path):
@@ -392,6 +268,7 @@ def main():
     results = []
     started = time.monotonic()
     SUITE_DEADLINE = started + 1200
+    build_tools.SUITE_DEADLINE = SUITE_DEADLINE
     try:
         ghc, cc = executable(args.ghc), executable(args.cc)
         producer = build_producer(ghc, cc, output, env)
