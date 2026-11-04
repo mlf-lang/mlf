@@ -229,5 +229,265 @@ class AnalyzerTests(unittest.TestCase):
         self.assertIn('duplicate cohort label', process.stderr + process.stdout)
 
 
+
+# Graph fixtures are independently encoded by the frozen wire-format reference,
+# not a compiler run and never a substitute for retained measurement evidence.
+def graph_fixture(groups=1, mutate_nodes=None):
+    import base64
+    import query_cache as Q
+    from artifact_binary_reference import tree_document
+    def s(value): return ('text', value)
+    def n(tag, *children): return ('node', tag, tuple(children))
+    def l(*children): return n(1, *children)
+    raw_hash = hashlib.sha256(b'fixture raw payload').hexdigest()
+    binding_hash = hashlib.sha256(b'fixture shared binding').hexdigest()
+    binding = Q.pack(['Binding', 'imported'])
+    nodes = [
+        {'key': Q.pack(['Input', binding]), 'hash': binding_hash, 'reads': [], 'payload': None},
+        {'key': binding, 'hash': binding_hash,
+         'reads': [(Q.pack(['Input', binding]), binding_hash)], 'payload': binding_hash},
+        {'key': Q.pack(['Binding', 'alias']), 'hash': binding_hash,
+         'reads': [(binding, binding_hash)], 'payload': binding_hash},
+    ]
+    crate = 'compiler-shapes/flat_functions-8'
+    report = {'format': 1, 'crate': crate, 'inferred_groups': groups,
+              'reused_groups': 0, 'groups': []}
+    for i in range(groups):
+        members = ['f' + str(i)]
+        key = Q.pack(['InferScc', Q.pack(members)])
+        nodes.append({'key': key, 'hash': raw_hash,
+                      'reads': [(binding, binding_hash)], 'payload': raw_hash})
+        identity = 'Query_' + ''.join(str(ord(c)) + '_' for c in crate) + 'z_' + ''.join(
+            str(ord(c)) + '_' for c in members[0])
+        report['groups'].append({'id': identity, 'members': members,
+                                'cached': False, 'query_key': raw_hash})
+    if mutate_nodes:
+        mutate_nodes(nodes)
+    configuration = Q.pack([crate, 'b' * 64, 'fixture source format', 'open-fragment-checker-1', 'source'])
+    index = tree_document([n(411, s('MLF-CRATE-QUERY-GRAPH-1'), s(configuration),
+        l(*(n(410, s(x['key']), s(x['hash']),
+               l(*(n(2, s(k), s(h)) for k, h in x['reads'])),
+               n(4) if x['payload'] is None else n(5, s(x['payload']))) for x in nodes)))], 6)
+    generation = hashlib.sha256(index).hexdigest()
+    current = tree_document([s(generation)], 6)
+    files = {Q.GRAPH + 'CURRENT': current, Q.GRAPH + 'generations/' + generation + '.mlfqg': index}
+    inventory = {p: {'bytes': len(b), 'sha256': hashlib.sha256(b).hexdigest()} for p, b in files.items()}
+    for h in [binding_hash, raw_hash]:
+        inventory[Q.GRAPH + 'results/' + h + '.mlfqr'] = {'bytes': 40, 'sha256': h}
+    evidence = {'format': 1, 'query_report_json': json.dumps(report),
+                'files_base64': {p: base64.b64encode(b).decode('ascii') for p, b in files.items()}}
+    return inventory, evidence
+
+
+def change_report(evidence, mutate):
+    report = json.loads(evidence['query_report_json'])
+    mutate(report)
+    evidence['query_report_json'] = json.dumps(report)
+
+
+class GraphCacheTests(unittest.TestCase):
+    def check(self, inventory, evidence, groups=1):
+        return analyze.Q.check_graph(inventory, evidence, groups, 1,
+                                     'compiler-shapes/flat_functions-8', 'b' * 64)
+
+    def test_accepts_extra_nodes_and_content_deduplication(self):
+        inventory, evidence = graph_fixture(groups=3)
+        result = self.check(inventory, evidence, groups=3)
+        self.assertEqual(len(result['groups']), 3)
+        self.assertEqual(result['files'], 4)  # CURRENT, index, two unique payloads
+        self.assertEqual(result['bytes'], sum(v['bytes'] for v in inventory.values()))
+
+    def test_rejects_missing_evidence(self):
+        inventory, _ = graph_fixture()
+        with self.assertRaisesRegex(ValueError, 're-measure'):
+            self.check(inventory, None)
+
+    def test_rejects_missing_payload(self):
+        inventory, evidence = graph_fixture()
+        del inventory[next(p for p in inventory if p.endswith('.mlfqr'))]
+        with self.assertRaisesRegex(ValueError, 'missing retained payload'):
+            self.check(inventory, evidence)
+
+    def test_rejects_bad_content_address(self):
+        inventory, evidence = graph_fixture()
+        inventory[next(p for p in inventory if p.endswith('.mlfqr'))]['sha256'] = '0' * 64
+        with self.assertRaisesRegex(ValueError, 'content-addressed query graph SHA'):
+            self.check(inventory, evidence)
+
+    def test_rejects_nonfinite_fractional_or_boolean_sizes(self):
+        for size in [float('inf'), float('nan'), 1.5, True, -1]:
+            inventory, evidence = graph_fixture()
+            inventory[next(iter(inventory))]['bytes'] = size
+            with self.subTest(size=size), self.assertRaisesRegex(ValueError, 'finite integral'):
+                self.check(inventory, evidence)
+
+    def test_rejects_tampered_retained_bytes(self):
+        inventory, evidence = graph_fixture()
+        evidence['files_base64'][analyze.Q.GRAPH + 'CURRENT'] = 'AAAA'
+        with self.assertRaisesRegex(ValueError, 'retained query graph bytes'):
+            self.check(inventory, evidence)
+
+    def test_rejects_current_selecting_other_generation(self):
+        import base64
+        from artifact_binary_reference import tree_document
+        inventory, evidence = graph_fixture()
+        current = analyze.Q.GRAPH + 'CURRENT'
+        wrong = tree_document([('text', '0' * 64)], 6)
+        evidence['files_base64'][current] = base64.b64encode(wrong).decode('ascii')
+        inventory[current] = {'bytes': len(wrong), 'sha256': hashlib.sha256(wrong).hexdigest()}
+        with self.assertRaisesRegex(ValueError, 'CURRENT selects'):
+            self.check(inventory, evidence)
+
+    def test_rejects_duplicate_node_keys(self):
+        inventory, evidence = graph_fixture(mutate_nodes=lambda ns: ns.append(dict(ns[0])))
+        with self.assertRaisesRegex(ValueError, 'unique query graph keys'):
+            self.check(inventory, evidence)
+
+    def test_rejects_missing_or_stale_dependency(self):
+        for missing in [True, False]:
+            def mutate(ns):
+                ns[-1]['reads'] = [('absent' if missing else ns[0]['key'], '0' * 64)]
+            inventory, evidence = graph_fixture(mutate_nodes=mutate)
+            with self.subTest(missing=missing), self.assertRaisesRegex(ValueError, 'missing/stale'):
+                self.check(inventory, evidence)
+
+    def test_rejects_graph_cycle(self):
+        def mutate(ns):
+            ns[0]['reads'] = [(ns[1]['key'], ns[1]['hash'])]
+        inventory, evidence = graph_fixture(mutate_nodes=mutate)
+        with self.assertRaisesRegex(ValueError, 'cyclic/deep'):
+            self.check(inventory, evidence)
+
+    def test_rejects_wrong_infer_identity_or_hash(self):
+        for field, value in [('members', ['other']), ('query_key', '0' * 64)]:
+            inventory, evidence = graph_fixture()
+            change_report(evidence, lambda q: q['groups'][0].__setitem__(field, value))
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'exact InferScc|group id matches'):
+                self.check(inventory, evidence)
+
+    def test_rejects_wrong_report_crate_format_or_group_id(self):
+        for mutate in [
+            lambda q: q.update(crate='other'),
+            lambda q: q.update(format=True),
+            lambda q: q['groups'][0].update(id='unrelated'),
+        ]:
+            inventory, evidence = graph_fixture()
+            change_report(evidence, mutate)
+            with self.assertRaises(ValueError):
+                self.check(inventory, evidence)
+
+    def test_rejects_wrong_measured_crate_or_compiler(self):
+        for crate, compiler in [('other', 'b' * 64), ('compiler-shapes/flat_functions-8', 'c' * 64)]:
+            inventory, evidence = graph_fixture()
+            with self.assertRaisesRegex(ValueError, 'crate/compiler configuration'):
+                analyze.Q.check_graph(inventory, evidence, 1, 1, crate, compiler)
+
+    def test_rejects_missing_or_duplicate_report_groups(self):
+        for mode in ['missing', 'duplicate', 'overlapping', 'extra-graph']:
+            inventory, evidence = graph_fixture(groups=2)
+            report = json.loads(evidence['query_report_json'])
+            groups = report['groups']
+            if mode == 'missing':
+                groups.pop()
+            elif mode == 'duplicate':
+                groups[1]['id'] = groups[0]['id']
+            elif mode == 'overlapping':
+                groups[1]['members'] = groups[0]['members']
+            else:
+                groups.pop()
+                report['inferred_groups'] = 1
+            evidence['query_report_json'] = json.dumps(report)
+            with self.subTest(mode=mode), self.assertRaises(ValueError):
+                self.check(inventory, evidence, groups=1 if mode == 'extra-graph' else 2)
+
+    def test_rejects_warm_report_and_false_counts(self):
+        for mutate in [
+            lambda q: q.update(reused_groups=1),
+            lambda q: q.update(inferred_groups=2),
+            lambda q: q.update(inferred_groups=True),
+            lambda q: q['groups'][0].update(cached=True),
+        ]:
+            inventory, evidence = graph_fixture()
+            change_report(evidence, mutate)
+            with self.assertRaises(ValueError):
+                self.check(inventory, evidence)
+
+    def test_rejects_duplicate_report_json_keys(self):
+        inventory, evidence = graph_fixture()
+        evidence['query_report_json'] = '{"inferred_groups":1,' + evidence['query_report_json'][1:]
+        with self.assertRaisesRegex(ValueError, 'duplicate query report JSON key'):
+            self.check(inventory, evidence)
+
+    def test_rejects_payload_hash_different_from_node_hash(self):
+        def mutate(nodes):
+            nodes[-1]['payload'] = nodes[1]['hash']
+        inventory, evidence = graph_fixture(mutate_nodes=mutate)
+        with self.assertRaisesRegex(ValueError, 'payload matches result hash'):
+            self.check(inventory, evidence)
+
+    def test_rejects_extra_generation(self):
+        inventory, evidence = graph_fixture()
+        inventory[analyze.Q.GRAPH + 'generations/' + '0' * 64 + '.mlfqg'] = {
+            'bytes': 1, 'sha256': '0' * 64}
+        with self.assertRaisesRegex(ValueError, 'one committed graph generation'):
+            self.check(inventory, evidence)
+
+    def test_rejects_mixed_storage_and_unpublished_staging(self):
+        for extra in ['legacy.mlfq', analyze.Q.GRAPH + 'staging/incomplete']:
+            inventory, evidence = graph_fixture()
+            inventory[extra] = {'bytes': 0, 'sha256': hashlib.sha256(b'').hexdigest()}
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                self.check(inventory, evidence)
+
+    def test_snapshot_retains_exact_actual_inputs(self):
+        import base64
+        import query_cache as Q
+        inventory, evidence = graph_fixture()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            query = root / 'queries'
+            for name, value in evidence['files_base64'].items():
+                path = query / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(base64.b64decode(value))
+            report = root / 'unit.queries'
+            report.write_text(evidence['query_report_json'])
+            destination = root / 'query-graph-evidence.json'
+            Q.snapshot(query, report, destination)
+            self.assertEqual(json.loads(destination.read_text()), evidence)
+
+
+class GraphAnalyzerTests(unittest.TestCase):
+    def test_graph_cohort_and_existing_raw_reuse_guards(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = write_cohort(directory)
+            inventory, evidence = graph_fixture()
+            legs = sorted((folder / 'legs').iterdir())
+            for leg in legs:
+                (leg / 'query-cache-inventory.json').write_text(json.dumps(inventory))
+                (leg / 'query-graph-evidence.json').write_text(json.dumps(evidence))
+            rows, _, _, samples = analyze.analyze(folder)
+            self.assertEqual(rows[0]['query_storage'], 'query-graph-v1')
+            self.assertEqual(rows[0]['fresh'], 1)
+            self.assertEqual(rows[0]['query_files'], 4)
+            self.assertEqual(len(samples), 6)
+            edit(folder, lambda r: r['runs'][-1].update(raw_compared_with_first_mlf_leg=False))
+            with self.assertRaisesRegex(ValueError, 'actual raw-byte comparisons'):
+                analyze.analyze(folder)
+
+    def test_rejects_inventory_drift_with_same_file_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = write_cohort(directory)
+            inventory, evidence = graph_fixture()
+            legs = sorted((folder / 'legs').iterdir())
+            for i, leg in enumerate(legs):
+                if i == 2:
+                    inventory[next(p for p in inventory if p.endswith('.mlfqr'))]['bytes'] += 1
+                (leg / 'query-cache-inventory.json').write_text(json.dumps(inventory))
+                (leg / 'query-graph-evidence.json').write_text(json.dumps(evidence))
+            with self.assertRaisesRegex(ValueError, 'stable graph inventory'):
+                analyze.analyze(folder)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -25,6 +25,8 @@ jq -r '.pinned_sha256 | to_entries[] | "\(.value)  \(.key)"' "$manifest" > "$wor
 sha256 -c "$work/SHA256SUMS" >/dev/null
 python3 -B tools/release/check_benchmark_transition.py
 python3 -B tools/release/test_benchmark_transition.py
+python3 -B tools/performance/artifact-binary/test_query_graph_migration.py
+python3 -B -O tools/performance/artifact-binary/test_query_graph_migration.py
 jq -r '.workloads[].provenance[] | select(.original_source != .build_source) | [.original_source,.build_source] | @tsv' "$manifest" > "$work/adaptations.tsv"
 
 count=0
@@ -47,3 +49,4 @@ while IFS=$'\t' read -r original built; do
 done < "$work/adaptations.tsv"
 test "$count" -gt 0
 printf 'Benchmark provenance passed: all pinned hashes and %s exact patch reconstructions.\n' "$count"
+

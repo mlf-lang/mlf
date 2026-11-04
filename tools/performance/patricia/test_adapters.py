@@ -1712,13 +1712,13 @@ class CoreProofTests(unittest.TestCase):
 
 
 class BinarySourceBoundaryTests(unittest.TestCase):
-    def test_actual_live132_then_exact_historical128(self):
+    def test_actual_live135_then_exact_historical128(self):
         binary = migration.binary_contract()
         manifest = json.loads((ROOT / 'shared-sources.json').read_bytes())
         actual = {row['module']: hashlib.sha256((ROOT / row['path']).read_bytes()).hexdigest()
                   for row in manifest['modules']}
         binary.require_registry(actual, 'current')
-        self.assertEqual(len(actual), 132)
+        self.assertEqual(len(actual), 135)
         self.assertIn('Bootstrap.SourceUnit', actual)
         # Fixture preparation must not replace coverage of public live gates.
         historical = json.loads((migration.HERE / 'source-migration.json').read_bytes())
@@ -1770,10 +1770,7 @@ class BinarySourceBoundaryTests(unittest.TestCase):
         copies = [(ROOT / name, checkout / name) for name in binary.value['current_files']]
         history_names = set(binary.parent['frozen_history']) | set(binary.maintenance_parent['files'])
         copies += [(ROOT / 'tools/performance' / name, history / name) for name in history_names]
-        bundle_names = {'source_contract.py', 'source_migration_adapter.py', 'parent-inventory.json',
-                        'maintenance-parents.json', 'source-migration.json', 'builtin-verification-receipt.json'}
-        bundle_names.update(row['file'] for row in binary.value['deltas'].values())
-        bundle_names.update(row['file'] for row in binary.value['maintenance'].values())
+        bundle_names = set(binary.metadata_paths)
         copies += [(binary.directory / name, bundle / name) for name in bundle_names]
         # New finite relocation fixture, NOT the old 8MiB unit-view allowance.
         # Actual bytes must enter the parent's future unit/ROOT reservation.

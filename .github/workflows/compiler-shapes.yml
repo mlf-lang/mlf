@@ -96,6 +96,8 @@ jobs:
             .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/command.json
             .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/stages.json
             .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/query-cache-inventory.json
+            .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/query-graph-evidence.json
             .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/stdout
             .mlf-build/compiler-shapes-${{ inputs.cohort }}/cohorts/**/legs/**/stderr
             .mlf-build/compiler-shapes-${{ inputs.cohort }}/results/**
+

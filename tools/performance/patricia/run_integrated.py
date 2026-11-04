@@ -34,8 +34,8 @@ def main():
             binary=M.binary_contract(source)
             binary.require_registry({name:row['sha256'] for name,row in auth['shared_inputs'].items()},'current')
             binary.live_registry(source);binary.live_host_inventory(source)
-            for path in [HERE/'source_migration.py',binary.directory/'source_contract.py',
-                         binary.directory/'source_migration_adapter.py',binary.directory/'source-migration.json']:
+            for path in [HERE/'source_migration.py',
+                         *[binary.directory / name for name in binary.metadata_paths]]:
                 record['driver_inputs'][str(path)]=H.sha(path)
             record['producer_receipt_sha256']=H.sha(producer/'receipt.json')
             if a.suite in ['graph','validation']:
