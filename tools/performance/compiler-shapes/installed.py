@@ -2,6 +2,7 @@
 """Paired public emlf SOURCE -o / GHC builds. Keep this endpoint's receipts separate."""
 
 import argparse
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -136,6 +137,20 @@ def workloads(root, n):
     return cases
 
 
+def leaf_edit(case):
+    file = Path(case["directory"]) / "Shared.hs"
+    original = file.read_text()
+    require(original.count("leaf x = addInt x 1") == 1, "unexpected shared leaf")
+    edited = original.replace("leaf x = addInt x 1", "leaf x = addInt x 2")
+    return {
+        "file": file.name,
+        "fresh": original,
+        "edited": edited,
+        "sources": {**case["sources"], file.name: hashlib.sha256(edited.encode()).hexdigest()},
+        "oracle": {arg: str(3 * int(arg) + 9) + "\n" for arg in case["oracle"]},
+    }
+
+
 def measured(argv, cwd, directory, runner):
     started = time.time_ns()
     try:
@@ -170,10 +185,10 @@ def oracle(case, program):
     return results
 
 
-def summarize(cases, samples, repeats):
+def summarize(cases, samples, repeats, states):
     result = []
     for name in cases:
-        for state in ("fresh", "warm"):
+        for state in states:
             rows = [s for s in samples if s["case"] == name and s["state"] == state]
             medians = {}
             for lane in ("before", "after", "ghc"):
@@ -201,6 +216,11 @@ def main():
         parser.add_argument("--" + option, type=Path, required=True)
     parser.add_argument("--size", type=int, default=16)
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument(
+        "--diamond-edit",
+        action="store_true",
+        help="measure a separate cohort with an edit to the common module dependency",
+    )
     args = parser.parse_args()
     require(args.size > 0 and args.repeats >= 3, "positive size and at least three rounds required")
     out = args.output.resolve()
@@ -219,6 +239,12 @@ def main():
 
     db = prepare_host_package(ghc, before / "sources", before, out / "host", run_setup)
     cases = workloads(out / "sources", args.size)
+    edit = None
+    states = ("fresh", "warm")
+    if args.diamond_edit:
+        cases = {"module_diamond": cases["module_diamond"]}
+        edit = leaf_edit(cases["module_diamond"])
+        states = ("fresh", "edited")
     # Alternate before/after, with GHC at rotating positions; each warm build
     # uses its own lane's immediately preceding fresh artifacts and identical bytes.
     schedule = []
@@ -226,7 +252,7 @@ def main():
         for r in range(args.repeats):
             order = ["before", "after"] if (r + c) % 2 == 0 else ["after", "before"]
             order.insert((r + c + 1) % 3, "ghc")
-            for state in ("fresh", "warm"):
+            for state in states:
                 for lane in order if state == "fresh" else reversed(order):
                     schedule.append({"case": name, "round": r, "state": state, "lane": lane})
     plan = {
@@ -244,6 +270,7 @@ def main():
         "limits": LIMITS,
         "producers": producers,
         "cases": cases,
+        "leaf_edit": edit,
         "schedule": schedule,
     }
     dump(out / "plan.json", plan)
@@ -258,8 +285,17 @@ def main():
         program = dest / "program"
         sample = dict(item)
         try:
+            if edit:
+                leaf = src / edit["file"]
+                desired = edit[state]
+                current = leaf.read_text()
+                require(current in (edit["fresh"], edit["edited"]), "shared leaf changed outside the plan")
+                if current != desired:
+                    leaf.write_text(desired)
+                if state == "edited":
+                    case = {**case, "sources": edit["sources"], "oracle": edit["oracle"]}
             require(all(sha(src / k) == v for k, v in case["sources"].items()), "workload bytes changed")
-            if state == "warm":
+            if state != "fresh":
                 prior = next(
                     s
                     for s in results["samples"]
@@ -364,7 +400,7 @@ def main():
             f"{name} {r} {state} {lane} {sample.get('wall_s', '-')} {sample.get('error', 'OK')}", flush=True
         )
     results["complete"] = all(s["passed"] for s in results["samples"])
-    results["summary"] = summarize(cases, results["samples"], args.repeats)
+    results["summary"] = summarize(cases, results["samples"], args.repeats, states)
     dump(out / "receipt.json", results)
     return 0 if results["complete"] else 1
 

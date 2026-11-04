@@ -46,7 +46,7 @@ chain, wide fan-out, a recursive SCC, a four-module diamond and the compiler's
 Unicode classifier. The latter uses its production source with a renamed module
 so both compilers compile it as user code. Each sample starts with empty target
 outputs or is a no-edit repeat of that lane's preceding build. GHC can reuse
-user objects on the repeat. The installed MLF command recompiles user code.
+user objects on the repeat. The installed MLF command recompiles user code. Pass `--diamond-edit` with a fresh output directory for a separate cohort that changes the shared leaf and checks the new result through both branches of the diamond.
 
 `prepare.py` additionally requires the producer's own receipt to carry
 `prepared_verification.kind == "empty"`, which is what a bootstrap-only build has.
