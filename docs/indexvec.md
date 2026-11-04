@@ -44,7 +44,7 @@ dependency tables covered here.
 Primitive code 132 is appended to the wire inventory. Earlier code assignments
 retain their meaning. The builtin interface advances to `/12` and the primitive
 ABI to `mlf-primitive-133-v8`. The runtime keeps its old link markers and adds
-the freeze marker for new generated code. Locks, interfaces, cache keys, worker
+the freeze marker for new generated code. Standalone name allocation visits entities from the original 132-entry inventory before assigning names for appended primitives. This preserves existing generated names even when a new primitive sorts ahead of a user module. Locks, interfaces, cache keys, worker
 JSON and diagnostics continue to use source or crate identities.
 
 ## Reproduction

@@ -1004,11 +1004,22 @@ module Bootstrap.Module where {
              } in
              (,) (M.insert compareEntity entity (fst chosen) entries) (snd chosen)
     };
-  freshNames modules entities =
+  -- Preserve the standalone names assigned with the original 132-entry ABI.
+  -- Appended primitives still receive collision-checked names, after every
+  -- entity that was present in an older compilation of the same source.
+  allocateEntities :: Set String -> Set Entity -> Names;
+  allocateEntities used entities =
     let {
-      used = Set.fromList compareString (concatMap sourceUsed modules)
-    } in
-    Names (fst (foldl (allocateName used) ((,) M.empty 0) (Set.toList entities)));
+      appended entity = case role entity of {
+        Primitive p -> P.primitiveCode p >= 132;
+        _ -> False
+      }
+    } in case partition appended (Set.toList entities) of {
+      (,) extra established -> Names (fst (foldl (allocateName used) ((,) M.empty 0)
+                                         (append established extra)))
+    };
+  freshNames modules entities =
+    allocateEntities (Set.fromList compareString (concatMap sourceUsed modules)) entities;
   -- Resolve the genuine facade alone, without subjecting standalone abstract
   -- nominal annotations to module lookup. The caller supplies every user name.
   standaloneBuiltinScope :: [] String -> Either String ((,,) Names Interface Renamed);
@@ -1016,8 +1027,7 @@ module Bootstrap.Module where {
     declared <- locals primitiveSource;
     let { env = union declared (interface sharedPrimitiveEntities) };
     let { used = Set.fromList compareString (append userNames (sourceUsed primitiveSource)) };
-    let { names = Names (fst (foldl (allocateName used) ((,) M.empty 0)
-                              (Set.toList (visible env)))) };
+    let { names = allocateEntities used (visible env) };
     renamed <- renameModule names env env primitiveSource;
     Right ((,,) names env renamed)
   };

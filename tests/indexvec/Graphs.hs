@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import qualified Bootstrap.Dependency as D
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Module as Modules
+import qualified Bootstrap.Types as T
 import qualified Bootstrap.Set as S
 import qualified MLF.Host.Base as H
 import qualified Package.Json as J
@@ -71,6 +72,12 @@ packageChecks = do
     ["library-prelude-left","library-prelude-right"]] (map (map H.unpack . J.getStrings "dependencies") jobs)
   let encoded = Jobs.graphJson graph
   check "worker graph roundtrip" (H.unpack (J.render encoded)) (H.unpack (J.render (Jobs.graphJson (Jobs.graphFrom encoded))))
+  let user = Modules.Entity "Zed" "value" Modules.Value
+      extra = Modules.Entity "Prelude" "freezeSTArray" (Modules.Primitive T.PFreezeSTArray)
+      nameOf entities = case Modules.resolvedName (Modules.freshNames [] (S.fromList Modules.compareEntity entities)) user of
+        T.Right name -> H.unpack name
+        T.Left err -> error (H.unpack err)
+  check "appended primitive preserves existing generated name" (nameOf [user]) (nameOf [extra,user])
   let direct = M.fromList H.v_compareString
                  [(H.literal k,S.fromList H.v_compareString (map H.literal ns))
                   | (k,ns) <- [("A",["B","External"]),("B",["A"]),("Alone",[])]]
