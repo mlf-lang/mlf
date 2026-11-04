@@ -10,6 +10,7 @@ module Bootstrap.CrateArtifact where {
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Module as Modules;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.Fresh as Fresh;
@@ -313,18 +314,29 @@ module Bootstrap.CrateArtifact where {
   primitiveEntitySet = Set.fromList Modules.compareEntity
     (append Modules.primitiveEntities Modules.sharedPrimitiveEntities);
   isPrimitiveEntity entity = Set.member Modules.compareEntity entity primitiveEntitySet;
-  data ExportInventory =
-    ExportInventory (Set String) (Set String) (Set String) (Set String) (Set String);
-  exportInventory iface =
-    ExportInventory (Set.fromList compareString (map fst (crateBindings iface)))
-      (Set.fromList compareString (map D.datatypeName (crateData iface)))
-      (Set.fromList compareString (map Classes.className (crateClasses iface)))
-      (Set.fromList compareString
-         (concatMap (\d -> map D.constructorName (D.datatypeConstructors d)) (crateData iface)))
-      (Set.fromList compareString
-         (concatMap (\c -> map fst (Classes.classMethods c)) (crateClasses iface)));
+  -- Independent interface readers have no resolver. Bind their stable keys
+  -- once to interface-local slots and check the declaration role in that table.
+  data TermExport = PublishedValue | PublishedMethod;
+  data ExportTerms = ExportTerms (Map String ([] (V.Index Declaration)))
+    (V.IndexVec Declaration TermExport);
+  exportTerms iface = let {
+    entries = append (map (\((,) n _) -> (,) n PublishedValue) (crateBindings iface))
+      (concatMap (\klass -> map (\((,) n _) -> (,) n PublishedMethod) (Classes.classMethods klass)) (crateClasses iface));
+    roles = V.fromList (map snd entries);
+    slots = M.fromListWith compareString append (zipWith (\((,) n _) i -> (,) n [i]) entries (V.indices roles))
+  } in ExportTerms slots roles;
+  hasExportTerm (ExportTerms slots roles) key role = any
+    (\i -> case (,) role (V.at roles i) of {
+      (,) PublishedValue PublishedValue -> True; (,) PublishedMethod PublishedMethod -> True; _ -> False
+    }) (M.findWithDefault compareString [] key slots);
+  data ExportInventory = ExportInventory ExportTerms (Set String) (Set String) (Set String);
+  exportInventory iface = ExportInventory (exportTerms iface)
+    (Set.fromList compareString (map D.datatypeName (crateData iface)))
+    (Set.fromList compareString (map Classes.className (crateClasses iface)))
+    (Set.fromList compareString
+       (concatMap (\d -> map D.constructorName (D.datatypeConstructors d)) (crateData iface)));
   validateOwnExport iface = validateOwnExportNamed (definitionName (crateId iface)) iface;
-  validateOwnExportNamed nameOf iface (ExportInventory values datatypes classes constructors methods) entity =
+  validateOwnExportNamed nameOf iface (ExportInventory terms datatypes classes constructors) entity =
     if (isPrimitiveEntity entity || not (elem eqString (Modules.owner entity) (crateModules iface)))
     then Right ()
     else do {
@@ -334,11 +346,11 @@ module Bootstrap.CrateArtifact where {
            let {
              declared =
                case Modules.role entity of {
-                 Modules.Value -> Set.member compareString name values;
+                 Modules.Value -> hasExportTerm terms name PublishedValue;
                  Modules.Datatype -> Set.member compareString name datatypes;
                  Modules.Class -> Set.member compareString name classes;
                  Modules.Constructor _ -> Set.member compareString name constructors;
-                 Modules.Method _ -> Set.member compareString name methods;
+                 Modules.Method _ -> hasExportTerm terms name PublishedMethod;
                  _ -> False
                }
            };

@@ -445,11 +445,12 @@ module Bootstrap.Dependency where {
   boundTable (BoundValues symbols bindings) = runST
     (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\slots ->
       stBind (ST.map_ (\b -> V.set slots (boundId b) (Just b)) bindings) (\_ -> V.freeze slots)));
-  appendBound (BoundValues old rows) name rhs =
+  appendBoundWithId (BoundValues old rows) name rhs =
     case appendSymbols old [name] of {
-      (,) table [i] -> BoundValues table (append rows [Bound i Nothing rhs]);
+      (,) table [i] -> (,) i (BoundValues table (append rows [Bound i Nothing rhs]));
       _ -> panic "missing appended declaration slot"
     };
+  appendBound values name rhs = snd (appendBoundWithId values name rhs);
   -- Class generation owns the slots of its local outputs. Interface-only
   -- selectors and dictionaries join the same table as imported bindings.
   data GeneratedTable = GeneratedTable Symbols ([] (V.Index Declaration))

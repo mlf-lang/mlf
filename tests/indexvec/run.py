@@ -10,6 +10,7 @@ import sys
 
 from packages import compare_managers
 from crates import check_crates
+from interfaces import check_interfaces
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -49,6 +50,7 @@ def main():
     emlf = args.compiler.resolve(strict=True)
     compare_managers(out / "packages", emlf.with_name("mlfpkg"), args.reference_manager)
     check_crates(run, out / "crates", emlf, args.reference_compiler)
+    check_interfaces(run, out / "interfaces", emlf, args.reference_compiler)
     flags = shlex.split(
         subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp", "bdw-gc"], text=True)
     )

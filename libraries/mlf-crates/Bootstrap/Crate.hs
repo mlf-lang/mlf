@@ -7,6 +7,7 @@ module Bootstrap.Crate where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Host as Host;
@@ -245,15 +246,19 @@ module Bootstrap.Crate where {
             (\((,) _ iface) ->
                map (\name -> (,) name (Artifact.crateId iface)) (Artifact.crateModules iface))
             interfaces));
+  data CrateEntry = NoEntry | CrateEntry Dependency.Symbols (V.Index Declaration);
+  entryName NoEntry = "";
+  entryName (CrateEntry symbols i) = Dependency.symbolName symbols i;
   data PreparedCrate = PreparedCrate Modules.ResolvedCrate ([] DataDecl)
     ([] SClassDecl) ([] ((,) String SInstanceDecl)) Inference.LoweredDeclarations
-    String (Map String (Set String)) (Maybe Source.SourcePlan);
+    CrateEntry (Map String (Set String)) (Maybe Source.SourcePlan);
   preparedResolution (PreparedCrate r _ _ _ _ _ _ _) = r;
   preparedData (PreparedCrate _ ds _ _ _ _ _ _) = ds;
   preparedClasses (PreparedCrate _ _ cs _ _ _ _ _) = cs;
   preparedInstances (PreparedCrate _ _ _ instances _ _ _ _) = instances;
   preparedLowered (PreparedCrate _ _ _ _ lowered _ _ _) = lowered;
-  preparedEntry (PreparedCrate _ _ _ _ _ entry _ _) = entry;
+  preparedEntryId (PreparedCrate _ _ _ _ _ entry _ _) = entry;
+  preparedEntry prepared = entryName (preparedEntryId prepared);
   preparedReach (PreparedCrate _ _ _ _ _ _ reach _) = reach;
   preparedSourcePlan (PreparedCrate _ _ _ _ _ _ _ plan) = plan;
   preparedLayouts prepared = case preparedSourcePlan prepared of {
@@ -266,14 +271,16 @@ module Bootstrap.Crate where {
   };
   entryBindings spec resolution = let {
     modules = Modules.resolvedCrateModules resolution; bindings = Modules.boundIn resolution modules
-  } in if eqString (specEntry spec) "" then Right ((,) "" bindings) else do {
+  } in if eqString (specEntry spec) "" then Right ((,) NoEntry bindings) else do {
     entry <- case find (\r -> eqString (Modules.moduleIdentity (Modules.resolvedSource r)) (specEntry spec)) modules of {
       Nothing -> Left "crate entry module was not resolved"; Just r -> Right r
     };
     expression <- Modules.entryExpr resolution entry;
     let { symbol = Artifact.definitionName (specIdentity spec)
             (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value) };
-    Right ((,) symbol (Dependency.appendBound bindings symbol expression))
+    case Dependency.appendBoundWithId bindings symbol expression of {
+      (,) slot allocated@(Dependency.BoundValues symbols _) -> Right ((,) (CrateEntry symbols slot) allocated)
+    }
   };
   externalInstanceOwners interfaces =
     concatMap
@@ -355,9 +362,9 @@ module Bootstrap.Crate where {
                   (map (\((,) owner value) -> (,) owner (snd value)) instances)
             };
             let {
-              valueScopes = case bindings of { Dependency.BoundValues symbols rows ->
+              valueScopes = case bindings of { Dependency.BoundValues symbols _ ->
                 Dependency.indexedScopes symbols (append (Modules.resolvedScopeRows resolved candidates)
-                  (if eqString entry "" then [] else [(,) (Dependency.boundId (last rows)) (candidates (specEntry spec))]))
+                  (case entry of { NoEntry -> []; CrateEntry _ i -> [(,) i (candidates (specEntry spec))] }))
               }
             };
             let {

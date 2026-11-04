@@ -10,6 +10,9 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Resolved as R;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.IntMap as IM;
   import qualified Bootstrap.IntSet as IS;
@@ -18,7 +21,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate,
     withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
     specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
-    preparedResolution, preparedNames, preparedLayouts, preparedReach,
+    preparedResolution, preparedNames, preparedLayouts, preparedReach, CrateEntry(..), preparedEntryId,
     preparedData, preparedClasses, preparedInstances, preparedEntry);
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.CrateGraph as CrateGraph;
@@ -229,12 +232,12 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
         Nothing -> CrateGraph.compileLoweredIn (preparedLowered prepared) verify (specIdentity spec) compiler directory imported
       }
       else ioReturn (Left "cannot fingerprint query graph compiler");
-    case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.result state of {
+    case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.checkedResult state of {
       (,,,) fragments report contracts session -> case graphInterface spec interfaces prepared fragments contracts of {
         Left e -> ioReturn (Left e);
         Right iface -> do {
           outputStarted <- QueryGraph.clock (CrateGraph.statistics state);
-          made <- Artifact.makeOpenObject iface (map snd interfaces) fragments;
+          made <- Artifact.makeOpenObject iface (map snd interfaces) (map (\((,,) n f _) -> (,) n f) fragments);
           case made of { Left e -> ioReturn (Left e); Right object -> do {
             written <- Artifact.writeObjectEither prefix object;
             case written of { Left e -> ioReturn (Left e); Right _ -> do {
@@ -264,18 +267,47 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
       layouts = filter (\d -> not (Set.member compareString (D.datatypeName d) external)) (preparedLayouts prepared);
       reach = map (\name -> (,) name (Set.toList
         (M.findWithDefault compareString Set.empty name (preparedReach prepared)))) modules;
-      bindings = concatMap (\((,) _ f) -> map (\((,) n ty) ->
-        (,) (X.nameHint n) (Separate.normalType ty)) (Open.bindings f)) fragments };
-    exports <- traverseEither (\r -> mapEither (\scope ->
-      (,) (Modules.moduleIdentity (Modules.resolvedSource r)) (Set.toList (Modules.visible scope)))
+      symbols = Source.contractSymbols contracts; scope = Source.checkedScope contracts;
+      owners = IS.fromList (concatMap (\((,,) _ _ ids) -> map V.toInt ids) fragments);
+      methods = IS.fromList (concatMap (\r -> concatMap (\(R.Class _ _ _ items) ->
+        map (compose V.toInt fst) items) (Modules.resolvedClasses (Modules.resolvedContents r))) resolved);
+      termTable = Modules.resolvedCrateBindings (preparedResolution prepared);
+      validateOwned entity ids = do {
+        i <- Modules.termId termTable entity;
+        ensure (IS.member (V.toInt i) ids) ("crate exports an undeclared entity: " ++ Modules.label entity)
+      };
+      validateExport entity = if Artifact.isPrimitiveEntity entity || not (elem eqString (Modules.owner entity) modules)
+        then Right () else case Modules.role entity of {
+          Modules.Value -> validateOwned entity owners; Modules.Method _ -> validateOwned entity methods; _ -> Right ()
+        };
+      project ((,) i ((,) name ty)) = do {
+        checked <- Source.checkedBinding contracts i;
+        ensure (eqString (Source.declName scope i) (X.nameHint name) && T.alphaEq ty (Source.contractType checked))
+          "open final binding differs from its checked declaration";
+        let { key = Dependency.symbolKey symbols i };
+        Right ((,) ((,) key (Separate.normalType ty)) ((,) key (Source.contractProtected checked)))
+      } };
+    rows <- traverseEither (\((,,) _ fragment ids) -> do {
+      let { bound = Open.bindings fragment };
+      ensure (length ids == length bound) "open final binding ownership mismatch";
+      traverseEither project (zip ids bound)
+    }) fragments;
+    let { output = concat rows };
+    exports <- traverseEither (\r -> mapEither (\visible ->
+      (,) (Modules.moduleIdentity (Modules.resolvedSource r)) (Set.toList (Modules.visible visible)))
       (Modules.resolvedExports (specMode spec) r)) resolved;
-    protection <- traverseEither (\((,) name _) -> case M.lookup compareString name contracts of {
-      Just contract -> Right ((,) name (Source.contractProtected contract));
-      Nothing -> Left "open final source binding lacks protection contract"
-    }) bindings;
+    mapM_ validateExport (concatMap snd exports);
+    entry <- case preparedEntryId prepared of {
+      NoEntry -> Right "";
+      CrateEntry allocated i -> do {
+        ensure (IS.member (V.toInt i) owners && eqString (Dependency.symbolKey allocated i) (Dependency.symbolKey symbols i))
+          "open final crate entry lacks its checked owner";
+        Right (Dependency.symbolKey symbols i)
+      }
+    };
     let { iface = Artifact.CrateInterface (specIdentity spec) dependencies modules exports reach
       (preparedData prepared) (preparedClasses prepared) (preparedInstances prepared)
-      layouts bindings (preparedEntry prepared) "pending" protection };
+      layouts (map fst output) entry "pending" (map snd output) };
     Artifact.validateInterface iface;
     Right iface
   };
