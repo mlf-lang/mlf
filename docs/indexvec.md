@@ -60,3 +60,6 @@ Pass `--reference-manager BEFORE/bin/mlfpkg` to check the actual plan and failur
 diagnostics byte for byte against the previous implementation. The graph
 fixture independently derives SCC membership by mutual reachability and checks
 ordered output for every three-node graph.
+
+The installed compiler measurements and their raw receipts are in the
+[comparison report](../benchmarks/results/2026-11-04-indexvec/README.md).

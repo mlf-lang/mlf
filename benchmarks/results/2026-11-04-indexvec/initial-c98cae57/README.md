@@ -3,8 +3,8 @@
 This is the first measurement window. A subsequent byte comparison found two
 existing module bindings had been renumbered in the emitted xMLF for the module
 diamond. The new primitive had advanced the standalone namespace allocator.
-The implementation was corrected and measured again. This receipt is retained
-for the original candidate only.
+The allocator was subsequently corrected. This receipt covers the original
+candidate only.
 
 The public `emlf SOURCE -o OUTPUT` installations at #29 (`8c455641`) and
 the IndexVec implementation (`c98cae57`) compiled the same programs as
