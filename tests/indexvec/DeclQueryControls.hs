@@ -46,5 +46,12 @@ main = do
               CG.groupKey CG.ScopeQuery pair, CG.groupKey CG.InferQuery pair, CG.groupKey CG.FinishQuery pair,
               CG.groupKey CG.FinishQuery reversePair, CG.groupKey CG.FinishQuery singleton]
   check "distinct query kinds, membership and order" (and [k /= j | (i,k) <- zip [0..] keys, j <- drop (i+1) keys])
+  let goal = T.XCon "C" [T.XCon "Int" []]
+      evidence group site ty = CG.evidenceKey (CG.EvidenceQuery group site ty)
+      e = evidence pair 0 goal
+  check "evidence keys include kind, membership, site and normalized goal"
+    (all (/= e) [CG.groupKey CG.InferQuery pair, evidence singleton 0 goal,
+                 evidence pair 1 goal, evidence pair 0 (T.XCon "C" [T.XCon "Bool" []])])
+  putStrLn "PASS evidence request group, site and goal identities"
   putStrLn "PASS typed SCC query kinds, ordered members and split identities"
   putStrLn "PASS declaration readers, sparse publication, local shadowing, ABI order and contract fields"

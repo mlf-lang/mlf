@@ -248,7 +248,7 @@ module Bootstrap.CrateGraph where {
                             case Source.prepareOpenFinish prepared fragment of {
                               Left e -> ioReturn (Left e);
                               Right finish -> do {
-                                evidence <- resolveRequests env (groupIdentity slots) ((:) (G.edge scopeNode) (map G.edge dataNodes))
+                                evidence <- resolveRequests env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
                                   (Source.openFinishRequests finish) fourth;
                                 case evidence of { Left e -> ioReturn (Left e); Right ((,,) answers evidenceReads afterEvidence) ->
                                 case Source.completeOpenFinish finish answers of {
@@ -335,15 +335,27 @@ module Bootstrap.CrateGraph where {
   result (State session contracts _ objects inferred reused reports _) =
     (,,,) (reverse objects) (Q.QueryReport inferred reused (reverse reports)) (Source.checkedNamed contracts) session;
   statistics (State _ _ _ _ _ _ _ stats) = stats;
-  evidenceNames candidates = zip (map Boundary.candidateName candidates)
-    (map (\((,) index candidate) -> XName (0 - index - 1) (X.nameHint (Boundary.candidateName candidate)))
-      (zip (range 0 (length candidates - 1)) candidates));
-  evidenceValue goal references candidates answer = let {
-    names = M.fromList X.compareName (evidenceNames candidates);
+  data EvidenceQuery = EvidenceQuery Source.GroupSlots Int XType;
+  evidenceKey (EvidenceQuery slots site goal) = G.key "Evidence"
+    (Separate.pack [groupIdentity slots,showInt site,Pretty.prettyType (Separate.normalType goal)]);
+  -- Resolve the checked boundary's candidate binders once, in the exact
+  -- declared order. Negative identities in the payload are evidence-local
+  -- ordinals, never the compilation's numeric declaration slots.
+  evidenceNames slots candidates = do {
+    let { ids = Source.candidateIds slots; scope = Source.slotScope slots };
+    ensure (length ids == length candidates) "evidence candidate inventory changed";
+    traverseEither (\((,) index ((,) i candidate)) -> do {
+      let { name = Boundary.candidateName candidate; stable = Source.declName scope i };
+      ensure (eqString (X.nameHint name) stable) "evidence candidate declaration mismatch";
+      Right ((,) name (XName (0 - index - 1) stable))
+    }) (zip (range 0 (length ids - 1)) (zip ids candidates))
+  };
+  evidenceValue goal references aliases answer = let {
+    names = M.fromList X.compareName aliases;
     canonical = mapOptional (Separate.mapTerm (\n -> M.findWithDefault X.compareName n n names) (\a -> a)) answer
   } in W.VNode 426 [A.toXType (Separate.normalType goal),
     A.toList (A.toPair A.toText A.toText) references,A.toMaybe A.toXTerm canonical];
-  decodeEvidence graph goal references candidates = do {
+  decodeEvidence graph goal references aliases = do {
     root <- case W.graphRoots graph of { [root] -> Right root; _ -> Left "evidence root count" };
     value <- W.lookupGraphNode graph root;
     case value of {
@@ -355,17 +367,17 @@ module Bootstrap.CrateGraph where {
         ensure (eqList (eqPair eqString eqString) savedReferences references) "evidence environment changed";
         decoded <- A.decodeGraphValue (A.ShapeMaybe A.ShapeXTerm) graph p;
         proof <- A.expectMaybe A.expectXTerm decoded;
-        let { replacements = M.fromList X.compareName (map (\((,) a b) -> (,) b a) (evidenceNames candidates)) };
+        let { replacements = M.fromList X.compareName (map (\((,) a b) -> (,) b a) aliases) };
         Right (mapOptional (Separate.mapTerm (\n -> M.findWithDefault X.compareName n n replacements) (\a -> a)) proof)
       };
       _ -> Left "invalid stable evidence record"
     }
   };
-  resolveRequests env identity dependencies requests session = case requests of {
+  resolveRequests env slots dependencies requests session = case requests of {
     [] -> ioReturn (Right ((,,) [] [] session));
-    (:) ((,,) ordinal goal candidates) rest -> do {
-      let { wanted = G.key "Evidence" (Separate.pack [identity,showInt ordinal,
-          Pretty.prettyType (Separate.normalType goal)]);
+    (:) ((,,) ordinal goal candidates) rest -> case evidenceNames slots candidates of {
+      Left e -> ioReturn (Left e); Right aliases -> do {
+      let { wanted = evidenceKey (EvidenceQuery slots ordinal goal);
         validated = G.validate wanted session; previous = fst validated; current = snd validated };
       cached <- case previous of {
         Nothing -> ioReturn (Left "dirty evidence query");
@@ -373,7 +385,7 @@ module Bootstrap.CrateGraph where {
           Nothing -> ioReturn (Left "missing evidence payload");
           Just digest -> do {
             read <- G.readValue (G.payloadPath current digest) (Just digest);
-            ioReturn (bindEither read (\graph -> decodeEvidence graph goal dependencies candidates))
+            ioReturn (bindEither read (\graph -> decodeEvidence graph goal dependencies aliases))
           }
         }
       };
@@ -392,15 +404,15 @@ module Bootstrap.CrateGraph where {
             Just node -> ioReturn (Right ((,) node current));
             Nothing -> ioReturn (Left "evidence validation invariant")
           };
-          Left _ -> G.record wanted dependencies True (evidenceValue goal dependencies candidates proof) current
+          Left _ -> G.record wanted dependencies True (evidenceValue goal dependencies aliases proof) current
         };
         case recorded of { Left e -> ioReturn (Left e); Right ((,) node next) -> do {
-          tail <- resolveRequests env identity dependencies rest next;
+          tail <- resolveRequests env slots dependencies rest next;
           ioReturn (mapEither (\((,,) answers edges final) ->
             (,,) ((:) ((,) ordinal proof) answers) ((:) (G.edge node) edges) final) tail)
         } }
       } }
-    }
+    } }
   };
   -- The standalone source-root boundary publishes only after every SCC has
   -- completed. CrateSession uses compile/result and owns the later IO boundary.
