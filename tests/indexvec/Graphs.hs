@@ -98,6 +98,9 @@ packageChecks = do
         T.Right name -> H.unpack name
         T.Left err -> error (H.unpack err)
   check "appended primitive preserves existing generated name" (nameOf [user]) (nameOf [extra,user])
+  let world = Modules.Entity "Prelude" "IOWorld" Modules.BuiltinType
+      bridge = Modules.Entity "Prelude" "stToIO" (Modules.Primitive T.PSTToIO)
+  check "IO world entities preserve existing generated name" (nameOf [user]) (nameOf [world,bridge,extra,user])
   let direct = M.fromList H.v_compareString
                  [(H.literal k,S.fromList H.v_compareString (map H.literal ns))
                   | (k,ns) <- [("A",["B","External"]),("B",["A"]),("Alone",[])]]

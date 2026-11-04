@@ -15,6 +15,7 @@
 void mlf_require_haskell_boundary_v4_abi(void);
 void mlf_require_byte_file_v2_abi(void);
 void mlf_require_freeze_st_array_abi(void);
+void mlf_require_st_to_io_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;
@@ -44,6 +45,7 @@ MlfValue *mlf_thunk_new(MlfCode code, uint64_t count);
 MlfValue *mlf_thunk(MlfCode code, MlfEnv *env);
 MlfValue *mlf_closure(MlfCode code, MlfEnv *env);
 MlfValue *mlf_native_io(MlfCode code, MlfEnv *env);
+MlfValue *mlf_native_io_value(MlfCode code, MlfEnv *env);
 MlfValue *mlf_peek(MlfValue *value);
 _Noreturn void mlf_bounds_failure(void);
 MlfValue *mlf_application(MlfValue *function, MlfValue *argument);

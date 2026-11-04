@@ -1071,7 +1071,7 @@ def canonical_session_builtin_pair(prefix):
         documents[suffix] = binary_artifact(raw, schema)
     meta, obj = documents[".mlfci"], documents[".mlfco"]
     iface = graph_node(meta, meta.roots[0], 242, 13)
-    require(graph_text(meta, iface[0]) == "mlf:builtin-shared-haskell-v1:12"
+    require(graph_text(meta, iface[0]) == "mlf:builtin-shared-haskell-v1:13"
             and graph_node(meta, iface[1], 1) == ()
             and sorted(graph_text(meta, n) for n in graph_node(meta, iface[2], 1)) == ["MLF.Primitive", "Prelude"]
             and graph_text(meta, iface[10]) == "", "canonical ABI11 builtin identity/ownership/dependencies")

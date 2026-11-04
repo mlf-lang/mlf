@@ -165,7 +165,8 @@ module Bootstrap.Types where {
     PReadByteFileOrError |
     PWriteByteFileOrError |
     PByteArrayDigest |
-    PFreezeSTArray;
+    PFreezeSTArray |
+    PSTToIO;
   data SType =
     STVar String |
     SBottom |

@@ -4,7 +4,8 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.IndexVec
   (Index, fromInt, toInt, IndexVec, count, at, indices, toList, fromList,
-   Builder, new, filled, size, get, set, push, freeze) where {
+   Builder, new, filled, size, get, set, push, freeze,
+   FixedBuilder, fixedFilled, fixedGet, fixedSet, fixedFreeze) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
@@ -29,6 +30,16 @@ module Bootstrap.IndexVec
   toList vec = S.map (at vec) (indices vec);
 
   -- Aliases share this header even when growth replaces the backing array.
+  data FixedBuilder s domain a = FixedBuilder Int (STArray s a);
+  fixedFilled :: forall s d a. Int -> a -> ST s (FixedBuilder s d a);
+  fixedFilled n value = if n < 0 || n > maxCells then panic "invalid IndexVec length"
+    else stBind (newSTArray n value) (\cells -> stReturn (FixedBuilder n cells));
+  fixedGet :: forall s d a. FixedBuilder s d a -> Index d -> ST s a;
+  fixedGet (FixedBuilder n cells) (Index i) = checked n i (readSTArray cells i);
+  fixedSet :: forall s d a. FixedBuilder s d a -> Index d -> a -> ST s ();
+  fixedSet (FixedBuilder n cells) (Index i) value = checked n i (writeSTArray cells i value);
+  fixedFreeze :: forall s d a. FixedBuilder s d a -> ST s (IndexVec d a);
+  fixedFreeze (FixedBuilder n cells) = stBind (freezeSTArray cells) (\lookup -> stReturn (Vector n lookup));
   data Buffer s a = Buffer Int Int (STArray s a);
   data Builder s domain a = Builder (STArray s (Buffer s a));
   maxCells :: Int;

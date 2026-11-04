@@ -33,6 +33,7 @@ module Bootstrap.Bitstream (
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IndexVec as V;
 
   -- The schema above this layer owns constructor tags and field types. VBits
   -- is an arbitrary Int64 bit pattern, not a nonnegative numeric quantity.
@@ -804,9 +805,15 @@ module Bootstrap.Bitstream (
   realizeGraphPlan :: GraphPlan -> Either String Graph;
   realizeGraphPlan (GraphPlan limits tables) = graphFromPlan limits tables;
   graphNodeDepth :: Graph -> Int -> Either String Int;
-  graphNodeDepth (Graph nodes _) index = case IM.lookup index nodes of {
-    Nothing -> Left "binary graph node index out of range";
-    Just parsed -> Right (parsedDepth parsed)
+  graphNodeDepth graph index = case graph of {
+    Graph nodes _ -> case IM.lookup index nodes of {
+      Nothing -> Left "binary graph node index out of range";
+      Just parsed -> Right (parsedDepth parsed)
+    };
+    DenseGraph nodes _ _ -> case denseLookup nodes index of {
+      Nothing -> Left "binary graph node index out of range";
+      Just (DenseInput _ depth _ _) -> Right depth
+    }
   };
   -- Only plan/prepareGraphPlan can call this private path. Their first-use
   -- traversal interns each symbol and entry once, creates a node only after
@@ -931,7 +938,9 @@ module Bootstrap.Bitstream (
         }
     };
   graphResourceStats :: Graph -> Either String ResourceStats;
-  graphResourceStats (Graph nodes roots) = do {
+  graphResourceStats graph = graphResourceStatsFrom (graphMap graph) (graphRoots graph);
+  graphResourceStatsFrom :: IntMap Parsed -> [] Int -> Either String ResourceStats;
+  graphResourceStatsFrom nodes roots = do {
     let { count = IM.size nodes; nodeWidth = referenceWidth count };
     measured <- measureGraphNodes nodes count nodeWidth 0
       (ResourceState IM.empty 0 0 0 0 0 0 0);
@@ -964,22 +973,46 @@ module Bootstrap.Bitstream (
   -- constructor is deliberately hidden. Typed adapters memoize by their
   -- expected shape and these canonical node IDs, preserving actual sharing
   -- instead of repeatedly reconstructing a shared subtree through Value.
-  data Graph = Graph (IntMap Parsed) ([] Int);
+  data DecodeId = DecodeId;
+  data Graph = Graph (IntMap Parsed) ([] Int) | DenseGraph (V.IndexVec DecodeId DenseInput) ([] Int) (V.IndexVec DecodeId Parsed);
   data GraphNode = GInt Int | GBits Int | GText String | GNode Int ([] Int);
   graphRoots :: Graph -> [] Int;
-  graphRoots (Graph _ roots) = roots;
+  graphRoots graph = case graph of { Graph _ roots -> roots; DenseGraph _ roots _ -> roots };
   graphNodeCount :: Graph -> Int;
-  graphNodeCount (Graph nodes _) = IM.size nodes;
+  graphNodeCount graph = case graph of { Graph nodes _ -> IM.size nodes; DenseGraph nodes _ _ -> V.count nodes };
+  graphMap :: Graph -> IntMap Parsed;
+  graphMap graph = case graph of {
+    Graph nodes _ -> nodes;
+    DenseGraph _ _ nodes -> IM.fromDistinctAscList (zip (range 0 (V.count nodes - 1)) (V.toList nodes))
+  };
+  denseLookup :: forall a. V.IndexVec DecodeId a -> Int -> Maybe a;
+  denseLookup nodes index =
+    if index < 0 || index >= V.count nodes then Nothing else Just (V.at nodes (V.fromInt index));
+  graphParsed :: Graph -> Int -> Maybe Parsed;
+  graphParsed graph index = case graph of {
+    Graph nodes _ -> IM.lookup index nodes; DenseGraph _ _ nodes -> denseLookup nodes index
+  };
   lookupGraphNode :: Graph -> Int -> Either String GraphNode;
-  lookupGraphNode (Graph nodes _) index = case IM.lookup index nodes of {
-    Nothing -> Left "binary graph node index out of range";
-    Just (Parsed entry value _ _) -> case entry of {
-      EInt integer -> Right (GInt integer);
-      EBits bits -> Right (GBits bits);
-      ENode tag children -> Right (GNode tag children);
-      EText _ -> case value of {
-        VText text -> Right (GText text);
-        _ -> Left "binary graph internal text-node invariant failure"
+  lookupGraphNode graph index = case graph of {
+    Graph _ _ -> case graphParsed graph index of {
+      Nothing -> Left "binary graph node index out of range";
+      Just (Parsed entry value _ _) -> case entry of {
+        EInt integer -> Right (GInt integer);
+        EBits bits -> Right (GBits bits);
+        ENode tag children -> Right (GNode tag children);
+        EText _ -> case value of {
+          VText text -> Right (GText text);
+          _ -> Left "binary graph internal text-node invariant failure"
+        }
+      }
+    };
+    DenseGraph nodes _ _ -> case denseLookup nodes index of {
+      Nothing -> Left "binary graph node index out of range";
+      Just (DenseInput entry _ _ text) -> case entry of {
+        EInt integer -> Right (GInt integer);
+        EBits bits -> Right (GBits bits);
+        ENode tag children -> Right (GNode tag children);
+        EText _ -> Right (GText text)
       }
     }
   };
@@ -1123,15 +1156,21 @@ module Bootstrap.Bitstream (
       Just parsed -> collectRoots nodes rest ((:) (parsedValue parsed) values)
     }
   };
+  collectGraphRoots :: Graph -> [] Int -> [] Value -> Either String ([] Value);
+  collectGraphRoots graph roots values = case roots of {
+    [] -> Right (reverse values);
+    (:) index rest -> case graphParsed graph index of {
+      Nothing -> Left "binary root has no decoded node";
+      Just parsed -> collectGraphRoots graph rest ((:) (parsedValue parsed) values)
+    }
+  };
   decode :: Limits -> Int -> ByteArray -> IO (Either String ([] Value));
   decode limits schema bytes = catchIOError (decodeChecked limits schema bytes)
     (\error -> ioReturn (Left ("binary decode IO failure: " ++ textFromChars (ioeGetErrorString error))));
   decodeChecked :: Limits -> Int -> ByteArray -> IO (Either String ([] Value));
   decodeChecked limits schema bytes = do {
     graph <- decodeGraphChecked [] limits schema bytes;
-    ioReturn (bindEither graph (\value -> case value of {
-      Graph nodes roots -> collectRoots nodes roots []
-    }))
+    ioReturn (bindEither graph (\value -> collectGraphRoots value (graphRoots value) []))
   };
   decodeGraph :: Limits -> Int -> ByteArray -> IO (Either String Graph);
   decodeGraph = decodeGraphWithText [];
@@ -1225,7 +1264,7 @@ module Bootstrap.Bitstream (
             Just ((,) symbols partial) -> do {
               actual <- checksumBytes table bytes size nodeOffset partial;
               if actual /= expectedCRC then ioReturn (Left "binary checksum mismatch")
-              else decodeNodesAndRoots limits bytes geometry symbols
+              else decodeDenseNodesAndRoots limits bytes geometry symbols
             }
           }
         }
@@ -1272,19 +1311,23 @@ module Bootstrap.Bitstream (
       }
     };
   decodeTables :: Limits -> ByteArray -> Layout -> IO (Either String ([] Value));
+  -- This low-level compatibility API accepts caller-supplied Layout values.
+  -- Keep its historical incremental checks and allocation behavior.
   decodeTables limits bytes geometry = do {
-    graph <- decodeGraphTables [] limits bytes geometry;
-    ioReturn (bindEither graph (\value -> case value of {
-      Graph nodes roots -> collectRoots nodes roots []
-    }))
+    graph <- decodeGraphTablesUsing decodeNodesAndRoots [] limits bytes geometry;
+    ioReturn (bindEither graph (\value -> collectGraphRoots value (graphRoots value) []))
   };
   decodeGraphTables :: [] String -> Limits -> ByteArray -> Layout -> IO (Either String Graph);
-  decodeGraphTables hints limits bytes geometry = case geometry of {
+  decodeGraphTables hints limits bytes geometry =
+    decodeGraphTablesUsing decodeDenseNodesAndRoots hints limits bytes geometry;
+  decodeGraphTablesUsing :: (Limits -> ByteArray -> Layout -> IntMap Symbol -> IO (Either String Graph)) ->
+    [] String -> Limits -> ByteArray -> Layout -> IO (Either String Graph);
+  decodeGraphTablesUsing decodeNodes hints limits bytes geometry = case geometry of {
     Layout _ symbolCount symbolLength _ _ _ _ _ _ _ _ _ -> do {
       symbolResult <- runSection bytes 80 symbolLength (getSymbolsWith (filter (\t -> stringLength t >= 256) (take 9 hints)) limits symbolCount 0 0 M.empty IM.empty);
       case symbolResult of {
         Left message -> ioReturn (Left message);
-        Right symbols -> decodeNodesAndRoots limits bytes geometry symbols
+        Right symbols -> decodeNodes limits bytes geometry symbols
       }
     }
   };
@@ -1306,5 +1349,154 @@ module Bootstrap.Bitstream (
         }
       }
     }
-  }
+  };
+  -- The verified wire layout supplies exact dense slots. Keep the mutable
+  -- builder inside decoding and publish only its frozen, checked snapshot.
+  data DenseInput = DenseInput Entry Int Int String;
+  liftReadIO :: forall a. IO a -> Read a;
+  liftReadIO action = Read (\cursor -> do {
+    value <- action; ioReturn (Right ((,) value cursor))
+  });
+  -- Keep every read of one entry and its write in the same world-state
+  -- action, rather than crossing the IO boundary for each child edge.
+  denseChildrenMeta :: Limits -> V.FixedBuilder IOWorld DecodeId DenseInput -> [] Int -> Int -> Int -> ST IOWorld (Either String ((,) Int Int));
+  denseChildrenMeta limits nodes children depth work = case children of {
+    [] -> stReturn (Right ((,) depth work));
+    (:) index rest -> stBind (V.fixedGet nodes (V.fromInt index)) (\checked ->
+      case checked of { DenseInput _ childDepth childWork _ ->
+        if childWork > maxExpandedWork limits - work then stReturn (Left "binary expanded-work limit exceeded")
+        else let { nextDepth = max depth (childDepth + 1); nextWork = work + childWork } in
+          if nextDepth > maxDepth limits then stReturn (Left "binary graph depth limit exceeded")
+          else seq nextDepth (seq nextWork (denseChildrenMeta limits nodes rest nextDepth nextWork))
+      })
+  };
+  denseInsert :: Limits -> IntMap Symbol -> V.FixedBuilder IOWorld DecodeId DenseInput -> Int -> Entry -> ST IOWorld (Either String ());
+  denseInsert limits symbols nodes index entry =
+    let { write depth work text = stBind (V.fixedSet nodes (V.fromInt index) (DenseInput entry depth work text))
+            (\_ -> stReturn (Right ())) } in
+    case entry of {
+      EInt _ -> if maxExpandedWork limits < 1 then stReturn (Left "binary expanded-work limit exceeded") else write 1 1 "";
+      EBits _ -> if maxExpandedWork limits < 1 then stReturn (Left "binary expanded-work limit exceeded") else write 1 1 "";
+      EText symbol -> case IM.lookup symbol symbols of {
+        Nothing -> stReturn (Left "binary symbol reference has no symbol");
+        Just (Symbol text size) -> if size >= maxExpandedWork limits
+          then stReturn (Left "binary expanded-work limit exceeded") else write 1 (1 + size) text
+      };
+      ENode _ children -> if maxExpandedWork limits < 1 then stReturn (Left "binary expanded-work limit exceeded")
+        else stBind (denseChildrenMeta limits nodes children 1 1) (\measured -> case measured of {
+          Left message -> stReturn (Left message);
+          Right ((,) depth work) -> write depth work ""
+        })
+    };
+  getDenseNodes :: Limits -> Layout -> IntMap Symbol -> V.FixedBuilder IOWorld DecodeId DenseInput -> Read ();
+  getDenseNodes limits (Layout _ symbolCount _ count _ _ edges _ _ _ nodeWidth symbolWidth) symbols nodes =
+    getDenseNodesAt limits symbols nodes symbolCount count nodeWidth symbolWidth 0 0 edges M.empty;
+  getDenseNodesAt :: Limits -> IntMap Symbol -> V.FixedBuilder IOWorld DecodeId DenseInput -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Map Entry Int -> Read ();
+  getDenseNodesAt limits symbols nodes symbolCount count nodeWidth symbolWidth index nextSymbol remainingEdges keys =
+    if index == count then do {
+      checkRead (remainingEdges == 0) "binary edge count mismatch";
+      checkRead (nextSymbol == symbolCount) "unused binary symbol table entries";
+      returnRead ()
+    } else do {
+      entry <- getEntry limits nodeWidth symbolWidth index symbolCount remainingEdges;
+      nextKeys <- case intern compareEntry entry keys of {
+        Found _ -> failRead "duplicate binary structural node"; Inserted fill -> returnRead (fill index)
+      };
+      followingSymbol <- case entry of {
+        EText symbol -> do {
+          checkRead (symbol == nextSymbol) "noncanonical binary symbol first-use order";
+          returnRead (nextSymbol + 1)
+        };
+        _ -> returnRead nextSymbol
+      };
+      stored <- liftReadIO (stToIO (denseInsert limits symbols nodes index entry));
+      _ <- liftEither stored;
+      let { nextEdges = remainingEdges - entryEdges entry };
+      seq nextKeys (seq nextEdges
+        (getDenseNodesAt limits symbols nodes symbolCount count nodeWidth symbolWidth (index + 1)
+          followingSymbol nextEdges nextKeys))
+    };
+  denseChildren :: forall s. V.Builder s DecodeId Parsed -> [] Int -> [] Value -> ST s ([] Value);
+  denseChildren nodes children acc = case children of {
+    [] -> stReturn (reverse acc);
+    (:) index rest -> stBind (V.get nodes (V.fromInt index)) (\child ->
+      seq child (denseChildren nodes rest ((:) (parsedValue child) acc)))
+  };
+  denseFill :: forall s. V.Builder s DecodeId Parsed -> Int -> [] DenseInput -> ST s ();
+  denseFill nodes index entries = case entries of {
+    [] -> stReturn ();
+    (:) (DenseInput entry depth work text) rest ->
+      let { finish value = stBind (V.set nodes (V.fromInt index) (Parsed entry value depth work)) (\_ ->
+              denseFill nodes (index + 1) rest) } in
+      case entry of {
+        EInt n -> finish (VInt n);
+        EBits n -> finish (VBits n);
+        EText _ -> finish (VText text);
+        ENode tag children -> stBind (denseChildren nodes children []) (\values -> finish (VNode tag values))
+      }
+  };
+  denseMaterialize :: [] DenseInput -> V.IndexVec DecodeId Parsed;
+  denseMaterialize entries = runST (stBind (V.filled (length entries) (panic "uninitialized binary graph node")) (\nodes ->
+    stBind (denseFill nodes 0 entries) (\_ -> V.freeze nodes)));
+  getDenseRoots :: Limits -> V.IndexVec DecodeId DenseInput -> Int -> Int -> Read ([] Int);
+  getDenseRoots limits nodes width count = getDenseRootsAt limits nodes width count 0 [];
+  getDenseRootsAt :: Limits -> V.IndexVec DecodeId DenseInput -> Int -> Int -> Int -> [] Int -> Read ([] Int);
+  getDenseRootsAt limits nodes width remaining work roots =
+    if remaining == 0 then returnRead (reverse roots) else do {
+      index <- getBits width;
+      case denseLookup nodes index of {
+        Nothing -> failRead "binary root reference out of range";
+        Just (DenseInput _ _ rootWork _) -> do {
+          checkRead (rootWork <= maxExpandedWork limits - work) "binary expanded root-work limit exceeded";
+          let { nextWork = work + rootWork };
+          seq nextWork (getDenseRootsAt limits nodes width (remaining - 1) nextWork ((:) index roots))
+        }
+      }
+    };
+  canonicalDense :: V.IndexVec DecodeId DenseInput -> [] Int -> Either String ();
+  canonicalDense nodes roots = canonicalDenseTasks nodes 0 ((:) (WalkIds roots) []);
+  canonicalDenseTasks :: V.IndexVec DecodeId DenseInput -> Int -> [] CanonicalTask -> Either String ();
+  canonicalDenseTasks nodes next tasks = case tasks of {
+    [] -> ensure (next == V.count nodes) "unused binary node table entries";
+    (:) task rest -> case task of {
+      CloseId index -> if index /= next then Left "noncanonical binary node postorder"
+        else canonicalDenseTasks nodes (next + 1) rest;
+      WalkIds references -> case references of {
+        [] -> canonicalDenseTasks nodes next rest;
+        (:) index more -> if index < next
+          then canonicalDenseTasks nodes next ((:) (WalkIds more) rest)
+          else case denseLookup nodes index of {
+            Nothing -> Left "binary graph contains an absent node";
+            Just (DenseInput entry _ _ _) -> case entry of {
+              ENode _ children -> canonicalDenseTasks nodes next
+                ((:) (WalkIds children) ((:) (CloseId index) ((:) (WalkIds more) rest)));
+              _ -> canonicalDenseTasks nodes next ((:) (CloseId index) ((:) (WalkIds more) rest))
+            }
+          }
+      }
+    }
+  };
+  decodeDenseNodesAndRoots :: Limits -> ByteArray -> Layout -> IntMap Symbol -> IO (Either String Graph);
+  decodeDenseNodesAndRoots limits bytes geometry symbols = case geometry of {
+    Layout _ _ _ nodeCount nodeOffset nodeLength _ rootCount rootOffset rootLength nodeWidth _ -> do {
+      builder <- stToIO (V.fixedFilled nodeCount (panic "uninitialized binary graph node"));
+      result <- runSection bytes nodeOffset nodeLength (getDenseNodes limits geometry symbols builder);
+      case result of {
+        Left message -> ioReturn (Left message);
+        Right _ -> do {
+          inputs <- stToIO (V.fixedFreeze builder);
+          let { nodes = denseMaterialize (V.toList inputs) };
+          rootResult <- runSection bytes rootOffset rootLength (getDenseRoots limits inputs nodeWidth rootCount);
+          case rootResult of {
+            Left message -> ioReturn (Left message);
+            Right roots -> ioReturn (do {
+              canonicalDense inputs roots;
+              Right (DenseGraph inputs roots nodes)
+            })
+          }
+        }
+      }
+    }
+  };
+
 }

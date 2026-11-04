@@ -8,7 +8,7 @@
 
 enum { IO_RETURN = 0, IO_BIND = 1, ST_RETURN = 66, ST_BIND = 67, RUN_ST = 68,
        NEW_ST_ARRAY = 69, READ_ST_ARRAY = 70, WRITE_ST_ARRAY = 71, LENGTH_ST_ARRAY = 72,
-       FREEZE_ST_ARRAY = 132 };
+       FREEZE_ST_ARRAY = 132, ST_TO_IO = 133 };
 static unsigned calls;
 static void require(int test, const char *message) {
     if (!test) { fprintf(stderr,"runtime ST: %s\n",message); exit(90); }
@@ -223,12 +223,36 @@ static void direct_cases(void) {
     number(mlf_st_read_array(array,integer("0")),"53");
 }
 
+static MlfValue *world_value(MlfEnv *env, MlfValue *argument) {
+    (void)argument;
+    GC_gcollect();
+    return mlf_env_get(env,0);
+}
+static MlfValue *world_check(MlfEnv *env, MlfValue *argument) {
+    (void)env;
+    number(argument,"71");
+    return mlf_prim1(IO_RETURN,unit());
+}
+static int world_gc_case(void) {
+    MlfValue *array = mlf_st_new_array(integer("1"), integer("71"));
+    MlfValue *action = mlf_native_io_value(world_value,env1(mlf_st_read_array(array,integer("0"))));
+    MlfValue *program = mlf_prim2(IO_BIND,action,closure(world_check,mlf_env_new(0)));
+    return mlf_run(program,1);
+}
+static int world_generic_case(void) {
+    MlfValue *array = mlf_st_new_array(integer("1"), integer("71"));
+    MlfValue *action = mlf_prim1(ST_TO_IO,read_at(array,"0"));
+    return mlf_run(mlf_prim2(IO_BIND,action,closure(world_check,mlf_env_new(0))),1);
+}
+
 int main(int argc, char **argv) {
     const char *mode=argc>1?argv[1]:"success";
     if (!strcmp(mode,"success")) {
         semantic_cases(); direct_cases(); require(gc_case()==0,"IO-root GC check failed");
         puts("runtime ST: laziness, snapshots, repetition, nesting, WHNF, and GC passed"); return 0;
     }
+    if (!strcmp(mode,"world-gc")) return world_gc_case();
+    if (!strcmp(mode,"world-generic")) return world_generic_case();
     MlfValue *array=run(mlf_prim2(NEW_ST_ARRAY,integer("1"),integer("5")));
     if (!strcmp(mode,"negative-size")) run(mlf_prim2(NEW_ST_ARRAY,integer("-1"),bad()));
     else if (!strcmp(mode,"huge-size")) run(mlf_prim2(NEW_ST_ARRAY,integer("123456789012345678901234567890"),bad()));

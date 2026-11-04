@@ -456,7 +456,7 @@ module Bootstrap.Module where {
       Right env
     };
   primitiveTypeNames :: [] String;
-  primitiveTypeNames = (:) "Char" ((:) "IOError" legacyPrimitiveTypeNames);
+  primitiveTypeNames = append ((:) "Char" ((:) "IOError" legacyPrimitiveTypeNames)) ["IOWorld"];
   legacyPrimitiveTypeNames :: [] String;
   legacyPrimitiveTypeNames =
     ["AsyncScope", "Completion", "AsyncSubscription", "ST", "STArray",
@@ -1013,6 +1013,7 @@ module Bootstrap.Module where {
     let {
       appended entity = case role entity of {
         Primitive p -> P.primitiveCode p >= 132;
+        BuiltinType -> eqString (spelling entity) "IOWorld";
         _ -> False
       }
     } in case partition appended (Set.toList entities) of {

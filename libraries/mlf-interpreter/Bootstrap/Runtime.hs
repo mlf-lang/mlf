@@ -40,6 +40,8 @@ module Bootstrap.Runtime where {
     RSTAction Primitive ([] (Either String RValue)) |
     RSTArrayHandle Int |
     RFrozenArray RSTArrayState |
+    RWorldArray Int (STArray IOWorld (Either String RValue)) |
+    RWorldSnapshot Int (Int -> Either String RValue) |
     RAsyncScopeHandle Int |
     RCompletionHandle Int Int |
     RAsyncSubscriptionHandle Int Int Int;
@@ -69,6 +71,7 @@ module Bootstrap.Runtime where {
       RByteArray array -> seq array value;
       RIntTable table -> seq table value;
       RSTArrayHandle handle -> seq handle value;
+      RWorldArray n array -> seq n (seq array value);
       RAsyncScopeHandle handle -> seq handle value;
       RCompletionHandle owner handle -> seq owner (seq handle value);
       RAsyncSubscriptionHandle owner handle status -> seq owner (seq handle (seq status value));
@@ -281,6 +284,10 @@ module Bootstrap.Runtime where {
       RFrozenArray (RSTArrayState n initial cells) -> do {
         index <- arrayIndex n argument;
         IM.findWithDefault initial index cells
+      };
+      RWorldSnapshot n snapshot -> do {
+        index <- arrayIndex n argument;
+        snapshot index
       };
       RPrimitive primitive arguments -> runtimePrimitive ds primitive (snoc arguments argument);
       _ -> Left "runtime application of a non-function"
@@ -573,8 +580,8 @@ module Bootstrap.Runtime where {
     let {
       n = P.primitiveCode primitive
     } in
-    (((n == 129) || (n == 131)) || ((n == 130) || ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
-     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94))))))))));
+    ((n == 133) || (((n == 129) || (n == 131)) || ((n == 130) || ((n == 106) || ((n == 100) || ((n == 101) || ((n <= 5) ||
+     (((n >= 27) && (n <= 44)) || (((n >= 56) && (n <= 65)) || ((n >= 73) && (n <= 94)))))))))));
   isSTAction primitive =
     case primitive of {
       PSTReturn -> True;
@@ -933,6 +940,50 @@ module Bootstrap.Runtime where {
           }
         };
       _ -> Left "runtime ST action primitive arity mismatch"
+    };
+  -- IO-world arrays use the host's traced boxed arrays. Unlike runST's
+  -- persistent region store, their lifetime follows the reachable handles;
+  -- a long-running interpreted program does not retain every decoded graph.
+  worldArray :: Either String RValue -> Either String ((,) Int (STArray IOWorld (Either String RValue)));
+  worldArray thunk = bindEither thunk (\value -> case value of {
+    RWorldArray n array -> Right ((,) n array);
+    _ -> Left "runtime primitive expected STArray"
+  });
+  runWorldAction :: DataEnv -> Either String RValue -> [] (Either String RValue) ->
+    IO (Either String (Either String RValue));
+  runWorldAction ds thunk continuations = case thunk of {
+    Left message -> ioReturn (Left message);
+    Right (RSTAction primitive arguments) -> performWorld ds primitive arguments continuations;
+    Right _ -> ioReturn (Left "runtime expected an ST action")
+  };
+  resumeWorld :: DataEnv -> Either String RValue -> [] (Either String RValue) ->
+    IO (Either String (Either String RValue));
+  resumeWorld ds value continuations = case continuations of {
+    [] -> ioReturn (Right value);
+    (:) next rest -> runWorldAction ds (bindEither next (\function -> apply ds function value)) rest
+  };
+  performWorld :: DataEnv -> Primitive -> [] (Either String RValue) -> [] (Either String RValue) ->
+    IO (Either String (Either String RValue));
+  performWorld ds primitive arguments continuations =
+    let { a = head arguments; b = head (tail arguments); c = head (tail (tail arguments)) } in
+    case primitive of {
+      PSTReturn -> resumeWorld ds a continuations;
+      PSTBind -> runWorldAction ds a ((:) b continuations);
+      PNewSTArray -> checkedIO (arraySize a) (\n ->
+        ioBind (stToIO (newSTArray n b)) (\array ->
+          resumeWorld ds (Right (RWorldArray n array)) continuations));
+      PLengthSTArray -> checkedIO (worldArray a) (\((,) n _) ->
+        resumeWorld ds (Right (RInteger n)) continuations);
+      PFreezeSTArray -> checkedIO (worldArray a) (\((,) n array) ->
+        ioBind (stToIO (freezeSTArray array)) (\snapshot ->
+          resumeWorld ds (Right (RWorldSnapshot n snapshot)) continuations));
+      PReadSTArray -> checkedIO (worldArray a) (\((,) n array) ->
+        checkedIO (arrayIndex n b) (\index ->
+          ioBind (stToIO (readSTArray array index)) (\value -> resumeWorld ds value continuations)));
+      PWriteSTArray -> checkedIO (worldArray a) (\((,) n array) ->
+        checkedIO (arrayIndex n b) (\index ->
+          ioBind (stToIO (writeSTArray array index c)) (\_ -> resumeWorld ds unit continuations)));
+      _ -> ioReturn (Left "runtime ST action primitive arity mismatch")
     };
   wrapIO :: forall a. IO a -> (a -> RValue) -> IO (Either String (Either String RValue));
   wrapIO action wrap = ioBind action (\value -> ioReturn (Right (Right (wrap value))));
@@ -1716,6 +1767,8 @@ module Bootstrap.Runtime where {
         case value of {
           RAction primitive arguments ->
             case primitive of {
+              PSTToIO -> ioBind (runWorldAction ds (head arguments) []) (\result ->
+                ioReturn (mapEither (\value -> (,) store (RIOSuccess value)) result));
               PIOBind ->
                 ioBind (runActionState args ds store (head arguments))
                   (\result ->

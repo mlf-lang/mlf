@@ -99,7 +99,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         require(invoke('formal-corrupt-'+str(schema),'formal-check',bad/'unit','reject-'+family+'-version')==('PASS formal-'+family+'-version-reject\n').encode(),'formal exact binary-version diagnostic; no legacy fallback')
 
     distro=output/'distribution';distro.mkdir();distribution=[]
-    builtin_id='mlf:builtin-shared-haskell-v1:12';root_id='binary-package/1/library'
+    builtin_id='mlf:builtin-shared-haskell-v1:13';root_id='binary-package/1/library'
     identities=(builtin_id,root_id)
     def pair_at(prefix):return tuple(prefix.with_suffix(suffix).read_bytes() for suffix in ('.mlfci','.mlfco'))
     def interface_summary(pair):

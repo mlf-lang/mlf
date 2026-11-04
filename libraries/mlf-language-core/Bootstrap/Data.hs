@@ -79,7 +79,7 @@ module Bootstrap.Data where {
       }
     };
   scalarPrimitiveKinds :: Map String Kind;
-  scalarPrimitiveKinds = M.insert compareString "Integer" Star (
+  scalarPrimitiveKinds = M.insert compareString "IOWorld" Star (M.insert compareString "Integer" Star (
     M.fromList compareString
       ((:) ((,) "AsyncScope" Star)
          ((:) ((,) "Completion" (KArrow Star Star))
@@ -96,7 +96,7 @@ module Bootstrap.Data where {
                                           ((:) ((,) "ByteArray" Star)
                                              ((:) ((,) "IntTable" Star)
                                                 ((:) ((,) "IO" (KArrow Star Star))
-                                                   []))))))))))))))));
+                                                   [])))))))))))))))));
   -- Wired source identities are independent of Bootstrap.Types' temporary
   -- List/Pair/Unit implementation ADTs. Never normalize a user ADT to these.
   sourceUnitDeclaration :: DataDecl;

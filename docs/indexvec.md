@@ -5,7 +5,10 @@ exports `Index d`, `Builder s d a` and immutable `IndexVec d a`. The `d`
 parameter distinguishes declaration, module, package and edge slots. Use
 `fromInt` at a boundary and `toInt` when a numeric offset is needed. `get`,
 `set` and `at` check `0 <= i < length`, including signed negative and very
-large inputs. `indices` and `toList` enumerate insertion order.
+large inputs. `indices` and `toList` enumerate insertion order. A
+`FixedBuilder` allocates exactly its declared length and omits the growable
+header; its typed reads and writes have the same bounds checks and its freeze
+has the same snapshot semantics.
 
 A builder contains a shared header with its logical length, capacity and
 boxed `STArray`. `push` returns the inserted index. On growth it doubles
@@ -23,6 +26,24 @@ keeps mutable handles local. Freezing a builder takes O(capacity), and
 native/GHC append is amortized O(1). The interpreter captures the current
 persistent `IntMap` of cells and its lazy default. Its lookup has the cost of
 a trie search. `fromList` uses exact allocation when the input is enumerable.
+
+`IOWorld` is the distinguished state token for arrays used by IO actions.
+`stToIO :: ST IOWorld a -> IO a` constructs a lazy IO action; executing it
+runs the state action, and its result remains lazy. Repeating the IO action
+executes the state action again. World arrays may be shared between IO calls
+and callbacks, and snapshots retain their old contents. The rank-2 `runST`
+interface still prevents world arrays and local region arrays from crossing
+one another. The interpreter stores world cells in traced boxed arrays so
+unreachable handles can be collected; local `runST` regions retain their
+independent persistent store.
+
+The binary graph reader checks the header and checksum before allocating an
+exact-size world builder. Each node's child reads, depth and expanded-work
+checks, and final write share one `ST IOWorld` action. Its checked entry is
+written directly to the canonical slot. The frozen vector serves graph lookup
+and canonical-order checks. Legacy `Value` trees are
+materialized on demand, while the low-level `decodeTables` compatibility entry
+retains its original caller-supplied layout validation path.
 
 ## Production paths
 
@@ -64,11 +85,14 @@ The persistent query format records keys, digests and ordered dependencies.
 Its temporary ordinals belong to one admitted graph. The inference constraint
 graph keeps its own solver identities.
 
-Primitive code 132 is appended to the wire inventory. Earlier code assignments
-retain their meaning. The builtin interface advances to `/12` and the primitive
-ABI to `mlf-primitive-133-v8`. The runtime keeps its old link markers and adds
-the freeze marker for new generated code. Standalone name allocation visits entities from the original 132-entry inventory before assigning names for appended primitives. This preserves existing generated names even when a new primitive sorts ahead of a user module. Locks, interfaces, cache keys, worker
-JSON and diagnostics continue to use source or crate identities.
+Primitive codes 132 and 133 append array snapshots and `stToIO` to the wire
+inventory. Earlier code assignments retain their meaning. The builtin interface
+is `/13`, the builtin crate identity ends in `:13`, and the primitive ABI is
+`mlf-primitive-134-v9`. The runtime retains
+the old link markers and adds a marker for the IO-world bridge. Standalone name
+allocation visits the original entities before the appended primitives and
+`IOWorld`, preserving existing generated names. Locks, interfaces, cache keys,
+worker JSON and diagnostics continue to use source or crate identities.
 
 ## Reproduction
 

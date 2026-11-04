@@ -226,7 +226,8 @@ module Bootstrap.BuiltinPreludeLiteral where {
     PReadByteFileOrError -> "PReadByteFileOrError";
     PWriteByteFileOrError -> "PWriteByteFileOrError";
     PByteArrayDigest -> "PByteArrayDigest";
-    PFreezeSTArray -> "PFreezeSTArray"
+    PFreezeSTArray -> "PFreezeSTArray";
+    PSTToIO -> "PSTToIO"
   };
   sourceType :: SType -> String;
   sourceType value = case value of {

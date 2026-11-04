@@ -4,7 +4,7 @@
 -- Ordinary Haskell syntax uses the standard class identities and desugaring.
 -- Only value representations and primitive operations are host adaptations.
 module MLF.Primitive
-  ( Int, Integer, Bool(..), Double, Char, IO, IOError, String, ST, STArray, Functor(..), Applicative(..), Monad(..), MonadFail(..), IsString(..), Eq(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
+  ( Int, Integer, Bool(..), Double, Char, IO, IOError, String, ST, STArray, IOWorld, Functor(..), Applicative(..), Monad(..), MonadFail(..), IsString(..), Eq(..), IntArray, DoubleArray, ByteArray, IntTable, AsyncScope, Completion, AsyncSubscription
   , HasCallStack, CallStack, callStack, prettyCallStack
   , MLFHasCallStack, MLFCallStack, MLFStackFrame(..), MLFStackEvidence(..)
   , mlfEmptyCallStack, mlfPushCallStack, mlfPrettyCallStack, mlfIOErrorWithStack
@@ -20,7 +20,7 @@ module MLF.Primitive
   , stringFromCode, compareString, readDouble, doubleToBits, doubleFromBits, seq, panic
   , readByteFileOrError, writeByteFileOrError, byteArrayDigest
   , readFile, writeFile, fileExists, canonicalPath, getArgCount, getArg, putErr
-  , exitWith, getExecutablePath, getContents, stReturn, stBind, runST, newSTArray
+  , exitWith, getExecutablePath, getContents, stReturn, stBind, runST, stToIO, newSTArray
   , readSTArray, writeSTArray, lengthSTArray, freezeSTArray, getEnv, setEnv, unsetEnv, runProcess
   , listDirectory, directoryExists, fileDigest, acquireFileLock, releaseFileLock, processSupervisor, asyncScopeNew
   , asyncScopeClose, asyncNewCompletion, asyncResolveCompletion, asyncReadCompletion, asyncSubscribeCompletion, asyncSubscriptionStatus, asyncCancelSubscription
@@ -33,6 +33,8 @@ module MLF.Primitive
 import qualified Prelude as P
 import Prelude (Functor(..), Applicative(..), Monad(..), Eq(..), Char, IOError)
 import Control.Monad.Fail (MonadFail(..))
+import qualified Control.Monad.ST as HostST
+import GHC.Exts (RealWorld)
 import Data.String (IsString(..))
 import GHC.Stack (HasCallStack, CallStack, callStack, prettyCallStack)
 import System.IO.Error (ioError)
@@ -291,6 +293,11 @@ stBind = Base.v_stBind
 
 runST :: (forall s. ST s a) -> a
 runST = Base.v_runST
+
+-- This distinguished state token is the IO world, not a runST region.
+type IOWorld = RealWorld
+stToIO :: ST IOWorld a -> IO a
+stToIO action = ioBind (ioReturn ()) (\_ -> HostST.stToIO action)
 
 newSTArray :: Int -> a -> ST s (STArray s a)
 newSTArray = Base.v_newSTArray
