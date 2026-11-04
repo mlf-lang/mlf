@@ -436,6 +436,35 @@
   },
   "control_sources": {
     "tools/shared/test_source_context_cache.py": "8dcc3e6115acba369e39a28d87d0642b3f4eb97751a57efcab29fa7d9e6e964a",
-    "tools/shared/run_context_controls.py": "b3dfbed5cf1f235e01713dbffd9e4aa2c21a69a45d9edc5ed2dcfaf36754a83d"
+    "tools/shared/run_context_controls.py": "b3dfbed5cf1f235e01713dbffd9e4aa2c21a69a45d9edc5ed2dcfaf36754a83d",
+    "tools/performance/patricia/run_fingerprint.py": "e3d8726e48ac70bbc524343c1709ed5ee6282dd77cfe33efb8c0968328d246bc",
+    "tools/performance/patricia/test_fingerprint_core.py": "a6f0ac234f40750224759d68e7566212744c39fa4e614a0159894292999ad6e9",
+    ".github/workflows/ci.yml": "d1471993f0d66e9989163dfb6bf1eaa0d4134fd9b1c83e0e31cfd2d5e142642a"
+  },
+  "additional_upstream_commit": "4f913c873ad0842c4430afaa715cba77cf4d45fd",
+  "production_inputs_reverified_after_additional_merge": {
+    "shared_inputs": 135,
+    "host_inputs": 33,
+    "configuration_inputs": 19
+  },
+  "core_binding_controls": {
+    "normal": {
+      "tests": 10,
+      "log": {
+        "path": "/private/tmp/mlf-query-pr29-push-core-tests.log",
+        "sha256": "643c7cfc3921e5830e047bed28578bc933677c101c9c5a9f6610b6207052d03c",
+        "bytes": 109
+      },
+      "text": "..........\n----------------------------------------------------------------------\nRan 10 tests in 0.002s\n\nOK\n"
+    },
+    "optimized": {
+      "tests": 10,
+      "log": {
+        "path": "/private/tmp/mlf-query-pr29-push-core-tests-optimized.log",
+        "sha256": "cf8d3a2572a7898fcf32a4c2dd1445509b3d59e66061853243c4627f80695068",
+        "bytes": 109
+      },
+      "text": "..........\n----------------------------------------------------------------------\nRan 10 tests in 0.001s\n\nOK\n"
+    }
   }
 }

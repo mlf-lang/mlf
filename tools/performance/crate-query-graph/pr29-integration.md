@@ -14,6 +14,12 @@ relative to PR 36. The pre-integration measurement remains in
 [`publication-fix.md`](publication-fix.md) and
 [`evidence-before-pr36-merge.json`](evidence-before-pr36-merge.json).
 
+Before pushing, PR 29 advanced to `4f913c87` with an independent Int64 Core-check
+correction. It was also merged normally. Only its test/analyzer and CI files
+changed; all 135 shared-source, 33 host-input and 19 build-configuration pins were
+reverified unchanged. Its ten focused tests passed in both normal and optimized
+Python modes. The qualified compiler and measurements above are unchanged.
+
 ## Qualification and integration
 
 The ordinary bootstrap build completed with GHC 9.14.1 and
