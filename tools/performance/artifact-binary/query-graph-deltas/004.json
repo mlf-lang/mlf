@@ -1,0 +1,22 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 37847,
+  "new_sha256": "eda3736fcc6c69b84e194b0818f22e9b37e4d609cf0419125c24df5962c4304e",
+  "old_bytes": 37552,
+  "old_sha256": "f2c32cbe86f9da7b58bbbc7acc52f2485960e785b5ec0bcd5a7301b0e4aa109d",
+  "path": "libraries/mlf-crates/Bootstrap/PreparedLibraries.hs",
+  "splices": [
+    {
+      "new": "LS0gVGhlIGluc3RhbGxlZCBuYXRpdmUgbGl0ZXJhbCBBQkkgc3RpbGwgY29uc3VtZXMgY2xvc2VkIENoZWNrZWRUZXJtCiAgICAgICAgICAtLSBzcGluZXMuIENvbnZlcnNpb24gaXMgY29uZmluZWQgdG8gdGhpcyBsZWdhY3kgcHJlcGFyZWQtbGlicmFyeSBBQkk7CiAgICAgICAgICAtLSBvcmRpbmFyeSBvcGVuLW9iamVjdCBsb2FkaW5nL2xpbmtpbmcgdXNlcyBleHBsaWNpdCBlbnZpcm9ubWVudHMuCiAgICAgICAgICBvYmplY3RzID0gTS5mcm9tTGlzdCBjb21wYXJlU3RyaW5nIChtYXAgKFxlbnRyeSAtPiBsZXQgeyBvYmplY3QgPSBBcnRpZmFjdC5sZWdhY3lPYmplY3QgKGxpYnJhcnlPYmplY3QgZW50cnkp",
+      "new_at": 7448,
+      "old": "b2JqZWN0cyA9IE0uZnJvbUxpc3QgY29tcGFyZVN0cmluZyAobWFwIChcZW50cnkgLT4gbGV0IHsgb2JqZWN0ID0gbGlicmFyeU9iamVjdCBlbnRyeQ==",
+      "old_at": 7448
+    },
+    {
+      "new": "KGNvbXBvc2UgQXJ0aWZhY3QubGVnYWN5T2JqZWN0IGxpYnJhcnlPYmplY3Qp",
+      "new_at": 33243,
+      "old": "bGlicmFyeU9iamVjdA==",
+      "old_at": 32980
+    }
+  ]
+}

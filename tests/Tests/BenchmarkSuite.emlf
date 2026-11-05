@@ -312,7 +312,86 @@ processGroupRace directory = do
 buildFailures : IO ()
 buildFailures = S.mapM_ (\((,) _ action) -> action) buildFailureCases
 buildFailureCases : [] ((,) String (IO ()))
-buildFailureCases =
+buildFailureCases = S.append splitRuntimeCases existingBuildFailureCases
+
+-- Each mock producer rendezvous with the other independent producers and
+-- writes distinct bytes. The link process consumes all three completed files;
+-- successful stage metadata alone cannot make these controls pass.
+splitRuntimeMode : String -> IO ()
+splitRuntimeMode mode = do
+ unsetEnv "MLF_BENCH_STREAM_LINK"
+ unsetEnv "MLF_BENCH_STREAM_LLVM"
+ if eqString mode "ordinary" then return () else setEnv "MLF_BENCH_STREAM_LLVM" "1"
+ if eqString mode "prestarted" then setEnv "MLF_BENCH_STREAM_LINK" "1" else return ()
+
+withSplitRuntime : (String -> String -> IO ()) -> IO ()
+withSplitRuntime action = H.withScratch (\directory -> do
+ exe <- getExecutablePath
+ let compiler = directory ++ "/mock"
+ O.copy exe compiler
+ setEnv "MLF_MOCK_BUILD" "1"
+ setEnv "MLF_BENCH_SPLIT_RUNTIME" "1"
+ action directory compiler
+ unsetEnv "MLF_MOCK_FAIL_RUNTIME"
+ unsetEnv "MLF_MOCK_FAIL_SUPERVISOR"
+ unsetEnv "MLF_BENCH_STREAM_LINK"
+ unsetEnv "MLF_BENCH_STREAM_LLVM"
+ unsetEnv "MLF_BENCH_SPLIT_RUNTIME"
+ unsetEnv "MLF_MOCK_BUILD")
+
+splitRuntimeCases : [] ((,) String (IO ()))
+splitRuntimeCases =
+ (:) ((,) "test_split_runtime_compiles_independent_objects_before_linking" (do
+  check "test_split_runtime_compiles_independent_objects_before_linking" (withSplitRuntime (\directory compiler ->
+   S.mapM_ (\mode -> do
+    splitRuntimeMode mode
+    let build = directory ++ "/" ++ mode
+    result <- B.buildParallel build compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime source/runtime.c") [] 10.0
+    (,) binary sample <- H.right result
+    let stages = V.array "stages" sample
+    let phase name = S.fromMaybe (panic ("missing build stage " ++ name)) (S.find (\stage -> eqString name (V.text "phase" stage)) stages)
+    let started name = V.double 0.0 (J.get "started_seconds" (phase name))
+    let finished name = V.double 0.0 (J.get "finished_seconds" (phase name))
+    let expected = if eqString mode "ordinary" then "frontend runtime runtime-supervisor llvm link" else if eqString mode "prestarted" then "setup frontend runtime runtime-supervisor llvm runtime-ready runtime-supervisor-ready llvm-ready link" else "setup frontend runtime runtime-supervisor llvm link"
+    H.assert (S.eqList eqString (S.map (V.text "phase") stages) (O.words expected)) "split build omitted a recorded stage"
+    H.assert (ltDouble (started "runtime") (finished "runtime-supervisor") && ltDouble (started "runtime-supervisor") (finished "runtime") && V.int "maximum_parallel_compilers" sample >= (if eqString mode "ordinary" then 3 else if eqString mode "prestarted" then 5 else 4)) "fresh runtime compilation did not overlap"
+    if eqString mode "ordinary" then H.assert (S.not (ltDouble (started "llvm") (finished "frontend"))) "ordinary LLVM started before emission completed" else H.assert (ltDouble (started "llvm") (finished "frontend")) "streaming LLVM did not overlap emission"
+    if eqString mode "prestarted" then do
+     H.assert (ltDouble (started "link") (finished "frontend")) "prestarted linker waited for compilation before startup"
+     S.mapM_ (\((,) marker producer) -> H.assert (S.not (ltDouble (started marker) (finished producer))) "ready marker preceded its successful producer") ((:) ((,) "runtime-ready" "runtime") ((:) ((,) "runtime-supervisor-ready" "runtime-supervisor") ((:) ((,) "llvm-ready" "llvm") [])))
+     else H.assert (S.all (\producer -> S.not (ltDouble (started "link") (finished producer))) (O.words "frontend runtime runtime-supervisor llvm")) "link started before a producer completed"
+    contents <- readFile binary
+    core <- readFile (build ++ "/runtime.o")
+    supervisor <- readFile (build ++ "/runtime-supervisor.o")
+    code <- readFile (build ++ "/program.o")
+    markers <- S.mapM (\name -> fileExists (build ++ "/" ++ name ++ ".ready")) (O.words "runtime.o runtime-supervisor.o program.o")
+    H.assert (eqString contents "binary" && eqString core "object" && eqString supervisor "supervisor" && eqString code "code" && S.all (\present -> if eqString mode "prestarted" then present else S.not present) markers) "split build linked stale or incomplete objects"
+    reused <- B.buildParallel build compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime source/runtime.c") [] 10.0
+    H.assert (S.isLeft reused) "split build accepted previously populated output directory") (O.words "ordinary stream prestarted")))
+ )) ((:) ((,) "test_split_runtime_failed_producers_reap_every_child" (do
+  check "test_split_runtime_failed_producers_reap_every_child" (withSplitRuntime (\directory compiler ->
+   S.mapM_ (\mode -> do
+    splitRuntimeMode mode
+    S.mapM_ (\producer -> do
+     let failure = if eqString producer "runtime" then "MLF_MOCK_FAIL_RUNTIME" else "MLF_MOCK_FAIL_SUPERVISOR"
+     let build = directory ++ "/" ++ mode ++ "-" ++ producer
+     setEnv failure "1"
+     result <- B.buildParallel build compiler compiler (directory ++ "/Main.emlf") (directory ++ "/runtime source/runtime.c") [] 5.0
+     observed <- J.read (build ++ "/pipeline.json")
+     let failed = S.fromMaybe J.empty (S.find (\stage -> eqString producer (V.text "phase" stage)) (V.array "stages" observed))
+     H.assert (V.int "exit_code" observed == 9 && V.int "exit_code" failed == 9 && V.int "pid" failed > 0 && S.not (S.null (J.getStrings "command" failed))) "failure receipt did not identify the injected producer failure"
+     binary <- fileExists (build ++ "/pending-executable")
+     object <- fileExists (build ++ "/" ++ producer ++ ".o")
+     ready <- fileExists (build ++ "/" ++ producer ++ ".o.ready")
+     H.assert (S.isLeft result && S.not binary && S.not object && S.not ready && V.int "remaining_children" observed == 0 && ltDouble (V.double 0.0 (J.get "wall_seconds" observed)) 3.0) "failed runtime producer published an object or left a blocked child"
+     S.mapM_ (\stage -> if V.int "pid" stage == 0 then return () else do
+      group <- O.exec "" ((:) "/bin/sh" ((:) "-c" ((:) "kill -0 -\"$1\"" ((:) "check-group" ((:) (showInt (V.int "pid" stage)) []))))) "" (build ++ "/group.out") (build ++ "/group.err") 5
+      H.assert (group /= 0) "failed split build left a process group alive") (V.array "stages" observed)
+     unsetEnv failure) (O.words "runtime runtime-supervisor")) (O.words "ordinary stream prestarted")))
+ )) [])
+
+existingBuildFailureCases : [] ((,) String (IO ()))
+existingBuildFailureCases =
  (:) ((,) "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers" (do
   check "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers" (H.withScratch (\directory -> do
    exe <- getExecutablePath

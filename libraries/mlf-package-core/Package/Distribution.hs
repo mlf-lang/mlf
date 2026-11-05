@@ -9,6 +9,7 @@ module Package.Distribution where {
   import qualified Package.OS as O;
   import qualified Package.Json as J;
   import qualified Package.Release as R;
+  import qualified Bootstrap.ArtifactStorage as Storage;
   -- Distribution is a text envelope, not an archive with producer-selected
   -- paths. Only release.json and validated digest-key artifact pairs are written.
   alphanumeric c =
@@ -66,12 +67,14 @@ module Package.Distribution where {
       let {
         prefix = R.bundlePrefix directory key
       };
-      metadata <- readFile (prefix ++ ".mlfci");
-      object <- readFile (prefix ++ ".mlfco");
+      encodedMetadata <- Storage.readBase64 (prefix ++ ".mlfci");
+      metadata <- R.checked encodedMetadata;
+      encodedObject <- Storage.readBase64 (prefix ++ ".mlfco");
+      object <- R.checked encodedObject;
       ioReturn
         (J.Object
            ((:) ((,) "key" (J.str key))
-              ((:) ((,) "metadata" (J.str metadata)) ((:) ((,) "object" (J.str object)) []))))
+              ((:) ((,) "metadata_base64" (J.str metadata)) ((:) ((,) "object_base64" (J.str object)) []))))
     };
   pack :: String -> String -> IO J.Json;
   pack directory output =
@@ -107,7 +110,7 @@ module Package.Distribution where {
       let {
         envelope =
           J.Object
-            ((:) ((,) "format" (J.num 1))
+            ((:) ((,) "format" (J.num 2))
                ((:) ((,) "manifest" (J.str manifestText))
                   ((:) ((,) "crates" (J.Array crates)) [])))
       };
@@ -124,7 +127,8 @@ module Package.Distribution where {
     do {
       envelope <- J.read asset;
       J.fields envelope (O.words "format manifest crates") "checked release asset";
-      O.require (J.equal (J.get "format" envelope) (J.num 1))
+      let { legacy = J.equal (J.get "format" envelope) (J.num 1) };
+      O.require (legacy || J.equal (J.get "format" envelope) (J.num 2))
         "unsupported checked release asset format";
       manifestText <- R.fieldText "manifest" envelope;
       manifest <- R.checked (J.parse manifestText);
@@ -137,10 +141,11 @@ module Package.Distribution where {
       S.mapM_
         (\entry ->
            do {
-             J.fields entry (O.words "key metadata object") "release asset crate";
+             J.fields entry (O.words (if legacy then "key metadata object"
+               else "key metadata_base64 object_base64")) "release asset crate";
              key <- R.fieldText "key" entry;
-             R.fieldText "metadata" entry;
-             R.fieldText "object" entry;
+             R.fieldText (if legacy then "metadata" else "metadata_base64") entry;
+             R.fieldText (if legacy then "object" else "object_base64") entry;
              O.require (R.validKey key) "invalid release asset crate key"
            })
         crates;
@@ -167,8 +172,18 @@ module Package.Distribution where {
                prefix = R.bundlePrefix destination (R.rowKey entry)
              };
              O.mkdir (O.parent prefix);
-             writeFile (prefix ++ ".mlfci") (J.getText "metadata" "" entry);
-             writeFile (prefix ++ ".mlfco") (J.getText "object" "" entry)
+             if legacy then do {
+               -- Format1 carries original text bytes authenticated by its manifest.
+               writeFile (prefix ++ ".mlfci") (J.getText "metadata" "" entry);
+               writeFile (prefix ++ ".mlfco") (J.getText "object" "" entry)
+             } else do {
+               metadata <- Storage.writeBase64 (prefix ++ ".mlfci")
+                 (J.getText "metadata_base64" "" entry);
+               R.checked metadata;
+               object <- Storage.writeBase64 (prefix ++ ".mlfco")
+                 (J.getText "object_base64" "" entry);
+               R.checked object
+             }
            })
         crates;
       R.readPinnedManifest destination expected

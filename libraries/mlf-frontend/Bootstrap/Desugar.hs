@@ -43,6 +43,7 @@ module Bootstrap.Desugar where {
       SApp f a -> append (allNames f) (allNames a);
       SLet name a b -> (:) name (append (allNames a) (allNames b));
       SAnn a _ -> allNames a;
+      SSignature a _ -> allNames a;
       SCase a alternatives ->
         append (allNames a)
           (concatMap (\(SAlternative p b) -> append (patternVariables p) (allNames b))
@@ -115,6 +116,7 @@ module Bootstrap.Desugar where {
     SApp a b -> do { x <- sharedGo env a; y <- sharedGo env b; freshPure (SApp x y) };
     SLet n a b -> do { x <- sharedGo env a; y <- sharedGo env b; freshPure (SLet n x y) };
     SAnn a ty -> do { x <- sharedGo env a; freshPure (SAnn x ty) };
+    SSignature a ty -> do { x <- sharedGo env a; freshPure (SSignature x ty) };
     SCase a branches -> do {
       x <- sharedGo env a;
       bs <- mapM (\(SAlternative p b) -> do { y <- sharedGo env b; freshPure (SAlternative p y) }) branches;
@@ -171,6 +173,11 @@ module Bootstrap.Desugar where {
           value <- go a;
           freshPure (SAnn value t)
         };
+      SSignature a t ->
+        do {
+          value <- go a;
+          freshPure (SSignature value t)
+        };
       SCase a alternatives ->
         do {
           value <- go a;
@@ -214,11 +221,11 @@ module Bootstrap.Desugar where {
         };
       _ -> freshPure expression
     };
-  goDefinition :: (,,) String SAnnotation SExpr -> Fresh ((,,) String SAnnotation SExpr);
-  goDefinition ((,,) n t a) =
+  goDefinition :: (,,) String RecursiveMode SExpr -> Fresh ((,,) String RecursiveMode SExpr);
+  goDefinition ((,,) n mode a) =
     do {
       value <- go a;
-      freshPure ((,,) n t value)
+      freshPure ((,,) n mode value)
     };
   block :: [] SStatement -> SExpr -> Fresh SExpr;
   block statements result =
@@ -235,7 +242,7 @@ module Bootstrap.Desugar where {
                   (SLet n
                      (case annotation of {
                         Nothing -> value2;
-                        Just a -> SAnn value2 a
+                        Just a -> SSignature value2 a
                       })
                      continuation)
               };

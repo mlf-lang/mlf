@@ -7,14 +7,15 @@
 module SnakeBaseline where
 
 import System.IO (hFlush, stdout)
+import Data.Int (Int64)
 
--- Integer matches the source language's arbitrary-precision Int.
-data Position = Position Integer Integer deriving (Eq, Show)
+-- Int64 matches the source language's signed 64-bit Int.
+data Position = Position Int64 Int64 deriving (Eq, Show)
 data Direction = North | South | West | East deriving (Eq, Show)
 data Command = Turn Direction | Forward | Quit | Invalid deriving (Eq, Show)
 data Snake = Snake Position [Position] deriving (Eq, Show)
-data Game = Game Snake Direction Position Integer deriving (Eq, Show)
-data Outcome = Continue Game | Lost String Integer | Won Integer deriving (Eq, Show)
+data Game = Game Snake Direction Position Int64 deriving (Eq, Show)
+data Outcome = Continue Game | Lost String Int64 | Won Int64 deriving (Eq, Show)
 
 -- The same monadic interface serves the real console and scripted tests.
 data Console m = Console
@@ -22,7 +23,7 @@ data Console m = Console
   , writeText :: String -> m ()
   }
 
-width, height :: Integer
+width, height :: Int64
 width = 12
 height = 8
 
@@ -92,14 +93,14 @@ tile (Game (Snake headPosition body) _ food _) position
   | position == food = "*"
   | otherwise = "."
 
-row :: Game -> Integer -> String
+row :: Game -> Int64 -> String
 row game y = "|" ++ cells 0
   where
     cells x
       | x == width = "|\n"
       | otherwise = tile game (Position x y) ++ cells (x + 1)
 
-rows :: Game -> Integer -> String
+rows :: Game -> Int64 -> String
 rows game y
   | y == height = ""
   | otherwise = row game y ++ rows game (y + 1)

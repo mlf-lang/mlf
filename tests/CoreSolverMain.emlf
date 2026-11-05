@@ -3,4 +3,4 @@ import Bootstrap.Types
 import qualified Tests.CoreSolver as T
 import qualified Tests.CoreRunner as R
 main : IO ()
-main = R.main "core-solver" false 33 T.families
+main = R.main "core-solver" false 34 T.families

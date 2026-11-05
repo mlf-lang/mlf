@@ -1,0 +1,8 @@
+{
+  "adaptation": "module header only",
+  "format": "sparse-contracts-classes-oracle-v1",
+  "frozen_sha256": "a25e6e69c2461afe780a653a1dc4bef40a402de871d13f71374cb284533f704c",
+  "path": "libraries/mlf-inference/Bootstrap/Classes.hs",
+  "ref": "48275901cd7b760cc8dd000ed54898a23a494a87",
+  "source_sha256": "3f685123f17509b53cdb2a28dde74d8b54e7459002f7b19c4eb698abef8273dd"
+}

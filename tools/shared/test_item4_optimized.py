@@ -13,6 +13,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import time
 import test_item4_contracts as contract
 
@@ -22,8 +23,23 @@ FIXTURES = {'pattern-do': 'PatternDo.hs', 'source': 'SourceSemantics.hs',
             'artifact': 'ArtifactIdentity.hs', 'query': 'QueryCache.hs',
             'core': 'CoreIdentity.hs', 'separate': 'SeparateCrates.hs',
             'builtin': 'BuiltinArtifact.hs', 'source-scc': 'SourceSCC.hs',
-            'source-crates': 'SourceCrates.hs'}
+            'source-crates': 'SourceCrates.hs', 'query-encoding': 'QueryEncoding.hs'}
 PROFILE = 'item4-O2-pedantic-bottoms-no-state-hack-v1'
+
+
+def process_memory(group):
+    if sys.platform != 'darwin':
+        return contract.process_memory(group)
+    processes = subprocess.check_output(['/bin/ps', '-axo', 'pgid=,rss='], text=True)
+    rss = sum(int(fields[1]) * 1024 for line in processes.splitlines()
+              if len(fields := line.split()) == 2 and int(fields[0]) == group)
+    vm = subprocess.check_output(['/usr/bin/vm_stat'], text=True)
+    page_size = int(re.search(r'page size of (\d+) bytes', vm)[1])
+    pages = dict(re.findall(r'Pages (free|inactive|speculative):\s+(\d+)\.', vm))
+    if set(pages) != {'free', 'inactive', 'speculative'}:
+        raise RuntimeError('vm_stat memory fields missing')
+    # Reclaimable estimate on macOS, not Linux MemAvailable.
+    return rss, sum(map(int, pages.values())) * page_size
 
 
 def main():
@@ -49,7 +65,9 @@ def main():
     closure.update(k for k in before if k.startswith('runtime/') and k.endswith('.h'))
     receipt = {'scope': 'focused-item4-optimized-' + args.suite,
                'status': 'running', 'profile': PROFILE, 'inputs': before,
-               'commands': [], 'tools': {}}
+               'commands': [], 'tools': {},
+               'memory_available_measure': ('vm_stat free + inactive + speculative estimate'
+                    if sys.platform == 'darwin' else 'Linux MemAvailable')}
     def save():
         (out / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     def run(argv, label):
@@ -62,7 +80,7 @@ def main():
                                     stderr=subprocess.STDOUT, start_new_session=True)
             try:
                 while proc.poll() is None:
-                    rss, available = contract.process_memory(proc.pid)
+                    rss, available = process_memory(proc.pid)
                     peak = max(peak, rss)
                     if rss > 1.5 * 1024**3 or available < 3 * 1024**3:
                         raise RuntimeError('resource-memory guard: ' + label)
@@ -150,6 +168,9 @@ def main():
             arguments.append(out / ('cache-' + str(time.time_ns())))
         arguments.extend(['+RTS', '-M700m', '-RTS'])
         run(arguments, 'positive')
+        if args.suite == 'query-encoding':
+            if (out / 'positive.log').read_text() != 'Query encoding audit: 54 checks passed\n':
+                raise RuntimeError('query encoding audit completion inventory changed')
         if args.suite in {'pattern-do', 'source'}:
             expected = {'pattern-do': 34, 'source': 18}[args.suite]
             actual = (out / 'positive.log').read_text().count('pass: ')

@@ -68,8 +68,8 @@ module Bootstrap.Parser where {
   upperReference =
     qualified (pChoices ((:) upperIdentifier ((:) (pToken "True") ((:) (pToken "False") []))));
   locatedReference :: Parser String -> Parser SExpr;
-  locatedReference parser = do {
-    located <- pWithSpan parser;
+  locatedReference parser = pBind (pWithSpan parser) referenceAt;
+  referenceAt located = do {
     syntax <- pSourceSyntax;
     case located of {
       (,) location name -> case syntax of {
@@ -78,15 +78,33 @@ module Bootstrap.Parser where {
       }
     }
   };
+  -- The final identifier consumes one whole token; a successful qualifier
+  -- consumes an identifier followed by a dot. Capture those token endpoints
+  -- as the grammar runs, without measuring both remaining token lists.
+  locatedLowerReference = do {
+    original <- pState;
+    result <- pTry (qualifiedWith (\prefixes ((,) token suffix) ->
+      (,) token (qualifiedName prefixes suffix)) (do {
+        lastState <- pState;
+        suffix <- lowerIdentifier;
+        pPure ((,) (stateToken lastState) suffix)
+      }));
+    case original of { ParseState file _ _ _ sourceModule sourcePackage ->
+      let { first = stateToken original; final = fst result } in
+      referenceAt ((,) (SourceSpan sourcePackage sourceModule file (tokenLine first) (tokenColumn first)
+        (tokenEndLine final) (tokenEndColumn final)) (snd result))
+    }
+  };
   lowerReference :: Parser String;
   lowerReference = pTry (qualified lowerIdentifier);
   qualified :: Parser String -> Parser String;
-  qualified final =
-    do {
-      prefixes <- pMany (pTry (pBefore upperIdentifier (pToken ".")));
-      name <- final;
-      pPure (foldr (\prefix suffix -> (prefix ++ ("." ++ suffix))) name prefixes)
-    };
+  qualified = qualifiedWith qualifiedName;
+  qualifiedName prefixes name = foldr (\prefix suffix -> prefix ++ ("." ++ suffix)) name prefixes;
+  qualifiedWith build final = do {
+    prefixes <- pMany (pTry (pBefore upperIdentifier (pToken ".")));
+    item <- final;
+    pPure (build prefixes item)
+  };
   moduleName :: Parser String;
   moduleName = pMap (intercalate ".") (pSepBy1 upperIdentifier (pToken "."));
   parseExpr :: String -> String -> Either String SExpr;
@@ -479,11 +497,12 @@ module Bootstrap.Parser where {
     if recursive
     then pMap (\ds -> SLetRec ds body) (pEither (Surface.recursiveValues values))
     else pPure (foldr (\((,,) n a e) b -> SLet n (annotateMaybe e a) b) body values);
+  -- Declaration and instance-method signatures must not become expression coercions.
   annotateMaybe :: SExpr -> Maybe SAnnotation -> SExpr;
   annotateMaybe expression ty =
     case ty of {
       Nothing -> expression;
-      Just a -> SAnn expression a
+      Just a -> SSignature expression a
     };
   parameter :: Parser ((,) String Kind);
   parameter =
@@ -1037,7 +1056,7 @@ module Bootstrap.Parser where {
                      ((:) (pMap SIntLit naturalLiteral)
                         ((:) (pMap (\text -> SApp (SVar "$MLF.Primitive.fromString")
                                   (Surface.sourceStringExpression text)) sourceStringLiteral)
-                           ((:) (locatedReference lowerReference)
+                           ((:) locatedLowerReference
                               ((:) (pThen (pNot (pTry operatorReference)) (pMap (\name -> SConstructor (sharedSourceName name)) upperReference)) [])))))))));
   sourceConsExpression :: SExpr -> SExpr -> SExpr;
   sourceConsExpression a b = SApp (SApp (SConstructor ":") a) b;
@@ -1057,7 +1076,7 @@ module Bootstrap.Parser where {
                   ((:) (pMap SDoubleLit doubleLiteral)
                      ((:) (pMap SIntLit naturalLiteral)
                         ((:) (pMap SStringLit stringLiteral)
-                           ((:) (locatedReference lowerReference)
+                           ((:) locatedLowerReference
                               ((:) (pMap SConstructor upperReference) [])))))))));
   -- Nonempty collections never admit a trailing comma or tuple sections.
   -- The separator check also gives ranges/comprehensions a direct diagnostic.
@@ -1153,7 +1172,7 @@ module Bootstrap.Parser where {
          let {
            value = readDouble spelling
          };
-         if (((doubleToBits value / 4503599627370496) % 2048) == 2047)
+         if ((andInt (doubleToBits value) 9218868437227405312) == 9218868437227405312)
          then pFail "non-finite Double literal"
          else pPure value
        });
@@ -1563,6 +1582,12 @@ module Bootstrap.Parser where {
           validateSharedScheme ty;
           validateSharedExpression e
         };
+      SSignature e (SAnnotation variables ty) ->
+        do {
+          unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
+          validateSharedScheme ty;
+          validateSharedExpression e
+        };
       SCase value branches ->
         do {
           validateSharedExpression value;
@@ -1585,12 +1610,10 @@ module Bootstrap.Parser where {
       SLetRec definitions body ->
         do {
           mapM_
-            (\((,,) name (SAnnotation variables ty) value) ->
+            (\((,,) name mode value) ->
                do {
                  validateSharedBinding name;
-                 unless (null variables)
-                   (Left "existential annotations are outside shared-haskell-v1");
-                 validateSharedScheme ty;
+                 validateSharedRecursiveMode mode;
                  validateSharedExpression value
                })
             definitions;
@@ -1598,6 +1621,16 @@ module Bootstrap.Parser where {
         };
       SDo _ _ -> Left "internal error: shared do was not normalized";
       _ -> Right ()
+    };
+  validateSharedRecursiveMode :: RecursiveMode -> Either String ();
+  validateSharedRecursiveMode mode =
+    case mode of {
+      InferRecursive -> Right ();
+      CheckRecursive (SAnnotation variables ty) ->
+        do {
+          unless (null variables) (Left "existential annotations are outside shared-haskell-v1");
+          validateSharedScheme ty
+        }
     };
   sharedDoExpr :: Parser SExpr;
   sharedDoExpr =

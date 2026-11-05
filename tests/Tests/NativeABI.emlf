@@ -142,8 +142,8 @@ generatedForce = H.withScratch (\directory -> do
    out <- readFile (directory ++ "/" ++ name ++ "-" ++ mode ++ ".out")
    err <- readFile (directory ++ "/" ++ name ++ "-" ++ mode ++ ".err")
    let success = eqString mode "success"
-   let reason = if eqString mode "null" then "missing runtime value" else "cyclic evaluation of a recursive binding"
-   O.require (status == (if success then 0 else 1) && eqString out (if success then "generated force: sharing, canonical values, long spines and no-interior GC passed\n" else "") && eqString err (if success then "" else "Runtime: " ++ reason ++ "\n")) ("generated force ABI mismatch: " ++ name ++ " " ++ mode)) (O.words "success null hole cycle-enter cycle-return")) ((:) ((,) "compact" []) ((:) ((,) "debug" ((:) "-DGC_DEBUG" [])) ((:) ((,) "audit" ((:) "-DMLF_ALLOCATION_AUDIT" [])) [])))
+   let reason = if eqString mode "null" || eqString mode "failure-order" then "missing runtime value" else "cyclic evaluation of a recursive binding"
+   O.require (status == (if success then 0 else 1) && eqString out (if success then "generated force: sharing, canonical values, long spines and no-interior GC passed\n" else if eqString mode "failure-order" then "before generated force failure\n" else "") && eqString err (if success then "" else "Runtime: " ++ reason ++ "\n")) ("generated force ABI mismatch: " ++ name ++ " " ++ mode)) (O.words "success null hole cycle-enter cycle-return failure-order")) ((:) ((,) "compact-O0" (O.words "-O0")) ((:) ((,) "debug-O0" (O.words "-O0 -DGC_DEBUG")) ((:) ((,) "audit-O0" (O.words "-O0 -DMLF_ALLOCATION_AUDIT")) ((:) ((,) "compact" []) ((:) ((,) "debug" ((:) "-DGC_DEBUG" [])) ((:) ((,) "audit" ((:) "-DMLF_ALLOCATION_AUDIT" [])) []))))))
  if eqString old "" then unsetEnv "GC_INITIAL_HEAP_SIZE" else setEnv "GC_INITIAL_HEAP_SIZE" old
  )
 

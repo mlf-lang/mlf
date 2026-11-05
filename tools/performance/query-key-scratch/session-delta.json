@@ -1,0 +1,15 @@
+{
+  "format": "query-key-scratch-projection-v1",
+  "module": "Bootstrap.CrateSession",
+  "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+  "parent_ref": "d6fe38c56fde162506700af40e031534c075e129",
+  "baseline_ref": "5172c4ade3b3141da2e64593c383892575b36699",
+  "old_sha256": "a5cd0cb1b939c81785c2c8b7fa2499fd63c24cd6730b8a2e3d74ce9559edabbf",
+  "new_sha256": "5c888e550760f023278beaeffb137a5e3940980b19be2850186ce35ff117805b",
+  "edits": [
+    {
+      "old": "                }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)\n                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing)\n                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];\n                releaseFileLock lock;\n                ioReturn result\n              }\n            }\n        }\n",
+      "new": "                }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)\n                  (if shareEncoding then Just (Source.prepareOwnedSourceContext plan contracts) else Nothing)\n                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];\n                cleaned <- Query.cleanupQueryKey cacheDir result;\n                releaseFileLock lock;\n                ioReturn cleaned\n              }\n            }\n        }\n"
+    }
+  ]
+}

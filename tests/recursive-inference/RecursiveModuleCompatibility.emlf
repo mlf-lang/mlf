@@ -1,0 +1,9 @@
+module Main where
+import Bootstrap.Types
+import qualified RecursiveInventoryDiscovery as Discovery
+import qualified Tests.CrateQueries as Queries
+import qualified Bootstrap.Std as S
+import Tests.Modules (moduleTests)
+import Tests.Separate (separateTests)
+labels = (:) "modules typing: cross-module qualified recursion generalizes shared exports" ((:) "crate typing: cross-module qualified recursion generalizes shared exports" ((:) "modules checking: cyclic empty imports carry defining-module instances" ((:) "crate checking: cyclic empty imports carry defining-module instances" ((:) "modules typing: cross-module recursion infers unsigned cycle" ((:) "crate typing: cross-module recursion infers unsigned cycle" ((:) "modules rejection: downstream orphan cannot leak into an import cycle" ((:) "crate rejects: downstream orphan cannot leak into an import cycle" ((:) "modules rejection: instance not visible in imported signed definition" ((:) "crate rejects: instance not visible in imported signed definition" ((:) "modules rejection: instance not visible in another instance" ((:) "crate rejects: instance not visible in another instance" [])))))))))))
+main = do { Discovery.main; (let selected = S.filter (\((,) label _) -> eqString label "query encodings preserve semantics and normalize lexical names") Queries.crateQueryTests in if S.length selected == 1 then S.mapM_ (\((,) _ action) -> action) selected else panic "missing canonical query test"); (let cases = S.filter (\((,) label action) -> S.elem eqString label labels) (S.append moduleTests separateTests) in if S.length cases == 12 then S.mapM_ (\((,) label action) -> do { putStrLn label; action }) cases else panic "focused module case identity mismatch") }

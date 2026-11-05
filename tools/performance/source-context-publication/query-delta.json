@@ -1,0 +1,18 @@
+{
+  "edits": [
+    {
+      "new": "  -- Caller holds the directory lock and has just written this fixed stage.\n  -- Preserve the publication failure even if removing that stage also fails.\n  -- Refuse directories: the Windows remove adapter would recurse into them.\n  -- Host exceptions and uncooperative replacement races remain outside this\n  -- normal-return cleanup; no other cache path is removed.\n  rejectSourceContextPublication :: String -> String -> IO (Either String String);\n  rejectSourceContextPublication cacheDir error = do {\n    let { staging = cacheDir ++ \"/source-context.new\" };\n    isDirectory <- directoryExists staging;\n    cleaned <- if isDirectory\n      then ioReturn (Left \"cannot remove source query context staging: path is a directory\")\n      else do {\n        code <- cacheCommand [\"/bin/rm\", \"-f\", staging];\n        ioReturn (if code == 0 then Right ()\n          else Left \"cannot remove source query context staging\")\n      };\n    ioReturn (case cleaned of {\n      Right _ -> Left error;\n      Left cleanupError -> Left (error ++ \"; \" ++ cleanupError)\n    })\n  };\n  -- The existing cache-directory lock owns this staging file. Publish the\n",
+      "old": "  -- The existing cache-directory lock owns this staging file. Publish the\n"
+    },
+    {
+      "new": "      let { destination = sourceContextPath cacheDir digest };\n      isDirectory <- directoryExists destination;\n      if isDirectory\n      then rejectSourceContextPublication cacheDir\n        \"cannot publish source query context: destination is a directory\"\n      else do {\n      present <- fileExists destination;\n      same <- if present then do {\n        previous <- readFile destination;\n        ioReturn (eqString previous contents)\n      } else ioReturn False;\n      code <- if same\n        then cacheCommand [\"/bin/rm\", \"-f\", staging]\n        else cacheCommand [\"/bin/mv\", \"-f\", staging, destination];\n      ioReturn (if code == 0 then Right digest else Left \"cannot publish source query context\")\n      }\n",
+      "old": "      let { destination = sourceContextPath cacheDir digest };\n      present <- fileExists destination;\n      same <- if present then do {\n        previous <- readFile destination;\n        ioReturn (eqString previous contents)\n      } else ioReturn False;\n      code <- if same\n        then cacheCommand [\"/bin/rm\", \"-f\", staging]\n        else cacheCommand [\"/bin/mv\", \"-f\", staging, destination];\n      ioReturn (if code == 0 then Right digest else Left \"cannot publish source query context\")\n"
+    }
+  ],
+  "format": "source-context-publication-owner-v1",
+  "module": "Bootstrap.CrateQuery",
+  "new_sha256": "a1d35da4cb9f5256b3d0d1302aba6c54ce87752d5e1c6f247ae773ab0be9131f",
+  "old_sha256": "3a7cb44316980c5a40916a0cfd595472091efba215ab101382c65963f05023f6",
+  "parent_ref": "97fe3dc80237bbd4d58594b043f189c5ba633209",
+  "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs"
+}

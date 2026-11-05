@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Prelude
+import SourceKeyWitness (sourceKeys, fullKey)
 import Control.Monad(foldM,unless)
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Std as Std
@@ -22,6 +23,8 @@ import qualified MLF.Primitive as Prim
 import System.IO
 import System.Environment(getArgs)
 import qualified Bootstrap.CrateQuery as Q
+import qualified Bootstrap.ArtifactStorage as Storage
+import qualified Bootstrap.ArtifactStructure as Structure
 import qualified Bootstrap.SourceEquality as E
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.X.Pretty as Pretty
@@ -37,7 +40,10 @@ instBool=T.SInstanceDecl [] [] "Tag" [bool] [("tag",T.SLam "x" T.Nothing(T.SIntL
 add x y=T.SApp(T.SApp(T.SPrimitive T.PAddInt)x)y
 tag=T.SApp(T.SVar "tag")
 app n x=T.SApp(T.SVar n)x
-roots=[("sameDeps",T.SLet "known" (T.SAnn(tag(T.SIntLit 2))(T.SAnnotation [] int))(add(tag(T.SIntLit 1))(T.SVar "known")),Just 3,0),("f0",tag(T.SIntLit 21),Just 21,0),("f1",add(T.SVar "f0")(T.SVar "f0"),Just 42,0),("f2",add(T.SVar "f1")(T.SVar "f1"),Just 84,0),("mixed",add(tag(T.SIntLit 19))(tag(T.SBoolLit True)),Just 61,0),("plain",add(T.SIntLit 1)(T.SIntLit 2),Just 3,0),("nonground",T.SLam "x" T.Nothing(tag(T.SVar "x")),Nothing,1),("nongroundUse",add(app "nonground"(T.SIntLit 21))(app "nonground"(T.SBoolLit True)),Just 63,0),("mixedResidual",T.SLam "x" T.Nothing(add(tag(T.SIntLit 21))(tag(T.SVar "x"))),Nothing,2),("mixedResidualUse",app "mixedResidual"(T.SBoolLit True),Just 63,0),("partialScope",add(tag(T.SIntLit 21))(tag(T.SBoolLit True)),Nothing,2),("partialScopeUse",T.SVar "partialScope",Just 63,0),("managedRoot",T.SLet "ignoredStack" (T.SVar "$MLF.Stack.callStack") (tag(T.SIntLit 21)),Nothing,1),("managedUse",T.SVar "managedRoot",Nothing,1),("signedUse",add(T.SVar "signed")(app "recursive"(T.SIntLit 2)),Just 42,0)]
+-- This local type is a declaration interface: it deliberately closes one Tag Int
+-- use before root compaction, retaining the same raw/final dependency context.
+-- Expression SAnn remains a coercion and does not supply that declaration intent.
+roots=[("sameDeps",T.SLet "known" (T.SSignature(tag(T.SIntLit 2))(T.SAnnotation [] int))(add(tag(T.SIntLit 1))(T.SVar "known")),Just 3,0),("f0",tag(T.SIntLit 21),Just 21,0),("f1",add(T.SVar "f0")(T.SVar "f0"),Just 42,0),("f2",add(T.SVar "f1")(T.SVar "f1"),Just 84,0),("mixed",add(tag(T.SIntLit 19))(tag(T.SBoolLit True)),Just 61,0),("plain",add(T.SIntLit 1)(T.SIntLit 2),Just 3,0),("nonground",T.SLam "x" T.Nothing(tag(T.SVar "x")),Nothing,1),("nongroundUse",add(app "nonground"(T.SIntLit 21))(app "nonground"(T.SBoolLit True)),Just 63,0),("mixedResidual",T.SLam "x" T.Nothing(add(tag(T.SIntLit 21))(tag(T.SVar "x"))),Nothing,2),("mixedResidualUse",app "mixedResidual"(T.SBoolLit True),Just 63,0),("partialScope",add(tag(T.SIntLit 21))(tag(T.SBoolLit True)),Nothing,2),("partialScopeUse",T.SVar "partialScope",Just 63,0),("managedRoot",T.SLet "ignoredStack" (T.SVar "$MLF.Stack.callStack") (tag(T.SIntLit 21)),Nothing,1),("managedUse",T.SVar "managedRoot",Nothing,1),("signedUse",add(T.SVar "signed")(app "recursive"(T.SIntLit 2)),Just 42,0)]
 program=T.SClassProgram [] [cls] [instInt,instBool] (foldr(\(n,e,_,_)b->T.SLet n e b)(T.SConstructor "()")roots)
 scopes=M.fromList Prim.compareString [(n,IS.fromList(if n=="partialScope"||n=="sameDeps" then [0] else [0,1]))|(n,_,_,_)<-roots]
 data Value=Value Prim.String SI.SourceContract T.XTerm
@@ -61,11 +67,46 @@ evaluate term=do
  v<-expect"runtime"(R.evaluate env(R.REnv M.empty)(X.erase term))
  case v of R.RInteger n->pure n;_->error"not integer"
 closed ds values parameters rhs=
- let ids=foldl(\acc(n,t)->U.typeIdentities t(Set.insert Std.compareInt(X.nameId n)acc))(U.termIdentities rhs Set.empty)parameters
-     start=1+maximum(0:Set.toList ids)
+ let ids=foldl(\acc(n,t)->U.typeIdentities t(IS.insert(X.nameId n)acc))(U.termIdentities rhs IS.empty)parameters
+     start=1+maximum(0:IS.toList ids)
      step(serial,bindings)(n,_)=let(next,term)=U.freshObject serial(strip(vb(lookupValue values(X.nameHint n))))in(next,bindings++[(n,term)])
      (_,bindings)=foldl step(start,[])parameters
  in T.XWithData ds(foldr(\(n,term)b->T.XLet n term b)rhs bindings)
+-- Read the actual default binary raw record. The compact key has no user
+-- context field. Verify its carrier, then use normal checked-record admission.
+decodeRawSourceCache keys cache digest final=do
+ let iface=U.objectInterface final; ds=U.unitData iface; name=U.unitName iface
+     file=B.literal(cache++"/"++B.unpack digest++".mlfq")
+ input<-Storage.read 2 file >>= expect "raw record wire"
+ graph<-case input of Storage.BinaryInput g->pure g; _->error "expected binary source record"
+ query<-expect "shared source record"(Q.binaryQuery graph)
+ (stored,result,ref,bodyIndex)<-case query of
+  Q.LocalQuery key hash (Q.SharedPayload context _ body)->pure(key,hash,context,body)
+  Q.SlotQuery key hash (Q.SharedPayload context _ body)->pure(key,hash,context,body)
+  _->error "expected a shared source context"
+ assert "source context reference is a safe SHA"(Q.validSourceContextDigest ref)
+ actual<-Prim.fileDigest(Q.sourceContextPath(B.literal cache)ref)
+ assert "actual source context SHA"(actual==ref)
+ key<-fullKey keys digest
+ assert "stored input and result fingerprints" (stored==digest && Q.validSourceContextDigest result)
+ body<-expect "raw parameter spine"(Structure.fromGraphXTerm graph bodyIndex)
+ let parameters=[(X.nameHint n,ty)|(n,ty)<-fst(U.splitParameters body)]
+ (_,_,decoded)<-Q.readBinarySourceGraph [] (B.literal cache) key name parameters ds (map fst(U.unitBindings iface)) graph
+ raw<-expect "checked raw record and complete datatype context" decoded
+ pure(key,raw)
+
+-- Compare the checked receipt directly to the former independent spine walk.
+checkBindingInventory raw = do
+ let (ds,body) = case U.objectTerm raw of { T.XWithData declarations term -> (declarations,term); term -> ([],term) }
+     (parameters,spine) = U.splitParameters body
+ env <- expect "raw datatype validation" (D.validateDeclarations ds)
+ old <- expect "independent raw binding inventory"
+   (U.collectBindings env (T.XEnv M.empty (M.fromList X.compareName parameters)) spine)
+ receipt <- expect "checked raw term" (U.objectChecked raw)
+ actual <- expect "receipt binding inventory" (Checked.declarationBindings receipt)
+ let same (n,t) (m,u) = X.nameId n == X.nameId m && X.nameHint n == X.nameHint m && XT.alphaEq t u
+ assert "checked raw inventory equals independent walk" (length old == length actual && and (zipWith same old actual))
+
 main=do
  hSetBuffering stdout LineBuffering
  [cache]<-getArgs
@@ -75,6 +116,9 @@ main=do
  let plan=case rawPlan of SI.SourcePlan a b c d e f g _ i j -> SI.SourcePlan a b c d e f g (error "POISON old global lowering forced") i j
  (objects,cold,contracts)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "cold source SCC compilation"
  assert "cold inferred all groups" (Q.inferredCount cold==fromIntegral(length(SI.planGroups plan))&&Q.reusedCount cold==0)
+ keys<-sourceKeys "dispatch" plan [] M.empty contracts
+ mapM_ (\(key,object) -> decodeRawSourceCache keys cache key object >>= checkBindingInventory . snd)
+   (zip (Q.queryKeys cold) objects)
  values<-foldM collect [] objects
  mapM_ (\(n,_,wanted,slots)->if n=="signedUse" then pure() else do
    let v=lookupValue values n;c=case M.lookup Prim.compareString n contracts of T.Just x->x;_->error "contract absent"
@@ -89,16 +133,13 @@ main=do
      [(groupId,digest)]=[(gid,digest)|Q.GroupResult gid names _ _ digest<-reports,names==["sameDeps"]]
      [compact]=[obj|obj<-objects,U.unitName(U.objectInterface obj)==groupId]
      cacheFile=cache++"/"++B.unpack digest++".mlfq"
- rawText<-B.literal <$> readFile cacheFile
- fields<-expect "read raw cached payload"(U.unpack rawText)
- rawIface<-expect "raw cache interface"(U.decodeInterface(fields!!2))
- rawObject<-expect "raw cache object"(U.decodeObject rawIface(fields!!3))
+ (exactKey,rawObject)<-decodeRawSourceCache keys cache digest compact
+ let rawIface=U.objectInterface rawObject
  let rawParameters=map(\(n,t)->(X.nameHint n,t))(fst(U.splitParameters(strip(U.objectTerm rawObject))))
- let exactKey=fields!!1
  _<-expect "counterexample generic validator accepts compact with same dependency context"(Q.decodeCached exactKey groupId rawParameters (U.unitData rawIface) ["sameDeps"] (Q.encodeCached exactKey compact))
  keyFields<-expect "source query framing"(U.unpack exactKey)
- assert "raw cache uses exact new source namespace"(head keyFields=="MLF-SOURCE-CRATE-QUERY-5")
- assert "raw provisional is not compact final object"(Q.encodeCached exactKey compact/=rawText)
+ assert "raw cache uses exact new source namespace"(head keyFields=="MLF-SOURCE-CRATE-QUERY-7")
+ assert "raw provisional is not compact final object"(Q.encodeCached exactKey compact/=Q.encodeCached exactKey rawObject)
  writeFile cacheFile(B.unpack(Q.encodeCached exactKey compact))
  (repairedObjects,repaired,_)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "reject normalized-as-raw cache"
  assert "normalized final payload fails raw cache validation and reinfers"(Q.inferredCount repaired==1&&Q.reusedCount repaired==fromIntegral(length objects-1))
@@ -193,10 +234,8 @@ supportProtectionChecks cache=do
  let Q.QueryReport _ _ rows=report
      [(gid,digest)]=[(gid,digest)|Q.GroupResult gid ns _ _ digest<-rows,ns==["guarded"]]
      [final]=[o|o<-objects,U.unitName(U.objectInterface o)==gid]
- cacheText<-B.literal <$> readFile(cache++"/"++B.unpack digest++".mlfq")
- fs<-expect "managed raw cache"(U.unpack cacheText)
- i<-expect "managed raw interface"(U.decodeInterface(fs!!2))
- raw<-expect "managed raw object"(U.decodeObject i(fs!!3))
+ keys<-sourceKeys "managed-support" plan [] M.empty contracts
+ (_,raw)<-decodeRawSourceCache keys cache digest final
  assert "selected managed proof veto preserves exact original object"(U.encodeObject raw==U.encodeObject final)
  values<-foldM collect [] objects
  evaluate(vb(lookupValue values "safeBool"))>>=assert "safe proof runtime".(==42)

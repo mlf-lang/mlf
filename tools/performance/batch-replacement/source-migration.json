@@ -1,0 +1,27 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.LLVM": {
+      "new": "40ece18dfdbd917a1cb978e78c11f620ead4fb9712fa5e8d6b4f747b706d9e7d",
+      "old": "a8c0c5b03f85c25b35e64a6753a2df9572a76650a01d987e3cd98959c719cfe5",
+      "reviewed_change": "Use owned batch optimizer only after successful opaque checked-term construction."
+    },
+    "Bootstrap.LLVM.Library": {
+      "new": "4bcc573811ebe0f2c5689bca61b5e3667a571ba36e5a06d41b7d5c7e9649eb55",
+      "old": "0da1651f87d14beb7a66edaed94dc9ff16d9471a72f8d5b84e2ea5462d2eca1d",
+      "reviewed_change": "Use owned batch optimizer only after successful opaque checked-term construction."
+    },
+    "Bootstrap.LLVM.Optimize": {
+      "new": "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f",
+      "old": "b1a1e81d21a81300e8df8be5c62d21c824496e77c8040e3ca5cc122c4334fee4",
+      "reviewed_change": "Restricted owned batch inliner preserving the public raw optimizer and original rewrite/Fresh order."
+    }
+  },
+  "format": "batch-replacement-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "f925cbc17365a534db21e66ec806820ed7957fc2942dd9b1eb5d789f12b1b4cf",
+  "parent_ref": "7bf7ac6db5e3db2daff2e0a1c249e68ae0db2d0c",
+  "removed_sources": {},
+  "unchanged_sources": 125
+}

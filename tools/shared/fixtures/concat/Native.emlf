@@ -1,0 +1,152 @@
+-- Every engine sees the same literal and demand controls. The frozen balanced
+-- engine uses only binary concatenation and is independent of the new helper.
+module Main where
+import Bootstrap.Types
+import qualified Bootstrap.Primitive as Metadata
+import qualified Bootstrap.Std as S
+import qualified ConcatReference as Reference
+
+join : String -> [] String -> String
+join engine fragments =
+  if eqString engine "primitive" then concatStringList fragments
+  else if eqString engine "stdlib" then S.concatStrings fragments
+  else if eqString engine "reference" then Reference.concatStrings fragments
+  else panic "unknown concat engine"
+
+-- A separate function deliberately exposes worker argument preforcing. The
+-- join must finish before a failing suffix is demanded by binary concat.
+appendJoined : String -> [] String -> String -> String
+appendJoined engine pieces suffix = concatString (join engine pieces) suffix
+
+assert : Bool -> String -> IO ()
+assert condition label =
+  if condition then return () else panic ("native concat control: " ++ label)
+
+check : String -> [] String -> String -> IO ()
+check engine fragments expected = do
+  let actual = join engine fragments
+  assert (eqString actual expected) "literal text"
+  assert (stringLength actual == stringLength expected) "literal scalar length"
+
+metadata : IO ()
+metadata = do
+  assert (Metadata.primitiveCode PConcatStringList == 107) "new opcode"
+  assert (Metadata.primitiveCode PIOErrorWithStack == 106) "previous opcode"
+  assert (eqString (Metadata.primitiveName PConcatStringList) "concatStringList") "primitive name"
+  assert (Metadata.primitiveArity PConcatStringList == 1) "primitive arity"
+  assert (Metadata.primitiveStrict PConcatStringList) "strict operand"
+  assert (case Metadata.primitiveSignature PConcatStringList of
+    ((,) [] (Function (Applied list [Applied input []]) (Applied output []))) ->
+      eqString list "[]" && eqString input "String" && eqString output "String"
+    _ -> false) "primitive signature"
+  assert (case Metadata.lookupTargetPrimitive "concatStringList" of
+    Just PConcatStringList -> true
+    _ -> false) "primitive lookup"
+  assert (S.eqList eqInt (S.map Metadata.primitiveCode Metadata.allPrimitives) (S.range 0 107))
+    "append-only opcode inventory"
+
+literals : String -> IO ()
+literals engine = do
+  metadata
+  let nul = stringFromCode 0
+  check engine [] ""
+  check engine [""] ""
+  check engine ["", "", ""] ""
+  check engine ["single"] "single"
+  check engine ["a", "b"] "ab"
+  check engine ["a", "b", "c"] "abc"
+  check engine ["", "a", "", "b", ""] "ab"
+  check engine ["α", "β"] "αβ"
+  check engine ["A", "😀", "Z"] "A😀Z"
+  check engine [nul] nul
+  check engine ["a" ++ nul, nul ++ "b"] ("a" ++ nul ++ nul ++ "b")
+  check engine [stringFromCode 127, stringFromCode 128] (stringFromCode 127 ++ stringFromCode 128)
+  check engine ["e", stringFromCode 769] ("e" ++ stringFromCode 769)
+  check engine [stringFromCode 1114111, nul] (stringFromCode 1114111 ++ nul)
+  check engine ["α😀", "", nul, "z"] ("α😀" ++ nul ++ "z")
+  check engine ["last", "", ""] "last"
+  let text = join engine ["A", "α", nul, "😀", "Z"]
+  assert (stringLength text == 5) "mixed scalar count"
+  assert (stringCodeAt text 0 == 65) "ASCII scalar"
+  assert (stringCodeAt text 1 == 945) "BMP scalar"
+  assert (stringCodeAt text 2 == 0) "NUL scalar"
+  assert (stringCodeAt text 3 == 128512) "astral scalar"
+  assert (stringCodeAt text 4 == 90) "post-astral scalar"
+  putStrLn "concat literals passed"
+
+fragments : Int -> Int -> [] String
+fragments count seed = S.map
+  (\index -> stringFromCode (65 + remInt (index + seed) 26) ++ stringFromCode 0 ++ "α😀")
+  (S.range 0 (count - 1))
+
+verifyScalarChunk : String -> Int -> Int -> Int -> Bool
+verifyScalarChunk text index end seed =
+  if index >= end then true else
+    let position = remInt index 4 in
+    let expected =
+          if position == 0 then 65 + remInt (quotInt index 4 + seed) 26
+          else if position == 1 then 0
+          else if position == 2 then 945
+          else 128512 in
+    if stringCodeAt text index == expected
+    then verifyScalarChunk text (index + 1) end seed
+    else false
+
+-- O0 need not eliminate tail calls. Verify every scalar while bounding the
+-- inner recursion to 1,024 frames and the outer recursion to 128 chunks.
+verifyScalars : String -> Int -> Int -> Int -> Bool
+verifyScalars text index size seed =
+  if index >= size then true else
+    let end = if index + 1024 < size then index + 1024 else size in
+    if verifyScalarChunk text index end seed
+    then verifyScalars text end size seed
+    else false
+
+stress : String -> Int -> IO ()
+stress engine count = do
+  let size = count * 4
+  let first = join engine (fragments count 0)
+  assert (stringLength first == size) "first stress length"
+  -- Keep the first result live while another large, dynamically produced list
+  -- is forced. The harness observes actual BDWGC collections in these runs.
+  let second = join engine (fragments count 7)
+  assert (stringLength second == size) "second stress length"
+  assert (verifyScalars first 0 size 0) "retained stress scalars"
+  assert (verifyScalars second 0 size 7) "second stress scalars"
+  putStrLn "concat stress passed"
+
+main : IO ()
+main = do
+  engine <- getArg 0
+  mode <- getArg 1
+  if eqString mode "literals" then literals engine
+  else if eqString mode "stress" then do
+    count <- getArg 2
+    stress engine (readInt count)
+  else if eqString mode "list-bottom" then
+    printInt (stringLength (join engine (panic "list-first")))
+  else if eqString mode "head-before-tail" then
+    printInt (stringLength (join engine ((:) (panic "head-first") (panic "tail-second"))))
+  else if eqString mode "tail-required" then
+    printInt (stringLength (join engine ((:) "a" (panic "tail-required"))))
+  else if eqString mode "second-before-tail" then
+    printInt (stringLength (join engine ((:) "a" ((:) (panic "second-first") (panic "tail-second")))))
+  else if eqString mode "third-before-tail" then
+    printInt (stringLength (join engine ((:) "a" ((:) "b" ((:) (panic "third-first") (panic "tail-second"))))))
+  else if eqString mode "empty-before-second" then
+    printInt (stringLength (join engine ((:) "" ((:) (panic "second-first") (panic "tail-second")))))
+  else if eqString mode "singleton-bottom" then
+    printInt (stringLength (join engine [panic "singleton-required"]))
+  else if eqString mode "empty-pair-tail" then
+    printInt (stringLength (join engine ((:) "" ((:) "" (panic "tail-required")))))
+  else if eqString mode "strict-string-left" then
+    printInt (stringLength (join engine [concatString (panic "string-left") (panic "string-right")]))
+  else if eqString mode "outer-head-before-suffix" then
+    printInt (stringLength (appendJoined engine [panic "head-first"] (panic "suffix-second")))
+  else if eqString mode "outer-tail-before-suffix" then
+    printInt (stringLength (appendJoined engine ((:) "a" (panic "tail-first")) (panic "suffix-second")))
+  else if eqString mode "unused-result" then
+    let unused = join engine (panic "unused-list") in printInt 1
+  else if eqString mode "untaken-result" then
+    if false then printInt (stringLength (join engine (panic "untaken-list"))) else printInt 1
+  else panic "unknown concat control"

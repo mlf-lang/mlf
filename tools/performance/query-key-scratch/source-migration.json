@@ -1,0 +1,23 @@
+{
+  "added_sources": {},
+  "baseline_ref": "5172c4ade3b3141da2e64593c383892575b36699",
+  "changed_sources": {
+    "Bootstrap.CrateQuery": {
+      "new": "43af002afc2ddb1d69efef0a2d5c1c75dc3dd0b33c85685d4e83fd3290101a68",
+      "old": "9d6cda4a88c1891cd52e292691955ab2a34f9e03dd70ad764dbf52eb9de5ccb2",
+      "reviewed_change": "Remove only reserved query-key.new after normal locked public invocation; preserve full keys, cache encoding and original error, and reject directory cleanup."
+    },
+    "Bootstrap.CrateSession": {
+      "new": "5c888e550760f023278beaeffb137a5e3940980b19be2850186ce35ff117805b",
+      "old": "a5cd0cb1b939c81785c2c8b7fa2499fd63c24cd6730b8a2e3d74ce9559edabbf",
+      "reviewed_change": "Remove only reserved query-key.new after normal locked public invocation; preserve full keys, cache encoding and original error, and reject directory cleanup."
+    }
+  },
+  "format": "query-key-scratch-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "5dbb5cbc5fcb047732e1ef48931c88a3dbd73030af4cc853f6a07ed951208a6e",
+  "parent_ref": "d6fe38c56fde162506700af40e031534c075e129",
+  "removed_sources": {},
+  "unchanged_sources": 126
+}

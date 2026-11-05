@@ -1,0 +1,60 @@
+{
+  "format": "frozen-selector-oracle-v1",
+  "baseline_source": "libraries/mlf-frontend/Bootstrap/Module.hs",
+  "baseline_sha256": "d1d131834ec7bafa312577f5b2b3f85a986e2a1a0f73ea9427f896634dc33aa1",
+  "oracle_sha256": "62c44c42657f507c35d46fc08b5fc39f99ac23d34cb9cb2cf645fabfc83767d4",
+  "excerpt_sha256": "d77ad09a09f358926c43b637c5a9ab04052c6da2d16e90a7fe81cd27d156003a",
+  "original_definitions_unedited": true,
+  "shared_dependency_pins": {
+    "libraries/mlf-foundation/Bootstrap/Std.hs": "0eb137b5935bdf13ed6807c2a4aa96bb558bfce37fd39c9fb08897bb63eedbff",
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "c8bf3c734fa5c7e4c9b1f546774fb7dbfac9cc872fc7194f18cacb53d332132a",
+    "libraries/mlf-frontend/Bootstrap/Lexer.hs": "9c681c46059d62f430c71e783d77b74ed7e0898225a148b4116995a5a2155179",
+    "libraries/mlf-language-core/Bootstrap/Primitive.hs": "d5ab2e97d7c217143311ff81c09075f9f9adb96ecf9f0cfe285e274e28130e23",
+    "host/ghc/MLF/Primitive.hs": "2ec6ab90201feb449a9a9accbfa9d34661e03216e54cb3c52ffbfe2d15f7353b",
+    "host/ghc/MLF/Host/Base.hs": "b9663c40059791bfb99e9f302d4eab94452379653db3e951ee02c8ff45933de3"
+  },
+  "scope": "Oracle freezes target selector/helper definitions and historical Map/Set implementation bodies. It shares schema datatype constructors and pinned Std/Types/lexer/primitive dependencies. Candidate collections are separately pinned after explicit re-audit, not substituted into the oracle. If any dependency changes, re-audit independence or supply separately frozen dependencies; do not update pins merely to pass.",
+  "historical_baseline_sha": "af9ea26a2d2d76630a58e82e9e12940a03cfb5f0",
+  "f1_dependency_reaudit": {
+    "prior_host_pins": {
+      "host/ghc/MLF/Primitive.hs": "4b0c1ab711471b60c136cc3a8b9cbe6ed07e2a4df367b43384dee77cd0498316",
+      "host/ghc/MLF/Host/Base.hs": "31fb27b1438c9a8bbf20804db4e770cc3af9d48dc39ad4ced9c55e10565ba63f"
+    },
+    "production_delta": "Exact frozen F1: Base adds two guarded Int64 helpers, two literal RULES, five phase-controlled INLINE pragmas and Data.Int import; Primitive adds six INLINE pragmas. Existing definitions unchanged, no shared/native source or ABI edits.",
+    "independence": "Selector/schema/collection definitions unchanged. The separate F1 gate independently checks the host arithmetic against O0 Prelude Integer, including demand and error order."
+  },
+  "collection_dependency_reaudit": {
+    "baseline_sha": "af9ea26a2d2d76630a58e82e9e12940a03cfb5f0",
+    "candidate_dependency_pins": {
+      "libraries/mlf-foundation/Bootstrap/Map.hs": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30",
+      "libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+    },
+    "frozen_modules": [
+      {
+        "file": "FrozenSelectorMap.hs",
+        "baseline_source": "libraries/mlf-foundation/Bootstrap/Map.hs",
+        "baseline_sha256": "d4d9ebfa39a14ae1cbaf48fa9d540eafa7b452aaa3cc73ffc624a34c15417bdb",
+        "oracle_sha256": "9b7dce8485229d577862ea78e8be34cd28edd9766809a91de7ddf87dd43102e9"
+      },
+      {
+        "file": "FrozenSelectorSet.hs",
+        "baseline_source": "libraries/mlf-foundation/Bootstrap/Set.hs",
+        "baseline_sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+        "oracle_sha256": "882f4a8beba89fa538b398c99831891628e0b6ae28c5c7f8ce70680f6ef91d19"
+      }
+    ],
+    "adapted_selector_sha256": "b72dcd1aea7d2d6d69358eb95f94630183c426619652d7a9e5d82f9fd84e3dc3",
+    "production_delta": "Map.unionWith now folds the smaller input, using insertRightWith to preserve the left key representative and combine order, and has empty-input fast paths. Set definitions are unchanged but call the changed Map transitively.",
+    "independence": "FrozenSelectors.hs and all selector/helper bodies remain literal historical fixtures. The runner adapts only its Map/Set imports. FrozenSelectorMap is the complete historical Map with only its module name changed; FrozenSelectorSet is historical Set with only its module name and Map import changed. Inverse adaptations must reproduce the historical dependency hashes. Both oracle collection modules share only the pinned Bootstrap.Types datatypes, Std and host primitives, never candidate collection functions.",
+    "demand_scope": "Controls cover valid map shapes, lazy stored values, unused combining functions, left key representatives and noncommutative combining order in both size directions. Empty fast paths can avoid old comparator demands even with valid trees (for example a multi-key left map and empty right map); no equivalence for bottom comparators or malformed/partial internal trees is claimed.",
+    "coverage": "Historical 154072 selector checks are retained. Additional collection checks use independently authored ordered-list and size expectations over all pairs of five-key subsets, plus the historical Map.valid validator for cached subtree sizes, ordering and balance on both Map and Set results, and explicit demand/poison controls.",
+    "balance_dependency_reaudit": {
+      "prior_candidate_map_sha256": "1fdf24d3b3874c76d246f098ee9361a7f93e7eb01f741e064347452976cdaf0a",
+      "candidate_map_sha256": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30",
+      "production_delta": "After unchanged total<=1, compare leftSize<rightSize and test only the possible heavy side. No other Map function changes.",
+      "independence": "FrozenSelectorMap/Set and FrozenSelectors remain byte-identical. Their imports resolve only to independently frozen collections and the same pinned Types, Std and host primitives. The candidate Map never supplies an oracle operation. Inverse module/import adaptations and historical hashes are still required.",
+      "semantic_obligation": "For any Integer L,R with L+R>1: L<R implies R>0 and L<=3R; L>=R implies L>0 and R<=3L. This preserves the selected branch for signed, inconsistent or huge cached sizes. The unchanged total test already forces sizes in the original order. No additional payload or descendant demand.",
+      "additional_controls": "24649 unfiltered complete raw-shape pairs against original FrozenMap; 400 complete mutation tree comparisons against the qualified pre-change Map; 30 manual demand/error-order cases. Candidate and unchanged baseline both pass. This finite coverage supplements, and does not replace, the full historical selector checks."
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.CrateQuery": {
+      "new": "03938b24a01727e6a655c57399fd111d47b0c8befb8b4533d74fc5ad0d9b02a7",
+      "old": "322ee23d20fc88edb382df53da7366208c36910d18cb94af72e2e69a84a1049d",
+      "reviewed_change": "Reuse lazily encoded checked predecessor contracts, synchronized with successful finalized contract deltas."
+    },
+    "Bootstrap.CrateSession": {
+      "new": "c97410642e2c86c7bc84436492a284c51291d617e1be0e262716275e5997a23d",
+      "old": "1d837ed6dfb21a54d78e491dc90b24c42e11e702bec53dd72d85f2f291d305b6",
+      "reviewed_change": "Reuse lazily encoded checked predecessor contracts, synchronized with successful finalized contract deltas."
+    }
+  },
+  "format": "contract-context-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "6b819d779d924972f8123f258abbf0f97c410485bc97995ef0f8d9aee49bb9c2",
+  "removed_sources": [],
+  "unchanged_sources": 126
+}

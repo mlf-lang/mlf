@@ -43,6 +43,12 @@ module Bootstrap.Dependency where {
   observePredicate (SPredicate n args) =
     merge (Observation [] [] [] ((:) n [])) (mergeMany (map observeType args));
   observeAnnotation (SAnnotation _ ty) = observeType ty;
+  observeRecursiveMode :: RecursiveMode -> Observation;
+  observeRecursiveMode mode =
+    case mode of {
+      InferRecursive -> emptyObservation;
+      CheckRecursive annotation -> observeAnnotation annotation
+    };
   observeOptional value =
     case value of {
       Nothing -> emptyObservation;
@@ -78,6 +84,7 @@ module Bootstrap.Dependency where {
       SLet n a b ->
         merge (observeExpression a) (bindObservation (S.singleton n) (observeExpression b));
       SAnn a t -> merge (observeExpression a) (observeAnnotation t);
+      SSignature a t -> merge (observeExpression a) (observeAnnotation t);
       SCase a branches ->
         merge (observeExpression a)
           (mergeMany
@@ -101,7 +108,7 @@ module Bootstrap.Dependency where {
         bindObservation (S.fromList compareString (map (\((,,) n _ _) -> n) declarations))
           (merge (observeExpression body)
              (mergeMany
-                (map (\((,,) _ a b) -> merge (observeAnnotation a) (observeExpression b))
+                (map (\((,,) _ mode b) -> merge (observeRecursiveMode mode) (observeExpression b))
                    declarations)));
       SWanted dictionary candidates ->
         Observation (map snd candidates) ((:) dictionary []) [] [];

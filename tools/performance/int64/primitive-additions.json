@@ -1,0 +1,204 @@
+[
+  {
+    "code": 108,
+    "constructor": "POrInt",
+    "name": "orInt",
+    "arguments": [
+      "Int",
+      "Int"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 109,
+    "constructor": "PXorInt",
+    "name": "xorInt",
+    "arguments": [
+      "Int",
+      "Int"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 110,
+    "constructor": "PShiftLInt",
+    "name": "shiftLInt",
+    "arguments": [
+      "Int",
+      "Int"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 111,
+    "constructor": "PShiftRInt",
+    "name": "shiftRInt",
+    "arguments": [
+      "Int",
+      "Int"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 112,
+    "constructor": "PUnsignedShiftRInt",
+    "name": "unsignedShiftRInt",
+    "arguments": [
+      "Int",
+      "Int"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 113,
+    "constructor": "PCountLeadingZerosInt",
+    "name": "countLeadingZerosInt",
+    "arguments": [
+      "Int"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 114,
+    "constructor": "PCountTrailingZerosInt",
+    "name": "countTrailingZerosInt",
+    "arguments": [
+      "Int"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 115,
+    "constructor": "PPopCountInt",
+    "name": "popCountInt",
+    "arguments": [
+      "Int"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 116,
+    "constructor": "PIntToInteger",
+    "name": "intToInteger",
+    "arguments": [
+      "Int"
+    ],
+    "result": "Integer"
+  },
+  {
+    "code": 117,
+    "constructor": "PIntegerToInt",
+    "name": "integerToInt",
+    "arguments": [
+      "Integer"
+    ],
+    "result": "Int"
+  },
+  {
+    "code": 118,
+    "constructor": "PAddInteger",
+    "name": "addInteger",
+    "arguments": [
+      "Integer",
+      "Integer"
+    ],
+    "result": "Integer"
+  },
+  {
+    "code": 119,
+    "constructor": "PSubInteger",
+    "name": "subInteger",
+    "arguments": [
+      "Integer",
+      "Integer"
+    ],
+    "result": "Integer"
+  },
+  {
+    "code": 120,
+    "constructor": "PMulInteger",
+    "name": "mulInteger",
+    "arguments": [
+      "Integer",
+      "Integer"
+    ],
+    "result": "Integer"
+  },
+  {
+    "code": 121,
+    "constructor": "PQuotInteger",
+    "name": "quotInteger",
+    "arguments": [
+      "Integer",
+      "Integer"
+    ],
+    "result": "Integer"
+  },
+  {
+    "code": 122,
+    "constructor": "PRemInteger",
+    "name": "remInteger",
+    "arguments": [
+      "Integer",
+      "Integer"
+    ],
+    "result": "Integer"
+  },
+  {
+    "code": 123,
+    "constructor": "PEqInteger",
+    "name": "eqInteger",
+    "arguments": [
+      "Integer",
+      "Integer"
+    ],
+    "result": "Bool"
+  },
+  {
+    "code": 124,
+    "constructor": "PLtInteger",
+    "name": "ltInteger",
+    "arguments": [
+      "Integer",
+      "Integer"
+    ],
+    "result": "Bool"
+  },
+  {
+    "code": 125,
+    "constructor": "PShowInteger",
+    "name": "showInteger",
+    "arguments": [
+      "Integer"
+    ],
+    "result": "String"
+  },
+  {
+    "code": 126,
+    "constructor": "PReadInteger",
+    "name": "readInteger",
+    "arguments": [
+      "String"
+    ],
+    "result": "Integer"
+  },
+  {
+    "code": 127,
+    "constructor": "PIntegerToDouble",
+    "name": "integerToDouble",
+    "arguments": [
+      "Integer"
+    ],
+    "result": "Double"
+  },
+  {
+    "code": 128,
+    "constructor": "PUnsignedLtInt",
+    "name": "unsignedLtInt",
+    "arguments": [
+      "Int",
+      "Int"
+    ],
+    "result": "Bool"
+  }
+]

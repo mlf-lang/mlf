@@ -1,0 +1,104 @@
+module Tests.GraphUnification where
+-- Select the standard Monad used by shared Either; retain legacy guest syntax.
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.OS as OS
+import qualified Tests.Helpers as H
+import Tests.Helpers (Quint(..), Sext(..))
+import qualified Bootstrap.IntMap as IM
+import Bootstrap.Constraint
+import Tests.Graph
+import qualified Bootstrap.Graph.Solver as Solver
+import Bootstrap.Parser (parseExpr, parseProgram)
+import Tests.GraphValidation (smallGraphs)
+import Tests.GraphUnificationReference (referenceUnify)
+import qualified Tests.Graph as G
+
+graphUnificationTests : [] ((,) String (IO ()))
+graphUnificationTests =
+ (:) ((,) "indexed unification and identity renaming agree with map-based reference" unificationAndRenaming)
+ ((:) ((,) "indexed unification agrees on successive scoped expansions" (do { H.forM_ programs (\((,) source accepted) -> do
+  c <- H.right (bind (parseExpr "<unification reference>" source) generate)
+  initial <- compareUnifiers (initialGraph c) (equalities c)
+  result <- S.foldM solveStep initial (solveSteps c)
+  H.assert (H.eq (S.isRight result) accepted) ("unexpected reference outcome: " ++ source)); projectionPrograms }))
+ ((:) ((,) "dependency traversal rejects structural cycles created by merging" (let
+  g = Graph (IM.fromList ((:) ((,) 0 (Node (GGen 1) Nothing Flexible))
+      ((:) ((,) 1 (Node (GArr 2 3) (Just 0) Flexible))
+      ((:) ((,) 2 (Node GBot (Just 1) Flexible))
+      ((:) ((,) 3 (Node GBot (Just 1) Flexible)) []))))) IM.empty 4
+  in do
+   result <- compareUnifiers g ((:) ((,) 1 2) [])
+   H.assert (S.not (S.isRight result)) "occurs check accepted a self-cycle")) []))
+
+-- Each canonical result has already passed both reference comparisons. Reuse
+-- it for the same 80 identity cases, then release the graph and retain a Bool.
+unificationAndRenaming : IO ()
+unificationAndRenaming = do
+ outcomes <- S.forM (S.zip (S.range 0 (H.length cases - 1)) cases) (\((,) index ((,) g eqs)) -> do
+  expected <- compareUnifiers g eqs
+  if index < 80 then checkRenamings g eqs expected else return ()
+  return (S.isRight expected))
+ let successes = H.length (S.filter S.id outcomes)
+ H.assert (successes > 100 && successes < H.length cases - 100) "unification corpus lacks successful and rejected merges"
+ putStrLn ("Graph unification: " ++ H.show (H.length cases) ++ " cases; " ++ H.show successes ++ " accepted")
+ putStrLn "Graph identity renaming: 80 canonical results reused; 320 renamed executions"
+
+checkRenamings : Graph -> [] ((,) Int Int) -> Either String Graph -> IO ()
+checkRenamings g eqs expected =
+ H.forM_ ((:) (\n -> n * 100000)
+  ((:) (H.subtract 30)
+  ((:) (\n -> n + (9223372036854775807 - 20))
+  ((:) (\n -> n + ((0 - 9223372036854775808) + 1)) [])))) (\rename -> do
+   let shifted = renameGraph rename g
+   actual <- compareUnifiers shifted (S.map (\((,) a b) -> (,) (rename a) (rename b)) eqs)
+   H.assert (H.eq (S.mapEither (renameGraph rename) expected) actual || (S.not (S.isRight expected) && S.not (S.isRight actual))) "unification depends on numeric identity layout")
+
+-- Projection is deliberately scoped to its production operation. The following
+-- independent expansion and reference-unification branches are unchanged.
+solveStep : Either String Graph -> SolveStep -> IO (Either String Graph)
+solveStep result action = case action of
+ Instantiate edge -> expansionStep result edge
+ ProjectCase fields -> case result of
+  Left err -> return (Left err)
+  Right graph -> do
+   initial <- H.right (Solver.prepare graph)
+   case Solver.projectCaseFields fields initial of
+    Left err -> return (Left err)
+    Right projected -> do
+     after <- H.right (Solver.finish projected)
+     rebuilt <- H.right (Solver.prepare after)
+     H.assert (H.eq (Solver.structuralParents projected) (Solver.structuralParents rebuilt) && H.eq (Solver.bindingChildren projected) (Solver.bindingChildren rebuilt) && Solver.equalScopes (Solver.scopeIndex projected) (Solver.scopeIndex rebuilt)) "case projection indexes differ from reconstruction"
+     return (Right after)
+
+projectionPrograms : IO ()
+projectionPrograms = H.forM_ ((:) ((,) "data Box a = Box a\ncase ((Box (\\x -> x)) : Box (forall a. a -> a)) of { Box f -> let a = f 42 in f true }" true)
+ ((:) ((,) "data Box a = Box a\n\\box -> case box of { Box f -> let a = f 42 in f true }" false) [])) (\((,) source accepted) -> do
+  c <- H.right (bind (parseProgram "<case projection reference>" source) generateProgram)
+  H.assert (S.any (\step -> case step of { Instantiate _ -> false; ProjectCase _ -> true }) (solveSteps c)) "case projection replay fixture has no barrier"
+  initial <- compareUnifiers (initialGraph c) (equalities c)
+  result <- S.foldM solveStep initial (solveSteps c)
+  H.assert (H.eq (S.isRight result) accepted) ("unexpected case projection reference outcome: " ++ source))
+
+expansionStep : Either String Graph -> Edge -> IO (Either String Graph)
+expansionStep result edge = case result of
+ Left err -> return (Left err)
+ Right g -> do
+  let target = resolve g (toNode edge)
+  destination <- S.maybe (H.fail "missing target binder") return (binder (nodeAt g target))
+  (,) ((,,) root _ frontier) expanded <- H.right (runBuild g (expand (fromGen edge) destination))
+  compareUnifiers expanded (H.append frontier ((:) ((,) root target) []))
+
+compareUnifiers : Graph -> ([] ( ((,) (Int) (Int)) )) -> IO ( Either String Graph )
+compareUnifiers g eqs = (let { actual = (S.mapEither S.snd (runBuild g (unify eqs))) } in (let { expected = (S.mapEither S.snd (runBuild g (referenceUnify eqs))) } in (let { incremental = (bind (bind (Solver.prepare g) (Solver.unify eqs)) Solver.finish) } in do { (let guardSubject3 = ((,) actual expected) in (let guardNext6 = \ignored -> (let guardNext5 = \ignored -> (let guardNext4 = \ignored -> (panic "non-exhaustive test case") in (case guardSubject3 of { _ -> (H.fail (H.append "unification differs\n" (H.append (H.show g) (H.append "\n" (H.append (H.show eqs) (H.append "\nactual: " (H.append (H.show actual) (H.append "\nreference: " (H.show expected))))))))) })) in (case guardSubject3 of { ((,) (Right a) (Right b)) -> (if (H.eq a b) then (return ()) else (guardNext5 ())); _ -> (guardNext5 ()) })) in (case guardSubject3 of { ((,) (Left _) (Left _)) -> (return ()); _ -> (guardNext6 ()) }))); do { (let guardSubject7 = ((,) incremental expected) in (let guardNext10 = \ignored -> (let guardNext9 = \ignored -> (let guardNext8 = \ignored -> (panic "non-exhaustive test case") in (case guardSubject7 of { _ -> (H.fail (H.append "component unification differs\n" (H.append (H.show g) (H.append "\n" (H.append (H.show eqs) (H.append "\nactual: " (H.append (H.show incremental) (H.append "\nreference: " (H.show expected))))))))) })) in (case guardSubject7 of { ((,) (Right a) (Right b)) -> (if (H.eq a b) then (return ()) else (guardNext9 ())); _ -> (guardNext9 ()) })) in (case guardSubject7 of { ((,) (Left _) (Left _)) -> (return ()); _ -> (guardNext10 ()) }))); (return actual) } })))
+
+cases : ([] ( ((,) (Graph) (([] ( ((,) (Int) (Int)) )))) ))
+cases = (S.concatMap (\g -> (S.concatMap (\a -> (S.concatMap (\b -> (S.concatMap (\c -> (S.concatMap (\eqs -> ((:) ((,) (Graph (IM.mapWithKey (\n v -> (Node (G.tag v) (G.binder v) (case n of { 1 -> a; 2 -> b; 3 -> c; _ -> (flag v) }))) (nodes g)) (G.links g) (G.nextId g)) eqs) [])) ((:) [] ((:) ((:) ((,) 1 2) []) ((:) ((:) ((,) 1 3) []) ((:) ((:) ((,) 2 3) []) ((:) ((:) ((,) 2 2) []) ((:) ((:) ((,) 0 1) []) ((:) ((:) ((,) 1 2) ((:) ((,) 2 3) [])) ((:) ((:) ((,) 2 3) ((:) ((,) 1 2) [])) ((:) ((:) ((,) 3 2) ((:) ((,) 2 1) [])) []))))))))))) ((:) Flexible ((:) Rigid [])))) ((:) Flexible ((:) Rigid [])))) ((:) Flexible ((:) Rigid [])))) (S.filter (S.compose S.isRight validateGraph) smallGraphs))
+
+renameGraph : ( Int -> Int ) -> Graph -> Graph
+renameGraph f g = (let { renameTag t = (case t of { (GArr a b) -> (GArr (f a) (f b)); (GCon c ns) -> (GCon c (S.map f ns)); (GTyApp a b) -> (GTyApp (f a) (f b)); (GGen n) -> (GGen (f n)); _ -> t }) } in (Graph (IM.fromList (S.concatMap (\((,) n v) -> ((:) ((,) (f n) (Node (renameTag (tag v)) (S.mapOptional f (binder v)) (G.flag v))) [])) (IM.toList (nodes g)))) (IM.fromList (S.concatMap (\((,) n p) -> ((:) ((,) (f n) (f p)) [])) (IM.toList (links g)))) (f (nextId g))))
+
+programs : ([] ( ((,) (String) (Bool)) ))
+programs = ((:) ((,) "\\x -> x" true) ((:) ((,) "\\x -> x x" false) ((:) ((,) "\\f x -> f x" true) ((:) ((,) "let id = \\x -> x in let a = id 42 in id true" true) ((:) ((,) "(\\(f : forall a. a -> a) -> f f) (\\x -> x)" true) ((:) ((,) "let choose = ((\\x y -> x) : forall a. a -> a -> a) in let id = \\x -> x in let g = choose id in g g" true) ((:) ((,) "(\\x -> x) : forall (a >= forall b. b -> b). a -> a" true) ((:) ((,) "(\\x -> x) : Int -> Bool" false) []))))))))

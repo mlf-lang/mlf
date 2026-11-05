@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 24031,
+  "new_sha256": "36339e780160c328cf6b4a5cc2d2391c6b166f8bc6c53319cace55ea312801d3",
+  "old_bytes": 23937,
+  "old_sha256": "a9d80177e357efe0060991d68e48009e8fcc6f36e9419d90aaea8a5c0c77743d",
+  "path": "libraries/mlf-package-core/Package/Release.hs",
+  "splices": [
+    {
+      "new": "ICAgICAgICBBcnRpZmFjdC5PcGVuQ3JhdGVPYmplY3QgXyBwYWNrYWdlIC0+IFJpZ2h0IChBcnRpZmFjdC5PcGVuQ3JhdGVPYmplY3QgaWZhY2UgcGFja2FnZSk7Cg==",
+      "new_at": 10248,
+      "old": "",
+      "old_at": 10248
+    }
+  ]
+}

@@ -15,6 +15,11 @@ static MlfValue *returned(MlfEnv *env, MlfValue *argument) {
     ++calls;
     return mlf_env_get(env, 0);
 }
+static MlfValue *failed(MlfEnv *env, MlfValue *argument) {
+    (void)env; (void)argument;
+    puts("before generated force failure");
+    return mlf_force(NULL);
+}
 static MlfValue *entered(MlfEnv *env, MlfValue *argument) {
     return probe_force(returned(env, argument));
 }
@@ -26,8 +31,13 @@ static MlfValue *suspend(MlfValue *value, MlfCode code) {
 int main(int argc, char **argv) {
     assert(argc == 2);
     GC_set_all_interior_pointers(0);
-    mlf_require_compact_gc_abi();
+    mlf_require_haskell_boundary_v4_abi();
     if (!strcmp(argv[1], "null")) { probe_force(NULL); return 99; }
+    if (!strcmp(argv[1], "failure-order")) {
+        probe_force(mlf_thunk(failed, NULL));
+        puts("after generated force failure");
+        return 99;
+    }
     if (!strcmp(argv[1], "hole")) { probe_force(mlf_hole()); return 99; }
     if (!strcmp(argv[1], "cycle-enter") || !strcmp(argv[1], "cycle-return")) {
         MlfEnv *env = mlf_env_new(1);

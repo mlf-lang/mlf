@@ -3,4 +3,4 @@ import Bootstrap.Types
 import qualified Tests.Core as T
 import qualified Tests.CoreRunner as R
 main : IO ()
-main = R.main "core" true 739 ((:) ((,) "core/substring-adapter" []) T.families)
+main = R.main "core" true 746 ((:) ((,) "core/substring-adapter" []) T.families)

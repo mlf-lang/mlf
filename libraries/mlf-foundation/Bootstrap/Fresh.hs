@@ -52,8 +52,8 @@ module Bootstrap.Fresh where {
            name = (prefix ++ showInt count)
          } in
          if S.member compareString name used
-         then runFreshState (freshName prefix) (count + 1) used
-         else Right ((,,) name (count + 1) (S.insert compareString name used)));
+         then runFreshState (freshName prefix) (advanceIdentity count 1) used
+         else Right ((,,) name (advanceIdentity count 1) (S.insert compareString name used)));
   freshNames :: Int -> String -> Fresh ([] String);
   freshNames count prefix =
     if (count <= 0)

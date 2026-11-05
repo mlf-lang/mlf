@@ -1,0 +1,74 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.CrateQuery": {
+      "new": "3b3b7a5de8b1f83b0a369e9a47ead5666d1169490e5466e2d8a9983b20eeb8b9",
+      "old": "f1b55c953d2631458af0ab6e736f7c13fd0303bc1b6be8025c90eb0c4f5215f0",
+      "reviewed_change": "bounded call-owned eight-context window and empty-window lifecycle at the existing source-group driver"
+    },
+    "Bootstrap.CrateSession": {
+      "new": "e3002483e06d189b31e3d93e876618c0a65fc807be654f6757452f087088e2a1",
+      "old": "8adefc9d5346f375dd8568a59400bd498695af270b6fc70bea296c0698b5d190",
+      "reviewed_change": "bounded call-owned eight-context window and empty-window lifecycle at the existing source-group driver"
+    }
+  },
+  "current_lock_sha256": "123f426bda8ed1ede2bebce0b1c74e3c37e995f3ba0ace7c091c6d4f41a5379a",
+  "current_registry_sha256": "269cf6dbecd72de027ddef781ba8b48d00af8d61f91998ccdb7f823795cbb3bd",
+  "format": "source-context-read-window-migration-v1",
+  "frozen_references": {
+    "full-compiler/session-delta.json": "6aeb0fac2965143ec648c30ce2d540060480af1a422b146654d5c9377e605c5d",
+    "full-compiler/source-migration.json": "8a7118c56442506571541c5c20821086e8ce9aff987de058097a81e224e29bb0",
+    "full-compiler/source_contract.py": "68eec55dbeb8eec2a1d983dac1f5f61f03e1c03057c0cf9689c6361e8141a027",
+    "llvm-memory/host-delta.json": "3139c588c098659f16b17e88d20f584af54810c26ecda63aad7c042592feec29",
+    "llvm-memory/source_contract.py": "dafccd15ca69dbce1540b7963403410b9c60e3f83c51659e13b7254c3de7f539",
+    "query-key-scratch/query-delta.json": "0c04d92f7da1eea83192e14fa870de681c4fac962bf79badb80c38ab6f20c411",
+    "query-key-scratch/session-delta.json": "5534f3bfc032fbc51aa71eee39992f67760bb337a6690f9490bea08a5b364e06",
+    "query-key-scratch/source-migration.json": "9ecbc912e288495a1ff7f5652e81b429c5cfafd2dcd2da951c395efdc762a95a",
+    "query-key-scratch/source_contract.py": "a445a69b7c5a8eaae9cfeb794192ea5bfd7201e5a1bc96fb1dd231933f8281ba",
+    "source-context-key-parts/query-delta.json": "f12e5cdeaafee31475441bdf5a53d45265a2a273f113780e43339fbc9e1d4568",
+    "source-context-key-parts/source-migration.json": "409ca0938d1b0a4949f6b7de0a44292b2defe8e6beab90bed8f644f5a4fe7392",
+    "source-context-key-parts/source_contract.py": "56c1dea54ff991889ea3829f21d89e2050f11f57f4f64ece610378c77cdc423d",
+    "source-context-projection-merge/left-session-delta.json": "73fb0aae3ec2efe06c4c8654e869f77efd07cf96460663b96ee12092de3fb076",
+    "source-context-projection-merge/right-session-delta.json": "c7d673c951ea8ddc9e64f091bfec6c539d6088739f6da9611bdf51bb10bd5396",
+    "source-context-projection-merge/source-migration.json": "be4b1897299a20e7f2cc1ae0ad7dc056da48418920141ca7a9329b14271c6112",
+    "source-context-projection-merge/source_contract.py": "352ae609b851fc57586ccaea7cd77a95a6bb5c85d29ae0b8c7d684962ec1ee2d",
+    "source-context-publication/query-delta.json": "53720f0a1ff588d1eb71356350657dd4fdda5a5ba6c97d06c35f54aebc4b2174",
+    "source-context-publication/source-migration.json": "b5d62c0a13a2306413167e318687573a790585a85d418203747bfd5956b62ca6",
+    "source-context-publication/source_contract.py": "b2abf018b5c3b5017d704a2adcb0f6f05c0501038b8edd9e421bb0f49c252c0c",
+    "source-context-read-reuse/query-delta.json": "022636870b0dd0da2abdfcca3764efb4fb947dc17402b88025434742588f7ee0",
+    "source-context-read-reuse/session-delta.json": "624818cd1064a142066198aed31f49c8ed3c22f9143042fe33b27c7900b3544f",
+    "source-context-read-reuse/source-migration.json": "f53f560ee5f2014ecd7db26c555040a8bf531fa4d6c77bd36d32934d67172c1c",
+    "source-context-read-reuse/source_contract.py": "186714be67b6866b711a38f53d532b4cc68641e91b2103a7aa5ce60234f5a890",
+    "source-query-context/query-delta.json": "d35a696a0dbe00def5c8bf579e88ae4b515b1c2f40f2318408c3dcf8548bc864",
+    "source-query-context/session-delta.json": "6442aa9316137001e8c71cc54c2257f5c3bee388b7dee1f957b52edae99abc5a",
+    "source-query-context/source-migration.json": "5dbb5cbc5fcb047732e1ef48931c88a3dbd73030af4cc853f6a07ed951208a6e",
+    "source-query-context/source_contract.py": "8cacdec2b8f398d357fd01555e5095eeb2f56376beebffcd9f57980a504cec29"
+  },
+  "host_sources": {},
+  "module_count": 128,
+  "owners": {
+    "Bootstrap.CrateQuery": {
+      "delta_sha256": "6754fceb1b7c99f6823a6f8361d1c1872a2e69b0e3e1ab8f9395565cd99894e3",
+      "edit_count": 5,
+      "file": "query-delta.json",
+      "new": "3b3b7a5de8b1f83b0a369e9a47ead5666d1169490e5466e2d8a9983b20eeb8b9",
+      "old": "f1b55c953d2631458af0ab6e736f7c13fd0303bc1b6be8025c90eb0c4f5215f0",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs"
+    },
+    "Bootstrap.CrateSession": {
+      "delta_sha256": "49cfbc634c790d453c08eaaed04a431c3454a72322046afaa59dc450a8db2c81",
+      "edit_count": 3,
+      "file": "session-delta.json",
+      "new": "e3002483e06d189b31e3d93e876618c0a65fc807be654f6757452f087088e2a1",
+      "old": "8adefc9d5346f375dd8568a59400bd498695af270b6fc70bea296c0698b5d190",
+      "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs"
+    }
+  },
+  "parent_lock_sha256": "0c7ef4f26547c1b9c0eb49dc814ac417a4317a1cd803dacd90d9499e626631f4",
+  "parent_manifest_sha256": "409ca0938d1b0a4949f6b7de0a44292b2defe8e6beab90bed8f644f5a4fe7392",
+  "parent_ref": "97fe3dc80237bbd4d58594b043f189c5ba633209",
+  "parent_registry_sha256": "7eae16f2e1df8be084b411e676e524f75d61626687e8fafd9b98acf6b26b70e2",
+  "removed_sources": {},
+  "unchanged_count": 126,
+  "unchanged_owners": {}
+}

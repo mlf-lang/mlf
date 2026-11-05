@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 15858,
+  "new_sha256": "531c9b120eb85e1a66f90d4bc8a10cc9c537e7ac052063a0ab76f0a5336aeaae",
+  "old_bytes": 15858,
+  "old_sha256": "48df44dfebb7b382dd0427e77395a3fce2fb2dae870aa1b8476a96bc9a1901d1",
+  "path": "mlf.lock",
+  "splices": [
+    {
+      "new": "ZjVlYzVmMTE1ZWQwMTNiYzQwOTkzMDM5ZjAyMjQ5ZWI4MDljNWFhMWVjZjIyZDBjMzliYzQ1NjRhOGM3M2U3OA==",
+      "new_at": 13441,
+      "old": "MDI0ODFmYjljMjQ2MGFiNWUyY2E2NTc3NDE2ZmZjMzZiNjYwODVkYzk1YmQwNGRmNDkxZDljMTRjZTYxMGY1Ng==",
+      "old_at": 13441
+    }
+  ]
+}

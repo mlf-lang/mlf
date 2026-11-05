@@ -16,12 +16,12 @@ check a b = do
  let right = IS.fromList (L.append b (L.reverse b))
  let expected = L.sortBy L.compareInt (L.nubBy eqInt (L.append a b))
  let result = IS.union left right
- case result of { IntSet tree -> assert (L.eqList eqInt (IS.toList result) expected && IS.size result == L.length expected && M.valid L.compareInt tree) }
+ assert (L.eqList eqInt (IS.toList result) expected && IS.size result == L.length expected && IS.valid result)
 
 unions : A.Test ()
 unions = do
  let counts = (:) 0 ((:) 1 ((:) 2 ((:) 5 ((:) 17 ((:) 65 [])))))
- let offsets = (:) (-1000000000000000000000000000000000000) ((:) (-1000) ((:) 0 ((:) 3 ((:) 1000000000000000000000000000000000000 []))))
+ let offsets = (:) (-1152921504606846976) ((:) (-1000) ((:) 0 ((:) 3 ((:) 1152921504606846976 []))))
  let pairs = L.concatMap (\n -> L.concatMap (\m -> L.map (\offset -> (,) (L.map (\i -> 17 * i) (L.range 0 (n - 1))) (L.map (\i -> offset + 17 * i) (L.range 0 (m - 1)))) offsets) counts) counts
  let ordered = L.concatMap (\((,) a b) -> (:) ((,) a b) ((:) ((,) b a) [])) pairs
  let unique = H.distinctListPairs eqInt ordered

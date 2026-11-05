@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 2219103,
+  "new_sha256": "02481fb9c2460ab5e2ca6577416ffc36b66085dc95bd04df491d9c14ce610f56",
+  "old_bytes": 2219103,
+  "old_sha256": "d95cab7b74dea6948951467df255499f0a087471236c1ef5f6ba88386d30e040",
+  "path": "bootstrap/MLF/BuiltinPreludeData.hs",
+  "splices": [
+    {
+      "new": "NjI1MmFmY2I2ZTJlZTNmZDMzM2VkNmViY2U2YzY3Mjk5NmJmMjgyY2FjYTNhMWQyMTg3OTAzZGQyODI4YTIxZQ==",
+      "new_at": 776,
+      "old": "MjFlZjUxOTQzYmNjY2IyZTkzMDE0MjIwMTZhZDIwYWMzYzc3NDgzMWQxZGY4ODI0NzczYmYxMWVhMTY2ZWY4OQ==",
+      "old_at": 776
+    }
+  ]
+}

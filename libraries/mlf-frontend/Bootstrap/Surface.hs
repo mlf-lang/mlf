@@ -87,6 +87,7 @@ module Bootstrap.Surface where {
       SApp a b -> append (freeNamesRaw a) (freeNamesRaw b);
       SLet n a b -> append (freeNamesRaw a) (without (freeNamesRaw b) ((:) n []));
       SAnn a _ -> freeNamesRaw a;
+      SSignature a _ -> freeNamesRaw a;
       SCase a branches ->
         append (freeNamesRaw a)
           (concatMap (\(SAlternative p b) -> append (patternReferences p) (without (freeNamesRaw b) (patternVariables p)))
@@ -123,12 +124,13 @@ module Bootstrap.Surface where {
       _ -> body
     };
   recursiveValues :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
-                     Either String ([] ((,,) String SAnnotation SExpr));
+                     Either String ([] ((,,) String RecursiveMode SExpr));
   recursiveValues values =
     traverseEither
       (\((,,) n a e) ->
          case a of {
-           Just (SAnnotation [] ty) -> Right ((,,) n (SAnnotation [] ty) e);
+           Nothing -> Right ((,,) n InferRecursive e);
+           Just (SAnnotation [] ty) -> Right ((,,) n (CheckRecursive (SAnnotation [] ty)) e);
            _ -> Left ("recursive definition " ++ (n ++ " requires an explicit closed signature"))
          })
       values;
@@ -176,7 +178,7 @@ module Bootstrap.Surface where {
                        (SLet n
                           (case a of {
                              Nothing -> e;
-                             Just t -> SAnn e t
+                             Just t -> SSignature e t
                            })
                           continuation);
                    _ -> Left "invalid declaration group"
@@ -247,14 +249,19 @@ module Bootstrap.Surface where {
           value <- lower env a;
           freshPure (SAnn value ty)
         };
+      SSignature a ty ->
+        do {
+          value <- lower env a;
+          freshPure (SSignature value ty)
+        };
       SLetRec definitions body ->
         do {
           ds <-
             mapM
-              (\((,,) n t a) ->
+              (\((,,) n mode a) ->
                  do {
                    value <- lower env a;
-                   freshPure ((,,) n t value)
+                   freshPure ((,,) n mode value)
                  })
               definitions;
           b <- lower env body;

@@ -3,4 +3,4 @@ import Bootstrap.Types
 import qualified Tests.CoreLanguage as T
 import qualified Tests.CoreRunner as R
 main : IO ()
-main = R.main "core-language" false 380 T.families
+main = R.main "core-language" false 384 T.families

@@ -1,0 +1,7 @@
+{
+  "parent_commit": "c1b802bd505d20d3f52653b27bd3db506f1ff617",
+  "source": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+  "source_sha256": "61201909b9874944a650153af3492a3a7b5ae953b678b22113d8278c222e9712",
+  "frozen_sha256": "f8c2b72af4fae35a76f3a3d43a65aadca4675bbf3560bea9f6f54b4448d223af",
+  "transformation": "module header only; complete old implementation retained"
+}

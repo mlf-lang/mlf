@@ -59,11 +59,11 @@ main = do
   builtin <- expect "compile builtin" A.builtinPrelude >>= roundtrip
   let bp = B.literal (base ++ "/builtin.mlfi")
       pp = B.literal (base ++ "/provider.mlfi")
-  let oldBuiltin (A.CrateInterface _ deps ms es reach ds cs instances lowered bindings entry objectHash protection) = A.CrateInterface "mlf:builtin-shared-haskell-v1:7" deps ms es reach ds cs instances lowered bindings entry objectHash protection
-      stalePath = B.literal (base ++ "/stale-builtin7.mlfci")
+  let oldBuiltin (A.CrateInterface _ deps ms es reach ds cs instances lowered bindings entry objectHash protection) = A.CrateInterface "mlf:builtin-shared-haskell-v1:8" deps ms es reach ds cs instances lowered bindings entry objectHash protection
+      stalePath = B.literal (base ++ "/stale-builtin8.mlfci")
   writeFile (B.unpack stalePath) (B.unpack (A.encodeInterface (oldBuiltin (A.objectInterface builtin))))
   staleLoaded <- A.loadInterfaces [stalePath]
-  check "stale builtin7 dependency rejected by filesystem loader" (case staleLoaded of { T.Left message -> "stale or forged builtin crate identity" `isInfixOf` B.unpack message; T.Right _ -> False })
+  check "stale builtin8 dependency rejected by filesystem loader" (case staleLoaded of { T.Left message -> "stale or forged builtin crate identity" `isInfixOf` B.unpack message; T.Right _ -> False })
   -- All consumers use DECODED builtin metadata; no source facade is injected.
   let facadeCase name imports = B.literal ("module " ++ name ++ " where\n" ++ imports ++ "\nmain :: IO Int\nmain = do { x <- return (42 :: Int); if (\"same\" :: [Char]) == \"same\" then return x else return 0 }\n")
       checkFacade name mode imports deps = do

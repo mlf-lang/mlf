@@ -1,0 +1,86 @@
+{
+  "format": "portable-artifact-representation-validation-v1",
+  "python": "3.12.14",
+  "codec_controls_passed": 41,
+  "cli_controls_passed": 9,
+  "code_sha256": {
+    "representation.py": "5676ef360ec21a4c5ace9185fc23a907a0995f50c54fac7934f171f656c8c783",
+    "test_representation.py": "aafb2cf03738ce91b9058ddbb5aff8ae3a476687b13c34df4f1d67aefedad1c2",
+    "cli.py": "3fd8ebd8418fb6f7f512e8069b90e5fa307beed4e25cb67deb2075333945985a"
+  },
+  "cases": {
+    "cli": {
+      "cases": [
+        "CLI-pack-postwrite-exact-roundtrip",
+        "CLI-verify-complete-bundle",
+        "CLI-restore-exact-stdout",
+        "CLI-restore-exact-file",
+        "CLI-refuses-output-file-overwrite",
+        "CLI-refuses-bundle-overwrite",
+        "CLI-refuses-duplicate-basenames-before-write",
+        "CLI-refuses-invalid-input-before-write",
+        "test-entrypoint-refuses-disabled-assertions"
+      ],
+      "passed": 9
+    },
+    "codec": {
+      "cases": [
+        "UTF8-astral-combining-NUL-and-opaque-float-token-exact-roundtrip",
+        "independent-legacy-framing-oracle",
+        "full-reachable-accounting",
+        "manifest-record-restores-with-original-byte-hash",
+        "typed-domain-separates-raw-body-from-ordinary-text",
+        "deterministic-query-root",
+        "key-field-1-affects-root",
+        "key-field-2-affects-root",
+        "key-field-3-affects-root",
+        "key-field-4-affects-root",
+        "key-field-5-affects-root",
+        "key-field-6-affects-root",
+        "key-field-7-affects-root",
+        "key-field-8-affects-root",
+        "stable-roots-under-input-reordering",
+        "deterministic-objects.pack",
+        "deterministic-objects.index",
+        "deterministic-manifest.json",
+        "unchanged-content-identities-survive-insertion",
+        "same-header-context-shared-across-changed-body",
+        "changed-raw-body-never-aliases",
+        "CACHE-2-rejected-not-reinterpreted",
+        "unknown-semantic-version",
+        "unequal-header-body-context-fails-closed",
+        "invalid-UTF8",
+        "truncated-legacy-field",
+        "noncanonical-length-explicitly-unsupported",
+        "non-ASCII-length-rejected",
+        "oversized-legacy-length",
+        "pack-checksum-failure",
+        "index-checksum-failure",
+        "unknown-storage-version",
+        "final-root-not-accepted-as-raw",
+        "partial-write-without-published-manifest",
+        "offset-gap-rejected-even-with-valid-index-digest",
+        "oversized-decoded-field-rejected",
+        "unknown-node-kind-rejected",
+        "dangling-reference",
+        "orphan-cannot-be-hidden-from-accounting",
+        "cycle-walker-unit-test",
+        "declared-expansion-checked-before-child-allocation"
+      ],
+      "limitations": [
+        "Cycle and expansion guards use adversarial in-memory providers, not a forged SHA-256 fixed point.",
+        "No compiler semantic checker, production crash/concurrency/GC test, or raw-to-final conversion is run."
+      ],
+      "passed": 41
+    }
+  },
+  "qualification_result_sha256": "17108ef001d335fe8d8d73cabc99784842311c28927abd478b6e0dd91ead0c3c",
+  "guard_receipt_sha256": "5aa181558bd0d9b0896aaddac8dd2de02f25deb8a369b0111aa362c08dc1277d",
+  "limits": {
+    "guard_seconds": 120,
+    "address_space_mib": 512,
+    "tree_rss_mib": 256,
+    "new_output_mib": 2
+  },
+  "scope": "Synthetic offline codec/real CLI controls only. No compiler semantic checker, native build, production migration or performance qualification."
+}

@@ -37,6 +37,7 @@ sourceSize expression = 1 + (case expression of
   SApp f a -> sourceSize f + sourceSize a
   SLet _ a b -> sourceSize a + sourceSize b
   SAnn a _ -> sourceSize a
+  SSignature a _ -> sourceSize a
   SCase a branches -> sourceSize a + sumBy (\branch -> case branch of SAlternative _ body -> sourceSize body) branches
   SDo statements body -> sumBy statementSize statements + sourceSize body
   SEquations equations -> sumBy (\equation -> case equation of Pair _ body -> sourceSize body) equations

@@ -47,7 +47,7 @@ checkScopes solver starts = do
 -- All start categories and six identity renamings on small graphs; large
 -- chains retain their original sizes once, including both sides of 32/128.
 componentInputs sizes large = L.append
- (L.concatMap (\offset -> L.concatMap (\stride -> L.map (N.rename (\n -> offset + stride * n)) ((:) (N.fixture 7) (L.map chain sizes))) ((:) 1 ((:) 100003 []))) ((:) 0 ((:) 340282366920938463463374607431768211456 ((:) (-340282366920938463463374607431768211456) []))))
+ (L.concatMap (\offset -> L.concatMap (\stride -> L.map (N.rename (\n -> offset + stride * n)) ((:) (N.fixture 7) (L.map chain sizes))) ((:) 1 ((:) 100003 []))) ((:) 0 ((:) 1152921504606846976 ((:) (-1152921504606846976) []))))
  (L.map chain large)
 scopes : IO ()
 scopes = do
@@ -105,7 +105,7 @@ checkRestoration count offset stride mode = do
 restoration : IO ()
 restoration = do
  -- Full modes, malformed ranks and large identities on small structures.
- L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> L.mapM_ (checkRestoration count offset stride) (L.range 0 7)) ((:) 1 ((:) 100003 []))) ((:) (-340282366920938463463374607431768211456) ((:) (-7) ((:) 0 ((:) 340282366920938463463374607431768211456 []))))) ((:) 0 ((:) 1 ((:) 2 ((:) 5 []))))
+ L.mapM_ (\count -> L.mapM_ (\offset -> L.mapM_ (\stride -> L.mapM_ (checkRestoration count offset stride) (L.range 0 7)) ((:) 1 ((:) 100003 []))) ((:) (-1152921504606846976) ((:) (-7) ((:) 0 ((:) 1152921504606846976 []))))) ((:) 0 ((:) 1 ((:) 2 ((:) 5 []))))
  -- Scale exercises ordered restoration without crossing every renaming.
  L.mapM_ (\count -> L.mapM_ (checkRestoration count 0 1) (L.range 0 7)) ((:) 17 ((:) 33 []))
  return ()

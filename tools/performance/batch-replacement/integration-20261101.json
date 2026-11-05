@@ -1,0 +1,95 @@
+{
+  "complete": true,
+  "decision": "Accepted under the user-directed structural-positive-gain-v1 rule: both required primary gains are strictly positive, correctness and mechanism qualification passed, and retained regression guards passed. The original 5 percent discovery outcome remains historical; no new timing samples or formal statistical confirmation were added.",
+  "performance_gate_passed": true,
+  "formal_confirmation_run": false,
+  "correctness_suites": [
+    "p123",
+    "graph",
+    "map-balance",
+    "validation",
+    "builtin",
+    "native-library",
+    "native-containers",
+    "fingerprint",
+    "direct",
+    "native-io",
+    "locked-plan",
+    "manifest"
+  ],
+  "native_io_cases": 18,
+  "source_migration_sha256": "10f2da2458cbda85d61787be112fcb09e28d93cf97ebbd7b974eaccac5466f6b",
+  "receipts": {
+    "baseline-producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/baseline-producer/receipt.json",
+      "sha256": "572dc2bccdb78bec9a515332600d3f39516b414bcad78ebfe0e6aa047ff40a10"
+    },
+    "producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/producer/receipt.json",
+      "sha256": "2edb2b69f5cd99a27bb4004ccf224e2451d376e47b6e7d33a230b634b8e1389c"
+    },
+    "qualification.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/qualification.json",
+      "sha256": "1c687c04674d0dad2beb28ee7bb48ab17424e732de077b02a6d32b3383ead39f"
+    },
+    "controls-o0-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/controls-o0-01/receipt.json",
+      "sha256": "d9b10f52cf0e305b03b98b292b4b777e327acc349b693757f7174155ae00db0b"
+    },
+    "controls-o2-02/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/controls-o2-02/receipt.json",
+      "sha256": "48d323008cbeff6fcd12d3f1b72575370b6813ef4605cb01de65480c81996868"
+    },
+    "mechanism-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/mechanism-01/receipt.json",
+      "sha256": "8cf84002a70d435a4f048d6cf08422cae4ae773b0f58665017d9d667a2bcbf61"
+    },
+    "discovery/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/discovery/receipt.json",
+      "sha256": "4e346bc4c14390cbae8d4ed0ef74c6ad2474a57a8ed81b13e823d41423cabc1a"
+    },
+    "gates.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/gates.json",
+      "sha256": "5e709112e590a1a5d90e845f486a8484a9a3ef99feacabff68eb28c3a8c6b870"
+    },
+    "gates-attempt-01.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/gates-attempt-01.json",
+      "sha256": "84800de9323eb0080bc200b519df68a12bfa9c46979fac465b7d4424728a8c68"
+    },
+    "native-io/adapter-ledger.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/native-io/adapter-ledger.json",
+      "sha256": "71753fb9c78eea72d876b0d70030edf9cc3302ca07d8eeb995f2127c6d41e782"
+    },
+    "native-io-02/adapter-ledger.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/native-io-02/adapter-ledger.json",
+      "sha256": "1b888cb6104fff90d671239f3802a938bd7aebf4a736792be16cc4ef5f1cf6f1"
+    },
+    "native-io-02/driver/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/batch-replacement-20261101/native-io-02/driver/receipt.json",
+      "sha256": "fbbff7e44982ff4df2d9cf54b6c82db0a76c2d98d7b9d6788f451b8b587348a4"
+    }
+  },
+  "limitations": [
+    "Local macOS experiment; sampled RSS, no enforced address-space limit.",
+    "No stable or portable speedup claim; no confidence interval from the discovery blocks.",
+    "No new installed self-bootstrap or 711-group compiler inference performance comparison.",
+    "The source-path counts establish this admitted chain mechanism, not linear complexity of all compiler work."
+  ],
+  "historical_decision": "Engineering adoption for the explicitly requested removal of quadratic ancestor reconstruction on admitted chains; not acceptance of the failed 5 percent whole-run performance advancement rule. No formal wall-time confirmation was launched.",
+  "historical_5_percent_gate_passed": false,
+  "current_acceptance": {
+    "acceptance_rule": "structural-positive-gain-v1",
+    "both_2048_gain_positive": true,
+    "guard_and_smaller_meaningful_regressions": [],
+    "timing_rule_pass": true,
+    "decision_date": "2026-11-01",
+    "authorized_by": "User: structural improvements require measured improvement greater than zero; use this rule going forward.",
+    "metric": "unrounded fixed-block geometric whole-compilation time ratio for each required primary case",
+    "evaluated_existing_samples": true,
+    "new_performance_samples": 0,
+    "correctness_and_mechanism_qualification_passed": true,
+    "engineering_adoption_passed": true,
+    "historical_5_percent_gate_passed": false,
+    "statistical_significance_claimed": false
+  }
+}

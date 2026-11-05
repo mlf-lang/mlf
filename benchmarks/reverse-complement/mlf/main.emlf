@@ -5,7 +5,7 @@ minimum a b = if a < b then a else b
 
 -- Read one line at a time. Each record starts small and doubles as needed;
 -- no file-size query or whole-input allocation is used.
-copy : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit
+copy : ByteArray -> ByteArray -> Int -> Int -> Int -> IO ()
 copy source dest n offset i =
   if i < n then do
     b <- readByteArray source i
@@ -23,7 +23,7 @@ trimLine line n =
     b <- readByteArray line (n - 1)
     if b == 10 then trimLine line (n - 1) else if b == 13 then trimLine line (n - 1) else return n
 
-initTable : ByteArray -> ByteArray -> ByteArray -> Int -> IO Unit
+initTable : ByteArray -> ByteArray -> ByteArray -> Int -> IO ()
 initTable table letters complements i =
   if i < 16 then do
     b <- readByteArray letters i
@@ -33,7 +33,7 @@ initTable table letters complements i =
     initTable table letters complements (i + 1)
   else return ()
 
-fillRow : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> Int -> Int -> IO Unit
+fillRow : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> Int -> Int -> IO ()
 fillRow table source out last offset count i =
   if i < count then do
     b <- readByteArray source (last - i)
@@ -42,7 +42,7 @@ fillRow table source out last offset count i =
     fillRow table source out last offset count (i + 1)
   else return ()
 
-fill : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit
+fill : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> Int -> IO ()
 fill table source out last remaining offset =
   if remaining == 0 then return ()
   else do
@@ -51,7 +51,7 @@ fill table source out last remaining offset =
     writeByteArray out (offset + count) 10
     fill table source out (last - count) (remaining - count) (offset + count + 1)
 
-emit : ByteArray -> ByteArray -> ByteArray -> Int -> IO Unit
+emit : ByteArray -> ByteArray -> ByteArray -> Int -> IO ()
 emit table out source remaining =
   if remaining == 0 then return ()
   else do
@@ -60,7 +60,7 @@ emit table out source remaining =
     putBytes out 0 (count + (count + 59) / 60)
     emit table out source (remaining - count)
 
-records : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> IO Unit
+records : ByteArray -> ByteArray -> ByteArray -> Int -> Int -> IO ()
 records table out bytes used capacity = do
   line <- getByteLine
   length <- lengthByteArray line

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Bounded direct-adapter qualification; does not build the compiler or install packages."""
-import argparse, datetime, hashlib, json, os, pathlib, shutil, subprocess
+import argparse, datetime, hashlib, json, os, pathlib, shutil, subprocess, sys
 p=argparse.ArgumentParser()
 p.add_argument('ghc')
 p.add_argument('--gc-root',type=pathlib.Path)
@@ -38,9 +38,9 @@ try:
     run('ghc-version',[a.ghc,'--version'])
     for opt in ['O0','O2']:
         b=build('contracts','ContractProbe.hs',opt)
-        run('contracts-'+opt,[b],text='TOTAL 87 FAILED 0')
+        run('contracts-'+opt,[b],text='TOTAL 89 FAILED 0')
         b=build('numeric','NumericProbe.hs',opt,[tests/'NumericOracle.c'])
-        run('numeric-'+opt,[b],text='TOTAL 590 FAILED 0')
+        run('numeric-'+opt,[b],text='TOTAL 722 FAILED 0')
         b=build('identity','IdentityProbe.hs',opt)
         run('identity-'+opt,[b],text='PASS actual Prelude.Bool')
         b=build('filesystem','FilesystemProbe.hs',opt)
@@ -70,6 +70,7 @@ try:
             run('panic-nested-'+locale+'-'+opt,[b,'nested'],expected=1,exact='Runtime: inner\n',env={'LC_ALL':locale})
             run('panic-unicode-'+locale+'-'+opt,[b,'unicode'],expected=1,exact='Runtime: 😀\n',env={'LC_ALL':locale})
     run('array-types-are-distinct',[a.ghc,'--make','-fno-code','-XHaskell2010','-package-env','-','-ihost/ghc','-itests/shared-host','-odir',out/'negative','-hidir',out/'negative',tests/'CrossArrayIdentity.hs'],expected=1,text="Couldn't match expected type")
+    run('digest-controls',[sys.executable,tests/'test-digest.py'])
     run('ownership-build',['cc','-std=c11','-D_POSIX_C_SOURCE=200809L','-Iruntime',tests/'c-ownership-probe.c','runtime/mlf_process_supervisor.c','-o',out/'ownership'])
     run('ownership',[out/'ownership'],text='outstanding_adapter_allocations=0')
     if a.gc_root:
@@ -85,7 +86,7 @@ try:
                 run('native-environment-nul-'+compiler,[binary,'nul-name'],expected=1,exact='Runtime: file path contains NUL\n')
     receipt['passed']=True
 finally:
-    sources=list((root/'host/ghc/MLF').rglob('*.hs'))+[root/'host/ghc/cbits/host.c']+list(tests.glob('*.hs'))+list(tests.glob('*.c'))+[tests/'run.py']+[root/'runtime'/x for x in ['mlf_runtime.c','mlf_system.h','mlf_process_binding.h','mlf_process_supervisor.c','mlf_completion.h']]
+    sources=list((root/'host/ghc/MLF').rglob('*.hs'))+[root/'host/ghc/cbits/host.c']+list(tests.glob('*.hs'))+list(tests.glob('*.c'))+[tests/'run.py',tests/'test-digest.py']+[root/'runtime'/x for x in ['mlf_runtime.c','mlf_system.h','mlf_process_binding.h','mlf_process_supervisor.c','mlf_completion.h']]
     receipt['sources']={str(x.relative_to(root)):hashlib.sha256(x.read_bytes()).hexdigest() for x in sorted(sources)}
     receipt.setdefault('passed',False)
     (out/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')

@@ -22,7 +22,7 @@ import qualified Bootstrap.Data as Data
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
-import Tests.Modules (modulePrograms, moduleRejections, ModuleRejection(..))
+import Tests.Modules (modulePrograms, moduleRejections, ModuleRejection(..), moduleTypings, ModuleTyping(..), checkTypedModuleTarget)
 import Tests.System (withScratch)
 
 separatePrograms : ([] ( (Quint String PreludeMode ([] ((,) String String)) String String) ))
@@ -136,6 +136,14 @@ forgeUnusedParameter fragments earlier = case fragments of
         let forged = case original of {XWithData ds term -> XWithData ds (XAbs name (XCon "Bool" []) term); term -> XAbs name (XCon "Bool" []) term} in
         Right ((:) (replaceFragmentTerm fragment forged) rest)
 
+-- Compile and link the original divergent source, but never run the target.
+checkSeparateTyping : ModuleTyping -> (,) String (IO ())
+checkSeparateTyping (ModuleTyping name libraries source expected) = (,) ("crate typing: " ++ name) do
+  result <- compileSeparateProgram ImplicitPrelude libraries source
+  objects <- H.right result
+  term <- H.right (Artifact.linkObjects objects fixtureIdentity)
+  checkTypedModuleTarget expected term
+
 separateTests : [] ((,) String (IO ()))
 separateTests = S.append
   (S.map (\(Quint name mode libraries source _) -> (,) ("crate checking: " ++ name) do
@@ -143,11 +151,13 @@ separateTests = S.append
     objects <- H.right result
     term <- H.right (Artifact.linkObjects objects fixtureIdentity)
     ty <- H.right (Check.checkClosed term)
-    H.assert (T.alphaEq ty (XCon "IO" ((:) (XCon "Unit" []) []))) "crate entry retained unresolved arguments") separatePrograms)
+    H.assert (T.alphaEq ty (XCon "IO" ((:) (XCon "()" []) []))) "crate entry retained unresolved arguments") separatePrograms)
   (S.append
-    (S.map (\(ModuleRejection name libraries source _ _) -> (,) ("crate rejects: " ++ name) do
-      result <- compileSeparateProgram ImplicitPrelude libraries source
-      case result of {Left _ -> return (); Right _ -> H.fail ("accepted invalid crate: " ++ name)}) moduleRejections)
+    (S.append
+      (S.map (\(ModuleRejection name libraries source _ _) -> (,) ("crate rejects: " ++ name) do
+        result <- compileSeparateProgram ImplicitPrelude libraries source
+        case result of {Left _ -> return (); Right _ -> H.fail ("accepted invalid crate: " ++ name)}) moduleRejections)
+      (S.map checkSeparateTyping moduleTypings))
     ((:) ((,) "crate paths and native cache commands" cratePaths)
     ((:) ((,) "crate metadata version rejection" (expect "MLFCI-5" (Artifact.decodeInterface "7:MLFCI-9")))
     ((:) ((,) "crate object binding schemes are independently checked" do
@@ -184,8 +194,21 @@ separateTests = S.append
 -- independent checker. Test the growing environment invariant separately.
 checkedReceipts : IO ()
 checkedReceipts = do
+  checkedComposition
+  let declarations = ((:) (DataDecl "Box" ((:) "a" []) ((:) (ConstructorDecl "Mk" ((:) (Parameter "a") [])) [])) [])
+  let contexts = Checked.contextPool ((:) declarations [])
+  pooled <- H.right (Checked.checkWithContexts contexts (XWithData declarations (XIntTerm 1)))
+  H.assert (T.alphaEq (Checked.typeOf pooled) (XCon "Int" [])) "context pool lost checked type"
+  let altered = ((:) (DataDecl "Box" ((:) "b" []) ((:) (ConstructorDecl "Mk" ((:) (Parameter "a") [])) [])) [])
+  let invalidContext = XWithData altered (XIntTerm 1)
+  case Checked.check invalidContext of
+    Left expected -> case Checked.checkWithContexts contexts invalidContext of
+      Left actual -> H.assert (eqString expected actual) "context pool changed declaration error"
+      Right _ -> H.assert False "context pool reused a different declaration AST"
+    Right _ -> H.assert False "context fixture unexpectedly valid"
+  H.assert (S.isLeft (Checked.checkWithContexts contexts (XWithData declarations (XApp (XIntTerm 1) (XIntTerm 2))))) "context pool skipped body checking"
   let name = XName 1 "value"
-  let term = XLet name (XIntTerm 42) (XConstructor "Unit" [])
+  let term = XLet name (XIntTerm 42) (XConstructor "()" [])
   let header = Fragment.UnitInterface "Receipt" [] [] [] [] [] [] ""
   proof <- H.right (Checked.check term)
   let raw = Fragment.UnitObject header term
@@ -196,7 +219,7 @@ checkedReceipts = do
   H.assert (S.isLeft (Fragment.objectChecked forged)) "body replacement reused the preceding checked proof"
   H.assert (eqString (Fragment.encodeObject raw) (Fragment.encodeObject checked)) "checked receipt changed transport bytes"
   reused <- H.right (Fragment.objectChecked checked)
-  H.assert (T.alphaEq (Checked.typeOf reused) (XCon "Unit" [])) "checked receipt lost its inferred type"
+  H.assert (T.alphaEq (Checked.typeOf reused) (XCon "()" [])) "checked receipt lost its inferred type"
   H.assert (S.isLeft (Fragment.objectChecked (Fragment.UnitObject header (XApp (XIntTerm 1) (XIntTerm 2))))) "raw object skipped independent checking"
   bindings <- H.right (Fragment.collectBindings Data.emptyDataEnv (XEnv Map.empty Map.empty) term)
   H.assert (S.eqList (\a b -> X.compareName (S.fst a) (S.fst b) == 0 && T.alphaEq (S.snd a) (S.snd b)) bindings ((:) ((,) name (XCon "Int" [])) [])) "checked environment lost inferred bindings"
@@ -205,12 +228,69 @@ checkedReceipts = do
   -- known unsaturated constructor to test recursive signature kind checking.
   let invalidSignature = XCon "IO" []
   H.assert (S.isLeft (Check.termType Data.emptyDataEnv Map.empty invalidSignature)) "recursive signature fixture unexpectedly has kind *"
-  H.assert (S.isLeft (Fragment.collectBindings Data.emptyDataEnv (XEnv Map.empty Map.empty) (XLetRec ((:) ((,,) name invalidSignature (XIntTerm 42)) []) (XConstructor "Unit" [])))) "binding extraction accepted an ill-kinded recursive signature"
+  H.assert (S.isLeft (Fragment.collectBindings Data.emptyDataEnv (XEnv Map.empty Map.empty) (XLetRec ((:) ((,,) name invalidSignature (XIntTerm 42)) []) (XConstructor "()" [])))) "binding extraction accepted an ill-kinded recursive signature"
   S.mapM_ (\text -> S.mapM_ (\split -> do
     let prefix = stringSlice text 0 split
     let suffix = stringSlice text split (stringLength text - split)
     let state = Fragment.fingerprintAppend ((,) 0 1) (Fragment.fingerprintPart prefix)
     H.assert (eqString (Fragment.fingerprint text) (Fragment.fingerprintAfter state suffix)) "prefix checksum composition differs"
+    let prefixEncoding = Fragment.encodingText prefix
+    let suffixEncoding = Fragment.encodingText suffix
+    let combined = Fragment.encodingAppend prefixEncoding suffixEncoding
+    H.assert (Fragment.encodingLength combined == stringLength text) "summary scalar length differs"
+    H.assert (eqString (Fragment.encodingFingerprint combined) (Fragment.fingerprint text)) "summary concatenation differs from canonical text"
+    let framed = Fragment.encodingPack ((:) prefixEncoding ((:) suffixEncoding []))
+    let framedText = Fragment.pack ((:) prefix ((:) suffix []))
+    H.assert (Fragment.encodingLength framed == stringLength framedText) "summary framing length differs"
+    H.assert (eqString (Fragment.encodingFingerprint framed) (Fragment.fingerprint framedText)) "summary framing differs from canonical text"
+    H.assert (eqString (Fragment.encodingAfter state suffixEncoding) (Fragment.fingerprintAfter state suffix)) "summary seeded checksum differs"
+    let memo = Fragment.encodingChunks Map.empty ((:) prefix ((:) suffix ((:) prefix []))) Fragment.encodingEmpty
+    H.assert (eqString (Fragment.encodingFingerprint (S.snd memo)) (Fragment.fingerprint (prefix ++ suffix ++ prefix))) "memoized chunks changed exact text"
+    let swapped = Fragment.encodingChunks (S.fst memo) ((:) suffix ((:) prefix ((:) suffix []))) Fragment.encodingEmpty
+    H.assert (eqString (Fragment.encodingFingerprint (S.snd swapped)) (Fragment.fingerprint (suffix ++ prefix ++ suffix))) "memoized chunks confused ordered text"
+    let seeded = Fragment.encodingChunks (S.fst memo) ((:) suffix []) prefixEncoding
+    H.assert (Fragment.encodingLength (S.snd seeded) == stringLength text && eqString (Fragment.encodingFingerprint (S.snd seeded)) (Fragment.fingerprint text)) "chunk accumulation lost its initial summary"
     let joined = Fragment.fingerprintAppend state (Fragment.fingerprintPart suffix)
     H.assert (eqString (Fragment.fingerprint text) (Fragment.fingerprintAfter joined "")) "scalar checksum composition differs") (S.range 0 (stringLength text)))
     ((:) "" ((:) "abc\n" ((:) "λ😀汉字\n" ((:) (S.concatStrings (S.map (\n -> showInt n ++ "λ") (S.range 0 99))) []))))
+
+-- Checked composition must derive syntax/types from opaque independent checks;
+-- the ordinary complete checker remains its separate correctness oracle.
+checkedComposition : IO ()
+checkedComposition = do
+  let integer = XCon "Int" []
+  let unit = XConstructor "()" []
+  let library = XLet (XName 9223372036854775807 "export") (XIntTerm 42) unit
+  fragment <- H.right (Checked.check library)
+  linked <- H.right (Checked.appendSpine Checked.emptySpine fragment)
+  let wrapper = XAbs (XName 9223372036854775807 "parameter") integer (XLetRec [] (XVarTerm (XName 9223372036854775807 "parameter")))
+  root <- H.right (Checked.check wrapper)
+  composed <- H.right (Checked.finishSpine linked ((:) ((,) "export" "parameter") []) root)
+  independent <- H.right (Checked.check (Checked.term composed))
+  H.assert (T.alphaEq (Checked.typeOf composed) (Checked.typeOf independent)) "composition changed independently checked type"
+  H.assert (S.isLeft (Checked.appendSpine linked fragment)) "composition accepted duplicate exports"
+  let parameter = XName 1 "parameter"
+  S.mapM_ (\body -> H.assert (S.isLeft (Checked.check (XAbs parameter integer body))) "independent checker allowed an imported identity to be rebound")
+    ((:) (XAbs parameter integer (XVarTerm parameter))
+      ((:) (XLet parameter (XIntTerm 1) unit)
+        ((:) (XLetRec ((:) ((,,) parameter integer (XIntTerm 1)) []) unit)
+          ((:) (XCase (XIntTerm 1) integer ((:) (XAlternative (XDefaultPattern (Just parameter)) (XIntTerm 1)) [])) []))))
+  H.assert (S.isLeft (Checked.appendFreshSpine linked (Checked.freshFragment 0 fragment))) "composition accepted an overlapping fresh interval"
+  H.assert (S.isLeft (Checked.finishSpine linked ((:) ((,) "missing" "parameter") []) root)) "composition accepted missing import"
+  H.assert (S.isLeft (Checked.finishSpine linked ((:) ((,) "export" "different") []) root)) "composition accepted wrong import prefix"
+  returnedLambda <- H.right (Checked.check (XAbs (XName 1 "local") integer (XVarTerm (XName 1 "local"))))
+  preserved <- H.right (Checked.finishSpine linked [] returnedLambda)
+  H.assert (T.alphaEq (Checked.typeOf preserved) (Checked.typeOf returnedLambda)) "composition stripped a user lambda"
+  -- An undeclared XCon receives the target checker's fallback kind. Adding a
+  -- declaration for that name can invalidate a previously checked annotation.
+  let unknown = XLet (XName 2 "identity") (XAbs (XName 3 "x") (XCon "Ghost" []) (XVarTerm (XName 3 "x"))) unit
+  unknownProof <- H.right (Checked.check unknown)
+  unknownSpine <- H.right (Checked.appendSpine Checked.emptySpine unknownProof)
+  let context = ((:) (DataDecl "Ghost" ((:) "a" []) ((:) (ConstructorDecl "MkGhost" []) [])) [])
+  contextRoot <- H.right (Checked.check (XWithData context (XIntTerm 9)))
+  H.assert (S.isLeft (Checked.finishSpine unknownSpine [] contextRoot)) "composition unsafely weakened an unknown constructor kind"
+  invalidGraft <- H.right (Fragment.graft unknown (XIntTerm 9))
+  H.assert (S.isLeft (Checked.check (XWithData context invalidGraft))) "unknown constructor context fixture should fail independently"
+  harmless <- H.right (Checked.finishSpine linked [] contextRoot)
+  harmlessOracle <- H.right (Checked.check (Checked.term harmless))
+  H.assert (T.alphaEq (Checked.typeOf harmless) (Checked.typeOf harmlessOracle)) "composition rejected or mistyped harmless datatype extension"

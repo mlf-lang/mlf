@@ -250,8 +250,16 @@ module Bootstrap.Std where {
   break p xs = span (\x -> not (p x)) xs;
   replicate :: forall a. Int -> a -> [] a;
   replicate n x = if (n <= 0) then [] else (:) x (replicate (n - 1) x);
+  -- Language arithmetic wraps; identity allocation must fail before reusing
+  -- an identity. Keep the same operand demand order as ordinary addition.
+  advanceIdentity :: Int -> Int -> Int;
+  advanceIdentity current amount = seq current (seq amount
+    (if (amount > 0 && current > 9223372036854775807 - amount) ||
+        (amount < 0 && current < (-9223372036854775808) - amount)
+     then panic "identity supply exhausted" else current + amount));
   range :: Int -> Int -> [] Int;
-  range first last = if (first > last) then [] else (:) first (range (first + 1) last);
+  range first last = if (first > last) then [] else (:) first
+    (if first == last then [] else range (first + 1) last);
   iterate :: forall a. (a -> a) -> a -> [] a;
   iterate f x = (:) x (iterate f (f x));
   repeat :: forall a. a -> [] a;
@@ -302,20 +310,10 @@ module Bootstrap.Std where {
     };
   intercalate :: String -> [] String -> String;
   intercalate sep xs = concatStrings (intersperse sep xs);
-  -- Join adjacent pieces in rounds. Native strings are contiguous UTF-8, so
-  -- a right fold copies every suffix again; balanced joins copy O(log n) times.
-  -- Force pieces in source order, retaining the old failure/strictness order.
+  -- Join through the general primitive so contiguous UTF-8 fragments are
+  -- copied once. It preserves the original head-before-tail demand order.
   concatStrings :: [] String -> String;
-  concatStrings xs =
-    case xs of {
-      [] -> "";
-      (:) first rest ->
-        seq first
-          (case rest of {
-             [] -> first;
-             (:) second tail -> concatStrings (concatStringPairs xs)
-           })
-    };
+  concatStrings xs = concatStringList xs;
   concatStringPairs :: [] String -> [] String;
   concatStringPairs xs =
     case xs of {
@@ -633,7 +631,5 @@ module Bootstrap.Std where {
       bits = doubleToBits value
     } in
     doubleFromBits
-      (if (bits < 9223372036854775808)
-       then (bits + 9223372036854775808)
-       else (bits - 9223372036854775808))
+      (xorInt bits (-9223372036854775808))
 }

@@ -1,0 +1,204 @@
+{
+  "complete": true,
+  "decision": "User-authorized structural improvement after closed discovery failed its threshold; stable speedup and disk savings unproven.",
+  "baseline_ref": "48275901cd7b760cc8dd000ed54898a23a494a87",
+  "production_source_sha256": {
+    "Bootstrap.Classes": "28b098e1a881b25a289f79a33252c7a1842664ea6cdc3633169231aad85cbdbc",
+    "Bootstrap.CrateQuery": "06263b9871c593c9f4f7a4f51975b8a38c9f96737f84a632afe5aa7525e50576",
+    "Bootstrap.CrateSession": "18abedc7f96452392ed3401f1ae607233ec13e2a5ba24bd1c0cba344820c382f",
+    "Bootstrap.SourceInference": "936ec48b2d8535a4211db4ebea027f09ae2c3d8b2615551d41cbd17b779b2fc0",
+    "MLF.BuiltinPreludeData": "a40b64e7420a93d9dbbb393df479ec68134ea8d432a9c293fe92b939e0a4eff2"
+  },
+  "performance_samples": 0,
+  "target_qualification": {
+    "complete": true,
+    "fresh": 711,
+    "reused": 0,
+    "raw_bytes_equal": true,
+    "purpose": "qualification only, no performance sample"
+  },
+  "suites": [
+    {
+      "name": "p123",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_integrated.py",
+        "--suite",
+        "p123",
+        "--producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/p123"
+      ]
+    },
+    {
+      "name": "graph",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_integrated.py",
+        "--suite",
+        "graph",
+        "--producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/graph"
+      ]
+    },
+    {
+      "name": "map-balance",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_integrated.py",
+        "--suite",
+        "map-balance",
+        "--producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/map-balance"
+      ]
+    },
+    {
+      "name": "validation",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_integrated.py",
+        "--suite",
+        "validation",
+        "--producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/validation"
+      ]
+    },
+    {
+      "name": "builtin",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_integrated.py",
+        "--suite",
+        "builtin",
+        "--producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/builtin"
+      ]
+    },
+    {
+      "name": "files",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_file_controls.py",
+        "--reference-source",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf",
+        "--reference-producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--builtin-prefix",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/builtin/builtin",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/files"
+      ]
+    },
+    {
+      "name": "native-containers",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_native.py",
+        "--producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--mode",
+        "standalone",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/native-containers"
+      ]
+    },
+    {
+      "name": "fingerprint",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/performance/patricia/run_fingerprint.py",
+        "--producer",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/fingerprint"
+      ]
+    },
+    {
+      "name": "direct",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/shared/test_direct.py",
+        "--bin-dir",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer/bin",
+        "--build-receipt",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer/receipt.json",
+        "--output",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/direct",
+        "--cc",
+        "/usr/bin/cc"
+      ]
+    },
+    {
+      "name": "locked-plan",
+      "exit_code": 0,
+      "command": [
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-reservation-20261101/producer/bin/mlfpkg",
+        "--locked",
+        "plan"
+      ]
+    },
+    {
+      "name": "manifest",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "-B",
+        "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/tools/testing/check_manifest_snapshot.py"
+      ]
+    }
+  ],
+  "locked_plan_endpoint": "ordinary GHC bootstrap producer, not a newly installed native package",
+  "guard_note": "macOS helper: sampled process-group RSS; address-space limit not enforced; Linux resource_watchdog unavailable due to missing /proc/meminfo",
+  "receipts": {
+    "results.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/results.json",
+      "sha256": "ffe5605638113e7363c5503754ad5bd809a4ddd34e6445a776781aaae8f4385a"
+    },
+    "target-711/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/target-711/receipt.json",
+      "sha256": "612aaa467c98aceeaf3f8937349218123a87186fa1cfba689f798bbf85546d47"
+    },
+    "linux-watchdog-unavailable.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-context-integration-20261101/linux-watchdog-unavailable.json",
+      "sha256": "e7e92687275bc50c2fb3c502da79a415e209df5d2eb608a750b07d536b7a51d0"
+    }
+  },
+  "ci_checks": [
+    "O2 frozen owned-path control step and captured receipts added",
+    "Workflow policy and 34 CI mutation controls passed locally"
+  ],
+  "limits": [
+    "No new installed-native bootstrap",
+    "No independent performance confirmation; original exploratory cohorts unchanged",
+    "No allocation, peak-memory or disk-use reduction established"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "format": "c4-current-source-basis-migration-v1",
+  "previous_integration_commit": "05a421798f30576bc7b75b69eff06303b51623a1",
+  "previous_manifest_path": "tools/performance/c4-local-transaction/manifest.json",
+  "previous_manifest_sha256": "af82e03a1a9fcb328ee6e5257aa553101b0f5cbacb4ae2d37ffe899098b06cdc",
+  "from_ref": "d3906cbaefc9d5965ee59bb87b6be8f730ec3204",
+  "to_ref": "d96f67726599fa4e21f236462886106434c8e417",
+  "input_count": 179,
+  "unchanged_input_count": 178,
+  "changed_inputs": {
+    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": {
+      "old": "cf29431eb01eaeb287b89444f80b45fc88de79a2d43f006411821c180647f8eb",
+      "new": "61201909b9874944a650153af3492a3a7b5ae953b678b22113d8278c222e9712"
+    }
+  },
+  "added_inputs": {},
+  "removed_inputs": [],
+  "old_input_contract_sha256": "53928815c964c95bcf05a64f8f3053bb4c7b07c4e5a0d56890992a4cd8a37e3a",
+  "new_input_contract_sha256": "914d336f1611028f4484c647ca66cd62af44b5946631092bfb2fb1503d8880f2",
+  "contract_digest_encoding": "UTF-8 JSON, sort_keys=True, separators=(comma,colon), no trailing newline",
+  "source_provenance": "All 179 new before inputs independently read with git show from exact to_ref, not copied from candidate results or a newly generated expected output. One exact reviewed source delta; every other path unchanged.",
+  "historical_p3_commit": "875e483de49655030c4ffba1995b60610a50273a",
+  "historical_c4_commit": "6be0c51f93ae8f31e4048aebe4c9a9bba3ce0a88",
+  "algorithm_oracle_fixture_entrypoint_and_support_bytes_changed": false,
+  "runtime_controls_or_qualifier_changed": false,
+  "old_runtime_evidence_reused": false
+}

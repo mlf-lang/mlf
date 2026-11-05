@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import shutil
@@ -11,28 +12,67 @@ import signal
 import subprocess
 import sys
 import time
+import types
+
+try:
+    import resource
+except ImportError:
+    resource = None
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_CASES = [
-    ('frontend', '--frontend', b'shared frontend: parser and namespace checks passed\n'),
+    # --frontend runs the maintained recursive/evidence checks before its
+    # final parser success banner. Require every banner in order, not only the suffix.
+    ('frontend', '--frontend',
+     b'shared frontend: qualified recursive inference checks passed\n'
+     b'shared frontend: declaration provenance and declared forall field checks passed\n'
+     b'shared frontend: recursive inference checks passed\n'
+     b'shared frontend: parser and namespace checks passed\n'),
     ('native-first', '--native-first', b'shared frontend: first native semantics checks passed\n'),
     ('native-second', '--native-second', b'shared frontend: checks passed\n'),
 ]
+# O0's canonical-prelude workload is substantially slower even on the upstream
+# compiler. Select limits only from the authenticated producer, never a CLI
+# optimization label. O2's native-first margin is justified separately below.
+# CI166 exhausted 2400s after the qualified-recursion banner. The residual
+# suite grew from 90 to 163 literal compilation calls; allow a bounded 3600s
+# for O0 frontend only, without changing its cases/order or the 120m job bound.
+def frontend_case_timeout(name, optimization, frontend_seconds=None):
+    if optimization not in ('0', '2'):
+        raise ValueError('unsupported authenticated optimization level')
+    if name not in {case[0] for case in FRONTEND_CASES}:
+        raise ValueError('unknown frontend case')
+    maximum = 3600 if optimization == '0' else 1800
+    if frontend_seconds is not None and not 1 <= frontend_seconds <= maximum:
+        raise ValueError('frontend timeout must be between 1 and ' + str(maximum) + ' seconds')
+    if name == 'frontend':
+        return frontend_seconds if frontend_seconds is not None else (3600 if optimization == '0' else 1200)
+    if optimization == '0':
+        # Exact six-case O0 diagnosis passed in 1051s; CI exhausted 1200s.
+        # Preserve the five-case native-second limit rather than enlarging all.
+        return 1800 if name == 'native-first' else 1200
+    # CI167 timed out at 120s with the identical binary that passed CI166.
+    # Only these six closed native-first checks get additional finite margin.
+    return 180 if name == 'native-first' else 120
+
 ORACLES = ['tests/async-task/suite.stdout', 'tests/async-task/processes.stdout',
            'tests/async-task/wait-graph.stdout', 'tests/async-process/suite.stdout']
 
 
-def frontend_timeout_seconds(optimization):
-    """Budget only after producer authentication; do not weaken any test oracle.
+def prepared_verifier():
+    path = Path(__file__).resolve().with_name('verify_prepared_libraries.py')
+    module = types.ModuleType('verify_prepared_libraries')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
 
-    Current O0 frontend measured 302.7s versus O2 34.9s. The larger O0
-    margin also covers the still-unmeasured semantic modes; CI checks them.
-    """
-    if optimization == '0':
-        return 1800
-    if optimization == '2':
-        return 120
-    raise ValueError('unsupported authenticated frontend optimization')
+
+def builtin_verifier():
+    path = Path(__file__).resolve().with_name('verify_builtin_prelude.py')
+    module = types.ModuleType('verify_builtin_prelude')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
 
 
 def sha(path):
@@ -149,12 +189,95 @@ def authenticate_build(receipt_path, binaries, root=ROOT):
         raise ValueError('producer did not finish every command')
     for entry in producer['commands']:
         verify_file({'path': entry['log'], 'sha256': entry['log_sha256']})
+    helpers = {'tools/shared/builtin_prelude_identity.py', 'tools/shared/verify_builtin_prelude.py'}
+    if set(producer.get('builtin_verification_helpers', {})) != helpers:
+        raise ValueError('missing builtin verification helper inventory')
+    for name in helpers:
+        verify_file(producer['builtin_verification_helpers'][name], root / name)
+    if not {'emlf', 'builtin-prelude'}.issubset(expected_outputs):
+        raise ValueError('missing canonical builtin verifier/generator outputs')
+    builtin_verifier().authenticate(producer.get('builtin_verification'), root,
+                                   binaries / 'emlf', binaries / 'builtin-prelude')
+    verify_file(producer.get('prepared_verification_helper'), root / 'tools/shared/verify_prepared_libraries.py')
+    prepared_verifier().authenticate(producer.get('prepared_verification'), root)
     return producer
+
+
+def child_cpu_sample():
+    """Optional diagnostics only; never turn missing accounting into zero CPU."""
+    if resource is None:
+        return {'available': False, 'reason': 'resource module unavailable'}
+    try:
+        usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+        values = [usage.ru_utime, usage.ru_stime]
+        if any(type(value) not in (int, float) or not math.isfinite(value) or value < 0
+               for value in values):
+            raise ValueError('invalid child CPU counters')
+        return {'available': True, 'user_seconds': values[0], 'system_seconds': values[1]}
+    except Exception as error:
+        return {'available': False, 'reason': type(error).__name__ + ': ' + str(error)}
+
+
+def child_cpu_interval(before, after):
+    result = {'scope': 'RUSAGE_CHILDREN-reaped-child-interval', 'available': False,
+              'limits': 'May omit unreaped/orphan/escaped descendants and include other reaped children; not total process-group CPU or a hardware-cause measurement.'}
+    if not before.get('available') or not after.get('available'):
+        result['reason'] = 'before: ' + str(before.get('reason', 'available')) + '; after: ' + str(after.get('reason', 'available'))
+        return result
+    try:
+        user = after['user_seconds'] - before['user_seconds']
+        system = after['system_seconds'] - before['system_seconds']
+        total = user + system
+        if any(not math.isfinite(value) or value < 0 for value in (user, system, total)):
+            raise ValueError('invalid child CPU interval')
+        result.update(available=True, user_seconds=user, system_seconds=system, total_seconds=total)
+    except Exception as error:
+        result['reason'] = type(error).__name__ + ': ' + str(error)
+    return result
 
 
 class CommandRunner:
     def __init__(self, root, output, receipt, save):
         self.root, self.output, self.receipt, self.save = root, output, receipt, save
+
+    @staticmethod
+    def stop_group(process):
+        # start_new_session gives this command its own original process group.
+        # A dead leader (or closed capture pipes) does not mean its children died.
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
+        finally:
+            # Always escalate, including when communicate already returned after
+            # the leader exited and a TERM-ignoring child redirected its stdio.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        cleanup = {'scope': 'original-process-group', 'capture_drained': True, 'leader_reaped': True}
+        try:
+            stdout, stderr = process.communicate(timeout=2)
+        except subprocess.TimeoutExpired as error:
+            # An escaped descendant can retain these pipes. Do not hang while
+            # draining them or signal an unrelated/new process group to fix it.
+            stdout, stderr = error.stdout or b'', error.stderr or b''
+            cleanup['capture_drained'] = False
+            for stream in (process.stdout, process.stderr):
+                if stream is not None:
+                    stream.close()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                cleanup['leader_reaped'] = False
+        cleanup['complete'] = cleanup['capture_drained'] and cleanup['leader_reaped']
+        if not cleanup['complete']:
+            cleanup['error'] = 'original process-group cleanup could not drain captures or reap the leader within its bounds'
+        return stdout, stderr, cleanup
 
     def run(self, name, command, *, overrides=None, status=0, expected=None, timeout=180):
         command = list(map(str, command))
@@ -165,7 +288,9 @@ class CommandRunner:
         self.save()
         stdout, stderr = b'', b''
         started = time.monotonic()
+        cpu_before = child_cpu_sample()
         process = None
+        group_stopped = False
         try:
             process = subprocess.Popen(command, cwd=self.root, env={**os.environ, **overrides},
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
@@ -173,18 +298,8 @@ class CommandRunner:
                 stdout, stderr = process.communicate(timeout=timeout)
             except subprocess.TimeoutExpired:
                 entry['timed_out'] = True
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-                try:
-                    stdout, stderr = process.communicate(timeout=2)
-                except subprocess.TimeoutExpired:
-                    try:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                    stdout, stderr = process.communicate()
+                stdout, stderr, entry['cleanup'] = self.stop_group(process)
+                group_stopped = True
             entry['exit_code'] = process.returncode
             if entry.get('timed_out'):
                 raise RuntimeError(name + ' exceeded ' + str(timeout) + ' seconds')
@@ -195,12 +310,10 @@ class CommandRunner:
         except BaseException as error:
             entry['state'] = 'failed'
             entry['error'] = str(error)
-            if process is not None and process.poll() is None:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                stdout, stderr = process.communicate()
+            if process is not None:
+                if not group_stopped:
+                    stdout, stderr, entry['cleanup'] = self.stop_group(process)
+                entry['exit_code'] = process.returncode
             raise
         finally:
             for suffix, data in [('stdout', stdout), ('stderr', stderr)]:
@@ -208,6 +321,7 @@ class CommandRunner:
                 path.write_bytes(data)
                 entry[suffix + '_sha256'] = sha(path)
             entry['seconds'] = time.monotonic() - started
+            entry['child_cpu'] = child_cpu_interval(cpu_before, child_cpu_sample())
             self.save()
 
 
@@ -217,7 +331,11 @@ def main():
     parser.add_argument('--build-receipt', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--cc', default=os.environ.get('CC', 'cc'))
+    parser.add_argument('--frontend-timeout', type=int,
+                        help='bounded frontend override: O0 1..3600, O2 1..1800; defaults come from authenticated optimization')
     args = parser.parse_args()
+    if args.frontend_timeout is not None and not 1 <= args.frontend_timeout <= 3600:
+        parser.error('frontend timeout must be between 1 and 3600 seconds')
     binaries, output = args.bin_dir.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     receipt = {'format': 1, 'complete': False, 'source_mode': 'authenticated direct committed shared source',
@@ -234,6 +352,9 @@ def main():
             raise ValueError('direct async fixture qualification requires a POSIX host')
         build_receipt = (args.build_receipt or binaries.parent / 'receipt.json').resolve(strict=True)
         producer = authenticate_build(build_receipt, binaries)
+        budgets = {name: frontend_case_timeout(name, producer['optimization'], args.frontend_timeout)
+                   for name, _, _ in FRONTEND_CASES}
+        receipt['execution_budgets'] = budgets
         receipt['producer'] = {**identified(build_receipt), 'host': producer['producer_host'],
                                'optimization': producer['optimization']}
         compiler = shutil.which(args.cc)
@@ -268,10 +389,9 @@ def main():
         if b'async-scope-panic' not in result.stderr:
             raise RuntimeError('panic failed for unrelated reason')
         runner.run('panic-child-reaped', [process_helper, 'assert-gone', work / 'panic.pid'])
-        frontend_timeout = frontend_timeout_seconds(producer['optimization'])
-        receipt['frontend_timeout_seconds'] = frontend_timeout
         for name, option, expected in FRONTEND_CASES:
-            runner.run('shared-frontend-' + name, [binaries / 'shared-frontend', option], expected=expected, timeout=frontend_timeout)
+            runner.run('shared-frontend-' + name, [binaries / 'shared-frontend', option], expected=expected,
+                       timeout=budgets[name])
         runner.run('build-receipts', [sys.executable, ROOT / 'tools/release/test-suite-build-receipts.py',
                    '--executable', binaries / 'build-receipts', '--output', output / 'build-receipts'], timeout=1800)
         for collection in [receipt['inputs'], receipt['helpers']]:

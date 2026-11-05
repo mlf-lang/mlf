@@ -60,6 +60,7 @@ freeNames e = let rec {
   SApp a b -> Set.union (freeNames a) (freeNames b);
   SLet x a b -> Set.union (freeNames a) (Set.delete x (freeNames b));
   SAnn a _ -> freeNames a;
+  SSignature a _ -> freeNames a;
   SIntLit _ -> Set.empty;
   SDoubleLit _ -> Set.empty;
   SBoolLit _ -> Set.empty;

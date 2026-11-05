@@ -1,0 +1,19 @@
+{
+  "format": "c4-current-runtime-source-basis-migration-v1",
+  "from_ref": "d96f67726599fa4e21f236462886106434c8e417",
+  "to_ref": "823f3060ea379ddb7d865764ae2b097e8fcf29bc",
+  "previous_manifest_sha256": "f20bf3c067f495ba4c013ffe4611eb782e236ef95bcc61ceed698970c63928a5",
+  "previous_input_contract_sha256": "914d336f1611028f4484c647ca66cd62af44b5946631092bfb2fb1503d8880f2",
+  "current_input_contract_sha256": "35540d5cf220834f3a848e74f9a73246d7f3a266ff3b0b05b2e8e0eeda249d38",
+  "input_count": 179,
+  "unchanged_input_count": 178,
+  "changed_inputs": {
+    "runtime/mlf_system.h": {
+      "old": "b3ea6d3c5d4d0f6ebf116bf272fc1636c4dcf8ae266c86f86c6ac621cf323ac7",
+      "new": "9254a1d28a0718ef100916020a96d860ee559e797d311cd4569f887d5fec841e"
+    }
+  },
+  "added_inputs": {},
+  "removed_inputs": [],
+  "scope": "Exact upstream Darwin-only runtime source delta; unchanged C4 algorithms, independent oracles, active Linux C preprocessing and ordinary host objects. Old native qualification remains on d96; no new ordinary producer receipt or macOS qualification is claimed."
+}

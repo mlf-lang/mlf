@@ -37,6 +37,8 @@ mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-
  streaming <- getEnv "MLF_BENCH_STREAM_LLVM"
  if eqString fast "1" then return () else do
   waitFor "runtime.started" 300
+  split <- getEnv "MLF_BENCH_SPLIT_RUNTIME"
+  if eqString split "1" then waitFor "runtime-supervisor.started" 300 else return ()
   if eqString streaming "1" then waitFor "llvm.launched" 300 else return ()
   linking <- getEnv "MLF_BENCH_STREAM_LINK"
   if eqString linking "1" then waitFor "link.launched" 300 else return ()
@@ -54,11 +56,31 @@ mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-
   H.assert (eqString (O.trim ir) "IR") "LLVM compilation started before emission completed"
   writeFile "llvm.started" ""
   writeFile (outputPath args) "code"
+ else if S.elem eqString "-c" args && S.any (O.ends "mlf_process_supervisor.c") args then do
+  present <- fileExists "runtime-supervisor.cache.o"
+  H.assert (S.not present) "supervisor output directory reused"
+  writeFile "runtime-supervisor.cache.o" ""
+  writeFile "runtime-supervisor.started" ""
+  waitFor "frontend.started" 300
+  waitFor "runtime.started" 300
+  linking <- getEnv "MLF_BENCH_STREAM_LINK"
+  if eqString linking "1" then waitFor "link.launched" 300 else return ()
+  failure <- getEnv "MLF_MOCK_FAIL_SUPERVISOR"
+  if eqString failure "1" then exitWith 9 else return ()
+  waitFor "llvm.started" 300
+  writeFile (outputPath args) "supervisor"
  else if S.elem eqString "-c" args then do
   present <- fileExists "cache.o"
   H.assert (S.not present) "runtime output directory reused"
   writeFile "cache.o" ""
   writeFile "runtime.started" ""
+  split <- getEnv "MLF_BENCH_SPLIT_RUNTIME"
+  if eqString split "1" then do
+   H.assert (S.elem eqString "-DMLF_RUNTIME_EXTERNAL_PROCESS_SUPERVISOR=1" args) "split core retained its embedded supervisor"
+   waitFor "runtime-supervisor.started" 300
+   linking <- getEnv "MLF_BENCH_STREAM_LINK"
+   if eqString linking "1" then waitFor "link.launched" 300 else return ()
+   else return ()
   failure <- getEnv "MLF_MOCK_FAIL_RUNTIME"
   if eqString failure "1" then exitWith 9 else return ()
   waitFor "frontend.started" 300
@@ -66,14 +88,21 @@ mockBuild args = if S.any (\flag -> S.elem eqString flag args) (O.words "--emit-
   writeFile (outputPath args) "object"
   else do
    streaming <- getEnv "MLF_BENCH_STREAM_LINK"
+   split <- getEnv "MLF_BENCH_SPLIT_RUNTIME"
    if eqString streaming "1" then do
     writeFile "link.launched" ""
     waitFor "program.o.ready" 300
     waitFor "runtime.o.ready" 300
+    if eqString split "1" then waitFor "runtime-supervisor.o.ready" 300 else return ()
     else return ()
    object <- readFile "runtime.o"
    code <- readFile "program.o"
    H.assert (eqString object "object" && eqString code "code") "link started before independent phases completed"
+   if eqString split "1" then do
+    H.assert (S.any (O.ends "/runtime-supervisor.o") args) "link omitted the separate supervisor object"
+    supervisor <- readFile "runtime-supervisor.o"
+    H.assert (eqString supervisor "supervisor") "link started before the supervisor completed"
+    else return ()
    writeFile (outputPath args) "binary"
 -- The registry contains deferred original actions. Listing IDs does not load
 -- fixture files, start tools, or execute any assertion.

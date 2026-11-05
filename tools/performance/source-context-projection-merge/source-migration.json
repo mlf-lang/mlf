@@ -1,0 +1,57 @@
+{
+  "added_sources": {},
+  "common_ref": "5172c4ade3b3141da2e64593c383892575b36699",
+  "common_session_sha256": "51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9",
+  "format": "source-context-projection-diamond-v1",
+  "frozen_references": {
+    "full-compiler/session-delta.json": "6aeb0fac2965143ec648c30ce2d540060480af1a422b146654d5c9377e605c5d",
+    "full-compiler/source-migration.json": "8a7118c56442506571541c5c20821086e8ce9aff987de058097a81e224e29bb0",
+    "full-compiler/source_contract.py": "68eec55dbeb8eec2a1d983dac1f5f61f03e1c03057c0cf9689c6361e8141a027",
+    "query-key-scratch/query-delta.json": "0c04d92f7da1eea83192e14fa870de681c4fac962bf79badb80c38ab6f20c411",
+    "query-key-scratch/session-delta.json": "5534f3bfc032fbc51aa71eee39992f67760bb337a6690f9490bea08a5b364e06",
+    "query-key-scratch/source-migration.json": "9ecbc912e288495a1ff7f5652e81b429c5cfafd2dcd2da951c395efdc762a95a",
+    "query-key-scratch/source_contract.py": "a445a69b7c5a8eaae9cfeb794192ea5bfd7201e5a1bc96fb1dd231933f8281ba",
+    "source-query-context/query-delta.json": "d35a696a0dbe00def5c8bf579e88ae4b515b1c2f40f2318408c3dcf8548bc864",
+    "source-query-context/session-delta.json": "6442aa9316137001e8c71cc54c2257f5c3bee388b7dee1f957b52edae99abc5a",
+    "source-query-context/source-migration.json": "5dbb5cbc5fcb047732e1ef48931c88a3dbd73030af4cc853f6a07ed951208a6e",
+    "source-query-context/source_contract.py": "8cacdec2b8f398d357fd01555e5095eeb2f56376beebffcd9f57980a504cec29"
+  },
+  "host_sources": {},
+  "left_parent_manifest_sha256": "9ecbc912e288495a1ff7f5652e81b429c5cfafd2dcd2da951c395efdc762a95a",
+  "left_ref": "2c3ce0ee4d13cf8d2da19e745189cb85005d3cad",
+  "left_unchanged_sources": 127,
+  "module_count": 128,
+  "query": {
+    "common_sha256": "06263b9871c593c9f4f7a4f51975b8a38c9f96737f84a632afe5aa7525e50576",
+    "left_sha256": "43af002afc2ddb1d69efef0a2d5c1c75dc3dd0b33c85685d4e83fd3290101a68",
+    "merged_sha256": "43af002afc2ddb1d69efef0a2d5c1c75dc3dd0b33c85685d4e83fd3290101a68",
+    "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+    "right_sha256": "06263b9871c593c9f4f7a4f51975b8a38c9f96737f84a632afe5aa7525e50576"
+  },
+  "registries": {
+    "common": "f3cdd7d5328f2060ea9afcdd649c96ba90ff0d60aad38da4d5dfa8827ceb582b",
+    "left": "feac2529b2d5da25dff158a0d8043c4dbbdbf26dbc201e4af7d318d78903abee",
+    "merged": "8d259a293e60df946362123fd631156fdedbad1e1c956d67235b87960af6c9fa",
+    "right": "3843ccebb5581db27d6ec385a7e8f403e07acb9856712e7db9aa5a1106af0538"
+  },
+  "removed_sources": {},
+  "right_parent_manifest_sha256": "8a7118c56442506571541c5c20821086e8ce9aff987de058097a81e224e29bb0",
+  "right_ref": "9dfcd6625775819568eaaa5065f8dd1431df52f8",
+  "right_unchanged_sources": 126,
+  "session_edges": {
+    "left": {
+      "edit_count": 1,
+      "file": "left-session-delta.json",
+      "new_sha256": "b35637aab8fb473646af9719fe857f1fdb1cda822feedf05e06739e95f4a73a4",
+      "old_sha256": "5c888e550760f023278beaeffb137a5e3940980b19be2850186ce35ff117805b",
+      "sha256": "73fb0aae3ec2efe06c4c8654e869f77efd07cf96460663b96ee12092de3fb076"
+    },
+    "right": {
+      "edit_count": 3,
+      "file": "right-session-delta.json",
+      "new_sha256": "b35637aab8fb473646af9719fe857f1fdb1cda822feedf05e06739e95f4a73a4",
+      "old_sha256": "1210cfc8605bb8e45fd6801661175f892ebeddef561afa097b3fa3eafdde3c37",
+      "sha256": "c7d673c951ea8ddc9e64f091bfec6c539d6088739f6da9611bdf51bb10bd5396"
+    }
+  }
+}

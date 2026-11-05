@@ -20,7 +20,7 @@ stack = push (frame (str "inner") (num 12)) (push (frame (str "outer") (num 12))
 header = "CallStack (from HasCallStack):"
 render c = case R.runtimeCharsText c of T.Left _ -> Nothing; T.Right t -> Just (B.unpack t)
 takeChars 0 _ = Just ""
-takeChars n (T.Right (R.RConstructor ":" ((:) (T.Right (R.RChar c)) ((:) rest [])))) = fmap ((toEnum (fromInteger c)):) (takeChars (n-1) rest)
+takeChars n (T.Right (R.RConstructor ":" ((:) (T.Right (R.RChar c)) ((:) rest [])))) = fmap ((toEnum (fromIntegral c)):) (takeChars (n-1) rest)
 takeChars _ (T.Right (R.RConstructor "[]" _)) = Just ""
 takeChars _ _ = Nothing
 assert label ok = if ok then putStrLn ("PASS "++label) else error ("FAIL "++label)
@@ -57,7 +57,7 @@ main = do
   let prefix=header++"\n  f, called at "
   assert "location-not-demanded-before-file" (takeChars (length prefix) badEnd==Just prefix)
   assert "location-demands-end-coordinate" (takeChars (length prefix+1) badEnd==Nothing)
-  assert "coordinate-overflow-rejected" (render (pretty (push (frame (str "f") (num 9223372036854775808)) empty))==Nothing)
+  assert "coordinate-literal-wraps" (render (pretty (push (frame (str "f") (num 9223372036854775808)) empty))==Just (header++"\n  f, called at file.hs:10:2 in pkg:Mod"))
   let delayed=R.runtimePrimitive D.emptyDataEnv T.PIOErrorWithStack (ls [T.Left "error bottom",T.Left "stack bottom"])
   assert "stacked-action-deferred" $ case delayed of T.Right (R.RAction _ _) -> True; _ -> False
   result <- run (catch (act T.PIOErrorWithStack [rv (R.RIOError (T.Left "message bottom")),T.Left "stack bottom"]) ret)

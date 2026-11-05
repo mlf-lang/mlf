@@ -1,6 +1,16 @@
 /* POSIX host IO. Package policy, manifests and build decisions live in MLF. */
 #ifndef MLF_SYSTEM_H
 #define MLF_SYSTEM_H
+/* This transport is also included directly by the GHC host adapter. */
+#ifndef MLF_NOINLINE
+#if defined(_MSC_VER)
+#define MLF_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define MLF_NOINLINE __attribute__((noinline))
+#else
+#define MLF_NOINLINE
+#endif
+#endif
 #ifdef _WIN32
 #include "mlf_system_windows.h"
 #else
@@ -9,6 +19,14 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <time.h>
+#if defined(__linux__)
+#include <poll.h>
+#include <sys/syscall.h>
+#elif defined(__APPLE__)
+#include <sys/event.h>
+#include <crt_externs.h>
+#include <spawn.h>
+#endif
 
 static MlfValue *os_getEnv(MlfValue *name) {
     const char *key = file_path(name);
@@ -34,7 +52,7 @@ static MlfValue *os_directoryExists(MlfValue *name) {
     struct stat st;
     return mlf_boolean(!stat(file_path(name),&st) && S_ISDIR(st.st_mode));
 }
-static MlfValue *os_listDirectory(MlfValue *name) {
+static MLF_NOINLINE MlfValue *os_listDirectory(MlfValue *name) {
     DIR *dir = opendir(file_path(name));
     if (!dir) fail("IO error: listDirectory failed");
     size_t size = 0, capacity = 256;
@@ -71,7 +89,7 @@ static MlfValue *os_releaseFileLock(MlfValue *handle) {
 /* cwd, plus NUL-terminated fields: timeout seconds, stdin file, stdout file,
  * stderr file, executable, arguments. Empty redirections inherit streams;
  * equal nonempty stdout/stderr paths share one descriptor. No shell is used. */
-static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
+static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
     const char *cwd = file_path(directory);
     specification = expect(specification,STRING);
     size_t length = specification->as.string.length, count = 0;
@@ -94,7 +112,29 @@ static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
     long scope_id = scope && *scope ? strtol(scope,&scope_end,10) : 0;
     int supervised = scope_id > 0 && scope_end && !*scope_end && scope_id == (long)getpgrp();
     fflush(NULL);
+#if defined(__APPLE__)
+    pid_t pid = -1;
+    /* Cache publications inherit cwd/stdio. Spawn avoids copying the compiler's
+     * address space, while retaining the command and the existing wait path.
+     * Other forms, or any spawn failure, keep fork/execvp (including its shell
+     * fallback for executable text files without a shebang). */
+    if (!*cwd && !*parts[1] && !*parts[2] && !*parts[3]) {
+        posix_spawnattr_t attributes;
+        if (!posix_spawnattr_init(&attributes)) {
+            int ready = supervised ||
+                (!posix_spawnattr_setpgroup(&attributes,0) &&
+                 !posix_spawnattr_setflags(&attributes,POSIX_SPAWN_SETPGROUP));
+            pid_t spawned;
+            if (ready && !posix_spawnp(&spawned,parts[4],NULL,&attributes,
+                                      parts+4,*_NSGetEnviron())) pid = spawned;
+            /* A failed spawn leaves its PID unspecified; never use it. */
+            posix_spawnattr_destroy(&attributes);
+        }
+    }
+    if (pid < 0) pid = fork();
+#else
     pid_t pid = fork();
+#endif
     if (pid < 0) { free(parts); fail("IO error: runProcess failed"); }
     if (!pid) {
         /* Only the child establishes its group. Concurrent parent/child
@@ -115,25 +155,77 @@ static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
     free(parts);
     struct timespec start,now,pause = {0,10000000};
     if (clock_gettime(CLOCK_MONOTONIC,&start)) { kill(-pid,SIGKILL); kill(pid,SIGKILL); waitpid(pid,NULL,0); fail("IO error: runProcess failed"); }
+    /* Readiness only shortens the existing pause. waitpid remains the sole
+     * status/reaping authority; unsupported hosts retain the old path. */
+    int ready_fd = -1;
+#if defined(__linux__) && defined(SYS_pidfd_open)
+    struct sigaction child_action;
+    if (!sigaction(SIGCHLD,NULL,&child_action) &&
+        child_action.sa_handler == SIG_DFL && !(child_action.sa_flags & SA_NOCLDWAIT))
+        ready_fd = (int)syscall(SYS_pidfd_open,(long)pid,0L);
+#elif defined(__APPLE__)
+    struct sigaction child_action;
+    if (!sigaction(SIGCHLD,NULL,&child_action) &&
+        child_action.sa_handler == SIG_DFL && !(child_action.sa_flags & SA_NOCLDWAIT)) {
+        ready_fd = kqueue();
+        if (ready_fd>=0) {
+            struct kevent change;
+            EV_SET(&change,(uintptr_t)pid,EVFILT_PROC,EV_ADD|EV_ONESHOT,NOTE_EXIT,0,NULL);
+            if (fcntl(ready_fd,F_SETFD,FD_CLOEXEC)<0 ||
+                kevent(ready_fd,&change,1,NULL,0,NULL)<0) {
+                close(ready_fd); ready_fd = -1;
+            }
+        }
+    }
+#endif
     int status;
     for (;;) {
         pid_t done = waitpid(pid,&status,WNOHANG);
         if (done == pid) break;
-        if (done<0 && errno!=EINTR) fail("IO error: runProcess failed");
+        if (done<0 && errno!=EINTR) {
+            if (ready_fd>=0) close(ready_fd);
+            fail("IO error: runProcess failed");
+        }
         clock_gettime(CLOCK_MONOTONIC,&now);
         if (now.tv_sec-start.tv_sec >= seconds && (now.tv_sec-start.tv_sec>seconds || now.tv_nsec>=start.tv_nsec)) {
             /* A timed-out supervised subprocess invalidates the whole action.
              * Killing its enclosing scope also stops grandchildren. */
+            if (ready_fd>=0) close(ready_fd);
             kill(supervised ? -getpgrp() : -pid,SIGKILL); kill(pid,SIGKILL); while (waitpid(pid,&status,0)<0 && errno==EINTR) {}
             return small(124);
         }
+#if defined(__linux__) && defined(SYS_pidfd_open)
+        if (ready_fd>=0) {
+            struct pollfd event = {ready_fd,POLLIN,0};
+            int ready = poll(&event,1,10);
+            if (ready>=0 && !(event.revents & (POLLERR|POLLNVAL))) continue;
+            if (ready<0 && errno==EINTR) continue;
+            /* Disable an unusable wake source, without repeated-error spins.
+             * Linux close is not retried: its fd number may already be free. */
+            close(ready_fd); ready_fd = -1;
+        }
+#elif defined(__APPLE__)
+        if (ready_fd>=0) {
+            struct kevent event;
+            int ready = kevent(ready_fd,NULL,0,&event,1,&pause);
+            if (ready==0 || (ready==1 && event.ident==(uintptr_t)pid &&
+                event.filter==EVFILT_PROC && !(event.flags&EV_ERROR) &&
+                (event.fflags&NOTE_EXIT))) continue;
+            if (ready<0 && errno==EINTR) continue;
+            close(ready_fd); ready_fd = -1;
+        }
+#endif
         nanosleep(&pause,NULL);
     }
+    if (ready_fd>=0) close(ready_fd);
     return small(WIFEXITED(status) ? WEXITSTATUS(status) : 128+WTERMSIG(status));
 }
 
 #endif
 /* SHA-256, streaming binary files; independent of text encoding and tools. */
+#if defined(__APPLE__) && !defined(MLF_TEST_FORCE_PORTABLE_SHA256)
+#include <CommonCrypto/CommonDigest.h>
+#else
 static uint32_t os_rotr(uint32_t x, unsigned n) { return (x>>n)|(x<<(32-n)); }
 static void os_sha_block(uint32_t h[8], const unsigned char block[64]) {
     static const uint32_t k[64] = {
@@ -152,9 +244,27 @@ static void os_sha_block(uint32_t h[8], const unsigned char block[64]) {
     for(int i=0;i<64;++i) {uint32_t t=v+(os_rotr(e,6)^os_rotr(e,11)^os_rotr(e,25))+((e&f)^(~e&g))+k[i]+w[i];uint32_t u=(os_rotr(a,2)^os_rotr(a,13)^os_rotr(a,22))+((a&b)^(a&c)^(b&c)); v=g;g=f;f=e;e=d+t;d=c;c=b;b=a;a=t+u;}
     h[0]+=a;h[1]+=b;h[2]+=c;h[3]+=d;h[4]+=e;h[5]+=f;h[6]+=g;h[7]+=v;
 }
-static MlfValue *os_fileDigest(MlfValue *name) {
+#endif
+static MLF_NOINLINE MlfValue *os_fileDigest(MlfValue *name) {
     FILE *file = fopen(file_path(name),"rb");
     if (!file) fail("IO error: fileDigest failed");
+#if defined(__APPLE__) && !defined(MLF_TEST_FORCE_PORTABLE_SHA256)
+    CC_SHA256_CTX context;
+    if (!CC_SHA256_Init(&context)) { fclose(file); fail("IO error: fileDigest failed"); }
+    unsigned char buffer[65536], digest[CC_SHA256_DIGEST_LENGTH];
+    size_t n; int failed=0;
+    while ((n=fread(buffer,1,sizeof(buffer),file))) {
+        if (!CC_SHA256_Update(&context,buffer,(CC_LONG)n)) { failed=1; break; }
+    }
+    if(ferror(file))failed=1;
+    if(fclose(file))failed=1;
+    if(failed || !CC_SHA256_Final(digest,&context))fail("IO error: fileDigest failed");
+    char hex[65];
+    static const char digits[]="0123456789abcdef";
+    for(int i=0;i<CC_SHA256_DIGEST_LENGTH;++i){hex[2*i]=digits[digest[i]>>4];hex[2*i+1]=digits[digest[i]&15];}
+    hex[64]=0;
+    return mlf_string(hex,64);
+#else
     uint32_t h[8]={0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19};
     unsigned char buffer[65536],tail[128]={0};
     size_t n,remaining=0; uint64_t total=0;
@@ -171,5 +281,6 @@ static MlfValue *os_fileDigest(MlfValue *name) {
     os_sha_block(h,tail);if(size==128)os_sha_block(h,tail+64);
     char hex[65];for(int i=0;i<8;++i)snprintf(hex+8*i,9,"%08" PRIx32,h[i]);
     return mlf_string(hex,64);
+#endif
 }
 #endif

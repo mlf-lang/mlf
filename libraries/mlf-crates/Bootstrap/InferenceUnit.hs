@@ -13,11 +13,10 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Separate as Separate;
-  import qualified Bootstrap.Data as D;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Syntax as X;
-  import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
+  import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.X.Pretty as Pretty;
   -- Class translation is a crate query, before the value dependency graph is
   -- built. Its generated selectors/dictionaries become ordinary signed graph
@@ -28,6 +27,12 @@ module Bootstrap.InferenceUnit where {
   loweredData (LoweredDeclarations ds _ _) = ds;
   loweredValues (LoweredDeclarations _ values _) = values;
   loweredNames (LoweredDeclarations _ _ names) = names;
+  recursiveAnnotation :: RecursiveMode -> Maybe SAnnotation;
+  recursiveAnnotation mode =
+    case mode of {
+      InferRecursive -> Nothing;
+      CheckRecursive annotation -> Just annotation
+    };
   extractLoweredDeclarations :: SExpr ->
                                 Either String ([] ((,,) String (Maybe SAnnotation) SExpr));
   extractLoweredDeclarations expression = extractDeclarations expression [];
@@ -50,14 +55,15 @@ module Bootstrap.InferenceUnit where {
           body = matchValueShared4
         } in
         let {
-          annotation =
+          -- A checked expression can come from a qualified SAnn too. Only
+          -- declaration provenance may restore a declaration signature here.
+          declaration =
             case rhs of {
-              SChecked ty _ -> Just (SAnnotation [] ty);
-              SAnn _ a -> Just a;
-              _ -> Nothing
+              SSignature value annotation -> (,,) n (Just annotation) value;
+              _ -> (,,) n Nothing rhs
             }
         } in
-        extractDeclarations body ((:) ((,,) n annotation rhs) reversed);
+        extractDeclarations body ((:) declaration reversed);
       SLetRec matchValueShared5 matchValueShared6 ->
         let {
           definitions = matchValueShared5
@@ -66,7 +72,7 @@ module Bootstrap.InferenceUnit where {
           body = matchValueShared6
         } in
         extractDeclarations body
-          (foldlStrict (\acc ((,,) n a rhs) -> (:) ((,,) n (Just a) rhs) acc) reversed
+          (foldlStrict (\acc ((,,) n mode rhs) -> (:) ((,,) n (recursiveAnnotation mode) rhs) acc) reversed
              definitions);
       SConstructor matchValueShared7 ->
         if MLF.Primitive.eqString matchValueShared7 "()"
@@ -184,6 +190,18 @@ module Bootstrap.InferenceUnit where {
   -- crate artifact validates the selected schemes and owns the crate DAG;
   -- module interface dependency hashes would cause transitive invalidation.
   compileLoweredGroup name dependencies datatypes members =
+    compileLoweredGroupUsing (\term -> Separate.fingerprint (Pretty.prettyTerm term))
+      name dependencies datatypes members;
+  compileLoweredGroupWithDatatypes :: Separate.DatatypeEncodings -> String ->
+    [] Separate.UnitInterface -> [] DataDecl ->
+    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Separate.UnitObject;
+  compileLoweredGroupWithDatatypes pool name dependencies datatypes members =
+    compileLoweredGroupUsing (Separate.fingerprintTermWithDatatypes pool)
+      name dependencies datatypes members;
+  compileLoweredGroupUsing :: (XTerm -> String) -> String ->
+    [] Separate.UnitInterface -> [] DataDecl ->
+    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Separate.UnitObject;
+  compileLoweredGroupUsing payloadFingerprint name dependencies datatypes members =
     do {
       ensure (not (null members)) "cannot infer an empty declaration group";
       externalTypes <- foldM mergeExternal M.empty (concatMap Separate.unitBindings dependencies);
@@ -239,29 +257,103 @@ module Bootstrap.InferenceUnit where {
       case boundValueShared9 of {
         (,) parameters implementation ->
           do {
-            dataEnv <- D.validateDeclarations declarations;
-            bindings <-
-              Separate.collectBindings dataEnv (XEnv M.empty (M.fromList X.compareName parameters))
-                implementation;
-            ensure
-              (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) bindings))
-                 (sortBy compareString (map (\((,,) n _ _) -> n) members)))
-              "inference fragment changed declaration ownership";
+            -- Only the named external parameters may precede the declaration
+            -- spine. The checker peels leading lambdas when collecting its
+            -- inventory, so an extra lambda here must still be rejected.
+            case implementation of {
+              XAbs _ _ _ -> Left "invalid inference fragment: expected declarations ending in ()";
+              _ -> Right ()
+            };
             let {
               payload =
                 XWithData declarations
                   (foldr (\((,) n ty) term -> XAbs n ty term) implementation parameters)
             };
             checked <- Checked.check payload;
+            bindings <- Checked.declarationBindings checked;
+            ensure
+              (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) bindings))
+                 (sortBy compareString (map (\((,,) n _ _) -> n) members)))
+              "inference fragment changed declaration ownership";
             let {
               iface =
                 Separate.UnitInterface name [] [] declarations [] []
                   (Separate.sortBindings
                      (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) bindings))
-                  (Separate.fingerprint (Pretty.prettyTerm payload))
+                  (payloadFingerprint payload)
             };
             Right (Separate.CheckedUnitObject iface checked)
           }
       }
-    }
+    };
+  compileOpenGroup = compileOpenGroupUsing (\_ -> "");
+  compileOpenGroupUsing :: (XTerm -> String) -> String ->
+    [] Separate.UnitInterface -> [] DataDecl ->
+    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Open.Fragment;
+  compileOpenGroupUsing payloadFingerprint name dependencies datatypes members =
+    do {
+      ensure (not (null members)) "cannot infer an empty declaration group";
+      externalTypes <- foldM mergeExternal M.empty (concatMap Separate.unitBindings dependencies);
+      traverseEither
+        (\((,,) n _ _) ->
+           ensure (not (M.member compareString n externalTypes))
+             ("inference group also imports its own binding: " ++ n))
+        members;
+      body <- Surface.bindValues members (SConstructor "()");
+      let {
+        -- Members already contain explicit evidence applications. Recovering
+        -- source qualifications here would insert the managed argument twice.
+        externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes
+      };
+      lowered <- Classes.lowerSeparateClasses externals [] (SProgram datatypes body);
+      compiled <- mapLeft Compiler.prettyError (Compiler.finishCompilation lowered);
+      let {
+        coreAndData =
+          case Compiler.compiledTerm compiled of {
+            XWithData ds term -> (,) ds term;
+            term -> (,) [] term
+          }
+      };
+      let {
+        declarations = fst coreAndData
+      };
+      let {
+        core = snd coreAndData
+      };
+      boundValueShared9 <-
+        if M.null externalTypes
+        then Right ((,) [] core)
+        else case core of {
+               XLetRec bindings rest ->
+                 do {
+                   ensure
+                     (eqList eqString (map (\((,,) n _ _) -> X.nameHint n) bindings)
+                        (M.keys externalTypes))
+                     "inference parameter order mismatch";
+                   traverseEither
+                     (\((,,) n ty _) ->
+                        ensure
+                          (case M.lookup compareString (X.nameHint n) externalTypes of {
+                             Nothing -> False;
+                             Just expected -> T.alphaEq ty expected
+                           })
+                          ("dependency scheme changed during inference: " ++ X.nameHint n))
+                     bindings;
+                   Right ((,) (map (\((,,) n ty _) -> (,) n ty) bindings) rest)
+                 };
+               _ -> Left "inference did not retain external parameters"
+             };
+      case boundValueShared9 of {
+        (,) parameters implementation -> do {
+          env <- Open.environment declarations;
+          checked <- Open.check env parameters implementation;
+          ensure
+            (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) (Open.bindings checked)))
+              (sortBy compareString (map (\((,,) n _ _) -> n) members)))
+            "inference fragment changed declaration ownership";
+          Right checked
+        }
+      }
+    };
+
 }

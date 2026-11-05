@@ -311,5 +311,72 @@ module Bootstrap.EvidenceBoundary where {
         }
       }
     }
+  };
+
+  -- Planning from a checked open RHS never constructs a closed wrapper or
+  -- rechecks that RHS. A changed recipe is independently checked by its owner.
+  data CheckedPlan = KeepChecked | ResolveChecked XTerm XType
+    ([] ((,) XName XType)) ([] Candidate) Int ([] XType) ([] Slot);
+  checkedPlan registry boundary slots ambient scopes expectedType rhs = case boundary of {
+    Boundary bid origin managed root expected -> do {
+      ensure (length expected == length slots && uniqueNames expected) "missing/duplicate authoritative slot";
+      ensure (uniqueNames (map fst ambient) && uniqueInts (map scopeIdentity scopes)) "duplicate evidence environment identity";
+      validateSlots bid root scopes 0 expected slots;
+      mapM_ (\scope -> ensure (uniqueNames (map candidateName (scopeCandidates scope))) "duplicate scoped candidate") scopes;
+      let { authorized = concatMap scopeCandidates (filter (\scope -> scopeIdentity scope == root) scopes) };
+      _ <- mergeTypes (append ambient (map (\c -> (,) (candidateName c) (candidateType c)) (concatMap scopeCandidates scopes)));
+      combined <- mergeTypes (append ambient (map (\c -> (,) (candidateName c) (candidateType c)) authorized));
+      if not (eligible origin) || managed || hasForall expectedType then Right KeepChecked else do {
+        ensure (not (any isGiven authorized)) "unsigned no-givens provenance contradicts scope";
+        domains <- prefixTypes (length slots) expectedType;
+        validateDomains registry domains slots;
+        case directPrefix (length slots) rhs expectedType of {
+          Nothing -> Right KeepChecked;
+          Just ((,) binders result) -> do {
+            ensure (sameBinders binders expected) "slot does not name checked outer binder";
+            if not (eligibleSlots domains slots) then Right KeepChecked else
+              let { base = addInt 1 (foldl (\n name -> if n >= X.nameId name then n else X.nameId name)
+                0 (append (names rhs) (map fst combined))) }
+              in Right (ResolveChecked rhs result combined authorized base domains slots)
+          }
+        }
+      }
+    }
+  };
+  checkedRequests plan = case plan of {
+    KeepChecked -> [];
+    ResolveChecked _ _ _ candidates _ domains slots -> map
+      (\((,) ordinal ((,) domain _)) -> (,,) ordinal domain candidates)
+      (filter (\((,) _ ((,) domain (Slot _ _ _ role _))) -> ordinary role && ground domain)
+        (zip (range 0 (length domains - 1)) (zip domains slots)))
+  };
+  data CheckedRecipe = KeepRecipe | ChangeRecipe XType XTerm ([] ((,) XName XType)) ([] XName);
+  finishCheckedPlan plan answers = case plan of {
+    KeepChecked -> Right KeepRecipe;
+    ResolveChecked rhs result combined candidates base domains slots -> do {
+      items <- traverseEither (\((,) ordinal ((,) domain (Slot _ _ _ role _))) ->
+        let { retained = Retain (XName (base + ordinal) "retainedEvidence") domain }
+        in if not (ordinary role) || not (ground domain) then Right retained else
+          case lookup eqInt ordinal answers of {
+            Nothing -> Left "missing stable evidence query result";
+            Just Nothing -> Right retained;
+            Just (Just proof) -> let { used = nubNames (freeNames proof) } in do {
+              ensure (all (\n -> any (\c -> X.equalName n (candidateName c)) candidates) used)
+                "proof escaped definition evidence scope";
+              Right (Discharge proof used)
+            }
+          }) (zip (range 0 (length domains - 1)) (zip domains slots));
+      let { kept = keptFrom 0 items };
+      if not (null kept) || null slots then Right KeepRecipe else do {
+        let { body = foldl XApp rhs (map argument items);
+          supports = nubNames (concatMap proofNames items);
+          used = nubNames (freeNames body);
+          required = filter (\entry -> any (X.equalName (fst entry)) used) combined };
+        ensure (all (\name -> any (X.equalName name) (map fst combined)) used)
+          "adapter escaped authorized parameter environment";
+        Right (ChangeRecipe result body required supports)
+      }
+    }
   }
+
 }

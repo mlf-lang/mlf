@@ -93,7 +93,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
            constructors = entryConstructors declarations
          } in
          let {
-           optimized = Optimize.optimize (X.erase term)
+           optimized = Optimize.optimizeOwned (X.erase term)
          } in
          let {
            lowered = Wrappers.optimize declarations constructors optimized
@@ -238,7 +238,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          } in
          Right
            (runtimePack
-              ((:) "MLF-CODEGEN-INPUT-COMPACT-2"
+              ((:) "MLF-CODEGEN-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2"
                  ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
                     ((:) (runtimeBool (ioType (Checked.typeOf checked)))
                        ((:) (constructorKey (entryConstructors declarations))
@@ -246,7 +246,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
                              ((:) (canonicalErasedKey (X.erase (Checked.term checked))) [])))))));
   preparedKey (PreparedEntry executeIO constructors lowered) =
     runtimePack
-      ((:) "MLF-CODEGEN-PREPARED-COMPACT-2"
+      ((:) "MLF-CODEGEN-PREPARED-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2"
          ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
             ((:) (runtimeBool executeIO)
                ((:) (constructorKey constructors) ((:) (canonicalErasedKey lowered) [])))));
@@ -330,7 +330,7 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
          } in
          Right
            (runtimePack
-              ((:) "MLF-CODEGEN-CRATE-INPUT-COMPACT-2"
+              ((:) "MLF-CODEGEN-CRATE-INPUT-COMPACT-4-RESULT-SUM-1-LAZY-PRODUCER-1-STRING-INDEX-1-READY-TOTAL-3-SEQ-DEMAND-1-CONCAT-LIST-1-ORDERED-DEMAND-1-READY-LET-1-BYTE-FILE-2"
                  ((:) "compact-bdwgc-v1-process-v1-completion-v2-haskell-boundary-v3"
                     ((:) (runtimeBool (ioType (Checked.typeOf checked)))
                        ((:) (constructorKey (entryConstructors declarations))
@@ -339,11 +339,11 @@ module Bootstrap.LLVM (emitLLVM, emitLLVMIO, emitLLVMChunks, emitLLVMIOChunks, i
   entryCode :: String -> Bool -> [] String;
   entryCode entry executeIO =
     let {
-      abi = "mlf_require_haskell_boundary_v3_abi"
+      abi = "mlf_require_haskell_boundary_v4_abi"
     } in
-    (:) ("declare void @" ++ (abi ++ "()"))
+    (:) ("declare void @" ++ (abi ++ "()\ndeclare void @mlf_require_byte_file_v2_abi()"))
       ((:) "define ptr @mlf_entry() {"
-         ((:) ("  call void @" ++ (abi ++ "()"))
+         ((:) ("  call void @" ++ (abi ++ "()\n  call void @mlf_require_byte_file_v2_abi()"))
             ((:) ("  %root = call ptr " ++ (entry ++ "(ptr null, ptr null)"))
                ((:) "  ret ptr %root"
                   ((:) "}"

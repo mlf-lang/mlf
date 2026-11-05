@@ -1,0 +1,453 @@
+{
+  "format": "source-context-read-reuse-controlled64-results-v1",
+  "date": "2026-11-01",
+  "status": "local completed; published exact-head hosted CI separate",
+  "population": {
+    "groups": 64,
+    "independent_runtime_values_checked": 576,
+    "names": "v000 through v063",
+    "initial_values": "1000+i",
+    "only_change": "v000: 1000 -> 2000",
+    "order": [
+      "coldA",
+      "materializeB",
+      "warmA1",
+      "warmB1",
+      "warmB2",
+      "warmA2",
+      "changeA",
+      "changeB",
+      "changedwarmA",
+      "changedwarmB"
+    ]
+  },
+  "identities": {
+    "previous_base_commit": "2c3ce0ee4d13cf8d2da19e745189cb85005d3cad",
+    "memo_base_commit": "6a82267e060afadeddd14a14b38b62af0ee82d11",
+    "memo_base_parents": [
+      "2c3ce0ee4d13cf8d2da19e745189cb85005d3cad",
+      "9dfcd6625775819568eaaa5065f8dd1431df52f8"
+    ],
+    "fixture_sha256": "966f6e2b8613541396828f208eb3344b584ba7fdb16af02aa6d638cc8accacec",
+    "runner_sha256": "468873c2bb4e11b2b2b6f36a2186f327828c7fb057dcadb923499dfd1cf72fee",
+    "fixture_and_runner_identical_between_runs": true,
+    "memo_source_sha256": {
+      "libraries/mlf-crates/Bootstrap/CrateQuery.hs": "3a7cb44316980c5a40916a0cfd595472091efba215ab101382c65963f05023f6",
+      "libraries/mlf-crates/Bootstrap/CrateSession.hs": "8adefc9d5346f375dd8568a59400bd498695af270b6fc70bea296c0698b5d190",
+      "mlf.lock": "e3f52b2c06e824232189f440fc05bbdc70cb4acc05e4b8bd34a1ac657088df24"
+    },
+    "memo_producer_receipt_sha256": "8b4148e5eb40cdf7ae79a7718593808fd01c58f3f13726a42dc82beb4582e199",
+    "memo_build_plan_sha256": "603f6cbcee312fb07831368fc348b093b925f880688b2bc405d4c7f59f376acf",
+    "memo_plan_sha256": "91d01a4a21dfc70c957bf28bd229b5a513732a9b46814a8fb8bcdda0b9b9c59a",
+    "memo_200_unit_receipt_sha256": "423b90c20760ba6bb1acad08e1b47dc7fdbef2860d7f8949c204331cfcc3879d",
+    "memo_34_receipt_sha256": "0b5baafdcc7fdb301e19b94660ab756d7d0b9996adda74e76e98b71bfaeb169c"
+  },
+  "local_qualification": {
+    "fresh_producer_build_commands": 18,
+    "shared_modules": 128,
+    "binaries": 13,
+    "derived_object_and_interface_files": 266,
+    "builtin_regeneration": "passed",
+    "python_controls_normal_and_optimized": 200,
+    "directed_runtime_invocations": 34,
+    "hosted_ci_for_memo": "not yet run"
+  },
+  "previous_without_memo": {
+    "binary_sha256": "2e111206df8b8055055ab1b8bfedf9fb27a08823c9bc90bf182f96b91ae5bfbf",
+    "runtime_receipt_sha256": "d509bd5f79372a194a63cc1eebccb7a1f6b672c588d00b79a705568ca5484ed4",
+    "qualified_wrapper_receipt_sha256": "d18d09bc7dd66659252420902b45a7764805cb7230e6c84fcb30edd3eef0da5a",
+    "guard_receipt_sha256": "c0f8dbf4d54a5ac31189c31921b07f15f137757e039a3ca035254a9ae6157aed",
+    "guard": {
+      "exit_code": 0,
+      "elapsed_seconds": 12.209996668010717,
+      "peak_group_rss": 484081664,
+      "peak_root_pathname_allocated_bytes": 8534417408,
+      "kernel_wait_no_children": true
+    },
+    "observations": [
+      {
+        "name": "coldA",
+        "wall_seconds": 0.46514330100035295,
+        "waited_child_cpu_seconds": {
+          "user": 0.344482,
+          "system": 0.117867
+        },
+        "query_action_cpu_seconds": 0.270975205,
+        "inferred_groups": 64,
+        "reused_groups": 0,
+        "exit_code": 0
+      },
+      {
+        "name": "materializeB",
+        "wall_seconds": 0.7663204440032132,
+        "waited_child_cpu_seconds": {
+          "user": 0.564907,
+          "system": 0.15981999999999996
+        },
+        "query_action_cpu_seconds": null,
+        "inferred_groups": null,
+        "reused_groups": null,
+        "exit_code": 0
+      },
+      {
+        "name": "warmA1",
+        "wall_seconds": 0.46650121398852207,
+        "waited_child_cpu_seconds": {
+          "user": 0.421111,
+          "system": 0.017252000000000045
+        },
+        "query_action_cpu_seconds": 0.429335642,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "warmB1",
+        "wall_seconds": 0.11441906800610013,
+        "waited_child_cpu_seconds": {
+          "user": 0.083032,
+          "system": 0.02163499999999996
+        },
+        "query_action_cpu_seconds": 0.095281737,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "warmB2",
+        "wall_seconds": 0.16492694699263666,
+        "waited_child_cpu_seconds": {
+          "user": 0.10070599999999996,
+          "system": 0.017566000000000026
+        },
+        "query_action_cpu_seconds": 0.108218324,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "warmA2",
+        "wall_seconds": 0.3652412980009103,
+        "waited_child_cpu_seconds": {
+          "user": 0.32495699999999994,
+          "system": 0.02010200000000001
+        },
+        "query_action_cpu_seconds": 0.336716945,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "changeA",
+        "wall_seconds": 0.41531276499154046,
+        "waited_child_cpu_seconds": {
+          "user": 0.318211,
+          "system": 0.04857600000000001
+        },
+        "query_action_cpu_seconds": 0.354556305,
+        "inferred_groups": 1,
+        "reused_groups": 63,
+        "exit_code": 0
+      },
+      {
+        "name": "changeB",
+        "wall_seconds": 0.1645418459957,
+        "waited_child_cpu_seconds": {
+          "user": 0.10434199999999993,
+          "system": 0.010110999999999981
+        },
+        "query_action_cpu_seconds": 0.101205616,
+        "inferred_groups": 1,
+        "reused_groups": 63,
+        "exit_code": 0
+      },
+      {
+        "name": "changedwarmA",
+        "wall_seconds": 0.3652657030033879,
+        "waited_child_cpu_seconds": {
+          "user": 0.3225760000000002,
+          "system": 0.030457999999999985
+        },
+        "query_action_cpu_seconds": 0.345610136,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "changedwarmB",
+        "wall_seconds": 0.16450258198892698,
+        "waited_child_cpu_seconds": {
+          "user": 0.11665500000000018,
+          "system": 0.012336999999999987
+        },
+        "query_action_cpu_seconds": 0.118489575,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      }
+    ],
+    "space_comparison": {
+      "scope": "complete cache directories; legacy materialization is not an old-compiler cold build",
+      "cold_compact_logical": 158065,
+      "materialized_legacy_logical": 7661697,
+      "cold_compact_allocated": 397312,
+      "materialized_legacy_allocated": 7876608,
+      "logical_bytes_avoided": 7503632,
+      "physical_allocated_bytes_avoided": 7479296,
+      "final_mixed_B_and_compact_A_keep_all_orphans": true
+    },
+    "final_both_directories": {
+      "logical": 7940072,
+      "allocated": 8404992,
+      "scope": "both complete cache directories; all records, contexts, locks, directories and orphan records"
+    }
+  },
+  "memo_candidate": {
+    "binary_sha256": "ee014ca9379748eadba0ca2e521becedf9a118f1965ec061279f87405d8bf48c",
+    "runtime_receipt_sha256": "bf425f2e20b44ee9fd49cb033496bd55201b98010a37a5f45d46100855bed22c",
+    "qualified_wrapper_receipt_sha256": "c0d2abcfced76d262271d58922e1b442d7b985f932bc8b7219572c578b8f53a9",
+    "guard_receipt_sha256": "9ec97da23ec3b41d0d5e10c0c236d2dbadf745330146ef07f5ad169acd46b2ed",
+    "guard": {
+      "exit_code": 0,
+      "elapsed_seconds": 11.63212703600584,
+      "peak_group_rss": 489025536,
+      "peak_root_pathname_allocated_bytes": 8536952832,
+      "kernel_wait_no_children": true
+    },
+    "observations": [
+      {
+        "name": "coldA",
+        "wall_seconds": 0.5156571440020343,
+        "waited_child_cpu_seconds": {
+          "user": 0.327337,
+          "system": 0.164454
+        },
+        "query_action_cpu_seconds": 0.304459386,
+        "inferred_groups": 64,
+        "reused_groups": 0,
+        "exit_code": 0
+      },
+      {
+        "name": "materializeB",
+        "wall_seconds": 0.4653698500042083,
+        "waited_child_cpu_seconds": {
+          "user": 0.34224599999999994,
+          "system": 0.12037700000000001
+        },
+        "query_action_cpu_seconds": null,
+        "inferred_groups": null,
+        "reused_groups": null,
+        "exit_code": 0
+      },
+      {
+        "name": "warmA1",
+        "wall_seconds": 0.1146026240021456,
+        "waited_child_cpu_seconds": {
+          "user": 0.09774100000000008,
+          "system": 0.013564999999999994
+        },
+        "query_action_cpu_seconds": 0.103170916,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "warmB1",
+        "wall_seconds": 0.1645169800030999,
+        "waited_child_cpu_seconds": {
+          "user": 0.10251599999999994,
+          "system": 0.015305999999999986
+        },
+        "query_action_cpu_seconds": 0.108462002,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "warmB2",
+        "wall_seconds": 0.16475558999809437,
+        "waited_child_cpu_seconds": {
+          "user": 0.11195100000000002,
+          "system": 0.020720000000000016
+        },
+        "query_action_cpu_seconds": 0.119910429,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "warmA2",
+        "wall_seconds": 0.16465091099962592,
+        "waited_child_cpu_seconds": {
+          "user": 0.11787399999999992,
+          "system": 0.012678999999999996
+        },
+        "query_action_cpu_seconds": 0.116254804,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "changeA",
+        "wall_seconds": 0.16458715101180132,
+        "waited_child_cpu_seconds": {
+          "user": 0.13054200000000016,
+          "system": 0.024017999999999984
+        },
+        "query_action_cpu_seconds": 0.14046895,
+        "inferred_groups": 1,
+        "reused_groups": 63,
+        "exit_code": 0
+      },
+      {
+        "name": "changeB",
+        "wall_seconds": 0.16506280600151513,
+        "waited_child_cpu_seconds": {
+          "user": 0.10528099999999996,
+          "system": 0.02507100000000001
+        },
+        "query_action_cpu_seconds": 0.114390967,
+        "inferred_groups": 1,
+        "reused_groups": 63,
+        "exit_code": 0
+      },
+      {
+        "name": "changedwarmA",
+        "wall_seconds": 0.16451005000271834,
+        "waited_child_cpu_seconds": {
+          "user": 0.13101399999999996,
+          "system": 0.019154000000000004
+        },
+        "query_action_cpu_seconds": 0.138261289,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      },
+      {
+        "name": "changedwarmB",
+        "wall_seconds": 0.16471213901240844,
+        "waited_child_cpu_seconds": {
+          "user": 0.13637100000000002,
+          "system": 0.015598999999999974
+        },
+        "query_action_cpu_seconds": 0.140512341,
+        "inferred_groups": 0,
+        "reused_groups": 64,
+        "exit_code": 0
+      }
+    ],
+    "space_comparison": {
+      "scope": "complete cache directories; legacy materialization is not an old-compiler cold build",
+      "cold_compact_logical": 158065,
+      "materialized_legacy_logical": 7661697,
+      "cold_compact_allocated": 397312,
+      "materialized_legacy_allocated": 7876608,
+      "logical_bytes_avoided": 7503632,
+      "physical_allocated_bytes_avoided": 7479296,
+      "final_mixed_B_and_compact_A_keep_all_orphans": true
+    },
+    "final_both_directories": {
+      "logical": 7940072,
+      "allocated": 8404992,
+      "scope": "both complete cache directories; all records, contexts, locks, directories and orphan records"
+    }
+  },
+  "memo_storage": {
+    "coldA": {
+      "all_file_logical_bytes": 158065,
+      "all_pathname_conservative_allocated_bytes": 397312,
+      "reachable_logical_bytes": 158065,
+      "reachable_file_allocated_bytes": 385024,
+      "records_count": 64,
+      "all_context_files_count": 1,
+      "active_records_count": 64,
+      "referenced_contexts_count": 1,
+      "retained_orphan_records_count": 0,
+      "unreferenced_contexts_count": 0
+    },
+    "materializeB": {
+      "all_file_logical_bytes": 7661697,
+      "all_pathname_conservative_allocated_bytes": 7876608,
+      "reachable_logical_bytes": 7661697,
+      "reachable_file_allocated_bytes": 7864320,
+      "records_count": 64,
+      "all_context_files_count": 0,
+      "active_records_count": 64,
+      "referenced_contexts_count": 0,
+      "retained_orphan_records_count": 0,
+      "unreferenced_contexts_count": 0
+    },
+    "changeA": {
+      "all_file_logical_bytes": 158674,
+      "all_pathname_conservative_allocated_bytes": 401408,
+      "reachable_logical_bytes": 158066,
+      "reachable_file_allocated_bytes": 385024,
+      "records_count": 65,
+      "all_context_files_count": 1,
+      "active_records_count": 64,
+      "referenced_contexts_count": 1,
+      "retained_orphan_records_count": 1,
+      "unreferenced_contexts_count": 0,
+      "retained_snapshot_delta": {
+        "created_files": [
+          "cc80bb3777a91890364c97699281e952c6bf5bbadf4c918bde07b07984f5b3cb.mlfq"
+        ],
+        "removed_files": [],
+        "changed_existing_files": [],
+        "observed_created_or_rewritten_file_bytes": 609,
+        "logical_delta": 609,
+        "physical_allocated_delta": 4096,
+        "not_cumulative_IO_or_transient_staging_write_bytes": true
+      }
+    },
+    "changeB": {
+      "all_file_logical_bytes": 7781398,
+      "all_pathname_conservative_allocated_bytes": 8003584,
+      "reachable_logical_bytes": 7661684,
+      "reachable_file_allocated_bytes": 7868416,
+      "records_count": 65,
+      "all_context_files_count": 1,
+      "active_records_count": 64,
+      "referenced_contexts_count": 1,
+      "retained_orphan_records_count": 1,
+      "unreferenced_contexts_count": 0,
+      "retained_snapshot_delta": {
+        "created_files": [
+          "cc80bb3777a91890364c97699281e952c6bf5bbadf4c918bde07b07984f5b3cb.mlfq",
+          "context-1d5db3437e0073eac01fa1ab5e1a49a5f07d86f849ca6550111e6f09e171c0c4.mlfqc"
+        ],
+        "removed_files": [],
+        "changed_existing_files": [],
+        "observed_created_or_rewritten_file_bytes": 119701,
+        "logical_delta": 119701,
+        "physical_allocated_delta": 126976,
+        "not_cumulative_IO_or_transient_staging_write_bytes": true
+      }
+    }
+  },
+  "semantic_results": {
+    "all_10_target_invocations_exit_zero": true,
+    "all_original_final_bytes_equal_across_arms_and_runs": true,
+    "all_changed_final_bytes_equal_across_arms_and_runs": true,
+    "original_final_sha256": "2f6d2d87809c00c4605af188dad2567476796a1ea39d33bec8c6a9aad9879cf1",
+    "changed_final_sha256": "0bccd6699fe834709291833913defdba1ec0bd5b9e42f98d526b578ab2e5af2d",
+    "changed_final_different_from_original": true,
+    "both_one_change_reports": {
+      "inferred_groups": 1,
+      "reused_groups": 63
+    },
+    "unchanged_prior_active_records_per_arm": 63
+  },
+  "interpretation": [
+    "Single fixed ABBA sequence per producer, not a statistical performance claim; no OS cache flush.",
+    "Legacy CACHE-1 is materialized by the same new binary from real cold raw objects; this is not an old-compiler cold baseline.",
+    "The previous compact warm observations were slower than their legacy counterparts; that negative result is retained.",
+    "In this repeat the previous large compact warm-time gap was not observed; raw times are reported without a generalized speedup factor.",
+    "Previous producer is cleanup-only 2c; memo producer includes combined 6a plus memo. These are not a one-source-change causal experiment.",
+    "Wall time includes subprocess/final semantics/output; narrow query CPU has lazy-forcing and child-scope limitations. Post-stage complete hashing can warm filesystem caches.",
+    "High-sharing synthetic population; 97.94% logical and 94.96% allocated reductions are not corpus estimates. The separate historical real-cache screen showed 22.30% reachable-content reduction.",
+    "Complete physical directories include locks, directories and two retained old orphan records. No GC, in-place reclaim, cumulative I/O or transient-write accounting is claimed.",
+    "Both runs use original outer1800/6GiBAS/5GiBRSS/ROOT8GiB floors; each target180s and poststage both-cache24MiB checks. Sampled resource limits are not hard isolation.",
+    "Functional 34-control suite separately checks call-boundary invalidation, malformed/missing context repair, live-owner locking, full keys/raw and PreparedRaw. No crash/hostile-directory/Windows or same-process-thread qualification."
+  ]
+}

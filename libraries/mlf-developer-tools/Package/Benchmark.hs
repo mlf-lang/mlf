@@ -1172,6 +1172,15 @@ module Package.Benchmark where {
              let {
                streamLink = eqString linking "1"
              };
+             splitting <- getEnv "MLF_BENCH_SPLIT_RUNTIME";
+             O.require (eqString splitting "" || eqString splitting "1")
+               "invalid split runtime setting";
+             let {
+               splitRuntime = eqString splitting "1"
+             };
+             let {
+               supervisorObject = (directory ++ "/runtime-supervisor.o")
+             };
              let {
                emit =
                  (:) compiler
@@ -1191,8 +1200,27 @@ module Package.Benchmark where {
              };
              let {
                runtimeCommand =
-                 S.append ((:) clang (O.words "-O2 -std=c11 -c"))
+                 S.append
+                   ((:) clang
+                      (S.append (O.words "-O2 -std=c11 -c")
+                         (if splitRuntime
+                          then (:) "-DMLF_RUNTIME_EXTERNAL_PROCESS_SUPERVISOR=1" []
+                          else [])))
                    (S.append ((:) runtime flags) ((:) "-o" ((:) object [])))
+             };
+             let {
+               supervisorCommand =
+                 S.append ((:) clang (O.words "-O2 -std=c11 -c"))
+                   (S.append ((:) (O.parent runtime ++ "/mlf_process_supervisor.c") flags)
+                      ((:) "-o" ((:) supervisorObject [])))
+             };
+             let {
+               runtimeCommands =
+                 (:) runtimeCommand (if splitRuntime then (:) supervisorCommand [] else [])
+             };
+             let {
+               runtimeObjects =
+                 (:) object (if splitRuntime then (:) supervisorObject [] else [])
              };
              let {
                llvmCommand =
@@ -1207,65 +1235,90 @@ module Package.Benchmark where {
                  S.append
                    ((:) clang
                       (S.append (if streamLink then (:) "--mlf-wait-objects" [] else [])
-                         ((:) code ((:) object flags))))
+                         ((:) code (S.append runtimeObjects flags))))
                    ((:) "-lm" ((:) "-o" ((:) binary [])))
              };
              let {
                ordinary =
-                 (:) frontend ((:) runtimeCommand ((:) llvmCommand ((:) linkCommand [])))
+                 (:) frontend (S.append runtimeCommands ((:) llvmCommand ((:) linkCommand [])))
              };
              let {
                setup = (:) "/usr/bin/mkfifo" ((:) (ir ++ ".pipe") [])
              };
              let {
+               readyCommands =
+                 S.map (\path -> (:) "/usr/bin/touch" ((:) (path ++ ".ready") []))
+                   (S.snoc runtimeObjects code)
+             };
+             let {
                linked =
                  (:) setup
                    ((:) frontend
-                      ((:) runtimeCommand
-                         ((:) llvmCommand
-                            ((:) ((:) "/usr/bin/touch" ((:) (object ++ ".ready") []))
-                               ((:) ((:) "/usr/bin/touch" ((:) (code ++ ".ready") []))
-                                  ((:) linkCommand []))))))
+                      (S.append runtimeCommands
+                         ((:) llvmCommand (S.snoc readyCommands linkCommand))))
              };
              let {
                commands =
                  if streamLink then linked else if stream then (:) setup ordinary else ordinary
              };
              let {
-               linkDependencies =
-                 (:) []
-                   ((:) ((:) 0 [])
-                      ((:) []
-                         ((:) ((:) 0 [])
-                            ((:) ((:) 0 ((:) 2 []))
-                               ((:) ((:) 0 ((:) 3 [])) ((:) ((:) 0 []) []))))))
+               frontendIndex = if stream then 1 else 0
+             };
+             let {
+               runtimeIndex = frontendIndex + 1
+             };
+             let {
+               runtimeIndices =
+                 (:) runtimeIndex (if splitRuntime then (:) (runtimeIndex + 1) [] else [])
+             };
+             let {
+               llvmIndex = runtimeIndex + S.length runtimeCommands
+             };
+             let {
+               producers = S.snoc runtimeIndices llvmIndex
+             };
+             let {
+               beforeLink =
+                 (:) (if stream then (:) 0 [] else [])
+                   (S.snoc (S.map (\_ -> []) runtimeCommands) ((:) 0 []))
              };
              let {
                dependencies =
                  if streamLink
-                 then linkDependencies
+                 then (:) []
+                        (S.append beforeLink
+                           (S.snoc (S.map (\index -> (:) 0 ((:) index [])) producers) ((:) 0 [])))
                  else if stream
-                      then (:) []
-                             ((:) ((:) 0 [])
-                                ((:) []
-                                   ((:) ((:) 0 []) ((:) ((:) 1 ((:) 2 ((:) 3 []))) []))))
-                      else (:) [] ((:) [] ((:) ((:) 0 []) ((:) ((:) 1 ((:) 2 [])) [])))
+                      then (:) [] (S.snoc beforeLink ((:) frontendIndex producers))
+                      else S.snoc beforeLink producers
+             };
+             let {
+               runtimeOutputs =
+                 (:) (directory ++ "/runtime.stdout")
+                   (if splitRuntime then (:) (directory ++ "/runtime-supervisor.stdout") [] else [])
              };
              let {
                ordinaryOutputs =
                  (:) (if stream then (directory ++ "/frontend.stdout") else ir)
-                   ((:) (directory ++ "/runtime.stdout")
+                   (S.append runtimeOutputs
                       ((:) (directory ++ "/llvm.stdout") ((:) (directory ++ "/link.stdout") [])))
+             };
+             let {
+               readyOutputs =
+                 (:) (directory ++ "/runtime-ready.stdout")
+                   (S.append
+                      (if splitRuntime
+                       then (:) (directory ++ "/runtime-supervisor-ready.stdout") []
+                       else [])
+                      ((:) (directory ++ "/llvm-ready.stdout") []))
              };
              let {
                linkedOutputs =
                  (:) (directory ++ "/setup.stdout")
                    ((:) (directory ++ "/frontend.stdout")
-                      ((:) (directory ++ "/runtime.stdout")
+                      (S.append runtimeOutputs
                          ((:) (directory ++ "/llvm.stdout")
-                            ((:) (directory ++ "/runtime-ready.stdout")
-                               ((:) (directory ++ "/llvm-ready.stdout")
-                                  ((:) (directory ++ "/link.stdout") []))))))
+                            (S.snoc readyOutputs (directory ++ "/link.stdout")))))
              };
              let {
                outputs =
@@ -1276,39 +1329,63 @@ module Package.Benchmark where {
                       else ordinaryOutputs
              };
              let {
+               runtimePhases = if splitRuntime then "runtime runtime-supervisor" else "runtime"
+             };
+             let {
+               readyPhases =
+                 if splitRuntime
+                 then "runtime-ready runtime-supervisor-ready llvm-ready"
+                 else "runtime-ready llvm-ready"
+             };
+             let {
                phases =
                  O.words
-                   (if streamLink
-                    then "setup frontend runtime llvm runtime-ready llvm-ready link"
-                    else if stream
-                         then "setup frontend runtime llvm link"
-                         else "frontend runtime llvm link")
+                   ((if stream then "setup " else "") ++ "frontend " ++ runtimePhases ++ " llvm " ++
+                    (if streamLink then readyPhases ++ " " else "") ++ "link")
+             };
+             let {
+               annotate group =
+                 let {
+                   stages =
+                     S.zipWith (\name entry -> J.set "phase" (J.str name) entry) phases
+                       (S.zipWith (\argv entry -> J.set "command" (J.stringArray argv) entry)
+                          commands
+                          (V.array "stages" group));
+                   cpu =
+                     S.foldl addDouble 0.0
+                       (S.map (\row -> V.double 0.0 (J.get "cpu_seconds" row)) stages)
+                 } in
+                 J.set "cpu_seconds" (J.Number (formatDouble 9 cpu))
+                   (J.set "stages" (J.Array stages) group)
              };
              result <-
                runPipeline directory timeout
                  (S.zipWith (\deps command -> (,) deps command) dependencies
                     (S.zipWith (\output argv -> (,,,) directory "" output argv) outputs commands));
              case result of {
-               Left error -> return (Left error);
+               Left error ->
+                 do {
+                   -- Preserve producer identities in failure receipts too. A
+                   -- transport failure may leave no complete JSON document.
+                   present <- fileExists (directory ++ "/pipeline.json");
+                   if present
+                   then do {
+                          raw <- readFile (directory ++ "/pipeline.json");
+                          case J.parse raw of {
+                            Left _ -> return ();
+                            Right group -> J.write (directory ++ "/pipeline.json") (annotate group)
+                          }
+                        }
+                   else return ();
+                   return (Left error)
+                 };
                Right group ->
                  do {
                    let {
-                     stages =
-                       S.zipWith (\name entry -> J.set "phase" (J.str name) entry) phases
-                         (S.zipWith (\argv entry -> J.set "command" (J.stringArray argv) entry)
-                            commands
-                            (V.array "stages" group))
+                     sample = annotate group
                    };
-                   let {
-                     cpu =
-                       S.foldl addDouble 0.0
-                         (S.map (\row -> V.double 0.0 (J.get "cpu_seconds" row)) stages)
-                   };
-                   return
-                     (Right
-                        ((,) binary
-                           (J.set "cpu_seconds" (J.Number (formatDouble 9 cpu))
-                              (J.set "stages" (J.Array stages) group))))
+                   J.write (directory ++ "/pipeline.json") sample;
+                   return (Right ((,) binary sample))
                  }
              }
            }

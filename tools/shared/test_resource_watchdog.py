@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Focused output-accounting races and final-cap controls; no compiler workloads."""
 import ast
+import errno
 import json
 import os
 from pathlib import Path
@@ -14,7 +15,7 @@ from unittest import mock
 DRIVER = Path(__file__).with_name('resource_watchdog.py')
 TREE = ast.parse(DRIVER.read_text())
 FUNCTION = next(n for n in TREE.body if isinstance(n, ast.FunctionDef) and n.name == 'output_bytes')
-NAMESPACE = {'Path': Path, 'os': os, 'stat': stat}
+NAMESPACE = {'Path': Path, 'os': os, 'stat': stat, 'errno': errno}
 exec(compile(ast.Module(body=[FUNCTION], type_ignores=[]), str(DRIVER), 'exec'), NAMESPACE)
 output_bytes = NAMESPACE['output_bytes']
 

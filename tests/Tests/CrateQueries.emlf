@@ -4,6 +4,8 @@ import Bootstrap.Types
 import Bootstrap.Std
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Dependency as Dependency
+import qualified Bootstrap.Desugar as Desugar
+import qualified Bootstrap.Surface as Surface
 import qualified Bootstrap.InferenceUnit as Inference
 import qualified Bootstrap.CrateQuery as Query
 import qualified Bootstrap.Separate as Separate
@@ -53,6 +55,9 @@ observations = do
   H.assert (null (Dependency.valueNames observed) && eqList eqString (Dependency.typeNames observed) ((:) "T" ((:) "U" [])) && eqList eqString (Dependency.classNames observed) ((:) "C" [])) "type/class observations contaminated value dependencies or lost lexical scope"
   let constructor = Dependency.normalize (Dependency.observeExpression (SCase (SVar "input") ((:) (SAlternative (SConstructorPattern "Box" ((:) (Just "field") [])) (SVar "field")) [])))
   H.assert (eqList eqString (Dependency.valueNames constructor) ((:) "input" []) && eqList eqString (Dependency.constructorNames constructor) ((:) "Box" [])) "pattern constructor dependency or local binder was lost"
+  let recursive = SLetRec ((:) ((,,) "f" InferRecursive (SApp (SVar "g") (SVar "input"))) ((:) ((,,) "g" (CheckRecursive (SAnnotation [] (SCon "T" []))) (SVar "f")) [])) (SVar "g")
+  let recursiveObserved = Dependency.normalize (Dependency.observeExpression recursive)
+  H.assert (eqList eqString (Dependency.valueNames recursiveObserved) ((:) "input" []) && eqList eqString (Dependency.typeNames recursiveObserved) ((:) "T" [])) "recursive mode observations invented a signature or lost group scope"
 
 principalInference = do
   first <- H.right (Inference.compileLoweredGroup "Identity" [] [] ((:) ((,,) "identity" Nothing (SLam "x" Nothing (SVar "x"))) []))
@@ -71,7 +76,21 @@ recursiveInference = do
   object <- H.right (Inference.compileLoweredGroup "Recursive" [] [] members)
   H.assert (length (Separate.unitBindings (Separate.objectInterface object)) == 2 && T.alphaEq (scheme "f" object) identityType && T.alphaEq (scheme "g" object) identityType) "signed recursive schemes changed across a group boundary"
   let unsigned = map (\((,,) n _ body) -> (,,) n Nothing body) members
-  H.assert (case Inference.compileLoweredGroup "Unsigned" [] [] unsigned of {Left message -> H.contains "requires an explicit closed signature" message; Right _ -> false}) "unsupported unsigned recursion escaped its documented diagnostic"
+  inferred <- H.right (Inference.compileLoweredGroup "Unsigned" [] [] unsigned)
+  let divergent = XForall (XTyVar 0) XBot (XForall (XTyVar 1) XBot (XArrow (XVar (XTyVar 0)) (XVar (XTyVar 1))))
+  H.assert (T.alphaEq (scheme "f" inferred) divergent && T.alphaEq (scheme "g" inferred) divergent) "unsigned recursive schemes were not generalized after the component"
+  converted <- H.right (Surface.recursiveValues members)
+  H.assert (all (\((,,) _ mode _) -> case mode of {CheckRecursive (SAnnotation [] _) -> true; _ -> false}) converted) "closed signatures lost their explicit recursive checking mode"
+  H.reject (Surface.recursiveValues ((:) ((,,) "f" (Just (SAnnotation ((:) "a" []) (STVar "a"))) (SVar "f")) []))
+  let mixed = (:) ((,,) "f" InferRecursive (SVar "f")) ((:) ((,,) "g" (CheckRecursive (SAnnotation [] (SCon "Int" []))) (SIntLit 1)) [])
+  extracted <- H.right (Inference.extractLoweredDeclarations (SLetRec mixed (SConstructor "()")))
+  H.assert (case extracted of {(:) ((,,) "f" Nothing _) ((:) ((,,) "g" (Just (SAnnotation [] (SCon "Int" []))) _) []) -> true; _ -> false}) "declaration extraction confused inferred and checked recursive modes"
+  let expected = SLetRec mixed (SVar "g")
+  H.assert (H.eq (Desugar.desugarDo (SDo ((:) (SDoLetRec mixed) []) (SVar "g"))) expected) "do desugaring changed recursive modes"
+  lowered <- H.right (Surface.lowerExpression expected)
+  H.assert (H.eq lowered expected) "surface lowering changed recursive modes"
+  hygienic <- H.right (Separate.hygiene expected)
+  H.assert (case hygienic of {SLetRec ((:) ((,,) _ InferRecursive _) ((:) ((,,) _ (CheckRecursive _) _) [])) _ -> true; _ -> false}) "hygiene changed recursive modes"
 openEnvironment = do
   let imported = Separate.UnitInterface "Open" [] [] [] [] [] ((:) ((,) "input" (XVar (XTyVar 0))) []) "parameters"
   H.assert (case Inference.compileLoweredGroup "UseOpen" ((:) imported []) [] ((:) ((,,) "f" Nothing (SVar "input")) []) of {Left message -> H.contains "open type" message; Right _ -> false}) "query generalized an open imported type variable"
@@ -150,6 +169,20 @@ canonicalKeys = do
   H.assert (eqString (Query.queryKey "Alpha" "compiler" ((:) first []) [] []) (Query.queryKey "Alpha" "compiler" ((:) renamed []) [] [])) "given evidence names leaked into query identity"
   H.assert (not (eqString (Query.encodeType (SForall Flexible "a" SBottom (STVar "a"))) (Query.encodeType (SForall Rigid "a" SBottom (STVar "a"))))) "query encoding lost the quantifier flag"
   H.assert (eqString (Query.encodeBinding ((,) "x" (XCon "List" ((:) (XCon "Int" []) [])))) (Query.encodeBinding ((,) "x" (XApply (XCon "List" []) (XCon "Int" []))))) "equivalent type applications invalidate semantic query inputs"
+  let checked = (,,) "f" (CheckRecursive (SAnnotation [] (SCon "Int" []))) (SVar "f")
+  let inferred = (,,) "f" InferRecursive (SVar "f")
+  H.assert (eqString (Query.encodeRecursive checked) "9:recursive1:f39:10:annotation0:21:11:constructor3:Int0:13:8:variable1:f") "signed recursive query encoding changed"
+  H.assert (not (eqString (Query.encodeRecursive checked) (Query.encodeRecursive inferred))) "query encoding conflated inferred and checked recursion"
+  H.assert (not (H.eq (SLetRec ((:) checked []) (SVar "f")) (SLetRec ((:) inferred []) (SVar "f")))) "source equality conflated inferred and checked recursion"
+  H.assert (not (H.eq (SDo ((:) (SDoLetRec ((:) checked [])) []) (SVar "f")) (SDo ((:) (SDoLetRec ((:) inferred [])) []) (SVar "f")))) "statement equality conflated inferred and checked recursion"
+  let firstRecursive = (,,) "entry" Nothing (SLetRec ((:) inferred []) (SVar "f"))
+  let renamedRecursive = (,,) "entry" Nothing (SLetRec ((:) ((,,) "renamed" InferRecursive (SVar "renamed")) []) (SVar "renamed"))
+  H.assert (eqString (Query.queryKey "AlphaRecursive" "compiler" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler" ((:) renamedRecursive []) [] [])) "unsigned recursive binder names leaked into query identity"
+  H.assert (not (eqString (Query.queryKey "AlphaRecursive" "compiler-before" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler-after" ((:) firstRecursive []) [] []))) "compiler identity change reused a recursive query key"
+  let checkedRecursive = (,,) "entry" Nothing (SLetRec ((:) checked []) (SVar "f"))
+  H.assert (not (eqString (Query.queryKey "AlphaRecursive" "compiler" ((:) firstRecursive []) [] []) (Query.queryKey "AlphaRecursive" "compiler" ((:) checkedRecursive []) [] []))) "canonical query identity erased recursive checking mode"
+  let signedRecursive = \name variable -> (,,) "entry" Nothing (SLetRec ((:) ((,,) name (CheckRecursive (SAnnotation [] (SForall Flexible variable SBottom (SArrow (STVar variable) (STVar variable))))) (SLam "value" (Just (SAnnotation [] (STVar variable))) (SApp (SVar name) (SVar "value")))) []) (SVar name))
+  H.assert (eqString (Query.queryKey "SignedAlphaRecursive" "compiler" ((:) (signedRecursive "f" "a") []) [] []) (Query.queryKey "SignedAlphaRecursive" "compiler" ((:) (signedRecursive "renamed" "other") []) [] [])) "signed recursive scoped type names leaked into query identity"
 cacheBoundary = do
   object <- H.right (Inference.compileLoweredGroup "CacheBoundary" [] [] ((:) ((,,) "identity" Nothing (SLam "x" Nothing (SVar "x"))) []))
   let original = Separate.objectInterface object

@@ -59,6 +59,7 @@ freeNames expression = case expression of
   T.SApp a b -> Set.union (freeNames a) (freeNames b)
   T.SLet x a b -> Set.union (freeNames a) (Set.delete (H.unpack x) (freeNames b))
   T.SAnn a _ -> freeNames a
+  T.SSignature a _ -> freeNames a
   T.SIntLit _ -> Set.empty
   T.SDoubleLit _ -> Set.empty
   T.SBoolLit _ -> Set.empty

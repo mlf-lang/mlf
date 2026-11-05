@@ -1,0 +1,83 @@
+{
+  "baseline_commit": "a047e81f716256ecfa99ce851d248f1b74bddc3d",
+  "parent_manifest_sha256": "35feca71afa2d2c392df2d920b890f61a5dce84fd85c8c61909f5da32d31fea6",
+  "purpose": "explicit index-design source admission after the unchanged Int64 migration; not a behavioral oracle",
+  "changed_sources": {
+    "Bootstrap.BuiltinPreludeContext": {
+      "old": "35d97dc2dac3ef247f593a3b994d33b34770ac1f307de0ed700b46e5a9f17f00",
+      "new": "1c78b34b5dc5389558ec221117439ac6637b9be4c268540e4892b5a3a068a501",
+      "reviewed_change": "Patricia identity inventories; existing source-demand checks preserved"
+    },
+    "Bootstrap.ClassDemand": {
+      "old": "160ccb4889adcb562adf7d99263197d2436b21f5a110c76df6e6ab3b47ead957",
+      "new": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+      "reviewed_change": "checked explicit nextSlot supply independent of cardinality"
+    },
+    "Bootstrap.CrateArtifact": {
+      "old": "54afbe194c3e064e928561dc64fccdca0cffd70c3258b35270ed00e29f152c15",
+      "new": "56baf52d3f314d450c543392884fb1d44d01081d58a57e89a0fb1fc686c6be0f",
+      "reviewed_change": "Int64 builtin ABI identity and Patricia datatype pool; wire encoding unchanged"
+    },
+    "Bootstrap.CrateSession": {
+      "old": "c213c9223fcece3e0bd05ef96bf58db73e20d883b193ac1d04761d32e3a5abe1",
+      "new": "da9727970cf184031b547c5c877a083a31d43bbaf03d4a1e647f7f49be38d88b",
+      "reviewed_change": "exact reversible rank-view interface and three corresponding type signatures"
+    },
+    "Bootstrap.Graph.Solver": {
+      "old": "883247f32bb8ffb8a5ab4adfaff1e4b8ae4e66ea60f9a25503e4e302b2b4ab5f",
+      "new": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+      "reviewed_change": "Patricia local index writes, checked supplies and shared immutable rank/select views"
+    },
+    "Bootstrap.ImportedRoot": {
+      "old": "c76ec249447f2100d8de8caea62f80f47ec15b570285c6a2712b6c4a62867796",
+      "new": "345418996f5ceaea45afdca54b614d506803bf583f3113ce6e5042727f48d7dc",
+      "reviewed_change": "checked imported identity accounting and Patricia identity membership"
+    },
+    "Bootstrap.IntMap": {
+      "old": "f846b19c7f7ec12ee716919f45e866c16a625bb4af5cfeca8df94519862ecbac",
+      "new": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+      "reviewed_change": "lazy cached-cardinality Int64 Patricia operations; rank/select delegated to IntRank"
+    },
+    "Bootstrap.IntSet": {
+      "old": "1a76228fcf4ce346b3de4bf030321c79001cdd6fd711e2f1468aa62aa69f047d",
+      "new": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+      "reviewed_change": "cached-cardinality bitmap-leaf Int64 Patricia operations; rank/select delegated to IntRank"
+    },
+    "Bootstrap.Runtime": {
+      "old": "482a23905c385a61d335b320ef847f26e04bff7493e37cdacaaef863004e64fc",
+      "new": "1bc048a4a4fd28eeaef1cc4a8f8b0b7878c5bf945deb7ffeebc5a2dc92629eab",
+      "reviewed_change": "Int64/Integer runtime values and shared Patricia ST/async stores"
+    },
+    "Bootstrap.Separate": {
+      "old": "cd856547fabe3a320681795662fd5a4fd8435128a3d16f6b5c0dfeb474bdb34b",
+      "new": "762419bd4d7e818799f972264c16607cd7f935e436f86419e2aaca6a57786861",
+      "reviewed_change": "Int64 ABI and canonical-residue fingerprints; Patricia identity inventory and renaming"
+    },
+    "Bootstrap.SourceInference": {
+      "old": "6d52680450b2a49b170033b0c7266565a9f7ad3c5ec2d24a61b328074e16f2a9",
+      "new": "3cbcf934a1390a578916534cc12e9cb9f424b30faf8f9c7a58d5c6ed3700c75e",
+      "reviewed_change": "Patricia annotation identity membership; signed order and payload demand preserved"
+    },
+    "MLF.BuiltinPreludeData": {
+      "old": "d84e6c935908b908de69352e02004cbc25879252203af58ef93e4fcdb3a878c8",
+      "new": "1bf3daaa14bb6ba16224e8d4f80cfa3db4ee7aca91a55e51741567c964552039",
+      "reviewed_change": "fresh canonical literal regenerated from the current fixed source identity"
+    },
+    "MLF.Tests.ClassDemand": {
+      "old": "585bc63568109dfc2dee9ddb5eb0cc4906c03f9ccc7772226eb85dc4da02c373",
+      "new": "72905289e995ba3ac7b8b42137edb61518017208550102c463144eab0b75babd",
+      "reviewed_change": "constructor field adaptation and independent sparse slot-supply controls"
+    }
+  },
+  "added_sources": {
+    "Bootstrap.IntRank": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+  },
+  "removed_sources": [],
+  "host_sources": {
+    "host/ghc/MLF/Host/IO.hs": {
+      "old": "5360f3be72506b51c8b17385e60484b2cbc7fab959526b97790f1cb4a0f37db4",
+      "new": "0aa29495ef707741b6728652a26b0115a64d74b20deaed2b7114c6fc448e83e7",
+      "reviewed_change": "fixed Int64 interface and ordered demand; machine IntMap on wide hosts, lossless generic fallback on narrow hosts"
+    }
+  }
+}
