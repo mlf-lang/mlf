@@ -92,6 +92,8 @@ measurementProtocol = do
  measurementRejected "signal exit mismatch" (J.set "exit_code" (J.num 138) signal)
  let classified = (Cons (P.classify 2 entry (Right measurement) childText) (Cons (P.classify 2 entry (Right (J.set "exit_code" (J.num 1) measurement)) failedText) (Cons (P.classify 2 entry (Right timeout) "") (Cons (P.classify 2 entry (Right signal) "") (Cons (P.classify 2 entry (Right interrupted) "") (Cons (P.classify 2 entry (Right (J.set "exit_code" (J.num 9) measurement)) (render (Cons (S.head rows) Nil))) (Cons (P.classify 2 entry (Right measurement) (render (Cons (S.head rows) Nil))) (Cons (P.classify 2 entry (Left "missing measurement") childText) Nil))))))))
  H.assert (S.eqList eqString (S.map P.status classified) (O.words "passed failed timed_out crashed crashed crashed protocol_error protocol_error")) "protocol classification changed literal outcomes"
+ H.assert (S.eqList eqString (S.map (J.getText "typed_outcome" "") classified) (O.words "passed assertion_failure timeout crash cancelled crash protocol_error protocol_error")) "typed classification differs from measured outcome"
+ H.assert (eqString (J.getText "expected" "" (S.index classified 1)) "1" && eqString (J.getText "actual" "" (S.index classified 1)) "2") "typed classification dropped assertion diagnostics"
 protocol : IO Unit
 protocol = do
  inventoryProtocol
@@ -106,6 +108,26 @@ supervised directory self name args expected =
  let command = Cons "--" (Cons self (Cons "--isolated-probe" Nil)) in
  let selected = Cons (directory ++ "/" ++ name ++ "-work") (S.append args command) in
  CLI.check directory self name (S.append (O.words "--supervise --work-dir") selected) expected
+-- Require transport outputs and include a child report only when it exists.
+-- Verify the new additive fields against the retained files, not their labels.
+checkRawEvidence : J.Json -> IO Unit
+checkRawEvidence row = do
+ H.assert (J.equal (J.get "qualification_eligible" row) (J.Boolean false) && eqString (J.getText "cleanup_status" "" row) "unverified-v1-transport") "legacy transport invented qualification or cleanup proof"
+ raw <- H.right (P.arrayField "raw_evidence" row)
+ let directory = O.parent (J.getText "stdout" "" row)
+ hasReport <- fileExists (directory ++ "/report.jsonl")
+ let kinds = S.append (O.words "stdout stderr measurement.json measurement.stderr") (if hasReport then Cons "report.jsonl" Nil else Nil)
+ H.assert (S.eqList eqString (S.map (J.getText "kind" "") raw) kinds) "raw evidence inventory changed"
+ S.mapM_ (\item -> do
+  kind <- H.right (P.textField "kind" item)
+  path <- H.right (P.textField "path" item)
+  digest <- H.right (P.textField "digest" item)
+  H.assert (eqString path (directory ++ "/" ++ kind)) "raw evidence escaped case directory"
+  present <- fileExists path
+  H.assert present "raw evidence file is missing"
+  actual <- fileDigest path
+  H.assert (stringLength digest == 64 && eqString digest actual) "raw evidence digest differs from retained bytes") raw
+ H.assert (eqString (J.getText "stderr" "" row) (directory ++ "/stderr") && eqString (J.getText "measurement" "" row) (directory ++ "/measurement.json") && eqString (J.getText "child_report" "" row) (directory ++ "/report.jsonl")) "case paths disagree with raw evidence"
 main : String -> IO Unit
 main directory = do
  protocol
@@ -119,6 +141,8 @@ main directory = do
   let cases = results rows
   H.assert (S.eqList eqString (S.map (J.getText "status" "") cases)
    (O.words "failed crashed crashed timed_out passed passed")) "supervisor stopped early or misclassified a child"
+  H.assert (S.eqList eqString (S.map (J.getText "typed_outcome" "") cases) (O.words "assertion_failure crash crash timeout passed passed")) "supervised typed outcomes differ"
+  S.mapM_ checkRawEvidence cases
   let summary = S.last rows
   H.assert (eqString (J.getText "event" "" summary) "summary" && J.getBool "complete" false summary &&
    J.equal (J.get "executed" summary) (J.num 6) && J.equal (J.get "passed" summary) (J.num 2) &&

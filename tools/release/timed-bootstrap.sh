@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Time an ordinary, cold native bootstrap; compiler/linker arguments stay intact.
+# Time the cold primitive transition and checked root build, without tests.
 set -euo pipefail
 test "$(uname -s):$(uname -m)" = Darwin:arm64
 scripts=$(cd -- "$(dirname -- "$0")" && pwd)
@@ -67,14 +67,29 @@ finish() {
   exit "$code"
 }
 trap finish EXIT
-# The released seed manager cannot parse target dependency declarations. Build
-# the current manager from source first, retaining this cold stage and its child
-# compiler/linker measurements in the same bootstrap timing and memory budget.
+# The released compiler cannot resolve the current processSupervisor primitive,
+# and its manager cannot decode the extended prelude. Use the same isolated
+# stage-1 bridge and real stage-2 transition as the async-language gate. Measure
+# the whole cold transition here, including its unwrapped stage-2 child calls;
+# the existing seed/Clang wrappers still retain their individual measurements.
+export MLF_ASYNC_BOOTSTRAP_DIR="$build/async-bootstrap"
 MLF_COMPILER="$MLF_TIMING_DIR/bin/emlf" CC="$MLF_TIMING_DIR/bin/clang" \
-  "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" manager-bootstrap "$scripts/bootstrap-manager.sh" "$build/manager-bootstrap"
-export MLF_PACKAGE_MANAGER="$build/manager-bootstrap/bin/mlfpkg"
+  "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" async-bootstrap "$PWD/scripts/bootstrap-async.sh"
+test "$(cat "$MLF_ASYNC_BOOTSTRAP_DIR/capability.txt")" = 1
+shasum -a 256 -c "$MLF_ASYNC_BOOTSTRAP_DIR/compilers.sha256"
+shasum -a 256 -c "$MLF_ASYNC_BOOTSTRAP_DIR/manager.sha256"
+identity=$(cat "$MLF_ASYNC_BOOTSTRAP_DIR/source-identity.txt")
+[[ "$identity" =~ ^[0-9a-f]{64}$ ]]
+export MLF_TIMING_COMPILER="$MLF_ASYNC_BOOTSTRAP_DIR/stage2"
+export MLF_PACKAGE_MANAGER
+MLF_PACKAGE_MANAGER=$(cat "$MLF_ASYNC_BOOTSTRAP_DIR/manager.path")
+test -x "$MLF_TIMING_COMPILER" && test -x "$MLF_PACKAGE_MANAGER"
+test "$("$(dirname -- "$MLF_PACKAGE_MANAGER")/mlf-build-runner" --protocol-version)" = 1
 jq --arg path "$MLF_PACKAGE_MANAGER" --arg hash "$(shasum -a 256 "$MLF_PACKAGE_MANAGER" | awk '{print $1}')" \
-  '.manager = {path:$path,sha256:$hash}' "$MLF_TIMING_DIR/context.json" > "$MLF_TIMING_DIR/context.tmp"
+  --arg compiler "$MLF_TIMING_COMPILER" --arg compiler_hash "$(shasum -a 256 "$MLF_TIMING_COMPILER" | awk '{print $1}')" \
+  --arg identity "$identity" \
+  '.manager = {path:$path,sha256:$hash} | .bootstrap_compiler = {path:$compiler,sha256:$compiler_hash} | .async_source_identity = $identity' \
+  "$MLF_TIMING_DIR/context.json" > "$MLF_TIMING_DIR/context.tmp"
 mv "$MLF_TIMING_DIR/context.tmp" "$MLF_TIMING_DIR/context.json"
 "$MLF_TIMING_DRIVER" "$MLF_TIMING_DIR" package-manager "$PWD/mlfpkg" \
   --compiler "$MLF_TIMING_DIR/bin/emlf" --clang "$MLF_TIMING_DIR/bin/clang" \

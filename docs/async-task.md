@@ -198,7 +198,7 @@ guard. It has independent command watchdogs; the deliberately long sleeps must
 be cancelled well before those watchdogs. Watchdog expiry is a failure, never a
 successful timing assertion.
 
-The 30 contracts cover heterogeneous values and closures, repeated await,
+The current 31 contracts cover heterogeneous values and closures, repeated await,
 queued/sleeping/waiting/completed cancellation, shared prerequisites, capture
 versus fail-fast, nested groups, bounded input ordering, explicit limits,
 monotonic deadlines including child joins, scope cancellation, jobs=1 logical
@@ -206,13 +206,17 @@ dependencies, escaped/wrong-scope rejection, cold construction, scope process
 join, dynamic submission, process outcome distinctions, checked failures,
 process cancellation/failure cleanup, queued cancellation, ancestor cancellation,
 process queue limits, total deadlines including Task queue time and the dynamic
-diamond. Six contracts are explicitly white-box: self-await, two live mutually
-awaiting fibers, injected primary-plus-cleanup failures, delayed cleanup after
+diamond. The added `Guards.emlf` contract checks ordered function and expression
+guards around a spawned, sleeping task and its awaited result, including
+unselected failing tasks and predicate panics. Its fixed expected output is
+`PASS guards-task-selection`; it is additional coverage beyond the 30-contract
+qualification record above. Six contracts are explicitly white-box: self-await,
+two live mutually awaiting fibers, injected primary-plus-cleanup failures, delayed cleanup after
 primary or parent cancellation (including recovery wrappers), and synchronous ancestor
 stop visibility before its queued notification runs, and root cancellation
 signalling and joining a suspended sibling. For those only, the
 harness copies the scheduler source and removes its export restriction. The
-production module and both public-facing suites keep all constructors hidden.
+production module and all three public-facing suites keep all constructors hidden.
 Five compile-negative fixtures cover public/internal constructor access and
 mixing a numeric fiber with a string consumer.
 

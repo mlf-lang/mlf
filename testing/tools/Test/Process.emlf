@@ -192,8 +192,8 @@ classify total entry measured text =
 rawJson (D.Raw path digest kind) = J.Object (Cons (Pair "path" (J.str path)) (Cons (Pair "digest" (J.str digest)) (Cons (Pair "kind" (J.str kind)) Nil)))
 rawFile directory name = do
   let path = directory ++ "/" ++ name
-  exists <- fileExists path
-  if exists then do { digest <- fileDigest path; return (Just (D.Raw path digest name)) } else return Nothing
+  present <- fileExists path
+  if present then do { digest <- fileDigest path; return (Just (D.Raw path digest name)) } else return Nothing
 rawEvidence directory = do
   files <- S.mapM (rawFile directory) (O.words "stdout stderr measurement.json measurement.stderr report.jsonl")
   return (S.concatMap (\item -> case item of { Just value -> Cons value Nil; Nothing -> Nil }) files)
@@ -275,6 +275,7 @@ supervise : Config -> String -> String -> String -> R.Options -> Int -> List C.C
 supervise config helper cwd directory options total entries index = case B.create B.serial of
   Left error -> do { O.require false error; return Nil }
   Right budget -> superviseBudget budget config helper cwd directory options total entries index
+superviseBudget : B.Budget -> Config -> String -> String -> String -> R.Options -> Int -> List C.Case -> Int -> IO (List J.Json)
 superviseBudget budget config helper cwd directory options total entries index = case entries of
   Nil -> return Nil
   Cons entry rest -> do

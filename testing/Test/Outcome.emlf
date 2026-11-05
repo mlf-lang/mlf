@@ -1,5 +1,5 @@
 module Test.Outcome where
-import Bootstrap.Types
+import Bootstrap.Types hiding (Phase)
 
 -- A rejection is meaningful only at the phase named by its independent oracle.
 data Phase = Setup | Source | TypeCheck | Target | Emission | Runtime | Validation | Cleanup

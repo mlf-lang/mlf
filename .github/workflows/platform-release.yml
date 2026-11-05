@@ -41,6 +41,8 @@ jobs:
         with:
           ref: ${{ inputs.validation_only && github.sha || inputs.tag || github.sha }}
           fetch-depth: 0
+      - name: Prepare reviewed historical source objects
+        run: python3 -B tools/testing/prepare_history_refs.py
       - name: Validate immutable source and requested platforms
         id: version
         env:

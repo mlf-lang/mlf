@@ -51,6 +51,8 @@ for (const name of ['build-runner','async-runtime','async-language']) {
 assert.match(ciJob('build-runner'),/process-supervisor-tests/);
 const asyncJob = ciJob('async-language');
 assert.match(asyncJob,/fetch-depth: 0/);
+assert.match(ci,/pull_request:\n    types: \[opened, synchronize, reopened, labeled, unlabeled\]/);
+assert.match(fs.readFileSync('tools/release/async-change-scope.py','utf8'), /OPT_IN_LABEL = "ci:async-parity"/);
 assert.match(asyncJob,/id: scope\n        run: python3 tools\/release\/async-change-scope.py/);
 assert.match(asyncJob,/\.mlf-build\/async-change-scope\/decision.json/);
 assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 5);

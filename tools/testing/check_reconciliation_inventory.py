@@ -43,7 +43,11 @@ def main():
     for path, expected in value['preserved_inputs'].items():
         actual = (ROOT / path).read_bytes()
         prior = historical_bytes(PARENT, path)
-        assert actual == prior and sha(actual) == expected, path
+        assert sha(prior) == expected, path
+        if path == 'mlf.lock':
+            assert checked_current(path, actual, expected), path
+        else:
+            assert actual == prior, path
     assert value['selection_is_not_execution'] is True
     print(json.dumps({'status':'supplemental-source-inventory-valid','tracked_entries':len(rows),
                       'new_upstream_paths':2,'new_local_audits':1,'changed_upstream_owners':3,
