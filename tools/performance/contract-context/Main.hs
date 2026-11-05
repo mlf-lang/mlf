@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
+import FrozenSourceKey (upgradeV6)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless)
@@ -54,8 +55,8 @@ main = do
       base = delta (head variants)
       empty = Q.prepareSourceContractEncodings M.empty
       datum = F.encodeDatatypeContext []
-      key pool env group = Q.sourceQueryKeyWithContractEncodings pool "crate" "compiler" group env datum
-      old env group = F.sourceQueryKeyWithContext "crate" "compiler" group env datum
+      key pool env group = Q.sourceQueryKeyWithContractEncodings pool "crate" "compiler" group env (Q.encodeSourceDatatypes [])
+      old env group = upgradeV6 datum (F.sourceQueryKeyWithContext "crate" "compiler" group env datum)
   forM_ variants $ \v -> do
     let env=delta v
         pool=Q.extendSourceContractEncodings env (Q.prepareSourceContractEncodings base)
@@ -121,16 +122,25 @@ main = do
   -- Exercise a real successful finalization, then install its returned delta.
   case S.prepareSourcePlan M.empty [] [] [] (contracts [("first",IS.empty)]) [] [("first",T.Nothing,T.SIntLit 4)] of
     T.Right (T.Just plan) -> case S.prepareGroup plan M.empty ["first"] of
-      T.Right first -> case I.compileLoweredGroup "first" [] [] (S.groupMembers first) of
-        T.Right object -> case S.finishGroup first object of
-          T.Right result -> do
-            let final=S.finalGroupContracts result
-                cache=Q.extendSourceContractEncodings final (Q.prepareSourceContractEncodings M.empty)
-            forM_ (M.toList final) $ \pair ->
-              check "real finalized delta exact contract bytes" (Q.cachedSourceContract cache pair==F.encodeSourceContract pair)
-            check "real finalized delta owns exactly one contract" (length (M.toList final)==1)
-          T.Left err -> fail ("finishGroup finalized delta: "++B.unpack err)
-        T.Left err -> fail ("compileLoweredGroup finalized delta: "++B.unpack err)
+      T.Right first -> do
+        -- A value binding is lowercase; an artifact's module identity is not.
+        -- Retain the original malformed fixture as a strict rejection control.
+        case I.compileLoweredGroup "first" [] [] (S.groupMembers first) of
+          T.Right invalid -> case S.finishGroup first invalid of
+            T.Left err -> check "invalid module identity rejected"
+              (B.unpack err == "<module identity>:1:1: unexpected first; expected constructor name")
+            T.Right _ -> fail "invalid module identity accepted"
+          T.Left err -> fail ("compileLoweredGroup invalid identity fixture: "++B.unpack err)
+        case I.compileLoweredGroup "ContractControl" [] [] (S.groupMembers first) of
+          T.Right object -> case S.finishGroup first object of
+            T.Right result -> do
+              let final=S.finalGroupContracts result
+                  cache=Q.extendSourceContractEncodings final (Q.prepareSourceContractEncodings M.empty)
+              forM_ (M.toList final) $ \pair ->
+                check "real finalized delta exact contract bytes" (Q.cachedSourceContract cache pair==F.encodeSourceContract pair)
+              check "real finalized delta owns exactly one contract" (length (M.toList final)==1)
+            T.Left err -> fail ("finishGroup finalized delta: "++B.unpack err)
+          T.Left err -> fail ("compileLoweredGroup finalized delta: "++B.unpack err)
       T.Left err -> fail ("prepareGroup finalized delta: "++B.unpack err)
     _ -> fail "prepareSourcePlan finalized delta"
   -- Obtain the prepared group from the production lowering path, not a fixture constructor.

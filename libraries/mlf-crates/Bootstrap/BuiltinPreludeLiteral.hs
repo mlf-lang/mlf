@@ -9,6 +9,8 @@ module Bootstrap.BuiltinPreludeLiteral where {
   import qualified Bootstrap.Unicode as Unicode;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.CrateArtifact as Artifact;
+  import qualified Bootstrap.ArtifactStorage as Storage;
+  import qualified Bootstrap.ArtifactStructure as Structure;
   import qualified Bootstrap.BuiltinPreludeContext as Context;
   import qualified Bootstrap.SourceInference as Source;
   import qualified Bootstrap.X.Pretty as Pretty;
@@ -220,7 +222,10 @@ module Bootstrap.BuiltinPreludeLiteral where {
     PShowInteger -> "PShowInteger";
     PReadInteger -> "PReadInteger";
     PIntegerToDouble -> "PIntegerToDouble";
-    PUnsignedLtInt -> "PUnsignedLtInt"
+    PUnsignedLtInt -> "PUnsignedLtInt";
+    PReadByteFileOrError -> "PReadByteFileOrError";
+    PWriteByteFileOrError -> "PWriteByteFileOrError";
+    PByteArrayDigest -> "PByteArrayDigest"
   };
   sourceType :: SType -> String;
   sourceType value = case value of {
@@ -531,6 +536,27 @@ module Bootstrap.BuiltinPreludeLiteral where {
     if offset == stringLength text then [] else let {
       size = L.min 2048 (stringLength text - offset)
     } in (:) (string (stringSlice text offset size)) (objectLiteralPieces text (offset + size));
+  -- Produce the same v1 pair as the ordinary artifact writer. Limit this
+  -- compiler-owned witness to the small, checked builtin crate.
+  imageTexts object = let {
+    iface = Structure.toCrateInterfaceFields (Artifact.binaryInterfaceFields (Artifact.objectInterface object));
+    unit = Structure.toCrateObjectFields (Artifact.binaryObjectFields object)
+  } in if Artifact.envelopeMarked object || Artifact.envelopeAboveOldWork [unit]
+    then ioReturn (Left "prepared Prelude binary image exceeds the v1 domain") else do {
+      metadata <- imageText 3 iface; body <- imageText 4 unit;
+      ioReturn (do { a <- metadata; b <- body; Right ((,) a b) })
+    };
+  imageText schema value = do {
+    encoded <- Storage.encode schema [value];
+    case encoded of {
+      Left message -> ioReturn (Left message);
+      Right bytes -> do {
+        size <- lengthByteArray bytes;
+        if size > 2097152 then ioReturn (Left "prepared Prelude binary image exceeds its limit")
+        else Storage.encodeBase64 bytes
+      }
+    }
+  };
   objectLiteral text = "concatStringList [" ++ L.intercalate "," (objectLiteralPieces text 0) ++ "]";
   rawPreludePieces :: Context.RawPrelude -> (,) String String;
   rawPreludePieces value = case value of {

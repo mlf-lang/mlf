@@ -23,6 +23,9 @@
 #include <mach-o/dyld.h>
 #endif
 #include "mlf_process_supervisor.h"
+#if defined(_WIN32)
+#include "mlf_windows.h"
+#endif
 
 typedef struct MlfValue {
   union { struct { const char *bytes; size_t length; } string; int64_t integer; } as;
@@ -70,6 +73,7 @@ static int valid_utf8(const unsigned char *bytes, size_t length) {
 }
 
 #include "mlf_system.h"
+#include "mlf_byte_file.h"
 /* Filesystem strings use native UTF-8 bytes, including validation during the
  * action even if its returned String is discarded. Directory.doesFileExist
  * accepts non-directory special files, unlike the native regular-file test. */
@@ -205,4 +209,20 @@ void mlf_ghc_shutdown(void) { mlf_process_shutdown();mlf_process_binding_clear()
 /* The native contract uses the initial C locale and snprintf binary64 rounding. */
 int mlf_ghc_format(int places,double n,char *buffer) {
   return snprintf(buffer,384,"%.*f",places,n);
+}
+
+/* Raw transport intentionally bypasses hostText/fromUtf8. Diagnostics are
+ * borrowed static ASCII, output is owned and must be freed by the caller. */
+const char *mlf_ghc_read_byte_file(const char *path, size_t path_length, int64_t limit,
+                                   unsigned char **output, size_t *length) {
+    return mlf_byte_file_read(path, path_length, limit, output, length);
+}
+const char *mlf_ghc_write_byte_file(const char *path, size_t path_length,
+                                    const unsigned char *bytes, size_t length) {
+    return mlf_byte_file_write(path, path_length, bytes, length);
+}
+
+#include "mlf_build_runner_hash.h"
+void mlf_ghc_byte_array_digest(const unsigned char *bytes, size_t length, char hex[65]) {
+    build_hash(bytes, length, hex);
 }

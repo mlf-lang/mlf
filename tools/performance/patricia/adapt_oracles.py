@@ -7,30 +7,105 @@ def require(value,message):
 
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 
+# Exact public surface of the authenticated live owner. Frozen projected
+# sessions still have the historical compileSpecFile-only module header.
+LIVE_SESSION_HEADER = 'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller) where {'
 RANK_IMPORT = b'  import qualified Bootstrap.IntRank as Rank;\n'
 OLD_INDEX = b'case selected of {\n               IntMap tree -> tree\n             }'
 NEW_INDEX = b'Rank.indexMap selected'
 
+def binary_contract(source_root=None):
+    import types
+    path = Path(__file__).resolve().parent / 'source_migration.py'
+    module = types.ModuleType('binary_live_owner_migration')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module.binary_contract(source_root=source_root)
+
+
+def project_binary_owner(raw, source_root=None):
+    return binary_contract(source_root).project_owner(raw, 'Bootstrap.CrateSession')
+
+
+def read_window_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-read-window/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_read_window_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def key_parts_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-key-parts/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_key_parts_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def publication_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-publication/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_publication_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def memo_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-read-reuse/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_read_reuse_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def without_context_read_reuse(raw):
+    read_window=read_window_contract();read_window.manifest()
+    if sha(raw)==read_window.OWNERS['Bootstrap.CrateSession']['new']:
+        raw=read_window.project_owner(raw,'Bootstrap.CrateSession')
+    # The exact K parent continues through its fixed key-parts identity below;
+    # older source-proof replay remains in frozen diamond history, not the
+    # read-window live entry, which rejects every prior or partial owner.
+    key_parts=key_parts_contract();key_parts.manifest()
+    publication=publication_contract();publication.manifest()
+    memo=memo_contract();memo.manifest()
+    if sha(raw)==memo.OWNERS['Bootstrap.CrateSession']['new']:
+        raw=key_parts.project_owner(raw,'Bootstrap.CrateSession')
+        raw=publication.project_owner(raw,'Bootstrap.CrateSession')
+        return memo.restore_previous_owner(raw)
+    # Historical admission remains entirely in the frozen diamond contract.
+    diamond_contract().storage_history(raw)
+    return raw
+
+def diamond_contract():
+    path=Path(__file__).resolve().parent.parent/'source-context-projection-merge/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_diamond_adapter',path)
+    adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
+    return adapter
+
+def without_query_key_scratch(raw):
+    path=Path(__file__).resolve().parent.parent/'query-key-scratch/source_contract.py'
+    spec=importlib.util.spec_from_file_location('query_key_scratch_projection',path)
+    adapter=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    return adapter.current_or_parent(diamond_contract().storage_history(without_context_read_reuse(raw)))
+
+def without_source_query_context(raw):
+    path=Path(__file__).resolve().parent.parent/'source-query-context/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_query_context_projection',path)
+    adapter=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    return adapter.current_or_parent(without_query_key_scratch(raw))
+
 def without_projection_patch(raw):
-    # The following full-compiler adapter still rejects unreviewed input.
-    path=Path(__file__).resolve().parent.parent/'crate-prelude/source_contract.py'
-    spec=importlib.util.spec_from_file_location('crate_prelude_inverse',path)
-    prelude=importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(prelude)
-    if sha(raw)==prelude.manifest()['changed_sources']['Bootstrap.CrateSession']['new']:
-        raw=prelude.restore_session(raw)
     path=Path(__file__).resolve().parent.parent/'full-compiler/source_contract.py'
     spec=importlib.util.spec_from_file_location('owned_projection_inverse',path)
     adapter=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    return adapter.current_or_parent(raw)
+    return adapter.current_or_parent(diamond_contract().upstream_history(without_context_read_reuse(raw)))
 
 def without_survivor_merge(raw):
     path=Path(__file__).resolve().parent.parent/'c3-survivors/source_contract.py'
     spec=importlib.util.spec_from_file_location('c3_survivor_projection',path)
     adapter=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(adapter)
-    return adapter.current_or_parent(without_projection_patch(raw))
+    return adapter.current_or_parent(without_projection_patch(without_source_query_context(raw)))
 
 def without_delayed_indexes(raw):
     path=Path(__file__).resolve().parent.parent/'c3-delayed-index/source_contract.py'
@@ -60,14 +135,14 @@ def with_rank_view(raw):
             and raw.count(OLD_INDEX)==1 and RANK_IMPORT not in raw, 'exact previous session rank interface')
     return raw.replace(marker,marker+RANK_IMPORT).replace(b'IntMapTree Node',b'Rank.MapIndex Node').replace(OLD_INDEX,NEW_INDEX)
 
-def private_session_header(source):
-    headers = ['module Bootstrap.CrateSession (compileSpecFile) where {',
-               'module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude) where {']
-    require(sum(source.count(header) for header in headers) == 1, 'unique private header')
-    return next(header for header in headers if header in source)
-
-
 def prepare(root,out):
+    # Preserve the public adapter's pure header failure before full source
+    # admission or any output. Positive inputs still pass the entire binary gate.
+    header_source=(root/'libraries/mlf-crates/Bootstrap/CrateSession.hs').read_text()
+    require(header_source.count(LIVE_SESSION_HEADER)==1
+            and 'module SessionUnderTest where {' not in header_source,'unique private header')
+    # Admit the current binary sources; runtime test copies below remain entirely current.
+    binary_contract(root).live_registry(root)
     out.mkdir(parents=True,exist_ok=False)
     a=root/'tools/performance/a1-private-index/controls';c=root/'tools/performance/c4-local-transaction/controls'
     files={p.name:p for p in c.glob('*.hs') if p.name!='FileControls.hs'}
@@ -133,7 +208,7 @@ def prepare(root,out):
         require(''.join(difflib.restore(difference,2))==s,'exact adapted inverse')
         (out/(name+'.ndiff')).write_text(''.join(difference))
         changes.append({'source':str(path),'source_sha256':sha(original.encode()),'adapted':str(out/name),'adapted_sha256':sha(raw),'algorithm_body_unchanged':frozen,'inverse_verified':True})
-    owner=root/'libraries/mlf-crates/Bootstrap/CrateSession.hs';s=owner.read_text();before=private_session_header(s);after='module SessionUnderTest where {'
+    owner=root/'libraries/mlf-crates/Bootstrap/CrateSession.hs';s=owner.read_text();before=LIVE_SESSION_HEADER;after='module SessionUnderTest where {'
     require(s.count(before)==1 and after not in s,'unique private header')
     adapted=s.replace(before,after);require(adapted.replace(after,before)==s,'private header inverse')
     (out/'SessionUnderTest.hs').write_text(adapted)

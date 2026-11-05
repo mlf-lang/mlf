@@ -164,9 +164,34 @@ the recorded cohort, re-running `bench.py analyze` reproduced a byte-identical
 Large build products stay in the evidence directory and in CI artifacts. The
 repository does not contain them: `.mlf-build/` is ignored.
 
+### Query storage evidence
+
+Legacy cohorts retain the original one-`.mlfq`-per-fresh-group check and footprint
+calculation. With `query-graph-v1`, group counts still come from the compiler's
+actual `.queries` report, never from the number of result files. Binding,
+Datatype and other graph nodes add results, and equal payloads share an address.
+
+After timing, before the existing query-cache cleanup, the runner retains a
+`query-graph-evidence.json` sidecar containing the exact UTF-8 query report and
+base64 copies of the actual CURRENT and generation-index bytes. The ordinary
+inventory records every result's measured SHA-256 and byte count. The analyzer
+checks CURRENT's selected index, content addresses, graph closure and cycles,
+the measured crate/compiler configuration, and the exact correspondence between
+each fresh group's reported identity, sorted members,
+`InferScc` node and raw payload SHA. It rejects reused groups, missing evidence,
+missing or corrupt result inventories, and changes across repetitions. Existing
+raw checked-output comparisons and executable oracles remain required.
+
+`query_storage` labels the footprint: `legacy-mlfq` counts only `.mlfq` files;
+`query-graph-v1` counts CURRENT, its generation index and all unique persisted
+`.mlfqr` results, including initial or superseded-node results. Neither is a
+group count or a measurement of cumulative disk traffic. Historical measurements
+are not relabelled. Graph cohorts recorded before this sidecar cannot establish
+the index mapping or closure and must be re-measured, not retroactively filled in.
+
 ## CI
 
-- Every ordinary PR runs `test_contract.py` (17 contract tests: refusals, schedule
+- Every ordinary PR runs `test_contract.py` (39 contract tests: refusals, graph evidence, schedule
   balance and matrix shape; no compiler needed) and
   the `smoke` matrix — 3 cells, 18 timed compilations — inside the existing
   GHC O2 job, uploading its results and raw receipts even on failure.
@@ -287,3 +312,4 @@ A first full-matrix attempt at `7c395e04` stopped at leg 149 on the aggregate
 evidence budget, which was still sized for the older 41-cell windows. Its 148
 retained legs are kept locally as an aborted cohort, carry `complete: false` with
 their original records, and are excluded from every result above.
+

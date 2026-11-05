@@ -1,0 +1,46 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 2797,
+  "new_sha256": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
+  "old_bytes": 2010,
+  "old_sha256": "0bbc1bd3d42303d37f2e7e8ce9123780e55795f4bd1a7de5d0145ff399e6ea49",
+  "path": "bootstrap/MLF/Entry/BuiltinPrelude.hs",
+  "splices": [
+    {
+      "new": "ICBpbXBvcnQgcXVhbGlmaWVkIEJvb3RzdHJhcC5DcmF0ZUFydGlmYWN0IGFzIEFydGlmYWN0Owo=",
+      "new_at": 415,
+      "old": "",
+      "old_at": 415
+    },
+    {
+      "new": "Y2FzZSAoZG8gewogICAgb2JqZWN0IDwtIEFydGlmYWN0LmJ1aWx0aW5QcmVsdWRlOyByYXcgPC0gQ29udGV4dC5wcmVwYXJlT2JqZWN0IGlkZW50aXR5IG9iamVjdDsKICAgIFJpZ2h0ICgoLCkgb2JqZWN0IHJhdykKICB9KSBvZiB7CiAgICBMZWZ0IG1lc3NhZ2UgLT4gaW9SZXR1cm4gKExlZnQgbWVzc2FnZSk7CiAgICBSaWdodCAoKCwpIG9iamVjdCByYXcpIC0+IGRvIHsKICAgICAgaW1hZ2VzIDwtIExpdGVyYWwuaW1hZ2VUZXh0cyBvYmplY3Q7CiAgICAgIGlvUmV0dXJuIChkbyB7IHBhaXIgPC0gaW1hZ2VzOyBSaWdodCAocmVuZGVyU291cmNlIHJhdyBvYmplY3QgcGFpcikgfSkKICAgIH0KICB9OwogIHJlbmRlclNvdXJjZSByYXcgb2JqZWN0ICgoLCkgaW50ZXJmYWNlSW1hZ2Ugb2JqZWN0SW1hZ2UpID0=",
+      "new_at": 709,
+      "old": "ZG8gewogICAgcmF3IDwtIENvbnRleHQucHJlcGFyZUZyZXNoIGlkZW50aXR5Ow==",
+      "old_at": 653
+    },
+    {
+      "new": "",
+      "new_at": 1171,
+      "old": "UmlnaHQgKA==",
+      "old_at": 757
+    },
+    {
+      "new": "LCBidWlsdGluT2JqZWN0LCBpbnRlcmZhY2VJbWFnZSwgb2JqZWN0SW1hZ2U=",
+      "new_at": 1598,
+      "old": "",
+      "old_at": 1191
+    },
+    {
+      "new": "CiAgICAgICAiXG4gIGJ1aWx0aW5PYmplY3QgOjogU3RyaW5nO1xuICBidWlsdGluT2JqZWN0ID0gIiwKICAgICAgIExpdGVyYWwub2JqZWN0TGl0ZXJhbCAoQXJ0aWZhY3QuZW5jb2RlT2JqZWN0IG9iamVjdCksCiAgICAgICAiO1xuICBpbnRlcmZhY2VJbWFnZSA6OiBTdHJpbmc7XG4gIGludGVyZmFjZUltYWdlID0gIiwgTGl0ZXJhbC5vYmplY3RMaXRlcmFsIGludGVyZmFjZUltYWdlLAogICAgICAgIjtcbiAgb2JqZWN0SW1hZ2UgOjogU3RyaW5nO1xuICBvYmplY3RJbWFnZSA9ICIsIExpdGVyYWwub2JqZWN0TGl0ZXJhbCBvYmplY3RJbWFnZSwgIlxufVxuIl0=",
+      "new_at": 2107,
+      "old": "ICJcbn1cbiJdKQogIH0=",
+      "old_at": 1656
+    },
+    {
+      "new": "Z2VuZXJhdGVkIDwtIHNvdXJjZSBpZGVudGl0eTsKICAgICAgY2FzZSBnZW5lcmF0ZWQ=",
+      "new_at": 2531,
+      "old": "Y2FzZSBzb3VyY2UgaWRlbnRpdHk=",
+      "old_at": 1774
+    }
+  ]
+}

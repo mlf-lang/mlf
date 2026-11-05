@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import statistics as S
+import query_cache as Q
 
 
 def require(condition,message):
@@ -56,7 +57,8 @@ def analyze(folder):
         require(run['command'].get('exit_code')==0 and run['command'].get('reason') is None,'clean exit without guard')
         for k in ['wall_seconds','child_user_seconds','child_system_seconds']:
             require(math.isfinite(run['command'][k]) and run['command'][k]>=0,'finite nonnegative timings')
-        if run['lane']=='mlf':require(run['fresh']>0 and run['reused']==0,'fresh MLF target')
+        if run['lane']=='mlf':require(type(run['fresh']) is int and run['fresh']>0 and
+            type(run['reused']) is int and run['reused']==0,'fresh MLF target')
         groups[run['case'],run['lane']].append(run)
         samples.append({'cohort':plan['benchmark']['cohort'],'order':order,'case':run['case'],'lane':run['lane'],
             'position':run['position'],'wall_seconds':run['command']['wall_seconds'],
@@ -88,13 +90,29 @@ def analyze(folder):
                     for metric in ['wall_seconds','user_seconds','system_seconds']:
                         require(all(math.isfinite(s[metric]) and s[metric]>=0 for s in ss),'valid stage timings')
                         row[stage+'_'+metric+'_median']=S.median(s[metric] for s in ss)
-                directories=[p for p in (folder/'legs').iterdir() if p.name.endswith(case['id']+'-mlf')]
+                directories=sorted(p for p in (folder/'legs').iterdir() if p.name.endswith(case['id']+'-mlf'))
                 require(len(directories)==repeats,'all retained leg directories')
                 inventories=[load(d/'query-cache-inventory.json') for d in directories]
-                counts=[sum(k.endswith('.mlfq') for k in inv) for inv in inventories]
-                require(all(n==row['fresh'] for n in counts),'one persisted query object per fresh group')
-                row['query_files']=counts[0]
-                row['query_bytes_median']=S.median(sum(v['bytes'] for k,v in inv.items() if k.endswith('.mlfq')) for inv in inventories)
+                graph=[any(k.startswith(Q.GRAPH) or k.endswith(('.mlfqg','.mlfqr')) for k in inv)
+                       for inv in inventories]
+                require(all(graph) or not any(graph),'stable query storage format')
+                row['query_storage']='query-graph-v1' if all(graph) else 'legacy-mlfq'
+                if all(graph):
+                    checks=[]
+                    for directory,inventory in zip(directories,inventories):
+                        evidence=directory/'query-graph-evidence.json'
+                        require(evidence.is_file(),'query graph evidence missing; re-measure, do not reconstruct an old cohort')
+                        checks.append(Q.check_graph(inventory,load(evidence),row['fresh'],row['max_group_members'],
+                            'compiler-shapes/'+case['id'],plan['toolchain']['producer']['emlf_sha256']))
+                    require(all(inv==inventories[0] for inv in inventories),'stable graph inventory bytes and identities')
+                    require(all(c['groups']==checks[0]['groups'] for c in checks),'stable ordered graph groups and raw hashes')
+                    row['query_files']=checks[0]['files']
+                    row['query_bytes_median']=S.median(c['bytes'] for c in checks)
+                else:
+                    counts=[sum(k.endswith('.mlfq') for k in inv) for inv in inventories]
+                    require(all(n==row['fresh'] for n in counts),'one persisted query object per fresh group')
+                    row['query_files']=counts[0]
+                    row['query_bytes_median']=S.median(sum(v['bytes'] for k,v in inv.items() if k.endswith('.mlfq')) for inv in inventories)
         row['mlf_over_ghc']=row['mlf_wall_median']/row['ghc_wall_median'];rows.append(row)
     return rows,plan,receipt,samples
 
@@ -214,3 +232,4 @@ def main():
 
 
 if __name__=='__main__':main()
+

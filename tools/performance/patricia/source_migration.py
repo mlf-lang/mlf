@@ -41,6 +41,72 @@ def full_delta():
             raise ValueError('exact owned projection source hash row')
     return value
 
+SCRATCH_MANIFEST_SHA='9ecbc912e288495a1ff7f5652e81b429c5cfafd2dcd2da951c395efdc762a95a'
+
+def scratch_delta():
+    raw=(HERE.parent/'query-key-scratch/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=SCRATCH_MANIFEST_SHA:
+        raise ValueError('fixed reviewed query-key scratch migration required')
+    value=json.loads(raw)
+    metadata={
+        'format':'query-key-scratch-source-migration-v1',
+        'parent_manifest_sha256':SOURCE_CONTEXT_MANIFEST_SHA,
+        'parent_ref':'d6fe38c56fde162506700af40e031534c075e129',
+        'baseline_ref':'5172c4ade3b3141da2e64593c383892575b36699',
+        'module_count':128, 'unchanged_sources':126,
+        'added_sources':{}, 'removed_sources':{}, 'host_sources':{}}
+    hashes={
+        'Bootstrap.CrateQuery':(
+            '9d6cda4a88c1891cd52e292691955ab2a34f9e03dd70ad764dbf52eb9de5ccb2',
+            '43af002afc2ddb1d69efef0a2d5c1c75dc3dd0b33c85685d4e83fd3290101a68'),
+        'Bootstrap.CrateSession':(
+            'a5cd0cb1b939c81785c2c8b7fa2499fd63c24cd6730b8a2e3d74ce9559edabbf',
+            '5c888e550760f023278beaeffb137a5e3940980b19be2850186ce35ff117805b')}
+    if (not isinstance(value,dict) or set(value)!=set(metadata)|{'changed_sources'}
+        or any(value[key]!=wanted for key,wanted in metadata.items())
+        or not isinstance(value['changed_sources'],dict)
+        or set(value['changed_sources'])!=set(hashes)):
+        raise ValueError('exact two-owner query-key scratch migration')
+    for name,row in value['changed_sources'].items():
+        if (not isinstance(row,dict) or set(row)!={'old','new','reviewed_change'}
+            or not isinstance(row['reviewed_change'],str) or not row['reviewed_change']
+            or (row['old'],row['new'])!=hashes[name]):
+            raise ValueError('exact query-key scratch owner hashes')
+    return value
+
+SOURCE_CONTEXT_MANIFEST_SHA='5dbb5cbc5fcb047732e1ef48931c88a3dbd73030af4cc853f6a07ed951208a6e'
+
+def source_context_delta():
+    raw=(HERE.parent/'source-query-context/source-migration.json').read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=SOURCE_CONTEXT_MANIFEST_SHA:
+        raise ValueError('fixed reviewed source-query context migration required')
+    value=json.loads(raw)
+    metadata={
+        'format':'source-query-context-source-migration-v1',
+        'parent_manifest_sha256':SURVIVORS_MANIFEST_SHA,
+        'parent_ref':'941b6c03bed05db0a5b3054d6d789e54204e3cea',
+        'baseline_ref':'5172c4ade3b3141da2e64593c383892575b36699',
+        'module_count':128, 'unchanged_sources':126,
+        'added_sources':{}, 'removed_sources':{}, 'host_sources':{}}
+    hashes={
+        'Bootstrap.CrateQuery':(
+            '06263b9871c593c9f4f7a4f51975b8a38c9f96737f84a632afe5aa7525e50576',
+            '9d6cda4a88c1891cd52e292691955ab2a34f9e03dd70ad764dbf52eb9de5ccb2'),
+        'Bootstrap.CrateSession':(
+            '51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9',
+            'a5cd0cb1b939c81785c2c8b7fa2499fd63c24cd6730b8a2e3d74ce9559edabbf')}
+    if (not isinstance(value,dict) or set(value)!=set(metadata)|{'changed_sources'}
+        or any(value[key]!=wanted for key,wanted in metadata.items())
+        or not isinstance(value['changed_sources'],dict)
+        or set(value['changed_sources'])!=set(hashes)):
+        raise ValueError('exact two-owner source-query context migration')
+    for name,row in value['changed_sources'].items():
+        if (not isinstance(row,dict) or set(row)!={'old','new','reviewed_change'}
+            or not isinstance(row['reviewed_change'],str) or not row['reviewed_change']
+            or (row['old'],row['new'])!=hashes[name]):
+            raise ValueError('exact source-query context owner hashes')
+    return value
+
 SURVIVORS_MANIFEST_SHA='de9192eeaa64cc15ef8039ce2db936db0ed4d23b4578ecd40ac293c066730aff'
 
 def survivors_delta():
@@ -206,7 +272,42 @@ def apply_changes(base, changes):
         result[name]=row['new']
     return result
 
-def through_full_compiler(base):
+def read_window_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-read-window/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_read_window_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def key_parts_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-key-parts/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_key_parts_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def publication_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-publication/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_publication_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def memo_contract():
+    import importlib.util
+    path=Path(__file__).resolve().parent.parent/'source-context-read-reuse/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_context_read_reuse_contract',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def diamond_contract():
+    import importlib.util
+    path=HERE.parent/'source-context-projection-merge/source_contract.py'
+    spec=importlib.util.spec_from_file_location('source_diamond_registry',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+def migrate_to_read_window(base):
     raw=(HERE/'source-migration.json').read_bytes()
     if MANIFEST_SHA is None or hashlib.sha256(raw).hexdigest()!=MANIFEST_SHA:
         raise ValueError('fixed reviewed Int64/Patricia source migration required')
@@ -237,23 +338,15 @@ def through_full_compiler(base):
     result=apply_changes(result,canonical_carry_delta()['changed_sources'])
     result=apply_changes(result,c3_delta()['changed_sources'])
     result=apply_changes(result,survivors_delta()['changed_sources'])
-    return apply_changes(result,full_delta()['changed_sources'])
+    upstream=apply_changes(result,full_delta()['changed_sources'])
+    result=apply_changes(result,source_context_delta()['changed_sources'])
+    result=apply_changes(result,scratch_delta()['changed_sources'])
+    return read_window_contract().advance_registry(key_parts_contract().advance_registry(
+        publication_contract().advance_registry(
+            memo_contract().advance_registry(diamond_contract().merge_registry(result,upstream)))))
 
 
-def crate_prelude():
-    path = HERE.parent / 'crate-prelude/source_contract.py'
-    spec = importlib.util.spec_from_file_location('crate_prelude_transition', path)
-    adapter = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(adapter)
-    return adapter
-
-
-def migrate(base):
-    parent = through_full_compiler(base)
-    return crate_prelude().advance_registry(parent)
-
-
-def host_sources(base):
+def host_sources_to_read_window(base):
     raw=(HERE/'source-migration.json').read_bytes()
     if MANIFEST_SHA is None or hashlib.sha256(raw).hexdigest()!=MANIFEST_SHA:
         raise ValueError('fixed host ABI migration')
@@ -267,3 +360,46 @@ def host_sources(base):
     delta=adapter.manifest()
     updated=apply_changes(updated,{delta['path']:{key:delta[key] for key in ['old','new','reviewed_change']}})
     return {k:updated[k] for k in base}
+
+
+# New final source edge; every historical migration above remains unchanged.
+def binary_contract(source_root=None):
+    import types
+    path = HERE.parent / 'artifact-binary/source_migration_adapter.py'
+    module = types.ModuleType('live_binary_source_adapter')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module.live_contract(HERE.parent, source_root=source_root)
+
+
+def migrate(base):
+    parent = migrate_to_read_window(base)
+    binary = binary_contract()
+    result = binary.advance_registry(parent)
+    if binary.live_registry(binary.source_root) != result:
+        raise ValueError('exact full live binary131 source registry')
+    return result
+
+
+def host_sources(base):
+    parent = host_sources_to_read_window(base)
+    binary = binary_contract()
+    binary.live_host_inventory(binary.source_root)
+    return binary.advance_legacy_host_subset(parent)
+
+
+def project_binary_registry(current):
+    binary = binary_contract()
+    return binary.registry_to_parent(current, binary.added_source_bytes(binary.source_root))
+
+
+def project_binary_owner(raw, module):
+    return binary_contract().project_owner(raw, module)
+
+
+def project_binary_file(raw, path):
+    return binary_contract().restore_path(raw, path)
+
+
+def project_binary_hosts(current):
+    return binary_contract().legacy_host_subset_to_parent(current)

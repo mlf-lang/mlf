@@ -14,6 +14,14 @@ current = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(current)
 
 
+def binary_migration():
+    path = ROOT / 'tools/performance/patricia/source_migration.py'
+    spec = importlib.util.spec_from_file_location('actual_binary_source_migration', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class CurrentCompatibilityTests(unittest.TestCase):
     def producer(self):
         return {'optimization': '2', 'resolved_modules': dict.fromkeys(current.SHARED_HASHES),
@@ -25,12 +33,10 @@ class CurrentCompatibilityTests(unittest.TestCase):
         manifest = json.loads((ROOT / 'shared-sources.json').read_text())
         actual = {row['module']: current.sha(ROOT / row['path']) for row in manifest['modules']}
         expected = current.SHARED_HASHES
-        if 'Bootstrap.IntTree' in actual:
-            path = ROOT / 'tools/performance/patricia/source_migration.py'
-            migration_spec = importlib.util.spec_from_file_location('explicit_numeric_migration', path)
-            migration = importlib.util.module_from_spec(migration_spec)
-            migration_spec.loader.exec_module(migration)
-            expected = migration.migrate(expected)
+        # Historical 126 base stays fixed; only the live final tail becomes 131.
+        migration = binary_migration()
+        expected = migration.migrate(expected)
+        migration.binary_contract().require_registry(actual, 'current')
         self.assertEqual(actual, expected)
 
     def test_source_and_literal_mutations_rejected(self):
@@ -477,17 +483,35 @@ class CurrentCompatibilityTests(unittest.TestCase):
                           if current.SHARED_HASHES[n] != current.BALANCE_SHARED_HASHES[n]},
                          {'Bootstrap.CrateSession'})
         owner = (ROOT / contract.OWNER).read_bytes()
-        path = ROOT / 'tools/performance/crate-prelude/source_contract.py'
-        spec = importlib.util.spec_from_file_location('crate_prelude_inverse', path)
-        prelude = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(prelude)
-        owner = prelude.restore_session(owner)
-        if b'projectedOriginalNodes' in owner:
-            path = ROOT / 'tools/performance/full-compiler/source_contract.py'
-            spec = importlib.util.spec_from_file_location('projection_patch_adapter', path)
-            adapter = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(adapter)
-            owner = adapter.restore_previous_owner(owner)
+        owner = binary_migration().project_binary_owner(owner, 'Bootstrap.CrateSession')
+        path = ROOT / 'tools/performance/source-context-projection-merge/source_contract.py'
+        spec = importlib.util.spec_from_file_location('source_diamond', path)
+        diamond = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(diamond)
+        read_window_spec = importlib.util.spec_from_file_location('read_window_contract', ROOT / 'tools/performance/source-context-read-window/source_contract.py')
+        read_window = importlib.util.module_from_spec(read_window_spec);read_window_spec.loader.exec_module(read_window)
+        owner = read_window.project_owner(owner, 'Bootstrap.CrateSession')
+        key_parts_spec = importlib.util.spec_from_file_location('key_parts_contract', ROOT / 'tools/performance/source-context-key-parts/source_contract.py')
+        key_parts = importlib.util.module_from_spec(key_parts_spec);key_parts_spec.loader.exec_module(key_parts)
+        owner = key_parts.project_owner(owner, 'Bootstrap.CrateSession')
+        publication_spec = importlib.util.spec_from_file_location('publication_contract', ROOT / 'tools/performance/source-context-publication/source_contract.py')
+        publication = importlib.util.module_from_spec(publication_spec);publication_spec.loader.exec_module(publication)
+        owner = publication.project_owner(owner, 'Bootstrap.CrateSession')
+        memo_spec = importlib.util.spec_from_file_location('read_reuse_contract', ROOT / 'tools/performance/source-context-read-reuse/source_contract.py')
+        memo = importlib.util.module_from_spec(memo_spec);memo_spec.loader.exec_module(memo)
+        owner = memo.restore_previous_owner(owner)
+        diamond.verify_diamond(owner)
+        owner = diamond.to_left(owner)
+        path = ROOT / 'tools/performance/query-key-scratch/source_contract.py'
+        spec = importlib.util.spec_from_file_location('query_key_scratch_adapter', path)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        owner = adapter.restore_previous_owner(owner)
+        path = ROOT / 'tools/performance/source-query-context/source_contract.py'
+        spec = importlib.util.spec_from_file_location('source_query_context_adapter', path)
+        adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapter)
+        owner = adapter.restore_previous_owner(owner)
         if b'survivingFreshFromDelta' in owner:
             path = ROOT / 'tools/performance/c3-survivors/source_contract.py'
             spec = importlib.util.spec_from_file_location('c3_survivor_adapter', path)

@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 18746,
+  "new_sha256": "6cf6343a81b11f81c4f18c85f6e522a892a5e4cb194ca8d27316e4b8dd807a56",
+  "old_bytes": 18811,
+  "old_sha256": "f259a173fcc647ca910a4a5bf788280c16d6b7a83bff001fa500da027cd4e177",
+  "path": "patricia/run_integrated.py",
+  "splices": [
+    {
+      "new": "CiAgICAgICAgICAgICAgICAgICAgICAgICAqW2JpbmFyeS5kaXJlY3RvcnkgLyBuYW1lIGZvciBuYW1lIGluIGJpbmFyeS5tZXRhZGF0YV9wYXRoc10=",
+      "new_at": 2356,
+      "old": "YmluYXJ5LmRpcmVjdG9yeS8nc291cmNlX2NvbnRyYWN0LnB5JywKICAgICAgICAgICAgICAgICAgICAgICAgIGJpbmFyeS5kaXJlY3RvcnkvJ3NvdXJjZV9taWdyYXRpb25fYWRhcHRlci5weScsYmluYXJ5LmRpcmVjdG9yeS8nc291cmNlLW1pZ3JhdGlvbi5qc29uJw==",
+      "old_at": 2356
+    }
+  ]
+}

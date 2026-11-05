@@ -1,0 +1,23 @@
+{
+  "added_sources": {},
+  "baseline_ref": "5172c4ade3b3141da2e64593c383892575b36699",
+  "changed_sources": {
+    "Bootstrap.CrateQuery": {
+      "new": "9d6cda4a88c1891cd52e292691955ab2a34f9e03dd70ad764dbf52eb9de5ccb2",
+      "old": "06263b9871c593c9f4f7a4f51975b8a38c9f96737f84a632afe5aa7525e50576",
+      "reviewed_change": "Add source-query-v6 CACHE-3 shared datatype-key context with complete SHA, context, key and existing contextual-object validation; retain legacy formats and raw/final ownership."
+    },
+    "Bootstrap.CrateSession": {
+      "new": "a5cd0cb1b939c81785c2c8b7fa2499fd63c24cd6730b8a2e3d74ce9559edabbf",
+      "old": "51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9",
+      "reviewed_change": "Route the existing source-group driver through the strict shared-context reader/writer without changing key identity, validation, inference, finalization or publication order."
+    }
+  },
+  "format": "source-query-context-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "de9192eeaa64cc15ef8039ce2db936db0ed4d23b4578ecd40ac293c066730aff",
+  "parent_ref": "941b6c03bed05db0a5b3054d6d789e54204e3cea",
+  "removed_sources": {},
+  "unchanged_sources": 126
+}

@@ -16,8 +16,25 @@ def load_projection(path):
     return adapter
 
 
+def prebinary_owner(raw):
+    migration = load_projection(ROOT / 'tools/performance/patricia/source_migration.py')
+    return migration.project_binary_owner(raw, 'Bootstrap.CrateSession')
+
+
 def retained_owner(raw=None):
-    source = (ROOT / C.OWNER).read_bytes() if raw is None else raw
+    # Explicit raw arguments are old-layer negative fixtures, not live admission.
+    source = prebinary_owner((ROOT / C.OWNER).read_bytes()) if raw is None else raw
+    source = load_projection(ROOT / 'tools/performance/source-context-read-window/source_contract.py').project_owner(source, 'Bootstrap.CrateSession')
+    source = load_projection(ROOT / 'tools/performance/source-context-key-parts/source_contract.py').project_owner(source, 'Bootstrap.CrateSession')
+    source = load_projection(ROOT / 'tools/performance/source-context-publication/source_contract.py').project_owner(source, 'Bootstrap.CrateSession')
+    source = load_projection(ROOT / 'tools/performance/source-context-read-reuse/source_contract.py').restore_previous_owner(source)
+    diamond = load_projection(ROOT / 'tools/performance/source-context-projection-merge/source_contract.py')
+    diamond.verify_diamond(source)
+    source = diamond.to_left(source)
+    scratch = load_projection(ROOT / 'tools/performance/query-key-scratch/source_contract.py')
+    source = scratch.restore_previous_owner(source)
+    context = load_projection(ROOT / 'tools/performance/source-query-context/source_contract.py')
+    source = context.restore_previous_owner(source)
     # Match run_integrated.py's validation source-proof projection. Each
     # reviewed context layer checks its fixed manifest and complete before/
     # after hashes; runtime candidate sources and frozen V1 expectations stay
@@ -75,11 +92,24 @@ class SourceContractTests(unittest.TestCase):
 
     def test_reviewed_projection_chain_and_order_are_pinned(self):
         source = (ROOT / C.OWNER).read_bytes()
-        prelude = load_projection(ROOT / 'tools/performance/crate-prelude/source_contract.py')
-        source = prelude.restore_session(source)
+        source = prebinary_owner(source)
+        source = load_projection(ROOT / 'tools/performance/source-context-read-window/source_contract.py').project_owner(source, 'Bootstrap.CrateSession')
+        source = load_projection(ROOT / 'tools/performance/source-context-key-parts/source_contract.py').project_owner(source, 'Bootstrap.CrateSession')
+        source = load_projection(ROOT / 'tools/performance/source-context-publication/source_contract.py').project_owner(source, 'Bootstrap.CrateSession')
+        source = load_projection(ROOT / 'tools/performance/source-context-read-reuse/source_contract.py').restore_previous_owner(source)
+        diamond = load_projection(ROOT / 'tools/performance/source-context-projection-merge/source_contract.py')
+        common = diamond.verify_diamond(source)
         projection = load_projection(ROOT / 'tools/performance/full-compiler/source_contract.py')
-        self.assertEqual(C.sha(source), projection.NEW_SHA)
-        source = projection.restore_previous_owner(source)
+        incoming = diamond.to_right(source)
+        self.assertEqual(C.sha(incoming), projection.NEW_SHA)
+        self.assertEqual(projection.restore_previous_owner(incoming), common)
+        source = diamond.to_left(source)
+        scratch = load_projection(ROOT / 'tools/performance/query-key-scratch/source_contract.py')
+        self.assertEqual(C.sha(source), scratch.NEW_SHA)
+        source = scratch.restore_previous_owner(source)
+        context = load_projection(ROOT / 'tools/performance/source-query-context/source_contract.py')
+        self.assertEqual(C.sha(source), context.NEW_SHA)
+        source = context.restore_previous_owner(source)
         survivors = load_projection(ROOT / 'tools/performance/c3-survivors/source_contract.py')
         self.assertEqual(C.sha(source), survivors.NEW_SHA)
         source = survivors.restore_previous_owner(source)
@@ -111,6 +141,7 @@ class SourceContractTests(unittest.TestCase):
 
     def test_unknown_owner_edits_and_partial_projection_rejected(self):
         source = (ROOT / C.OWNER).read_bytes()
+        source = prebinary_owner(source)
         adapters = load_projection(ROOT / 'tools/performance/patricia/adapt_oracles.py')
         partial = adapters.without_sparse_contracts(source)
         for changed in (source + b' ', source.replace(b'Rank.MapIndex Node', b'IntMapTree Node', 1), partial):
@@ -119,7 +150,7 @@ class SourceContractTests(unittest.TestCase):
                 retained_owner(changed)
 
     def test_context_projection_manifests_are_not_new_expectations(self):
-        for family in ('sparse-contracts', 'contract-context', 'datatype-context'):
+        for family in ('query-key-scratch', 'source-query-context', 'sparse-contracts', 'contract-context', 'datatype-context'):
             original = ROOT / 'tools/performance' / family
             raw = (original / 'session-delta.json').read_bytes()
             with tempfile.TemporaryDirectory() as directory:

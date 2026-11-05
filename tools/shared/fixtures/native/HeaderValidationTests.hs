@@ -4,6 +4,8 @@ import Prelude
 import Control.Monad (unless,forM_)
 import qualified Data.List as List
 import qualified Bootstrap.Types as T
+import qualified Bootstrap.Map as Table
+import qualified Bootstrap.SourceEquality as Equal
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.Module as M
 import qualified Bootstrap.CrateArtifact as A
@@ -29,6 +31,19 @@ main=do
  assert "duplicate datatypes" (leftText(D.validateDeclarations [T.DataDecl "A" [] [T.ConstructorDecl "A1" []],T.DataDecl "A" [] [T.ConstructorDecl "A2" []]])==Just "duplicate data type")
  assert "duplicate constructors" (leftText(D.validateDeclarations [T.DataDecl "A" [] [T.ConstructorDecl "C" []],T.DataDecl "B" [] [T.ConstructorDecl "C" []]])==Just "duplicate data constructor")
  assert "duplicate type parameters" (leftText(D.validateDeclarations [T.DataDecl "A" ["a","a"] [T.ConstructorDecl "C" []]])==Just "duplicate type parameter")
+ let own = T.DataDecl "UserType" [] [T.ConstructorDecl "User" [], T.ConstructorDecl "MLFLegacyUnit" []]
+ forM_ [[],[own]] $ \users -> case D.validateDeclarations users of
+  T.Left _ -> error "valid datatype context rejected"
+  T.Right (T.DataEnv types constructors _) -> do
+   let full = D.builtinDeclarations ++ users
+       previousTypes = Table.fromList P.compareString [(D.datatypeName d,d) | d <- full]
+       previousCtors = Table.fromList P.compareString
+        [(D.constructorName c,(d,c)) | d <- full, c <- D.datatypeConstructors d]
+       sameEntries same x y = map fst x == map fst y && and (zipWith same (map snd x) (map snd y))
+       sameConstructor (d,c) (other,k) = Equal.eqDataDecl d other && Equal.eqConstructorDecl c k
+   assert "datatype and constructor tables equal full ordered construction"
+    (sameEntries Equal.eqDataDecl (Table.toList types) (Table.toList previousTypes) &&
+     sameEntries sameConstructor (Table.toList constructors) (Table.toList previousCtors))
  let roles=[M.Value,M.Datatype,M.Class,M.Constructor "T",M.Method "C",M.BuiltinType,M.Primitive T.PAddInt,M.Primitive T.PSubInt,M.Boolean True,M.Boolean False,M.ManagedConstraint]
      originals=M.primitiveEntities++M.sharedPrimitiveEntities
      entities=originals++[M.Entity owner name role|owner<-["Prelude","MLF.Primitive","User","模块"],name<-["addInt","CallStack","True","x","λ😀"],role<-roles]

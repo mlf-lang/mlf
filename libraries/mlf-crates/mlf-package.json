@@ -24,6 +24,9 @@
   },
   "library": {
     "modules": {
+      "Bootstrap.ArtifactStorage": "Bootstrap/ArtifactStorage.hs",
+      "Bootstrap.ArtifactStructure": "Bootstrap/ArtifactStructure.hs",
+      "Bootstrap.Bitstream": "Bootstrap/Bitstream.hs",
       "Bootstrap.BuiltinPreludeContext": "Bootstrap/BuiltinPreludeContext.hs",
       "Bootstrap.BuiltinPreludeLiteral": "Bootstrap/BuiltinPreludeLiteral.hs",
       "Bootstrap.Crate": "Bootstrap/Crate.hs",
@@ -38,7 +41,11 @@
       "Bootstrap.PreparedLibraryLiteral": "Bootstrap/PreparedLibraryLiteral.hs",
       "Bootstrap.Separate": "Bootstrap/Separate.hs",
       "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs",
-      "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs"
+      "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs",
+      "Bootstrap.OpenFragment": "Bootstrap/OpenFragment.hs",
+      "Bootstrap.QueryGraph": "Bootstrap/QueryGraph.hs",
+      "Bootstrap.CrateGraph": "Bootstrap/CrateGraph.hs",
+      "Bootstrap.SourceUnit": "Bootstrap/SourceUnit.hs"
     }
   },
   "source-syntax": "shared-haskell-v1"

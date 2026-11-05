@@ -10,6 +10,7 @@ import subprocess
 import sys
 import types
 import generate as G
+import query_cache as Q
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -82,7 +83,9 @@ def main():
         for position,lane in enumerate(lanes):
             schedule.append({'case':case['id'],'position':position,'lane':lane})
     inputs={str(p.resolve()):H.sha(p) for p in [args.setup,hp,HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
-        HERE/'matrix.json',Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
+        HERE/'matrix.json',HERE/'query_cache.py',Q.SHARED/'artifact_binary_reference.py',
+        Q.SHARED/'test_query_index.py',
+        Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
         Path(setup['ghc']),Path(setup['clang']),Path(setup['runtime']),Path(setup['builtin']+'.mlfci'),
         Path(setup['builtin']+'.mlfco')]}
     inputs.update(H.file_pins(Path(setup['package_db']).parent))
@@ -123,7 +126,7 @@ def main():
         'timing_boundary':'exact-child worker launch through wait4; common Python dispatcher included; preparation and validation excluded'}
     plan_path=out/'plan.json';H.save(plan_path,plan);plan_sha=H.sha(plan_path)
     scripts=out/'scripts';scripts.mkdir()
-    for name in ['run.py','worker.py','generate.py']:
+    for name in ['run.py','worker.py','generate.py','query_cache.py']:
         shutil.copy2(HERE/name,scripts/name)
     record={'complete':False,'plan_sha256':plan_sha,'runs':[],'failures':[]}; refs={};blocked=set()
     def save():H.save(out/'receipt.json',record)
@@ -179,6 +182,7 @@ def main():
                 query=build/'queries'
                 if query.is_dir():
                     H.save(leg/'query-cache-inventory.json',{str(p.relative_to(query)):{'bytes':p.stat().st_size,'sha256':H.sha(p)} for p in sorted(query.rglob('*')) if p.is_file()})
+                    Q.snapshot(query,build/'unit.queries',leg/'query-graph-evidence.json')
                     shutil.rmtree(query)
         H.check_pins(inputs)
         H.require(H.authenticate(Path(setup['producer']),Path(setup.get('source',ROOT)))==auth,'ordinary producer unchanged')
@@ -187,3 +191,4 @@ def main():
 
 
 if __name__=='__main__':main()
+

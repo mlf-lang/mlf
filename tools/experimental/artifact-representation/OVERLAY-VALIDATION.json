@@ -1,0 +1,89 @@
+{
+  "schema": "artifact-representation-overlay-portable-validation-1",
+  "scope": "One local qualification of tiny synthetic controls. Not a compiler semantic-checker run, historical sample rerun, Windows qualification, or performance result.",
+  "complete": true,
+  "platform": "POSIX/Linux",
+  "python_invocation": [
+    "python3",
+    "-I",
+    "-B",
+    "test_overlay.py",
+    "--output-dir",
+    "<fresh-output-directory>"
+  ],
+  "test_result": {
+    "cases": [
+      "synthetic-base-two-records-exact",
+      "one-key-field-update-only-adds-three-nodes",
+      "unchanged-record-exact",
+      "changed-record-exact",
+      "fresh-reader-exact-five-file-dependency-audit",
+      "old-base-manifest-not-read",
+      "two-old-base-nodes-are-dead-for-current-root",
+      "old-and-new-pinned-roots-reach-all-nodes",
+      "current-physical-closure-counts-all-five-files",
+      "pinned-old-root-adds-old-manifest-once",
+      "full-rewrite-two-records-exact",
+      "full-rewrite-excludes-dead-base-nodes",
+      "old-snapshot-still-restores-both-originals",
+      "base-all-three-files-byte-unchanged",
+      "old-reader-refuses-overlay-version",
+      "missing-base-not-silently-fetched",
+      "wrong-base-identity",
+      "duplicate-identity-across-layers",
+      "hash-valid-dangling-cross-layer-reference",
+      "recursive-base-descriptor-refused",
+      "recursive-descriptor-rejected-before-write",
+      "measurement-wrapper-help",
+      "measurement-wrapper-rejects-unpinned-synthetic-base-before-write",
+      "overlay-test-entrypoint-refuses-disabled-assertions",
+      "bounded-wrapper-output"
+    ],
+    "current_physical_bytes": 6757,
+    "full_rewrite_bytes": 6013,
+    "historical_measurements_executed": false,
+    "passed": 25,
+    "pinned_physical_bytes": 7481,
+    "scope": "Tiny synthetic storage controls only; no compiler semantics, GC, production safety, or performance claim."
+  },
+  "returncode": 0,
+  "wall_seconds": 0.6667702120030299,
+  "tested_source_sha256": {
+    "measure.py": "418b760b825e9dbdcd61e75b5f713036d0c2d311582d5d8f53c995c861df010d",
+    "overlay.py": "a54c41438366f3a2c8fb2688ddb33ebf170f9d8664b9693753aa6ec08e2cfed1",
+    "read_update_experiment.py": "54f56ff317f2d844228f7d0b3d9fe6c8479e8eca7a37f73509b11aeebb407edc",
+    "representation.py": "5676ef360ec21a4c5ace9185fc23a907a0995f50c54fac7934f171f656c8c783",
+    "test_overlay.py": "7ad25815d5a3a7f64e104648b89c8ab83099f9e471af538783bb385473ed16f7",
+    "test_representation.py": "aafb2cf03738ce91b9058ddbb5aff8ae3a476687b13c34df4f1d67aefedad1c2"
+  },
+  "evidence_sha256": {
+    "local_validation": "25af0d6e026a4e7e30b73efc25012ca3ffe4ad89823a749793e4a7a83dcb8913",
+    "local_guard_receipt": "6fe134f2bbd1c48f3f5f793ec1b93fb5f0464f09a29b1c1c6c0613facea7ba4f",
+    "plan": "2babab4389eaf2b218892262f66a3b3598e42e4518b9debaf646025ec33fde65"
+  },
+  "guard": {
+    "complete": true,
+    "exit_code": 0,
+    "reason": null,
+    "elapsed_seconds": 1.9155999139984488,
+    "sampled_peak_tree_rss_bytes": 38719488,
+    "cleanup_kernel_wait_no_children": true,
+    "remaining_descendants": [],
+    "limits": {
+      "wall_seconds": 120,
+      "address_space_per_process": 536870912,
+      "process_tree_rss_bytes": 268435456,
+      "host_available_floor": 3221225472,
+      "disk_free_floor": 4294967296,
+      "max_output_bytes": 8589934592,
+      "max_output_allocated_bytes": 8589934592
+    }
+  },
+  "identity_new_allocated_bytes_before_result": 114688,
+  "limits": [
+    "No MLF semantic oracle or production cache integration.",
+    "Historical 20 read observations were not rerun by these controls.",
+    "The actual compiler-update invalidation fanout is not simulated.",
+    "Current constructor eagerly validates the complete packs; random-access speedup is not claimed."
+  ]
+}

@@ -60,8 +60,40 @@ const validate = text => {
   assert.doesNotMatch(producer, /^        if:/m, 'Every shard builds its own authenticated producer');
   assert.match(producer, /python3 tools\/shared\/build.py --bootstrap-only --optimization '\$\{\{ matrix.optimization \}\}' --build-dir \.mlf-build\/shared-ghc\n/);
   assert.match(producer, /jq -e '\.complete == true and \.producer_host == "GHC" and \.typecheck_only == false' \.mlf-build\/shared-ghc\/receipt.json/);
+
+  assert.match(producer, /^        id: shared_build$/m);
+  const regeneration = commandStep('tools/shared/generate_builtin_evidence.py');
+  assert.equal(regeneration.match(/^        if: (.+)$/m)?.[1], "failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))",
+    'Only failed builds in one O0 and the O2 leg collect actual generation evidence');
+  assert.match(regeneration, /^        timeout-minutes: 16$/m);
+  const regenerationExpression = regeneration.match(/^        if: (.+)$/m)[1];
+  const regenerationSelected = Function('matrix', 'failure', 'steps', `return (${regenerationExpression});`);
+  for (const leg of legs) {
+    for (const failed of [false, true]) for (const outcome of ['success', 'failure', 'skipped']) {
+      assert.equal(regenerationSelected(leg, () => failed, {shared_build: {outcome}}),
+        failed && outcome === 'failure' && (leg.suite === 'default' || leg.suite === 'all'));
+    }
+  }
+  assert.match(regeneration, /resource_watchdog.py --seconds 900 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 \.mlf-build\/builtin-generation-guard python3 -B tools\/shared\/generate_builtin_evidence.py --root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/builtin-generation-guard\/results --timeout 600\n/);
+  assert.ok(steps.indexOf(producer) < steps.indexOf(regeneration), 'Generation follows the failed build');
+  assert.ok(steps.indexOf(regeneration) < steps.indexOf(commandStep('tools/performance/crate-query-graph/verify.py')),
+    'Generation does not replace or wrap later qualification gates');
+  for (const flags of ['-B', '-O -B']) {
+    assert.ok(job(text, 'metadata').includes('python3 ' + flags + ' tools/shared/test_generate_builtin_evidence.py\n'),
+      'Keep normal and optimized generation refusal controls');
+  }
   const toolchain = commandStep('https://downloads.haskell.org/~ghc/9.14.1/');
   assert.doesNotMatch(toolchain, /^        if:/m, 'Every producer has its own verified toolchain');
+  assert.ok(toolchain.includes('python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json\n'),
+    'Each shard verifies and removes only its pinned install inputs');
+  const installedAt = toolchain.indexOf('make install)');
+  const cleanupAt = toolchain.indexOf('python3 -B tools/release/cleanup-ghc-install.py');
+  assert.ok(installedAt >= 0 && cleanupAt >= 0 && installedAt < cleanupAt,
+    'Install-input cleanup follows successful installation');
+  for (const flags of ['-B', '-O -B']) {
+    assert.ok(job(text, 'metadata').includes('python3 ' + flags + ' tools/release/test-ghc-install-cleanup.py\n'),
+      'Keep normal and optimized cleanup refusal controls');
+  }
   const checkout = commandStep('uses: actions/checkout@');
   assert.doesNotMatch(checkout, /^        if:/m);
   assert.match(checkout, /fetch-depth: 0/);
@@ -96,14 +128,34 @@ const validate = text => {
   assert.match(numeric, /for suite in host native legacy; do/);
   assert.match(numeric, /run_controls.py --suite "\$suite" --producer \.mlf-build\/shared-ghc/);
   assert.match(commandStep('tools/performance/patricia/run_native.py'), /--mode standalone\n/);
+  const graphChecks = [
+    'tools/performance/crate-query-graph/verify.py',
+    'tools/performance/crate-query-graph/source_checks.py',
+  ];
+  for (const command of graphChecks) {
+    const step = commandStep(command);
+    assert.match(step, /^        if: matrix.optimization == '2'$/m);
+    assert.match(step, /resource_watchdog.py --seconds 600 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 /);
+  }
   const o2Only = [
     ...migrated,
+    ...graphChecks,
     'python3 -B tools/performance/patricia/test_adapters.py',
     'python3 -O -B tools/performance/patricia/test_adapters.py',
+    'tools/shared/test_source_context_cache.py',
+    'tools/shared/test_artifact_binary.py',
     'tools/shared/test_recursive_managed.py',
     'tools/shared/test_guest_framework.py',
     'tools/shared/test_guest_state_laws.py',
   ];
+  const binary = commandStep('tools/shared/test_artifact_binary.py');
+  assert.match(binary, /^        if: matrix.optimization == '2'$/m);
+  assert.match(binary, /set -euo pipefail/);
+  assert.ok(binary.includes('python3 -B tools/shared/test_artifact_binary_modular.py\n'));
+  assert.ok(binary.includes('python3 -O -B tools/shared/test_artifact_binary_modular.py\n'));
+  assert.match(binary, /resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 \.mlf-build\/artifact-binary-guard python3 -B tools\/shared\/test_artifact_binary.py --source-root "\$PWD" --build-receipt \.mlf-build\/shared-ghc\/receipt.json --clang clang --gc-prefix "\$PWD\/\.mlf-build\/io-action-gc" --partial-write-sink \/dev\/full --output \.mlf-build\/artifact-binary-guard\/results\n/);
+  const gcPreparation = commandStep('cp "$archive" "$prefix/lib/libgc.a"');
+  assert.ok(steps.indexOf(gcPreparation) < steps.indexOf(binary), 'GC preparation precedes binary native build');
   const framework = commandStep('tools/shared/test_framework_direct.py');
   assert.match(framework, /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct --suite '\$\{\{ matrix.suite \}\}' \$\{suite_args\[@\]\+"\$\{suite_args\[@\]\}"\}\n/);
   assert.doesNotMatch(native, /--frontend-timeout|--native-timeout/,
@@ -139,6 +191,18 @@ const validate = text => {
     'O0 shards must cover the complete prior O0 scope exactly once, with neither omissions nor duplicates');
   const upload = commandStep('uses: actions/upload-artifact@');
   assert.match(upload, /^        if: always\(\)$/m, 'Keep evidence for failed and timed-out shards');
+  for (const evidence of ['bounded-receipt.json', 'build.log', 'results/**/*.json',
+                          'results/**/*.stdout', 'results/**/*.stderr']) {
+    assert.ok(upload.includes('.mlf-build/artifact-binary-guard/' + evidence),
+      'Keep binary build, target, and independent-oracle evidence: ' + evidence);
+  }
+
+  assert.ok(upload.includes('            .mlf-build/ghc-install-cleanup.json\n'),
+    'Retain exact cleanup scope, validation and refusal receipts');
+
+  assert.ok(upload.includes('            .mlf-build/shared-ghc/ghc-info.txt\n'), 'Preserve the compiled toolchain metadata');
+  assert.ok(upload.includes('            .mlf-build/shared-ghc/builtin-verification/\n'), 'Preserve the original failed builtin evidence');
+  assert.ok(upload.includes('            .mlf-build/builtin-generation-guard/\n'), 'Preserve actual generator output and guards');
   const artifact = upload.match(/^          name: (.+)$/m)?.[1];
   assert.ok(artifact);
   const artifactNames = legs.map(leg => artifact.replaceAll('${{ matrix.optimization }}', leg.optimization).replaceAll('${{ matrix.suite }}', leg.suite));
@@ -153,12 +217,33 @@ const validate = text => {
 
 validate(workflow);
 const controls = [
+  ['generation compiler metadata omitted', '            .mlf-build/shared-ghc/ghc-info.txt\n', ''],
+  ["producer diagnostic id omitted","        id: shared_build\n",""],
+  ["generation failure condition relaxed","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))"],
+  ["generation O0 coverage changed","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'direct') || (matrix.optimization == '2' && matrix.suite == 'all'))"],
+  ["generation O2 omitted","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'all'))","failure() && steps.shared_build.outcome == 'failure' && ((matrix.optimization == '0' && matrix.suite == 'default') || (matrix.optimization == '2' && matrix.suite == 'framework'))"],
+  ["generation command omitted","tools/shared/generate_builtin_evidence.py","tools/shared/omitted_builtin_evidence.py"],
+  ["generation resource guard relaxed","--rss-mib 5120 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard","--rss-mib 6144 --max-output-mib 16 --disk-free-mib 4096 .mlf-build/builtin-generation-guard"],
+  ["generation time allowance widened","--timeout 600\n","--timeout 601\n"],
+  ["generation original evidence omitted","            .mlf-build/shared-ghc/builtin-verification/\n",""],
+  ["generation real output omitted","            .mlf-build/builtin-generation-guard/\n",""],
+  ["generation normal refusal controls omitted","          python3 -B tools/shared/test_generate_builtin_evidence.py\n",""],
+  ["generation optimized refusal controls omitted","          python3 -O -B tools/shared/test_generate_builtin_evidence.py\n",""],
   ['missing shard', "          - optimization: '0'\n            suite: default\n", ''],
   ['duplicate shard', '            suite: default\n', '            suite: framework\n'],
   ['missing O2', "          - optimization: '2'\n", "          - optimization: '0'\n"],
   ['matrix exclusion', '        include:\n', '        exclude: []\n        include:\n'],
   ['outer bound changed', '    timeout-minutes: 120\n', '    timeout-minutes: 121\n'],
   ['fail-fast cancellation', '      fail-fast: false\n', '      fail-fast: true\n'],
+  ['installation omitted before cleanup', '&& make install)', '&& true)'],
+  ['premature install-input cleanup',
+    '          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux"',
+    '          python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/ghc-install-cleanup.json\n          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux"'],
+  ['install-input cleanup omitted', 'python3 -B tools/release/cleanup-ghc-install.py --receipt', 'python3 -B tools/release/omitted-cleanup.py --receipt'],
+  ['cleanup receipt argument omitted', '--receipt .mlf-build/ghc-install-cleanup.json', '--receipt .mlf-build/omitted-cleanup.json'],
+  ['cleanup evidence omitted', '            .mlf-build/ghc-install-cleanup.json\n', ''],
+  ['normal cleanup controls omitted', '          python3 -B tools/release/test-ghc-install-cleanup.py\n', ''],
+  ['optimized cleanup controls omitted', '          python3 -O -B tools/release/test-ghc-install-cleanup.py\n', ''],
   ['producer skipped', '      - name: Build exact committed shared sources and direct test runners\n', "      - name: Build exact committed shared sources and direct test runners\n        if: matrix.optimization == '2'\n"],
   ['producer authentication removed', '.complete == true and .producer_host == "GHC" and .typecheck_only == false', '.complete == true'],
   ['direct coverage skipped', "if: matrix.suite == 'all' || matrix.suite == 'direct'", "if: matrix.suite == 'all'"],
@@ -173,7 +258,35 @@ const controls = [
   ['all framework budgets changed', "if [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:framework' ] || [ '${{ matrix.optimization }}:${{ matrix.suite }}' = '0:default' ]; then", 'if true; then'],
   ['direct budget override', 'python3 tools/shared/test_direct.py --bin-dir', 'python3 tools/shared/test_direct.py --suite-timeout 5400 --bin-dir'],
   ['Figure12 omitted', 'python3 tools/shared/test_figure12_direct.py', 'python3 tools/shared/omitted.py'],
-  ['O2 guest omitted', "if: matrix.optimization == '2'", 'if: false'],
+  // Bind selector mutations to the named step, not the first unrelated O2 step.
+  ['O2 guest omitted',
+    "      - name: Check actual MLF mixed-framework source acceptance\n        if: matrix.optimization == '2'\n",
+    "      - name: Check actual MLF mixed-framework source acceptance\n        if: false\n"],
+  ['O2 graph fingerprints omitted',
+    "      - name: Check query graph fingerprints and publication recovery\n        if: matrix.optimization == '2'\n",
+    "      - name: Check query graph fingerprints and publication recovery\n        if: false\n"],
+  ['O2 source graph omitted',
+    "      - name: Check source query graph and lowered fallback\n        if: matrix.optimization == '2'\n",
+    "      - name: Check source query graph and lowered fallback\n        if: false\n"],
+  ['graph fingerprints command omitted', 'tools/performance/crate-query-graph/verify.py', 'tools/performance/crate-query-graph/omitted.py'],
+  ['source graph command omitted', 'tools/performance/crate-query-graph/source_checks.py', 'tools/performance/crate-query-graph/omitted_source.py'],
+  ['graph fingerprint resource guard relaxed', '--rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard', '--rss-mib 6144 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-ich-guard'],
+  ['source graph resource guard relaxed', '--rss-mib 5120 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard', '--rss-mib 6144 --max-output-mib 100 --disk-free-mib 4096 .mlf-build/source-graph-guard'],
+  ['O2 source context omitted',
+    "      - name: Check retained legacy query API contexts and codecs\n        if: matrix.optimization == '2'\n",
+    "      - name: Check retained legacy query API contexts and codecs\n        if: false\n"],
+  ['O2 artifact binary omitted',
+    "      - name: Check binary artifact codecs and real native storage\n        if: matrix.optimization == '2'\n",
+    "      - name: Check binary artifact codecs and real native storage\n        if: false\n"],
+  ['binary output allowance widened', '--max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--max-output-mib 641 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
+  ['binary modular normal controls omitted', '          python3 -B tools/shared/test_artifact_binary_modular.py\n', ''],
+  ['binary modular optimized controls omitted', '          python3 -O -B tools/shared/test_artifact_binary_modular.py\n', ''],
+  ['binary command omitted', 'tools/shared/test_artifact_binary.py', 'tools/shared/omitted_artifact_binary.py'],
+  ['binary producer receipt omitted', '--build-receipt .mlf-build/shared-ghc/receipt.json --clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc"', '--clang clang --gc-prefix "$PWD/.mlf-build/io-action-gc"'],
+  ['binary native sink omitted', '--partial-write-sink /dev/full', ''],
+  ['binary native dependencies omitted', '--gc-prefix "$PWD/.mlf-build/io-action-gc"', ''],
+  ['binary resource guard relaxed', '--rss-mib 5120 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard', '--rss-mib 6144 --max-output-mib 640 --disk-free-mib 4096 .mlf-build/artifact-binary-guard'],
+  ['binary evidence omitted', '            .mlf-build/artifact-binary-guard/results/**/*.json\n', ''],
   ['retained P123 omitted', 'run_integrated.py --suite p123', 'run_integrated.py --suite graph'],
   ['retained graph omitted', 'run_integrated.py --suite graph', 'run_integrated.py --suite builtin'],
   ['retained validation omitted', 'run_integrated.py --suite validation', 'run_integrated.py --suite builtin'],
@@ -190,6 +303,12 @@ const controls = [
 ];
 for (const [name, before, after] of controls) {
   assert.ok(workflow.includes(before), `Mutation ${name} must hit the actual workflow`);
-  assert.throws(() => validate(workflow.replace(before, after)), undefined, `Reject ${name}`);
+  if (['O2 guest omitted', 'O2 graph fingerprints omitted', 'O2 source graph omitted',
+       'O2 source context omitted', 'O2 artifact binary omitted'].includes(name)) {
+    assert.equal(workflow.split(before).length, 2, `Mutation ${name} must select exactly one named step`);
+  }
+  const mutated = workflow.replace(before, after);
+  assert.notEqual(mutated, workflow, `Mutation ${name} must change the actual workflow`);
+  assert.throws(() => validate(mutated), undefined, `Reject ${name}`);
 }
 console.log(`Native O0/O2 CI partition and ${controls.length} mutation controls passed.`);

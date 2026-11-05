@@ -148,14 +148,18 @@ module Bootstrap.Data where {
   builtinDeclarations = (:) unitDeclaration
     (append (take 5 sourceBuiltinDeclarations)
       ((:) stackFrameDeclaration ((:) stackEvidenceDeclaration (drop 5 sourceBuiltinDeclarations))));
+  -- M.fromList inserts from left to right. Splitting its input at the
+  -- builtin prefix preserves the tree and any later user replacement.
+  extendDatatypes initial ds = foldlStrict
+    (\tree d -> M.insert compareString (datatypeName d) d tree) initial ds;
+  extendConstructors initial ds = foldlStrict
+    (\tree d -> foldlStrict
+      (\previous c -> M.insert compareString (constructorName c) ((,) d c) previous)
+      tree (datatypeConstructors d)) initial ds;
   builtinDatatypes :: Map String DataDecl;
-  builtinDatatypes =
-    M.fromList compareString (map (\d -> (,) (datatypeName d) d) builtinDeclarations);
+  builtinDatatypes = extendDatatypes M.empty builtinDeclarations;
   builtinConstructors :: Map String ((,) DataDecl ConstructorDecl);
-  builtinConstructors =
-    M.fromList compareString
-      (concatMap (\d -> map (\c -> (,) (constructorName c) ((,) d c))
-                           (datatypeConstructors d)) builtinDeclarations);
+  builtinConstructors = extendConstructors M.empty builtinDeclarations;
   withKinds ks =
     DataEnv builtinDatatypes builtinConstructors
       (M.union compareString primitiveKinds (M.fromList compareString ks));
@@ -307,15 +311,9 @@ module Bootstrap.Data where {
       distinct "data constructor"
         (concatMap (\d -> map constructorName (datatypeConstructors d)) ds);
       let {
-        declarations = append builtinDeclarations ds
-      };
-      let {
         env =
-          DataEnv (M.fromList compareString (map (\d -> (,) (datatypeName d) d) declarations))
-            (M.fromList compareString
-               (concatMap
-                  (\d -> map (\c -> (,) (constructorName c) ((,) d c)) (datatypeConstructors d))
-                  declarations))
+          DataEnv (extendDatatypes builtinDatatypes ds)
+            (extendConstructors builtinConstructors ds)
             (M.union compareString primitiveKinds
                (M.fromList compareString
                   (map

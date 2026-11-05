@@ -594,8 +594,9 @@ module Bootstrap.Crate where {
     };
   parentDirectory path = Host.parentDirectory path;
   ensureBuiltin = ensureBuiltinWith Nothing;
-  -- A disk hit still admits both formal artifacts and matches the whole interface.
-  -- The compiler-owned split representation is demanded only on installation.
+  -- Both formal readers and exact interface equality guard disk hits. A
+  -- miss can install the split object generated with the checked compiler
+  -- witness. Any failure in the embedded object's admission takes the fresh path.
   ensureBuiltinWith witness prefix =
     case (case witness of {
       Nothing -> mapEither Artifact.objectInterface Artifact.builtinPrelude;
@@ -633,16 +634,7 @@ module Bootstrap.Crate where {
                    then ioReturn (Right ())
                    else case builtinForInstall witness of {
                      Left message -> ioReturn (Left message);
-                     Right builtin -> do {
-                          body <-
-                            Query.writeCache (prefix ++ ".mlfco") (Artifact.encodeObject builtin);
-                          case body of {
-                            Left message -> ioReturn (Left message);
-                            Right _ ->
-                              Query.writeCache metadata
-                                (Artifact.encodeInterface (Artifact.objectInterface builtin))
-                          }
-                     }
+                     Right builtin -> Artifact.writeObjectAtomicEither prefix builtin
                    };
                  releaseFileLock lock;
                  ioReturn (mapEither (\_ -> metadata) result)
@@ -725,12 +717,16 @@ module Bootstrap.Crate where {
                 ioReturn (Left (Modules.displayNames diagnostics message));
               Right ((,,) object payload report) ->
                 do {
-                  Artifact.writeObjectWithPayload prefix object payload;
-                  writeFile (prefix ++ ".queries")
-                    (Query.reportJSON (specIdentity spec)
-                       (Artifact.semanticFingerprint (Artifact.objectInterface object))
-                       report);
-                  ioReturn (Right ())
+                  written <- Artifact.writeObjectWithPayloadEither prefix object payload;
+                  case written of {
+                    Left message -> ioReturn (Left message);
+                    Right _ -> do {
+                      writeFile (prefix ++ ".queries")
+                        (Query.reportJSON (specIdentity spec)
+                           (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
+                      ioReturn (Right ())
+                    }
+                  }
                 }
             }
           }

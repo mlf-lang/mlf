@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
+import FrozenSourceKey (upgradeV6)
 import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless, foldM)
@@ -56,7 +57,7 @@ main = do
   let check label ok=do
         unless ok (fail label)
         modifyIORef' count (+1)
-      expected=map F.encodeDatatypeContext contexts
+      expected=map (F.list F.encodeDatatype) contexts
   -- Force independent expectations once. The tested cache never supplies them.
   mapM_ (evaluate . P.stringLength) expected
   forM_ pools $ \pool->do
@@ -84,7 +85,7 @@ main = do
         (context,_)=Q.reuseDatatypeContext pool (Q.emptyDatatypeContextEncoding pool) current
         actual=Q.sourceQueryKeyWithContext "crate" "fixed-compiler" group contracts context
         old=F.sourceQueryKey "crate" "fixed-compiler" group contracts current
-    check "whole original query key with reused datatype context" (actual==old)
+    check "whole original query key with reused datatype context" (actual==upgradeV6 (F.encodeDatatypeContext []) old)
   -- Existing structural encoders retain their original partial-value behavior.
   let bad label=errorWithoutStackTrace label
       broken=T.DataDecl (bad "datatype name first") [] [T.ConstructorDecl (bad "constructor next") []]

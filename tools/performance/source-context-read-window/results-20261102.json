@@ -1,0 +1,1342 @@
+{
+  "format": "source-context-foundation-study-results-v1",
+  "complete": true,
+  "recorded_date_utc": "2026-11-02",
+  "publication_is_not_a_new_execution": true,
+  "comparison": {
+    "A": "CACHE-3 with eight-entry owned-call verified context window",
+    "B": "CACHE-1 losslessly materialized by the same new wrapper executable; NOT an older compiler",
+    "order": [
+      "coldA",
+      "materializeB",
+      "warmA1",
+      "warmB1",
+      "warmB2",
+      "warmA2",
+      "changeA",
+      "changeB",
+      "changedwarmA",
+      "changedwarmB"
+    ],
+    "ordinary_cli": "runEntry Entry.main, unchanged owner objects",
+    "binary_scope": "study wrapper identity, not the ordinary emlf executable bytes",
+    "time_units": "seconds",
+    "timing_scope": "subprocess wall; waited child user/system CPU retained separately",
+    "single_fixed_abba": true,
+    "statistical_speedup_claim": false
+  },
+  "source_identity": {
+    "publication_parent_head": "a03307734554b6fe49b0d0b6960064025b3a5b51",
+    "upstream_base": "c5928b5be73cd78d194405e734aa012415570e1a",
+    "synthetic_source_tree": "c40c981cfaef0673a0e2791c239f0eac4e28fb68",
+    "local_layers": [
+      "source-context-publication",
+      "source-context-key-parts",
+      "source-context-read-window"
+    ],
+    "owners": {
+      "libraries/mlf-crates/Bootstrap/CrateQuery.hs": {
+        "bytes": 87698,
+        "sha256": "3b3b7a5de8b1f83b0a369e9a47ead5666d1169490e5466e2d8a9983b20eeb8b9"
+      },
+      "libraries/mlf-crates/Bootstrap/CrateSession.hs": {
+        "bytes": 75134,
+        "sha256": "e3002483e06d189b31e3d93e876618c0a65fc807be654f6757452f087088e2a1"
+      },
+      "mlf.lock": {
+        "bytes": 13218,
+        "sha256": "123f426bda8ed1ede2bebce0b1c74e3c37e995f3ba0ace7c091c6d4f41a5379a"
+      }
+    },
+    "producer_state": {
+      "closed_tree_sha256": "8ec78a2bdab2bd1da529a5b53eabc53912db5fe8b1375e3f4f3951f09b502229",
+      "receipt_sha256": "e9ec8769d7f8978f9022aec7b50ec8bf2227c551e1bd03dbd210762db54f36b0"
+    },
+    "wrapper_sha256": "a1512db7cec5cf95803219aa1cba6ec31e83f76ad28c8ff0758a9182674d7ec1"
+  },
+  "population": {
+    "modules": 14,
+    "groups": 504,
+    "source_bytes": 204977,
+    "internal_import_edges": 28,
+    "only_external_source_import": "MLF.Primitive",
+    "scc_histogram": {
+      "1": 501,
+      "2": 1,
+      "4": 2
+    },
+    "ordered_projection_sha256": "7d65ce8b9a8718c932a7376583b2ea121a1ccca2133d5ffaa43582cfb2cf7762",
+    "historical_report_sha256": "e329ad83074a301ad803965a035e895c27eeb33b668ba6ba3829ef038063583c",
+    "projection_encoding": "[{id,members},...] encoded json.dumps(ensure_ascii=False,sort_keys=True,separators=(',',':')) plus LF, UTF8",
+    "source_inputs": [
+      {
+        "bytes": 2592,
+        "module": "Bootstrap.Fresh",
+        "relative": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+        "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+      },
+      {
+        "bytes": 3246,
+        "module": "Bootstrap.Host",
+        "relative": "libraries/mlf-foundation/Bootstrap/Host.hs",
+        "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+      },
+      {
+        "bytes": 21811,
+        "module": "Bootstrap.IntMap",
+        "relative": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+        "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+      },
+      {
+        "bytes": 6684,
+        "module": "Bootstrap.IntRank",
+        "relative": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+        "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+      },
+      {
+        "bytes": 17405,
+        "module": "Bootstrap.IntSet",
+        "relative": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+        "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+      },
+      {
+        "bytes": 3727,
+        "module": "Bootstrap.IntTree",
+        "relative": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+        "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+      },
+      {
+        "bytes": 17218,
+        "module": "Bootstrap.Map",
+        "relative": "libraries/mlf-foundation/Bootstrap/Map.hs",
+        "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+      },
+      {
+        "bytes": 38169,
+        "module": "Bootstrap.Regex",
+        "relative": "libraries/mlf-foundation/Bootstrap/Regex.hs",
+        "sha256": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d"
+      },
+      {
+        "bytes": 2539,
+        "module": "Bootstrap.ST",
+        "relative": "libraries/mlf-foundation/Bootstrap/ST.hs",
+        "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+      },
+      {
+        "bytes": 4093,
+        "module": "Bootstrap.Set",
+        "relative": "libraries/mlf-foundation/Bootstrap/Set.hs",
+        "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+      },
+      {
+        "bytes": 19628,
+        "module": "Bootstrap.Std",
+        "relative": "libraries/mlf-foundation/Bootstrap/Std.hs",
+        "sha256": "d8ac87643ba3c81b1a87a46f59386f4a8f27eaad3515100b5374737f9747ca17"
+      },
+      {
+        "bytes": 12056,
+        "module": "Bootstrap.Types",
+        "relative": "libraries/mlf-foundation/Bootstrap/Types.hs",
+        "sha256": "9eb67b3a3e7f3591f051a8627bb466209a3be39436d58f48db8efc89f936fbac"
+      },
+      {
+        "bytes": 55482,
+        "module": "Bootstrap.Unicode",
+        "relative": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+        "sha256": "fb8a1f8a0147d416d3b5bfd637d53121e584de6f8856d2c380ec360d2df47adf"
+      },
+      {
+        "bytes": 327,
+        "module": "Bootstrap.Version",
+        "relative": "libraries/mlf-foundation/Bootstrap/Version.hs",
+        "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "name": "coldA",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 51.03145412198501,
+      "waited_child_cpu_seconds": {
+        "user": 44.307613,
+        "system": 6.9300299999999995
+      },
+      "counts": {
+        "inferred": 504,
+        "reused": 0
+      },
+      "cache": {
+        "all_file_logical_bytes": 49387843,
+        "all_pathname_allocated_bytes": 50651136,
+        "reachable_logical_bytes": 49387843,
+        "reachable_file_allocated_bytes": 50577408,
+        "all_nodes": 589,
+        "records": 504,
+        "active_records": 504,
+        "referenced_contexts": 83,
+        "all_context_files": 83,
+        "retained_orphan_records": 0,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-A.spec",
+        "-o",
+        "${STUDY}/run/outputs/coldA/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 588805,
+        "sha256": "a6e55ea90980a035a4baee737e8159ca3767487030e9348fbb5d5ea3872cdbe5"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937580,
+          "allocated": 937984,
+          "sha256": "4c6cd56e3d289fd38276b7a8d0397f9ea2d7d0d5b236afc9f8d3548c0209112d"
+        },
+        ".mlfco": {
+          "bytes": 10032715,
+          "allocated": 10035200,
+          "sha256": "7e55afefb88a2cc7b4d1394d8f64530102c7fd0b5e93cf1039b4cdf652ed90e7"
+        },
+        ".queries": {
+          "bytes": 630796,
+          "allocated": 634880,
+          "sha256": "47f37d8757f192e72cc24bda51f3405e9f6aefdc201071c5bc87da208358f9ff"
+        }
+      }
+    },
+    {
+      "name": "materializeB",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": false,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 19.980050212994684,
+      "waited_child_cpu_seconds": {
+        "user": 15.810687000000001,
+        "system": 4.220937999999999
+      },
+      "counts": null,
+      "cache": {
+        "all_file_logical_bytes": 104698792,
+        "all_pathname_allocated_bytes": 105771008,
+        "reachable_logical_bytes": 104698792,
+        "reachable_file_allocated_bytes": 105701376,
+        "all_nodes": 506,
+        "records": 504,
+        "active_records": 504,
+        "referenced_contexts": 0,
+        "all_context_files": 0,
+        "retained_orphan_records": 0,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--study-materialize",
+        "${STUDY}/run/cache/A",
+        "${STUDY}/run/cache/B",
+        "${STUDY}/run/metadata/cold.index",
+        "${STUDY}/run/outputs/coldA/unit",
+        "${STUDY}/run/metadata/materializeB.conversion"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 59,
+          "sha256": "fa0f23128d791a3b2b3ee3d8c47d5dcd882231d483013ae4e6a32601897bcf27"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 404324,
+        "sha256": "445c68f131e89e68dc82daebf3c34e0e64a499e18d7be925c9a1a2e939b993ae"
+      },
+      "artifacts": {}
+    },
+    {
+      "name": "warmA1",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 17.326310278003803,
+      "waited_child_cpu_seconds": {
+        "user": 16.780281000000002,
+        "system": 0.3182299999999998
+      },
+      "counts": {
+        "inferred": 0,
+        "reused": 504
+      },
+      "cache": {
+        "all_file_logical_bytes": 49387843,
+        "all_pathname_allocated_bytes": 50651136,
+        "reachable_logical_bytes": 49387843,
+        "reachable_file_allocated_bytes": 50577408,
+        "all_nodes": 589,
+        "records": 504,
+        "active_records": 504,
+        "referenced_contexts": 83,
+        "all_context_files": 83,
+        "retained_orphan_records": 0,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-A.spec",
+        "-o",
+        "${STUDY}/run/outputs/warmA1/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 588805,
+        "sha256": "343379f136b707a8ad0537fa5081149d71f7fbae88404f388d72b42a7cf8a91b"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937580,
+          "allocated": 937984,
+          "sha256": "4c6cd56e3d289fd38276b7a8d0397f9ea2d7d0d5b236afc9f8d3548c0209112d"
+        },
+        ".mlfco": {
+          "bytes": 10032715,
+          "allocated": 10035200,
+          "sha256": "7e55afefb88a2cc7b4d1394d8f64530102c7fd0b5e93cf1039b4cdf652ed90e7"
+        },
+        ".queries": {
+          "bytes": 630292,
+          "allocated": 630784,
+          "sha256": "ee54c49f920df600faa644626d0fb6c4e258d401910e0b126095ab149b3e8519"
+        }
+      }
+    },
+    {
+      "name": "warmB1",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 16.015132531989366,
+      "waited_child_cpu_seconds": {
+        "user": 15.650556999999992,
+        "system": 0.36702799999999947
+      },
+      "counts": {
+        "inferred": 0,
+        "reused": 504
+      },
+      "cache": {
+        "all_file_logical_bytes": 104698792,
+        "all_pathname_allocated_bytes": 105771008,
+        "reachable_logical_bytes": 104698792,
+        "reachable_file_allocated_bytes": 105701376,
+        "all_nodes": 506,
+        "records": 504,
+        "active_records": 504,
+        "referenced_contexts": 0,
+        "all_context_files": 0,
+        "retained_orphan_records": 0,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-B.spec",
+        "-o",
+        "${STUDY}/run/outputs/warmB1/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 410719,
+        "sha256": "202855272992acb4bcc5060425e15869152f093fb4ac2da8ab099f1d9d97c186"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937580,
+          "allocated": 937984,
+          "sha256": "4c6cd56e3d289fd38276b7a8d0397f9ea2d7d0d5b236afc9f8d3548c0209112d"
+        },
+        ".mlfco": {
+          "bytes": 10032715,
+          "allocated": 10035200,
+          "sha256": "7e55afefb88a2cc7b4d1394d8f64530102c7fd0b5e93cf1039b4cdf652ed90e7"
+        },
+        ".queries": {
+          "bytes": 630292,
+          "allocated": 630784,
+          "sha256": "ee54c49f920df600faa644626d0fb6c4e258d401910e0b126095ab149b3e8519"
+        }
+      }
+    },
+    {
+      "name": "warmB2",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 16.37748495399137,
+      "waited_child_cpu_seconds": {
+        "user": 16.091164000000006,
+        "system": 0.31770099999999957
+      },
+      "counts": {
+        "inferred": 0,
+        "reused": 504
+      },
+      "cache": {
+        "all_file_logical_bytes": 104698792,
+        "all_pathname_allocated_bytes": 105771008,
+        "reachable_logical_bytes": 104698792,
+        "reachable_file_allocated_bytes": 105701376,
+        "all_nodes": 506,
+        "records": 504,
+        "active_records": 504,
+        "referenced_contexts": 0,
+        "all_context_files": 0,
+        "retained_orphan_records": 0,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-B.spec",
+        "-o",
+        "${STUDY}/run/outputs/warmB2/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 410719,
+        "sha256": "710c8bba81c3c20a07418dae89aa78b35afbdcfc0530f5918e7a42d28d3738b2"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937580,
+          "allocated": 937984,
+          "sha256": "4c6cd56e3d289fd38276b7a8d0397f9ea2d7d0d5b236afc9f8d3548c0209112d"
+        },
+        ".mlfco": {
+          "bytes": 10032715,
+          "allocated": 10035200,
+          "sha256": "7e55afefb88a2cc7b4d1394d8f64530102c7fd0b5e93cf1039b4cdf652ed90e7"
+        },
+        ".queries": {
+          "bytes": 630292,
+          "allocated": 630784,
+          "sha256": "ee54c49f920df600faa644626d0fb6c4e258d401910e0b126095ab149b3e8519"
+        }
+      }
+    },
+    {
+      "name": "warmA2",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 16.37924539297819,
+      "waited_child_cpu_seconds": {
+        "user": 16.09936400000001,
+        "system": 0.28443799999999975
+      },
+      "counts": {
+        "inferred": 0,
+        "reused": 504
+      },
+      "cache": {
+        "all_file_logical_bytes": 49387843,
+        "all_pathname_allocated_bytes": 50651136,
+        "reachable_logical_bytes": 49387843,
+        "reachable_file_allocated_bytes": 50577408,
+        "all_nodes": 589,
+        "records": 504,
+        "active_records": 504,
+        "referenced_contexts": 83,
+        "all_context_files": 83,
+        "retained_orphan_records": 0,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-A.spec",
+        "-o",
+        "${STUDY}/run/outputs/warmA2/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 588805,
+        "sha256": "3c1fbb2f49ad75519075ecee97abe651ea1e8f05784752a74689817bfcf8e5f1"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937580,
+          "allocated": 937984,
+          "sha256": "4c6cd56e3d289fd38276b7a8d0397f9ea2d7d0d5b236afc9f8d3548c0209112d"
+        },
+        ".mlfco": {
+          "bytes": 10032715,
+          "allocated": 10035200,
+          "sha256": "7e55afefb88a2cc7b4d1394d8f64530102c7fd0b5e93cf1039b4cdf652ed90e7"
+        },
+        ".queries": {
+          "bytes": 630292,
+          "allocated": 630784,
+          "sha256": "ee54c49f920df600faa644626d0fb6c4e258d401910e0b126095ab149b3e8519"
+        }
+      }
+    },
+    {
+      "name": "changeA",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 17.024431477009784,
+      "waited_child_cpu_seconds": {
+        "user": 16.780457000000013,
+        "system": 0.2758080000000014
+      },
+      "counts": {
+        "inferred": 1,
+        "reused": 503
+      },
+      "cache": {
+        "all_file_logical_bytes": 49607972,
+        "all_pathname_allocated_bytes": 50872320,
+        "reachable_logical_bytes": 49387844,
+        "reachable_file_allocated_bytes": 50577408,
+        "all_nodes": 590,
+        "records": 505,
+        "active_records": 504,
+        "referenced_contexts": 83,
+        "all_context_files": 83,
+        "retained_orphan_records": 1,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-A.spec",
+        "-o",
+        "${STUDY}/run/outputs/changeA/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 589685,
+        "sha256": "cd8bfd8ae55b005c9965e05b8f6a3df7afbcd6af33f894941f3a6003b949dec6"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937579,
+          "allocated": 937984,
+          "sha256": "541c8b7d0f6781b20801c2a5065f327ce94382d544c905f95277e3b3657a183e"
+        },
+        ".mlfco": {
+          "bytes": 10032714,
+          "allocated": 10035200,
+          "sha256": "70528b15e14fd09ead5118fc93a98211693c0245da7dfec8bb2bb61f3b42e960"
+        },
+        ".queries": {
+          "bytes": 630293,
+          "allocated": 630784,
+          "sha256": "42538696f611b527ecd25ab4ddba65dfab30294c712f4252b665b6cc554f7df7"
+        }
+      }
+    },
+    {
+      "name": "changeB",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 15.564088184008142,
+      "waited_child_cpu_seconds": {
+        "user": 15.288498000000004,
+        "system": 0.30045300000000097
+      },
+      "counts": {
+        "inferred": 1,
+        "reused": 503
+      },
+      "cache": {
+        "all_file_logical_bytes": 105046105,
+        "all_pathname_allocated_bytes": 106123264,
+        "reachable_logical_bytes": 104689238,
+        "reachable_file_allocated_bytes": 105693184,
+        "all_nodes": 508,
+        "records": 505,
+        "active_records": 504,
+        "referenced_contexts": 1,
+        "all_context_files": 1,
+        "retained_orphan_records": 1,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-B.spec",
+        "-o",
+        "${STUDY}/run/outputs/changeB/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 412531,
+        "sha256": "bd858118007086395c619ffd28f90cf757c63004f626bc2c4404115baca66f2b"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937579,
+          "allocated": 937984,
+          "sha256": "541c8b7d0f6781b20801c2a5065f327ce94382d544c905f95277e3b3657a183e"
+        },
+        ".mlfco": {
+          "bytes": 10032714,
+          "allocated": 10035200,
+          "sha256": "70528b15e14fd09ead5118fc93a98211693c0245da7dfec8bb2bb61f3b42e960"
+        },
+        ".queries": {
+          "bytes": 630293,
+          "allocated": 630784,
+          "sha256": "42538696f611b527ecd25ab4ddba65dfab30294c712f4252b665b6cc554f7df7"
+        }
+      }
+    },
+    {
+      "name": "changedwarmA",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 16.975774831982562,
+      "waited_child_cpu_seconds": {
+        "user": 16.70109199999999,
+        "system": 0.3222000000000005
+      },
+      "counts": {
+        "inferred": 0,
+        "reused": 504
+      },
+      "cache": {
+        "all_file_logical_bytes": 49607972,
+        "all_pathname_allocated_bytes": 50872320,
+        "reachable_logical_bytes": 49387844,
+        "reachable_file_allocated_bytes": 50577408,
+        "all_nodes": 590,
+        "records": 505,
+        "active_records": 504,
+        "referenced_contexts": 83,
+        "all_context_files": 83,
+        "retained_orphan_records": 1,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-A.spec",
+        "-o",
+        "${STUDY}/run/outputs/changedwarmA/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 589685,
+        "sha256": "8c511bdaed3eb581b21f60a5b599d0ba4759cd96b5df20abde22f643d22fa79e"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937579,
+          "allocated": 937984,
+          "sha256": "541c8b7d0f6781b20801c2a5065f327ce94382d544c905f95277e3b3657a183e"
+        },
+        ".mlfco": {
+          "bytes": 10032714,
+          "allocated": 10035200,
+          "sha256": "70528b15e14fd09ead5118fc93a98211693c0245da7dfec8bb2bb61f3b42e960"
+        },
+        ".queries": {
+          "bytes": 630292,
+          "allocated": 630784,
+          "sha256": "641e886297b77703e9b07b77eb201de9f55cc8f2b54de7f5c4ffe2d618cac4f6"
+        }
+      }
+    },
+    {
+      "name": "changedwarmB",
+      "state": "passed",
+      "exit_code": 0,
+      "timed_endpoint": true,
+      "timeout_seconds": 300,
+      "subprocess_wall_seconds": 16.326217330992222,
+      "waited_child_cpu_seconds": {
+        "user": 16.059179,
+        "system": 0.25938599999999923
+      },
+      "counts": {
+        "inferred": 0,
+        "reused": 504
+      },
+      "cache": {
+        "all_file_logical_bytes": 105046105,
+        "all_pathname_allocated_bytes": 106123264,
+        "reachable_logical_bytes": 104689238,
+        "reachable_file_allocated_bytes": 105693184,
+        "all_nodes": 508,
+        "records": 505,
+        "active_records": 504,
+        "referenced_contexts": 1,
+        "all_context_files": 1,
+        "retained_orphan_records": 1,
+        "unreferenced_contexts": 0
+      },
+      "argv_display": [
+        "${STUDY}/build/foundation-study",
+        "--compile-crate",
+        "${STUDY}/run/metadata/crate-B.spec",
+        "-o",
+        "${STUDY}/run/outputs/changedwarmB/unit"
+      ],
+      "capture_identities": {
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "snapshot_identity": {
+        "bytes": 412531,
+        "sha256": "8b64f7d7676f3324a294fabd30cc269c3352729a1443b8193251ed9eb5fd8a97"
+      },
+      "artifacts": {
+        ".mlfci": {
+          "bytes": 937579,
+          "allocated": 937984,
+          "sha256": "541c8b7d0f6781b20801c2a5065f327ce94382d544c905f95277e3b3657a183e"
+        },
+        ".mlfco": {
+          "bytes": 10032714,
+          "allocated": 10035200,
+          "sha256": "70528b15e14fd09ead5118fc93a98211693c0245da7dfec8bb2bb61f3b42e960"
+        },
+        ".queries": {
+          "bytes": 630292,
+          "allocated": 630784,
+          "sha256": "641e886297b77703e9b07b77eb201de9f55cc8f2b54de7f5c4ffe2d618cac4f6"
+        }
+      }
+    }
+  ],
+  "auxiliary_commands": [
+    {
+      "name": "prepare-builtin",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-builtin",
+        "${STUDY}/run/builtin/unit"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 10.04714505400625,
+      "waited_child_cpu_seconds": {
+        "user": 9.971996,
+        "system": 0.08314099999999999
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 50,
+          "sha256": "938534f9ebd6f3f6b13fc74a2a79fef397da877c018f77b9a4a431dadff16b18"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-coldA",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/coldA/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "original",
+        "${STUDY}/run/metadata/coldA.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 6.9379546149866655,
+      "waited_child_cpu_seconds": {
+        "user": 6.830542000000001,
+        "system": 0.09758900000000015
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-warmA1",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/warmA1/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "original",
+        "${STUDY}/run/metadata/warmA1.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 6.696702767017996,
+      "waited_child_cpu_seconds": {
+        "user": 6.552842999999996,
+        "system": 0.11022100000000101
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-warmB1",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/warmB1/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "original",
+        "${STUDY}/run/metadata/warmB1.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 6.639606688026106,
+      "waited_child_cpu_seconds": {
+        "user": 6.499539000000013,
+        "system": 0.12394000000000105
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-warmB2",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/warmB2/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "original",
+        "${STUDY}/run/metadata/warmB2.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 6.688774741021916,
+      "waited_child_cpu_seconds": {
+        "user": 6.5109119999999905,
+        "system": 0.15203099999999914
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-warmA2",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/warmA2/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "original",
+        "${STUDY}/run/metadata/warmA2.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 6.487571610021405,
+      "waited_child_cpu_seconds": {
+        "user": 6.394956999999977,
+        "system": 0.08779000000000003
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-changeA",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/changeA/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "changed",
+        "${STUDY}/run/metadata/changeA.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 6.337442444986664,
+      "waited_child_cpu_seconds": {
+        "user": 6.223233999999991,
+        "system": 0.1090769999999992
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-changeB",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/changeB/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "changed",
+        "${STUDY}/run/metadata/changeB.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 5.733372339018388,
+      "waited_child_cpu_seconds": {
+        "user": 5.627211000000017,
+        "system": 0.10869099999999854
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-changedwarmA",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/changedwarmA/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "changed",
+        "${STUDY}/run/metadata/changedwarmA.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 7.148595456004841,
+      "waited_child_cpu_seconds": {
+        "user": 6.989179000000007,
+        "system": 0.14498500000000014
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "version-changedwarmB",
+      "argv": [
+        "${STUDY}/build/foundation-study",
+        "--study-version",
+        "${STUDY}/run/outputs/changedwarmB/unit",
+        "${STUDY}/run/metadata/cold.index",
+        "changed",
+        "${STUDY}/run/metadata/changedwarmB.version"
+      ],
+      "cwd": "${STUDY}/run",
+      "timed_endpoint": false,
+      "state": "passed",
+      "timeout_seconds": 300,
+      "exit_code": 0,
+      "subprocess_wall_seconds": 6.343214402993908,
+      "waited_child_cpu_seconds": {
+        "user": 6.179021999999975,
+        "system": 0.1516390000000012
+      },
+      "captures": {
+        "stdout": {
+          "bytes": 61,
+          "sha256": "e4abafec49b7c88efc6f6e24be1720d9a31439d52798ad7c146e05d53c135aa7"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "warm_mean_A_seconds": 16.852777835490997,
+    "warm_mean_B_seconds": 16.196308742990368,
+    "warm_A_minus_B_seconds": 0.6564690925006289,
+    "warm_A_over_B_percent": 4.0532018925901525,
+    "cold_logical_reduction_percent": 52.828641041054226,
+    "cold_allocated_reduction_percent": 52.11245788638036,
+    "change_A_over_B_percent": 9.382774472468757
+  },
+  "functional_prerequisites": {
+    "maintained_build_commands": 18,
+    "strict_python_checks_normal_and_optimized": 232,
+    "runtime_control_invocations": 40,
+    "local_native_fixedpoint_qualified": false
+  },
+  "terminal": {
+    "guard": {
+      "complete": true,
+      "exit_code": 0,
+      "elapsed_seconds": 350.26640670301276,
+      "peak_group_rss": 491651072,
+      "reason": null,
+      "cleanup_errors": [],
+      "remaining_descendants": [],
+      "cleanup_kernel_wait_no_children": true
+    },
+    "guard_limits": {
+      "wall_seconds": 1800,
+      "address_space_per_process": 6442450944,
+      "process_tree_rss_bytes": 5368709120,
+      "host_available_floor": 3221225472,
+      "disk_free_floor": 4294967296,
+      "max_output_bytes": 8589934592,
+      "max_output_allocated_bytes": 8589934592
+    },
+    "peak_sampled_root_allocated_bytes": 8399691776,
+    "post_integrity": true,
+    "study_final_before_terminal_receipts": {
+      "categories": {
+        "cache_A": {
+          "logical": 49607972,
+          "allocated": 50872320,
+          "nodes": 590
+        },
+        "cache_B": {
+          "logical": 105046105,
+          "allocated": 106123264,
+          "nodes": 508
+        },
+        "helper": {
+          "logical": 15265630,
+          "allocated": 15290368,
+          "nodes": 9
+        },
+        "sources": {
+          "logical": 205304,
+          "allocated": 249856,
+          "nodes": 19
+        },
+        "builtin": {
+          "logical": 796435,
+          "allocated": 802816,
+          "nodes": 4
+        },
+        "metadata": {
+          "logical": 6908536,
+          "allocated": 7139328,
+          "nodes": 95
+        },
+        "output_coldA": {
+          "logical": 11601091,
+          "allocated": 11612160,
+          "nodes": 6
+        },
+        "output_warmA1": {
+          "logical": 11600587,
+          "allocated": 11608064,
+          "nodes": 6
+        },
+        "output_warmB1": {
+          "logical": 11600587,
+          "allocated": 11608064,
+          "nodes": 6
+        },
+        "output_warmB2": {
+          "logical": 11600587,
+          "allocated": 11608064,
+          "nodes": 6
+        },
+        "output_warmA2": {
+          "logical": 11600587,
+          "allocated": 11608064,
+          "nodes": 6
+        },
+        "output_changeA": {
+          "logical": 11600586,
+          "allocated": 11608064,
+          "nodes": 6
+        },
+        "output_changeB": {
+          "logical": 11600586,
+          "allocated": 11608064,
+          "nodes": 6
+        },
+        "output_changedwarmA": {
+          "logical": 11600585,
+          "allocated": 11608064,
+          "nodes": 6
+        },
+        "output_changedwarmB": {
+          "logical": 11600585,
+          "allocated": 11608064,
+          "nodes": 6
+        }
+      },
+      "logical": 282235763,
+      "allocated": 284954624,
+      "sampling": "before/after stage; NOT an instantaneous or continuous subroot bound",
+      "guard_receipt_resampling": {
+        "attempts": 1,
+        "restarts": 0,
+        "temporary_path": "${STUDY}/guard/bounded-receipt.json.tmp",
+        "observed_final_receipts_after_tmp_enoent": [],
+        "scope": "complete sampled account; not atomic or hard isolation"
+      }
+    }
+  },
+  "evidence": {
+    "guard": {
+      "bytes": 82384,
+      "sha256": "ec77ded3744979fe8c77ca6e04cdaec53c3cc89545ff218a33058a96c562350e"
+    },
+    "outer_receipt": {
+      "bytes": 153751,
+      "sha256": "9792acfcbf723a7b2d0de76f712078988e3c4fb756988ea92606ae3688f81290"
+    },
+    "progress": {
+      "bytes": 224441,
+      "sha256": "2601fcaa3d8b1fe2903ec8e9eab45b755c757efa2d9c369a5562133c7db73cf5"
+    },
+    "approved_qualification_plan": {
+      "bytes": 36008,
+      "sha256": "f294fcd75b7c5693fafb6da1b48ec43fd23d5c38665d512440e2fb7464407499"
+    },
+    "actual_study_plan": {
+      "bytes": 87025,
+      "sha256": "717564f6122e6ba9edb80d6f648d664b32155fff9871f203a5b1d0a5bce6ef69"
+    },
+    "fixture_source": {
+      "bytes": 13016,
+      "sha256": "86effd0440ff90eef37a11a52f36d8eaed4d88f9247acd0ff0b098289278f663"
+    },
+    "reference_inner_runner": {
+      "bytes": 40879,
+      "sha256": "942632fbd79d65847f3f95f052bce8a098ea0c1d84adcba6a4a9396eacf0bf4d"
+    },
+    "reference_qualification_launcher": {
+      "bytes": 33474,
+      "sha256": "60d3d00d6fa5ed59ef0c4f88bf9c9c7d765dbf40d0d3b8a7c314ae8b52d2d403"
+    },
+    "producer_receipt": {
+      "bytes": 1181056,
+      "sha256": "e9ec8769d7f8978f9022aec7b50ec8bf2227c551e1bd03dbd210762db54f36b0"
+    },
+    "40_guard": {
+      "bytes": 33509,
+      "sha256": "affa34cb56600f88046c79051581d81bd36ebbe6632df21e2fa2b2f209b8200d"
+    },
+    "40_harness": {
+      "bytes": 130924,
+      "sha256": "6d41f5c872bb1834bd98d3099a3f9dcc19e30856ec187c1022553fef94bcb551"
+    },
+    "40_controls": {
+      "bytes": 449934,
+      "sha256": "254150a78ecd5ae993c39f2bd3b33bbc3d6b2917f6575132e8cd83e8cf2ebb50"
+    }
+  },
+  "historical_observations": [
+    {
+      "candidate": "publication-safety / P",
+      "whole_study": "PASS",
+      "warm_A_seconds": [
+        14.806004,
+        14.509256
+      ],
+      "warm_B_seconds": [
+        12.903572,
+        12.798524
+      ],
+      "warm_difference_percent_rounded": 14.0579
+    },
+    {
+      "candidate": "canonical-key-parts / K",
+      "whole_study": "FAIL: exact guard-receipt temporary file disappeared during accounting after changeB child exited 0",
+      "warm_A_seconds": [
+        14.708987493,
+        14.261922481
+      ],
+      "warm_B_seconds": [
+        12.998562194,
+        13.052203101
+      ],
+      "warm_difference_percent_rounded": 11.2094,
+      "later_stages_not_run": [
+        "changedwarmA",
+        "changedwarmB"
+      ]
+    }
+  ],
+  "limitations": [
+    "One fixed ABBA, not statistical performance evidence.",
+    "Different candidate builds/runs cannot isolate causal contribution of one optimization.",
+    "Both arms use the same new binary; no old compiler baseline or legacy cold compile.",
+    "All query-cache directories counted; not total workspace savings, I/O or peak retained heap.",
+    "Raw/final/failed evidence retained locally; repository hashes are not the unpublished large artifact bytes.",
+    "Reference source/argv display is not an executed portable rerun; dollar-braced labels are display roles only.",
+    "Cooperative process locks; no new crash, malicious writer, thread exclusion or Windows lock qualification.",
+    "No automatic GC or deletion of old query records.",
+    "Exact-head hosted CI is still a separate gate; prior CI244 does not qualify this candidate."
+  ]
+}

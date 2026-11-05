@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 6010,
+  "new_sha256": "e756b620a877be2700a0de96098c04c1fc63a114f531e0fbc193cd37f4c98ea2",
+  "old_bytes": 5969,
+  "old_sha256": "d5b2dc216f413b31639722e176df348cc295c06d577896567eeee9533dbc0e70",
+  "path": "runtime/mlf_runtime.h",
+  "splices": [
+    {
+      "new": "dm9pZCBtbGZfcmVxdWlyZV9ieXRlX2ZpbGVfdjJfYWJpKHZvaWQpOwo=",
+      "new_at": 785,
+      "old": "",
+      "old_at": 785
+    }
+  ]
+}

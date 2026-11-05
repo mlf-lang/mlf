@@ -12,13 +12,42 @@ from legacy_controls import prepare
 from run_integrated import ROOT, HERE, LIMITS
 
 def machine_worker(text, name, worker=True):
-    blocks=[b for b in text.split('-- RHS size:') if re.search(r'^(?:[A-Za-z.]+\.)?'+(r'\$w' if worker else '')+re.escape(name)+r'(?:\s|$)',b,re.M)]
-    if len(blocks)!=1:raise ValueError('unique Int64 Core worker '+name)
-    block=blocks[0]
-    if 'fingerprintIntStep' in block or any(op in block for op in ['integerMul','integerAdd','integerRem']):
-        raise ValueError('retired Integer narrowing path in '+name)
-    if not all(op in block for op in ['timesInt64#','plusInt64#','remInt64#']):
+    # GHC may retain a $w worker and forwarding wrapper, or inline the same
+    # machine arithmetic into the public binding. Inspect actual binding RHSs,
+    # never an unfolding annotation or arithmetic in a different binding.
+    def bindings(symbol):
+        pattern=r'^(?P<symbol>(?:[A-Za-z][\w.]*\.)?'+re.escape(symbol)+r')[ \t]*(?:\n[ \t]*)?='
+        result=[]
+        for block in text.split('-- RHS size:'):
+            matches=list(re.finditer(pattern,block,re.M))
+            if len(matches)>1:raise ValueError('unique Int64 Core worker '+name)
+            if matches:result.append((matches[0]['symbol'],block[matches[0].end():]))
+        if len(result)>1:raise ValueError('unique Int64 Core worker '+name)
+        return result
+    public=bindings(name)
+    workers=bindings('$w'+name) if worker else []
+    if not workers and not public:raise ValueError('unique Int64 Core worker '+name)
+    operations=['timesInt64#','plusInt64#','remInt64#']
+    for _,body in workers+public:
+        if 'fingerprintIntStep' in body or any(op in body for op in ['integerMul','integerAdd','integerRem']):
+            raise ValueError('retired Integer narrowing path in '+name)
+    if workers and public:
+        # The retained GHC wrapper unboxes the first Int64 argument and tail-calls
+        # this exact worker with both original arguments in order. A mere mention
+        # (including an unused let or a different qualified worker) is not proof.
+        identifier=r"[A-Za-z][\w']*"
+        forwarding=(r'\s*\\\s*\((?P<a>'+identifier+r')\s*::\s*M\.Int\)\s*'
+                    r'\((?P<c>'+identifier+r')\s*::\s*M\.Int\)\s*->\s*'
+                    r'case\s+(?P=a)\s+of\s*\{\s*'
+                    r'ghc-internal:GHC\.Internal\.Int\.I64#\s+(?P<u>'+identifier+r')\s*->\s*'
+                    +re.escape(workers[0][0])+r'\s+(?P=u)\s+(?P=c)\s*\}\s*')
+        matched=re.fullmatch(forwarding,public[0][1])
+        if matched is None or len({matched['a'],matched['c'],matched['u']})!=3:
+            raise ValueError('ambiguous Int64 Core worker '+name)
+    body=(workers or public)[0][1]
+    if not all(op in body for op in operations):
         raise ValueError('direct Int64 arithmetic missing '+name)
+
 
 def verify_int64_core(text):
     for name in ['unmatchedMultiplier','unmatchedModulus']:machine_worker(text,name)

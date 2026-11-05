@@ -131,6 +131,7 @@ static void gc_free(void *memory) {
  * runtime with incompatible field offsets must fail before execution. */
 /* Canonical source constructor tags and Char/typed-IOError primitives 95..102 and managed stack/context 103..106. */
 void mlf_require_haskell_boundary_v4_abi(void) {}
+void mlf_require_byte_file_v2_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
@@ -170,6 +171,7 @@ typedef enum {
     EMPTY_CALL_STACK, PUSH_CALL_STACK, PRETTY_CALL_STACK, IO_ERROR_WITH_STACK,
     CONCAT_STRING_LIST,
     OR_INT, XOR_INT, SHIFT_LINT, SHIFT_RINT, UNSIGNED_SHIFT_RINT, COUNT_LEADING_ZEROS_INT, COUNT_TRAILING_ZEROS_INT, POP_COUNT_INT, INT_TO_INTEGER, INTEGER_TO_INT, ADD_INTEGER, SUB_INTEGER, MUL_INTEGER, QUOT_INTEGER, REM_INTEGER, EQ_INTEGER, LT_INTEGER, SHOW_INTEGER, READ_INTEGER, INTEGER_TO_DOUBLE, UNSIGNED_LT_INT,
+    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -1411,6 +1413,7 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
     case GET_BYTE_LINE: case NEW_INT_TABLE: case READ_INT_TABLE:
+    case READ_BYTE_FILE_OR_ERROR: case WRITE_BYTE_FILE_OR_ERROR: case BYTE_ARRAY_DIGEST:
     case READ_FILE: case WRITE_FILE: case FILE_EXISTS: case CANONICAL_PATH:
     case GET_ARG_COUNT: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_EXECUTABLE_PATH: case GET_CONTENTS:
@@ -1515,7 +1518,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
         1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2, 1,1,1,1,1,1,2,1, 0,2,1,2, 1,
-        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2
+        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1
     };
     _Static_assert(sizeof(arities) / sizeof(arities[0]) == PRIMITIVE_COUNT,
                    "primitive arity inventory mismatch");
@@ -1628,6 +1631,7 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     case SQRT_DOUBLE: case INT_TO_DOUBLE: case LENGTH_INT_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
     case STRING_LENGTH: case STRING_FROM_CODE: case READ_DOUBLE: case DOUBLE_TO_BITS: case DOUBLE_FROM_BITS:
+    case BYTE_ARRAY_DIGEST:
     case PANIC: case READ_FILE: case FILE_EXISTS: case CANONICAL_PATH: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK: case PROCESS_SUPERVISOR:
     case ASYNC_SCOPE_CLOSE: case ASYNC_SUBSCRIPTION_STATUS: case ASYNC_CANCEL_SUBSCRIPTION: case ASYNC_STEP:
@@ -1645,6 +1649,7 @@ MlfValue *mlf_prim2(int64_t p, MlfValue *a, MlfValue *b) {
     case ADD_DOUBLE: case SUB_DOUBLE: case MUL_DOUBLE: case DIV_DOUBLE: case EQ_DOUBLE: case LT_DOUBLE:
     case FORMAT_DOUBLE: case NEW_INT_ARRAY: case READ_INT_ARRAY: case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case READ_INT_TABLE:
+    case READ_BYTE_FILE_OR_ERROR: case WRITE_BYTE_FILE_OR_ERROR:
     case STRING_CODE_AT: case MLF_COMPARE_STRING: case SEQ: case WRITE_FILE:
     case SET_ENV: case RUN_PROCESS:
     case ASYNC_SCOPE_NEW: case ASYNC_RESOLVE_COMPLETION: case ASYNC_SUBSCRIBE_COMPLETION: case ASYNC_ENQUEUE: case ASYNC_WAIT:
@@ -1723,6 +1728,40 @@ static const char *file_path(MlfValue *entry) {
     entry = expect(entry,STRING);
     if (memchr(entry->as.string.bytes,0,entry->as.string.length)) fail("file path contains NUL");
     return entry->as.string.bytes;
+}
+
+#include "mlf_byte_file.h"
+#include "mlf_build_runner_hash.h"
+static MlfValue *byte_array_digest(MlfValue *bytes) {
+    bytes = expect(bytes, BYTE_ARRAY);
+    char hex[65];
+    build_hash(bytes->as.byte_array.cells, bytes->as.byte_array.length, hex);
+    return mlf_string(hex, 64);
+}
+static MlfValue *read_byte_file_or_error(MlfValue *name, MlfValue *bound) {
+    name = expect(name, STRING);
+    int64_t limit = unbox_integer(bound);
+    unsigned char *bytes = NULL; size_t length = 0;
+    const char *error = mlf_byte_file_read(name->as.string.bytes,
+        name->as.string.length, limit, &bytes, &length);
+    MlfValue *array = value(BYTE_ARRAY);
+    array->as.byte_array.length = length;
+    array->as.byte_array.cells = NULL;
+    array->as.byte_array.cells = allocate_raw(length ? length : 1);
+    if (length) memcpy(array->as.byte_array.cells, bytes, length);
+    free(bytes);
+    /* Data.builtinDeclarations: tombstone0, unit1, nil2, cons3, tuple2=4. */
+    return mlf_constructor2(4, mlf_string(error, strlen(error)), array);
+}
+static MlfValue *write_byte_file_or_error(MlfValue *name, MlfValue *bytes) {
+    name = expect(name, STRING);
+    /* Validate path before demanding the array, matching the GHC adapter. */
+    if (memchr(name->as.string.bytes, 0, name->as.string.length))
+        return mlf_string("file path contains NUL", 22);
+    bytes = expect(bytes, BYTE_ARRAY);
+    const char *error = mlf_byte_file_write(name->as.string.bytes,
+        name->as.string.length, bytes->as.byte_array.cells, bytes->as.byte_array.length);
+    return mlf_string(error, strlen(error));
 }
 
 static MLF_NOINLINE MlfValue *read_file(MlfValue *entry) {
@@ -2394,6 +2433,11 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             continue;
         case IO_RETURN: result = operation->as.action.first; break;
         case GET_LINE: result = read_line(); break;
+        case BYTE_ARRAY_DIGEST: result = byte_array_digest(operation->as.action.first); break;
+        case READ_BYTE_FILE_OR_ERROR:
+            result = read_byte_file_or_error(operation->as.action.first, operation->as.action.second); break;
+        case WRITE_BYTE_FILE_OR_ERROR:
+            result = write_byte_file_or_error(operation->as.action.first, operation->as.action.second); break;
         case READ_FILE: result = read_file(operation->as.action.first); break;
         case WRITE_FILE:
             write_file(operation->as.action.first,operation->as.action.second);

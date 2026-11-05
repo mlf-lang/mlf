@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Retained finite regressions across the explicitly reviewed Int64/Patricia ABI."""
 from pathlib import Path
-import argparse, json, shutil, types
+import argparse, json, shutil, types, struct, zlib
 from legacy_controls import prepare
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -30,6 +30,13 @@ def main():
     try:
         with H.SerialLock(ROOT/'.mlf-build'):
             auth=H.authenticate(producer,source)
+            M=H.module(HERE/'source_migration.py','binary_source_migration')
+            binary=M.binary_contract(source)
+            binary.require_registry({name:row['sha256'] for name,row in auth['shared_inputs'].items()},'current')
+            binary.live_registry(source);binary.live_host_inventory(source)
+            for path in [HERE/'source_migration.py',
+                         *[binary.directory / name for name in binary.metadata_paths]]:
+                record['driver_inputs'][str(path)]=H.sha(path)
             record['producer_receipt_sha256']=H.sha(producer/'receipt.json')
             if a.suite in ['graph','validation']:
                 A=H.module(HERE/'adapt_oracles.py','adapter')
@@ -49,7 +56,8 @@ def main():
                 if a.suite=='validation':
                     V=H.module(ROOT/'tools/performance/validation-reuse/source_contract.py','validation_contract')
                     raw=(source/V.OWNER).read_bytes()
-                    collection_source=raw
+                    # Source-proof inverse only; V1SessionUnderTest keeps raw binary source.
+                    collection_source=A.project_binary_owner(raw, source)
                     if b'Source.prepareGroupOwned' in collection_source:
                         sparse_path=ROOT/'tools/performance/sparse-contracts/source_contract.py'
                         for path in [sparse_path,sparse_path.with_name('session-delta.json')]:
@@ -77,7 +85,8 @@ def main():
                     if rank_view:previous=A.with_rank_view(previous)
                     H.require(H.sha(source/V.CONSTRAINT)==V.CONSTRAINT_SHA,'unchanged generated constraint owner')
                     for name,data in [('V1FrozenSession',previous),('V1SessionUnderTest',raw)]:
-                        old_header=A.private_session_header(data.decode()).encode()
+                        old_header=(A.LIVE_SESSION_HEADER.encode() if name=='V1SessionUnderTest' else
+                                    b'module Bootstrap.CrateSession (compileSpecFile) where {')
                         new_header=('module '+name+' where {').encode()
                         H.require(data.count(old_header)==1,'one private session header')
                         changed=data.replace(old_header,new_header)
@@ -94,6 +103,10 @@ def main():
                 pins=H.load(HERE/'legacy-controls-pins.json')['files']
                 H.require(H.sha(control)==pins[str(control.relative_to(ROOT))],'original builtin malformed controls')
                 shutil.copy2(control,out/'source'/control.name)
+                binary_control=ROOT/'tools/performance/artifact-binary/BinaryBuiltinControls.hs'
+                record['driver_inputs'][str(binary_control)]=H.sha(binary_control)
+                record['driver_inputs'][str(control)]=H.sha(control)
+                shutil.copy2(binary_control,out/'source'/binary_control.name)
                 fixture=out/'Fixture.emlf';fixture.write_text('module Fixture where\nvalue = 42\n')
                 pack=lambda xs:''.join(str(len(x))+':'+x for x in xs)
                 spec=out/'fixture.spec';builtin=out/'builtin';target=out/'fixture'
@@ -102,7 +115,18 @@ def main():
                 report=H.load(str(target)+'.queries')
                 H.require(report['inferred_groups']==1 and report['reused_groups']==0 and len(report['groups'])==1 and report['groups'][0]['cached'] is False,'one fresh builtin fixture group')
                 record['builtin_pins']={str(builtin)+suffix:H.sha(str(builtin)+suffix) for suffix in ['.mlfci','.mlfco']}
-                modules=['CurrentBuiltinControls']
+                # Independent standard-library envelope/CRC inspection of the
+                # actual default files; the Haskell control checks typed semantics.
+                record['binary_builtin_wire']={}
+                for suffix,schema in [('.mlfci',3),('.mlfco',4)]:
+                    raw=Path(str(builtin)+suffix).read_bytes()
+                    H.require(len(raw)>=80 and raw[:8]==b'MLFBIN\r\n','actual binary builtin '+suffix)
+                    fields=struct.unpack('<18I',raw[8:80])
+                    H.require(fields[:4]==(1,0,schema,80) and fields[4]==len(raw),'binary builtin envelope '+suffix)
+                    crc=zlib.crc32(raw[:76]+b'\0'*4+raw[80:]) & 0xffffffff
+                    H.require(crc==fields[17],'independent binary builtin CRC '+suffix)
+                    record['binary_builtin_wire'][suffix]={'schema':schema,'bytes':len(raw),'crc32':crc,'sha256':H.sha(str(builtin)+suffix)}
+                modules=['BinaryBuiltinControls']
             else:modules,_=prepare(ROOT,out/'source',a.suite)
             objects=out/'objects';shutil.copytree(producer/'objects',objects)
             original=H.file_pins(objects);record['control_sources']=H.file_pins(out/'source')
@@ -122,7 +146,7 @@ def main():
                 entry.write_text('module Main where\nimport qualified '+module+' as C\nmain :: IO ()\nmain=C.'+('boundary' if module=='PatriciaOracleControls' else 'main')+'\n')
                 binary=out/(module+'-binary');extra=['-package','filepath'] if module=='P2Controls' else []
                 H.Runner(out,LIMITS).run([auth['ghc']['path'],'--make','-j1',*flags,*extra,'-rtsopts=ignoreAll',entry,producer/'host.o',producer/'supervisor.o','-o',binary],source,out/(module+'-build'))
-                args=[out/'fingerprint-output'] if module=='P2Controls' else [builtin] if module=='CurrentBuiltinControls' else []
+                args=[out/'fingerprint-output'] if module=='P2Controls' else [builtin] if module=='BinaryBuiltinControls' else []
                 H.Runner(out,LIMITS).run([binary,*args],source,out/(module+'-run'))
                 stdout=(out/(module+'-run')/'stdout').read_bytes();stderr=(out/(module+'-run')/'stderr').read_bytes()
                 H.require(not stderr,'control stderr empty '+module)
@@ -139,7 +163,10 @@ def main():
                     H.require(stdout==b'{"complete":true,"native_compatibility_controls":1243}\n',
                               'all frozen supplemental P2 native-integration controls')
                     record['native_compatibility_controls']=1243
-                if module=='CurrentBuiltinControls':H.require(stdout==b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\n','retained canonical builtin controls')
+                if module=='BinaryBuiltinControls':
+                    H.require(stdout==b'PASS current builtin: canonical literal, full check, exact wire, 7 malformed/mismatch rejections\nPASS binary builtin: public readers, canonical bytes, fixed literal/full check, 5 binary rejections, separate frozen legacy 7\n','binary controls and all retained explicit legacy builtin controls')
+                    record['builtin_controls']={'legacy_frozen_rejections':7,'binary_rejections':5,'original_default_files_remain_binary':True}
+                    record['builtin_witness_pins']={str(builtin)+suffix:H.sha(str(builtin)+suffix) for suffix in ['.explicit-legacy.mlfci','.explicit-legacy.mlfco','.binary-negative-version','.binary-negative-crc','.binary-negative-pairing']}
                 if module=='BoundaryControls':H.require(stdout==b'PASS validation reuse: 20 authored programs, raw solver states, skeleton demand, 3 raw rejections, 4 partial-value orders\n','retained validation reuse boundary inventory')
                 if module=='BalanceControls':H.require(stdout==b'Balance controls: 24649 raw-shape pairs; 400 mutation steps; 30 independent demand/order cases passed\n','complete Map balance inventory')
                 if module=='PublicControls':record['public']=C.public_result(stdout,stderr)
@@ -177,7 +204,7 @@ def main():
                     record['checks'].append('private-'+name)
             changed=[p for p,digest in original.items() if Path(p).name not in ['Main.o','Main.hi'] and H.sha(p)!=digest]
             H.require(not changed,'ordinary production objects unchanged: '+str(changed))
-            H.check_pins(record['driver_inputs']);H.check_pins(record.get('original_control_inputs',{}));H.check_pins(record.get('builtin_pins',{}))
+            H.check_pins(record['driver_inputs']);H.check_pins(record.get('original_control_inputs',{}));H.check_pins(record.get('builtin_pins',{}));H.check_pins(record.get('builtin_witness_pins',{}))
             H.check_pins(record['control_sources']);H.require(H.authenticate(producer,source)==auth,'producer unchanged')
             record.update(complete=True,ordinary_production_objects_unchanged=True);save()
     except BaseException as e:record['error']=repr(e);save();raise

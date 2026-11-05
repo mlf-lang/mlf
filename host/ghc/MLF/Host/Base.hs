@@ -16,7 +16,7 @@ module MLF.Host.Base
   , v_eqDouble, v_ltDouble, v_intToDouble, v_doubleToBits, v_doubleFromBits
   , v_concatString, v_concatStringList, v_eqString, v_compareString, v_stringLength, v_stringCodeAt
   , v_stringSlice, v_stringFromCode, v_showInt, v_readInt, v_readDouble, v_formatDouble
-  , v_ifThenElse, v_seq, v_panic, HostError(..), failure, bounded, strict2
+  , v_ifThenElse, v_seq, v_panic, HostError(..), failure, bounded, stIndex, strict2
   ) where
 
 import Prelude hiding (Int, String)
@@ -169,26 +169,34 @@ v_newSTArray n initial = pure n >>= \operand -> do
   pure (STArray (fromIntegral size) cells)
 stIndex :: Int -> Int -> P.Int
 stIndex size n =
-  if n<0 || n>=size then failure "array index out of bounds" else fromIntegral n
+  -- Array lengths are validated nonnegative and fit the host Int.
+  if (fromIntegral n :: Word.Word64) < fromIntegral size
+  then fromIntegral n else failure "array index out of bounds"
 v_readSTArray :: STArray s a -> Int -> ST s a
 v_readSTArray a n = pure a >>= \(STArray size cells) ->
-  let i=stIndex size n in i `pseq` AB.unsafeRead cells i
+  AB.unsafeRead cells (stIndex size (a `pseq` n))
 v_writeSTArray :: STArray s a -> Int -> a -> ST s ()
 v_writeSTArray a n value = pure a >>= \(STArray size cells) ->
-  let i=stIndex size n in i `pseq` AB.unsafeWrite cells i value
+  AB.unsafeWrite cells (stIndex size (a `pseq` n)) value
 v_lengthSTArray :: STArray s a -> ST s Int
 v_lengthSTArray a = pure a >>= \(STArray size _) -> pure size
 
 strict2 :: (a -> b -> c) -> a -> b -> c
 strict2 f a b = a `pseq` b `pseq` f a b
+-- These machine operations demand both operands. Making the right operand
+-- depend on the left preserves primitive error order while leaving the result
+-- available to an enclosing arithmetic operation or branch.
+orderedStrict :: (a -> b -> c) -> a -> b -> c
+orderedStrict op a b = op a (a `pseq` b)
+{-# INLINE orderedStrict #-}
 v_addInt, v_subInt, v_mulInt, v_quotInt, v_remInt, v_andInt :: Int -> Int -> Int
-v_addInt = strict2 (+)
-v_subInt = strict2 (-)
-v_mulInt = strict2 (*)
-v_quotInt = strict2 (\a b -> if b==0 then failure "integer division by zero"
+v_addInt = orderedStrict (+)
+v_subInt = orderedStrict (-)
+v_mulInt = orderedStrict (*)
+v_quotInt = orderedStrict (\a b -> if b==0 then failure "integer division by zero"
   else if a==minBound && b==(-1) then failure "integer division overflow" else quot a b)
-v_remInt = strict2 (\a b -> if b==0 then failure "integer division by zero" else rem a b)
-v_andInt = strict2 (.&.)
+v_remInt = orderedStrict (\a b -> if b==0 then failure "integer division by zero" else rem a b)
+v_andInt = orderedStrict (.&.)
 
 -- These operations already use machine Int64 arithmetic. The former
 -- Integer-to-Int64 rolling-hash rules and their guarded fallback are unnecessary.
@@ -198,8 +206,8 @@ v_andInt = strict2 (.&.)
 {-# INLINE v_remInt #-}
 
 v_eqInt, v_ltInt, neInt, leInt, gtInt, geInt :: Int -> Int -> Bool
-v_eqInt = strict2 (==)
-v_ltInt = strict2 (<)
+v_eqInt = orderedStrict (==)
+v_ltInt = orderedStrict (<)
 {-# INLINE v_ltInt #-}
 neInt a b = not (v_eqInt a b)
 leInt a b = not (v_ltInt b a)
@@ -234,7 +242,11 @@ v_formatDouble places value = places `pseq` value `pseq`
   let p=bounded "Double precision must be between 0 and 17" 17 places in p `seq`
   literal (if isNaN value then "NaN" else if isInfinite value then if value<0 then "-Infinity" else "Infinity" else formatFinite p value)
 v_showInt :: Int -> String
-v_showInt = literal . show
+v_showInt n
+  | 0 <= n, n <= 255 = smallDecimal Array.! fromIntegral n
+  | otherwise = mkText (T.pack (show n))
+smallDecimal :: Array.Array P.Int String
+smallDecimal = Array.listArray (0,255) [mkText (T.pack (show i)) | i <- [0..255 :: P.Int]]
 v_readInt :: String -> Int
 v_readInt = readDecimal
 -- Preserve MLF's signed-decimal grammar. Overflow follows the destination
@@ -261,7 +273,7 @@ v_readDouble text = let s=unpack text in
                                             in not (null digits) && all digit digits
         exponent _ = False
 v_concatString :: String -> String -> String
-v_concatString = strict2 (\(String a na _) (String b nb _) -> mkSizedText (na+nb) (T.append a b))
+v_concatString = orderedStrict (\(String a na _) (String b nb _) -> mkSizedText (na+nb) (T.append a b))
 -- Force each fragment before demanding the next list cell, matching the
 -- balanced source join's observable failure order. Text.concat then copies
 -- the validated fragments once rather than at every balanced-tree level.
@@ -284,22 +296,24 @@ v_concatStringList pieces = case pieces of
                  in nextScalars `pseq` nextBytes `pseq`
                       collect nextScalars nextBytes (text:chunks) rest
 v_eqString :: String -> String -> Bool
-v_eqString = strict2 (\(String a _ _) (String b _ _) -> a==b)
+v_eqString = orderedStrict (\(String a _ _) (String b _ _) -> a==b)
 v_compareString :: String -> String -> Int
-v_compareString = strict2 (\(String a _ _) (String b _ _) -> case compare a b of { LT -> -1; EQ -> 0; GT -> 1 })
+v_compareString = orderedStrict (\(String a _ _) (String b _ _) -> case compare a b of { LT -> -1; EQ -> 0; GT -> 1 })
 v_stringLength :: String -> Int
 v_stringLength (String _ n _) = fromIntegral n
 -- All String constructors are private and preserve valid UTF-8 plus exact
 -- scalar count. Equality of byte/scalar counts proves ASCII. Bounds precede
 -- unchecked byte indexing; slice copies to avoid retaining the source buffer.
 v_stringCodeAt :: String -> Int -> Int
-v_stringCodeAt text@(String t size characters) index = text `pseq` index `pseq`
-  let i=bounded "string index out of bounds" (fromIntegral size-1) index
-  in case t of
-    TI.Text bytes offset byteLength
-      | byteLength == size -> i `pseq` fromIntegral (TA.unsafeIndex bytes (offset+i))
-      | otherwise -> let position=scalarOffset t size characters i
-                     in fromIntegral (ord (T.head (TI.text bytes (offset+position) (byteLength-position))))
+v_stringCodeAt text@(String t size offsets) index =
+  let n = text `pseq` index
+  in if (fromIntegral n :: Word.Word64) >= fromIntegral size
+     then failure "string index out of bounds"
+     else case t of
+       TI.Text bytes offset byteLength
+         | byteLength == size -> fromIntegral (TA.unsafeIndex bytes (offset + fromIntegral n))
+         | otherwise -> let pos = scalarOffset t size offsets (fromIntegral n)
+                        in fromIntegral (ord (T.head (TI.text bytes (offset+pos) (byteLength-pos))))
 v_stringSlice :: String -> Int -> Int -> String
 v_stringSlice text@(String t size characters) start count = text `pseq` start `pseq` count `pseq`
   let i=bounded "string slice out of bounds" (fromIntegral size) start
@@ -311,7 +325,7 @@ v_stringSlice text@(String t size characters) start count = text `pseq` start `p
                          end=scalarOffset t size characters (i+n)
                      in mkSizedText n (T.copy (TI.text bytes (offset+begin) (end-begin)))
 v_stringFromCode :: Int -> String
-v_stringFromCode n = if n<0 || n>0x10ffff || (n>=0xd800 && n<=0xdfff) then failure "invalid Unicode scalar" else literal [chr (fromIntegral n)]
+v_stringFromCode n = if n<0 || n>0x10ffff || (n>=0xd800 && n<=0xdfff) then failure "invalid Unicode scalar" else mkSizedText 1 (T.singleton (chr (fromIntegral n)))
 v_ifThenElse :: Bool -> a -> a -> a
 v_ifThenElse c a b = if c then a else b
 v_seq :: a -> b -> b
@@ -352,17 +366,17 @@ v_integerToDouble :: Integer -> Double
 v_integerToDouble = fromInteger
 
 v_unsignedLtInt :: Int -> Int -> Bool
-v_unsignedLtInt = strict2 (\a b -> (fromIntegral a :: Word.Word64) < fromIntegral b)
+v_unsignedLtInt = orderedStrict (\a b -> (fromIntegral a :: Word.Word64) < fromIntegral b)
 {-# INLINE v_unsignedLtInt #-}
 
 v_orInt, v_xorInt, v_shiftLInt, v_shiftRInt, v_unsignedShiftRInt :: Int -> Int -> Int
-v_orInt = strict2 (Bits..|.)
-v_xorInt = strict2 Bits.xor
-v_shiftLInt = strict2 (\x n -> if n<0 then failure "integer shift overflow"
+v_orInt = orderedStrict (Bits..|.)
+v_xorInt = orderedStrict Bits.xor
+v_shiftLInt = orderedStrict (\x n -> if n<0 then failure "integer shift overflow"
   else if n>=64 then 0 else Bits.shiftL x (fromIntegral n))
-v_shiftRInt = strict2 (\x n -> if n<0 then failure "integer shift overflow"
+v_shiftRInt = orderedStrict (\x n -> if n<0 then failure "integer shift overflow"
   else if n>=64 then if x<0 then -1 else 0 else Bits.shiftR x (fromIntegral n))
-v_unsignedShiftRInt = strict2 (\x n -> if n<0 then failure "integer shift overflow"
+v_unsignedShiftRInt = orderedStrict (\x n -> if n<0 then failure "integer shift overflow"
   else if n>=64 then 0 else fromIntegral (Bits.shiftR (fromIntegral x :: Word.Word64) (fromIntegral n)))
 v_countLeadingZerosInt, v_countTrailingZerosInt, v_popCountInt :: Int -> Int
 v_countLeadingZerosInt = fromIntegral . Bits.countLeadingZeros

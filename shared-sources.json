@@ -2,7 +2,7 @@
   "format": 1,
   "source_syntax": "shared-haskell-v1",
   "frontend_semantics": "mlf-frontend/shared-haskell-v1/8",
-  "primitive_abi": "mlf-primitive-129-v6",
+  "primitive_abi": "mlf-primitive-132-v7",
   "source_roots": [
     "libraries/mlf-async",
     "libraries/mlf-crates",
@@ -46,6 +46,21 @@
     {
       "module": "Async.Task.Internal",
       "path": "libraries/mlf-async/Async/Task/Internal.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ArtifactStorage",
+      "path": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.ArtifactStructure",
+      "path": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.Bitstream",
+      "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
       "role": "implementation"
     },
     {
@@ -96,6 +111,11 @@
     {
       "module": "Bootstrap.CrateCodegen",
       "path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.CrateGraph",
+      "path": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
       "role": "implementation"
     },
     {
@@ -294,6 +314,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.OpenFragment",
+      "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Parsec",
       "path": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
       "role": "implementation"
@@ -329,6 +354,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.QueryGraph",
+      "path": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.Regex",
       "path": "libraries/mlf-foundation/Bootstrap/Regex.hs",
       "role": "implementation"
@@ -361,6 +391,11 @@
     {
       "module": "Bootstrap.SourceInference",
       "path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Bootstrap.SourceUnit",
+      "path": "libraries/mlf-crates/Bootstrap/SourceUnit.hs",
       "role": "implementation"
     },
     {
@@ -760,5 +795,5 @@
     "host/ghc/app/source-smoke/Main.hs",
     "host/ghc/app/builtin-prelude/Main.hs"
   ],
-  "builtin_interface": "mlf-primitive/shared-haskell-v1/10"
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/11"
 }

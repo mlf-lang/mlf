@@ -63,10 +63,9 @@ module Bootstrap.Separate where {
       CheckedUnitObject _ checked -> Right checked
     };
   encodedFrom :: String -> Int -> String;
-  encodedFrom text i =
-    if (i >= stringLength text)
-    then ""
-    else (showInt (stringCodeAt text i) ++ ("_" ++ encodedFrom text (i + 1)));
+  encodedFrom text i = concatStringList (encodedChunks text i);
+  encodedChunks text i = if i >= stringLength text then []
+    else (:) (showInt (stringCodeAt text i)) ((:) "_" (encodedChunks text (i + 1)));
   encoded text = encodedFrom text 0;
   canonicalPreludeConstructor entity =
     (eqString (Modules.owner entity) "Prelude" &&
@@ -413,7 +412,10 @@ module Bootstrap.Separate where {
         else Left "invalid inference fragment: expected declarations ending in ()";
       _ -> Left "invalid inference fragment: expected declarations ending in ()"
     };
-  pack fields = concatMapString (\s -> (showInt (stringLength s) ++ (":" ++ s))) fields;
+  pack fields = concatStringList (packChunks fields);
+  packChunks fields = case fields of {
+    [] -> []; (:) text rest -> (:) (showInt (stringLength text)) ((:) ":" ((:) text (packChunks rest)))
+  };
   digitEnd :: String -> Int -> Int;
   digitEnd text i =
     if (i >= stringLength text)
@@ -477,7 +479,21 @@ module Bootstrap.Separate where {
         let { nextB = (((b * 131) + code) % 2147483629) } in
         seq nextA (seq nextB (fingerprintChars rest nextA nextB))
     };
-  fingerprint text = fingerprintFrom text 0 0 1;
+  -- Group four scalar steps for the canonical seeds. Each coefficient is
+  -- reduced modulo its original prime. Even the largest possible state
+  -- times coefficient plus three Unicode scalars times coefficients fits Int64.
+  -- The exported signed-seed and indexed recurrences retain their old domain.
+  canonicalFingerprintState chars a b = case chars of {
+    (:) c0 ((:) c1 ((:) c2 ((:) c3 rest))) -> let {
+      x0 = charCode c0; x1 = charCode c1; x2 = charCode c2; x3 = charCode c3;
+      nextA = (a * 1172642095 + x0 * 780718649 + x1 * 8261507 + x2 * 65599 + x3) % 2147483647;
+      nextB = (b * 294499921 + x0 * 2248091 + x1 * 17161 + x2 * 131 + x3) % 2147483629
+    } in seq nextA (seq nextB (canonicalFingerprintState rest nextA nextB));
+    _ -> fingerprintStateChars chars a b
+  };
+  fingerprint text = case canonicalFingerprintState (textToChars text) 0 1 of {
+    (,) a b -> showInt a ++ "-" ++ showInt b
+  };
   -- Exact summaries of the two existing rolling checksums. A summary composes
   -- with a canonical nonnegative rolling state, so datatype prefixes need not be rescanned
   -- for every independently checked fragment. The serialized digest is unchanged.
@@ -525,7 +541,7 @@ module Bootstrap.Separate where {
          if ((count % 2) == 0) then squared else ((squared * base) % modulus);
   fingerprintPart :: String -> (,,,) Int Int Int Int;
   fingerprintPart text =
-    case fingerprintStateFrom text 0 0 0 of {
+    case canonicalFingerprintState (textToChars text) 0 0 of {
       (,) a b ->
         (,,,) (fingerprintPower 65599 (stringLength text) 2147483647)
           (fingerprintPower 131 (stringLength text) 2147483629)

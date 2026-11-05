@@ -3,6 +3,8 @@
 import copy
 import json
 import tempfile
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 from check_manifest_snapshot import snapshot, strict_object
@@ -21,6 +23,47 @@ class SnapshotControls(unittest.TestCase):
     def save(self, value=None):
         self.manifest.write_text(json.dumps(value if value is not None else self.value))
         return snapshot(self.manifest)
+
+    def lock_cli(self, raw):
+        (self.root / 'mlf.lock').write_text(raw)
+        return subprocess.run(
+            [sys.executable, '-B', str(Path(__file__).with_name('check_manifest_snapshot.py')),
+             '--manifest', str(self.manifest)], capture_output=True, text=True)
+
+    def test_cli_compact_and_formatted_lock(self):
+        value = self.save()
+        for raw in [json.dumps(value, sort_keys=True, separators=(',', ':')) + '\n',
+                    json.dumps(value, indent=2) + '\n']:
+            with self.subTest(raw=raw[:20]):
+                result = self.lock_cli(raw)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_cli_source_digest_change_refused(self):
+        value = self.save()
+        value['packages'][0]['sources']['Main.emlf'] = '0' * 64
+        result = self.lock_cli(json.dumps(value))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('lock differs', result.stderr)
+
+    def test_cli_duplicate_lock_key_refused(self):
+        value = self.save()
+        result = self.lock_cli('{"format":1,' + json.dumps(value)[1:])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('duplicate JSON key', result.stderr)
+
+    def test_cli_boolean_format_refused(self):
+        value = self.save()
+        value['format'] = True
+        result = self.lock_cli(json.dumps(value))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('lock differs', result.stderr)
+
+    def test_cli_float_format_refused(self):
+        value = self.save()
+        value['format'] = 1.0
+        result = self.lock_cli(json.dumps(value))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('lock differs', result.stderr)
 
     def test_plain_snapshot_and_source_change(self):
         first = self.save()

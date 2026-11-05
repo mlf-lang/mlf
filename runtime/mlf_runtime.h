@@ -13,6 +13,7 @@
  * tuple arities2..64, and source stack frames7/evidence8. No earlier ABI guard is exported: old generated
  * objects must use their frozen old runtime, not silently cross this boundary. */
 void mlf_require_haskell_boundary_v4_abi(void);
+void mlf_require_byte_file_v2_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;

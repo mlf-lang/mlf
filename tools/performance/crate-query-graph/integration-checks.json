@@ -1,0 +1,470 @@
+{
+  "format": 1,
+  "complete": true,
+  "integrated_upstream_commit": "5ee8f67a709b2903d0b6a7537fefc1994677317f",
+  "producer_receipt": {
+    "path": "/Users/ares/.codex/worktrees/crate-query-graph/mlf/.mlf-build/query-pr29-merge/receipt.json",
+    "sha256": "7271edb587b2d85e5429a484890b34827686a215c8592654acd9ca9d78a2e79c",
+    "bytes": 1048211
+  },
+  "compiler": {
+    "path": "/Users/ares/.codex/worktrees/crate-query-graph/mlf/.mlf-build/query-pr29-merge/bin/emlf",
+    "sha256": "510db4dbc1b61cf24cc948d5e32e27629c63827c6a150b31441ebe575b45c26e"
+  },
+  "legacy_query_controls": {
+    "receipt": {
+      "path": "/private/tmp/mlf-query-pr29-push-legacy/receipt.json",
+      "sha256": "5d7f02705ea504918afd01ba49a124283a6c798e319caf7a132a8e011f8f9793",
+      "bytes": 122382
+    },
+    "inner_receipt": {
+      "path": "/private/tmp/mlf-query-pr29-push-legacy/controls/receipt.json",
+      "sha256": "93ee8dfc1e266f2766a7fa87ce246883d4c0e90b798073c1ec77d94da28375c1",
+      "bytes": 264820
+    },
+    "command_count": 29,
+    "commands": [
+      "helper",
+      "raw-final",
+      "query-cold",
+      "query-warm",
+      "query-install-legacy",
+      "query-mixed-old-new",
+      "query-one-value-change",
+      "query-changed-warm",
+      "query-missing-context",
+      "query-corrupt-context",
+      "query-corrupt-record",
+      "left-legacy",
+      "lock-after-legacy",
+      "left-source",
+      "lock-after-source",
+      "empty-stale-success",
+      "empty-directory-failure",
+      "lock-after-empty-directory",
+      "cleanup-dual-failure",
+      "lock-after-cleanup-dual",
+      "concurrent-a",
+      "concurrent-b",
+      "memo-helper",
+      "memo-query",
+      "context-directory-setup",
+      "context-directory-reject",
+      "context-stage-cleanup-failure",
+      "decoder-differential",
+      "window-helper"
+    ],
+    "decoder_differential": {
+      "seed_before": {
+        "directory": {
+          "device": 16777232,
+          "inode": 437815257,
+          "mode": 16877,
+          "links": 11,
+          "bytes": 352,
+          "blocks": 0,
+          "mtime_ns": 1793753194061531860,
+          "ctime_ns": 1793753194061531860,
+          "children": [
+            ".lock",
+            "box.mlfq",
+            "context-2fa9451c7e39f672ee10562e5706406826399575524b4d0e2e6c126d49d8dbea.mlfqc",
+            "context-581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389.mlfqc",
+            "fallback.mlfq",
+            "legacy2.mlfq",
+            "pooled.mlfq",
+            "record.mlfq",
+            "second.mlfq"
+          ],
+          "directory_entry_names_sha256": "5a00071fc4a1e21620e08317c288a3b8a79019157a08eef002eb5c487c79a967",
+          "directory_hash_scope": "sorted immediate entry names, not directory contents"
+        },
+        "files": {
+          ".lock": {
+            "st_dev": 16777232,
+            "st_ino": 437815258,
+            "st_mode": 33152,
+            "st_nlink": 1,
+            "st_size": 0,
+            "st_mtime_ns": 1793753193898126165,
+            "st_ctime_ns": 1793753193898147207,
+            "st_blocks": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "box.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815278,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 430,
+            "st_mtime_ns": 1793753194058402010,
+            "st_ctime_ns": 1793753194059767494,
+            "st_blocks": 8,
+            "sha256": "b255c40907f432262fd5eed6ea150f38dda8eb871c12e6d46334be91ca969116"
+          },
+          "context-2fa9451c7e39f672ee10562e5706406826399575524b4d0e2e6c126d49d8dbea.mlfqc": {
+            "st_dev": 16777232,
+            "st_ino": 437815277,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 113,
+            "st_mtime_ns": 1793753194056057383,
+            "st_ctime_ns": 1793753194057946585,
+            "st_blocks": 8,
+            "sha256": "2fa9451c7e39f672ee10562e5706406826399575524b4d0e2e6c126d49d8dbea"
+          },
+          "context-581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389.mlfqc": {
+            "st_dev": 16777232,
+            "st_ino": 437815259,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 87,
+            "st_mtime_ns": 1793753193973946278,
+            "st_ctime_ns": 1793753193973946278,
+            "st_blocks": 8,
+            "sha256": "581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389"
+          },
+          "fallback.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815273,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 326,
+            "st_mtime_ns": 1793753193976545535,
+            "st_ctime_ns": 1793753193978121231,
+            "st_blocks": 8,
+            "sha256": "8a24f348b22257dc739ab32312776d10fa156cd2891f33a77f2de0199723d78e"
+          },
+          "legacy2.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815274,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 119329,
+            "st_mtime_ns": 1793753193986619763,
+            "st_ctime_ns": 1793753193988331628,
+            "st_blocks": 240,
+            "sha256": "d1c9a20ffcc74cafb41170187094d90bc300548c5dcf30a721c0b136fda09fa1"
+          },
+          "pooled.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815266,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 376,
+            "st_mtime_ns": 1793753193964996863,
+            "st_ctime_ns": 1793753193966654435,
+            "st_blocks": 8,
+            "sha256": "ed6c1bc7e3bb47f5b654228553a5c0f281d9cb4e103b9f5487ebb9710b5fc02c"
+          },
+          "record.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815260,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 376,
+            "st_mtime_ns": 1793753193914889351,
+            "st_ctime_ns": 1793753193916429963,
+            "st_blocks": 8,
+            "sha256": "ed6c1bc7e3bb47f5b654228553a5c0f281d9cb4e103b9f5487ebb9710b5fc02c"
+          },
+          "second.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815272,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 377,
+            "st_mtime_ns": 1793753193974439579,
+            "st_ctime_ns": 1793753193976026359,
+            "st_blocks": 8,
+            "sha256": "bf3a8981278215f448e468e53d006966f5942703e83c3df57e4e1b833f988f90"
+          }
+        },
+        "references": {
+          "record.mlfq": "581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389",
+          "second.mlfq": "581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389",
+          "box.mlfq": "2fa9451c7e39f672ee10562e5706406826399575524b4d0e2e6c126d49d8dbea"
+        },
+        "source_record_count": 3,
+        "context_count": 2,
+        "all_regular_files": 9,
+        "identity_scope": "dev/ino/mode/nlink/size/mtime/ctime/blocks/full SHA; atime deliberately excluded"
+      },
+      "expected_right": [
+        "writer-raw41",
+        "writer-second-raw41",
+        "writer-box-context",
+        "codec-raw42-original-key",
+        "codec-raw42-other-key",
+        "unicode-scalar-framing"
+      ],
+      "expected_left": [
+        "compact-field-tag",
+        "compact-field-crate",
+        "compact-field-compiler",
+        "compact-field-members",
+        "compact-field-bindings",
+        "compact-field-prepared",
+        "compact-field-contracts",
+        "compact-field-scopes",
+        "compact-leading-zero-length",
+        "compact-truncated",
+        "compact-trailing-bytes",
+        "compact-seven-fields",
+        "compact-nine-fields",
+        "compact-empty",
+        "compact-nondigit-length",
+        "unicode-utf8-length",
+        "unicode-utf16-length",
+        "unicode-short-scalar-length",
+        "full-key-leading-zero-length",
+        "full-key-truncated",
+        "full-key-trailing-bytes",
+        "full-key-eight-fields",
+        "full-key-ten-fields",
+        "full-key-wrong-tag",
+        "single-expected-context-field",
+        "same-context-other-record-key",
+        "same-context-other-expected-key",
+        "actual-datatypes-mismatch",
+        "box-layout-mismatch",
+        "context-carrier-mismatch",
+        "context-carrier-wrong-tag",
+        "context-carrier-leading-zero-length",
+        "context-carrier-truncated",
+        "context-carrier-extra-field",
+        "record-wrong-format",
+        "record-invalid-reference",
+        "actual-digest-mismatch",
+        "record-leading-zero-length",
+        "record-truncated",
+        "record-trailing-bytes",
+        "record-three-fields",
+        "record-five-fields",
+        "payload-empty",
+        "owner-mismatch",
+        "binding-mismatch",
+        "declaration-mismatch",
+        "priority-framing-before-key",
+        "priority-truncation-before-key",
+        "priority-record-shape-before-key",
+        "priority-reference-before-key",
+        "priority-key-before-context",
+        "priority-datatypes-before-compact",
+        "priority-context-before-compact",
+        "priority-compact-framing-before-payload",
+        "priority-key-mismatch-before-payload",
+        "priority-payload-before-owner",
+        "priority-owner-before-declarations"
+      ],
+      "case_count": 63,
+      "scope": "explicit legacy-only stateless decoder API differential against frozen P body; real binary seed IO is independently inspected, then fixture derives separate legacy in-memory seeds and their own legacy context SHA; all 63 full Right bytes and exact Left errors remain unchanged",
+      "not_a_prepared_raw_or_performance_claim": true,
+      "seed_after": {
+        "directory": {
+          "device": 16777232,
+          "inode": 437815257,
+          "mode": 16877,
+          "links": 11,
+          "bytes": 352,
+          "blocks": 0,
+          "mtime_ns": 1793753194061531860,
+          "ctime_ns": 1793753194061531860,
+          "children": [
+            ".lock",
+            "box.mlfq",
+            "context-2fa9451c7e39f672ee10562e5706406826399575524b4d0e2e6c126d49d8dbea.mlfqc",
+            "context-581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389.mlfqc",
+            "fallback.mlfq",
+            "legacy2.mlfq",
+            "pooled.mlfq",
+            "record.mlfq",
+            "second.mlfq"
+          ],
+          "directory_entry_names_sha256": "5a00071fc4a1e21620e08317c288a3b8a79019157a08eef002eb5c487c79a967",
+          "directory_hash_scope": "sorted immediate entry names, not directory contents"
+        },
+        "files": {
+          ".lock": {
+            "st_dev": 16777232,
+            "st_ino": 437815258,
+            "st_mode": 33152,
+            "st_nlink": 1,
+            "st_size": 0,
+            "st_mtime_ns": 1793753193898126165,
+            "st_ctime_ns": 1793753193898147207,
+            "st_blocks": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "box.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815278,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 430,
+            "st_mtime_ns": 1793753194058402010,
+            "st_ctime_ns": 1793753194059767494,
+            "st_blocks": 8,
+            "sha256": "b255c40907f432262fd5eed6ea150f38dda8eb871c12e6d46334be91ca969116"
+          },
+          "context-2fa9451c7e39f672ee10562e5706406826399575524b4d0e2e6c126d49d8dbea.mlfqc": {
+            "st_dev": 16777232,
+            "st_ino": 437815277,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 113,
+            "st_mtime_ns": 1793753194056057383,
+            "st_ctime_ns": 1793753194057946585,
+            "st_blocks": 8,
+            "sha256": "2fa9451c7e39f672ee10562e5706406826399575524b4d0e2e6c126d49d8dbea"
+          },
+          "context-581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389.mlfqc": {
+            "st_dev": 16777232,
+            "st_ino": 437815259,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 87,
+            "st_mtime_ns": 1793753193973946278,
+            "st_ctime_ns": 1793753193973946278,
+            "st_blocks": 8,
+            "sha256": "581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389"
+          },
+          "fallback.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815273,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 326,
+            "st_mtime_ns": 1793753193976545535,
+            "st_ctime_ns": 1793753193978121231,
+            "st_blocks": 8,
+            "sha256": "8a24f348b22257dc739ab32312776d10fa156cd2891f33a77f2de0199723d78e"
+          },
+          "legacy2.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815274,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 119329,
+            "st_mtime_ns": 1793753193986619763,
+            "st_ctime_ns": 1793753193988331628,
+            "st_blocks": 240,
+            "sha256": "d1c9a20ffcc74cafb41170187094d90bc300548c5dcf30a721c0b136fda09fa1"
+          },
+          "pooled.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815266,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 376,
+            "st_mtime_ns": 1793753193964996863,
+            "st_ctime_ns": 1793753193966654435,
+            "st_blocks": 8,
+            "sha256": "ed6c1bc7e3bb47f5b654228553a5c0f281d9cb4e103b9f5487ebb9710b5fc02c"
+          },
+          "record.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815260,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 376,
+            "st_mtime_ns": 1793753193914889351,
+            "st_ctime_ns": 1793753193916429963,
+            "st_blocks": 8,
+            "sha256": "ed6c1bc7e3bb47f5b654228553a5c0f281d9cb4e103b9f5487ebb9710b5fc02c"
+          },
+          "second.mlfq": {
+            "st_dev": 16777232,
+            "st_ino": 437815272,
+            "st_mode": 33188,
+            "st_nlink": 1,
+            "st_size": 377,
+            "st_mtime_ns": 1793753193974439579,
+            "st_ctime_ns": 1793753193976026359,
+            "st_blocks": 8,
+            "sha256": "bf3a8981278215f448e468e53d006966f5942703e83c3df57e4e1b833f988f90"
+          }
+        },
+        "references": {
+          "record.mlfq": "581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389",
+          "second.mlfq": "581f6fdc6a295705bbbb593084ad97ea66b698dc418182460b15b484f9208389",
+          "box.mlfq": "2fa9451c7e39f672ee10562e5706406826399575524b4d0e2e6c126d49d8dbea"
+        },
+        "source_record_count": 3,
+        "context_count": 2,
+        "all_regular_files": 9,
+        "identity_scope": "dev/ino/mode/nlink/size/mtime/ctime/blocks/full SHA; atime deliberately excluded"
+      },
+      "seed_identity_unchanged": true,
+      "complete": true
+    },
+    "scope": "Retained legacy Query API, codecs, contexts, locks and helper windows. Eleven obsolete old-format Session commands are not included; graph CLI and same-process Session controls are recorded separately in evidence.json."
+  },
+  "provenance_unit_controls": {
+    "log": {
+      "path": "/private/tmp/mlf-query-pr29-merge-provenance-final.log",
+      "sha256": "ef5becf1974fb4fb1e2a3f2503cbb88bb6d5cb1b059443935aa8d0985ad34eed",
+      "bytes": 12631
+    },
+    "tests": 86,
+    "skipped": 4,
+    "source": {
+      "path": "/Users/ares/.codex/worktrees/crate-query-graph/mlf/tools/shared/test_provenance.py",
+      "sha256": "40a989340842bb59579c24a4e92e190fff231f7e9e311fe60d5849e03cdfce83",
+      "bytes": 47606
+    },
+    "scope": "Control-framework and manifest regression suite; four /proc-dependent process cleanup tests skipped on macOS."
+  },
+  "locked_package_plan": {
+    "log": {
+      "path": "/private/tmp/mlf-query-pr29-push-locked-plan.log",
+      "sha256": "e75caac8dc1ce29efc19c8f1831010253266bde0489e06a3dcbaf2cf3fcac75a",
+      "bytes": 22115
+    },
+    "lock": {
+      "path": "/Users/ares/.codex/worktrees/crate-query-graph/mlf/mlf.lock",
+      "sha256": "3e410f09732ed30926efce187304630d937bd9a9140feb7dabb665c5420df5e9",
+      "bytes": 15858
+    },
+    "packages_match_lock": true,
+    "command": [
+      ".mlf-build/query-pr29-merge/bin/mlfpkg",
+      "--offline",
+      "--locked",
+      "plan"
+    ]
+  },
+  "control_sources": {
+    "tools/shared/test_source_context_cache.py": "8dcc3e6115acba369e39a28d87d0642b3f4eb97751a57efcab29fa7d9e6e964a",
+    "tools/shared/run_context_controls.py": "b3dfbed5cf1f235e01713dbffd9e4aa2c21a69a45d9edc5ed2dcfaf36754a83d",
+    "tools/performance/patricia/run_fingerprint.py": "e3d8726e48ac70bbc524343c1709ed5ee6282dd77cfe33efb8c0968328d246bc",
+    "tools/performance/patricia/test_fingerprint_core.py": "a6f0ac234f40750224759d68e7566212744c39fa4e614a0159894292999ad6e9",
+    ".github/workflows/ci.yml": "d1471993f0d66e9989163dfb6bf1eaa0d4134fd9b1c83e0e31cfd2d5e142642a"
+  },
+  "additional_upstream_commit": "4f913c873ad0842c4430afaa715cba77cf4d45fd",
+  "production_inputs_reverified_after_additional_merge": {
+    "shared_inputs": 135,
+    "host_inputs": 33,
+    "configuration_inputs": 19
+  },
+  "core_binding_controls": {
+    "normal": {
+      "tests": 10,
+      "log": {
+        "path": "/private/tmp/mlf-query-pr29-push-core-tests.log",
+        "sha256": "643c7cfc3921e5830e047bed28578bc933677c101c9c5a9f6610b6207052d03c",
+        "bytes": 109
+      },
+      "text": "..........\n----------------------------------------------------------------------\nRan 10 tests in 0.002s\n\nOK\n"
+    },
+    "optimized": {
+      "tests": 10,
+      "log": {
+        "path": "/private/tmp/mlf-query-pr29-push-core-tests-optimized.log",
+        "sha256": "cf8d3a2572a7898fcf32a4c2dd1445509b3d59e66061853243c4627f80695068",
+        "bytes": 109
+      },
+      "text": "..........\n----------------------------------------------------------------------\nRan 10 tests in 0.001s\n\nOK\n"
+    }
+  }
+}

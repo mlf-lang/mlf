@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 12134,
+  "new_sha256": "699b031d3b623b06db1bcbee5b8e0b7e68da04ae94407d62d1c7400eec2abdcd",
+  "old_bytes": 12056,
+  "old_sha256": "9eb67b3a3e7f3591f051a8627bb466209a3be39436d58f48db8efc89f936fbac",
+  "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+  "splices": [
+    {
+      "new": "IHwKICAgIFBSZWFkQnl0ZUZpbGVPckVycm9yIHwKICAgIFBXcml0ZUJ5dGVGaWxlT3JFcnJvciB8CiAgICBQQnl0ZUFycmF5RGlnZXN0",
+      "new_at": 3944,
+      "old": "",
+      "old_at": 3944
+    }
+  ]
+}

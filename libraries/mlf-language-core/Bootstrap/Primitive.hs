@@ -138,7 +138,10 @@ module Bootstrap.Primitive where {
       PShowInteger -> 125;
       PReadInteger -> 126;
       PIntegerToDouble -> 127;
-      PUnsignedLtInt -> 128
+      PUnsignedLtInt -> 128;
+      PReadByteFileOrError -> 129;
+      PWriteByteFileOrError -> 130;
+      PByteArrayDigest -> 131
     };
   primitiveName :: Primitive -> String;
   primitiveName p =
@@ -271,7 +274,10 @@ module Bootstrap.Primitive where {
       PShowInteger -> "showInteger";
       PReadInteger -> "readInteger";
       PIntegerToDouble -> "integerToDouble";
-      PUnsignedLtInt -> "unsignedLtInt"
+      PUnsignedLtInt -> "unsignedLtInt";
+      PReadByteFileOrError -> "readByteFileOrError";
+      PWriteByteFileOrError -> "writeByteFileOrError";
+      PByteArrayDigest -> "byteArrayDigest"
     };
   legacyPrimitives :: [] Primitive;
   legacyPrimitives =
@@ -441,7 +447,7 @@ module Bootstrap.Primitive where {
                                                                                                                                                                                                                                                                                                 []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   allPrimitives :: [] Primitive;
   allPrimitives = S.append legacyPrimitives
-    [PTextToChars, PTextFromChars, PCharCode, PCharFromCode, PUserError, PIOError, PCatchIOError, PIOErrorString, PEmptyCallStack, PPushCallStack, PPrettyCallStack, PIOErrorWithStack, PConcatStringList, POrInt, PXorInt, PShiftLInt, PShiftRInt, PUnsignedShiftRInt, PCountLeadingZerosInt, PCountTrailingZerosInt, PPopCountInt, PIntToInteger, PIntegerToInt, PAddInteger, PSubInteger, PMulInteger, PQuotInteger, PRemInteger, PEqInteger, PLtInteger, PShowInteger, PReadInteger, PIntegerToDouble, PUnsignedLtInt];
+    [PTextToChars, PTextFromChars, PCharCode, PCharFromCode, PUserError, PIOError, PCatchIOError, PIOErrorString, PEmptyCallStack, PPushCallStack, PPrettyCallStack, PIOErrorWithStack, PConcatStringList, POrInt, PXorInt, PShiftLInt, PShiftRInt, PUnsignedShiftRInt, PCountLeadingZerosInt, PCountTrailingZerosInt, PPopCountInt, PIntToInteger, PIntegerToInt, PAddInteger, PSubInteger, PMulInteger, PQuotInteger, PRemInteger, PEqInteger, PLtInteger, PShowInteger, PReadInteger, PIntegerToDouble, PUnsignedLtInt, PReadByteFileOrError, PWriteByteFileOrError, PByteArrayDigest];
   lookupTargetPrimitive :: String -> Maybe Primitive;
   lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives;
   lookupPrimitive :: String -> Maybe Primitive;
@@ -610,6 +616,13 @@ module Bootstrap.Primitive where {
         (,) ((:) ((,) "a" Star) ((:) ((,) "b" Star) []))
           (Function (Parameter "a") (Function (Parameter "b") (Parameter "b")));
       PPanic -> (,) ((:) ((,) "a" Star) []) (Function (Applied "String" []) (Parameter "a"));
+      PReadByteFileOrError ->
+        (,) [] (Function (Applied "String" []) (Function (Applied "Int" [])
+          (Applied "IO" [Applied "(,)" [Applied "String" [], Applied "ByteArray" []]])));
+      PWriteByteFileOrError ->
+        (,) [] (Function (Applied "String" []) (Function (Applied "ByteArray" [])
+          (Applied "IO" [Applied "String" []])));
+      PByteArrayDigest -> (,) [] (Function (Applied "ByteArray" []) (Applied "IO" [Applied "String" []]));
       PReadFile ->
         (,) [] (Function (Applied "String" []) (Applied "IO" ((:) (Applied "String" []) [])));
       PWriteFile ->
@@ -926,7 +939,10 @@ module Bootstrap.Primitive where {
       PShowInteger -> 1;
       PReadInteger -> 1;
       PIntegerToDouble -> 1;
-      PUnsignedLtInt -> 2
+      PUnsignedLtInt -> 2;
+      PReadByteFileOrError -> 2;
+      PWriteByteFileOrError -> 2;
+      PByteArrayDigest -> 1
     };
   fieldArity :: Field -> Int;
   fieldArity field =
@@ -936,7 +952,7 @@ module Bootstrap.Primitive where {
     };
   primitiveStrict :: Primitive -> Bool;
   primitiveStrict p =
-    ((primitiveCode p >= 108) || ((primitiveCode p >= 95) && (primitiveCode p <= 98)) ||
+    (((primitiveCode p >= 108) && (primitiveCode p <= 128)) || ((primitiveCode p >= 95) && (primitiveCode p <= 98)) ||
      (primitiveCode p == 68) || (primitiveCode p == 107) ||
      S.elem eqInt (primitiveCode p)
        ((:) 6

@@ -97,12 +97,15 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_128_modules_13_executables(self):
+    def test_closed_corpus_has_matching_135_modules_13_executables(self):
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 128)
+        self.assertEqual(len(manifest['modules']), 135)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 128)
+        self.assertEqual(len(modules), 135)
         for name, path, role in (
+            ('Bootstrap.Bitstream', 'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'implementation'),
+            ('Bootstrap.ArtifactStorage', 'libraries/mlf-crates/Bootstrap/ArtifactStorage.hs', 'implementation'),
+            ('Bootstrap.ArtifactStructure', 'libraries/mlf-crates/Bootstrap/ArtifactStructure.hs', 'implementation'),
             ('Bootstrap.IntTree', 'libraries/mlf-foundation/Bootstrap/IntTree.hs', 'implementation'),
             ('Bootstrap.IntRank', 'libraries/mlf-foundation/Bootstrap/IntRank.hs', 'implementation'),
             ('Bootstrap.CrateSession', 'libraries/mlf-crates/Bootstrap/CrateSession.hs', 'implementation'),
@@ -112,6 +115,10 @@ class ManifestParity(unittest.TestCase):
             ('Bootstrap.Standalone', 'libraries/mlf-frontend/Bootstrap/Standalone.hs', 'implementation'),
             ('Bootstrap.EvidenceBoundary', 'libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs', 'implementation'),
             ('Bootstrap.SourceInference', 'libraries/mlf-crates/Bootstrap/SourceInference.hs', 'implementation'),
+            ('Bootstrap.SourceUnit', 'libraries/mlf-crates/Bootstrap/SourceUnit.hs', 'implementation'),
+            ('Bootstrap.OpenFragment', 'libraries/mlf-crates/Bootstrap/OpenFragment.hs', 'implementation'),
+            ('Bootstrap.QueryGraph', 'libraries/mlf-crates/Bootstrap/QueryGraph.hs', 'implementation'),
+            ('Bootstrap.CrateGraph', 'libraries/mlf-crates/Bootstrap/CrateGraph.hs', 'implementation'),
             ('Bootstrap.BuiltinPreludeContext', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs', 'implementation'),
             ('Bootstrap.BuiltinPreludeLiteral', 'libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs', 'implementation'),
             ('Bootstrap.ImportParameters', 'libraries/mlf-crates/Bootstrap/ImportParameters.hs', 'implementation'),
@@ -240,8 +247,26 @@ class InferredSchemeEvidence(unittest.TestCase):
             build.audit_inferred_interfaces(self.log('Example', ''), {'Example': {}})
 
     def test_literal_polymorphism_rejected(self):
+        for constraint in ['Num', 'Fractional', 'IsString']:
+            with self.subTest(constraint=constraint):
+                with self.assertRaisesRegex(RuntimeError, 'unresolved host literal'):
+                    build.audit_inferred_interfaces(self.log('Example',
+                        'TYPE SIGNATURES\n  value :: ' + constraint + ' a => a\n'), {'Example': {}})
+
+    def test_private_overloaded_error_rejected(self):
+        name = 'Bootstrap.OpenFragment'
+        scheme = ('  restoreFinals8 :: forall {e}. IsString e => [PackageFinalFields8] -> '
+                  '[XTerm] -> Either e [(String, Fragment)]\n')
         with self.assertRaisesRegex(RuntimeError, 'unresolved host literal'):
-            build.audit_inferred_interfaces(self.log('Example', 'TYPE SIGNATURES\n  value :: Num a => a\n'), {'Example': {}})
+            build.audit_inferred_interfaces(self.log(name, 'TYPE SIGNATURES\n' + scheme), {name: {}})
+
+    def test_concrete_private_error_accepted(self):
+        name = 'Bootstrap.OpenFragment'
+        scheme = ('  restoreFinals8 :: [PackageFinalFields8] -> [XTerm] -> '
+                  'Either String [(String, Fragment)]\n')
+        result = build.audit_inferred_interfaces(self.log(name, 'TYPE SIGNATURES\n' + scheme), {name: {}})
+        self.assertEqual(result[name]['signatures'], scheme)
+        self.assertIs(result[name]['unresolved_literal_constraints'], False)
 
     def test_actual_monomorphic_scheme_accepted(self):
         result = build.audit_inferred_interfaces(self.log('Example', 'TYPE SIGNATURES\n  value :: Int\n'), {'Example': {}})
