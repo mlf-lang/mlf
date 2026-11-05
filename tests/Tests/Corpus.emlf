@@ -2,6 +2,7 @@
 module Tests.Corpus where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as M
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Tests.Helpers as H
@@ -40,7 +41,7 @@ boundParameter flag name bound = case (,) flag bound of
 annotationTerms =
  let identityExpr = SLam "x" Nothing (SVar "x") in
  let identityType = SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a")) in
- let types = (:) SBottom ((:) (SCon "Int" []) ((:) (SCon "Bool" []) ((:) identityType ((:) (SForall Flexible "a" SBottom (SCon "List" ((:) (STVar "a") []))) ((:) (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) []))))) in
+ let types = (:) SBottom ((:) (SCon "Int" []) ((:) (SCon "Bool" []) ((:) identityType ((:) (SForall Flexible "a" SBottom (SCon "[]" ((:) (STVar "a") []))) ((:) (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) []))))) in
  let nested = S.append types (S.concatMap (\a -> S.map (SArrow a) types) types) in
  S.concatMap (\ty -> (:) (SAnn identityExpr (SAnnotation [] (SArrow ty ty))) ((:) (SLam "x" (Just (SAnnotation [] ty)) (SVar "x")) ((:) (SLet "f" (SAnn identityExpr (SAnnotation [] (SArrow ty ty))) (SVar "f")) []))) nested
 rows directory = do
@@ -61,6 +62,7 @@ regenerate directory group expressions oracle manifest = do
 -- language semantics: their import cycles contain no recursive value group,
 -- and their entry expression is the integer literal 42. The prescribed type
 -- and reference target below are independent of the candidate compiler.
+crateCycleExpectation : String -> Maybe ((,,) String String String)
 crateCycleExpectation identity = case identity of
  "module-reject-000025" -> Just ((,,) "cycle includes chain" "Main -> A -> B -> A" "import A\n42\n")
  "module-reject-000026" -> Just ((,,) "self import" "Main -> Main" "module Main where\nimport Main\nmain = 42\n\n")
@@ -99,12 +101,110 @@ migrateCrateCycles directory manifest = do
  writeFile (directory ++ "/" ++ crateCycleReference) "42\n"
  -- Preserve every other historical row byte-for-byte, including its oracle.
  writeFile (directory ++ "/manifest.jsonl") (S.unlines (S.map (\((,) line row) -> if isCrateCycle row then J.render row else line) (S.zip lines migrated)))
+-- Finite authenticated migration of frozen source/API representations.
+-- The archive and original manifest remain immutable. The reviewed sidecar
+-- fixes full old rows and exact old/current/projected source hashes. Expected
+-- types are structural projections of the frozen independent oracle, never
+-- candidate-inferred types. Custom List/Pair/Unit declarations remain nominal.
+-- The existing two crate-cycle acceptance migrations are kept separate.
+data SourceApiRegistry = SourceApiRegistry ([] J.Json) (Map String J.Json) (Map String J.Json)
+sourceApiEntries (SourceApiRegistry entries _ _) = entries
+sourceApiTable (SourceApiRegistry _ identities _) = identities
+sourceApiPaths (SourceApiRegistry _ _ paths) = paths
+loadSourceApiRegistry : String -> IO SourceApiRegistry
+loadSourceApiRegistry root = do
+ let path = root ++ "/tests/golden/parity-source-api.json"
+ raw <- readFile path
+ digest <- sourceApiDigest raw
+ H.assert (eqString digest "23e857328a652604d0f08125bdda256d57f1237f7955d86774e998cbef2680ff") "fixed source/API migration registry changed"
+ value <- H.right (J.parse raw)
+ case value of
+  J.Array entries -> do
+   let identities = M.fromList compareString (S.map (\entry -> ((,) (sourceApiIdentity entry) entry)) entries)
+   let paths = M.fromList compareString (S.map (\entry -> ((,) (sourceApiPath entry) entry)) entries)
+   H.assert (S.length entries == 179 && M.size identities == 179 && M.size paths == 179) "source/API registry identities or paths are not exact and unique"
+   return (SourceApiRegistry entries identities paths)
+  _ -> H.fail "source/API migration registry must be an array"
+sourceApiIdentity entry = J.getText "id" "" entry
+sourceApiPath entry = J.getText "source_path" "" entry
+sourceApiLookup registry identity = M.lookup compareString identity (sourceApiTable registry)
+sourceApiLookupPath registry path = M.lookup compareString path (sourceApiPaths registry)
+sourceApiRowMatches : J.Json -> J.Json -> Bool
+sourceApiRowMatches entry row = J.equal row (J.get "old_row" entry)
+sourceApiRowsMatch : SourceApiRegistry -> [] J.Json -> Bool
+sourceApiRowsMatch registry manifest =
+ let selected = S.filter (\row -> S.isJust (sourceApiLookup registry (J.getText "id" "" row))) manifest in
+ let actual = M.fromList compareString (S.map (\row -> ((,) (J.getText "id" "" row) row)) selected) in
+ S.length (sourceApiEntries registry) == 179 && M.size (sourceApiTable registry) == 179 && M.size (sourceApiPaths registry) == 179 && S.length selected == 179 && M.size actual == 179 &&
+ S.all (\entry -> case M.lookup compareString (sourceApiIdentity entry) actual of { Just row -> sourceApiRowMatches entry row; Nothing -> false }) (sourceApiEntries registry)
+sourceApiHashesMatch : J.Json -> String -> String -> Bool
+sourceApiHashesMatch entry old fresh = eqString old (J.getText "old_source_sha256" "" entry) && eqString fresh (J.getText "new_source_sha256" "" entry)
+sourceApiDigest : String -> IO String
+sourceApiDigest text = do { bytes <- byteArrayFromString text; byteArrayDigest bytes }
+prepareSourceApi : SourceApiRegistry -> String -> String -> [] J.Json -> IO ()
+prepareSourceApi registry root directory manifest = do
+ H.assert (sourceApiRowsMatch registry manifest) "source/API migration identities or frozen oracles changed"
+ S.mapM_ (\entry -> do
+  let path = directory ++ "/" ++ sourceApiPath entry
+  old <- fileDigest path
+  let fresh = J.getText "new_source" "" entry
+  freshHash <- sourceApiDigest fresh
+  H.assert (sourceApiHashesMatch entry old freshHash) ("source/API migration bytes changed: " ++ sourceApiIdentity entry)
+  if O.starts "repository/" (sourceApiPath entry) then do
+   current <- fileDigest (root ++ "/" ++ O.relative "repository" (sourceApiPath entry))
+   H.assert (eqString current (J.getText "checkout_source_sha256" "" entry)) "source/API checkout input changed"
+  else return ()
+  writeFile path fresh) (sourceApiEntries registry)
+-- The sidecar authenticates the complete original row, including these three
+-- descriptive identities. Keep its oracle/configuration fields in the output
+-- provenance without repeating identities already excluded by the existing
+-- parity execution key. This preserves the original 11 exact shared pairs;
+-- every oracle, configuration, and unknown field still participates in it.
+sourceApiPreviousOracle row = J.Object (S.filter (\entry -> S.not (S.elem eqString (S.fst entry) ((:) "id" ((:) "label" ((:) "source_path" []))))) (J.items row))
+migrateSourceApiRow : SourceApiRegistry -> J.Json -> IO J.Json
+migrateSourceApiRow registry row = case sourceApiLookup registry (J.getText "id" "" row) of
+ Nothing -> return row
+ Just entry -> do
+  H.assert (sourceApiRowMatches entry row) "source/API migration frozen row changed"
+  let prescribed = S.foldl (\changed ((,) key value) -> J.set key value changed) row (J.items (J.get "updates" entry))
+  let provenance = J.set "previous_oracle" (sourceApiPreviousOracle row) prescribed
+  let hashes = J.set "previous_source_sha256" (J.get "old_source_sha256" entry) (J.set "source_sha256" (J.get "new_source_sha256" entry) (J.set "checkout_source_sha256" (J.get "checkout_source_sha256" entry) provenance))
+  return (J.set "source_api_migration" (J.str "canonical-prelude-source-api-v1") (J.set "source_api_basis" (J.get "reason" entry) hashes))
+checkRepositoryInput : SourceApiRegistry -> String -> String -> String -> IO ()
+checkRepositoryInput registry root directory path = do
+ let relative = O.relative (directory ++ "/repository") path
+ current <- readFile (root ++ "/" ++ relative)
+ original <- readFile path
+ case sourceApiLookupPath registry ("repository/" ++ relative) of
+  Nothing -> H.assert (eqString current original) ("repository corpus input changed; review oracle: " ++ relative)
+  Just entry -> do
+   checkoutHash <- sourceApiDigest current
+   projectedHash <- sourceApiDigest original
+   H.assert (eqString checkoutHash (J.getText "checkout_source_sha256" "" entry) && eqString projectedHash (J.getText "new_source_sha256" "" entry)) "source/API repository input changed after projection"
+migrateSourceApiRows : SourceApiRegistry -> String -> IO ()
+migrateSourceApiRows registry directory = do
+ manifest <- rows directory
+ H.assert (sourceApiRowsMatch registry manifest) "source/API migration identities or frozen oracles changed"
+ original <- readFile (directory ++ "/manifest.jsonl")
+ let lines = O.nonempty (H.lines original)
+ H.assert (S.length lines == S.length manifest) "source/API manifest framing changed"
+ migrated <- S.mapM (migrateSourceApiRow registry) manifest
+ -- Preserve every line outside the explicit 179-row registry. The two
+ -- independently authenticated crate-cycle lines have already been migrated.
+ writeFile (directory ++ "/manifest.jsonl") (S.unlines (S.map (\((,) line row) -> if S.isJust (sourceApiLookup registry (J.getText "id" "" row)) then J.render row else line) (S.zip lines migrated)))
+
 main : String -> IO ()
 main directory = do
  root <- canonicalPath "."
  O.mkdir directory
+ archiveHash <- fileDigest (root ++ "/tests/golden/parity-seed.tar.gz")
+ H.assert (eqString archiveHash "ad64708fe76cad0f93af44d39e0a49b86e00b3ccaa621296fc4a43694e902ae8") "frozen parity archive changed"
  O.run "" ((:) "tar" ((:) "-xzf" ((:) (root ++ "/tests/golden/parity-seed.tar.gz") ((:) "-C" ((:) directory [])))))
+ manifestHash <- fileDigest (directory ++ "/manifest.jsonl")
+ H.assert (eqString manifestHash "c32f9fd7a57dbc9b5d792194ad70a81e62b4d64d5359f433bd65dc9c4072fa2d") "frozen parity manifest changed"
  manifest <- rows directory
+ registry <- loadSourceApiRegistry root
+ prepareSourceApi registry root directory manifest
  H.assert (S.length manifest == 7086) "parity baseline coverage changed"
  regenerate directory "hm-exhaustive" (W.closedTerms 6) W.hmTypable manifest
  regenerate directory "hm-generated" (W.generatedTerms 5000) W.hmTypable manifest
@@ -118,11 +218,7 @@ main directory = do
   H.assert (H.eq (F.expectedAcceptance c) (J.getBool "expected_accept" false row)) "Figure12 acceptance changed") F.cases
  -- Refresh repository inputs from the current checkout while keeping prescribed oracle types.
  files <- O.files (directory ++ "/repository")
- S.mapM_ (\path -> do
-  let relative = O.relative (directory ++ "/repository") path
-  current <- readFile (root ++ "/" ++ relative)
-  original <- readFile path
-  H.assert (eqString current original) ("repository corpus input changed; review oracle: " ++ relative)
-  writeFile path current) files
+ S.mapM_ (checkRepositoryInput registry root directory) files
  migrateCrateCycles directory manifest
- putStrLn "Fresh MLF corpus: 7086 rows; exhaustive, seeded, annotation, and Figure12 inputs reproduced"
+ migrateSourceApiRows registry directory
+ putStrLn "Fresh MLF corpus: 7086 rows; generated inputs checked; 179 authenticated source/API projections"

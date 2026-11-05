@@ -299,6 +299,9 @@ module Bootstrap.ArtifactStructure where {
 
   toSExpr :: SExpr -> W.Value;
   toSExpr value = case value of {
+    SGlobal _ n -> toSExpr (SVar n);
+    SDeclScope _ b -> toSExpr b;
+    SWantedRefs n xs -> toSExpr (SWanted n (S.namedCandidates xs));
     SVar x0 -> W.VNode 120 [toText x0];
     SConstructor x0 -> W.VNode 121 [toText x0];
     SLam x0 x1 x2 -> W.VNode 122 [toText x0, (toMaybe toSAnnotation) x1, toSExpr x2];
@@ -332,6 +335,7 @@ module Bootstrap.ArtifactStructure where {
     SAnnotatedPattern x0 x1 -> W.VNode 153 [toText x0, toSAnnotation x1];
     SIntPattern x0 -> W.VNode 154 [toInt x0];
     SStringPattern x0 -> W.VNode 155 [toText x0];
+    SIndexedStringPattern text eq from -> toSPattern (SOverloadedStringPattern text (S.termRefName eq) (S.termRefName from));
     SOverloadedStringPattern x0 x1 x2 -> W.VNode 156 [toSourceString x0, toText x1, toText x2];
     SBoolPattern x0 -> W.VNode 157 [toBool x0];
     SAsPattern x0 x1 -> W.VNode 158 [toText x0, toSPattern x1];

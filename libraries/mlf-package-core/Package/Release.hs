@@ -250,7 +250,8 @@ module Package.Release where {
     S.mapM
       (\((,) key iface) ->
          do {
-           decoded <- Artifact.readObject (bundlePrefix directory key ++ ".mlfco") iface;
+           decoded <- Artifact.readObjectWithInterfaces (S.map S.snd interfaces)
+             (bundlePrefix directory key ++ ".mlfco") iface;
            object <- checked decoded;
            ioReturn object
          })

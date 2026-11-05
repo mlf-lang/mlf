@@ -33,6 +33,179 @@ class FixtureError(ValueError):
     pass
 
 
+
+# Step-18 maintenance is a closed, reviewed source transcription. Keep the old
+# semantic allowlist unchanged. Undo only the exact listed additions, then
+# authenticate every remaining byte against that independent preimage. Fixture
+# strings, declarations and old oracle bodies are never regenerated or parsed
+# into replacement source. Evidence: 18-integration-repairs.json entries
+# figure12-new-source-constructors, import-collision, physical-spans-and-explicit-sites.
+REVIEWED_SOURCE_TRANSITIONS = {'tests/Tests/Figure12.emlf': {'preimage_sha256': '08b77da6c872229a3234c164bc105d5cde9a16a7b2279a238e44b012f585d175',
+                               'postimage_sha256': 'dd7f8b94c22d9cc1634867d75317ff177282a6562f617b28c4391577c65857a1',
+                               'edits': (('freeNames : SExpr -> Set String\n',
+                                          '-- Signature selection visits parseExpr output and '
+                                          'legacy lexical names only.\n'
+                                          '-- Resolved declarations and evidence cannot be '
+                                          'identified by display hints.\n'
+                                          'freeNames : SExpr -> Set String\n'),
+                                         ('  bound (SOverloadedStringPattern _ _ _) = [];\n',
+                                          '  bound (SOverloadedStringPattern _ _ _) = [];\n'
+                                          '  bound (SIndexedStringPattern _ _ _) = [];\n'),
+                                         ('  references (SOverloadedStringPattern _ equality '
+                                          'conversion) = Set.union (reference equality) (reference '
+                                          'conversion);\n',
+                                          '  references (SOverloadedStringPattern _ equality '
+                                          'conversion) = Set.union (reference equality) (reference '
+                                          'conversion);\n'
+                                          '  references (SIndexedStringPattern _ _ _) = panic '
+                                          '"Figure12 signature oracle received a resolved string '
+                                          'pattern";\n'),
+                                         ('  SVar x -> reference x;\n',
+                                          '  SVar x -> reference x;\n'
+                                          '  SGlobal _ _ -> panic "Figure12 signature oracle '
+                                          'received a resolved global";\n'
+                                          '  SDeclScope _ _ -> panic "Figure12 signature oracle '
+                                          'received a declaration scope";\n'
+                                          '  SWantedRefs _ _ -> panic "Figure12 signature oracle '
+                                          'received resolved evidence";\n'))},
+ 'tests/Tests/Helpers.emlf': {'preimage_sha256': 'e915d86eb800e8ec736a961ccc870d530facc64e37814acd64b1a1f832deb590',
+                              'postimage_sha256': '49091120fa91fc998e78cf5529fa5185643d883f11f22d2db19a2b5e8e6328fd',
+                              'edits': (('module Tests.Helpers where\n',
+                                         'module Tests.Helpers where\n'
+                                         'import Prelude hiding (Eq, fail)\n'),
+                                        ('showKindArgument k = "(" ++ showKindDerived k ++ ")"\n',
+                                         'showKindArgument k = "(" ++ showKindDerived k ++ ")"\n'
+                                         '\n'
+                                         '-- Layout changes physical source positions. Keep '
+                                         'call-site labels, owners,\n'
+                                         '-- wrappers and every syntax field; erase only filenames '
+                                         'and coordinates.\n'
+                                         'layoutExpr : SExpr -> SExpr\n'
+                                         'layoutExpr expression = case expression of\n'
+                                         ' SCallSite label (SourceSpan package owner _ _ _ _ _) '
+                                         'body -> SCallSite label (SourceSpan package owner "" 0 0 '
+                                         '0 0) (layoutExpr body)\n'
+                                         ' SSourceDefinition body -> SSourceDefinition (layoutExpr '
+                                         'body)\n'
+                                         ' SLam name annotation body -> SLam name annotation '
+                                         '(layoutExpr body)\n'
+                                         ' SApp function argument -> SApp (layoutExpr function) '
+                                         '(layoutExpr argument)\n'
+                                         ' SLet name value body -> SLet name (layoutExpr value) '
+                                         '(layoutExpr body)\n'
+                                         ' SAnn body annotation -> SAnn (layoutExpr body) '
+                                         'annotation\n'
+                                         ' SSignature body annotation -> SSignature (layoutExpr '
+                                         'body) annotation\n'
+                                         ' SCase scrutinee alternatives -> SCase (layoutExpr '
+                                         'scrutinee) (S.map (\\(SAlternative pattern body) -> '
+                                         'SAlternative pattern (layoutExpr body)) alternatives)\n'
+                                         ' SDo statements body -> SDo (S.map layoutStatement '
+                                         'statements) (layoutExpr body)\n'
+                                         ' SEquations equations -> SEquations (S.map (\\((,) '
+                                         'patterns body) -> (,) patterns (layoutExpr body)) '
+                                         'equations)\n'
+                                         ' SLetRec bindings body -> SLetRec (S.map layoutBinding '
+                                         'bindings) (layoutExpr body)\n'
+                                         ' SChecked ty body -> SChecked ty (layoutExpr body)\n'
+                                         ' SSharedBind pattern action continuation binding failure '
+                                         '-> SSharedBind pattern (layoutExpr action) (layoutExpr '
+                                         'continuation) (layoutExpr binding) (layoutExpr failure)\n'
+                                         ' _ -> expression\n'
+                                         'layoutBinding : (,,) String RecursiveMode SExpr -> (,,) '
+                                         'String RecursiveMode SExpr\n'
+                                         'layoutBinding ((,,) name mode body) = (,,) name mode '
+                                         '(layoutExpr body)\n'
+                                         'layoutStatement : SStatement -> SStatement\n'
+                                         'layoutStatement statement = case statement of\n'
+                                         ' SDoBind pattern body -> SDoBind pattern (layoutExpr '
+                                         'body)\n'
+                                         ' SDoThen body -> SDoThen (layoutExpr body)\n'
+                                         ' SDoLet name annotation body -> SDoLet name annotation '
+                                         '(layoutExpr body)\n'
+                                         ' SDoLetRec bindings -> SDoLetRec (S.map layoutBinding '
+                                         'bindings)\n'
+                                         'layoutInstance : SInstanceDecl -> SInstanceDecl\n'
+                                         'layoutInstance (SInstanceDecl variables predicates name '
+                                         'types methods) = SInstanceDecl variables predicates name '
+                                         'types (S.map (\\((,) method body) -> (,) method '
+                                         '(layoutExpr body)) methods)\n'
+                                         'layoutProgram : SProgram -> SProgram\n'
+                                         'layoutProgram program = case program of\n'
+                                         ' SProgram datatypes body -> SProgram datatypes '
+                                         '(layoutExpr body)\n'
+                                         ' SClassProgram datatypes classes instances body -> '
+                                         'SClassProgram datatypes classes (S.map layoutInstance '
+                                         'instances) (layoutExpr body)\n'
+                                         '\n'
+                                         '-- These controls keep the layout comparison narrower '
+                                         'than source identity.\n'
+                                         'layoutComparisonChecks : IO ()\n'
+                                         'layoutComparisonChecks = let\n'
+                                         '  span = SourceSpan "main" "Main" "first.emlf" 1 2 3 4\n'
+                                         '  site = SCallSite "x" span (SVar "x")\n'
+                                         '  same = SCallSite "x" (SourceSpan "main" "Main" '
+                                         '"second.emlf" 8 9 10 11) (SVar "x")\n'
+                                         '  different = (:)\n'
+                                         '    (SCallSite "y" span (SVar "x")) ((:)\n'
+                                         '    (SCallSite "x" (SourceSpan "other" "Main" '
+                                         '"first.emlf" 1 2 3 4) (SVar "x")) ((:)\n'
+                                         '    (SCallSite "x" (SourceSpan "main" "Other" '
+                                         '"first.emlf" 1 2 3 4) (SVar "x")) ((:)\n'
+                                         '    (SCallSite "x" span (SVar "y")) ((:)\n'
+                                         '    (SVar "x") ((:)\n'
+                                         '    (SSourceDefinition site) [])))))\n'
+                                         '  annotation = SAnnotation [] (SCon "Int" [])\n'
+                                         '  changedAnnotation = SAnnotation [] (SCon "Bool" [])\n'
+                                         ' in do\n'
+                                         '  assert (eq (layoutExpr site) (layoutExpr same)) '
+                                         '"layout comparison retained physical location"\n'
+                                         '  assert (S.all (\\other -> S.not (eq (layoutExpr site) '
+                                         '(layoutExpr other))) different) "layout comparison '
+                                         'erased call-site identity or structure"\n'
+                                         '  assert (S.not (eq (layoutExpr (SLam "x" Nothing site)) '
+                                         '(layoutExpr (SLam "y" Nothing site)))) "layout '
+                                         'comparison erased a binder"\n'
+                                         '  assert (S.not (eq (layoutExpr (SAnn site annotation)) '
+                                         '(layoutExpr (SAnn site changedAnnotation)))) "layout '
+                                         'comparison erased an annotation"\n'
+                                         '  assert (S.not (eq (layoutExpr (SIntLit 1)) (layoutExpr '
+                                         '(SIntLit 2)))) "layout comparison erased a literal"\n'
+                                         '\n'
+                                         '-- Compare module layout through value bodies and '
+                                         'instance methods, preserving\n'
+                                         '-- the source module identity, exports, imports, '
+                                         'declarations and syntax mode.\n'
+                                         'layoutModule : SourceModule -> SourceModule\n'
+                                         'layoutModule (SourceModule file name exports imports '
+                                         'datatypes classes instances values body syntax) =\n'
+                                         ' SourceModule file name exports imports datatypes '
+                                         'classes (S.map layoutInstance instances)\n'
+                                         '  (S.map (\\((,,) n annotation value) -> (,,) n '
+                                         'annotation (layoutExpr value)) values)\n'
+                                         '  (S.maybe Nothing (\\value -> Just (layoutExpr value)) '
+                                         'body) syntax\n'))}}
+
+
+def authenticate_semantic_source(relative, contents, reviewed):
+    actual = hashlib.sha256(contents).hexdigest()
+    source = contents.decode('utf-8')
+    if actual == reviewed:
+        return source
+    transition = REVIEWED_SOURCE_TRANSITIONS.get(relative)
+    if transition is not None and transition['preimage_sha256'] == reviewed:
+        projected = source
+        for before, after in reversed(transition['edits']):
+            if projected.count(after) != 1:
+                break
+            projected = projected.replace(after, before, 1)
+        else:
+            if (hashlib.sha256(projected.encode('utf-8')).hexdigest() == reviewed and
+                    actual == transition['postimage_sha256']):
+                return source
+    raise FixtureError(f'unreviewed Figure12 oracle semantics: {relative}; '
+                       'review exact source migration and harness/oracle parity')
+
 TOKEN = re.compile(r'\s+|--[^\n]*|"(?:[^"\\]|\\["\\nrt])*"|[A-Za-z_][A-Za-z_0-9\']*|[0-9]+|\[\]|\(:\)|\(,\)|[(){}=;]')
 
 
@@ -209,11 +382,8 @@ def decode(root=ROOT):
             actual = hashlib.sha256(contents).hexdigest()
         except OSError as error:
             raise FixtureError(f'missing reviewed semantic fixture {relative}: {error}') from error
-        if actual != reviewed:
-            raise FixtureError(f'unreviewed Figure12 oracle semantics: {relative}; '
-                               'review harness/oracle parity before updating semantic digest allowlist')
+        reviewed_sources[relative] = authenticate_semantic_source(relative, contents, reviewed)
         semantic_hashes[relative] = actual
-        reviewed_sources[relative] = contents.decode('utf-8')
     fixture = reviewed_sources['tests/Tests/Figure12.emlf']
     suite = reviewed_sources['tests/Tests/Figure12Suite.emlf']
     # Projections are the only fixture functions provided by the decoder.

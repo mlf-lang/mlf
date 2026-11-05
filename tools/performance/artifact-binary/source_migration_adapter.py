@@ -1,17 +1,12 @@
-"""Reviewed builtin-regeneration source loader; graph135 and frozen132 evidence are unchanged.
-
-Install beside source_contract.py and the future frozen metadata bundle at
- tools/performance/artifact-binary/. The historical source chain is unchanged.
-This loader performs no IO until explicitly called. Both live pins are explicit.
-"""
+"""Load the pinned DeclId source transition for current qualification and historical projections."""
 from pathlib import Path
 import hashlib
 import types
 import os
 import stat
 
-FINAL_MANIFEST_SHA256 = 'fb8335e198e463d3a25b336f124d56dac141c6ad2063df531c09ade8e7411559'
-CONTRACT_SOURCE_SHA256 = '80ab586aed593698fc60f1644e8f0b4b24fc5d33140e7da60675ee5cf6677c19'
+FINAL_MANIFEST_SHA256 = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
+CONTRACT_SOURCE_SHA256 = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
 
 
 def read_implementation(path):
@@ -37,16 +32,19 @@ def read_implementation(path):
 
 
 def live_contract(history_root, source_root=None):
-    if FINAL_MANIFEST_SHA256 is None:
-        raise ValueError('binary source migration is not frozen; live135 admission is unavailable')
     directory = Path(__file__).resolve().parent
-    path = directory / 'builtin_regeneration_contract.py'
+    path = directory / 'declid_contract.py'
     raw = read_implementation(path)
     if hashlib.sha256(raw).hexdigest() != CONTRACT_SOURCE_SHA256:
-        raise ValueError('fixed builtin-regeneration source contract implementation SHA')
-    module = types.ModuleType('fixed_binary_source_contract')
+        raise ValueError('fixed DeclId source contract implementation SHA')
+    import sys
+    name = '_mlf_declid_contract_' + CONTRACT_SOURCE_SHA256
+    if name in sys.modules:
+        return sys.modules[name].Contract(directory, FINAL_MANIFEST_SHA256, history_root, source_root=source_root)
+    module = types.ModuleType(name)
     module.__file__ = str(path)
     # Execute only this separately author-pinned maintenance implementation;
     # never a candidate Haskell module or timestamp-selected .pyc.
     exec(compile(raw, str(path), 'exec'), module.__dict__)
+    sys.modules[name] = module
     return module.Contract(directory, FINAL_MANIFEST_SHA256, history_root, source_root=source_root)

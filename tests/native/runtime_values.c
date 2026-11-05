@@ -147,7 +147,9 @@ static void booleans(void) {
     canonical_boolean(mlf_boolean(-1), 1);
     canonical_boolean(mlf_boolean(INT64_MAX), 1);
     MlfValue *small = mlf_integer("-2"), *other = mlf_integer("3");
-    MlfValue *large = mlf_integer("123456789012345678901234567890");
+    /* Keep this positive Int64 payload outside the tagged immediate range. */
+    MlfValue *large = mlf_integer("9223372036854775807");
+    require(((uintptr_t)large & 3u) == 0u && (uintptr_t)large > 6u, "wide comparison payload is not boxed");
     canonical_boolean(mlf_eq_int(small, small), 1);
     canonical_boolean(mlf_eq_int(small, other), 0);
     canonical_boolean(mlf_lt_int(small, other), 1);
@@ -191,7 +193,8 @@ static void private_thunks(void) {
         MlfValue *entry = mlf_thunk_new(consume_captures, private_count);
         MlfEnv *env;
         memcpy(&env, (const unsigned char *)entry + 16, sizeof env);
-        MlfValue *answer = mlf_integer("340282366920938463463374607431768211456");
+        MlfValue *answer = mlf_integer("9223372036854775807");
+        require(((uintptr_t)answer & 3u) == 0u && (uintptr_t)answer > 6u, "private capture payload is not boxed");
         for (unsigned i = 0; i < private_count; ++i)
             mlf_env_set(env, i, i == 0 || i + 1 == private_count ? answer : mlf_thunk(poison, NULL));
         GC_gcollect();
@@ -326,27 +329,27 @@ static void string_failure(const char *mode) {
     } failures[] = {
         {"string-sparse-negative-index", NULL, 0, 47, "-1", NULL},
         {"string-sparse-past-index", NULL, 0, 47, "31", NULL},
-        {"string-sparse-huge-index", NULL, 0, 47, "18446744073709551616", NULL},
+        {"string-sparse-huge-index", NULL, 0, 47, "9223372036854775807", NULL},
         {"string-sparse-past-offset", NULL, 0, 48, "32", "0"},
         {"string-sparse-past-count", NULL, 0, 48, "30", "2"},
         {"string-ascii-negative-index", "abc", 3, 47, "-1", NULL},
         {"string-ascii-past-index", "abc", 3, 47, "3", NULL},
-        {"string-ascii-huge-index", "abc", 3, 47, "18446744073709551616", NULL},
+        {"string-ascii-huge-index", "abc", 3, 47, "9223372036854775807", NULL},
         {"string-empty-index", "", 0, 47, "0", NULL},
         {"string-mixed-negative-index", "a\xce\xbb", 3, 47, "-1", NULL},
         {"string-mixed-past-index", "a\xce\xbb", 3, 47, "2", NULL},
-        {"string-mixed-huge-index", "a\xce\xbb", 3, 47, "18446744073709551616", NULL},
+        {"string-mixed-huge-index", "a\xce\xbb", 3, 47, "9223372036854775807", NULL},
         {"string-ascii-negative-offset", "abc", 3, 48, "-1", "0"},
         {"string-ascii-past-offset", "abc", 3, 48, "4", "0"},
         {"string-ascii-negative-count", "abc", 3, 48, "0", "-1"},
         {"string-ascii-past-count", "abc", 3, 48, "2", "2"},
-        {"string-ascii-huge-count", "abc", 3, 48, "0", "18446744073709551616"},
+        {"string-ascii-huge-count", "abc", 3, 48, "0", "9223372036854775807"},
         {"string-empty-past-count", "", 0, 48, "0", "1"},
         {"string-mixed-negative-offset", "a\xce\xbb", 3, 48, "-1", "0"},
         {"string-mixed-past-offset", "a\xce\xbb", 3, 48, "3", "0"},
         {"string-mixed-negative-count", "a\xce\xbb", 3, 48, "0", "-1"},
         {"string-mixed-past-count", "a\xce\xbb", 3, 48, "1", "2"},
-        {"string-mixed-huge-count", "a\xce\xbb", 3, 48, "0", "18446744073709551616"},
+        {"string-mixed-huge-count", "a\xce\xbb", 3, 48, "0", "9223372036854775807"},
         {"string-invalid-prefix", "ascii\x80", 6, 46, NULL, NULL},
         {"string-invalid-surrogate-index", "\xed\xa0\x80", 3, 47, "0", NULL},
         {"string-invalid-surrogate-slice", "\xed\xa0\x80", 3, 48, "0", "0"},

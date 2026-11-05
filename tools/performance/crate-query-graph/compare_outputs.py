@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 sys.setrecursionlimit(50000)
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'shared'))
+from query_generation import cache_directory
 from artifact_binary_reference import read_document, tree_document
 from artifact_binary_typed import (value_node as node, text, list_values as items,
                                    unpack, logical_context, validate_type, query_payload_root)
@@ -78,7 +79,7 @@ def old_raw(cache, key):
     return tuple(parameters), body_semantics(body), tuple(owned), data_semantics(declarations)
 
 def new_raw(cache, key):
-    directory = cache / 'query-graph-v1/results'
+    directory = cache_directory(cache) / 'results'
     raw = (directory / (key + '.mlfqr')).read_bytes()
     assert sha(raw) == key
     document = read_document(raw, 6)

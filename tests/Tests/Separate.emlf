@@ -5,7 +5,7 @@ import MLF.Primitive (Monad, return, bind)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Map as Map
-import qualified Bootstrap.Set as Set
+import qualified Bootstrap.IntSet as IS
 import qualified Package.OS as O
 import qualified Tests.Helpers as H
 import Tests.Helpers (Quint(..))
@@ -131,7 +131,7 @@ forgeUnusedParameter fragments earlier = case fragments of
     case S.find (\((,) n ty) -> S.not (S.elem eqString n parameterNames) && T.alphaEq ty (XCon "Int" [])) earlier of
       Nothing -> S.mapEither ((:) fragment) (forgeUnusedParameter rest (S.append earlier (Fragment.unitBindings (Fragment.objectInterface fragment))))
       Just ((,) symbol _) ->
-        let serial = 1 + S.foldl S.max 0 (Set.toList (Fragment.termIdentities original Set.empty)) in
+        let serial = 1 + S.foldl S.max 0 (IS.toList (Fragment.termIdentities original IS.empty)) in
         let name = XName serial symbol in
         let forged = case original of {XWithData ds term -> XWithData ds (XAbs name (XCon "Bool" []) term); term -> XAbs name (XCon "Bool" []) term} in
         Right ((:) (replaceFragmentTerm fragment forged) rest)

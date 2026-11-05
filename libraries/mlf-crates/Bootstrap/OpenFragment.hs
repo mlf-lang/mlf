@@ -5,7 +5,7 @@
 module Bootstrap.OpenFragment
   (Environment, environment, declarations, dataEnvironment, Fragment, check, fromChecked,
    parameters, body, bindings, usedParameters, context, fingerprint,
-   normalize, encodeBody, decodeTrusted, audit, closedTerm, fresh,
+   normalize, encodeBody, decodeTrusted, decodeTrustedIds, audit, closedTerm, fresh,
    Package, makePackage, readPackage, packageFragments, packageBytes,
    packageHash, packageMetadata, packageFamily, declarationValue, compatibilityIdentity) where {
   import MLF.Primitive;
@@ -15,6 +15,7 @@ module Bootstrap.OpenFragment
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.X.Check as Check;
   import qualified Bootstrap.X.Checked as Checked;
@@ -121,7 +122,17 @@ module Bootstrap.OpenFragment
      Structure.toList Structure.toXName (usedParameters fragment)];
   -- A reader cannot attach a claimed type to an AST. It must acquire the
   -- immutable bytes whose SHA came from the trusted generation/object index.
-  decodeTrusted path expected references stage name env expectedParameters expectedMembers = do {
+  -- The compatibility caller supplies stable names only. Number its whole
+  -- expected interface once. The query driver supplies its actual slots.
+  decodeTrusted path expected references stage name env parameters members = let {
+    start = length parameters;
+    slots = map V.fromInt (range 0 (start + length members - 1));
+    ps = zipWith (\i ((,) key ty) -> (,,) i key ty) slots parameters
+  } in decodeTrustedIds path expected references stage name env ps (zip (drop start slots) members);
+  decodeTrustedIds :: String -> String -> [] ((,) String String) -> String -> String -> Environment ->
+    [] ((,,) (V.Index Declaration) String XType) -> [] ((,) (V.Index Declaration) String) ->
+    IO (Either String Fragment);
+  decodeTrustedIds path expected references stage name env expectedParameters expectedMembers = do {
     acquired <- Storage.readRaw path;
     case acquired of {
       Left message -> ioReturn (Left message);
@@ -153,24 +164,24 @@ module Bootstrap.OpenFragment
                 rawParameters <- decodedList
                   (Structure.ShapePair Structure.ShapeXName Structure.ShapeText) graph ps;
                 pairs <- traverseEither (Structure.expectPair Structure.expectXName Structure.expectText) rawParameters;
-                typed <- traverseEither (\((,) binder key) -> do {
+                ensure (length pairs == length expectedParameters) "open fragment dependency inventory mismatch";
+                let { ids = append (map (\((,,) i _ _) -> V.toInt i) expectedParameters)
+                        (map (compose V.toInt fst) expectedMembers) };
+                ensure (IS.size (IS.fromList ids) == length ids) "duplicate open fragment declaration";
+                typed <- traverseEither (\((,) ((,) binder key) ((,,) _ stable ty)) -> do {
                   ensure (eqString (X.nameHint binder) key) "open fragment parameter identity mismatch";
-                  ty <- case lookup eqString key expectedParameters of {
-                    Nothing -> Left "open fragment has an undeclared dependency";
-                    Just ty -> Right ty };
+                  ensure (eqString key stable) "open fragment dependency inventory mismatch";
                   Right ((,) binder ty)
-                }) pairs;
-                ensure (eqList eqString (map snd pairs) (map fst expectedParameters)) "open fragment dependency inventory mismatch";
+                }) (zip pairs expectedParameters);
                 term <- Structure.fromGraphXTerm graph t;
                 ownedValues <- decodedList
                   (Structure.ShapePair Structure.ShapeXName Structure.ShapeXType) graph bs;
                 owned <- traverseEither (Structure.expectPair Structure.expectXName Structure.expectXType) ownedValues;
                 ensure (eqList eqString (sortBy compareString (map (compose X.nameHint fst) owned))
-                  (sortBy compareString expectedMembers)) "open fragment member inventory mismatch";
+                  (sortBy compareString (map snd expectedMembers))) "open fragment member inventory mismatch";
                 usedValues <- decodedList Structure.ShapeXName graph uses;
                 used <- traverseEither Structure.expectXName usedValues;
-                ensure (all (\x -> any (\p -> X.equalName x (fst p)) typed) used)
-                  "open fragment free-reference inventory mismatch";
+                validateBinders typed owned used;
                 let { result = Fragment env typed term owned used savedStamp };
                 -- ICH verification is serialization/fingerprint verification,
                 -- independent of the explicit semantic-audit operation.
@@ -182,6 +193,20 @@ module Bootstrap.OpenFragment
         }
       }
     }
+  };
+  -- XName IDs are fragment-local. A used reference must identify the same
+  -- binder and carry its recorded hint; the hint alone never binds an XName.
+  validateBinders parameters owned used = let {
+    ps = map fst parameters;
+    names = append ps (map fst owned);
+    byId = IM.fromList (map (\n -> (,) (X.nameId n) (X.nameHint n)) ps);
+    usedIds = IS.fromList (map X.nameId used);
+    matches n = case IM.lookup (X.nameId n) byId of {
+      Just key -> eqString key (X.nameHint n); Nothing -> False
+    }
+  } in do {
+    ensure (length names == IS.size (IS.fromList (map X.nameId names))) "duplicate open fragment binder";
+    ensure (length used == IS.size usedIds && all matches used) "open fragment free-reference inventory mismatch"
   };
   decodedList shape graph index = do {
     decoded <- Structure.decodeGraphValue (Structure.ShapeList shape) graph index;
@@ -237,11 +262,17 @@ module Bootstrap.OpenFragment
     }) values;
     ioReturn (sequenceEither hashes)
   };
+  -- Keep the last key and lazy value, as Map.fromList does, while avoiding
+  -- persistent path copies for repeated fragment references.
+  referenceTable :: forall a. [] ((,) String a) -> Map String a;
+  referenceTable entries = foldlStrict (\table ((,) key value) ->
+    if M.member compareString key table then table
+    else M.insert compareString key value table) M.empty (reverse entries);
   makePackage compiler metadata fragments = do {
-    let { ps = M.toList (M.fromList compareString (concatMap
+    let { ps = M.toList (referenceTable (concatMap
       (\((,) _ f) -> map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty))
         (append (parameters f) (bindings f))) fragments));
-      ds = M.toList (M.fromList compareString (concatMap
+      ds = M.toList (referenceTable (concatMap
         (\((,) _ f) -> map (\d -> (,) (D.datatypeName d) d) (declarations (context f))) fragments)) };
     bh <- referenceHashes Structure.toXType ps;
     dh <- referenceHashes declarationValue ds;
@@ -276,21 +307,26 @@ module Bootstrap.OpenFragment
             format <- textAt graph f; identity <- textAt graph c; association <- textAt graph m;
             ensure (eqString format packageFormat && eqString identity compiler) "open crate checker/compiler version mismatch; rebuild object";
             ensure (eqString association metadata) "open crate interface mismatch";
-            bindings <- referenceList graph b;
+            bindingRefs <- referenceList graph b;
             declarations <- referenceList graph d;
             entries <- nodeList graph fs;
-            Right ((,,,) graph bindings declarations entries)
+            Right ((,,,) graph bindingRefs declarations entries)
           };
           _ -> Left "invalid open crate header"
         }
       } of {
         Left e -> ioReturn (Left e);
-        Right ((,,,) graph bindings declarations entries) -> do {
-          bs <- validateReferences Structure.toXType allBindings bindings;
+        Right ((,,,) graph bindingRefs declarations entries) -> do {
+          bs <- validateReferences Structure.toXType allBindings bindingRefs;
           ds <- validateReferences declarationValue allDeclarations declarations;
           ioReturn (do {
             checkedBindings <- bs; checkedDeclarations <- ds;
-            fragments <- decodeFinals graph checkedBindings checkedDeclarations M.empty entries;
+            let { rows = M.toList checkedBindings; types = V.fromList (map snd rows);
+              table = M.fromDistinctAscList (zip (map fst rows) (V.indices types)) };
+            fragments <- decodeFinals graph ((,) table types) checkedDeclarations M.empty entries;
+            let { usedKeys = S.fromList compareString (concatMap (\((,) _ fragment) ->
+              map (compose X.nameHint fst) (append (parameters fragment) (bindings fragment))) fragments) };
+            ensure (S.size usedKeys == length rows) "open crate binding reference inventory mismatch";
             ensure (length fragments == length (nubBy eqString (map fst fragments))) "duplicate open crate fragment";
             if eqString auditSetting "1" then mapM_ (compose audit snd) fragments else Right ();
             Right (Package metadata fragments bytes digest)
@@ -302,7 +338,13 @@ module Bootstrap.OpenFragment
   referenceList graph index = do {
     values <- Structure.decodeGraphValue (Structure.ShapeList
       (Structure.ShapePair Structure.ShapeText Structure.ShapeText)) graph index;
-    Structure.expectList (Structure.expectPair Structure.expectText Structure.expectText) values
+    rows <- Structure.expectList (Structure.expectPair Structure.expectText Structure.expectText) values;
+    ensure (ascending (map fst rows)) "duplicate or unordered open crate reference";
+    Right rows
+  };
+  ascending names = case names of {
+    (:) a rest@((:) b _) -> compareString a b < 0 && ascending rest;
+    _ -> True
   };
   nodeList graph index = do {
     value <- W.lookupGraphNode graph index;
@@ -347,7 +389,10 @@ module Bootstrap.OpenFragment
           source <- Structure.fromGraphXTerm graph t;
           usedValues <- decodedList Structure.ShapeXName graph uses;
           used <- traverseEither Structure.expectXName usedValues;
-          ensure (all (\u -> any (\p -> X.equalName u (fst p)) params) used) "open crate reference inventory mismatch";
+          validateBinders params owned used;
+          -- Final objects retain the checked fingerprint of their own ordered
+          -- parameter list. The public interface only describes all exports.
+          ensure (eqString savedStamp (stamp env params source owned)) "open crate fragment fingerprint mismatch";
           let { fragment = Fragment env params source owned used savedStamp };
           next <- decodeFinals graph types declarations (M.insert compareString identity env contexts) rest;
           Right ((:) ((,) name fragment) next)
@@ -356,12 +401,16 @@ module Bootstrap.OpenFragment
       }
     }
   };
-  finalBindings graph types index = do {
+  finalBindings :: W.Graph -> (,) (Map String (V.Index Declaration))
+    (V.IndexVec Declaration XType) -> Int -> Either String ([] ((,) XName XType));
+  finalBindings graph ((,) slots types) index = do {
     raw <- decodedList Structure.ShapeXName graph index;
     names <- traverseEither Structure.expectXName raw;
-    ensure (length names == length (nubBy X.equalName names)) "duplicate open crate binder";
-    traverseEither (\name -> case M.lookup compareString (X.nameHint name) types of {
-      Just ty -> Right ((,) name ty); Nothing -> Left "open crate binding reference out of scope"
-    }) names
+    aligned <- traverseEither (\name -> case M.lookup compareString (X.nameHint name) slots of {
+      Just i -> Right ((,) name i); Nothing -> Left "open crate binding reference out of scope"
+    }) names;
+    ensure (IS.size (IS.fromList (map (compose V.toInt snd) aligned)) == length aligned)
+      "duplicate open crate binding reference";
+    Right (map (\((,) name i) -> (,) name (V.at types i)) aligned)
   }
 }

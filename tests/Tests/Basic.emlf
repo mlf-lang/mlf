@@ -1,4 +1,5 @@
 module Tests.Basic where
+import Prelude hiding (fail)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O

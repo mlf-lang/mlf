@@ -7,6 +7,7 @@ module Bootstrap.Crate where {
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Host as Host;
@@ -245,15 +246,19 @@ module Bootstrap.Crate where {
             (\((,) _ iface) ->
                map (\name -> (,) name (Artifact.crateId iface)) (Artifact.crateModules iface))
             interfaces));
+  data CrateEntry = NoEntry | CrateEntry Dependency.Symbols (V.Index Declaration);
+  entryName NoEntry = "";
+  entryName (CrateEntry symbols i) = Dependency.symbolName symbols i;
   data PreparedCrate = PreparedCrate Modules.ResolvedCrate ([] DataDecl)
     ([] SClassDecl) ([] ((,) String SInstanceDecl)) Inference.LoweredDeclarations
-    String (Map String (Set String)) (Maybe Source.SourcePlan);
+    CrateEntry (Map String (Set String)) (Maybe Source.SourcePlan);
   preparedResolution (PreparedCrate r _ _ _ _ _ _ _) = r;
   preparedData (PreparedCrate _ ds _ _ _ _ _ _) = ds;
   preparedClasses (PreparedCrate _ _ cs _ _ _ _ _) = cs;
   preparedInstances (PreparedCrate _ _ _ instances _ _ _ _) = instances;
   preparedLowered (PreparedCrate _ _ _ _ lowered _ _ _) = lowered;
-  preparedEntry (PreparedCrate _ _ _ _ _ entry _ _) = entry;
+  preparedEntryId (PreparedCrate _ _ _ _ _ entry _ _) = entry;
+  preparedEntry prepared = entryName (preparedEntryId prepared);
   preparedReach (PreparedCrate _ _ _ _ _ _ reach _) = reach;
   preparedSourcePlan (PreparedCrate _ _ _ _ _ _ _ plan) = plan;
   preparedLayouts prepared = case preparedSourcePlan prepared of {
@@ -266,14 +271,16 @@ module Bootstrap.Crate where {
   };
   entryBindings spec resolution = let {
     modules = Modules.resolvedCrateModules resolution; bindings = Modules.boundIn resolution modules
-  } in if eqString (specEntry spec) "" then Right ((,) "" bindings) else do {
+  } in if eqString (specEntry spec) "" then Right ((,) NoEntry bindings) else do {
     entry <- case find (\r -> eqString (Modules.moduleIdentity (Modules.resolvedSource r)) (specEntry spec)) modules of {
       Nothing -> Left "crate entry module was not resolved"; Just r -> Right r
     };
     expression <- Modules.entryExpr resolution entry;
     let { symbol = Artifact.definitionName (specIdentity spec)
             (Modules.Entity (specEntry spec) "<crate-entry>" Modules.Value) };
-    Right ((,) symbol (Dependency.appendBound bindings symbol expression))
+    case Dependency.appendBoundWithId bindings symbol expression of {
+      (,) slot allocated@(Dependency.BoundValues symbols _) -> Right ((,) (CrateEntry symbols slot) allocated)
+    }
   };
   externalInstanceOwners interfaces =
     concatMap
@@ -355,17 +362,10 @@ module Bootstrap.Crate where {
                   (map (\((,) owner value) -> (,) owner (snd value)) instances)
             };
             let {
-              valueScopes =
-                M.fromList compareString
-                  (append
-                     (concatMap
-                        (\r ->
-                           map (\name -> (,) name (candidates (Modules.moduleIdentity (Modules.resolvedSource r))))
-                             (Modules.renamedValueNames (Modules.resolvedContents r)))
-                        resolved)
-                     (if eqString entry ""
-                      then []
-                      else (:) ((,) entry (candidates (specEntry spec))) []))
+              valueScopes = case bindings of { Dependency.BoundValues symbols _ ->
+                Dependency.indexedScopes symbols (append (Modules.resolvedScopeRows resolved candidates)
+                  (case entry of { NoEntry -> []; CrateEntry _ i -> [(,) i (candidates (specEntry spec))] }))
+              }
             };
             let {
               allData = append (concatMap (\p -> Artifact.crateData (snd p)) interfaces) ownData
@@ -386,12 +386,13 @@ module Bootstrap.Crate where {
                   (concatMap (\p -> Artifact.crateBindings (snd p)) interfaces)
             };
             let {
+              importDictionaries name =
+                if eqString (stringSlice name 0 7) "module_" then dictionaries else M.empty;
+              conventions = M.mapWithKey (\name ty -> Separate.importClasses (importDictionaries name) ty) importedTypes;
               imported =
                 M.mapWithKey
                   (\name ty ->
-                     Separate.sourceScheme
-                       (if eqString (stringSlice name 0 7) "module_" then dictionaries else M.empty)
-                       ty)
+                     Separate.sourceScheme (importDictionaries name) ty)
                   importedTypes
             };
             let {
@@ -407,10 +408,10 @@ module Bootstrap.Crate where {
                     memberMap = M.fromList compareString (map (\m -> (,) (Modules.valueName m) m) members) };
               importedInstances <- traverseEither (\((,) _ ((,) name inst)) ->
                 mapEither ((,) name) (Surface.closeSourceInstance members memberMap inst)) inheritedInstances;
-              let { closeLocal = Surface.closeResolvedInstance (Surface.helperScope bindings) };
+              let { closeLocal = Surface.closeIndexedInstance (Surface.helperScope bindings) };
               local <- traverseEither (\((,) metadata row) -> mapEither ((,) (fst (snd metadata))) (closeLocal (snd row)))
                 (zip localInstances localRows);
-              Source.prepareResolvedSourcePlan bindings imported allData allClasses (map snd instances)
+              Source.prepareResolvedSourcePlanWithImports conventions bindings imported allData allClasses (map snd instances)
                 (append importedInstances local) valueScopes (map (\((,) owner _) -> candidates owner) instances)
             });
             lowered <- case sourcePlan of {
@@ -475,8 +476,7 @@ module Bootstrap.Crate where {
           else Query.compileSourceGroups (specIdentity spec) (specCache spec)
             imported protected plan;
         Nothing -> do {
-          result <- Query.compileGroups (specIdentity spec) (specCache spec) imported
-            (Inference.loweredData lowered) (Inference.loweredValues lowered);
+          result <- Query.compileLoweredFileGroups (specIdentity spec) (specCache spec) imported lowered;
           ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
             (M.fromList compareString
               (map (\((,) name ty) -> (,) name (Source.SourceContract ty [] True))

@@ -111,7 +111,7 @@ directionName South = "down"
 directionName West = "left"
 directionName East = "right"
 
-draw : Game -> IO Unit
+draw : Game -> IO ()
 draw game =
   case game of
     Game _ heading _ score -> do
@@ -120,7 +120,7 @@ draw game =
       putStr (rows game 0)
       putStrLn "+------------+"
 
-play : Game -> IO Unit
+play : Game -> IO ()
 play game = do
   draw game
   putStr "Move [w/a/s/d, Enter, q]: "
