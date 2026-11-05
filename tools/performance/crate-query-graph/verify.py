@@ -13,7 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/shared'))
-from artifact_binary_reference import read_document, tree_document
+from artifact_binary_reference import read_document, tree_document, Invalid, require
+from test_query_index import read_index
 from artifact_binary_typed import value_node as node, text, list_values as items, unpack
 
 
@@ -25,37 +26,95 @@ def spec(source, cache, builtin, identity='query-acceptance'):
 def read(path, schema): return read_document(path.read_bytes(), schema).values()[0]
 def pair(value): return node(value, 2, 2)
 
+
+def index_data(raw, *, expected=None):
+    """Read either index version through the independent, bounded oracle."""
+    values = read_document(raw, 6).values()
+    require(len(values) == 1, 'query graph root count')
+    value = values[0]
+    require(value[0] == 'node' and value[1] in (411, 412), 'query graph index tag')
+    version = 1 if value[1] == 411 else 2
+    fields = node(value, value[1], 3 if version == 1 else 4)
+    configuration = text(fields[1])
+    records, _ = read_index(raw, configuration, expected=expected)
+    return version, configuration, {
+        key: {'sha': digest, 'reads': reads, 'payload': location}
+        for key, (digest, reads, location) in records.items()
+    }
+
+
+def index_bytes(configuration, records, *, version):
+    """Independent fixture writer, including intentionally invalid closure.
+
+    Rebuild the dictionary after edits so a missing/stale dependency is not
+    accidentally rejected for an unrelated unused string or noncanonical ID.
+    Never deduplicate or reorder the provider's reads.
+    """
+    require(version in (1, 2), 'fixture query graph version')
+    def n(tag, *children): return ('node', tag, tuple(children))
+    def s(value): return ('text', value)
+    def i(value): return ('int', value)
+    def sequence(values): return n(1, *values)
+    ordered = sorted(records.items())
+    if version == 1:
+        rows = [n(410, s(key), s(entry['sha']),
+                  sequence(n(2, s(k), s(h)) for k, h in entry['reads']),
+                  n(4) if entry['payload'] is None else n(5, s(entry['payload'])))
+                for key, entry in ordered]
+        value = n(411, s('MLF-CRATE-QUERY-GRAPH-1'), s(configuration), sequence(rows))
+    else:
+        strings = set()
+        for key, entry in ordered:
+            strings.update((key, entry['sha']))
+            for dependency, expected in entry['reads']:
+                strings.update((dependency, expected))
+            if entry['payload'] is not None:
+                strings.add(entry['payload'])
+        dictionary = sorted(strings)
+        ids = {value: index for index, value in enumerate(dictionary)}
+        rows = [n(413, i(ids[key]), i(ids[entry['sha']]),
+                  sequence(n(2, i(ids[k]), i(ids[h])) for k, h in entry['reads']),
+                  n(4) if entry['payload'] is None else n(5, i(ids[entry['payload']])))
+                for key, entry in ordered]
+        value = n(412, s('MLF-CRATE-QUERY-GRAPH-2'), s(configuration),
+                  sequence(map(s, dictionary)), sequence(rows))
+    return tree_document([value], schema=6)
+
+
+def replace_result(records, wanted, digest):
+    """Repin a trusted result and all reads of it without changing read order."""
+    require(wanted in records, 'fixture result key missing')
+    return {
+        key: {'sha': digest if key == wanted else entry['sha'],
+              'reads': [(dependency, digest if dependency == wanted else expected)
+                        for dependency, expected in entry['reads']],
+              'payload': digest if key == wanted else entry['payload']}
+        for key, entry in records.items()
+    }
+
+
+def reject_index(raw, configuration, reason):
+    """Require the intended semantic rejection, not an incidental bad encoding."""
+    try:
+        read_index(raw, configuration)
+    except Invalid as error:
+        require(str(error) == reason, 'unexpected query-index rejection: ' + str(error))
+    else:
+        raise Invalid('invalid query-index fixture was accepted')
+
+
 def graph(cache):
     directory = cache / 'query-graph-v1'
     current = text(read(directory / 'CURRENT', 6))
     raw = (directory / 'generations' / (current + '.mlfqg')).read_bytes()
-    assert sha(raw) == current
-    fmt, config, entries = node(read_document(raw, 6).values()[0], 411, 3)
-    assert text(fmt) == 'MLF-CRATE-QUERY-GRAPH-1'
-    result = {}
-    for value in items(entries):
-        k, h, edges, location = node(value, 410, 4)
-        k, h = text(k), text(h)
-        assert k not in result
-        dependencies = [(text(a), text(b)) for a, b in map(pair, items(edges))]
-        loc = node(location)
-        payload = text(loc[0]) if loc else None
-        result[k] = {'sha': h, 'reads': dependencies, 'payload': payload}
-        if payload:
-            raw = (directory / 'results' / (payload + '.mlfqr')).read_bytes()
-            assert sha(raw) == payload == h
-            assert tree_document(read_document(raw, 6).values(), schema=6) == raw
+    _, _, result = index_data(raw, expected=current)
     for entry in result.values():
-        for key, expected in entry['reads']:
-            assert key in result and result[key]['sha'] == expected
-    visiting, done = set(), set()
-    def visit(key):
-        if key in done: return
-        assert key not in visiting, 'query cycle'
-        visiting.add(key)
-        for child, _ in result[key]['reads']: visit(child)
-        visiting.remove(key); done.add(key)
-    for key in result: visit(key)
+        payload = entry['payload']
+        if payload is not None:
+            raw = (directory / 'results' / (payload + '.mlfqr')).read_bytes()
+            require(sha(raw) == payload == entry['sha'], 'query payload SHA256')
+            require(tree_document(read_document(raw, 6).values(), schema=6) == raw,
+                    'query payload canonical bytes')
     return current, result
 
 
@@ -144,7 +203,7 @@ def main():
             current, nodes = graph(cache)
             if name == 'recursive-dictionary':
                 idx = cache / 'query-graph-v1/generations' / (current + '.mlfqg')
-                configuration = text(node(read(idx, 6), 411, 3)[1])
+                _, configuration, _ = index_data(idx.read_bytes(), expected=current)
                 assert unpack(configuration)[-1] == 'source', 'pure dictionary recursion should retain the source plan'
             before = {str(p.relative_to(cache)): (sha(p.read_bytes()), p.stat().st_mtime_ns)
                       for p in cache.rglob('*') if p.is_file() and p.name != '.lock'}
@@ -232,20 +291,20 @@ def main():
         # Broken, checksum-correct references reject the whole generation.
         valid_generation, valid_nodes = graph(cache)
         index = cache / 'query-graph-v1/generations' / (valid_generation + '.mlfqg')
-        fmt, config, values = node(read(index, 6), 411, 3)
-        damaged_entries = []
+        version, configuration, valid_nodes = index_data(index.read_bytes(), expected=valid_generation)
+        absent = frame(['Binding', 'absent-definition'])
+        require(absent not in valid_nodes, 'dangling fixture key already exists')
+        damaged_nodes = {key: dict(entry, reads=list(entry['reads']))
+                         for key, entry in valid_nodes.items()}
         changed = False
-        for value in items(values):
-            k, h, reads, location = node(value, 410, 4)
-            if not changed and items(reads):
-                edges = list(items(reads))
-                _, expected = pair(edges[0])
-                edges[0] = ('node', 2, (('text', frame(['Binding','absent-definition'])), expected))
-                value = ('node', 410, (k,h,('node',1,tuple(edges)),location))
+        for entry in damaged_nodes.values():
+            if not changed and entry['reads']:
+                _, expected = entry['reads'][0]
+                entry['reads'][0] = (absent, expected)
                 changed = True
-            damaged_entries.append(value)
         assert changed
-        bad_bytes = tree_document([('node',411,(fmt,config,('node',1,tuple(damaged_entries))))], schema=6)
+        bad_bytes = index_bytes(configuration, damaged_nodes, version=version)
+        reject_index(bad_bytes, configuration, 'closure' if version == 1 else 'missing dependency')
         bad_hash = sha(bad_bytes)
         (index.parent / (bad_hash + '.mlfqg')).write_bytes(bad_bytes)
         pointer.write_bytes(tree_document([('text',bad_hash)],schema=6))
@@ -259,7 +318,7 @@ def main():
             # normal reader/ICH must not silently become a second typechecker.
             generation, nodes = graph(cache)
             index = cache / 'query-graph-v1/generations' / (generation + '.mlfqg')
-            fmt, config, values = node(read(index, 6), 411, 3)
+            version, configuration, nodes = index_data(index.read_bytes(), expected=generation)
             def replace_literal(value, changed):
                 if value[0] != 'node': return value
                 if value[1] == 77 and not changed[0]:
@@ -275,15 +334,13 @@ def main():
             assert changed[0]
             raw = tree_document([forged],schema=6); forged_hash = sha(raw)
             (path.parent/(forged_hash+'.mlfqr')).write_bytes(raw)
-            new_entries = []
-            for value in items(values):
-                k,h,edges,location = node(value,410,4)
-                new_edges = tuple(('node',2,(dep,('text',forged_hash) if text(dep)==key else digest))
-                                  for dep,digest in map(pair,items(edges)))
-                if text(k)==key:
-                    h=('text',forged_hash); location=('node',5,(('text',forged_hash),))
-                new_entries.append(('node',410,(k,h,('node',1,new_edges),location)))
-            encoded = tree_document([('node',411,(fmt,config,('node',1,tuple(new_entries))))],schema=6)
+            new_nodes = replace_result(nodes, key, forged_hash)
+            encoded = index_bytes(configuration, new_nodes, version=version)
+            # This attack must pass structural/closure admission in the same
+            # version as the actual producer before exercising the audit policy.
+            parsed_version, parsed_configuration, parsed_nodes = index_data(encoded)
+            require((parsed_version, parsed_configuration, parsed_nodes) ==
+                    (version, configuration, new_nodes), 'trusted fixture changed logical graph')
             forged_generation = sha(encoded)
             (index.parent/(forged_generation+'.mlfqg')).write_bytes(encoded)
             pointer.write_bytes(tree_document([('text',forged_generation)],schema=6))
