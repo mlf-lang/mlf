@@ -3,10 +3,12 @@
 
 The baseline is an independently qualified Int64 producer. Both ordinary
 candidate entry points are checked. Historical fixture text, handwritten
-status/type/error expectations and the byte-comparison body stay unchanged.
+status/type/error expectations and the ordinary byte-comparison body stay unchanged.
+The Session branch uses the explicit open-format content and same-format gates.
 """
 from pathlib import Path
 import argparse,ast,hashlib,json,os,shutil,types
+import run_open_file_controls as OpenFiles
 ROOT=Path(__file__).resolve().parents[3]
 def main():
  p=argparse.ArgumentParser(description=__doc__)
@@ -18,18 +20,21 @@ def main():
  exec(compile(ast.Module(body=[function],type_ignores=[]),str(driver),'exec'),context)
  fixture=c4/'controls/FileControls.hs';source=fixture.read_text();inputs={str(x.resolve()):H.sha(x) for x in [Path(__file__),hp,driver,fixture,c4/'fixtures/file-cases.json']}
  for suffix in ['.mlfci','.mlfco']:q=Path(str(a.builtin_prefix.resolve())+suffix);inputs[str(q)]=H.sha(q)
- record={'complete':False,'scope':'nine unchanged C4 file cases; Int64 baseline Crate versus candidate Crate and CrateSession; full diagnostics, handwritten types, fresh groups and raw artifacts','whole_P3_bytes_equal_claim':False,'inputs':inputs,'routes':{}}
+ record={'complete':False,'scope':'nine unchanged C4 file cases; Int64 baseline Crate versus candidate Crate and CrateSession; full diagnostics, handwritten types, fresh groups; unchanged ordinary raw-byte gate and explicit open boundary','whole_P3_bytes_equal_claim':False,'inputs':inputs,'routes':{}}
  limits={'address_space_per_process_bytes':6*1024**3,'disk_free_floor_bytes':5*1024**3,'host_available_floor_bytes':3*1024**3,'max_work_bytes':2*1024**3,'process_tree_rss_bytes':5*1024**3,'wall_seconds':600}
  same_producer=a.reference_producer.resolve()==a.producer.resolve()
  record['independent_compiler_binary_reference']=not same_producer
- if same_producer:record['scope']='nine authored file cases, same ordinary producer: retained Crate algorithm versus CrateSession; handwritten status/type/errors and raw artifacts; shared numeric/typechecking dependencies'
+ if same_producer:record['scope']='nine authored file cases, same ordinary producer: retained Crate algorithm versus CrateSession; handwritten status/type/errors, ordinary exact bytes and complete open boundary comparison; shared numeric/typechecking dependencies'
  save=lambda:H.save(out/'receipt.json',record);save()
  try:
   with H.SerialLock(ROOT/'.mlf-build'):
    binaries={};auths={};roots={};producers={}
    for side,producer,root,session in [('reference',a.reference_producer,a.reference_source,False),('crate',a.producer,a.source,False),('session',a.producer,a.source,True)]:
     producer=producer.resolve();root=root.resolve();auth=H.authenticate(producer,root);auths[side]=auth;roots[side]=root;producers[side]=producer
-    folder=out/side;folder.mkdir();objects=folder/'objects';shutil.copytree(producer/'objects',objects);original=H.file_pins(objects)
+    folder=out/side;folder.mkdir();OpenFiles.verify_producer_objects(H,producer,auth)
+    OpenFiles.verify_c_support(H,out,root,producer,auth,folder,inputs,record,save,limits)
+    objects=folder/'objects';shutil.copytree(producer/'objects',objects);original=H.file_pins(objects)
+    H.require({'objects/'+str(Path(p).relative_to(objects)):h for p,h in original.items()}==auth['object_inputs'],'exact copied production object inventory')
     text=source.replace('Bootstrap.Crate as Old','Bootstrap.CrateSession as Old') if session else source
     H.require((text.replace('Bootstrap.CrateSession as Old','Bootstrap.Crate as Old') if session else text)==source,'only reviewed entry-point import adaptation')
     (folder/'FileControls.hs').write_text(text);entry=folder/'Main.hs';entry.write_text('module Main where\nimport qualified FileControls as C\nmain=C.main\n')
@@ -38,17 +43,21 @@ def main():
      flags.append(str(objects) if token==str(producer/'objects') else token)
      if token=='-i':flags.append('-i'+str(folder))
     binary=folder/'probe';H.Runner(out,limits).run([auth['ghc']['path'],'--make','-j1',*flags,entry,producer/'host.o',producer/'supervisor.o','-o',binary],root,folder/'build')
+    OpenFiles.verify_compiled_controls(H,(folder/'build/stdout').read_bytes(),(folder/'build/stderr').read_bytes(),folder)
     H.require(all(H.sha(path)==digest for path,digest in original.items() if Path(path).name not in ['Main.o','Main.hi']),'ordinary production objects unchanged')
     inputs[str(binary)]=H.sha(binary);binaries[side]=binary
-   for route in ['crate','session']:
+   for route in ['crate']:
     folder=out/('compare-'+route);folder.mkdir();rows={'file_cases':[]};record['routes'][route]=rows
     def run(name,argv,cwd):
      log=folder/name;H.Runner(out,limits).run(argv,cwd,log);return (log/'stdout').read_bytes(),(log/'stderr').read_bytes()
     context['run_files'](H,run,save,rows,inputs,folder,str(a.builtin_prefix.resolve()),binaries['reference'],binaries[route])
     H.require(len(rows['file_cases'])==9,'all nine retained cases completed')
+   OpenFiles.run_session_files(H,out,record,inputs,binaries,producers['session'],roots['session'],auths['session'],str(a.builtin_prefix.resolve()),save,limits)
    H.check_pins(inputs)
-   for side in auths:H.require(H.authenticate(producers[side],roots[side])==auths[side],'producer unchanged '+side)
+   for side in auths:
+    H.require(H.authenticate(producers[side],roots[side])==auths[side],'producer unchanged '+side)
+    OpenFiles.verify_producer_objects(H,producers[side],auths[side])
    record['complete']=True;save()
  except BaseException as error:record['error']=repr(error);save();raise
- print('PASS all nine retained file cases across both candidate entry points',flush=True)
+ print('PASS all nine retained file cases: ordinary exact bytes and explicit open boundary',flush=True)
 if __name__=='__main__':main()

@@ -217,10 +217,12 @@ module Bootstrap.Layout where {
     case closing of {
       (,) ending closed ->
         let {
+          -- An explicit semicolon supplies separation, but must not suppress
+          -- closing implicit frames on the following dedented line.
           newLine =
             case previous of {
               Nothing -> False;
-              Just old -> ((tokenEndLine old < tokenLine token) && not (eqString (tokenText old) ";" || eqString (tokenText old) "{"))
+              Just old -> ((tokenEndLine old < tokenLine token) && not (eqString (tokenText old) "{"))
             }
         } in
         let {

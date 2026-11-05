@@ -97,11 +97,11 @@ class ManifestParity(unittest.TestCase):
         mutation(data)
         path.write_text(json.dumps(data))
 
-    def test_closed_corpus_has_matching_135_modules_13_executables(self):
+    def test_closed_corpus_has_matching_137_modules_13_executables(self):
         manifest = self.check()
-        self.assertEqual(len(manifest['modules']), 135)
+        self.assertEqual(len(manifest['modules']), 137)
         modules = {entry['module']: entry for entry in manifest['modules']}
-        self.assertEqual(len(modules), 135)
+        self.assertEqual(len(modules), 137)
         for name, path, role in (
             ('Bootstrap.Bitstream', 'libraries/mlf-crates/Bootstrap/Bitstream.hs', 'implementation'),
             ('Bootstrap.ArtifactStorage', 'libraries/mlf-crates/Bootstrap/ArtifactStorage.hs', 'implementation'),

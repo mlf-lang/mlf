@@ -1,0 +1,296 @@
+{
+  "complete": true,
+  "base_commit": "19be26d6733d24e1802af120bee7d6cfbe753812",
+  "source_file": "testing/tools/Test/Process.emlf",
+  "patched_source_sha256": "af749748a11f84a43981801a29d3a8c8f38c9c6f46403bd4daebaf8c1ae24be3",
+  "original_inputs": {
+    "scope": "diagnostic current GHC against unchanged R3 native-produced interfaces",
+    "identity": "mlf-test-tools/0.1.0/library",
+    "sources": [
+      "/private/tmp/mlf-declid-self-preflight-r3/source/testing/tools/Test/NativeProcess.emlf",
+      "/private/tmp/mlf-declid-self-preflight-r3/source/testing/tools/Test/Process.emlf"
+    ],
+    "interfaces": [
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/d9640a8af29d890c4aa482155d4f881e980a026ac5f292b46e39d27354dbdd1b/unit.mlfci",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/1e7e6a70895b578cabe39083b2f34e47d7e73cb27dbd232454a0531702d11054/unit.mlfci",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/82af7f589cc4d67dacba425ac7957e6049c9f993edd35bc37f47978a9761d7d4/unit.mlfci",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/b22078bebcdb607aa85af7fd0614888a3120036f976da7d83dbb6a4cef885026/unit.mlfci"
+    ],
+    "input_sha256": {
+      "/private/tmp/mlf-declid-self-preflight-r3/source/testing/tools/Test/NativeProcess.emlf": "6df6d6f8870703b0e99277ae922f08ecc7db5cb1c1bd00f2ff4339035b45b3d5",
+      "/private/tmp/mlf-declid-self-preflight-r3/source/testing/tools/Test/Process.emlf": "feb9bce4c82e60d34df578c01dbd6b1fa40d16b416034abf785d865ab7cdcd12",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/d9640a8af29d890c4aa482155d4f881e980a026ac5f292b46e39d27354dbdd1b/unit.mlfci": "13195bcc13b30d9d551d712cf6828feacb3d586df1c69b499620684c04424eac",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/1e7e6a70895b578cabe39083b2f34e47d7e73cb27dbd232454a0531702d11054/unit.mlfci": "e4c8bcada3ab351656db9bd899798c9166af55baa2b3b2d93984795264eab14e",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/82af7f589cc4d67dacba425ac7957e6049c9f993edd35bc37f47978a9761d7d4/unit.mlfci": "2ef8bec47b11e6a2235ba0f78b7900a723b283335ac7f22987dc1cdc87a3bc07",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/b22078bebcdb607aa85af7fd0614888a3120036f976da7d83dbb6a4cef885026/unit.mlfci": "bbaebfbb01c686af124895ebb86c488c3c70b6368480cfd97f0b30e409e28606",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/d9640a8af29d890c4aa482155d4f881e980a026ac5f292b46e39d27354dbdd1b/unit.mlfco": "6c7d6f125b9ce6c5bb48a8cc88ac8113c7600bd1a2e9378fc4ce2d6a814889b4",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/1e7e6a70895b578cabe39083b2f34e47d7e73cb27dbd232454a0531702d11054/unit.mlfco": "9e176b6ce9e871886f0d0d3853f60efb50860ad2c244de81aa0865311c2d811d",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/82af7f589cc4d67dacba425ac7957e6049c9f993edd35bc37f47978a9761d7d4/unit.mlfco": "c5893ed032db4d050b90a6e0400f045afafadbf560a493add14260450b0a6049",
+      "/private/tmp/mlf-declid-self-preflight-r3/cache/b22078bebcdb607aa85af7fd0614888a3120036f976da7d83dbb6a4cef885026/unit.mlfco": "9889c5bf6263c05ea41e2489f9f98e63341426ac3c89f06b645dfb547acb7b7e"
+    },
+    "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+    "original_spec_sha256": "1351eba8bb1b1d55d0f165e2bf350eda7de15cc92b7771e342f284c8b26a1980",
+    "argv": [
+      "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "--compile-crate",
+      "/private/tmp/mlf-declid-test-tools-repro-20261105/ghc-current/crate.spec",
+      "-o",
+      "/private/tmp/mlf-declid-test-tools-repro-20261105/ghc-current/unit"
+    ]
+  },
+  "checks": {
+    "native": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/native/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/native/unit"
+      ],
+      "observed_exit": 0,
+      "spec_sha256": "5e7478e4eeefd0a82d4a1ab28a56ffec4d2a60013834b6bed064d1746fba9382",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {
+        "mlfci": "763473a4c595411dd2ad5e0e9bf3291ed3bc3b20953f199dd0485380440dca67",
+        "mlfco": "21b10fe6005f8fa01a77118cf50c97795a814bfbbda7bd6ff88e0afe62b33eb5",
+        "queries": "71977bc801c9e58e1ad62516759d541d3888997a8a77325b9a978b7b88264e5a"
+      }
+    },
+    "process": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/process/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/process/unit"
+      ],
+      "observed_exit": 1,
+      "spec_sha256": "79c4f5b3200030a29bedeefcd91e90eaf38604f38caf97c14ddf88acb137565a",
+      "stderr": "Resolution: no instance or given constraint for MLF.Primitive.IsString bot; ambiguous uses need a type annotation\n",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {}
+    },
+    "prefix-276": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/prefix-276/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/prefix-276/unit"
+      ],
+      "observed_exit": 0,
+      "spec_sha256": "b6500f995f2d2f4322c3b26fcf2cefae6b3325ecf18887dcddf1eaa0eaa7c13f",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {
+        "mlfci": "3db2fc11ba264984b196325c24a390c0ad039f1c13c57b26641502ea1fc8c7a3",
+        "mlfco": "0bf11899b4ea7ed483222b7afffe3253366830bb45925468c82c2fad6a64ec89",
+        "queries": "532afc1f61737d410a90a4a71ed369f755126893ff0c49604e6f1ebd61e321ed"
+      }
+    },
+    "prefix-307": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/prefix-307/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/prefix-307/unit"
+      ],
+      "observed_exit": 1,
+      "spec_sha256": "1eae3f95ded9d1f016e1d9843bce6b1f7a19241ce81742aa1bbc7a8399fe86a1",
+      "stderr": "Resolution: no instance or given constraint for MLF.Primitive.IsString bot; ambiguous uses need a type annotation\n",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {}
+    },
+    "generic-current": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/generic-current/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/generic-current/unit"
+      ],
+      "observed_exit": 1,
+      "spec_sha256": "e23c2af93fb82eb31d5fd40606f1c01d05f040583bf85fcb720acfc5eb009572",
+      "stderr": "Resolution: no instance or given constraint for Probe.ErrorText bot; ambiguous uses need a type annotation\n",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {}
+    },
+    "generic-before": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/emlf",
+      "compiler_sha256": "86dcabe8df31cf67ae62192314fb2709524482e0a0b26556cde0920467889b16",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/generic-before/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/generic-before/unit"
+      ],
+      "observed_exit": 1,
+      "spec_sha256": "92707bc347c3a58dab5c56cc46eccb8b11bb85fb18c122ffeef65c0fefb11f7b",
+      "stderr": "Resolution: no instance or given constraint for Probe.ErrorText bot; ambiguous uses need a type annotation\n",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {}
+    },
+    "generic-ascribed-current": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/generic-ascribed-current/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/generic-ascribed-current/unit"
+      ],
+      "observed_exit": 0,
+      "spec_sha256": "a220dc2d189c621cf3134520ec48c4d27769328f44e2f9663bee213b84f19511",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {
+        "mlfci": "5d1482edc2d7e8e1feb9fa90c5b41a3b97ef1ad7cb397ffef6483aed48ac0785",
+        "mlfco": "4a257d199103a34590b5afebc7a5ef9f8ca3465dc2ecd02c36f84c3fcd316d0e",
+        "queries": "16b909ae230815094d9bafcec9ca36f36d8ba7174d848c94ef23f0995cc42782"
+      }
+    },
+    "generic-ascribed-before": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/emlf",
+      "compiler_sha256": "86dcabe8df31cf67ae62192314fb2709524482e0a0b26556cde0920467889b16",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/generic-ascribed-before/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/generic-ascribed-before/unit"
+      ],
+      "observed_exit": 0,
+      "spec_sha256": "964727c4853610ee675ae1fb2d68b3e425c11e1efb1c26f50a8cfbcd91708b63",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {
+        "mlfci": "5f9d4b015b901e210b7a99abe9ee3c25bd014da8435ec80d77581fa53fbf513e",
+        "mlfco": "4a257d199103a34590b5afebc7a5ef9f8ca3465dc2ecd02c36f84c3fcd316d0e",
+        "queries": "16b909ae230815094d9bafcec9ca36f36d8ba7174d848c94ef23f0995cc42782"
+      }
+    },
+    "external-typed-current": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/external-typed-current/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/external-typed-current/unit"
+      ],
+      "observed_exit": 1,
+      "spec_sha256": "d68c0627de805106383516fa912dfec517f8e3ce8a54194d9779dc7ba1829f58",
+      "stderr": "Resolution: no instance or given constraint for MLF.Primitive.IsString bot; ambiguous uses need a type annotation\n",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {}
+    },
+    "external-ascribed-current": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/external-ascribed-current/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/external-ascribed-current/unit"
+      ],
+      "observed_exit": 0,
+      "spec_sha256": "6633b6a097d358f29c1e9ae088ad0c942bfb2f44df53c13fe24825b0c513a5ed",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {
+        "mlfci": "8ccd04aca2f96cf614ec5147b9b71a43fd61ba9b1abbe8faec5a96d6965f064b",
+        "mlfco": "77e7a85c5a0c7a5ed04dce5094d65369ebde3bdb62d8a9b2508bbc18db72dc9a",
+        "queries": "46c2dd3dade0e661830a37587878849d5e5d0b1c7df54c1855d1afd5f5efafe4"
+      }
+    },
+    "full-ascribed-current": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/full-ascribed-current/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/full-ascribed-current/unit"
+      ],
+      "observed_exit": 0,
+      "spec_sha256": "264f96ad6a7eeaf3c3c568edddd441a327f96476e1424274b063732bd7477dbb",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {
+        "mlfci": "70df59ef55cec4dce55c9d1240112c0ad1a157a74c417a8d3ac5c3328f717cf6",
+        "mlfco": "ec74362fbacc8911afd1e91a38ead4e09b0a8b7aca4c721431f2544c382101c3",
+        "queries": "6a37434dcadb044dea20dcb857b72bc05f614ca53677dccbf5237f1cd845923b"
+      }
+    },
+    "full-patched-ghc": {
+      "compiler": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+      "compiler_sha256": "5ce7e272115408b8c24a7249701e8531d7aa8503931f87c62edef2902c0a0502",
+      "argv": [
+        "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-6/bin/emlf",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/full-patched-ghc/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/full-patched-ghc/unit"
+      ],
+      "observed_exit": 0,
+      "spec_sha256": "03bec8f1e204794d796a7a6c1b9aa2cc9e79507229414fb5f97d59abf915977c",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {
+        "mlfci": "5125f7d60a5a1615d1ed58830df1a1d204fe92dec493cba2a2e991dab381ded6",
+        "mlfco": "9557768c9bd9e70aaa81d5b960e5f64149fb3d68da0deca79590410fbc84f658",
+        "queries": "4d78047b962143dfe674590f90a99e252ba6c286a75aa0924fd5698d48af5498"
+      }
+    },
+    "full-patched-native": {
+      "compiler": "/private/tmp/mlf-declid-self-preflight-r3/cache/b15285dbce4fe7e803bfecbe3fc65b890fd071cbbc42c574071028c68e0d50a4/program",
+      "compiler_sha256": "01c5d3cf9338266366f979c33685875b213c38cd9ee530031b29b080efd81b00",
+      "argv": [
+        "/private/tmp/mlf-declid-self-preflight-r3/cache/b15285dbce4fe7e803bfecbe3fc65b890fd071cbbc42c574071028c68e0d50a4/program",
+        "--compile-crate",
+        "/private/tmp/declid-test-tools-minimize-20261105/full-patched-native/crate.spec",
+        "-o",
+        "/private/tmp/declid-test-tools-minimize-20261105/full-patched-native/unit"
+      ],
+      "observed_exit": 0,
+      "spec_sha256": "fec766c94a940f6c48e0123a7a0c22702e908d09975e76374d78f49e5d632bf9",
+      "stderr": "",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "products": {
+        "mlfci": "5125f7d60a5a1615d1ed58830df1a1d204fe92dec493cba2a2e991dab381ded6",
+        "mlfco": "9557768c9bd9e70aaa81d5b960e5f64149fb3d68da0deca79590410fbc84f658",
+        "queries": "4d78047b962143dfe674590f90a99e252ba6c286a75aa0924fd5698d48af5498"
+      }
+    }
+  },
+  "conclusion": "The signed superviseBudget discards the polymorphic resource error field; explicitly select its intended String diagnostic before the case. A self-contained ErrorText/Result shape fails with bot in fixed and current compilers and succeeds in both with a String ascription. No resolver/defaulting policy change. Original two modules and four R3 native interfaces compile successfully with current GHC and original R3 native compiler and produce byte-identical public products.",
+  "limitations": [
+    "The same full mixed-version inputs fail in the fixed compiler at a different imported-type mismatch, so that run is not used to classify the qualification boundary.",
+    "Root locked tests still require rerun on the final candidate; this receipt is the narrow original native failure reproduction and fix.",
+    "Root lock must be refreshed normally after integrating this source change."
+  ],
+  "fix_commit": "1b53ca1d2f504224aec930e402bddc9330bc05c6",
+  "original_inputs_unchanged": true,
+  "maintenance": {
+    "decision": "noop",
+    "status": "deferred",
+    "reason": "Read-only diagnostic begin returned DEFERRED; no ordinary Skill matched; the independent historical source checkout does not contain the project manager. Parent may consolidate this evidence in its active lifecycle."
+  }
+}

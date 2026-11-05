@@ -10,6 +10,7 @@ import Tests.Backends
 import qualified Tests.Backends as B
 import qualified Bootstrap.Separate as Framing
 import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.ArtifactStorage as Storage
 import Bootstrap.Module (loadModuleMap, moduleIdentity)
 import Bootstrap.Parser (parseModule)
 import qualified Bootstrap.X.Parser as XP
@@ -78,8 +79,8 @@ cliProgram backends (Quint _ mode libraries source expected) = withScratch (\dir
   let prefix = directory ++ "/main"
   spec <- writeSpec directory fixtureIdentity "Main" mode paths [] prefix
   compileSpec compiler spec prefix
-  iface <- bind (readFile (prefix ++ ".mlfci")) (S.compose H.right Artifact.decodeInterface)
-  _ <- bind (readFile (prefix ++ ".mlfco")) (S.compose H.right (Artifact.decodeObject iface))
+  iface <- bind (Artifact.readInterface (prefix ++ ".mlfci")) H.right
+  _ <- bind (Artifact.readObject (prefix ++ ".mlfco") iface) H.right
   S.mapM_ (\((,) _ path) -> removeFile path) paths
   target <- command compiler ((:) "--link-crate" ((:) (prefix ++ ".mlfci") []))
   runTarget backends expected target)
@@ -105,10 +106,10 @@ cliTests backends = withScratch (\directory -> do
         removeFile entry
   let link = command compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") []))
   buildLibrary "42"
-  originalInterface <- readFile (prefix ++ ".mlfci")
-  originalObject <- readFile (prefix ++ ".mlfco")
-  _ <- H.right (Artifact.decodeInterface originalInterface)
-  seq (stringLength originalObject) (return ())
+  originalInterface <- bind (Storage.readRaw (prefix ++ ".mlfci")) H.right
+  originalObject <- bind (Storage.readRaw (prefix ++ ".mlfco")) H.right
+  iface <- bind (Artifact.readInterface (prefix ++ ".mlfci")) H.right
+  _ <- bind (Artifact.readObject (prefix ++ ".mlfco") iface) H.right
   -- Downstream inference consumes generated metadata with both upstream source
   -- and implementation absent. Linking still requires the checked object.
   renameFile (prefix ++ ".mlfco") (prefix ++ ".saved")
@@ -131,12 +132,24 @@ cliTests backends = withScratch (\directory -> do
   H.assert (J.equal (J.get "inferred_groups" report) (J.num 0) && S.not (S.null groups) && S.all (J.getBool "cached" false) groups) "unchanged upstream semantic schemes invalidated downstream inference"
   buildLibrary "\"changed type\""
   reject compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") [])) "stale crate dependency interface"
-  writeFile (prefix ++ ".mlfci") originalInterface
-  writeFile (prefix ++ ".mlfco") (originalObject ++ "corrupt")
-  reject compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") [])) "malformed crate object framing"
-  writeFile (prefix ++ ".mlfco") originalObject
+  _ <- bind (Storage.writeRawAtomic (prefix ++ ".mlfci") originalInterface) H.right
+  corrupted <- appendCorruption originalObject
+  _ <- bind (Storage.writeRawAtomic (prefix ++ ".mlfco") corrupted) H.right
+  reject compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") [])) "open crate SHA mismatch"
+  _ <- bind (Storage.writeRawAtomic (prefix ++ ".mlfco") originalObject) H.right
   writeFile (prefix ++ ".mlfci") "7:MLFCI-9"
   reject compiler ((:) "--link-crate" ((:) (mainPrefix ++ ".mlfci") [])) "unsupported"
-  writeFile (prefix ++ ".mlfci") originalInterface
+  _ <- bind (Storage.writeRawAtomic (prefix ++ ".mlfci") originalInterface) H.right
   restored <- link
   runTarget backends "42\n" restored)
+
+-- Preserve the acquired binary snapshot for exact restoration. Corruption is
+-- appended to a separate byte array, never to decoded or re-encoded text.
+appendCorruption : ByteArray -> IO ByteArray
+appendCorruption original = do
+  size <- lengthByteArray original
+  H.assert (size > 0) "compiled object snapshot is empty"
+  damaged <- newByteArray (size + 7) 0
+  S.mapM_ (\i -> do { byte <- readByteArray original i; writeByteArray damaged i byte }) (S.range 0 (size - 1))
+  S.mapM_ (\i -> writeByteArray damaged (size + i) (stringCodeAt "corrupt" i)) (S.range 0 6)
+  return damaged

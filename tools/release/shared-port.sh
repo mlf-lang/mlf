@@ -43,7 +43,7 @@ verify_files() {
     test "$(sha256 "$target" | awk '{print $1}')" = "$hash"
     test "$(sha256 "$target.checks.json" | awk '{print $1}')" = "$checks_hash"
     jq -e --arg fixture "$fixture" --arg hash "$hash" '
-      .format == 1 and .fixture == $fixture and .target_sha256 == $hash and .entry_type == "IO Unit" and
+      .format == 1 and .fixture == $fixture and .target_sha256 == $hash and .entry_type == "IO ()" and
       .checks == ["independent-type","inferred-type","serialization-erasure","transported-type"]
     ' "$target.checks.json" >/dev/null
   done < <(jq -r '.targets[] | [.fixture,.target,.target_sha256,.checks_sha256] | @tsv' "$producer/prepared-port.json")

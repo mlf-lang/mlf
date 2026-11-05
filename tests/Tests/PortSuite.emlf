@@ -37,7 +37,7 @@ prepareFixture name destination = do
  result <- C.compileFile (TS.portRoots graph) source
  compilation <- H.right result
  ty <- H.right (Check.checkClosed (C.compiledTerm compilation))
- expected <- H.right (P.parseType "IO Unit")
+ expected <- H.right (P.parseType "IO ()")
  H.assert (T.alphaEq ty (C.inferredType compilation) && T.alphaEq ty expected) "port inferred/target type differs"
  parsed <- H.right (P.parseTerm source (Pretty.prettyTerm (C.compiledTerm compilation)))
  parsedType <- H.right (Check.checkClosed parsed)
@@ -48,7 +48,7 @@ prepareFixture name destination = do
  H.assert (T.alphaEq transportedType ty) "port transport changed the target type"
  writeFile destination serialized
  hash <- fileDigest destination
- J.write (destination ++ ".checks.json") (J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "fixture" (J.str name)) ((:) ((,) "target_sha256" (J.str hash)) ((:) ((,) "entry_type" (J.str "IO Unit")) ((:) ((,) "inferred_type" (J.str (Pretty.prettyType ty))) ((:) ((,) "checks" V.portTargetChecks) [])))))))
+ J.write (destination ++ ".checks.json") (J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "fixture" (J.str name)) ((:) ((,) "target_sha256" (J.str hash)) ((:) ((,) "entry_type" (J.str "IO ()")) ((:) ((,) "inferred_type" (J.str (Pretty.prettyType ty))) ((:) ((,) "checks" V.portTargetChecks) [])))))))
  putStrLn ("CHECKED " ++ name)
 preparedSource : String -> IO String
 preparedSource name = preparedSourceFor names true name
