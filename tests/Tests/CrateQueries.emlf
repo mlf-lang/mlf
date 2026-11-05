@@ -3,6 +3,7 @@ module Tests.CrateQueries (crateQueryTests) where
 import Bootstrap.Types
 import Bootstrap.Std
 import qualified Bootstrap.Map as M
+import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.Dependency as Dependency
 import qualified Bootstrap.Desugar as Desugar
 import qualified Bootstrap.Surface as Surface
@@ -156,8 +157,8 @@ classCandidates = do
   let intInstance = SInstanceDecl [] [] "C" ((:) (SCon "Int" []) []) ((:) ((,) "methodC" (SLam "x" Nothing (SVar "x"))) [])
   let boolInstance = SInstanceDecl [] [] "C" ((:) (SCon "Bool" []) []) ((:) ((,) "methodC" (SLam "x" Nothing (SIntLit 1))) [])
   let members = (:) ((,,) "signedAnswer" (Just (SAnnotation [] (SCon "Int" []))) (SApp (SVar "methodC") (SIntLit 42))) []
-  let oldScope = IntSet (M.singleton 0 ())
-  let newScope = IntSet (M.fromList compareInt ((:) ((,) 0 ()) ((:) ((,) 1 ()) [])))
+  let oldScope = IS.singleton 0
+  let newScope = IS.fromList ((:) 0 ((:) 1 []))
   before <- H.right (Inference.lowerDeclarations [] ((:) klass []) ((:) ((,) "instanceCInt" intInstance) []) (M.singleton "signedAnswer" oldScope) ((:) oldScope []) members)
   after <- H.right (Inference.lowerDeclarations [] ((:) klass []) ((:) ((,) "instanceCInt" intInstance) ((:) ((,) "instanceCBool" boolInstance) [])) (M.singleton "signedAnswer" newScope) ((:) newScope ((:) newScope [])) members)
   (,) _ _ <- query "ClassCache" directory (Inference.loweredData before) (Inference.loweredValues before)

@@ -1,5 +1,6 @@
 module Tests.PackageReleases where
 import Bootstrap.Types
+import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.Std as S
 import qualified Package.OS as O
 import qualified Package.Json as J
@@ -455,7 +456,7 @@ releaseObjectIntegrity c savedGreeting originalManifest release = do
  let crates = bundle ++ "/crates/"
  let rootRow = S.fromMaybe (panic "missing release root") (S.find (\row -> eqString (J.getText "key" "" row) rootKey) (J.values (J.get "crates" release)))
  let objectPath = crates ++ rootKey ++ "/unit.mlfco"
- savedObject <- readFile objectPath
+ savedObject <- bind (Storage.readRaw objectPath) H.right
  writeFile objectPath "forged release object"
  invoke c app build ((:) "build" []) false "digest mismatch"
  checked "bundle artifact hashes are verified even after a cache hit"
@@ -469,7 +470,7 @@ releaseObjectIntegrity c savedGreeting originalManifest release = do
  setDependencies app ((:) (pair "greeting" (dependency "../published greeting" forgedDigest)) [])
  invoke c app build ((:) "build" []) false "malformed crate object framing"
  O.move (crates ++ forgedKey) (crates ++ rootKey)
- writeFile objectPath savedObject
+ _ <- bind (Storage.writeRawAtomic objectPath savedObject) H.right
  writeFile (bundle ++ "/release.json") originalManifest
  setDependencies app ((:) (pair "greeting" savedGreeting) [])
  checked "recomputed producer digests cannot bypass object checking"

@@ -12,18 +12,18 @@ import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.Map as M
 import qualified Tests.GraphValidation as Validation
 import qualified Bootstrap.IntSet as IS
-import Bootstrap.Classes (lowerClassesWithImports)
 import Bootstrap.Constraint
 import Bootstrap.Elaborate (reference, schemeType)
 import qualified Tests.Graph as G
 import qualified Bootstrap.Graph.Solver as Solver
 import qualified Bootstrap.Graph as NativeGraph
-import Bootstrap.Parser (parseProgram)
-import Bootstrap.Prelude (withPrelude)
+import Tests.CoreHelpers (sourceConstraints)
 import qualified Bootstrap.X.Type as T
+import qualified Bootstrap.Elaborate as Elaborate
+import qualified Bootstrap.Set as TypeSet
 
 graphSolverTests : ([] ( ((,) (String) (IO ())) ))
-graphSolverTests = ((:) ((,) "component solver matches every full-graph inference step" do { validatedKindControls; fieldProjectionControls; counts <- ((S.forM fixtures) (\file -> do { c <- (constraints file); do { solver <- (H.right (Solver.prepare (initialGraph c))); do { first <- (H.right (Solver.unify (equalities c) solver)); do { ((,) _ expected) <- (H.right (G.runBuild (initialGraph c) (G.unify (equalities c)))); do { (sameGraph expected first); do { _ <- (S.foldM compareSolveStep ((,) expected first) (solveSteps c)); (return ((H.length (solveSteps c)) + 1)) } } } } } })); (putStrLn (H.append "Component inference: " (H.append (H.show (S.sum counts)) " complete graph/index comparisons"))) }) ((:) ((,) "component witnesses preserve separate frontier solving and identities" do { counts <- ((S.forM fixtures) (\file -> do { c <- (constraints file); do { g <- (H.right (solve c)); do { solver <- (H.right (Solver.prepare g)); (let { nonreflexive edge = (S.not (T.alphaEq (schemeType g (fromGen edge)) (reference g (toNode edge)))) } in (let { edges = (S.filter nonreflexive (instances c)) } in do { ((H.forM_ edges) (\edge -> do { ((,) expectedCopies expected) <- (H.right (G.runBuild g (expandAndSolve true edge))); do { ((,) copies result) <- (H.right (Solver.witness (fromGen edge) (toNode edge) solver)); do { (S.unless (H.eq copies expectedCopies) (H.fail "witness lost original-to-copy identity")); (sameGraph expected result) } } })); (return (H.length edges)) })) } } })); do { (S.unless ((S.sum counts) > 100) (H.fail "vacuous witness comparison")); (putStrLn (H.append "Component witnesses: " (H.append (H.show (S.sum counts)) " full-graph comparisons"))) } }) ((:) ((,) "component solver includes incoming references and protected siblings" do { aliasReceipts; initial <- (H.right (Solver.prepare scopedGraph)); do { first <- (H.right (Solver.unify ((:) ((,) 4 8) []) initial)); do { ((,) _ expected) <- (H.right (G.runBuild scopedGraph (G.unify ((:) ((,) 4 8) [])))); do { (sameGraph expected first); do { (H.reject (Solver.unify ((:) ((,) 8 9) []) first)); (H.reject (Solver.unify ((:) ((,) 5 9) []) first)) } } } } }) ((:) ((,) "component solver rejects malformed disconnected input" (let { broken = (Graph (IM.adjust (\v -> (Node (GGen 99) (G.binder v) (G.flag v))) 0 (G.nodes scopedGraph)) (G.links scopedGraph) (G.nextId scopedGraph)) } in do { indexAudit; (H.reject (Solver.prepare broken)); do { initial <- (H.right (Solver.prepare scopedGraph)); do { (H.reject (Solver.unify ((:) ((,) 4 99) []) initial)); (H.reject (Solver.unify ((:) ((,) 99 99) []) initial)) } } })) ((:) ((,) "component solver preserves deep branching scopes and separate type components" branchingScopes) ((:) ((,) "expansion preserves the exact fresh identity budget across word boundaries" (let { expandFrom next = (G.runBuild (Graph (G.nodes scopedGraph) (G.links scopedGraph) next) (G.expand 2 0)) } in do { copyAllocation; do { (,) ((,,) _ boundaryCopies _) boundary <- H.right (expandFrom (9223372036854775807 - 4)); H.assert (IM.size boundaryCopies == 3 && G.nextId boundary == 9223372036854775806 && S.eqList eqInt (IM.elems boundaryCopies) ((:) 9223372036854775803 ((:) 9223372036854775804 ((:) 9223372036854775805 [])))) "Int64 expansion changed the reserved identity interval"; H.right (G.validateGraph boundary) }; do { ((,) ((,,) _ copies _) expanded) <- (H.right (expandFrom (9223372036854775807 - 3))); do { (S.unless ((H.eq (IM.size copies) 3) && (H.eq (G.nextId expanded) 9223372036854775807)) (H.fail "expansion did not use exactly its three reserved identities")); (H.right (G.validateGraph expanded)) } } })) ((:) ((,) "closed-instance optimization preserves all original schemes" do { counts <- ((S.forM (H.append fixtures (S.concatMap (\name -> ((:) (H.append "benchmarks/" (H.append name "/mlf/main.emlf")) [])) ((:) "binary-trees" ((:) "pidigits" ((:) "n-body" ((:) "fannkuch-redux" []))))))) (\file -> do { c <- (constraints file); do { initial <- (H.right (bind (Solver.prepare (initialGraph c)) (Solver.unify (equalities c)))); do { exact <- (H.right (bind (S.foldM exactSolveStep initial (solveSteps c)) Solver.finish)); do { optimized <- (H.right (solve c)); (let { expected = (G.normalize exact) } in (let { gens = (S.concatMap (\((,) n v) -> (S.concatMap (\comprehension1 -> case comprehension1 of { (GGen _) -> ((:) n []); _ -> [] }) ((:) (G.tag v) []))) (IM.toAscList (G.nodes (initialGraph c)))) } in do { ((H.forM_ gens) (\gen -> (S.unless (T.alphaEq (schemeType expected gen) (schemeType optimized gen)) (H.fail (H.append file (H.append ": changed scheme at " (H.append (H.show gen) (H.append "\n" (H.append (H.show (schemeType expected gen)) (H.append "\n" (H.show (schemeType optimized gen)))))))))))); (return (H.length gens)) })) } } } })); (putStrLn (H.append "Closed instances: " (H.append (H.show (S.sum counts)) " independent scheme comparisons"))) }) ((:) ((,) "closed-instance matching checks repeated, rigid and frontier variables" (let { graph fieldFlag fieldBinder rightName = (Graph (IM.fromList ((:) ((,) 0 (Node (GGen 1) Nothing Flexible)) ((:) ((,) 1 (Node (GCon "Unit" []) (Just 0) Rigid)) ((:) ((,) 2 (Node (GGen 3) (Just 0) Flexible)) ((:) ((,) 3 (Node (GArr 4 4) (Just 2) Flexible)) ((:) ((,) 4 (Node GBot (Just fieldBinder) fieldFlag)) ((:) ((,) 5 (Node (GGen 6) (Just 0) Flexible)) ((:) ((,) 6 (Node (GArr 7 8) (Just 5) Flexible)) ((:) ((,) 7 (Node (GCon "Int" []) (Just 6) Rigid)) ((:) ((,) 8 (Node (GCon rightName []) (Just 6) Rigid)) [])))))))))) IM.empty 9) } in (let { run g = (bind (bind (Solver.prepare g) (Solver.instantiateClosed 2 6)) Solver.finish) } in do { (H.reject (run (graph Flexible 2 "Bool"))); do { (H.reject (run (graph Rigid 2 "Int"))); do { result <- (H.right (run (graph Flexible 0 "Int"))); do { (S.unless (H.eq (G.tag (G.nodeAt result 4)) (GCon "Int" [])) (H.fail "external frontier was mistaken for a quantified variable")); do { _ <- (H.right (run (graph Flexible 2 "Int"))); (return ()) } } } } }))) []))))))))
+graphSolverTests = ((:) ((,) "component solver matches every full-graph inference step" do { validatedKindControls; fieldProjectionControls; counts <- ((S.forM fixtures) (\file -> do { c <- (constraints file); do { solver <- (H.right (Solver.prepare (initialGraph c))); do { first <- (H.right (Solver.unify (equalities c) solver)); do { ((,) _ expected) <- (H.right (G.runBuild (initialGraph c) (G.unify (equalities c)))); do { (sameGraph expected first); do { _ <- (S.foldM compareSolveStep ((,) expected first) (solveSteps c)); (return ((H.length (solveSteps c)) + 1)) } } } } } })); (putStrLn (H.append "Component inference: " (H.append (H.show (S.sum counts)) " complete graph/index comparisons"))) }) ((:) ((,) "component witnesses preserve separate frontier solving and identities" do { counts <- ((S.forM fixtures) (\file -> do { c <- (constraints file); do { g <- (H.right (solve c)); do { solver <- (H.right (Solver.prepare g)); (let { nonreflexive edge = (S.not (T.alphaEq (schemeType g (fromGen edge)) (reference g (toNode edge)))) } in (let { edges = (S.filter nonreflexive (instances c)) } in do { ((H.forM_ edges) (\edge -> do { ((,) expectedCopies expected) <- (H.right (G.runBuild g (expandAndSolve true edge))); do { ((,) copies result) <- (H.right (Solver.witness (fromGen edge) (toNode edge) solver)); do { (S.unless (H.eq copies expectedCopies) (H.fail "witness lost original-to-copy identity")); (sameGraph expected result) } } })); (return (H.length edges)) })) } } })); do { (S.unless ((S.sum counts) > 100) (H.fail "vacuous witness comparison")); (putStrLn (H.append "Component witnesses: " (H.append (H.show (S.sum counts)) " full-graph comparisons"))) } }) ((:) ((,) "component solver includes incoming references and protected siblings" do { aliasReceipts; initial <- (H.right (Solver.prepare scopedGraph)); do { first <- (H.right (Solver.unify ((:) ((,) 4 8) []) initial)); do { ((,) _ expected) <- (H.right (G.runBuild scopedGraph (G.unify ((:) ((,) 4 8) [])))); do { (sameGraph expected first); do { (H.reject (Solver.unify ((:) ((,) 8 9) []) first)); (H.reject (Solver.unify ((:) ((,) 5 9) []) first)) } } } } }) ((:) ((,) "component solver rejects malformed disconnected input" (let { broken = (Graph (IM.adjust (\v -> (Node (GGen 99) (G.binder v) (G.flag v))) 0 (G.nodes scopedGraph)) (G.links scopedGraph) (G.nextId scopedGraph)) } in do { indexAudit; (H.reject (Solver.prepare broken)); do { initial <- (H.right (Solver.prepare scopedGraph)); do { (H.reject (Solver.unify ((:) ((,) 4 99) []) initial)); (H.reject (Solver.unify ((:) ((,) 99 99) []) initial)) } } })) ((:) ((,) "component solver preserves deep branching scopes and separate type components" branchingScopes) ((:) ((,) "expansion preserves the exact fresh identity budget across word boundaries" (let { expandFrom next = (G.runBuild (Graph (G.nodes scopedGraph) (G.links scopedGraph) next) (G.expand 2 0)) } in do { copyAllocation; do { (,) ((,,) _ boundaryCopies _) boundary <- H.right (expandFrom (9223372036854775807 - 4)); H.assert (IM.size boundaryCopies == 3 && G.nextId boundary == 9223372036854775806 && S.eqList eqInt (IM.elems boundaryCopies) ((:) 9223372036854775803 ((:) 9223372036854775804 ((:) 9223372036854775805 [])))) "Int64 expansion changed the reserved identity interval"; H.right (G.validateGraph boundary) }; do { ((,) ((,,) _ copies _) expanded) <- (H.right (expandFrom (9223372036854775807 - 3))); do { (S.unless ((H.eq (IM.size copies) 3) && (H.eq (G.nextId expanded) 9223372036854775807)) (H.fail "expansion did not use exactly its three reserved identities")); (H.right (G.validateGraph expanded)) } } })) ((:) ((,) "closed-instance optimization preserves all original schemes" schemeComparisonTest) ((:) ((,) "closed-instance matching checks repeated, rigid and frontier variables" (let { graph fieldFlag fieldBinder rightName = (Graph (IM.fromList ((:) ((,) 0 (Node (GGen 1) Nothing Flexible)) ((:) ((,) 1 (Node (GCon "Unit" []) (Just 0) Rigid)) ((:) ((,) 2 (Node (GGen 3) (Just 0) Flexible)) ((:) ((,) 3 (Node (GArr 4 4) (Just 2) Flexible)) ((:) ((,) 4 (Node GBot (Just fieldBinder) fieldFlag)) ((:) ((,) 5 (Node (GGen 6) (Just 0) Flexible)) ((:) ((,) 6 (Node (GArr 7 8) (Just 5) Flexible)) ((:) ((,) 7 (Node (GCon "Int" []) (Just 6) Rigid)) ((:) ((,) 8 (Node (GCon rightName []) (Just 6) Rigid)) [])))))))))) IM.empty 9) } in (let { run g = (bind (bind (Solver.prepare g) (Solver.instantiateClosed 2 6)) Solver.finish) } in do { (H.reject (run (graph Flexible 2 "Bool"))); do { (H.reject (run (graph Rigid 2 "Int"))); do { result <- (H.right (run (graph Flexible 0 "Int"))); do { (S.unless (H.eq (G.tag (G.nodeAt result 4)) (GCon "Int" [])) (H.fail "external frontier was mistaken for a quantified variable")); do { _ <- (H.right (run (graph Flexible 2 "Int"))); (return ()) } } } } }))) []))))))))
 
 -- Exhaust the branching relations on a small graph. The original 1002-node
 -- graph separately retains long-ancestry and branch-junction regressions.
@@ -47,7 +47,7 @@ fixtures : ([] ( String ))
 fixtures = ((:) "examples/snake.emlf" ((:) "examples/monad-state-do.emlf" ((:) "examples/monad-maybe.emlf" ((:) "examples/contextual-instance.emlf" ((:) "examples/partial-annotation.emlf" [])))))
 
 constraints : String -> IO Constraints
-constraints file = do { source <- (readFile file); do { parsed <- (H.right (parseProgram file source)); (case (withPrelude ImplicitPrelude parsed) of { ((,) imports program) -> do { ((,) lowered _) <- (H.right (lowerClassesWithImports imports program)); (H.right (generateProgram lowered)) } }) } }
+constraints file = do { source <- readFile file; H.right (sourceConstraints file source) }
 
 expandAndSolve : Bool -> Edge -> G.Build ( IntMap Int )
 expandAndSolve separately edge = do { g <- get; (let { target = (G.resolve g (toNode edge)) } in do { destination <- (S.maybe (lift (Left "missing target binder")) return (G.binder (G.nodeAt g target))); do { ((,,) root copies frontier) <- (referenceExpand (fromGen edge) destination); do { (if separately then do { (S.unless (H.null frontier) (G.unify frontier)); (G.unify ((:) ((,) root target) [])) } else (G.unify (H.append frontier ((:) ((,) root target) [])))); (return copies) } } }) }
@@ -442,3 +442,342 @@ validatedKindControls = do
      ((:) ((:) pair ((:) ((,) missing missing) [])) ((:) ((:) ((,) missing missing) ((:) pair [])) ((:) ((:) pair []) [])))) keys) keys
   else return ()) Validation.smallGraphs
  putStrLn "validated kinds and eager input-error priority agree"
+
+-- Schemes nested inside another original Gen retain that owner's free
+-- references. Establish one graph correspondence before comparing any scheme:
+-- it starts at every original node and follows ordered structural/binder edges.
+-- Only rigid, closed ground structure outside every variable-owner closure may
+-- differ in sharing, fresh allocation or binder placement.
+schemeSameFlag a b = case ((,) a b) of
+ (,) Flexible Flexible -> true
+ (,) Rigid Rigid -> true
+ _ -> false
+
+schemeSameShape a b = case ((,) a b) of
+ (,) (GArr _ _) (GArr _ _) -> true
+ (,) (GTyApp _ _) (GTyApp _ _) -> true
+ (,) (GGen _) (GGen _) -> true
+ (,) GBot GBot -> true
+ (,) (GBotK k) (GBotK l) -> H.eq k l
+ (,) (GCon n xs) (GCon m ys) -> eqString n m && H.length xs == H.length ys
+ (,) (GTyCon n k) (GTyCon m l) -> eqString n m && H.eq k l
+ (,) (GSkolem n k) (GSkolem m l) -> n == m && H.eq k l
+ _ -> false
+
+schemeSensitive node = case G.tag node of
+ GGen _ -> true
+ GSkolem _ _ -> true
+ _ -> schemeSameFlag (G.flag node) Flexible
+
+schemeProtect : Graph -> IntSet -> Int -> IntSet
+schemeProtect graph seen original =
+ let n = G.resolve graph original in
+ if IS.member n seen then seen else
+ case IM.lookup n (G.nodes graph) of
+  Nothing -> IS.insert n seen
+  Just node -> case G.binder node of
+   Nothing -> IS.insert n seen
+   Just owner -> schemeProtect graph (IS.insert n seen) owner
+
+schemeProtected graph =
+ S.foldl (schemeProtect graph) IS.empty
+ (S.concatMap (\((,) n node) -> if schemeSensitive node then (:) n [] else [])
+  (IM.toAscList (G.nodes graph)))
+
+schemeClosedGround : Graph -> IntSet -> Int -> Bool
+schemeClosedGround graph active original =
+ let n = G.resolve graph original in
+ if IS.member n active then false else
+ case IM.lookup n (G.nodes graph) of
+  Nothing -> false
+  Just node ->
+   schemeSameFlag (G.flag node) Rigid &&
+   (case G.tag node of
+    GBot -> false
+    GBotK _ -> false
+    GSkolem _ _ -> false
+    GGen _ -> false
+    _ -> S.all (schemeClosedGround graph (IS.insert n active)) (G.children (G.tag node)))
+
+schemePairSeen x y seen = IS.member y (IM.findWithDefault IS.empty x seen)
+schemeInsertSeen x y seen = IM.insert x (IS.insert y (IM.findWithDefault IS.empty x seen)) seen
+schemeKnownDifferent key value mapping = case IM.lookup key mapping of
+ Nothing -> false
+ Just previous -> previous /= value
+
+-- This comparator needs a total representative lookup. Its domain guard
+-- checks every alias path before any G.resolve, independently of the production
+-- validator's treatment of aliases outside the live structural graph.
+schemeAliasPath : Graph -> IntSet -> IntSet -> Int -> Either String IntSet
+schemeAliasPath graph complete active identity =
+ if IS.member identity complete then Right complete
+ else if IS.member identity active then Left "scheme correspondence: alias cycle"
+ else case IM.lookup identity (G.links graph) of
+  Nothing ->
+   if IM.member identity (G.nodes graph) then Right (IS.insert identity complete)
+   else Left "scheme correspondence: missing alias target"
+  Just target -> do
+   checked <- schemeAliasPath graph complete (IS.insert identity active) target
+   Right (IS.insert identity checked)
+
+schemeValidateLinks : Graph -> Either String ()
+schemeValidateLinks graph = do
+ _ <- S.foldM (\complete identity -> schemeAliasPath graph complete IS.empty identity)
+  IS.empty (IM.keys (G.links graph))
+ Right ()
+
+schemeGraphRelation : Graph -> Graph -> Graph -> Either String (IntMap Int)
+schemeGraphRelation original left right = do
+ schemeValidateLinks original
+ schemeValidateLinks left
+ schemeValidateLinks right
+ G.validateGraph original
+ G.validateGraph left
+ G.validateGraph right
+ schemeVisit left right (schemeProtected left) (schemeProtected right)
+  IM.empty IM.empty IM.empty (S.map (\n -> (,) n n) (IM.keys (G.nodes original)))
+
+schemeVisit : Graph -> Graph -> IntSet -> IntSet -> IntMap Int -> IntMap Int ->
+ IntMap IntSet -> [] ((,) Int Int) -> Either String (IntMap Int)
+schemeVisit left right leftOwners rightOwners forward backward seen pending =
+ case pending of
+  [] -> Right forward
+  (:) ((,) oldLeft oldRight) rest ->
+   let x = G.resolve left oldLeft in
+   let y = G.resolve right oldRight in
+   if schemePairSeen x y seen
+   then schemeVisit left right leftOwners rightOwners forward backward seen rest
+   else case ((,) (IM.lookup x (G.nodes left)) (IM.lookup y (G.nodes right))) of
+    (,) (Just a) (Just b) ->
+     let message = H.append "scheme graph correspondence at " (H.show ((,) x y)) in
+     if S.not (schemeSameShape (G.tag a) (G.tag b)) then Left (H.append message ": shape")
+     else if S.not (schemeSameFlag (G.flag a) (G.flag b)) then Left (H.append message ": flag")
+     else case ((,) (G.kindAt left x) (G.kindAt right y)) of
+      (,) (Right k) (Right l) ->
+       if S.not (H.eq k l) then Left (H.append message ": kind") else
+       let children = S.zip (G.children (G.tag a)) (G.children (G.tag b)) in
+       let visited = schemeInsertSeen x y seen in
+       let ground = IS.notMember x leftOwners && IS.notMember y rightOwners &&
+            schemeClosedGround left IS.empty x && schemeClosedGround right IS.empty y in
+       if ground
+       then schemeVisit left right leftOwners rightOwners forward backward visited
+             (H.append children rest)
+       else if schemeKnownDifferent x y forward || schemeKnownDifferent y x backward
+       then Left (H.append message ": identity sharing")
+       else case ((,) (G.binder a) (G.binder b)) of
+        (,) Nothing Nothing ->
+         schemeVisit left right leftOwners rightOwners (IM.insert x y forward) (IM.insert y x backward)
+          visited (H.append children rest)
+        (,) (Just pa) (Just pb) ->
+         schemeVisit left right leftOwners rightOwners (IM.insert x y forward) (IM.insert y x backward)
+          visited (H.append children ((:) ((,) pa pb) rest))
+        _ -> Left (H.append message ": owner")
+      _ -> Left (H.append message ": invalid kind")
+    _ -> Left "scheme graph correspondence: missing node"
+
+-- The domains remain separate. A rigid skolem's payload is its semantic
+-- identity, not the identity of a possibly copied graph node.
+schemeVariablePairs left right pairs =
+ S.concatMap (\((,) x y) ->
+  let a = G.nodeAt left x in
+  let b = G.nodeAt right y in
+  case ((,) (G.tag a) (G.tag b)) of
+   (,) (GGen _) (GGen _) -> []
+   (,) (GSkolem sk _) (GSkolem tk _) -> (:) ((,) sk tk) []
+   _ -> if schemeSameFlag (G.flag a) Flexible then (:) ((,) x y) [] else [])
+ (IM.toAscList pairs)
+
+schemeVariablePair ((,) forward backward) ((,) x y) =
+ if schemeKnownDifferent x y forward || schemeKnownDifferent y x backward
+ then Left "scheme variable correspondence: identity sharing"
+ else Right ((,) (IM.insert x y forward) (IM.insert y x backward))
+
+data SchemeIdentity = SchemeIdentity
+ (IntMap Int) (IntMap Int) (Map XTyVar Int) (Map XTyVar Int) Int
+
+schemeIdentity : Graph -> Graph -> IntMap Int -> Either String SchemeIdentity
+schemeIdentity left right nodes = do
+ (,) forward backward <- S.foldM schemeVariablePair ((,) IM.empty IM.empty)
+  (schemeVariablePairs left right nodes)
+ let indexed = S.zip (S.range 0 (IM.size forward)) (IM.toAscList forward)
+ let lm = M.fromList T.compareTyVar (S.map (\((,) i ((,) x _)) -> (,) (XTyVar x) i) indexed)
+ let rm = M.fromList T.compareTyVar (S.map (\((,) i ((,) _ y)) -> (,) (XTyVar y) i) indexed)
+ Right (SchemeIdentity forward backward lm rm (IM.size forward))
+
+schemeCovered variables ty =
+ S.all (\(XTyVar n) -> IM.member n variables) (TypeSet.toList (T.freeVars ty))
+
+schemeAlpha : SchemeIdentity -> XType -> XType -> Either String ()
+schemeAlpha identity left right = case identity of
+ SchemeIdentity forward backward lm rm depth ->
+  if S.not (schemeCovered forward left && schemeCovered backward right)
+  then Left "scheme variable correspondence: unanchored free variable"
+  else if T.alphaIn lm rm depth left right then Right ()
+  else Left "scheme differs in its validated ambient context"
+
+schemeCompareAll : Graph -> Graph -> Graph -> Either String Int
+schemeCompareAll original expected optimized = do
+ nodes <- schemeGraphRelation original expected optimized
+ identity <- schemeIdentity expected optimized nodes
+ let expectedContext = Elaborate.prepareTypes expected
+ let optimizedContext = Elaborate.prepareTypes optimized
+ let gens = S.concatMap (\((,) n node) -> case G.tag node of
+              GGen _ -> (:) n []
+              _ -> []) (IM.toAscList (G.nodes original))
+ S.mapM_ (\gen ->
+  let left = Elaborate.schemeTypeIn expectedContext gen in
+  let right = Elaborate.schemeTypeIn optimizedContext gen in
+  case schemeAlpha identity left right of
+   Right () -> Right ()
+   Left why -> Left (H.append "changed scheme at " (H.append (H.show gen)
+    (H.append ": " (H.append why (H.append "\n" (H.append (H.show left)
+     (H.append "\n" (H.show right))))))))) gens
+ Right (H.length gens)
+
+schemeComparisonTest : IO ()
+schemeComparisonTest = do
+ schemeComparisonControls
+ counts <- S.forM
+  (H.append fixtures (S.map (\name -> H.append "benchmarks/" (H.append name "/mlf/main.emlf"))
+   ((:) "binary-trees" ((:) "pidigits" ((:) "n-body" ((:) "fannkuch-redux" []))))))
+  (\file -> do
+   c <- constraints file
+   initial <- H.right (bind (Solver.prepare (initialGraph c)) (Solver.unify (equalities c)))
+   exact <- H.right (bind (S.foldM exactSolveStep initial (solveSteps c)) Solver.finish)
+   optimized <- H.right (solve c)
+   case schemeCompareAll (initialGraph c) (G.normalize exact) optimized of
+    Left message -> H.fail (H.append file (H.append ": " message))
+    Right count -> return count)
+ putStrLn (H.append "Closed instances: " (H.append (H.show (S.sum counts)) " independent scheme comparisons"))
+
+schemeControlInitial : Graph
+schemeControlInitial = Graph (IM.fromList
+ ((:) ((,) 0 (Node (GGen 1) Nothing Flexible))
+ ((:) ((,) 1 (Node GBot (Just 0) Flexible))
+ ((:) ((,) 4 (Node (GGen 5) (Just 0) Flexible))
+ ((:) ((,) 5 (Node GBot (Just 4) Flexible))
+ ((:) ((,) 6 (Node (GGen 7) (Just 0) Flexible))
+ ((:) ((,) 7 (Node GBot (Just 6) Flexible)) []))))))) IM.empty 8
+
+schemeControl a b = Graph (IM.fromList
+ ((:) ((,) 0 (Node (GGen 1) Nothing Flexible))
+ ((:) ((,) 1 (Node (GArr a b) (Just 0) Rigid))
+ ((:) ((,) 4 (Node (GGen 5) (Just 0) Flexible))
+ ((:) ((,) 5 (Node (GArr a a) (Just 4) Rigid))
+ ((:) ((,) 6 (Node (GGen 7) (Just 0) Flexible))
+ ((:) ((,) 7 (Node (GArr a b) (Just 6) Rigid))
+ ((:) ((,) a (Node GBot (Just 0) Flexible))
+ ((:) ((,) b (Node GBot (Just 0) Flexible)) []))))))))) IM.empty 1000
+
+schemeControlSet n value graph =
+ Graph (IM.insert n value (G.nodes graph)) (G.links graph) (G.nextId graph)
+
+schemeGroundInitial : Graph
+schemeGroundInitial = Graph (IM.fromList
+ ((:) ((,) 0 (Node (GGen 1) Nothing Flexible))
+ ((:) ((,) 1 (Node (GArr 2 3) (Just 0) Rigid))
+ ((:) ((,) 2 (Node GBot (Just 0) Flexible))
+ ((:) ((,) 3 (Node GBot (Just 0) Flexible)) []))))) IM.empty 4
+
+schemeGroundControl a b c d owner = Graph (IM.fromList
+ ((:) ((,) 0 (Node (GGen 1) Nothing Flexible))
+ ((:) ((,) 1 (Node (GArr 2 3) (Just 0) Rigid))
+ ((:) ((,) 2 (Node (GCon "Pair" ((:) a ((:) b []))) (Just 1) Rigid))
+ ((:) ((,) 3 (Node (GCon "Pair" ((:) c ((:) d []))) (Just 1) Rigid))
+ ((:) ((,) a (Node (GTyCon "Int" Star) (Just owner) Rigid))
+ ((:) ((,) b (Node (GTyCon "Int" Star) (Just owner) Rigid))
+ ((:) ((,) c (Node (GTyCon "Int" Star) (Just owner) Rigid))
+ ((:) ((,) d (Node (GTyCon "Int" Star) (Just owner) Rigid)) []))))))))) IM.empty 1000
+
+schemeValidReject initial expected actual = do
+ H.right (G.validateGraph actual)
+ H.reject (schemeCompareAll initial expected actual)
+
+schemeComparisonControls : IO ()
+schemeComparisonControls = do
+ H.right (G.validateGraph schemeControlInitial)
+ let expected = schemeControl 100 101
+ let optimized = schemeControl 200 201
+ H.right (G.validateGraph expected)
+ H.right (G.validateGraph optimized)
+ count <- H.right (schemeCompareAll schemeControlInitial expected optimized)
+ H.assert (count == 3) "ambient oracle omitted an original Gen"
+ _ <- H.right (schemeCompareAll schemeControlInitial expected (schemeControl 101 100))
+ -- Splitting, merging or swapping a captured parameter across two original
+ -- schemes must fail the same global relation, even with the same owner.
+ let split = schemeControlSet 202 (Node GBot (Just 0) Flexible)
+              (schemeControlSet 5 (Node (GArr 200 202) (Just 4) Rigid) optimized)
+ let merged = schemeControlSet 1 (Node (GArr 200 200) (Just 0) Rigid) optimized
+ let swapped = schemeControlSet 7 (Node (GArr 201 200) (Just 6) Rigid) optimized
+ schemeValidReject schemeControlInitial expected split
+ schemeValidReject schemeControlInitial expected merged
+ schemeValidReject schemeControlInitial expected swapped
+ schemeValidReject schemeControlInitial expected
+  (schemeControlSet 200 (Node GBot (Just 0) Rigid) optimized)
+ -- This owner mutation escapes its new scope; it is an invalid-input control.
+ let owner = schemeControlSet 200 (Node GBot (Just 4) Flexible) optimized
+ H.reject (G.validateGraph owner)
+ H.reject (schemeCompareAll schemeControlInitial expected owner)
+ let skolemLeft = schemeControlSet 100 (Node (GSkolem 777 Star) (Just 0) Rigid) expected
+ let skolemRight = schemeControlSet 200 (Node (GSkolem 777 Star) (Just 0) Rigid) optimized
+ _ <- H.right (schemeCompareAll schemeControlInitial skolemLeft skolemRight)
+ schemeValidReject schemeControlInitial skolemLeft
+  (schemeControlSet 200 (Node (GSkolem 778 Star) (Just 0) Rigid) optimized)
+ nodes <- H.right (schemeGraphRelation schemeControlInitial expected optimized)
+ identity <- H.right (schemeIdentity expected optimized nodes)
+ -- 200 is lexical on the left but ambient on the right; 100 is the converse.
+ -- This checks capture avoidance as well as overlapping graph ID namespaces.
+ H.right (schemeAlpha identity
+  (XForall (XTyVar 200) XBot (XArrow (XVar (XTyVar 100)) (XVar (XTyVar 200))))
+  (XForall (XTyVar 100) XBot (XArrow (XVar (XTyVar 200)) (XVar (XTyVar 100)))))
+ H.right (schemeAlpha identity
+  (XForall (XTyVar 100) XBot (XVar (XTyVar 100)))
+  (XForall (XTyVar 200) XBot (XVar (XTyVar 200))))
+ H.reject (schemeAlpha identity
+  (XForall (XTyVar 300) XBot (XArrow (XVar (XTyVar 100)) (XVar (XTyVar 300))))
+  (XForall (XTyVar 200) XBot (XArrow (XVar (XTyVar 200)) (XVar (XTyVar 200)))))
+ H.reject (schemeAlpha identity (XVar (XTyVar 999)) (XVar (XTyVar 999)))
+ -- Closed rigid structure may duplicate/share descendants and reparent them.
+ let groundLeft = schemeGroundControl 100 101 102 103 0
+ let groundRight = schemeGroundControl 200 200 200 200 1
+ H.right (G.validateGraph schemeGroundInitial)
+ H.right (G.validateGraph groundLeft)
+ H.right (G.validateGraph groundRight)
+ _ <- H.right (schemeCompareAll schemeGroundInitial groundLeft groundRight)
+ schemeValidReject schemeGroundInitial groundLeft
+  (schemeControlSet 200 (Node (GTyCon "Bool" Star) (Just 1) Rigid) groundRight)
+ schemeValidReject schemeGroundInitial groundLeft
+  (schemeControlSet 2 (Node (GCon "Pair" ((:) 200 [])) (Just 1) Rigid) groundRight)
+ let wrongKind = schemeControlSet 200 (Node (GTyCon "Int" (KArrow Star Star)) (Just 1) Rigid) groundRight
+ H.reject (G.validateGraph wrongKind)
+ H.reject (schemeCompareAll schemeGroundInitial wrongKind wrongKind)
+ let illApplied = schemeControlSet 2 (Node (GTyApp 200 200) (Just 1) Rigid) groundRight
+ H.reject (G.validateGraph illApplied)
+ H.reject (schemeCompareAll schemeGroundInitial illApplied illApplied)
+ let missing = schemeControlSet 2 (Node (GArr 999 200) (Just 1) Rigid) groundRight
+ H.reject (G.validateGraph missing)
+ H.reject (schemeCompareAll schemeGroundInitial missing missing)
+ let cyclic = schemeControlSet 2 (Node (GArr 2 200) (Just 1) Rigid) groundRight
+ H.reject (G.validateGraph cyclic)
+ H.reject (schemeCompareAll schemeGroundInitial cyclic cyclic)
+ H.assert (S.not (schemeClosedGround cyclic IS.empty 2)) "ground predicate accepted structural cycle"
+ let aliasChain = Graph (G.nodes groundRight) (IM.fromList ((:) ((,) 900 901) ((:) ((,) 901 200) []))) 1000
+ H.right (schemeValidateLinks aliasChain)
+ _ <- H.right (schemeCompareAll schemeGroundInitial groundLeft aliasChain)
+ let missingAlias = Graph (G.nodes groundRight) (IM.singleton 900 999) 1000
+ H.reject (schemeValidateLinks missingAlias)
+ H.reject (schemeCompareAll schemeGroundInitial missingAlias missingAlias)
+ let aliases = Graph (G.nodes groundRight) (IM.fromList ((:) ((,) 900 901) ((:) ((,) 901 900) []))) 1000
+ H.reject (schemeValidateLinks aliases)
+ H.reject (schemeCompareAll schemeGroundInitial aliases aliases)
+ S.mapM_ (\node ->
+  H.assert (S.not (schemeClosedGround (schemeControlSet 200 node groundRight) IS.empty 200))
+   "ground predicate accepted a variable, Gen, skolem or flexible node")
+  ((:) (Node GBot (Just 1) Rigid)
+  ((:) (Node (GBotK Star) (Just 1) Rigid)
+  ((:) (Node (GSkolem 777 Star) (Just 1) Rigid)
+  ((:) (Node (GGen 2) (Just 1) Rigid)
+  ((:) (Node (GTyCon "Int" Star) (Just 1) Flexible) [])))))
+ let ownedGround = schemeControlSet 250 (Node GBot (Just 200) Flexible) groundRight
+ H.assert (IS.member 200 (schemeProtected ownedGround)) "ground exception lost a variable owner"
+ putStrLn "scheme context: anchored sharing, owners, ground structure, skolems and capture controls agree"

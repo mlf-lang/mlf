@@ -91,8 +91,8 @@ semantics = do
   expect (M.size (M.unionWith (\x y -> panic "empty union compared keys") (\x y -> panic "empty union combined values") M.empty taggedRight) == 2) "empty left union does not compare or combine"
   expect (eqString (labelAt 2 (M.intersection compareKey taggedLeft taggedRight)) "left-two") "intersection key representative"
   expect (eqString (labelAt 1 (M.difference compareKey taggedLeft taggedRight)) "left-one") "difference key representative"
-  let sparse = M.fromDistinctAscList ((:) ((,) (-1000000000000000000000) 5) ((:) ((,) 0 6) ((:) ((,) 1180591620717411303428 7) [])))
-  expect (M.valid L.compareInt (M.union L.compareInt sparse sparse) && M.size (M.difference L.compareInt sparse sparse) == 0 && M.size (M.intersection L.compareInt sparse sparse) == 3) "sparse arbitrary precision keys"
+  let sparse = M.fromDistinctAscList ((:) ((,) (-4611686018427392000) 5) ((:) ((,) 0 6) ((:) ((,) 4611686018427392000 7) [])))
+  expect (M.valid L.compareInt (M.union L.compareInt sparse sparse) && M.size (M.difference L.compareInt sparse sparse) == 0 && M.size (M.intersection L.compareInt sparse sparse) == 3) "sparse boxed Int64 keys"
   putStrLn "map fold semantics: 1024 subset pairs and laziness/key checks passed"
 
 

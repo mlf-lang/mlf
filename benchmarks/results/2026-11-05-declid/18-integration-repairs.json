@@ -1,0 +1,1275 @@
+{
+  "schema_version": 1,
+  "migration_step": "18",
+  "source_base": "796aaf8b089d532c01779e46a57773123c4d0214",
+  "comparison_baseline": "726cd256aa90d3e8cf596842fbb29515c1bc5249",
+  "candidate_compiler_sha256": "b5f11ecfa52b3c6e5ad91e469d7d8e16a0d7253495c0c2a124b498634aa7695d",
+  "baseline_compiler_sha256": "86dcabe8df31cf67ae62192314fb2709524482e0a0b26556cde0920467889b16",
+  "source_patch_sha256": "c4827a79e8929a300309a5f7a8a07712f5192c72787e8ec0544ca06c1516bc6a",
+  "source_files": 46,
+  "repair_count": 36,
+  "evidence_status": "Archive keys are proposed deterministic paths for the separate evidence branch; publication/materialization and final gate receipts remain pending. Receipt basenames plus SHA256 identify recorded evidence, not rerun instructions.",
+  "validation_status": "Completed per-action/per-family diagnostic preflight union, not one final full-unit or full-native execution.",
+  "repairs": [
+    {
+      "number": 1,
+      "id": "import-collision",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/Basic.emlf",
+        "tests/Tests/Helpers.emlf"
+      ],
+      "summary": "显式隐藏 Prelude 的 Eq/fail，保留测试 Eq 及 (==)。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current GHC/current native bad reject; fixed compile/run 42. All 14 test-library modules compile with original interfaces. Full GHC Harness55 passes.",
+      "source_sha256": {
+        "tests/Tests/Basic.emlf": "34188e4783189f5b9d843b86037801bf25bafc9e14323d0e1d182ae93bc23128",
+        "tests/Tests/Helpers.emlf": "49091120fa91fc998e78cf5529fa5185643d883f11f22d2db19a2b5e8e6328fd"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "input-receipt.json",
+          "sha256": "8353b9919c1da14e7c6578cc89dea1bb3ccf1b83a7587e207897226444f2fbfa",
+          "archive_key": "18-integration-repairs/import-collision/8353b9919c1da14e-input-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "99060292810db121a5bed5262e2f28df7fb02c9ce49c7d5881ec87db5f704577",
+          "archive_key": "18-integration-repairs/import-collision/99060292810db121-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "fail-controls.json",
+          "sha256": "edc60e9a310f47b5886282b9b196584824ea0d512f030e85822edff980a2561a",
+          "archive_key": "18-integration-repairs/import-collision/edc60e9a310f47b5-fail-controls.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 2,
+      "id": "isstring-element-type",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/NativeABI.emlf"
+      ],
+      "summary": "为仅用于 length 的错误标签表写明 String 元素类型。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current reduced before/after and current native full module before/after; original 35 cases retained. Complete Harness55 passes.",
+      "source_sha256": {
+        "tests/Tests/NativeABI.emlf": "5b161c91dd0dfbb1301aaa5fa34622b9f346a514cd845884ed39421122d2be3a"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "13d79c1f77005d0605bd98610f4b359e4dd4c154f72d3220d16dbf0769f3c851",
+          "archive_key": "18-integration-repairs/isstring-element-type/13d79c1f77005d06-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "minimal-controls.json",
+          "sha256": "3c9a4290fafe6c4f10e343eea62a0a6dfceaa7dc03fff65edfa77c43b13dbbf2",
+          "archive_key": "18-integration-repairs/isstring-element-type/3c9a4290fafe6c4f-minimal-controls.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "full-fixed-results.json",
+          "sha256": "7135640fb212118c0434792a666d13ee48d948f3ea6703b4ec4e065c9f3b45a7",
+          "archive_key": "18-integration-repairs/isstring-element-type/7135640fb212118c-full-fixed-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-fixed-result.json",
+          "sha256": "1d2a11717dc09e9287ba53035409109fd31f5220a321901392ad0400f8e29f0e",
+          "archive_key": "18-integration-repairs/isstring-element-type/1d2a11717dc09e92-runtime-fixed-result.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 3,
+      "id": "intset-fixture-api",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/CrateQueries.emlf",
+        "tests/Tests/Separate.emlf"
+      ],
+      "summary": "把身份集合 fixture 转到 IntSet API，保留元素及 max+1。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current GHC/current native bad reject, fixed compile/run outputs42 and8. Native query families pass; corrected Separate86 full GHC actions pass.",
+      "source_sha256": {
+        "tests/Tests/CrateQueries.emlf": "50236eb1ccbd6530fd625fdb3020ebb748157fa6cb61d633a1ccf1cca78eb9e1",
+        "tests/Tests/Separate.emlf": "0581687aa7986a8afe0618598d7d933332d726bae3d3011a78cb7e88baa6bd2b"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "target-probe-summary.json",
+          "sha256": "d5cf4ac34919552baab879dcb4d1dbc53c5abc419e746adcabb18e1de948a481",
+          "archive_key": "18-integration-repairs/intset-fixture-api/d5cf4ac34919552b-target-probe-summary.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "results.json",
+          "sha256": "07f174dd3dbbbe1eecbafb9c5f5778a8920e47312c3c083896ee01f7c3f688db",
+          "archive_key": "18-integration-repairs/intset-fixture-api/07f174dd3dbbbe1e-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "results.json",
+          "sha256": "b8575b2f5384cbfb6cb7fec7a5d259794eb9aae130a9492d012f9e13577130dc",
+          "archive_key": "18-integration-repairs/intset-fixture-api/b8575b2f5384cbfb-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "diagnostic-receipt-v2.json",
+          "sha256": "73ae28ac769b59ed3ce3340a812ad9eefbdeeba706980ce17d8ca2df0e44ebbe",
+          "archive_key": "18-integration-repairs/intset-fixture-api/73ae28ac769b59ed-diagnostic-receipt-v2.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 4,
+      "id": "map-index-fixture-api",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/ComponentProjection.emlf",
+        "tests/Tests/ProjectionRanks.emlf"
+      ],
+      "summary": "用 Rank.indexMap 显式包装受测树；独立 Map 期望值不变。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current GHC/current native bad reject/fixed compile+run0. Original 19-module target compiles; both native original families pass.",
+      "source_sha256": {
+        "tests/Tests/ComponentProjection.emlf": "0dc582991cbad3e68a76ebd1ae38242aa9b71d7488b088fcfade25052d0b05f0",
+        "tests/Tests/ProjectionRanks.emlf": "19b57a35200670bada7d1db2eb6645c1db6bf37cf8bbfca6b8d658e7192483de"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "input-receipt.json",
+          "sha256": "97340fbe55288a163647f9cdad2df729daf21365255865975d25151333f50c43",
+          "archive_key": "18-integration-repairs/map-index-fixture-api/97340fbe55288a16-input-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "final-receipt.json",
+          "sha256": "d30eb085d918b7e6abfee249f76419ac5e2c6fcefa2869d398ef52c545e67131",
+          "archive_key": "18-integration-repairs/map-index-fixture-api/d30eb085d918b7e6-final-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "results.json",
+          "sha256": "159761f588acdbb11f0e6caad18feb68b3dc83b135c942af389466f254cfb0b7",
+          "archive_key": "18-integration-repairs/map-index-fixture-api/159761f588acdbb1-results.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 5,
+      "id": "figure12-new-source-constructors",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/Figure12.emlf"
+      ],
+      "summary": "Figure12 源码 oracle 显式处理新构造器；拒绝把 resolved ID 节点当源码名字。",
+      "fixed_726_reproduces": false,
+      "validation": "726 legacy visitor accepts; current legacy visitor nonexhaustive. Current GHC/native full target compiles fixed. Four positive traversal controls and seven per-node/nested negatives pass; native43 expressions+36 supplemental checks pass.",
+      "source_sha256": {
+        "tests/Tests/Figure12.emlf": "dd7f8b94c22d9cc1634867d75317ff177282a6562f617b28c4391577c65857a1"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "body-and-ghc-controls.json",
+          "sha256": "f286ef7a68ad4df39ab67f946dce8e1779ebcebbbbb748e54bdbcb340a3d14eb",
+          "archive_key": "18-integration-repairs/figure12-new-source-constructors/f286ef7a68ad4df3-body-and-ghc-controls.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "validation.json",
+          "sha256": "20b23c549f0fd469dbfe2341a6cfaea602816538c97b5af00f204e71be3ef6e2",
+          "archive_key": "18-integration-repairs/figure12-new-source-constructors/20b23c549f0fd469-validation.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "results.json",
+          "sha256": "159761f588acdbb11f0e6caad18feb68b3dc83b135c942af389466f254cfb0b7",
+          "archive_key": "18-integration-repairs/figure12-new-source-constructors/159761f588acdbb1-results.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 6,
+      "id": "solver-normal-frontend-entry",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/CoreHelpers.emlf",
+        "tests/Tests/CoreSolver.emlf",
+        "tests/Tests/GraphUnification.emlf",
+        "tests/Tests/GraphSolver.emlf",
+        "tests/Tests/EmbeddingPruning.emlf"
+      ],
+      "summary": "先完成正常前端阶段，再向 solver 提供约束；独立参考求解不变。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current original escapes source-callsite or unbound ==; normal frontend helper succeeds; all7 embedding fixture node/sharing/solve controls equal baseline. GraphUnification3, EmbeddingPruning3, graph-expansion4 and GraphSolver8 original actions all individually PASS. GraphSolver covers17177 full inference graph comparisons,2701 witness comparisons and49548 scheme comparisons; action7 required the separate ambient-oracle repair recorded below.",
+      "source_sha256": {
+        "tests/Tests/CoreHelpers.emlf": "9ded9cdd644aebcf294d628118c020ddaf038ec2ea673848418c614cc426f359",
+        "tests/Tests/CoreSolver.emlf": "07751f668284d009bd2a25df28773f7129af2e9b62c788d4eeac0d9f22a89370",
+        "tests/Tests/GraphUnification.emlf": "d2ab4271b8e7986b4dbda48111b09d628decef42b3521e8daf8277d53412bc10",
+        "tests/Tests/GraphSolver.emlf": "0d3233b1e61b1444ff1dc754fc63b759536f952c829cb9c33ce805aa0030f958",
+        "tests/Tests/EmbeddingPruning.emlf": "8a3d3ac9230fc951c56c2da86f400447f9c7210539d33c59c35f34768f198f1f"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "family-results.json",
+          "sha256": "799f2d41b06749f947505e22239ab87601d611912ad103456beafb18e1b349c8",
+          "archive_key": "18-integration-repairs/solver-normal-frontend-entry/799f2d41b06749f9-family-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "results.json",
+          "sha256": "e03c6a0870d62c654ac676da0e4fb6dbcf6974f635ce8ec44d39be5eb3a29203",
+          "archive_key": "18-integration-repairs/solver-normal-frontend-entry/e03c6a0870d62c65-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "embedding-fixtures.json",
+          "sha256": "1a44a50c9281074d8a2e72e720a61291d59dd154202d4bc2f3c176745c2da461",
+          "archive_key": "18-integration-repairs/solver-normal-frontend-entry/1a44a50c9281074d-embedding-fixtures.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-receipt.json",
+          "sha256": "2559a0306e1839f99ed128249148588bf63b798675d1f8455eb33fe4cf308500",
+          "archive_key": "18-integration-repairs/solver-normal-frontend-entry/2559a0306e1839f9-runtime-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "final-handoff-receipt.json",
+          "sha256": "8a2afd712e2867efadb42cc298da43610f830976cd40731e44323a7e7920544d",
+          "archive_key": "18-integration-repairs/solver-normal-frontend-entry/8a2afd712e2867ef-final-handoff-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 7,
+      "id": "layout-semicolon-dedent",
+      "classification": "production-compiler",
+      "sources": [
+        "libraries/mlf-frontend/Bootstrap/Layout.hs"
+      ],
+      "summary": "显式分号后仍执行 dedent，修复真实 Layout 控制流。",
+      "fixed_726_reproduces": true,
+      "validation": "Current strict original17 layout pairs plus4 semicolon controls pass; Readability59/Guards55 complete with replacement Layout object.",
+      "source_sha256": {
+        "libraries/mlf-frontend/Bootstrap/Layout.hs": "97ba1d760fe1370b1b6f811e5f2cbbd62aa2c4e258a81e9122cde94de5c72150"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "c431229642cbe72d22ae62edd2f6aae69c4ea3ad9a0465e46c42d7bc62bec827",
+          "archive_key": "18-integration-repairs/layout-semicolon-dedent/c431229642cbe72d-receipt.json"
+        },
+        {
+          "role": "original_evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "6e15548b1fd3932f9a206eb51a156f381d982ba88d75dc5b6671d06b31e8b06f",
+          "archive_key": "18-integration-repairs/layout-semicolon-dedent/6e15548b1fd3932f-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "70577f21f3ff782f83e2d41d6b65ec589e77885d80a835ff1dc7209c024ce1da",
+          "archive_key": "18-integration-repairs/layout-semicolon-dedent/70577f21f3ff782f-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-results.json",
+          "sha256": "c285009bcd136871de0bd652407cbe39768fb88e3c93bf888d94fc1b40ac6ae0",
+          "archive_key": "18-integration-repairs/layout-semicolon-dedent/c285009bcd136871-runtime-results.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 8,
+      "id": "physical-spans-and-explicit-sites",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/Helpers.emlf",
+        "tests/Tests/Readability.emlf",
+        "tests/Tests/Guards.emlf",
+        "tests/Tests/SurfaceSyntax.emlf",
+        "tests/Tests/Datatypes.emlf",
+        "tests/Tests/Modules.emlf"
+      ],
+      "summary": "布局比较仅忽略物理文件和坐标；保留调用点标签、owner、wrapper 和类型签名。",
+      "fixed_726_reproduces": true,
+      "validation": "Full SourceEquality before/after controls on726/current; nine semantic negative controls retain span-independent semantics. Surface59, Guards55, Datatypes86, Readability59, Modules83 all full GHC actions pass.",
+      "source_sha256": {
+        "tests/Tests/Helpers.emlf": "49091120fa91fc998e78cf5529fa5185643d883f11f22d2db19a2b5e8e6328fd",
+        "tests/Tests/Readability.emlf": "adc261bd5145bc000a0684f904c33b71ed8370a264936b17ca44aeb93329459a",
+        "tests/Tests/Guards.emlf": "2344b20468e3e58c13a5800bb3298f249cf8ada4beb0e04893804a85375bb420",
+        "tests/Tests/SurfaceSyntax.emlf": "2887906d5ec8f6b9ac84fa0a1734cc143ea1f6418a3e319a8dc86e25faa418be",
+        "tests/Tests/Datatypes.emlf": "b5588b7573e0d8243e14082bf554ea712d7e72b342859548fa91cb22dbd60015",
+        "tests/Tests/Modules.emlf": "c1c987e1c70a6639dba7bb3828fe23677827fe33ce24a35a1aa6baf94977f584"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "c431229642cbe72d22ae62edd2f6aae69c4ea3ad9a0465e46c42d7bc62bec827",
+          "archive_key": "18-integration-repairs/physical-spans-and-explicit-sites/c431229642cbe72d-receipt.json"
+        },
+        {
+          "role": "original_evidence",
+          "receipt_basename": "results.json",
+          "sha256": "b43b2206359baa7d497c81fc2c7fa8b2178c1a404d63a0734a22e6c4adce3e45",
+          "archive_key": "18-integration-repairs/physical-spans-and-explicit-sites/b43b2206359baa7d-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "fc209383ff43f0b886465d517cdc8768a2a214dabdcba10c4d2a84ad932392ca",
+          "archive_key": "18-integration-repairs/physical-spans-and-explicit-sites/fc209383ff43f0b8-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-results.json",
+          "sha256": "38988bfa46cc1a8e6a55d13a303622e26db6151283823595d8480af3e45944d5",
+          "archive_key": "18-integration-repairs/physical-spans-and-explicit-sites/38988bfa46cc1a8e-runtime-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-results.json",
+          "sha256": "edec8d35c9d430254a35481f40aa744a32976e7192ce5978efd90cd072562f4d",
+          "archive_key": "18-integration-repairs/physical-spans-and-explicit-sites/edec8d35c9d43025-runtime-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-results.json",
+          "sha256": "c285009bcd136871de0bd652407cbe39768fb88e3c93bf888d94fc1b40ac6ae0",
+          "archive_key": "18-integration-repairs/physical-spans-and-explicit-sites/c285009bcd136871-runtime-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "diagnostic-receipt-v2.json",
+          "sha256": "73ae28ac769b59ed3ce3340a812ad9eefbdeeba706980ce17d8ca2df0e44ebbe",
+          "archive_key": "18-integration-repairs/physical-spans-and-explicit-sites/73ae28ac769b59ed-diagnostic-receipt-v2.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 9,
+      "id": "readability-string-type",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/Readability.emlf"
+      ],
+      "summary": "为 command 字符串模式 fixture 声明 String -> Int。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current original IsString bot; annotation IO(). Original full Readability59 passes.",
+      "source_sha256": {
+        "tests/Tests/Readability.emlf": "adc261bd5145bc000a0684f904c33b71ed8370a264936b17ca44aeb93329459a"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "results.json",
+          "sha256": "fdce0db42f9968f9d50ea8a816bb50e5f9b458a613bd9f3712c6f8901f584f28",
+          "archive_key": "18-integration-repairs/readability-string-type/fdce0db42f9968f9-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-results.json",
+          "sha256": "c285009bcd136871de0bd652407cbe39768fb88e3c93bf888d94fc1b40ac6ae0",
+          "archive_key": "18-integration-repairs/readability-string-type/c285009bcd136871-runtime-results.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 10,
+      "id": "standalone-let-and-io-unit",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/Readability.emlf",
+        "tests/Tests/Guards.emlf"
+      ],
+      "summary": "把旧 let rec / IO Unit fixture 更新到现有 let / IO () 契约。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current old syntax rejected/current syntax IO(); Readability59 and Guards55 all pass.",
+      "source_sha256": {
+        "tests/Tests/Readability.emlf": "adc261bd5145bc000a0684f904c33b71ed8370a264936b17ca44aeb93329459a",
+        "tests/Tests/Guards.emlf": "2344b20468e3e58c13a5800bb3298f249cf8ada4beb0e04893804a85375bb420"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "commands.json",
+          "sha256": "0a16479f6915a1c182f7a84e1b698ba3f796bedf5c067fe515a7f21b1a19fb94",
+          "archive_key": "18-integration-repairs/standalone-let-and-io-unit/0a16479f6915a1c1-commands.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-results.json",
+          "sha256": "38988bfa46cc1a8e6a55d13a303622e26db6151283823595d8480af3e45944d5",
+          "archive_key": "18-integration-repairs/standalone-let-and-io-unit/38988bfa46cc1a8e-runtime-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-results.json",
+          "sha256": "c285009bcd136871de0bd652407cbe39768fb88e3c93bf888d94fc1b40ac6ae0",
+          "archive_key": "18-integration-repairs/standalone-let-and-io-unit/c285009bcd136871-runtime-results.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 11,
+      "id": "primitive-constructor-boundary",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/Datatypes.emlf"
+      ],
+      "summary": "保留 primitive constructor 负例，并分别断言 standalone 重命名与三条拒绝边界。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current all4 boundary results agree; complete final Datatypes86 passes.",
+      "source_sha256": {
+        "tests/Tests/Datatypes.emlf": "b5588b7573e0d8243e14082bf554ea712d7e72b342859548fa91cb22dbd60015"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "0654c98d892e548a6ac8557b26ae100203ddf94b8bddc600cb734a9b03a0286b",
+          "archive_key": "18-integration-repairs/primitive-constructor-boundary/0654c98d892e548a-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "ede40f960a8fddfde5bec6e3d935524f367fd3798fa1fefb6c2a24ed5deb7ac3",
+          "archive_key": "18-integration-repairs/primitive-constructor-boundary/ede40f960a8fddfd-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-results.json",
+          "sha256": "edec8d35c9d430254a35481f40aa744a32976e7192ce5978efd90cd072562f4d",
+          "archive_key": "18-integration-repairs/primitive-constructor-boundary/edec8d35c9d43025-runtime-results.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 12,
+      "id": "intrinsic-unit-fixture",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/Datatypes.emlf",
+        "tests/Tests/CrateCodegen.emlf"
+      ],
+      "summary": "更新 intrinsic unit fixture；保留显式名义 Unit 负控。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current GHC/current native precise before/after controls; Datatypes86/CrateCodegen6 full actual GHC actions pass.",
+      "source_sha256": {
+        "tests/Tests/Datatypes.emlf": "b5588b7573e0d8243e14082bf554ea712d7e72b342859548fa91cb22dbd60015",
+        "tests/Tests/CrateCodegen.emlf": "6f047808c90fef13c4dad99f0bcf44a09db5725fb52b5b9e019587611dcc7269"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "mixed-controls.json",
+          "sha256": "20bb0f9fcb4570ca4f3d95f39b5a8862e325a7a78d6662272a652d49752ee29a",
+          "archive_key": "18-integration-repairs/intrinsic-unit-fixture/20bb0f9fcb4570ca-mixed-controls.json"
+        },
+        {
+          "role": "original_evidence",
+          "receipt_basename": "constructor-controls.json",
+          "sha256": "9c85cc548ee13110eba11838930ded7d6fdf701426ab4047e6c06dea385bd334",
+          "archive_key": "18-integration-repairs/intrinsic-unit-fixture/9c85cc548ee13110-constructor-controls.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-ghc-fixed-v3-result.json",
+          "sha256": "ef0d53eca6cfecb8360c56bcacab3a1c392040923780a47d1d9cbfaf50462899",
+          "archive_key": "18-integration-repairs/intrinsic-unit-fixture/ef0d53eca6cfecb8-runtime-ghc-fixed-v3-result.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 13,
+      "id": "crate-binary-vs-legacy-codec",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/CrateCodegen.emlf"
+      ],
+      "summary": "先读真实二进制对象，再显式投影 legacy codec；保留当前损坏对象拒绝。",
+      "fixed_726_reproduces": true,
+      "validation": "726 before5/6 then UTF8 error;726 after6/6 in16.819s;current after6/6 in21.393s, including all prior pooled checksum/context/unused/duplicate/out-of-bounds negatives, stale export removals, facade links, and new private binary damage negative.",
+      "source_sha256": {
+        "tests/Tests/CrateCodegen.emlf": "6f047808c90fef13c4dad99f0bcf44a09db5725fb52b5b9e019587611dcc7269"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "runtime-result.json",
+          "sha256": "52c2b5aa80fe3f30c66df2efc32b8e30538c45f09ffb935c59751582c263bb45",
+          "archive_key": "18-integration-repairs/crate-binary-vs-legacy-codec/52c2b5aa80fe3f30-runtime-result.json"
+        },
+        {
+          "role": "original_evidence",
+          "receipt_basename": "runtime-baseline-before-result.json",
+          "sha256": "50ed0c8e4ba21ae3b458f064951fcf30c5be02a75f59e357cf18ca655aac0072",
+          "archive_key": "18-integration-repairs/crate-binary-vs-legacy-codec/50ed0c8e4ba21ae3-runtime-baseline-before-result.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-baseline-after-result.json",
+          "sha256": "fd1aaa720288d731654aef17efc05a50759cc34a01b27292f32bf9d01d5e04cd",
+          "archive_key": "18-integration-repairs/crate-binary-vs-legacy-codec/fd1aaa720288d731-runtime-baseline-after-result.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-ghc-fixed-v3-result.json",
+          "sha256": "ef0d53eca6cfecb8360c56bcacab3a1c392040923780a47d1d9cbfaf50462899",
+          "archive_key": "18-integration-repairs/crate-binary-vs-legacy-codec/ef0d53eca6cfecb8-runtime-ghc-fixed-v3-result.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 14,
+      "id": "module-boundaries",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/Modules.emlf",
+        "tests/Tests/Helpers.emlf"
+      ],
+      "summary": "校验 NoPrelude、Primitive 注入与真实 Entity/Global/符号/调用点所有权。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current minimal controls pass; original full Modules83 and Separate86 all pass.",
+      "source_sha256": {
+        "tests/Tests/Modules.emlf": "c1c987e1c70a6639dba7bb3828fe23677827fe33ce24a35a1aa6baf94977f584",
+        "tests/Tests/Helpers.emlf": "49091120fa91fc998e78cf5529fa5185643d883f11f22d2db19a2b5e8e6328fd"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "e97dc430b0c7b867d3232bef02c77ae5077a1c1bb8316ea2479ae8fa3c1a2afe",
+          "archive_key": "18-integration-repairs/module-boundaries/e97dc430b0c7b867-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "385787aad3f1ff906d25c4228ae28c943313b6dcfe191348684c86a4c49c8431",
+          "archive_key": "18-integration-repairs/module-boundaries/385787aad3f1ff90-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "diagnostic-receipt-v2.json",
+          "sha256": "73ae28ac769b59ed3ce3340a812ad9eefbdeeba706980ce17d8ca2df0e44ebbe",
+          "archive_key": "18-integration-repairs/module-boundaries/73ae28ac769b59ed-diagnostic-receipt-v2.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 15,
+      "id": "state-worker-intrinsic-unit",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/StateCases.emlf"
+      ],
+      "summary": "三条实际 backend 消费的 state worker 改用 ST s ()，保留 LLVM 断言。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current12 public --type controls old unknownUnit/newIO(); current LLVM worker/tail-budget6/2/2 assertions pass.",
+      "source_sha256": {
+        "tests/Tests/StateCases.emlf": "de9e313a677fa9ff81735a00b82373eff7bf494c392fcd395acbac37d1983339"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "results.json",
+          "sha256": "cae7698463004262219cfdc18dd38c0736bd0139e9c2e73884dfa91ef2222247",
+          "archive_key": "18-integration-repairs/state-worker-intrinsic-unit/cae7698463004262-results.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 16,
+      "id": "example-box-annotation",
+      "classification": "example-source",
+      "sources": [
+        "examples/multiparameter.emlf"
+      ],
+      "summary": "修复真实 multiparameter example 的表达式 :: 注解。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current GHC/current native original unknownBool/newBox(Box Bool). Complete Typeclasses78 and16 example files pass.",
+      "source_sha256": {
+        "examples/multiparameter.emlf": "4b7f676c65b61199ac2fb3c43b8809e5c9bd99926bf1177c90607d6ddd928d15"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "multiparameter-controls.json",
+          "sha256": "af44c88f27d884d2ec6282e68a22ec2aa2b75cf7e6185c94a0c813b14d106153",
+          "archive_key": "18-integration-repairs/example-box-annotation/af44c88f27d884d2-multiparameter-controls.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-result.json",
+          "sha256": "626a1988d55cf511732e2280fa7d3f458f4064b8b9cadd84a1e629dfe2cbc19a",
+          "archive_key": "18-integration-repairs/example-box-annotation/626a1988d55cf511-runtime-result.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "diagnostic-receipt-v2.json",
+          "sha256": "73ae28ac769b59ed3ce3340a812ad9eefbdeeba706980ce17d8ca2df0e44ebbe",
+          "archive_key": "18-integration-repairs/example-box-annotation/73ae28ac769b59ed-diagnostic-receipt-v2.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 17,
+      "id": "example-snake-intrinsic-unit",
+      "classification": "example-source",
+      "sources": [
+        "examples/snake.emlf"
+      ],
+      "summary": "修复真实 snake example 的两处 IO () 签名，保留自定义 List。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current original type mismatch/newIO(); original16 example files pass with fixed copy. Actual GraphSolver all8 with fixed copy remains pending.",
+      "source_sha256": {
+        "examples/snake.emlf": "de35f93fd4502a836ba5af49d8a3bffea649e09d1a53fd00745704f1569dedb8"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "snake-controls.json",
+          "sha256": "f09e6425345f47a79426576ad7660b242917bd4247de423c350193cce5b4f837",
+          "archive_key": "18-integration-repairs/example-snake-intrinsic-unit/f09e6425345f47a7-snake-controls.json"
+        },
+        {
+          "role": "original_evidence",
+          "receipt_basename": "results.json",
+          "sha256": "b517b10cfe12444913d12236e4935e6240a08d3dc0ca718ba8d13294e87d1ad6",
+          "archive_key": "18-integration-repairs/example-snake-intrinsic-unit/b517b10cfe124449-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "diagnostic-receipt-v2.json",
+          "sha256": "73ae28ac769b59ed3ce3340a812ad9eefbdeeba706980ce17d8ca2df0e44ebbe",
+          "archive_key": "18-integration-repairs/example-snake-intrinsic-unit/73ae28ac769b59ed-diagnostic-receipt-v2.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 18,
+      "id": "pi-independent-integer-oracle",
+      "classification": "production-developer-tool",
+      "sources": [
+        "libraries/mlf-developer-tools/Package/Benchmark.hs"
+      ],
+      "summary": "Machin π 参考 oracle 使用显式任意精度 Integer 原语。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current old slice error/newexact independent50digits. Shared137-module check and full55-family GHC Harness pass.",
+      "source_sha256": {
+        "libraries/mlf-developer-tools/Package/Benchmark.hs": "35a164c226f51c529adac46bd575190204cf1307e932cffcf2df1d96abe3ec58"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "pi-controls.json",
+          "sha256": "ead5748bad440ac1eb7eb064040bda2c99259527e3648a1d755df0b0ab561ced",
+          "archive_key": "18-integration-repairs/pi-independent-integer-oracle/ead5748bad440ac1-pi-controls.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "shared-check.json",
+          "sha256": "4281d19fe328db0000c0d5d30a71f934afe349bf372d1dc607e3eea18fdce048",
+          "archive_key": "18-integration-repairs/pi-independent-integer-oracle/4281d19fe328db00-shared-check.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-fixed-result.json",
+          "sha256": "1d2a11717dc09e9287ba53035409109fd31f5220a321901392ad0400f8e29f0e",
+          "archive_key": "18-integration-repairs/pi-independent-integer-oracle/1d2a11717dc09e92-runtime-fixed-result.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "pi-native-domain-audit.json",
+          "sha256": "cc5a811bec13eed3ae80591323d4982b3b8b91309fef5b823dafe9682b182e86",
+          "archive_key": "18-integration-repairs/pi-independent-integer-oracle/cc5a811bec13eed3-pi-native-domain-audit.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 19,
+      "id": "int64-runtime-c-inputs",
+      "classification": "test-only",
+      "sources": [
+        "tests/native/runtime_values.c"
+      ],
+      "summary": "C runtime fixture 使用有效 Int64 输入并验证 boxed 正控；保留布尔和负控。",
+      "fixed_726_reproduces": true,
+      "validation": "Baseline seven selected modes pass; currentnormal/GC_DEBUG/ALLOCATION_AUDIT42 each=126 pass; full Harness55 passes.",
+      "source_sha256": {
+        "tests/native/runtime_values.c": "913f744ead95f1c6bb1c050fff782392925ea8b57feb55cd5460427497ca7593"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "results.json",
+          "sha256": "6ee5a457f3443a9f84cdd5f5c06de75e98b738d2124b86473619620d871af30a",
+          "archive_key": "18-integration-repairs/int64-runtime-c-inputs/6ee5a457f3443a9f-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "results.json",
+          "sha256": "9aa79b5833e68c64b26cdb8b5bceefacc165c26ff7c44514f423a8b6e3ab5b13",
+          "archive_key": "18-integration-repairs/int64-runtime-c-inputs/9aa79b5833e68c64-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "summary.json",
+          "sha256": "9c97466d16b5320b98cc4e4600ff64e15e3c75910f72b6b37f2e667cfa7e9499",
+          "archive_key": "18-integration-repairs/int64-runtime-c-inputs/9c97466d16b5320b-summary.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-fixed-result.json",
+          "sha256": "1d2a11717dc09e9287ba53035409109fd31f5220a321901392ad0400f8e29f0e",
+          "archive_key": "18-integration-repairs/int64-runtime-c-inputs/1d2a11717dc09e92-runtime-fixed-result.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 20,
+      "id": "tree-audit-constructor-abi",
+      "classification": "test-only",
+      "sources": [
+        "tests/native/benchmark_allocations.c"
+      ],
+      "summary": "树分配审计使用明确 ABI 的 Tree.Node tag 69+1，并保留 wrong-tag 负控。",
+      "fixed_726_reproduces": true,
+      "validation": "726/current four original sizes6,7,10,16: counts4398,8798,135854,14985902 and stdout agree with independent mathematics. Old/wrongtag2 controls reject. Full Harness55 passes.",
+      "source_sha256": {
+        "tests/native/benchmark_allocations.c": "c60f61a7d6dd5a1bacd450153338fcf9c6ae17ee92c574a63f4952ed61924697"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "results.json",
+          "sha256": "dfaf36588545ea11da6d0e096ad8e7a33e0d3be26d2126aa0d3baf54a3e684d7",
+          "archive_key": "18-integration-repairs/tree-audit-constructor-abi/dfaf36588545ea11-results.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "summary.json",
+          "sha256": "326cabe8bb3983f41354e46c838fcaa55f2f08261905b40715ff1b1492bf85f4",
+          "archive_key": "18-integration-repairs/tree-audit-constructor-abi/326cabe8bb3983f4-summary.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "runtime-fixed-result.json",
+          "sha256": "1d2a11717dc09e9287ba53035409109fd31f5220a321901392ad0400f8e29f0e",
+          "archive_key": "18-integration-repairs/tree-audit-constructor-abi/1d2a11717dc09e92-runtime-fixed-result.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 21,
+      "id": "prelude-append-parentheses",
+      "classification": "test-only: preserve original32 expressions/labels/order by moving4closing parentheses",
+      "sources": [
+        "tests/Tests/PreludeTests.emlf"
+      ],
+      "summary": "仅移动 Prelude fixture 四个右括号，恢复原 32 个表达式的 append 结构。",
+      "fixed_726_reproduces": "See bound receipt; no broader baseline claim inferred",
+      "validation": "See bound receipt for individual controls and limitations.",
+      "source_sha256": {
+        "tests/Tests/PreludeTests.emlf": "9f84239193047b689719eb83a7beeae030ab17c2b47d02474a01860950bd7ac4"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "6084522f1b03e1d790550f90db4b7357a6d5f91549e2dad9cd37557abad2728a",
+          "archive_key": "18-integration-repairs/prelude-append-parentheses/6084522f1b03e1d7-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 22,
+      "id": "numeric-ambiguous-literals",
+      "classification": "test-only: ops []String and prefix String required by raw guest; no numeric default change",
+      "sources": [
+        "tests/Tests/NumericArrays.emlf"
+      ],
+      "summary": "给 NumericArrays 的 ops 与 prefix 明确字符串类型。",
+      "fixed_726_reproduces": "See bound receipt; no broader baseline claim inferred",
+      "validation": "See bound receipt for individual controls and limitations.",
+      "source_sha256": {
+        "tests/Tests/NumericArrays.emlf": "d1e01dd7f277a32f25c2245d260aa6c37c406a5d9543d56c7f0272db284f1673"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "aa9ab55a41391315fe4f4b6c272e64edc63009e05183b2f9d1917bbbbc8cb233",
+          "archive_key": "18-integration-repairs/numeric-ambiguous-literals/aa9ab55a41391315-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 23,
+      "id": "bootstrap-ambiguous-literals",
+      "classification": "test-only: input render/contents String; baseline fullmodule symbol-limit boundary preserved; both minimal bindings726 reproduce",
+      "sources": [
+        "tests/Tests/BootstrapPrimitives.emlf"
+      ],
+      "summary": "给 BootstrapPrimitives 的 decodeDouble 输入及 contents 明确字符串类型。",
+      "fixed_726_reproduces": "See bound receipt; no broader baseline claim inferred",
+      "validation": "See bound receipt for individual controls and limitations.",
+      "source_sha256": {
+        "tests/Tests/BootstrapPrimitives.emlf": "6ef9460da83f8fd0ef62013b47a65d875170226aa2e98c23fcc25681b5b2c4d8"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "33dd620226f848ea37cd66809f5714fb7675e8dac7d411e1c4f0565f74297366",
+          "archive_key": "18-integration-repairs/bootstrap-ambiguous-literals/33dd620226f848ea-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 24,
+      "id": "backend-inventory",
+      "classification": "test harness/metadata/docs: exact541fixtures50families; strict593rows independently source-derived, actual full runtime pending",
+      "sources": [
+        "tests/Tests/BackendSuite.emlf",
+        "tests/test-catalog.json",
+        "tests/Tests/CompilerTests.hs",
+        "tests/Tests/PRSmoke.emlf",
+        "tests/README.md"
+      ],
+      "summary": "严格同步 541 fixtures、50 families、593 预期 rows 与 PRSmoke 原 12 个选择。",
+      "fixed_726_reproduces": "See bound receipt; no broader baseline claim inferred",
+      "validation": "See bound receipt for individual controls and limitations.",
+      "source_sha256": {
+        "tests/Tests/BackendSuite.emlf": "c8df20e31d2b83b17c81544263dc43892ea5dabe4ef7ab8ace023a273742e8d0",
+        "tests/test-catalog.json": "44b7de3c682c63c02c2a7d0542f4575b98f94e74a687c03703aa736f7a298cc7",
+        "tests/Tests/CompilerTests.hs": "dce70e32645f51e36f276e31f390457538d0a89d23f01cd29352ac99d630e525",
+        "tests/Tests/PRSmoke.emlf": "05c35d4621f5f922f5d7ffad9ee65e460e8e4df5ab46124b0cde30014c6d1563",
+        "tests/README.md": "384bdc8dfd5df4d47aa6de0eabb23c26fa479629aa25a5a917bc7796d32b5e99"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt-v1.json",
+          "sha256": "36bb44e5cebcc51aad116dd839489b6cb2ed925b9035eb0b444e0a5ca4281133",
+          "archive_key": "18-integration-repairs/backend-inventory/36bb44e5cebcc51a-receipt-v1.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 25,
+      "id": "io-shadow-ignored-string",
+      "classification": "test-only explicit type for ignored String literal; generic shadow function and zero output/event oracle preserved",
+      "sources": [
+        "tests/Tests/IOTests.emlf"
+      ],
+      "summary": "为被 generic shadow 丢弃的 quiet literal 注明 String；空输出 oracle 不变。",
+      "fixed_726_reproduces": "original public --type IsString bot; String-ascribed literal type IO() and run empty output",
+      "validation": "same before/after public controls plus native interpreter and emitted LLVM no output/no write events",
+      "source_sha256": {
+        "tests/Tests/IOTests.emlf": "e3c3cbfc0355400012177d49fef099ada4c3367e3bd1d9815481cbf2ba723aa5"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "9585312d861988b02af01675fadb487fef6ef386db224c1148e2bc6e9eb46ecb",
+          "archive_key": "18-integration-repairs/io-shadow-ignored-string/9585312d861988b0-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 26,
+      "id": "separate-binary-artifact-fixtures",
+      "classification": "test-only, no production artifact/runtime implementation changed",
+      "sources": [
+        "tests/Tests/SeparateBackends.emlf"
+      ],
+      "summary": "SeparateBackends 使用二进制读写快照；保留 missing/stale/corrupt/restore 断言。",
+      "fixed_726_reproduces": "original UTF8 failure; fixed selected public producer CLI passes all38 affected original actions/40matrix rows",
+      "validation": "same before/after runtime controls; normal raw guest compile4modules PASS",
+      "source_sha256": {
+        "tests/Tests/SeparateBackends.emlf": "619303b8601ae4acb5e04b10efa88c470f3df49d6e3af773d78a4e89df458e5a"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "2450ffc3ba08689fdd5d71cd11af87f682f950cb180cb1e5aaef706c59172d61",
+          "archive_key": "18-integration-repairs/separate-binary-artifact-fixtures/2450ffc3ba08689f-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 27,
+      "id": "backend-intrinsic-unit-and-driver-lists",
+      "classification": "test fixtures and test-driver entry points only",
+      "sources": [
+        "tests/Tests/ModuleBackends.emlf",
+        "tests/Tests/NumericArrays.emlf",
+        "tests/Tests/BackendCases.emlf",
+        "tests/Tests/ByteArrays.emlf",
+        "tests/Tests/BootstrapPrimitives.emlf",
+        "tests/Tests/DNA.emlf",
+        "tests/Tests/PRSmoke.emlf",
+        "bootstrap/RuntimeDriver.emlf",
+        "bootstrap/LLVMDriver.emlf"
+      ],
+      "summary": "Backend fixtures 改用 intrinsic ()；两个真实 driver 入口改用 []/(:)。",
+      "fixed_726_reproduces": "Not directly exercised for every file. Native drivers current raw normal consumers before unknown List/Unit -> after compiled; explicit String subissues have separate fixed726 controls.",
+      "validation": "All38 parent GHC BackendSuite modules compile/link. Both authentic current normal GHC->native driver consumers completed. Parent actual50families pending. No private host numeric-default bridge is included in source.",
+      "source_sha256": {
+        "tests/Tests/ModuleBackends.emlf": "4966133d8e30f1c50a1816d62f7df1604ff5b27721d0a30d0f490ccc36422dec",
+        "tests/Tests/NumericArrays.emlf": "d1e01dd7f277a32f25c2245d260aa6c37c406a5d9543d56c7f0272db284f1673",
+        "tests/Tests/BackendCases.emlf": "8a4fb0eaf7602946cf71fd14f59f99faa24e70590eaac8e2709877a75a6becd5",
+        "tests/Tests/ByteArrays.emlf": "5bca94dff02ecc08ab6deac906d978f23e4036e8ba65a62b578f3e34bb4c94fc",
+        "tests/Tests/BootstrapPrimitives.emlf": "6ef9460da83f8fd0ef62013b47a65d875170226aa2e98c23fcc25681b5b2c4d8",
+        "tests/Tests/DNA.emlf": "f390a0bc628d79d0ad7d3c3049991f3d7bf5205f281455616a5fdb873ce69093",
+        "tests/Tests/PRSmoke.emlf": "05c35d4621f5f922f5d7ffad9ee65e460e8e4df5ab46124b0cde30014c6d1563",
+        "bootstrap/RuntimeDriver.emlf": "5ab73b08e761f060362ade4f223f57a3f4f8080e196a01ad3c68457b3ad22bb7",
+        "bootstrap/LLVMDriver.emlf": "bf9cfd1b5320b6df3745ddeade6a46e7b4d09ef77ca6d9d6022657e51c3908f7"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "independent-static-review.json",
+          "sha256": "a2dea3157c420726312015aaf699ae381c49187835c220fbfba6e04ac1bca52a",
+          "archive_key": "18-integration-repairs/backend-intrinsic-unit-and-driver-lists/a2dea3157c420726-independent-static-review.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "complete.json",
+          "sha256": "bf1a4d521f1730f6dcca2dee103a13a6294e3a2cd73853eb69f9c207e5702f91",
+          "archive_key": "18-integration-repairs/backend-intrinsic-unit-and-driver-lists/bf1a4d521f1730f6-complete.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "9caea0f9eeb301bdb11a2a9a9c8f4923b7491ae9f7518f4a927bf36b6bdd638c",
+          "archive_key": "18-integration-repairs/backend-intrinsic-unit-and-driver-lists/9caea0f9eeb301bd-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 28,
+      "id": "backend-scope-recursive-binding",
+      "classification": "test-only fixture adaptation to existing recursive do-let scope",
+      "sources": [
+        "tests/Tests/BackendCases.emlf"
+      ],
+      "summary": "区分 recursive do-let 的内外绑定名；保留 ordered-scope 的原输出。",
+      "fixed_726_reproduces": "Baseline/current original public targets both contain identical self-recursive letrec binding; actual current native RuntimeDriver failed at stack guard. No false claim that original baseline runtime was run.",
+      "validation": "Both public compilers type/run fixed source with original42/polymorphic output; actual native interpreter and LLVM preserve output/equal trace. Original SurfaceSyntax same-name recursive type control retained.",
+      "source_sha256": {
+        "tests/Tests/BackendCases.emlf": "8a4fb0eaf7602946cf71fd14f59f99faa24e70590eaac8e2709877a75a6becd5"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "0d1d63df6d4c04fba2c79b2c1004ef535615420e47d94833eb739952b5980314",
+          "archive_key": "18-integration-repairs/backend-scope-recursive-binding/0d1d63df6d4c04fb-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "before-semantics-and-crash.json",
+          "sha256": "39fb9372571984a4eeb6220f61b89ea8a92e39bb35211c0420e1f7801f357da2",
+          "archive_key": "18-integration-repairs/backend-scope-recursive-binding/39fb9372571984a4-before-semantics-and-crash.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 29,
+      "id": "constructor-projection-shared-concrete-values",
+      "classification": "test-only",
+      "sources": [
+        "tests/Tests/ConstructorProjection.emlf"
+      ],
+      "summary": "给 Cell/saved 绑定具体类型，使共享值脱离字典抽象；全部结构断言保留。",
+      "fixed_726_reproduces": true,
+      "validation": "Both exact installed object sets yield byte-identical before AST/optimized dumps; twelve discriminating controls; original9actions and9dual-backendrows PASS with all structural guards unchanged; current normal raw module compile PASS; both public compilers run the repaired sources with the original expected outputs.",
+      "source_sha256": {
+        "tests/Tests/ConstructorProjection.emlf": "a6af7446545c97cb72549e44b4b70fb1960dd3c8426b208e82dd967540b268c3"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "e26928bed374f81463ee405a0b700272f660ed2e4aa646ead645ddca16fdb0fa",
+          "archive_key": "18-integration-repairs/constructor-projection-shared-concrete-values/e26928bed374f814-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 30,
+      "id": "environment-codegen-builtin-prefix",
+      "classification": "test-only raw Codegen constructor table",
+      "sources": [
+        "tests/Tests/EnvironmentAccess.emlf"
+      ],
+      "summary": "raw Codegen fixture 构造完整 69 项 builtin 前缀并验证固定 ABI 槽。",
+      "fixed_726_reproduces": true,
+      "validation": "Fixed726/current exact object controls before unknown constructor[]; repaired ABI/structure PASS. Original4actions/4dual-backendrows PASS again after repository69count guard.",
+      "source_sha256": {
+        "tests/Tests/EnvironmentAccess.emlf": "3e0de2191cf8ce06a6f4c2bb948a131c5a0f92cb3604d47264b9ea3413196d46"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "a9a478dbaa3efbd8ec0098a36a825ef166c180fcd2fd84cdf4fe8ca96ae7ec44",
+          "archive_key": "18-integration-repairs/environment-codegen-builtin-prefix/a9a478dbaa3efbd8-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "7c50ff460f0cc8b1286bd004bad0d70e8158bf2a4517cda429b7facaf68dd83a",
+          "archive_key": "18-integration-repairs/environment-codegen-builtin-prefix/7c50ff460f0cc8b1-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 31,
+      "id": "package-release-binary-snapshot",
+      "classification": "test-only artifact bytes",
+      "sources": [
+        "tests/Tests/PackageReleases.emlf"
+      ],
+      "summary": "PackageReleases 以原始字节保存、恢复二进制对象；所有 forgery 断言保留。",
+      "fixed_726_reproduces": "Both public compilers reject readFile on the same real binary object; no full baseline package suite claim.",
+      "validation": "Original6module raw compile PASS; fixed1module raw compile PASS. Actual original22resolver+29integration+scheduler+target dependency pass; original release stops after13 onUTF8; fixed28release allPASS116.87s. Coverage union79exactIDs across explicitly separate runs, not a synthetic single-run pass. Final native package gate plus22runner checks remain.",
+      "source_sha256": {
+        "tests/Tests/PackageReleases.emlf": "5948bb674f9928a188d756e6e282ea14394f68a42ec979745984c908ad2e0958"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "3c1d4a2d72e1303b2223235e3a626b901a691944bdbbdd45414c7e8d2ef3386a",
+          "archive_key": "18-integration-repairs/package-release-binary-snapshot/3c1d4a2d72e1303b-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 32,
+      "id": "byte-fixture-int64-domain",
+      "classification": "test-only valid Int64 inputs and independent binary64 oracle",
+      "sources": [
+        "tests/Tests/ByteArrays.emlf"
+      ],
+      "summary": "Bytes fixture 使用有效 Int64 边界及独立 IEEE-754 舍入 oracle。",
+      "fixed_726_reproduces": true,
+      "validation": "Independent exact distances/Python binary64 and volatile C FE_TONEAREST oracle; both public compilers raw targets; actual4+23actions/42dual-backendrows PASS including8native-store and4fallback cases. Independent review confirmed all three binary64 values and no Int64->Double Infinity.",
+      "source_sha256": {
+        "tests/Tests/ByteArrays.emlf": "5bca94dff02ecc08ab6deac906d978f23e4036e8ba65a62b578f3e34bb4c94fc"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "2cca59eb528dd02a17dcb9fd16b8983d89d1a838dc1d4535e4feb179274b1668",
+          "archive_key": "18-integration-repairs/byte-fixture-int64-domain/2cca59eb528dd02a-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "math-oracle.json",
+          "sha256": "5240311d03a2dc5b72f9ea485bb10c8b8cee41590ea5dccee41d58ab3a5d00ba",
+          "archive_key": "18-integration-repairs/byte-fixture-int64-domain/5240311d03a2dc5b-math-oracle.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 33,
+      "id": "module-cli-expression-ascription",
+      "classification": "test-only source API fixture",
+      "sources": [
+        "tests/Tests/ModuleBackends.emlf"
+      ],
+      "summary": "Module CLI 表达式改用 ::，保留完整复合 action 与最后三条拒绝路径。",
+      "fixed_726_reproduces": true,
+      "validation": "Both public producers before reject/afterIOInt controls; original complete compound action passes74.83s with3dual-backendrows and all final3reject commands; current normal raw3module consumer PASS.",
+      "source_sha256": {
+        "tests/Tests/ModuleBackends.emlf": "4966133d8e30f1c50a1816d62f7df1604ff5b27721d0a30d0f490ccc36422dec"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "cb9aec8e6150ff665e2deb59a617506bd5be6583c3d01ec399d4b858f657a579",
+          "archive_key": "18-integration-repairs/module-cli-expression-ascription/cb9aec8e6150ff66-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 34,
+      "id": "negativezero-doublebits-int64-oracle",
+      "classification": "test-only one-byte oracle correction",
+      "sources": [
+        "tests/Tests/BootstrapPrimitives.emlf"
+      ],
+      "summary": "负零 doubleToBits 的 Int64 oracle 改为 -9223372036854775808，仅增一个负号。",
+      "fixed_726_reproduces": true,
+      "validation": "Independent Python/C bit oracles; both public compiler type/run controls return signed-2^63 for original target. Original complete43primitive-runtime actions/69dual-backendrows PASS512.08s. Correct raw3module current guest consumer PASS. All other program/output lines and input snapshots unchanged.",
+      "source_sha256": {
+        "tests/Tests/BootstrapPrimitives.emlf": "6ef9460da83f8fd0ef62013b47a65d875170226aa2e98c23fcc25681b5b2c4d8"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "7e3eed60dd5f87ecfe8b9e713232afa3f986410b12d71043b16bc8aa5f91d9f1",
+          "archive_key": "18-integration-repairs/negativezero-doublebits-int64-oracle/7e3eed60dd5f87ec-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 35,
+      "id": "primitive-callback-comparison-boundary",
+      "classification": "test-only fixture primitive boundary",
+      "sources": [
+        "tests/Tests/HigherOrderSpecialization.emlf"
+      ],
+      "summary": "primitive-callback 的数值条件用 eqInt，保留全局零 generic-call 强断言。",
+      "fixed_726_reproduces": true,
+      "validation": "All25generic calls independently proven within24function bodies exactly shared by no-callback scalarEq control; fullLLVM old/fixed byte-identical726/current. Two-parameter recursive specialized worker retainsAddInt/EqInt and has no applied callback. Strong globalzero-generic guard and other10sources/oracles untouched. Both normal public compilers runall11rawconsumers; actual11actions/11dual-backendrows PASS.",
+      "source_sha256": {
+        "tests/Tests/HigherOrderSpecialization.emlf": "f5be13dfcdf23f720979d21c6ddfc2966194959a3d3bbecd0b2232c68afd7c6e"
+      },
+      "evidence": [
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "6af23ab23fc76d1f664dee0a11b14ee122539941c70abb28ce5096aaead20a6f",
+          "archive_key": "18-integration-repairs/primitive-callback-comparison-boundary/6af23ab23fc76d1f-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "root-test-diagnosis-review.json",
+          "sha256": "6ba6bd14c197cb4541c397646fe56b3c4ec2f2897488bcb12619e37bb8b4b9e8",
+          "archive_key": "18-integration-repairs/primitive-callback-comparison-boundary/6ba6bd14c197cb45-root-test-diagnosis-review.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    },
+    {
+      "number": 36,
+      "id": "scheme-ambient-identity-context",
+      "classification": "test-only independent oracle context repair",
+      "sources": [
+        "tests/Tests/GraphSolver.emlf"
+      ],
+      "summary": "从原始节点建立全局受约束图对应，恢复 scheme 的真实 ambient 身份上下文。",
+      "fixed_726_reproduces": true,
+      "validation": "Final eMLF original action7 with all authored controls and all9 original fixtures passes113.337858915s, including49548 original Gen schemes. The other7 original actions are byte-identical and already individually passed. Final exact19-module original CoreSolver closure compiles through normal public compile-crate in73.8497s. No new modules or manifest edits. Independent small host controls distinguish legitimate fresh renaming/overlapping numerical namespaces from valid split/merge/swap/flag mutations; final eMLF controls additionally cover nominal skolem payload, lexical capture, unanchored free variables, rigid-ground sharing/reparenting, kind/arity/missing/structural/alias-cycle input guards and variable-owner protection.",
+      "source_sha256": {
+        "tests/Tests/GraphSolver.emlf": "0d3233b1e61b1444ff1dc754fc63b759536f952c829cb9c33ce805aa0030f958"
+      },
+      "evidence": [
+        {
+          "role": "original_evidence",
+          "receipt_basename": "results.json",
+          "sha256": "4027ce0f09a3bbbc1498098294dab2162514a6c8d132a49711bc4c6458307019",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/4027ce0f09a3bbbc-results.json"
+        },
+        {
+          "role": "original_evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "a5531f6760b9c87d9eb70c42ab487b94ea9faf4cb0960f65bd71c5980c661612",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/a5531f6760b9c87d-receipt.json"
+        },
+        {
+          "role": "original_evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "25163e51286e74a410931a3b93a9199a45ea7006267a7a3edfdd9c989ede5147",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/25163e51286e74a4-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "final-handoff-receipt.json",
+          "sha256": "8a2afd712e2867efadb42cc298da43610f830976cd40731e44323a7e7920544d",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/8a2afd712e2867ef-final-handoff-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "source-proof.json",
+          "sha256": "e7311dfc0c182ea7692d0e8526844eb4af94fce4ed8abecac072b1f0157db202",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/e7311dfc0c182ea7-source-proof.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "d144532f5505371c75a9584da5128479f7fe8d74bbe0d3df77696183f969f694",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/d144532f5505371c-receipt.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "result.json",
+          "sha256": "b98b4cbea540f143885a34a99c60211b8a59c391976709d3e581a82650516c01",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/b98b4cbea540f143-result.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "review.json",
+          "sha256": "0253a0af483accd8657cfe49857cec2609032a575dffec9e3a0abcdf102a412a",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/0253a0af483accd8-review.json"
+        },
+        {
+          "role": "evidence",
+          "receipt_basename": "receipt.json",
+          "sha256": "981a2fad5362cee873573e3ec8a5d6234436807dbb1a5fc76281c5978fa813c2",
+          "archive_key": "18-integration-repairs/scheme-ambient-identity-context/981a2fad5362cee8-receipt.json"
+        }
+      ],
+      "qualification": "private diagnostic preflight; final source installation and native gates are separate"
+    }
+  ]
+}

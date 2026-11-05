@@ -25,12 +25,10 @@ jq -r '.pinned_sha256 | to_entries[] | "\(.value)  \(.key)"' "$manifest" > "$wor
 sha256 -c "$work/SHA256SUMS" >/dev/null
 python3 -B tools/release/check_benchmark_transition.py
 python3 -B tools/release/test_benchmark_transition.py
-python3 -B tools/performance/artifact-binary/test_query_graph_migration.py
-python3 -B -O tools/performance/artifact-binary/test_query_graph_migration.py
-# Current physical builtin tests also replay the unchanged writer suite on a
-# separately authenticated physical predecessor, never the new live view.
-python3 -B tools/performance/artifact-binary/test_builtin_regeneration_migration.py
-python3 -B -O tools/performance/artifact-binary/test_builtin_regeneration_migration.py
+# Check the live source transition and replay both predecessor suites (including
+# the writer suite) on the immutable source tree they originally authenticated.
+python3 -B tools/performance/artifact-binary/test_declid_migration.py
+python3 -O -B tools/performance/artifact-binary/test_declid_migration.py
 jq -r '.workloads[].provenance[] | select(.original_source != .build_source) | [.original_source,.build_source] | @tsv' "$manifest" > "$work/adaptations.tsv"
 
 count=0

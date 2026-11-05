@@ -14,3 +14,33 @@ this Types pin change plus the two evidence pins in the live manifest.
 Existing benchmark measurements and receipts are unchanged. These checks prove
 source identity and reconstruction, not unchanged runtime performance, benchmark
 correctness, or a new measurement on the current compiler.
+
+## DeclId successor
+
+The live Types input includes the two primitives introduced on #43 and the
+declaration-aware term references. Std compares these references during
+inference. `benchmarks/manifest.json` records the current hash of each file.
+The source transition in
+`tools/performance/artifact-binary/declid-source-migration.json` lists each changed
+source SHA on both sides and the new module hashes. The loader checks the entire
+live inventory, including unchanged sources, before it applies historical
+projections. It gets the predecessor bytes from Git commit
+`8c4556416023ac727e3fb2294070358a3dae8d9e`, whose tree is
+`c20bd3d8e0cdd7e319dfca77ea0b86cfbf77554d`.
+
+`tools/release/check-benchmark-provenance.sh` runs the current manifest, source
+and archive controls. It runs the original graph, writer and builtin-regeneration
+suites against their pinned physical predecessor in normal and optimized Python.
+Use a checkout containing the pinned Git commit when running these controls.
+
+The commit named below is a source-content checkpoint retained on a published
+ref. It anchors the source hashes; it is not the qualified installation. The
+final qualified commit differs only in the four audited source-pin and
+documentation files. Its fresh install, tests, CI and paired measurements are
+recorded separately with the child PR.
+
+At integrated source commit `f0c65b65431abd86ffd5716bda651ffb118541b3`,
+54 of the 196 predecessor paths changed. `Bootstrap.IndexVec` and
+`Bootstrap.Resolved` add two paths. The loader checks all 198 physical file
+identities and the resulting 137-module registry. The benchmark gate also
+reconstructs both historical benchmark dependencies byte for byte.

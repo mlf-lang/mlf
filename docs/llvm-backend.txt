@@ -264,8 +264,8 @@ target AST and scripted input to both the xMLF interpreter and LLVM native
 code. Frontend-only type and source-rejection assertions still run once.
 There is no per-fixture backend selector. A coverage audit checks that both
 backends completed every matrix row; missing executions or toolchain
-dependencies fail the suite. The current suite has 531 fixtures containing
-583 matrix rows checked on both backends. Some fixtures contain multiple
+dependencies fail the suite. The current suite has 541 fixtures containing
+593 matrix rows checked on both backends. Some fixtures contain multiple
 rows, while others check only parsing or types.
 
 The suite requires POSIX processes, clang, and pkg-config, GMP and BDWGC. It compiles

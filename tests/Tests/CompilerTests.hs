@@ -889,11 +889,11 @@ module Tests.CompilerTests where {
     };
   matrices :: TestContext -> String -> Bool -> IO ();
   matrices c binary portFixtures =
-    matrixSuite c binary portFixtures (if portFixtures then 25 else 583)
+    matrixSuite c binary portFixtures (if portFixtures then 25 else 593)
       ((:)
          (if portFixtures
           then "25 MLF port fixtures; 0 failures"
-          else "531 shared IO/prelude/backend fixtures; 0 failures")
+          else "541 shared IO/prelude/backend fixtures; 0 failures")
          []);
   matrixSuite :: TestContext -> String -> Bool -> Int -> [] String -> IO ();
   matrixSuite c binary portFixtures expectedRows expectations =
@@ -915,7 +915,7 @@ module Tests.CompilerTests where {
         unit =
           if portFixtures
           then "port"
-          else if ((expectedRows == 583) || S.isJust selected) then "backends" else ""
+          else if ((expectedRows == 593) || S.isJust selected) then "backends" else ""
       };
       expectedEntries <-
         if eqString unit ""

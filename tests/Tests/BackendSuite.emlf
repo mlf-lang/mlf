@@ -31,7 +31,7 @@ suite backends = S.append (Wr.backendTests backends) (S.concat ((:) (Io.ioTests 
 familyNames : [] String
 familyNames = O.words "backends/strict-wrappers backends/io-language backends/io-runtime backends/io-target-validation backends/io-monad-laws backends/io-failures backends/prelude-language backends/prelude-import-equivalence backends/prelude-runtime backends/snake backends/surface-language backends/guards backends/target-validation backends/target-runtime-input backends/target-semantics backends/example-corpus backends/tree-workload backends/native-arithmetic-boundaries backends/native-optimization backends/constructor-projection backends/force-reuse backends/boolean-lowering backends/environment-slots backends/strict-fields backends/numeric-language backends/numeric-specialization backends/numeric-target-validation backends/numeric-runtime backends/numeric-workloads backends/byte-language backends/byte-specialization backends/byte-target-validation backends/byte-io-failure backends/byte-runtime backends/byte-workloads backends/table-language backends/byte-input-runtime backends/table-specialization backends/table-runtime backends/dna-workloads backends/module-execution backends/module-cli backends/crate-linking backends/crate-cli backends/crate-invalidation backends/primitive-language backends/primitive-runtime backends/state-workers backends/state-runtime backends/higher-order-specialization"
 casesWith predicate cases = S.filter (\entry -> predicate (S.fst entry)) cases
-isIOLanguage label = O.starts "IO type: " label || O.starts "IO rejection: " label || eqString label "IO: unknown target primitive is rejected"
+isIOLanguage label = O.starts "IO string constraint: " label || O.starts "IO type: " label || O.starts "IO rejection: " label || eqString label "IO: unknown target primitive is rejected"
 isIOTarget label = O.starts "IO target: " label || eqString label "IO: pure programs are not executable entry points" || eqString label "IO: target verification happens before any effects"
 isIOLaw label = O.starts "IO monad law: " label
 isIOFailure label = eqString label "IO: EOF is reported and stops the continuation" || eqString label "IO: backend output errors are reported"
@@ -81,7 +81,7 @@ validateFamilies allCases entries = do
  H.assert (S.all (\entry -> S.not (S.null (S.snd entry))) entries && S.length partitioned == S.length labels && S.length partitioned == S.length (S.nubBy eqString partitioned) && S.eqList eqString (S.sortBy compareString partitioned) (S.sortBy compareString labels)) "backend families do not partition the preserved fixture actions"
 validateSuite allCases = do
  let labels = S.map S.fst allCases
- H.assert (S.length allCases == 531) "preserved backend fixture coverage changed"
+ H.assert (S.length allCases == 541) "preserved backend fixture coverage changed"
  H.assert (S.length labels == S.length (S.nubBy eqString labels)) "duplicate backend fixture labels"
 runCases backends cases = S.mapM_ (\((,) label action) -> B.inCase backends label (do { putStrLn label; action })) cases
 main : IO ()

@@ -1,0 +1,692 @@
+{
+  "format": "declid-step18-layout-memory-preflight-v1",
+  "source_base": "af2a1106752829b4f78bd33a68ca4c981d55f3d0",
+  "scope": "Historical isolated diagnostics for the adopted Layout fast path. Final exact-source install, x86_64 CI, root-eight and paired Foundation results are separate mandatory qualification gates.",
+  "adopted_source": {
+    "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+    "sha256": "2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de"
+  },
+  "patch_sha256": "c84392b6aae3ec1e2f06228dc315c8155e69a55b4ea6d6383b9c3833b353e3a1",
+  "diagnostic_summary_sha256": "12c508603a8b14a5eef4a1a45b5516f8719c0ad9d8ee61a52cdb8e58be867847",
+  "repair": "Skip offside only when closed stack is empty or starts with Explicit; offside already returns the same separator and exact stack in these cases. All Layout/Marker cases, guards and error/lazy-field demand remain.",
+  "cause": "Layout added identity offside calls after explicit semicolons. The extra31,904B of early allocation changes later GHC collection positions; paired raw variants isolate it from the fingerprint. It increases sampled peak live heap and heap capacity during inference/resolution. No new semantic token/LLVM output or persistent Layout retention was found.",
+  "semantic_controls": {
+    "full_tokens": {
+      "files": 138,
+      "fields": [
+        "text",
+        "start_line",
+        "start_column",
+        "end_line",
+        "end_column"
+      ],
+      "eof_token": true,
+      "comparison": "exact C Layout vs candidate"
+    },
+    "original_layout_pairs": 17,
+    "semicolon_scope_pairs": 4,
+    "semantic_field_negative_controls": 8,
+    "direct_frame_demand_and_boundary_controls": 7,
+    "diagnostic_position_preserved": true,
+    "recursive_IO_type_preserved": true,
+    "all_original_llvm_bytes_equal": true
+  },
+  "linux_preflight": {
+    "architecture": "aarch64",
+    "address_space_per_process_bytes": 6442450944,
+    "process_tree_rss_bytes": 5368709120,
+    "original_C_oom": true,
+    "candidate_passes": 3,
+    "candidate_peak_rss_bytes": [
+      4132855808,
+      4140273664
+    ],
+    "fixture_and_budget_unchanged": true,
+    "llvm_sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+    "llvm_bytes": 562913,
+    "review_sha256": "9657d0fbaa990715b66a28977d7cd7d60a6883e7cbceeb6ee343d02dac6aae31"
+  },
+  "evidence_status": "Archive keys are proposed paths in the separate evidence branch. Files have been locally hashed; this source checkpoint does not claim their publication.",
+  "evidence": [
+    {
+      "archive_key": "layout-memory-diagnostic/Layout-fastpath.patch",
+      "sha256": "c84392b6aae3ec1e2f06228dc315c8155e69a55b4ea6d6383b9c3833b353e3a1",
+      "bytes": 1093
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/PORTABLE-EVIDENCE.md",
+      "sha256": "b65bd3b5780220be2af80c4f3c2a731720a233752293b1ee2c24353143d0d019",
+      "bytes": 2515
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/diagnostic-summary.json",
+      "sha256": "12c508603a8b14a5eef4a1a45b5516f8719c0ad9d8ee61a52cdb8e58be867847",
+      "bytes": 5301
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/direct-layout-controls.py",
+      "sha256": "1536aa04d6af94b1cd538ca4fa8b57f1205b5cee4af60c3f204c773632b50ce2",
+      "bytes": 4063
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/Direct.hs",
+      "sha256": "47e17e0d6e3fe489162aee18523d3b73a71b3a0a1c069d45da236fe25bfa96c9",
+      "bytes": 2498
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/OldLayout.hs",
+      "sha256": "0e3f6fc9357c455bdfc6feadd7637351299644172f45c598973f3e7c40e4c33a",
+      "bytes": 19734
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/StrictLayoutProbe.hs",
+      "sha256": "9e92b7a20cdd6ae20b8dc0b0b6d3dbf90dc28cc83cea9b9ca16d1b901983d551",
+      "bytes": 9659
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/Tokens.hs",
+      "sha256": "db1ac662f9cb1121d0b4a9d348362a28692e8401618e0cd42f6d4c2bf2b7465e",
+      "bytes": 980
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/compile-layout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/compile-old-layout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/compile-strict.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/compile-tokens.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/direct-compile.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/direct-link.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/direct-receipt.json",
+      "sha256": "983cf216d6aba2f6aefef983d559fb77c7804adf17b47a64494da634a2adbc3c",
+      "bytes": 17018
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/direct-run.log",
+      "sha256": "b8ff8313542c50ef3c856b1078324daa2fd303db00af03ec92e4a84d7b589b1d",
+      "bytes": 351
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/gc-0.txt",
+      "sha256": "27e66f4ff113382f6322819bb96052693ca46f79a5a27d7a9a9a69983f3500a6",
+      "bytes": 5737935
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/gc-1.txt",
+      "sha256": "c607ddeb437b6a03ad01a0584b1f583525bcd399bb3a80ce59edbebcf28143f8",
+      "bytes": 5737935
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/gc-2.txt",
+      "sha256": "758066f3053cdb6816ed18deb57836e9f3cb16db9937131d77ea23b50c179bcc",
+      "bytes": 5737935
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/link-emlf.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/link-strict.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/link-tokens.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/receipt.json",
+      "sha256": "2101e64f5eee7c1e97ff4ce76779cc5dd2f43e718c680811d9f3f5b1b3d67e3e",
+      "bytes": 121784
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-0/command.json",
+      "sha256": "7daa894dfb76800d9a57b105ff3ac0de1a14236f34313907121a818929521e94",
+      "bytes": 2070
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-0/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-0/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-1/command.json",
+      "sha256": "f0e3d02da90207fd249aa67f4b65f9d88c5e057c27e44afd1f964fc455cd2cb1",
+      "bytes": 2070
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-1/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-1/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-2/command.json",
+      "sha256": "942c6f91689aecd0cd3c35a31ad550529a992b32827f02295c5a8d2ab2118403",
+      "bytes": 2067
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-2/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/run-2/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/strict-controls.log",
+      "sha256": "1c980e2e8af4613eb2467c7922968009bd2eb743632696e4ffda97f196ef2bc1",
+      "bytes": 1475
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate/token-controls.log",
+      "sha256": "e713ed0cc23336d35084f5145ddbcae6982f4f6cbdc75ca75a7c74dd9d0aaf2a",
+      "bytes": 19178
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-candidate.py",
+      "sha256": "807e30341fd8b9fff2c83fc7171fefcf1ddad1996dbfa762448463763e0fdd92",
+      "bytes": 4530
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-probe/Main.hs",
+      "sha256": "db1ac662f9cb1121d0b4a9d348362a28692e8401618e0cd42f6d4c2bf2b7465e",
+      "bytes": 980
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-probe/OldLayout.hs",
+      "sha256": "a89e8c3b272e8bfde7d2443819ae1fd0982005f5e39f80b4afe743fa3245ecbb",
+      "bytes": 19619
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-probe/link.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-probe/main.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-probe/old-layout.log",
+      "sha256": "dacb2ae7ea1c8833618f566b89afbb0d23056d8b6e52be16c4f4ee0d75a134ac",
+      "bytes": 28
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-probe/prepare.py",
+      "sha256": "253cf5526fea0f219563d96c6808296a7df90acae2fb0cf20cef6915f0e700a1",
+      "bytes": 3402
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-probe/receipt.json",
+      "sha256": "7206db433eb412c39ef889adea12a827e5963159be46779eeafe95004d9eb220",
+      "bytes": 22812
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/layout-probe/tokens.log",
+      "sha256": "ecb4e9def86dad88afd594eebf27719d6512c04b09e29983813434ff50191a6b",
+      "bytes": 2244
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/Layout-candidate.hs",
+      "sha256": "2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de",
+      "bytes": 20069
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/docker.log",
+      "sha256": "fb42db2a52ab464960141813bfceb6a682d7feb87be51fc9f66f3e8b240d662e",
+      "bytes": 89
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/C-run/command.json",
+      "sha256": "c807729f8a17bc681fa90b5ace5d8cb48c8ee95bcce30400d09b988c081c18ac",
+      "bytes": 1439
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/C-run/stderr",
+      "sha256": "7890b115edc9a5dc93f68d8a9a9d44b768754febbc4eaa42e857e0077d43d0de",
+      "bytes": 17
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/C-run/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/Layout-candidate.hs",
+      "sha256": "2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de",
+      "bytes": 20069
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/build.log",
+      "sha256": "8f301789269e8f82f15d9f6f9a085f6c4a342bd6bb9b343fd3cec677f3fdb0ce",
+      "bytes": 39688
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate0-run/command.json",
+      "sha256": "b45edfdfbcdb97fef04aa9a2ee21e68e1af9f385f927862194f5c1934f85a004",
+      "bytes": 1462
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate0-run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate0-run/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate1-run/command.json",
+      "sha256": "d1121d43ca0877b1e30d517034af1cb017c4509159e6a78cc9a444bb1b69f58f",
+      "bytes": 1461
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate1-run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate1-run/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate2-run/command.json",
+      "sha256": "fbb0e96b757c87e32cf2a2b9c7ed699b87dd950bcd61326187a99919735ce328",
+      "bytes": 1472
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate2-run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/candidate2-run/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/compile-layout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/compile-main.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/fixture.hs",
+      "sha256": "e7bc0d6bdd6ec6ac1a7d9b2cd6f71cb398c430f3029c870057d096efff2aaa82",
+      "bytes": 14282
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/link-C.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/link-candidate.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/receipt.json",
+      "sha256": "960279c4d4ce7ed90ebd94e9a9228c2068a4900831bdf0953bb3adec44866636",
+      "bytes": 59009
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/evidence/run.py",
+      "sha256": "71b51a76fa2b40dc633450e55baef83a31fd1c24d7ff3a5309bdc5668e10e69c",
+      "bytes": 3357
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/fixture.hs",
+      "sha256": "e7bc0d6bdd6ec6ac1a7d9b2cd6f71cb398c430f3029c870057d096efff2aaa82",
+      "bytes": 14282
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/launch.json",
+      "sha256": "a79a13f59f35c86aeb075d8e53804634c9cec024252b21dd23b02deda9f1d8b8",
+      "bytes": 682
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/review.json",
+      "sha256": "9657d0fbaa990715b66a28977d7cd7d60a6883e7cbceeb6ee343d02dac6aae31",
+      "bytes": 1301
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/run.py",
+      "sha256": "71b51a76fa2b40dc633450e55baef83a31fd1c24d7ff3a5309bdc5668e10e69c",
+      "bytes": 3357
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/source/tools/performance/a1-private-index/helper.py",
+      "sha256": "0d11b29419a32fc9832096951aa085cc317c8a304b9db110ee96ba411a4ce7cc",
+      "bytes": 13239
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/source/tools/shared/build.py",
+      "sha256": "3ac387f43f4ce6261a94fd514da2108d7dce607867bab2a4267bb73918b1de1f",
+      "bytes": 36630
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure/tracked-source-check.json",
+      "sha256": "108916e404e8d5698e5bcdac783a1ef1708fb8711fa561542b197ef17d58f3db",
+      "bytes": 968983
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/linux-pressure.py",
+      "sha256": "71b51a76fa2b40dc633450e55baef83a31fd1c24d7ff3a5309bdc5668e10e69c",
+      "bytes": 3357
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair/C/command.json",
+      "sha256": "8b0f3607497fa7921a54c44e0d9f0846f7f57bbfb5418433397e7cced13bf749",
+      "bytes": 1936
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair/C/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair/C/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair/Main.hs",
+      "sha256": "e7bc0d6bdd6ec6ac1a7d9b2cd6f71cb398c430f3029c870057d096efff2aaa82",
+      "bytes": 14282
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair/old796/command.json",
+      "sha256": "e73e976b8050aaddb5f54fbd828cf8863b7757fb13c3d893e86e270f48667789",
+      "bytes": 1946
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair/old796/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair/old796/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair/receipt.json",
+      "sha256": "ec9e910236351f72f998ccb143547703fcc53b5fb371a85bc869072598dfddf1",
+      "bytes": 5990
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/local-pair.py",
+      "sha256": "71c2e8b9cc9cfe6175713a7e25f5d70365aea421d8d19b5d53e31ca334770822",
+      "bytes": 2010
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/CompilerCore.hs",
+      "sha256": "33ed485821b248c0b1606833fc692815b43fa3215e30845f33872ae517807bfb",
+      "bytes": 3516
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/LLVM.hs",
+      "sha256": "1c295c9b8bff6f2d1e789316a43d1b0977a1d6327ffe3a9283a52c4182dd393e",
+      "bytes": 16926
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/Optimize.hs",
+      "sha256": "f54f3e200a0ccf4121db2a702212a82465aed4e753e96c1ee498e81d7cc6b40f",
+      "bytes": 58854
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/PhaseProbe.hs",
+      "sha256": "f1bb28a8a08ff5c16a32a8d3b6bd7162e29b348be7745b1c1e287fad5eabb111",
+      "bytes": 517
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/compile-CompilerCore.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/compile-LLVM.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/compile-Optimize.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/compile-PhaseProbe.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/gc.txt",
+      "sha256": "bd0144bc1c48a5ba1a2cb6920440a0ca76e0fe48e6d52fe2b331a280f41b258b",
+      "bytes": 5739043
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/link.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/receipt.json",
+      "sha256": "2bd99d9de61284e289fb8eec9f293dc8b2b88b39e9e8bce3a8994188e548c1fa",
+      "bytes": 22134
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/run/command.json",
+      "sha256": "db59d60404df4825f0eaacfc388ae4c81d61f521f912bd47e034c1ee6f5fe5b0",
+      "bytes": 2019
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/run/stderr",
+      "sha256": "2fe4e3299366bdbe77b2be2a90afdd279a0f96b53278e54f4e504fa50613996c",
+      "bytes": 2881
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase/run/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/phase.py",
+      "sha256": "aa46388916a049eab9446015851028b36c211f32b7a93685796d3732299a54b3",
+      "bytes": 5184
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/validate-linux.py",
+      "sha256": "7f9e88d66da49f22e5f2dd1df52ecb6713a3e0aa077d36257994160f31a7695d",
+      "bytes": 3735
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/BuiltinPreludeData.hs",
+      "sha256": "2e8f5caf08a8a075098dc454bad0adbb461b9249460f7ed3790fd5a4e42bcddb",
+      "bytes": 2220407
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/Layout.hs",
+      "sha256": "9d602c1743537623ae64a34dc6d34ee79c367ee57cb4214dc7e2e8509a9de411",
+      "bytes": 19626
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/Main-fixture.hs",
+      "sha256": "e7bc0d6bdd6ec6ac1a7d9b2cd6f71cb398c430f3029c870057d096efff2aaa82",
+      "bytes": 14282
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/Main.hs",
+      "sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79",
+      "bytes": 130
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/compile-main.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/compile-old-BuiltinPreludeData.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/compile-old-Layout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/link-newBoth.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/link-newIdentityOnly.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/link-newLayoutOnly.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/link-oldBoth.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newBoth-gc.txt",
+      "sha256": "207518bf5ac257af298a6813afecef97618da6a6df67cde5f538c8981da56584",
+      "bytes": 5738048
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newBoth-run/command.json",
+      "sha256": "2e90acf5e5c07f2449273cacfdf75998ca73d23d77dd82d70bf7d8cfc915253e",
+      "bytes": 2071
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newBoth-run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newBoth-run/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newIdentityOnly-gc.txt",
+      "sha256": "45cf590c668c830d48ff06a19d7eabca9fbf32b92782838eb497f2f0253dc393",
+      "bytes": 5737962
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newIdentityOnly-run/command.json",
+      "sha256": "b53f7888bb52a28aa682ce503773195e9203395ed4a5c92f8b9974440b4d1380",
+      "bytes": 2104
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newIdentityOnly-run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newIdentityOnly-run/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newLayoutOnly-gc.txt",
+      "sha256": "5cd3505a0a06ef87ef96579cc874b9c1fbb587ff45435ac9fd1cc3c99cc3b6dc",
+      "bytes": 5738060
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newLayoutOnly-run/command.json",
+      "sha256": "02d5774f4d53f3a6c7bf8aac9379edc9fff01f1eab01100080d76948ecab702d",
+      "bytes": 2095
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newLayoutOnly-run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/newLayoutOnly-run/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/oldBoth-gc.txt",
+      "sha256": "1d28d1756ad4076da3cf6c568d76f25d9dd49242e41e59c600a1e4ff9080ccda",
+      "bytes": 5737946
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/oldBoth-run/command.json",
+      "sha256": "9e41c1d5d024095ebbdf5121d0f9da760bcb854cc6e0340be93da012e0653ecf",
+      "bytes": 2072
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/oldBoth-run/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/oldBoth-run/stdout",
+      "sha256": "a3054a6356e31e509c5b78e76d6a92edc6769ec30cc3933cf8a1bdea81cb3f5f",
+      "bytes": 562913
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants-v2/receipt.json",
+      "sha256": "a381af1452f343e56dcd34ae58bf4e9b312130c9d55942034569012dd19b7fe1",
+      "bytes": 219481
+    },
+    {
+      "archive_key": "layout-memory-diagnostic/variants.py",
+      "sha256": "0c1e42bc9929ad45423e6f1ac18f6e27bb8725a793bbfa9054c11b543b0fc982",
+      "bytes": 4067
+    }
+  ]
+}
