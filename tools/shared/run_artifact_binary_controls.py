@@ -133,6 +133,25 @@ def main():
             raw=(constructor_dir/name).read_bytes();doc=ref.read_document(raw,7)
             require(doc.values()==expected,'independent complete structured meaning: '+name)
             require(raw==ref.tree_document(expected,7),'independent canonical exact bytes: '+name)
+            if name=='constructors.bin':
+                # Check the independent typed reader against actual emitted ABI
+                # roots, including the newest bridge and both closed bounds.
+                codes=[code for _,code in typed.CONTRACT['primitive_codes']]
+                require(codes==list(range(134)), 'exact current primitive ABI inventory')
+                primitive_roots=doc.roots[len(typed.CONTRACT['schema_fields']):]
+                require(len(primitive_roots)==134, 'actual complete primitive root inventory')
+                for root in primitive_roots:
+                    typed.validate_type(doc,root,'Primitive')
+                rejected=[]
+                for code in (-1,134,2147483647):
+                    negative=ref.read_document(ref.tree_document([typed.n(32,('int',code))],7),7)
+                    try:
+                        typed.validate_type(negative,negative.roots[0],'Primitive')
+                    except ref.Invalid:
+                        rejected.append(code)
+                    else:
+                        raise ValueError('independent reader accepted unknown primitive ABI: '+str(code))
+                record['primitive_abi']={'actual_checked_codes':codes,'rejected_codes':rejected}
             if name=='sharing.bin':
                 require(doc.accounting()['shared_node_references']>0,'real structural sharing')
             record.setdefault('artifacts',{})[name]={'sha256':hashlib.sha256(raw).hexdigest(),**doc.accounting()}

@@ -43,7 +43,7 @@
       "sources": {
         "Bootstrap/Dependency.hs": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2",
         "Bootstrap/Desugar.hs": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37",
-        "Bootstrap/Layout.hs": "9d602c1743537623ae64a34dc6d34ee79c367ee57cb4214dc7e2e8509a9de411",
+        "Bootstrap/Layout.hs": "2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de",
         "Bootstrap/Lexer.hs": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
         "Bootstrap/Module.hs": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
         "Bootstrap/Parsec.hs": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
@@ -160,8 +160,8 @@
       "name": "mlf-developer-tools",
       "path": "libraries/mlf-developer-tools",
       "sources": {
-        "Package/Benchmark.hs": "089024c9213e36e5e591bffca6ba8605d127d518f4432164adf9ae9080669aa8",
-        "Package/Verification.hs": "5863313b16d6058ded44ff8b46840f1534ffb2db02ff420911c382b2b68ab301"
+        "Package/Benchmark.hs": "35a164c226f51c529adac46bd575190204cf1307e932cffcf2df1d96abe3ec58",
+        "Package/Verification.hs": "84f0828c887ca288e2ba511cd535633768707cd249f1fef8929de06a6b0baa1e"
       },
       "version": "0.3.0"
     },
@@ -202,7 +202,7 @@
       "name": "mlf-compiler",
       "path": ".",
       "sources": {
-        "bootstrap/MLF/BuiltinPreludeData.hs": "2e8f5caf08a8a075098dc454bad0adbb461b9249460f7ed3790fd5a4e42bcddb",
+        "bootstrap/MLF/BuiltinPreludeData.hs": "91b2dee48f06af0432c7d2e81372d3a51d223c0e91ff22eab6e132559b4e3211",
         "bootstrap/MLF/Entry/BuiltinPrelude.hs": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
         "bootstrap/MLF/Entry/Emlf.hs": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
         "bootstrap/MLF/NativeBuild.hs": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
@@ -212,8 +212,8 @@
         "package/MLF/Entry/Mlfpkg.hs": "26dab5260f36e5d67ba85d4c74ab4cad6bd76b8772056ea1f22d7e9ea0264711",
         "tests/MLF/Entry/CompilerTests.hs": "45d7fdabe9d3ed340442f4154a7e953ff7df7279b788570d7e976b1d22c41695",
         "tests/MLF/Entry/TupleList.hs": "e817f6037216da8cff7d615e617adcccd58bf687b6e9dacc3155ad8e4a9f6bd8",
-        "tests/Tests/Catalog.hs": "9fbc4f7ef554a654e1b933a9bbb8335ad23834df168572c1cd737b3154625a78",
-        "tests/Tests/CompilerTests.hs": "f3f6c319a4a676e62b89aaca739dee1de5b2d46fba14eb95fe4aa12e89c034ca",
+        "tests/Tests/Catalog.hs": "c2acbcc2d6497b50199236a8bde33a7d69906f3a523c86377b8aeb56c7ab7982",
+        "tests/Tests/CompilerTests.hs": "dce70e32645f51e36f276e31f390457538d0a89d23f01cd29352ac99d630e525",
         "tests/Tests/CorePartitions.hs": "b020a93ed6d93bf92766016f06ad6eb59f89b7c3b288b934b3568c28cc14284b",
         "tests/Tests/Coverage.hs": "38ac76ab4abe5d17a53f6c8e66dd52bf8b3b718920ccab99f25909680516e7ff",
         "tests/Tests/Selection.hs": "8a53a01a1af9b5c5d18eccb0dc7ab370f4a829dda73f09ebd3c420f7cb8967fd",

@@ -186,6 +186,7 @@
       "main": "ReferencesMain.emlf",
       "profile": "compiler",
       "modules": {
+        "Tests.CoreHelpers": "Tests/CoreHelpers.emlf",
         "Tests.EmbeddingPruning": "Tests/EmbeddingPruning.emlf",
         "Tests.Figure12": "Tests/Figure12.emlf",
         "Tests.Graph": "Tests/Graph.emlf",

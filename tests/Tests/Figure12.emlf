@@ -24,6 +24,8 @@ signatures = ((:) ((,) "id" "forall a. a -> a") ((:) ((,) "choose" "forall a. a 
 cases : ([] ( Case ))
 cases = (let { yes n e = (Case n e true true []) } in (let { no n e = (Case n e false false []) } in (let { given ss c = (Case (caseId c) (expression c) (paperAcceptance c) (expectedAcceptance c) ss) } in (let { etaSignatures = ((:) ((,) "k" "forall a. a -> [] a -> a") ((:) ((,) "h" "Int -> (forall a. a -> a)") ((:) ((,) "lst" "[] (forall a. Int -> a -> a)") []))) } in ((:) (yes "A1" "\\x y -> y") ((:) (yes "A2" "choose id") ((:) (yes "A3" "choose nil ids") ((:) (yes "A4" "\\(x : forall a. a -> a) -> x x") ((:) (yes "A5" "id auto") ((:) (yes "A6" "id auto'") ((:) (yes "A7" "choose id auto") ((:) (Case (caseId (yes "A8" "choose id auto'")) (expression (yes "A8" "choose id auto'")) (paperAcceptance (yes "A8" "choose id auto'")) false (localSignatures (yes "A8" "choose id auto'"))) ((:) (given ((:) ((,) "f" "forall a. (a -> a) -> [] a -> a") []) (yes "A9" "f (choose id) ids")) ((:) (yes "A10.1" "poly id") ((:) (yes "A10.2" "poly (\\x -> x)") ((:) (yes "A10.3" "id poly (\\x -> x)") ((:) (given ((:) ((,) "k" "forall a. a -> [] a -> Int") ((:) ((,) "xs" "[] ((forall a. a -> a) -> (,) Int Bool)") [])) (no "A11" "k (\\f -> pair (f 1) (f True)) xs")) ((:) (yes "A12.1" "poly id") ((:) (yes "A12.2" "app poly id") ((:) (yes "A12.3" "revapp id poly") ((:) (yes "A13.1" "app runST argST") ((:) (yes "A13.2" "revapp argST runST") ((:) (yes "B1.1" "length ids") ((:) (yes "B1.2" "tail ids") ((:) (yes "B1.3" "head ids") ((:) (yes "B1.4" "single id") ((:) (yes "B2" "cons id ids") ((:) (yes "B3" "cons (\\x -> x) ids") ((:) (yes "B4" "append (single inc) (single id)") ((:) (yes "B5" "append (single id) ids") ((:) (yes "B6" "map poly (single id)") ((:) (yes "B7.1" "map head (single ids)") ((:) (yes "B7.2" "head ids True") ((:) (no "C1a" "\\f -> pair (f 1) (f True)") ((:) (yes "C1b" "\\(f : forall a. a -> a) -> pair (f 1) (f True)") ((:) (given ((:) ((,) "g" "((forall a. a -> a) -> (,) Int Bool) -> Char") []) (no "C1c" "g (\\f -> pair (f 1) (f True))")) ((:) (given ((:) ((,) "r" "(forall a. a -> (forall b. b -> b)) -> Int") []) (yes "C2" "r (\\x y -> y)")) ((:) (given etaSignatures (no "E1a" "k h lst")) ((:) (given etaSignatures (yes "E1b" "k (\\x -> h x) lst")) ((:) (yes "E2a" "\\x -> poly x") ((:) (yes "E2b" "(\\x -> poly x) : (forall a. a -> a) -> (,) Int Bool") ((:) (yes "E3a" "app poly id") ((:) (yes "E3b" "app (\\x -> poly x) id") ((:) (yes "E4a" "map poly ids") ((:) (yes "E4b" "map (\\x -> poly x) ids") ((:) (yes "E5a" "compose poly head") ((:) (yes "E5b" "\\xs -> poly (head xs)") [])))))))))))))))))))))))))))))))))))))))))))))))
 
+-- Signature selection visits parseExpr output and legacy lexical names only.
+-- Resolved declarations and evidence cannot be identified by display hints.
 freeNames : SExpr -> Set String
 freeNames e = let rec {
   reference : String -> Set String;
@@ -43,10 +45,12 @@ freeNames e = let rec {
   bound (SStringPattern _) = [];
   bound (SBoolPattern _) = [];
   bound (SOverloadedStringPattern _ _ _) = [];
+  bound (SIndexedStringPattern _ _ _) = [];
   bound (SAsPattern n p) = (:) n (bound p);
   bound (SLazyPattern p) = bound p;
   references : SPattern -> Set String;
   references (SOverloadedStringPattern _ equality conversion) = Set.union (reference equality) (reference conversion);
+  references (SIndexedStringPattern _ _ _) = panic "Figure12 signature oracle received a resolved string pattern";
   references (SNestedPattern _ ps) = Set.unions (S.map references ps);
   references (SAsPattern _ p) = references p;
   references (SLazyPattern p) = references p;
@@ -55,6 +59,9 @@ freeNames e = let rec {
   SSourceDefinition body -> freeNames body;
   SCallSite _ _ body -> freeNames body;
   SVar x -> reference x;
+  SGlobal _ _ -> panic "Figure12 signature oracle received a resolved global";
+  SDeclScope _ _ -> panic "Figure12 signature oracle received a declaration scope";
+  SWantedRefs _ _ -> panic "Figure12 signature oracle received resolved evidence";
   SConstructor _ -> Set.empty;
   SLam x _ b -> (Set.delete x (freeNames b));
   SApp a b -> Set.union (freeNames a) (freeNames b);
