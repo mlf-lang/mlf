@@ -55,6 +55,22 @@ for (const workflow of [ci, qualify, release, read('recover-release')]) {
   requireHistoricalCheckouts(workflow);
   assert.throws(() => requireHistoricalCheckouts(workflow.replaceAll('fetch-depth: 0', 'fetch-depth: 1')));
 }
+const historyPreparation = 'python3 -B tools/testing/prepare_history_refs.py';
+const requirePreparedHistory = (text, consumer) => {
+  const prepareAt = text.indexOf(historyPreparation);
+  const consumeAt = text.indexOf(consumer);
+  assert.ok(prepareAt >= 0 && consumeAt > prepareAt,
+    'Pinned squash history must be prepared explicitly before historical consumers');
+};
+const releaseChecks = fs.readFileSync('tools/release/check.sh', 'utf8');
+for (const [text, consumer] of [
+  [releaseChecks, 'tools/release/check-benchmark-provenance.sh'],
+  [ciJob('native'), 'name: Install pinned direct-host GHC'],
+]) {
+  requirePreparedHistory(text, consumer);
+  assert.throws(() => requirePreparedHistory(text.replace(historyPreparation, ''), consumer));
+  assert.throws(() => requirePreparedHistory(text.replace(historyPreparation, '') + historyPreparation, consumer));
+}
 assert.match(ciJob('native'), /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct/);
 assert.match(ciJob('native'), /python3 tools\/shared\/test_figure12_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json/);
 assert.match(ciJob('native'), /\.mlf-build\/framework-direct\/\*\.json\*/);

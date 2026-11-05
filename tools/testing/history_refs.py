@@ -10,6 +10,7 @@ no environment or user configuration can select another object.
 from functools import lru_cache
 from pathlib import Path
 import subprocess
+from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parents[2]
 # original identity -> (rewritten identity, original tree, rewritten tree, kind)
@@ -27,16 +28,76 @@ REVISIONS = {
 }
 
 
+class SquashTransport(NamedTuple):
+    source: str
+    integration: str
+    parent: str
+    tree: str
+
+
+# Closed review data for PR #25, keyed by the *only* rewritten historical
+# commit that lost direct ancestry. This proves exact-tree transport, not that
+# the squash retained source ancestry. Future squashes require a new review.
+SQUASH_TRANSPORTS = {
+    'bbed4764fdf6f0280b60299ebee67301e813a669': SquashTransport(
+        source='90319e3b8c3a7758cd68b3b6474ba0dff6a61923',
+        integration='d52fb5a7c931fbd8d5262bbaf77f5babe0089baa',
+        parent='0b738335a62b6f23a5b945da793c939b2b116b88',
+        tree='44c4aadf0e6799c9ef16bc2899fe14557f6cd802'),
+}
+
+
 def _object_tree(root, identity, kind):
-    result = subprocess.run(['git', 'cat-file', '-e', identity], cwd=root,
+    result = subprocess.run(['git', '--no-replace-objects', 'cat-file', '-e', identity], cwd=root,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if result.returncode:
         return None
-    actual_kind = subprocess.check_output(['git', 'cat-file', '-t', identity], cwd=root, text=True).strip()
+    actual_kind = subprocess.check_output(['git', '--no-replace-objects', 'cat-file', '-t', identity], cwd=root, text=True).strip()
     if actual_kind != kind:
         raise ValueError('historical object has unexpected type: ' + identity)
-    return subprocess.check_output(['git', 'rev-parse', '--verify', identity + '^{tree}'],
+    return subprocess.check_output(['git', '--no-replace-objects', 'rev-parse', '--verify', identity + '^{tree}'],
                                    cwd=root, text=True).strip()
+
+
+def _is_ancestor(ancestor, descendant):
+    result = subprocess.run(['git', '--no-replace-objects', 'merge-base',
+                             '--is-ancestor', ancestor, descendant], cwd=ROOT,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if result.returncode not in (0, 1):
+        raise ValueError('historical ancestry check failed: ' + result.stderr.strip())
+    return result.returncode == 0
+
+
+def verify_published_revision(original):
+    """Require the exact rewrite, with direct ancestry or one reviewed squash.
+
+    This offline publication check is deliberately separate from the resolver's
+    original-object fallback. Reachability is never cached: HEAD can change.
+    """
+    if original not in REVISIONS:
+        raise ValueError('unreviewed historical identity: ' + original)
+    rewritten, _oldtree, newtree, kind = REVISIONS[original]
+    if _object_tree(ROOT, rewritten, kind) != newtree:
+        raise ValueError('published historical object is unavailable or differs: ' + original)
+    if kind != 'commit' or _is_ancestor(rewritten, 'HEAD'):
+        return
+    transport = SQUASH_TRANSPORTS.get(rewritten)
+    if transport is None:
+        raise ValueError('historical commit has no reviewed ancestry or squash transport: ' + original)
+    for identity in (transport.source, transport.integration):
+        if _object_tree(ROOT, identity, 'commit') != transport.tree:
+            raise ValueError('squash transport object is unavailable or tree differs: ' + identity)
+    if _object_tree(ROOT, transport.parent, 'commit') is None:
+        raise ValueError('squash transport parent is unavailable: ' + transport.parent)
+    parents = subprocess.check_output(
+        ['git', '--no-replace-objects', 'show', '-s', '--format=%P', transport.integration],
+        cwd=ROOT, text=True).strip().split()
+    if parents != [transport.parent]:
+        raise ValueError('squash transport parent differs: ' + transport.integration)
+    if not (_is_ancestor(rewritten, transport.source)
+            and _is_ancestor(transport.parent, transport.source)
+            and _is_ancestor(transport.integration, 'HEAD')):
+        raise ValueError('squash transport ancestry differs: ' + original)
 
 
 @lru_cache(maxsize=None)
@@ -65,4 +126,4 @@ def historical_bytes(revision, path):
             or normalized == 'tools/profile/results' or normalized.startswith('tools/profile/results/')
             or (normalized.startswith('papers/') and normalized.endswith('.pdf'))):
         raise ValueError('unavailable or invalid historical source path: ' + path)
-    return subprocess.check_output(['git', 'show', resolve_revision(revision) + ':' + normalized], cwd=ROOT)
+    return subprocess.check_output(['git', '--no-replace-objects', 'show', resolve_revision(revision) + ':' + normalized], cwd=ROOT)

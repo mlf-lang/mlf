@@ -11,6 +11,9 @@ grep -q "^## $version " CHANGELOG.md
 for script in tools/release/*.sh; do bash -n "$script"; done
 test -s LICENSE
 git diff --check
+# Materialize only the closed, SHA-pinned squash source if absent. The
+# historical identity/reachability checks themselves remain offline.
+python3 -B tools/testing/prepare_history_refs.py
 tools/release/check-benchmark-provenance.sh
 tools/release/test-setup-macos.sh
 tools/release/test-package-publishing.sh
