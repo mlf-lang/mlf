@@ -9,6 +9,7 @@ import sys
 SHARED = Path(__file__).resolve().parents[2] / 'shared'
 sys.path.insert(0, str(SHARED))
 from artifact_binary_reference import read_document  # noqa: E402
+from test_query_index import read_index  # noqa: E402
 
 GRAPH = 'query-graph-v1/'
 HASH = re.compile(r'[0-9a-f]{64}')
@@ -126,28 +127,46 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
     generation = text(document(raw[current]))
     require(valid_hash(generation) and generations == [GRAPH + 'generations/' + generation + '.mlfqg'],
             'CURRENT selects retained generation')
-    format_value, configuration, entries = node(document(raw[generations[0]]), 411, 3)
-    require(text(format_value) == 'MLF-CRATE-QUERY-GRAPH-1' and text(configuration),
-            'query graph index format/configuration')
+    index = document(raw[generations[0]])
+    indexed = index[0] == 'node' and index[1] == 412
+    if indexed:
+        format_value, configuration, _, _ = node(index, 412, 4)
+        require(text(format_value) == 'MLF-CRATE-QUERY-GRAPH-2' and text(configuration),
+                'query graph index format/configuration')
+    else:
+        format_value, configuration, entries = node(index, 411, 3)
+        require(text(format_value) == 'MLF-CRATE-QUERY-GRAPH-1' and text(configuration),
+                'query graph index format/configuration')
     config = unpack(text(configuration))
     require(len(config) == 5 and config[0] == crate and config[1] == compiler_sha and
             valid_hash(compiler_sha) and config[2] and config[3] == 'open-fragment-checker-1' and
             config[4] in ('source', 'lowered'), 'query graph crate/compiler configuration')
-    nodes = {}
-    for entry in node(entries, 1):
-        key_value, hash_value, reads_value, payload_value = node(entry, 410, 4)
-        key, sha = text(key_value), text(hash_value)
-        require(key not in nodes and valid_hash(sha), 'unique query graph keys and valid hashes')
-        reads = [tuple(text(x) for x in node(edge, 2, 2)) for edge in node(reads_value, 1)]
-        require(all(valid_hash(h) for _, h in reads), 'query graph dependency hash')
-        require(payload_value[0] == 'node' and payload_value[1] in (4, 5), 'query graph payload Maybe')
-        payload_children = node(payload_value, payload_value[1], 0 if payload_value[1] == 4 else 1)
-        payload = text(payload_children[0]) if payload_children else None
-        if payload is not None:
-            require(valid_hash(payload) and payload == sha, 'query graph payload matches result hash')
-            require(GRAPH + 'results/' + payload + '.mlfqr' in inventory,
-                    'query graph missing retained payload')
-        nodes[key] = (sha, reads, payload)
+    if indexed:
+        # The independent oracle validates dictionary/ID canonicality, ordered
+        # reads, closure, longest path and referenced-work bounds before
+        # materializing the same logical rows used by the legacy checks below.
+        nodes, _ = read_index(raw[generations[0]], text(configuration), expected=generation)
+        for sha, _, payload in nodes.values():
+            if payload is not None:
+                require(valid_hash(payload) and payload == sha, 'query graph payload matches result hash')
+                require(GRAPH + 'results/' + payload + '.mlfqr' in inventory,
+                        'query graph missing retained payload')
+    else:
+        nodes = {}
+        for entry in node(entries, 1):
+            key_value, hash_value, reads_value, payload_value = node(entry, 410, 4)
+            key, sha = text(key_value), text(hash_value)
+            require(key not in nodes and valid_hash(sha), 'unique query graph keys and valid hashes')
+            reads = [tuple(text(x) for x in node(edge, 2, 2)) for edge in node(reads_value, 1)]
+            require(all(valid_hash(h) for _, h in reads), 'query graph dependency hash')
+            require(payload_value[0] == 'node' and payload_value[1] in (4, 5), 'query graph payload Maybe')
+            payload_children = node(payload_value, payload_value[1], 0 if payload_value[1] == 4 else 1)
+            payload = text(payload_children[0]) if payload_children else None
+            if payload is not None:
+                require(valid_hash(payload) and payload == sha, 'query graph payload matches result hash')
+                require(GRAPH + 'results/' + payload + '.mlfqr' in inventory,
+                        'query graph missing retained payload')
+            nodes[key] = (sha, reads, payload)
     for _, reads, _ in nodes.values():
         for key, sha in reads:
             require(key in nodes and nodes[key][0] == sha, 'query graph missing/stale dependency')

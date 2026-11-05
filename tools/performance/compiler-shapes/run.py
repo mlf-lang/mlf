@@ -84,6 +84,7 @@ def main():
             schedule.append({'case':case['id'],'position':position,'lane':lane})
     inputs={str(p.resolve()):H.sha(p) for p in [args.setup,hp,HERE/'run.py',HERE/'worker.py',HERE/'generate.py',
         HERE/'matrix.json',HERE/'query_cache.py',Q.SHARED/'artifact_binary_reference.py',
+        Q.SHARED/'test_query_index.py',
         Path(setup['producer'])/'receipt.json',Path(setup['producer'])/'bin/emlf',
         Path(setup['ghc']),Path(setup['clang']),Path(setup['runtime']),Path(setup['builtin']+'.mlfci'),
         Path(setup['builtin']+'.mlfco')]}
