@@ -35,7 +35,9 @@ none = W.VNode 4 []
 just value = W.VNode 5 [value]
 refs k h = W.VNode 2 [W.VInt k, W.VInt h]
 row k h reads location = W.VNode 413 [W.VInt k, W.VInt h, W.VNode 1 reads, location]
-rows = [row 2 0 [] none, row 3 1 [refs 2 0, refs 2 0] (just (W.VInt 0))]
+leafRow = row 2 0 [] none
+rootRow = row 3 1 [refs 2 0, refs 2 0] (just (W.VInt 0))
+rows = [leafRow, rootRow]
 v2 strings records = W.VNode 412 [W.VText "MLF-CRATE-QUERY-GRAPH-2",
   W.VText "config", W.VNode 1 (map W.VText strings), W.VNode 1 records]
 base = v2 dict rows
@@ -93,41 +95,41 @@ pureTests = do
   pass "legacy and v2 exact roundtrip, order, repeated reads, independent location"
 
   let bad label expected strings records = decodeReject label expected (v2 strings records)
-      changeFirst field value = mutateNode field value (head rows) : tail rows
+      changeFirst field value = [mutateNode field value leafRow, rootRow]
   forM_ [(-1),4,9223372036854775807] $ \id ->
     bad "hash ID range" "ID out of range" dict (changeFirst 1 (W.VInt id))
   forM_ [W.VText "0",W.VBits 0,W.VNode 1 []] $ \value ->
     bad "ID exact integer type" "Int" dict (changeFirst 1 value)
   bad "read ID negative" "ID out of range" dict
-    [head rows,row 3 1 [refs (-1) 0] (just (W.VInt 0))]
+    [leafRow,row 3 1 [refs (-1) 0] (just (W.VInt 0))]
   bad "read hash ID range" "ID out of range" dict
-    [head rows,row 3 1 [refs 2 4] (just (W.VInt 0))]
+    [leafRow,row 3 1 [refs 2 4] (just (W.VInt 0))]
   bad "payload ID negative" "ID out of range" dict
-    [head rows,row 3 1 [refs 2 0] (just (W.VInt (-1)))]
+    [leafRow,row 3 1 [refs 2 0] (just (W.VInt (-1)))]
   bad "payload ID bits" "Int" dict
-    [head rows,row 3 1 [refs 2 0] (just (W.VBits 0))]
+    [leafRow,row 3 1 [refs 2 0] (just (W.VBits 0))]
   bad "hash ID ordinary string" "digest" dict (changeFirst 1 (W.VInt 2))
   bad "read hash ordinary string" "digest" dict
-    [head rows,row 3 1 [refs 2 2] (just (W.VInt 0))]
+    [leafRow,row 3 1 [refs 2 2] (just (W.VInt 0))]
   bad "payload hash ordinary string" "digest" dict
-    [head rows,row 3 1 [refs 2 0] (just (W.VInt 2))]
+    [leafRow,row 3 1 [refs 2 0] (just (W.VInt 2))]
   bad "invalid hash text" "digest" ["a",hashB,"leaf","root"] rows
   bad "duplicate dictionary" "dictionary" [hashA,hashA,"leaf","root"] rows
   bad "unordered dictionary" "dictionary" [hashB,hashA,"leaf","root"] rows
   bad "unused dictionary" "unused" (dict ++ ["unused"]) rows
-  bad "duplicate node" "duplicate/unordered" dict [head rows,head rows,last rows]
+  bad "duplicate node" "duplicate/unordered" dict [leafRow,leafRow,rootRow]
   bad "unordered nodes" "duplicate/unordered" dict (reverse rows)
-  bad "missing dependency" "unpublished" dict [last rows]
+  bad "missing dependency" "unpublished" dict [rootRow]
   bad "stale expected hash" "stale" dict
-    [head rows,row 3 1 [refs 2 1] (just (W.VInt 0))]
-  bad "cycle" "cyclic/deep" dict [row 2 0 [refs 3 1] none,last rows]
+    [leafRow,row 3 1 [refs 2 1] (just (W.VInt 0))]
+  bad "cycle" "cyclic/deep" dict [row 2 0 [refs 3 1] none,rootRow]
   bad "self cycle" "cyclic/deep" dict
-    [head rows,row 3 1 [refs 3 1] (just (W.VInt 0))]
+    [leafRow,row 3 1 [refs 3 1] (just (W.VInt 0))]
   bad "read pair constructor" "indexed query read" dict
-    [head rows,row 3 1 [W.VNode 3 [W.VInt 2,W.VInt 0]] (just (W.VInt 0))]
+    [leafRow,row 3 1 [W.VNode 3 [W.VInt 2,W.VInt 0]] (just (W.VInt 0))]
   bad "payload constructor" "indexed query location" dict
-    [head rows,row 3 1 [refs 2 0] (W.VNode 5 [])]
-  bad "row constructor" "indexed query node" dict [W.VNode 410 [],last rows]
+    [leafRow,row 3 1 [refs 2 0] (W.VNode 5 [])]
+  bad "row constructor" "indexed query node" dict [W.VNode 410 [],rootRow]
   let header f c d e = W.VNode 412 [f,c,d,e]
   decodeReject "dictionary element type" "String"
     (header (W.VText "MLF-CRATE-QUERY-GRAPH-2") (W.VText "config")
@@ -299,7 +301,10 @@ publicationTests root = do
       generationPath = txt (root ++ "/generations/" ++ B.unpack generation ++ ".mlfqg")
   need "cold contains v2 generation" (not (null (B.unpack generation)) && M.size old == 2)
   graph <- Q.readValue generationPath (T.Just generation) >>= right "generation hash"
-  index <- right "generation root" (W.lookupGraphNode graph (head (W.graphRoots graph)))
+  rootID <- case W.graphRoots graph of
+    [rootID] -> pure rootID
+    _ -> errorWithoutStackTrace "publication must have exactly one generation root"
+  index <- right "generation root" (W.lookupGraphNode graph rootID)
   case index of W.GNode 412 _ -> pure (); _ -> error "publication must write v2"
   let (deleted,_) = Q.validate (Q.nodeKey node) reopened
       (_,changed) = Q.recordDigest (Q.nodeKey leaf) [] T.Nothing hashA T.Nothing reopened
