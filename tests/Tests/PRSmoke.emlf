@@ -20,7 +20,7 @@ import qualified Tests.IndependentType as IndependentType
 labels : [] String
 labels =
  (:) "IO: greeting and input order"
- ((:) "IO: integer arithmetic is signed and unbounded"
+ ((:) "IO: integer arithmetic is signed and wraps at 64 bits"
  ((:) "IO: conditional does not force an unselected pure branch"
  ((:) "IO: an action can be executed more than once"
  ((:) "IO: constructor and case evaluation"
@@ -54,7 +54,7 @@ independentControls : IO ()
 independentControls = do
  independentType "\\x -> x" Figure12.identity
  independentType "let id = \\x -> x in if id true then id 42 else 0" (XCon "Int" [])
- independentType "putStrLn \"checked\"" (XCon "IO" ((:) (XCon "Unit" []) []))
+ independentType "putStrLn \"checked\"" (XCon "IO" ((:) (XCon "()" []) []))
  let malformed = XApp (XPrimitive PPutStrLn []) (XIntTerm 42)
  case Independent.checkClosed malformed of
   Left error -> H.assert (H.contains "application type mismatch" error) error

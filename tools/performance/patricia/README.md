@@ -65,12 +65,44 @@ explicitly replaced with -1, since the old value wraps to zero. The unmatched
 Core obligation now requires signed Int64 primitive operations and no fusion,
 rather than the obsolete arbitrary-Integer operations.
 
-`run_file_controls.py` retains all nine authored file cases. For local
-qualification its baseline is the independently qualified Int64 balanced-map
-producer, and both candidate Crate and CrateSession routes must agree in raw
-bytes, errors, types and fresh-group inventory. Across the intentional numeric
-ABI change, the old P3 whole-artifact bytes are not a valid raw oracle; its
-frozen semantic algorithms remain in the suites above.
+`run_file_controls.py` retains all nine authored file cases and their frozen
+handwritten status/type/error expectations. The ordinary `Crate` route keeps
+the original complete raw-byte comparison against its authenticated reference.
+`CrateSession` already emitted an open schema-7 object at the fixed DeclId
+baseline, whereas `Crate` emitted a closed schema-4 object. Their bytes and
+object fingerprints necessarily differ. The explicit boundary comparison
+therefore checks every original fragment body, ordered parameter/owner/use and
+datatype inventories, interface fields, content hashes and complete linked
+terms. Step 14 deliberately links only entry-reachable local fragments. An
+independent closure over the already-compared ordered used-reference inventories
+selects the reference's outer declarations, requiring every original owner and
+the actual terminal entry identity. It retains all RHSs and lexical bindings;
+missing live groups, retained unreachable groups, owner swaps and local-shadow
+changes are negative controls. The receipt lists exactly selected and omitted
+groups. This is a finite C4 oracle over actual used references, not a general
+model of the production linker's additional parameter/support roots. Other
+representation allowances are external type alpha-renaming,
+all-Star datatype spelling, and capture-safe linked identity renaming. Actual
+public readers, linking, target checking and returned `Open.audit` fragments
+remain required. Separate fresh/fresh, warm-cache and audited-rebuild checks
+require complete open-artifact byte equality; three actual corrupted artifacts
+exercise the native admission/audit and independent comparison boundaries.
+
+The independent reader/schema triple is unchanged from pinned Git commit
+`8c4556416023ac727e3fb2294070358a3dae8d9e` and loaded into an isolated directory
+before execution. Each file has its original literal SHA256; tests reject a
+changed tree, changed file and checkout-module substitution. This finite C4
+corpus's own artifacts and linked terms use the old primitive domain: codes
+132 and 133 are explicitly rejected there. The actual builtin dependency
+interface declares both new primitives, so its separate validator applies only
+the authenticated reader's exact one-anchor 131-to-133 bound extension and
+requires the specified Prelude owner and `freezeSTArray`/`stToIO` spelling.
+It retains every dependency byte and content hash; code 134, wrong owners and
+wrong spellings are rejected. This is metadata qualification, not execution
+qualification of those new primitives. All production source pins and the
+three frozen C4 inputs remain unchanged. Across the earlier intentional numeric
+ABI change, old P3 whole-artifact bytes are not an oracle for current output;
+its frozen semantic algorithms remain in the suites above.
 
 ## Performance
 

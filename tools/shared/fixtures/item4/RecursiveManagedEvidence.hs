@@ -395,8 +395,9 @@ sourceChecks cache = do
     T.Nothing -> error "ordinary recursive sources unexpectedly require whole-path fallback"
   -- The source scheduler must not silently reinstate old global lowering.
   let plan = case rawPlan of
-        Source.SourcePlan a b c d e f g _ i j ->
-          Source.SourcePlan a b c d e f g (error "legacy global lowering forced") i j
+        Source.SourcePlan inventory graph count used externals _ instances protection ->
+          Source.SourcePlan inventory graph count used externals
+            (error "legacy global lowering forced") instances protection
   (objects, cold, contracts) <- Query.compileSourceGroups "recursive-managed-evidence"
     (Host.literal cache) [] Map.empty plan >>= expect "cold recursive source groups"
   assert "cold source inference covers every group"

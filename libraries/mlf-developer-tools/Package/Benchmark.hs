@@ -23,20 +23,40 @@ module Package.Benchmark where {
               } in
               (half * half)
          else (base * power base (n - 1));
-  atan :: Int -> Int -> Int -> Int -> Int -> Int;
+  -- Machin's fixed-point scale exceeds the fixed-width Int range.
+  powerInteger :: Integer -> Int -> Integer;
+  powerInteger base n =
+    if (n == 0)
+    then intToInteger 1
+    else if (remInt n 2 == 0)
+         then let {
+                half = powerInteger base (quotInt n 2)
+              } in
+              mulInteger half half
+         else mulInteger base (powerInteger base (n - 1));
+  atan :: Integer -> Integer -> Integer -> Integer -> Integer -> Integer;
   atan square value total odd sign =
-    if (value == 0)
+    if eqInteger value (intToInteger 0)
     then total
-    else atan square (quotInt value square) (total + (sign * quotInt value odd)) (odd + 2)
-           (0 - sign);
+    else atan square (quotInteger value square)
+           (addInteger total (mulInteger sign (quotInteger value odd)))
+           (addInteger odd (intToInteger 2))
+           (subInteger (intToInteger 0) sign);
   piDigits :: Int -> String;
   piDigits size =
     let {
-      scale = power 10 (size + 30)
+      scale = powerInteger (intToInteger 10) (size + 30);
+      first =
+        atan (intToInteger 25) (quotInteger scale (intToInteger 5))
+          (intToInteger 0) (intToInteger 1) (intToInteger 1);
+      second =
+        atan (intToInteger 57121) (quotInteger scale (intToInteger 239))
+          (intToInteger 0) (intToInteger 1) (intToInteger 1)
     } in
     stringSlice
-      (showInt
-         ((16 * atan 25 (quotInt scale 5) 0 1 1) - (4 * atan 57121 (quotInt scale 239) 0 1 1)))
+      (showInteger
+         (subInteger (mulInteger (intToInteger 16) first)
+            (mulInteger (intToInteger 4) second)))
       0
       size;
   pidigits :: Int -> String;

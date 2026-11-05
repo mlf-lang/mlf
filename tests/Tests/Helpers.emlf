@@ -1,4 +1,5 @@
 module Tests.Helpers where
+import Prelude hiding (Eq, fail)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Map as M
@@ -264,3 +265,66 @@ showKindDerived (KArrow a b) = "KArrow " ++ showKindArgument a ++ " " ++ showKin
 showKindArgument : Kind -> String
 showKindArgument Star = "Star"
 showKindArgument k = "(" ++ showKindDerived k ++ ")"
+
+-- Layout changes physical source positions. Keep call-site labels, owners,
+-- wrappers and every syntax field; erase only filenames and coordinates.
+layoutExpr : SExpr -> SExpr
+layoutExpr expression = case expression of
+ SCallSite label (SourceSpan package owner _ _ _ _ _) body -> SCallSite label (SourceSpan package owner "" 0 0 0 0) (layoutExpr body)
+ SSourceDefinition body -> SSourceDefinition (layoutExpr body)
+ SLam name annotation body -> SLam name annotation (layoutExpr body)
+ SApp function argument -> SApp (layoutExpr function) (layoutExpr argument)
+ SLet name value body -> SLet name (layoutExpr value) (layoutExpr body)
+ SAnn body annotation -> SAnn (layoutExpr body) annotation
+ SSignature body annotation -> SSignature (layoutExpr body) annotation
+ SCase scrutinee alternatives -> SCase (layoutExpr scrutinee) (S.map (\(SAlternative pattern body) -> SAlternative pattern (layoutExpr body)) alternatives)
+ SDo statements body -> SDo (S.map layoutStatement statements) (layoutExpr body)
+ SEquations equations -> SEquations (S.map (\((,) patterns body) -> (,) patterns (layoutExpr body)) equations)
+ SLetRec bindings body -> SLetRec (S.map layoutBinding bindings) (layoutExpr body)
+ SChecked ty body -> SChecked ty (layoutExpr body)
+ SSharedBind pattern action continuation binding failure -> SSharedBind pattern (layoutExpr action) (layoutExpr continuation) (layoutExpr binding) (layoutExpr failure)
+ _ -> expression
+layoutBinding : (,,) String RecursiveMode SExpr -> (,,) String RecursiveMode SExpr
+layoutBinding ((,,) name mode body) = (,,) name mode (layoutExpr body)
+layoutStatement : SStatement -> SStatement
+layoutStatement statement = case statement of
+ SDoBind pattern body -> SDoBind pattern (layoutExpr body)
+ SDoThen body -> SDoThen (layoutExpr body)
+ SDoLet name annotation body -> SDoLet name annotation (layoutExpr body)
+ SDoLetRec bindings -> SDoLetRec (S.map layoutBinding bindings)
+layoutInstance : SInstanceDecl -> SInstanceDecl
+layoutInstance (SInstanceDecl variables predicates name types methods) = SInstanceDecl variables predicates name types (S.map (\((,) method body) -> (,) method (layoutExpr body)) methods)
+layoutProgram : SProgram -> SProgram
+layoutProgram program = case program of
+ SProgram datatypes body -> SProgram datatypes (layoutExpr body)
+ SClassProgram datatypes classes instances body -> SClassProgram datatypes classes (S.map layoutInstance instances) (layoutExpr body)
+
+-- These controls keep the layout comparison narrower than source identity.
+layoutComparisonChecks : IO ()
+layoutComparisonChecks = let
+  span = SourceSpan "main" "Main" "first.emlf" 1 2 3 4
+  site = SCallSite "x" span (SVar "x")
+  same = SCallSite "x" (SourceSpan "main" "Main" "second.emlf" 8 9 10 11) (SVar "x")
+  different = (:)
+    (SCallSite "y" span (SVar "x")) ((:)
+    (SCallSite "x" (SourceSpan "other" "Main" "first.emlf" 1 2 3 4) (SVar "x")) ((:)
+    (SCallSite "x" (SourceSpan "main" "Other" "first.emlf" 1 2 3 4) (SVar "x")) ((:)
+    (SCallSite "x" span (SVar "y")) ((:)
+    (SVar "x") ((:)
+    (SSourceDefinition site) [])))))
+  annotation = SAnnotation [] (SCon "Int" [])
+  changedAnnotation = SAnnotation [] (SCon "Bool" [])
+ in do
+  assert (eq (layoutExpr site) (layoutExpr same)) "layout comparison retained physical location"
+  assert (S.all (\other -> S.not (eq (layoutExpr site) (layoutExpr other))) different) "layout comparison erased call-site identity or structure"
+  assert (S.not (eq (layoutExpr (SLam "x" Nothing site)) (layoutExpr (SLam "y" Nothing site)))) "layout comparison erased a binder"
+  assert (S.not (eq (layoutExpr (SAnn site annotation)) (layoutExpr (SAnn site changedAnnotation)))) "layout comparison erased an annotation"
+  assert (S.not (eq (layoutExpr (SIntLit 1)) (layoutExpr (SIntLit 2)))) "layout comparison erased a literal"
+
+-- Compare module layout through value bodies and instance methods, preserving
+-- the source module identity, exports, imports, declarations and syntax mode.
+layoutModule : SourceModule -> SourceModule
+layoutModule (SourceModule file name exports imports datatypes classes instances values body syntax) =
+ SourceModule file name exports imports datatypes classes (S.map layoutInstance instances)
+  (S.map (\((,,) n annotation value) -> (,,) n annotation (layoutExpr value)) values)
+  (S.maybe Nothing (\value -> Just (layoutExpr value)) body) syntax

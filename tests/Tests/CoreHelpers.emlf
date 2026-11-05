@@ -2,6 +2,10 @@ module Tests.CoreHelpers where
 import Bootstrap.Types
 import Bootstrap.Compiler
 import Bootstrap.Parser
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.Standalone as Standalone
+import qualified Bootstrap.Prelude as SourcePrelude
+import qualified Bootstrap.Constraint as Constraint
 import Bootstrap.X.Pretty
 import qualified Bootstrap.Std as S
 import qualified Tests.Helpers as H
@@ -9,6 +13,23 @@ import qualified Bootstrap.X.Check as C
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.X.Parser as XP
+
+-- Match Compiler.compileProgramWithPrelude before testing solver internals.
+sourceConstraints : String -> String -> Either String Constraints
+sourceConstraints file source = case parseProgram file source of
+ Left message -> Left message
+ Right parsed -> case Standalone.normalize ImplicitPrelude parsed of
+  Left message -> Left message
+  Right Nothing -> case SourcePrelude.withPrelude ImplicitPrelude parsed of
+   (,) imports program -> lowerSourceConstraints imports program
+  Right (Just ((,,) imports program _)) -> lowerSourceConstraints imports program
+
+lowerSourceConstraints : Set String -> SProgram -> Either String Constraints
+lowerSourceConstraints imports program = case Classes.canonicalSourceProgram imports program of
+ Left message -> Left message
+ Right canonical -> case Classes.lowerClassesWithImports imports canonical of
+  Left message -> Left message
+  Right ((,) lowered _) -> Constraint.generateProgram lowered
 
 v : Int -> XType
 v = (S.compose XVar XTyVar)

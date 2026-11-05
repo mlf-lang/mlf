@@ -3,6 +3,7 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntRank as Rank
 import qualified Bootstrap.Graph as G
 import qualified Bootstrap.Graph.Solver as S
 import qualified Tests.Helpers as H
@@ -17,7 +18,7 @@ checkRanks count offset stride = do
    let forward = IM.fromList (L.zip ordered indices)
    let backward = IM.fromList (L.zip indices ordered)
    -- Values are deliberately bottom: rank and selection depend only on keys.
-   let nodeTree = case IM.fromList (L.map (\key -> (,) key (panic "projection forced an unused node" :: Node)) (L.reverse ordered)) of IntMap tree -> tree
+   let nodeTree = Rank.indexMap (IM.fromList (L.map (\key -> (,) key (panic "projection forced an unused node" :: Node)) (L.reverse ordered)))
    L.mapM_ (\key -> H.assert (S.rankIdentity key 0 nodeTree == IM.get key forward) "node-map rank disagrees with independent renaming map") ordered
    L.mapM_ (\index -> H.assert (H.eq (S.selectIdentity index nodeTree) (case IM.lookup index backward of {Nothing -> Left "scope placeholder escaped local unification"; Just key -> Right key})) "node-map inverse rank disagrees with independent renaming map") (L.append indices ((:) (-1) ((:) (L.length ordered) [])))
    L.mapM_ (\key -> H.assert (S.compactIdentity G.emptyGraph selected key == IM.get key forward) "projection rank disagrees with independent map") ordered

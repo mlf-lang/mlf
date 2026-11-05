@@ -191,6 +191,8 @@ main = do
             check (label++" exact error") (a==b)
           _ -> fail (label++": owned and frozen results disagree")
       whenExpected wanted label = if wanted then fail (label++": expected success") else pure ()
+      compareViews label _ (S.FileSourceContext _ _ _) =
+        fail (label ++ ": named owned-source fixture received a resolver declaration table")
       compareViews label current (S.OwnedSourceContext _ _ overloads protection _) = do
         let reference=oldContracts current
         check (label++" complete overload view")
@@ -339,7 +341,7 @@ main = do
        overloadEnv protection (drop 3 orderedSources) 7 collisions
   -- Cached used is independently reconstructed from the original plan used
   -- and the current contract keys. Replacement and empty deltas add no names.
-  let S.SourcePlan _ _ _ _ _ baseUsed _ _ _ _ = indexedPlan
+  let FS.SourcePlan _ _ _ _ _ baseUsed _ _ _ _ = indexedOld
       expectedUsed current=foldr (Set.insert P.compareString) baseUsed (M.keys current)
       checkUsed current owned=check "cached reservation exact current domain"
         (setList (S.ownedSourceUsed owned)==setList (expectedUsed current))
