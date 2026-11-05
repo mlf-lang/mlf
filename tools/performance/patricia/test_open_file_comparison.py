@@ -26,7 +26,7 @@ def linked(one=101, two=102):
     return N(84, L([]), N(75, X(one, 'main'), N(77, I(7)),
                  N(75, X(two, 'unused'), N(70, X(one, 'main')), N(70, X(one, 'main')))))
 
-def fixture():
+def fixture(schema=7):
     ci = iface('native-vetted-closed-checksum')
     explicit = N(27, S('Box'), L([N(2, S('a'), N(10))]),
                  L([N(25, S('Box'), L([N(20, S('a'))]))]))
@@ -44,37 +44,52 @@ def fixture():
         fragments.append(N(401, S(group), S('native-audited-receipt'), L([S('Box')]),
                            L(params), body, L([own]), L(uses)))
     simple = C.items(C.fields(ci, 242, 13)[8])[0]
-    package = N(430, S('MLF-OPEN-CRATE-1/checker-1'), S(C.compatibility_identity()),
+    package = N(430, S({7: 'MLF-OPEN-CRATE-1/checker-1', 8: 'MLF-OPEN-CRATE-2/checker-1'}[schema]), S(C.compatibility_identity()),
         S(C.pack([C.interface_association(ci)])),
         L([N(2, S(key), S(C.fingerprint(TY))) for key in ['main', 'unused']]),
         L([N(2, S('Box'), S(C.fingerprint(C.declaration_hash_value(simple))))]), L(fragments))
     old = {'.mlfci': C.tree_document([ci], 3),
            '.mlfco': C.tree_document([N(243, N(6), ci, L(units))], 4)}
-    opened = refresh(package)
+    opened = refresh(package, schema=schema)
     return {'closed_files': old, 'open_files': opened, 'dependency_interfaces': [],
             'audited_open_files': dict(opened),
             'closed_linked_bytes': C.tree_document([linked()], 6),
             'open_linked_bytes': C.tree_document([linked(111, 112)], 6)}
 
-def refresh(package, interface=None):
-    raw = C.tree_document([package], 7)
+def refresh(package, interface=None, schema=7):
+    # Independent handwritten fixture framing, not the adapter under test.
+    fs = C.fields(package, 430, 6)
+    fragments = C.items(fs[5])
+    raw = C.tree_document([package], 7) if schema == 7 else C.tree_document(
+        [N(432, *fs[:5], I(len(fragments))), *fragments], 8)
     interface = iface('') if interface is None else interface
     fields = list(C.fields(interface, 242, 13))
     fields[11] = S(hashlib.sha256(raw).hexdigest())
     return {'.mlfco': raw, '.mlfci': C.tree_document([N(242, *fields)], 3)}
 
+def fixture_package(raw):
+    # Test-only view for mutations, independent of C.open_document/open_bytes.
+    schema = int.from_bytes(raw[16:20], 'little')
+    roots = C.read_document(raw, schema).values()
+    if schema == 7:
+        return schema, roots[0]
+    header = C.fields(roots[0], 432, 6)
+    return schema, N(430, *header[:5], L(roots[1:]))
+
 def mutate(data, callback, audit=True):
     result = copy.deepcopy(data)
-    root = list(C.fields(C.decoded(result['open_files']['.mlfco'], 7), 430, 6))
+    schema, package = fixture_package(result['open_files']['.mlfco'])
+    root = list(C.fields(package, 430, 6))
     callback(root)
-    result['open_files'] = refresh(N(430, *root))
+    result['open_files'] = refresh(N(430, *root), schema=schema)
     if audit:
         result['audited_open_files'] = dict(result['open_files'])
     return result
 
 class ComparatorControls(unittest.TestCase):
+    schema = 7
     def setUp(self):
-        self.data = fixture()
+        self.data = fixture(self.schema)
     def rejects(self, data, message=None):
         with self.assertRaises(C.ComparisonError) as error:
             C.compare_open_file(**data)
@@ -83,6 +98,8 @@ class ComparatorControls(unittest.TestCase):
     def test_positive_complete_private_body_and_linked_alpha(self):
         result = C.compare_open_file(**self.data)
         self.assertEqual(result['fragment_count'], 2)
+        self.assertEqual(result['open_wire_schema'], self.schema)
+        self.assertEqual(result['comparison'], 'explicit-schema-4-to-' + str(self.schema))
         self.assertTrue(result['all_original_fragment_bodies_exact'])
         self.assertEqual(result['linked']['changed_identity_pairs'], [(101,111),(102,112)])
         self.assertEqual([g['all_star_representation_pairs'] for g in result['groups']], [1,1])
@@ -100,7 +117,7 @@ class ComparatorControls(unittest.TestCase):
         self.assertFalse(C.type_alpha(a,N(46,v(0),N(40,v(0)),N(40,v(0)))))
     def test_wrong_binary_family(self):
         data = copy.deepcopy(self.data)
-        root = C.decoded(data['open_files']['.mlfco'],7)
+        schema, root = fixture_package(data['open_files']['.mlfco'])
         data['open_files']['.mlfco'] = C.tree_document([root],4)
         data['audited_open_files'] = dict(data['open_files'])
         self.rejects(data)
@@ -121,10 +138,10 @@ class ComparatorControls(unittest.TestCase):
         self.rejects(mutate(self.data,change),'body changed')
     def test_interface_content_changed(self):
         data = copy.deepcopy(self.data)
-        root = C.decoded(data['open_files']['.mlfco'],7)
+        schema, root = fixture_package(data['open_files']['.mlfco'])
         fields = list(C.fields(C.decoded(data['open_files']['.mlfci'],3),242,13))
         fields[2] = L([S('Other')])
-        data['open_files'] = refresh(root,N(242,*fields))
+        data['open_files'] = refresh(root,N(242,*fields),schema=schema)
         data['audited_open_files'] = dict(data['open_files'])
         self.rejects(data,'interface content')
     def test_ownership_changed(self):
@@ -207,6 +224,117 @@ class ComparatorControls(unittest.TestCase):
     def test_extra_artifact_file_rejected(self):
         data=copy.deepcopy(self.data);data['open_files']['extra']=b''
         self.rejects(data,'file inventory')
+
+
+class RootPackageComparatorControls(ComparatorControls):
+    """Every inherited semantic mutation also runs on handwritten schema8.
+
+    Historical schema7 remains a same-format synthetic boundary control.
+    Real schema7-to-8 migration belongs to the separate shared integration gate.
+    """
+    schema = 8
+
+    def changed_roots(self, callback, schema=8):
+        data = copy.deepcopy(self.data)
+        roots = list(C.read_document(data['open_files']['.mlfco'], 8).values())
+        callback(roots)
+        raw = C.tree_document(roots, schema)
+        ci = list(C.fields(C.decoded(data['open_files']['.mlfci'], 3), 242, 13))
+        ci[11] = S(hashlib.sha256(raw).hexdigest())
+        data['open_files'] = {'.mlfco': raw, '.mlfci': C.tree_document([N(242, *ci)], 3)}
+        data['audited_open_files'] = dict(data['open_files'])
+        return data
+
+    def test_header_root_missing_wrong_position_tag_or_arity(self):
+        mutations = [
+            lambda roots: roots.clear(),
+            lambda roots: roots.pop(0),
+            lambda roots: roots.reverse(),
+            lambda roots: roots.__setitem__(0, N(430, *C.fields(roots[0]))),
+            lambda roots: roots.__setitem__(0, N(432, *C.fields(roots[0])[:-1])),
+            lambda roots: roots.__setitem__(0, N(432, *C.fields(roots[0]), I(0))),
+        ]
+        for index, mutation in enumerate(mutations):
+            with self.subTest(index=index):
+                self.rejects(self.changed_roots(mutation))
+
+    def test_count_noninteger_negative_and_wrong(self):
+        for count in [S('2'), I(-1), I(0), I(1), I(3)]:
+            with self.subTest(count=count):
+                def change(roots):
+                    fs = list(C.fields(roots[0])); fs[5] = count
+                    roots[0] = N(432, *fs)
+                self.rejects(self.changed_roots(change), 'count mismatch')
+
+    def test_missing_extra_reordered_duplicate_and_malformed_final_roots(self):
+        def count_matches(roots):
+            fs = list(C.fields(roots[0])); fs[5] = I(len(roots) - 1)
+            roots[0] = N(432, *fs)
+        def missing(roots):
+            roots.pop(); count_matches(roots)
+        def extra(roots):
+            roots.append(roots[1]); count_matches(roots)
+        mutations = [missing, extra,
+            lambda roots: roots.__setitem__(slice(1, None), list(reversed(roots[1:]))),
+            lambda roots: roots.__setitem__(2, roots[1]),
+            lambda roots: roots.__setitem__(1, N(402, *C.fields(roots[1]))),
+            lambda roots: roots.__setitem__(1, N(401, *C.fields(roots[1])[:-1]))]
+        for index, mutation in enumerate(mutations):
+            with self.subTest(index=index):
+                self.rejects(self.changed_roots(mutation))
+
+    def test_schema_dispatch_marker_cross_mismatch_and_no_fallback(self):
+        self.rejects(self.changed_roots(lambda roots: None, schema=7))
+        old = fixture(7)
+        root = C.decoded(old['open_files']['.mlfco'], 7)
+        old['open_files']['.mlfco'] = C.tree_document([root, root], 7)
+        old['audited_open_files'] = dict(old['open_files'])
+        self.rejects(old, 'exactly one')
+        old = fixture(7)
+        self.rejects(mutate(old, lambda fs: fs.__setitem__(0, S('MLF-OPEN-CRATE-2/checker-1'))), 'family')
+        self.rejects(mutate(self.data, lambda fs: fs.__setitem__(0, S('MLF-OPEN-CRATE-1/checker-1'))), 'family')
+
+    def test_complete_multi_root_roundtrip_retains_global_sharing(self):
+        raw = self.data['open_files']['.mlfco']
+        document = C.read_document(raw, 8)
+        self.assertEqual(len(document.roots), 3)
+        self.assertGreater(document.accounting()['shared_node_references'], 0)
+        schema, opened = C.open_document(raw)
+        self.assertEqual(C.open_bytes(schema, opened), raw)
+        self.assertEqual(tuple(C.items(opened[5])), document.values()[1:])
+
+    def test_original_frozen_summed_work_limit_is_unchanged(self):
+        from unittest import mock
+        import artifact_binary_reference as R
+        real = C.read_document
+        calls = []
+        def observed(raw, schema, *args, **kwargs):
+            calls.append((schema, args, kwargs))
+            return real(raw, schema, *args, **kwargs)
+        with mock.patch.object(C, 'read_document', observed):
+            C.open_document(self.data['open_files']['.mlfco'])
+        self.assertEqual(calls, [(8, (), {})])
+        self.assertEqual(R.Limits().work, 64 * 1024**2)
+
+    def test_native_mutators_keep_all_unmodified_header_and_final_fields(self):
+        original = C.read_document(self.data['open_files']['.mlfco'], 8).values()
+        negatives = C.make_native_negatives(self.data['closed_files'], self.data['open_files'])
+        self.assertEqual([case['expected_helper_exit'] for case in negatives], [1, 0, 1])
+        for index, case in enumerate(negatives[:2]):
+            files = case['open_files']
+            document = C.read_document(files['.mlfco'], 8)
+            roots = document.values()
+            self.assertEqual(roots[0], original[0])
+            self.assertEqual(len(roots), len(original))
+            changed = []
+            for group, (before, after) in enumerate(zip(original[1:], roots[1:])):
+                aa, bb = C.fields(before, 401, 7), C.fields(after, 401, 7)
+                changed.extend((group, field) for field in range(7) if aa[field] != bb[field])
+            self.assertEqual(changed, [(0, 1)] if index == 0 else [(1, 6)])
+            self.assertEqual(C.tree_document(roots, 8), files['.mlfco'])
+            ci = C.fields(C.decoded(files['.mlfci'], 3), 242, 13)
+            self.assertEqual(C.text(ci[11]), hashlib.sha256(files['.mlfco']).hexdigest())
+        self.assertEqual(negatives[2]['open_files'], self.data['open_files'])
 
 if __name__=='__main__':
     unittest.main()
