@@ -6,7 +6,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 import history_refs as history
-import prepare_history_refs as preparation
 
 
 class HistoryReferenceControls(unittest.TestCase):
@@ -74,13 +73,27 @@ class HistoryReferenceControls(unittest.TestCase):
 
 
 class PublishedMappingControls(unittest.TestCase):
-    def test_rewritten_objects_have_exact_identity_and_reviewed_reachability(self):
+    def test_rewritten_history_objects_have_reviewed_publication(self):
         history.resolve_revision.cache_clear()
         for original, (rewritten, oldtree, newtree, kind) in history.REVISIONS.items():
             with self.subTest(original=original):
                 self.assertEqual(history.resolve_revision(original), rewritten)
                 self.assertEqual(history._object_tree(history.ROOT, rewritten, kind), newtree)
                 history.verify_published_revision(original)
+
+    def test_reconciliation_allows_only_the_pinned_transport_edits(self):
+        import hashlib
+        snapshot = '4d732f31982ebe18124511f2ca4cb412770d6bd6'
+        for path in ('.github/workflows/ci.yml', 'tools/release/check.sh',
+                     'tools/testing/check_reconciliation_inventory.py'):
+            with self.subTest(path=path):
+                original = history.historical_bytes(snapshot, path)
+                digest = hashlib.sha256(original).hexdigest()
+                current = history._git('show', 'afbe7219806881301831d79f43596811eca3279d:' + path)
+                self.assertTrue(history.checked_current(path, current, digest))
+                self.assertFalse(history.checked_current(path, current + b'\n# unrelated change\n', digest))
+                with self.assertRaisesRegex(ValueError, 'frozen reconciliation input changed'):
+                    history.checked_current(path, current, '0' * 64)
 
     def test_windows_negative_control_pins_original_runner_bytes(self):
         import hashlib
@@ -94,170 +107,269 @@ class PublishedMappingControls(unittest.TestCase):
         self.assertIn("Assert-Release $rejected 'Regression unexpectedly accepted the pre-fix runner'", workflow)
         self.assertIn("Assert-Release ($result.complete -eq $true -and $result.exit_code -eq 126)", workflow)
 
-
 class SquashTransportControls(HistoryReferenceControls):
     def setUp(self):
         super().setUp()
-        self.source = self.commit(self.newtree, [self.new], 'source tip')
-        self.integration = self.commit(self.newtree, [self.old], 'squash integration')
+        import prepare_history_refs
+        self.preparation = prepare_history_refs
+        self.seal = self.root / history.SEAL_PATH
+        self.seal.parent.mkdir(parents=True, exist_ok=True)
+        self.seal.write_text("# reviewed implementation\nSOURCE_ANCHOR = '" + '0' * 40 + "'\n")
+        self.git('add', '.')
+        self.precursor = self.commit(self.git('write-tree').strip(), [self.new, self.old], 'precursor')
+        self.seal.write_text(self.seal.read_text().replace('0' * 40, self.precursor))
+        self.git('add', '.')
+        self.sealed_tree = self.git('write-tree').strip()
+        self.source = self.commit(self.sealed_tree, [self.precursor], 'source')
+        self.integration = self.commit(self.sealed_tree, [self.old], 'squash')
+        for name, value in [('SOURCE_ANCHOR', self.precursor),
+                            ('SOURCE_PARENTS', (self.new, self.old)),
+                            ('MAIN_BASE', self.old),
+                            ('TRANSPORTED', frozenset([self.new])),
+                            ('COMPLETED_SEALS', {}), ('SQUASH_TRANSPORTS', {})]:
+            context = patch.object(history, name, value)
+            context.start(); self.addCleanup(context.stop)
         self.git('reset', '--hard', '-q', self.integration)
-        self.transport = history.SquashTransport(self.source, self.integration, self.old, self.newtree)
-        self.transports = {self.new: self.transport}
-        transport_patch = patch.object(history, 'SQUASH_TRANSPORTS', self.transports)
-        transport_patch.start()
-        self.addCleanup(transport_patch.stop)
+        history.verify_source(self.source)
+        self.git('update-ref', history.VERIFIED_SOURCE_REF, self.source)
 
     def commit(self, tree, parents, message):
         args = ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit-tree', tree]
         for parent in parents:
-            args += ['-p', parent]
+            args.extend(['-p', parent])
         return self.git(*args, '-m', message).strip()
 
     def verify(self):
         history.verify_published_revision(self.old)
 
-    def test_exact_transport_and_later_descendant_succeed_without_claiming_ancestry(self):
+    def test_source_squash_and_future_main_descendant(self):
+        history.verify_source(self.source)
+        self.verify()
         self.assertFalse(history._is_ancestor(self.new, 'HEAD'))
-        self.verify()
-        later = self.commit(self.oldtree, [self.integration], 'later unrelated edit')
-        self.git('reset', '--hard', '-q', later)
-        self.verify()
-        # Reachability must not remain cached after HEAD changes.
+        for head in [self.source,
+                     self.commit(self.sealed_tree, [self.old, self.source], 'PR CI'),
+                     self.commit(self.oldtree, [self.integration], 'future edit'),
+                     self.commit(self.sealed_tree, [self.integration, self.precursor], 'future merge')]:
+            self.git('reset', '--hard', '-q', head)
+            self.verify()
         self.git('reset', '--hard', '-q', self.old)
-        with self.assertRaisesRegex(ValueError, 'ancestry differs'):
+        with self.assertRaises(ValueError):
             self.verify()
 
-    def test_direct_ancestry_needs_no_transport(self):
+    def test_premerge_source_and_synthetic_merge_tree_drift_rejected(self):
+        for parents in [[self.source], [self.old, self.source]]:
+            with self.subTest(parents=parents):
+                drift = self.commit(self.oldtree, parents, 'unsealed tree drift')
+                self.git('reset', '--hard', '-q', drift)
+                with self.assertRaisesRegex(ValueError, 'no exact sealed HEAD'):
+                    self.verify()
+
+    def test_same_tree_source_descendant_and_moved_base_rejected(self):
+        newer_main = self.commit(self.oldtree, [self.old], 'empty main advance')
+        for parents in [[self.source], [newer_main, self.source]]:
+            with self.subTest(parents=parents):
+                candidate = self.commit(self.sealed_tree, parents, 'same tree unreviewed lineage')
+                self.git('reset', '--hard', '-q', candidate)
+                with self.assertRaisesRegex(ValueError, 'no exact sealed HEAD'):
+                    self.verify()
+
+    def test_unsealed_anchor_rejected_even_with_direct_ancestry(self):
         self.git('reset', '--hard', '-q', self.source)
-        self.transports.clear()
-        self.verify()
+        with patch.object(history, 'SOURCE_ANCHOR', '0' * 40):
+            with self.assertRaisesRegex(ValueError, 'unsealed'):
+                self.verify()
+            with self.assertRaisesRegex(ValueError, 'unsealed'):
+                self.preparation.prepare()
 
-    def test_no_implicit_transport_for_unknown_mapping(self):
-        self.transports.clear()
-        with self.assertRaisesRegex(ValueError, 'no reviewed ancestry or squash transport'):
-            self.verify()
-        with self.assertRaisesRegex(ValueError, 'unreviewed historical identity'):
-            history.verify_published_revision('9' * 40)
-
-    def test_missing_source_integration_parent_and_history_fail(self):
-        for field in ('source', 'integration', 'parent'):
-            with self.subTest(field=field):
-                self.transports[self.new] = self.transport._replace(**{field: '0' * 40})
-                with self.assertRaisesRegex(ValueError, 'unavailable'):
+    def test_wrong_precursor_parents_and_identity_rejected(self):
+        for parents in [(self.old, self.new), (self.new,), (self.old, self.old)]:
+            with patch.object(history, 'SOURCE_PARENTS', parents):
+                with self.assertRaisesRegex(ValueError, 'precursor parents'):
                     self.verify()
-        self.transports[self.new] = self.transport
-        self.mapping[self.old] = ('0' * 40, self.oldtree, self.newtree, 'commit')
-        with self.assertRaisesRegex(ValueError, 'published historical object is unavailable'):
-            self.verify()
+        with patch.object(history, 'SOURCE_ANCHOR', self.newtree):
+            with self.assertRaisesRegex(ValueError, 'unexpected type'):
+                self.verify()
 
-    def test_wrong_tree_types_and_mapping_fail(self):
-        for field, value in [('tree', self.oldtree), ('source', self.old),
-                             ('source', self.newtree), ('integration', self.old),
-                             ('integration', self.newtree), ('parent', self.oldtree)]:
-            with self.subTest(field=field, value=value):
-                self.transports[self.new] = self.transport._replace(**{field: value})
-                with self.assertRaisesRegex(ValueError, 'tree differs|unexpected type'):
+    def test_wrong_source_parents_rejected(self):
+        for parents in [[], [self.old], [self.precursor, self.old]]:
+            candidate = self.commit(self.sealed_tree, parents, 'wrong source')
+            with self.assertRaisesRegex(ValueError, 'source parents'):
+                history.verify_source(candidate)
+
+    def test_wrong_integration_parent_and_extra_parent_rejected(self):
+        for parents in [[], [self.new], [self.old, self.new]]:
+            candidate = self.commit(self.sealed_tree, parents, 'wrong integration')
+            self.git('reset', '--hard', '-q', candidate)
+            with self.assertRaises(ValueError):
+                self.verify()
+
+    def test_tree_blob_mode_path_and_seal_mutations_rejected(self):
+        good = self.seal.read_bytes()
+        mutations = [lambda: self.seal.write_bytes(good + b'# extra\n'),
+                     lambda: self.seal.write_bytes(good.replace(self.precursor.encode(), b'0' * 40)),
+                     lambda: self.seal.write_bytes(good + good),
+                     lambda: (self.root / 'evidence.txt').write_bytes(b'changed'),
+                     lambda: (self.root / 'extra').write_bytes(b'added'),
+                     lambda: self.seal.unlink(),
+                     lambda: self.git('update-index', '--chmod=+x', history.SEAL_PATH)]
+        for index, mutate in enumerate(mutations):
+            with self.subTest(mutation=index):
+                self.git('reset', '--hard', '-q', self.integration)
+                mutate()
+                if index != len(mutations) - 1:
+                    self.git('add', '-A')
+                badtree = self.git('write-tree').strip()
+                candidate = self.commit(badtree, [self.precursor], 'bad bytes')
+                with self.assertRaisesRegex(ValueError, 'sealed source'):
+                    history.verify_source(candidate)
+                integration = self.commit(badtree, [self.old], 'bad squash')
+                self.git('reset', '--hard', '-q', integration)
+                with self.assertRaisesRegex(ValueError, 'sealed source|no exact sealed HEAD'):
                     self.verify()
-        self.transports[self.new] = self.transport
+
+    def test_raw_tree_duplicate_order_and_mode_mutations_rejected(self):
+        raw = subprocess.check_output(['git', 'cat-file', 'tree', self.sealed_tree], cwd=self.root)
+        evil = subprocess.check_output(['git', 'hash-object', '-w', '--stdin'],
+                                       cwd=self.root, input=b'unreviewed duplicate\n').strip().decode()
+        records = []
+        offset = 0
+        while offset < len(raw):
+            end = raw.index(b'\0', offset) + 21
+            records.append(raw[offset:end])
+            offset = end
+        tree_record = next(record for record in records if record.startswith(b'40000 '))
+        mutations = [b'100644 evidence.txt\0' + bytes.fromhex(evil) + raw,
+                     tree_record + raw, b''.join(reversed(records))]
+        for mode in [b'0100644', b'100664', b'100640']:
+            mutations.append(raw.replace(b'100644 evidence.txt\0', mode + b' evidence.txt\0', 1))
+        for name in [b'', b'.', b'..', b'a/b']:
+            mutations.append(raw.replace(b'100644 evidence.txt\0', b'100644 ' + name + b'\0', 1))
+        mutations.append(raw[:-1])
+        for index, malformed in enumerate(mutations):
+            with self.subTest(mutation=index):
+                tree = subprocess.check_output(['git', 'hash-object', '-t', 'tree', '--literally',
+                                                '-w', '--stdin'], cwd=self.root,
+                                               input=malformed).decode().strip()
+                self.assertNotEqual(tree, self.sealed_tree)
+                candidate = self.commit(tree, [self.precursor], 'malformed source')
+                with self.assertRaisesRegex(ValueError, 'duplicate sealed tree|noncanonical sealed raw tree|malformed sealed raw tree'):
+                    history.verify_source(candidate)
+                # The same raw structural corruption must fail when used as
+                # an anchor, not only as a candidate or squash integration.
+                with self.assertRaisesRegex(ValueError, 'duplicate sealed tree|noncanonical sealed raw tree|malformed sealed raw tree'):
+                    history.verify_sealed_tree(self.source, anchor=candidate)
+                integration = self.commit(tree, [self.old], 'malformed squash')
+                self.git('reset', '--hard', '-q', self.integration)
+                # Do not check out malformed trees; verify the exact object.
+                with self.assertRaises(ValueError):
+                    history.verify_sealed_tree(integration)
+
+    def test_cached_tree_parse_does_not_cache_object_availability(self):
+        history.verify_source(self.source)
+        blob = self.git('rev-parse', self.source + ':evidence.txt').strip()
+        loose = self.root / '.git/objects' / blob[:2] / blob[2:]
+        self.assertTrue(loose.is_file())
+        loose.unlink()
+        with self.assertRaisesRegex(ValueError, 'object type differs or is unavailable'):
+            history.verify_source(self.source)
+
+    def test_added_empty_subtree_rejected(self):
+        empty = subprocess.check_output(['git', 'mktree'], cwd=self.root, input=b'').strip()
+        root = subprocess.check_output(['git', 'ls-tree', self.sealed_tree], cwd=self.root)
+        altered = subprocess.check_output(['git', 'mktree'], cwd=self.root,
+                                         input=root + b'040000 tree ' + empty + b'\tempty\n').decode().strip()
+        candidate = self.commit(altered, [self.precursor], 'empty subtree')
+        with self.assertRaisesRegex(ValueError, 'sealed source tree'):
+            history.verify_source(candidate)
+
+    def test_unknown_transport_and_historical_tree_rejected(self):
+        with patch.object(history, 'TRANSPORTED', frozenset()):
+            with self.assertRaisesRegex(ValueError, 'no reviewed squash'):
+                self.verify()
         self.mapping[self.old] = (self.new, self.oldtree, self.oldtree, 'commit')
-        with self.assertRaisesRegex(ValueError, 'published historical object is unavailable or differs'):
+        with self.assertRaisesRegex(ValueError, 'published historical object'):
             self.verify()
 
-    def test_wrong_single_parent_and_extra_parent_fail(self):
-        extra = self.commit(self.newtree, [self.old, self.new], 'two parents')
-        for transport in [self.transport._replace(parent=self.new),
-                          self.transport._replace(integration=extra)]:
-            with self.subTest(transport=transport):
-                self.transports[self.new] = transport
-                with self.assertRaisesRegex(ValueError, 'parent differs'):
-                    self.verify()
-
-    def test_unrelated_same_tree_source_and_integration_fail(self):
-        unrelated = self.commit(self.newtree, [self.old], 'same tree but unrelated')
-        for field in ('source', 'integration'):
-            with self.subTest(field=field):
-                self.transports[self.new] = self.transport._replace(**{field: unrelated})
-                with self.assertRaisesRegex(ValueError, 'ancestry differs'):
-                    self.verify()
-
-    def test_source_must_descend_from_prior_target(self):
-        other_parent = self.commit(self.oldtree, [], 'unrelated prior target')
-        integration = self.commit(self.newtree, [other_parent], 'unrelated target squash')
-        self.git('reset', '--hard', '-q', integration)
-        self.transports[self.new] = self.transport._replace(integration=integration, parent=other_parent)
-        with self.assertRaisesRegex(ValueError, 'ancestry differs'):
-            self.verify()
-
-    def test_git_replacements_cannot_spoof_evidence(self):
-        # A replacement could otherwise make the mapped historical commit look
-        # like HEAD, or hide the valid source's exact raw tree.
+    def test_replacements_cannot_spoof_objects_or_lineage(self):
         self.git('replace', self.new, self.integration)
-        self.git('replace', self.source, self.old)
-        self.assertFalse(history._is_ancestor(self.new, 'HEAD'))
-        self.assertEqual(history._object_tree(self.root, self.source, 'commit'), self.newtree)
+        self.git('replace', self.precursor, self.old)
         self.verify()
-        self.transports.clear()
-        with self.assertRaisesRegex(ValueError, 'no reviewed ancestry or squash transport'):
+        self.assertFalse(history._is_ancestor(self.new, 'HEAD'))
+        self.assertEqual(history._parents(self.precursor), [self.new, self.old])
+
+    def test_graft_and_shallow_history_rejected(self):
+        graft = self.root / '.git/info/grafts'
+        graft.write_text(self.integration + '\n')
+        with self.assertRaisesRegex(ValueError, 'grafted'):
+            self.verify()
+        graft.unlink()
+        (self.root / '.git/shallow').write_text(self.integration + '\n')
+        with self.assertRaisesRegex(ValueError, 'shallow'):
             self.verify()
 
-    def test_git_ancestry_errors_fail_closed(self):
-        with self.assertRaisesRegex(ValueError, 'ancestry check failed'):
-            history._is_ancestor('0' * 40, 'HEAD')
+    def test_preparation_existing_anchor_is_offline(self):
+        self.preparation.prepare()  # No origin configured.
 
-    def test_preparation_existing_objects_is_offline(self):
-        # No origin configured: a successful preparation cannot have fetched.
-        preparation.prepare()
+    def fresh_checkout(self, target):
+        subprocess.run(['git', 'init', '-q', '-b', 'main', str(target)], check=True)
+        subprocess.run(['git', 'remote', 'add', 'origin', str(self.root)], cwd=target, check=True)
+        subprocess.run(['git', 'fetch', '-q', 'origin', 'main'], cwd=target, check=True)
+        subprocess.run(['git', 'checkout', '-q', '--detach', 'FETCH_HEAD'], cwd=target, check=True)
 
-    def test_preparation_rejects_present_wrong_type_or_tree_without_fetch(self):
-        # No origin exists, so these errors must not attempt a network repair.
-        self.transports[self.new] = self.transport._replace(source=self.newtree)
-        with self.assertRaisesRegex(ValueError, 'unexpected type'):
-            preparation.prepare()
-        self.transports[self.new] = self.transport._replace(tree=self.oldtree)
-        with self.assertRaisesRegex(ValueError, 'squash source tree differs'):
-            preparation.prepare()
-
-    def test_preparation_fetches_only_exact_reviewed_ref(self):
+    def test_fresh_squash_checkout_fetches_only_reviewed_source(self):
+        self.git('update-ref', 'refs/pull/22/head', self.source)
         with tempfile.TemporaryDirectory() as destination:
             target = Path(destination)
-            self.git('update-ref', 'refs/pull/25/head', self.source)
-            subprocess.run(['git', 'init', '-q', '-b', 'main', str(target)], check=True)
-            subprocess.run(['git', 'remote', 'add', 'origin', str(self.root)], cwd=target, check=True)
-            subprocess.run(['git', 'fetch', '-q', 'origin', 'main'], cwd=target, check=True)
-            subprocess.run(['git', 'checkout', '-q', '--detach', 'FETCH_HEAD'], cwd=target, check=True)
-            with patch.object(history, 'ROOT', target), patch.object(
-                    preparation, 'SOURCE_REFS', {self.source: 'refs/pull/25/head'}):
-                self.assertIsNone(history._object_tree(target, self.source, 'commit'))
-                preparation.prepare()
-                self.assertEqual(history._object_tree(target, self.source, 'commit'), self.newtree)
+            self.fresh_checkout(target)
+            with patch.object(history, 'ROOT', target):
+                self.assertIsNone(history._object_tree(target, self.precursor, 'commit'))
+                self.preparation.prepare()
+                self.verify()
+                self.assertEqual(history._parents(self.source), [self.precursor])
 
-    def test_preparation_rejects_unreviewed_or_moved_ref(self):
-        missing = '0' * 40
-        self.transports[self.new] = self.transport._replace(source=missing)
-        with patch.object(preparation, 'SOURCE_REFS', {}):
-            with self.assertRaisesRegex(ValueError, 'no reviewed fetch ref'):
-                preparation.prepare()
-        self.git('remote', 'add', 'origin', str(self.root))
-        self.git('update-ref', 'refs/pull/25/head', self.source)
-        with patch.object(preparation, 'SOURCE_REFS', {missing: 'refs/pull/25/head'}):
-            with self.assertRaisesRegex(ValueError, 'fetched squash source differs'):
-                preparation.prepare()
+    def test_retained_source_ref_is_reauthenticated(self):
+        self.git('update-ref', history.VERIFIED_SOURCE_REF, self.precursor)
+        with self.assertRaisesRegex(ValueError, 'source parents'):
+            self.preparation.prepare()
+        with self.assertRaisesRegex(ValueError, 'source parents'):
+            self.verify()
 
-    def test_preparation_fetch_error_and_timeout_fail_closed(self):
-        missing = '0' * 40
-        self.transports[self.new] = self.transport._replace(source=missing)
+    def test_precursor_alone_is_not_publication_source(self):
+        self.git('update-ref', '-d', history.VERIFIED_SOURCE_REF)
+        with self.assertRaisesRegex(ValueError, 'verified sealed source is unavailable'):
+            self.verify()
+
+    def test_moved_locator_rejected(self):
+        moved = self.commit(self.sealed_tree, [self.source], 'unreviewed later source')
+        self.git('update-ref', 'refs/pull/22/head', moved)
+        with tempfile.TemporaryDirectory() as destination:
+            target = Path(destination)
+            self.fresh_checkout(target)
+            with patch.object(history, 'ROOT', target):
+                for attempt in range(2):
+                    with self.subTest(attempt=attempt), self.assertRaisesRegex(ValueError, 'source parents'):
+                        self.preparation.prepare()
+                    self.assertIsNotNone(history._object_tree(target, self.precursor, 'commit'))
+                    self.assertNotEqual(subprocess.run(
+                        ['git', 'rev-parse', '--verify', '--quiet', history.VERIFIED_SOURCE_REF],
+                        cwd=target, stdout=subprocess.DEVNULL).returncode, 0)
+
+    def test_fetch_failure_and_timeout_propagate(self):
         run = subprocess.run
         for error in [subprocess.CalledProcessError(1, ['git', 'fetch']),
                       subprocess.TimeoutExpired(['git', 'fetch'], 120)]:
+            fetched = []
             def fail_fetch(command, **kwargs):
-                if command[:2] == ['git', 'fetch']:
+                if command[:3] == ['git', '--no-replace-objects', 'fetch']:
+                    fetched.append(command)
                     raise error
                 return run(command, **kwargs)
-            with self.subTest(error=type(error).__name__), patch.object(
-                    preparation, 'SOURCE_REFS', {missing: 'refs/pull/25/head'}), patch.object(
-                    preparation.subprocess, 'run', side_effect=fail_fetch):
+            with patch.object(history, '_object_tree', return_value=None), patch.object(
+                    self.preparation.subprocess, 'run', side_effect=fail_fetch):
                 with self.assertRaises(type(error)):
-                    preparation.prepare()
+                    self.preparation.prepare()
+            self.assertEqual(fetched, [['git', '--no-replace-objects', 'fetch', '--no-tags',
+                                        'origin', 'refs/pull/22/head']])
 
 
 if __name__ == '__main__':

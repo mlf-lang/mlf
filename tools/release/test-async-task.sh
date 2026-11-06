@@ -105,16 +105,18 @@ success runtime "$clang" -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c "$
 # White-box tests import the committed Async.Task.Core module directly.
 
 export MLF_ASYNC_FIXTURE="$work/fixture"
-for suite in main processes wait-graph; do
+for suite in main processes wait-graph guards; do
  args=("${include_args[@]}")
+ type_oracle=io-unit.type
  case $suite in
   main) entry=Main.emlf; oracle=suite.stdout ;;
   processes) entry=Processes.emlf; oracle=processes.stdout ;;
   wait-graph) entry=WaitGraph.emlf; oracle=wait-graph.stdout ;;
+  guards) entry=Guards.emlf; oracle=guards.stdout; type_oracle=guards.type ;;
  esac
  success "$suite.compile" "$compiler" "${args[@]}" "$fixtures/$entry"
  success "$suite.check" "$compiler" --check "$work/$suite.compile.stdout"
- cmp "$fixtures/io-unit.type" "$work/$suite.check.stdout" || fail "$suite target type"
+ cmp "$fixtures/$type_oracle" "$work/$suite.check.stdout" || fail "$suite target type"
  success "$suite.emit" "$compiler" --xmlf-to-llvm-io-gc "$work/$suite.compile.stdout"
  grep -F 'mlf_require_async_completion_v2_abi' "$work/$suite.emit.stdout" >/dev/null || fail "$suite lacks async ABI guard"
  success "$suite.link" "$clang" -O2 -Wno-override-module -x ir "$work/$suite.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/$suite.native"
@@ -134,7 +136,7 @@ done
 record_inputs "$work/inputs.final.json"
 cmp "$work/inputs.json" "$work/inputs.final.json" || fail 'source changed during run'
 test "$(sha256 "$compiler")" = "$compiler_hash" || fail 'compiler changed during run'
-test "${#labels[@]}" -eq 25 || fail 'command coverage changed'
+test "${#labels[@]}" -eq 31 || fail 'command coverage changed'
 printf '{}\n' > "$work/artifacts.json"
 for file in "$work/runtime.o" "$work/fixture" "$work/"*.native "$work/"*.compile.stdout "$work/"*.emit.stdout; do
  jq --arg path "$(basename "$file")" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$work/artifacts.json" > "$work/artifacts.tmp"
@@ -151,8 +153,8 @@ done
 jq -n --arg compiler_sha256 "$compiler_hash" --arg work "$work" \
  --arg core_sha256 "$(sha256 "$root/libraries/mlf-async/Async/Task/Core.hs")" \
  --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" --slurpfile artifacts "$work/artifacts.json" \
- '{complete:true,cases:30,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:6,
+ '{complete:true,cases:31,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:6,
  compiler_sha256:$compiler_sha256,work:$work,whitebox_source_sha256:$core_sha256,whitebox_source:"libraries/mlf-async/Async/Task/Core.hs",
  inputs:$inputs[0],observations:$observations[0],artifacts:$artifacts[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
-echo 'Async.Task language parity passed: 30 contracts (6 white-box), 5 source rejections.'
+echo 'Async.Task language parity passed: 31 contracts (6 white-box), 5 source rejections.'

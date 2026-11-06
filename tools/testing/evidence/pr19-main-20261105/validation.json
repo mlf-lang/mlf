@@ -1,0 +1,1066 @@
+{
+  "format": 1,
+  "scope": "PR19 affected current-source focused validation; not full unit, self-host or full qualification",
+  "source_snapshot": {
+    "path": "tools/testing/evidence/pr19-main-20261105/final-source-identities.json",
+    "sha256": "879b9c6d77e8edac43eb2b5ed5a4db847e26e72524f04a2eb229a3c76fbbcadb",
+    "bytes": 41447
+  },
+  "actual_build_source_union": {
+    "path": "tools/testing/evidence/pr19-main-20261105/build-source-union.json",
+    "sha256": "b862b60be1156a87b3624a5c4130c20f8901494ad051d058e04e8f9c138c4734",
+    "bytes": 30080
+  },
+  "root_lock": {
+    "path": "mlf.lock",
+    "sha256": "c30cf4260fe067472a2f23af31f6ca7b0e5be103d5f1151762b6b5dcbd4bd045",
+    "bytes": 10869
+  },
+  "framework_implementation_sources": {
+    "testing/Test/Outcome.emlf": "ed046faef39ccbacb39b44be99270eea6f47987e58fed423f3af6f7e30381203",
+    "testing/Test/Evidence.emlf": "09e0170c7d76629c2abb70dc483717c07b76abe9d172862f8b1bd97f4da4d7b5",
+    "testing/Test/Plan.emlf": "dfa23b2c5d34f894339c3710417f6e1dfc79191cc9c1b418dda78c7555103aec",
+    "testing/tools/Test/Process.emlf": "ea47a19d22fc6ce36e4db9a8571de31226c848eb12fe4a945698483c5058e2e5"
+  },
+  "tool_inputs": {
+    "seed": {
+      "path": "$SEED_BUNDLE/bin/emlf",
+      "sha256": "25795d65a2f3caa6527c36073a7a8a6a368eeaffccc1a444338e5b3fd0d7d7e9",
+      "bytes": 8074192
+    },
+    "seed_receipt": {
+      "path": "$SEED_BUNDLE/receipt.json",
+      "sha256": "e48447617b94b38c5615c95f83a835576ae46d5161e330f162093ecef575cf8f",
+      "bytes": 812161
+    },
+    "current_manager": {
+      "path": ".mlf-build/pr19-validation/current-manager/mlfpkg",
+      "sha256": "aa4e96f3282d588577dbd6309ff93848199406916cd8f926a1784c2cdb65f385",
+      "bytes": 9822984
+    },
+    "clang_wrapper": {
+      "path": "$NATIVE_DEPS/bin/clang",
+      "sha256": "42b55edb52535749c226c364269bd83db297062a55874a1cab92830a7057bee3",
+      "bytes": 258
+    },
+    "native_toolchain_receipt": {
+      "path": "$NATIVE_DEPS/native-toolchain-identity.json",
+      "sha256": "d0580ee403cb48241018beb025b51bd3e4f35d6683ed16c1a256bfb73280dd29",
+      "bytes": 67081
+    },
+    "host_support_binary": {
+      "path": ".mlf-build/pr19-validation/helpers/host-support",
+      "sha256": "0c0105eaf5bc651332de4771422e4ab1b422f1c741869f3a499a5252679a744f",
+      "bytes": 22216
+    },
+    "host_support_source": {
+      "path": "tests/native/host_support.c",
+      "sha256": "644de0413a828b8855ba6dba7f663a4277bcd0af7f3722fb149af5507e6a37f2",
+      "bytes": 8884
+    },
+    "manager_bootstrap_source_identity": {
+      "path": ".mlf-build/pr19-validation/current-manager/validation-identity.json",
+      "sha256": "84f06a98ffc619d083af6396b241ad753bdd85f2998504b36417e53d3e63f21a",
+      "bytes": 12053
+    },
+    "post_recovery_identity_check": {
+      "path": ".mlf-build/pr19-validation/recovery-hash-verification.json",
+      "sha256": "c7caccc89e97266190cc9c2fb1c96aa5e41b96322aabe98809038b6fe8ed2b79",
+      "bytes": 137
+    }
+  },
+  "runs": {
+    "final-locked-plan": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/current-manager/mlfpkg",
+        "--locked",
+        "--offline",
+        "plan"
+      ],
+      "exit": 0,
+      "seconds": 3.9043989181518555,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/final-locked-plan.json",
+        "sha256": "101126ff45ab5b6ad9bce3a006cb0cd329f7004294c597dd153a41802fb630b9",
+        "bytes": 221
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/final-locked-plan.stdout",
+          "sha256": "ea491ffc64c80863e5d5488950e45b6f94a4485dda6870a1c32a257d4197dcaa",
+          "bytes": 17250
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/final-locked-plan.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "bootstrap": {
+      "command": [
+        "bash",
+        "-c",
+        "source \"$NATIVE_DEPS/env.sh\"; export MLF_COMPILER=\"$SEED_BUNDLE/bin/emlf\" MLF_PACKAGE_BOOTSTRAP_DIR=\"$REPO/.mlf-build/pr19-validation/current-manager\" CC=\"$NATIVE_DEPS/bin/clang\" GC_FREE_SPACE_DIVISOR=4; exec scripts/bootstrap-package.sh"
+      ],
+      "exit": 0,
+      "seconds": 386.2530028820038,
+      "peak_group_rss_kib": 3167324,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/bootstrap.json",
+        "sha256": "2b93464803440b9f91522616604dff61c2b94ab3b976315f7dcf2c187cfedbf2",
+        "bytes": 626
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/bootstrap.stdout",
+          "sha256": "cb0652905ec4662353cbbf8bbd87745039a65b5003709054b56c53ba7789e9e5",
+          "bytes": 102
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/bootstrap.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/bootstrap.memory.jsonl",
+          "sha256": "5dee46ce48b90aa2bd1b3a209bd59e880df1032c9d707e849c721a0afc046ca7",
+          "bytes": 26399
+        }
+      ],
+      "rss_accounting": "bootstrap command process group; no isolated scheduler children"
+    },
+    "lifecycle": {
+      "command": [
+        "$SEED_BUNDLE/bin/emlf",
+        "-i",
+        "$REPO/tests",
+        "-i",
+        "$REPO/testing",
+        "-i",
+        "$REPO/testing/tools",
+        "-i",
+        "$REPO/libraries/mlf-async",
+        "-i",
+        "$REPO/libraries/mlf-crates",
+        "-i",
+        "$REPO/libraries/mlf-developer-tools",
+        "-i",
+        "$REPO/libraries/mlf-foundation",
+        "-i",
+        "$REPO/libraries/mlf-frontend",
+        "-i",
+        "$REPO/libraries/mlf-inference",
+        "-i",
+        "$REPO/libraries/mlf-interpreter",
+        "-i",
+        "$REPO/libraries/mlf-language-core",
+        "-i",
+        "$REPO/libraries/mlf-llvm",
+        "-i",
+        "$REPO/libraries/mlf-package-core",
+        "-i",
+        "$REPO/libraries/mlf-xmlf",
+        "--run",
+        "testing/tools/LifecycleMain.emlf"
+      ],
+      "exit": 0,
+      "seconds": 65.07825016975403,
+      "peak_rss_kib": 725540,
+      "seed_sha256": "25795d65a2f3caa6527c36073a7a8a6a368eeaffccc1a444338e5b3fd0d7d7e9",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle.json",
+        "sha256": "f32477400114e0cc130b72d017877ca119339eaf7a7bebf754d708fa2f59ea4f",
+        "bytes": 1575
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle.stdout",
+          "sha256": "1d8d319ba2de1063defb5f1b53723400e5dbed701227de584c62de1e1fb79f05",
+          "bytes": 1469
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle.memory.jsonl",
+          "sha256": "8ae9108e23edc4351624b9dfa1307cead2db7a3270874ce625e86a416d1d3111",
+          "bytes": 3263
+        }
+      ]
+    },
+    "framework": {
+      "command": [
+        "$SEED_BUNDLE/bin/emlf",
+        "-i",
+        "$REPO/tests",
+        "-i",
+        "$REPO/testing",
+        "-i",
+        "$REPO/testing/tools",
+        "-i",
+        "$REPO/libraries/mlf-async",
+        "-i",
+        "$REPO/libraries/mlf-crates",
+        "-i",
+        "$REPO/libraries/mlf-developer-tools",
+        "-i",
+        "$REPO/libraries/mlf-foundation",
+        "-i",
+        "$REPO/libraries/mlf-frontend",
+        "-i",
+        "$REPO/libraries/mlf-inference",
+        "-i",
+        "$REPO/libraries/mlf-interpreter",
+        "-i",
+        "$REPO/libraries/mlf-language-core",
+        "-i",
+        "$REPO/libraries/mlf-llvm",
+        "-i",
+        "$REPO/libraries/mlf-package-core",
+        "-i",
+        "$REPO/libraries/mlf-xmlf",
+        "--run",
+        "tests/TestFrameworkMain.emlf"
+      ],
+      "exit": -9,
+      "seconds": 300.38296484947205,
+      "peak_rss_kib": 2777104,
+      "seed_sha256": "25795d65a2f3caa6527c36073a7a8a6a368eeaffccc1a444338e5b3fd0d7d7e9",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/framework.json",
+        "sha256": "515d7cd19164179177136aef888c877f9181d382643adbfbe2c94d11173c74d6",
+        "bytes": 1574
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework.stdout",
+          "sha256": "350e0426fd2408ae53e4847d1bc74ef374811d9f4d304ab07fd6625722b1face",
+          "bytes": 32
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework.memory.jsonl",
+          "sha256": "783ccd3d40e053cfb6303f7cbed3cacb8904addb5a6ede3e8bf44c98a39f9da7",
+          "bytes": 15473
+        }
+      ]
+    },
+    "lifecycle-native-build": {
+      "command": [
+        "bash",
+        "-c",
+        "source \"$NATIVE_DEPS/env.sh\"; export MLF_COMPILER=\"$SEED_BUNDLE/bin/emlf\" MLF_PACKAGE_MANAGER=\"$REPO/.mlf-build/pr19-validation/current-manager/mlfpkg\" CC=\"$NATIVE_DEPS/bin/clang\" GC_FREE_SPACE_DIVISOR=4; exec ./mlfpkg --compiler \"$SEED_BUNDLE/bin/emlf\" --clang \"$NATIVE_DEPS/bin/clang\" --runtime \"$REPO/runtime/mlf_runtime.c\" --manifest testing/tools/mlf-package.json --build-dir \"$REPO/.mlf-build/pr19-validation/lifecycle-native\" --cache-dir \"$REPO/.mlf-build/pr19-validation/cache\" --jobs 1 --timeout 1800 build --target test-lifecycle"
+      ],
+      "exit": 0,
+      "seconds": 826.734377861023,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle-native-build.json",
+        "sha256": "82e615f8db246eba67344e60b8151af8774e81c45da73ac66203a09eecb03d97",
+        "bytes": 1207
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle-native-build.stdout",
+          "sha256": "b67a71023e7837777604d9af2451394992c907bd1086c910e89219052ec869ce",
+          "bytes": 251
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle-native-build.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle-native-build.memory.jsonl",
+          "sha256": "91f78fadbd501f7e78e41210bdbd72e65fde2d102fd4272a97eadc62b3f9fa91",
+          "bytes": 64003
+        }
+      ],
+      "rss_accounting": "incomplete: only coordinator session sampled; scheduler child sessions excluded",
+      "coordinator_session_peak_rss_kib": 577084
+    },
+    "lifecycle-native": {
+      "exit": 0,
+      "seconds": 0.0037970542907714844,
+      "binary_sha256": "fdd6613823fc6429a21a86fff38d48889a737091d731c4fc053dcaf5f7997395",
+      "summary": {
+        "schema_version": 1,
+        "event": "summary",
+        "total": 22,
+        "selected": 22,
+        "scope": "full",
+        "complete": true,
+        "executed": 22,
+        "passed": 22,
+        "failed": 0
+      },
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle-native.json",
+        "sha256": "ab3482f4065ed77ae74d12ab60723bbbb1e8e569ac3953dde873e09944295fdf",
+        "bytes": 341
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle-native.stdout",
+          "sha256": "3b42225a2e6c7628b6c5dab88ca32b878ea0b5bc42a3c3b7444dac73e287671e",
+          "bytes": 4078
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/lifecycle-native.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "framework-native-retry-build": {
+      "command": [
+        "bash",
+        "-c",
+        "source \"$NATIVE_DEPS/env.sh\"; export MLF_COMPILER=\"$SEED_BUNDLE/bin/emlf\" MLF_PACKAGE_MANAGER=\"$REPO/.mlf-build/pr19-validation/current-manager/mlfpkg\" CC=\"$NATIVE_DEPS/bin/clang\" GC_FREE_SPACE_DIVISOR=4; exec ./mlfpkg --compiler \"$SEED_BUNDLE/bin/emlf\" --clang \"$NATIVE_DEPS/bin/clang\" --runtime \"$REPO/runtime/mlf_runtime.c\" --manifest tests/mlf-package.json --build-dir \"$REPO/.mlf-build/pr19-validation/framework-native-retry\" --cache-dir \"$REPO/.mlf-build/pr19-validation/cache\" --jobs 1 --timeout 1800 build --target test-framework --target int-set-unions"
+      ],
+      "exit": 0,
+      "seconds": 78.0492787361145,
+      "peak_group_rss_kib": 794492,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-retry-build.json",
+        "sha256": "c230e6df21184fbeb22ec48a1c1e3ad93ece60d14bb0d3d14d13f1ec9cde2f96",
+        "bytes": 1229
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-retry-build.stdout",
+          "sha256": "74db5ee5f5cae511276ea92e85ef5fa23d5d09721e8ebcedd6e76d46d823f9fe",
+          "bytes": 384
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-retry-build.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-retry-build.memory.jsonl",
+          "sha256": "cd7a276c203061d79988a50876d9e3d77c532309b9e2336281e23649059ef477",
+          "bytes": 5619
+        }
+      ],
+      "rss_accounting": "all process sessions in isolated invocation PID namespace"
+    },
+    "framework-native-default": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/framework-native-retry/bin/test-framework"
+      ],
+      "exit": 0,
+      "seconds": 4.0772247314453125,
+      "binary_sha256": "eac73e8d63bb21171f99f6ca3135a390aafba9dad1124fe86c87b30c84a5ac53",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-default.json",
+        "sha256": "7eada61aa54b146d348ca5b6e2d2da65b8e057995c76fc5d97e542678fb7891b",
+        "bytes": 282
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-default.stdout",
+          "sha256": "a3657f9e39792b7007d257d4e2f3e547c12f2ef5b19245c53226e7a0e3f98a08",
+          "bytes": 148
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-default.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "framework-native-cli": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/framework-native-retry/bin/test-framework",
+        "--verify-cli",
+        "$REPO/.mlf-build/pr19-validation/framework-cli",
+        "$REPO/.mlf-build/pr19-validation/framework-native-retry/bin/int-set-unions"
+      ],
+      "exit": 1,
+      "seconds": 10.2558753490448,
+      "binary_sha256": "eac73e8d63bb21171f99f6ca3135a390aafba9dad1124fe86c87b30c84a5ac53",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-cli.json",
+        "sha256": "2fd7493dd02080e9b8b36643dfed6b8ccde25b33936cdd46cbb581e47f3f1947",
+        "bytes": 528
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-cli.stdout",
+          "sha256": "25f39f322153d248de2487cdcd10bd7cfb97f59695dcaefc3dcb0879edc62576",
+          "bytes": 231
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-cli.stderr",
+          "sha256": "1e3918b5e78b7bf2a672223b76c4ad4b1c29a326dbd6275d855edc3038aa82b6",
+          "bytes": 65
+        }
+      ]
+    },
+    "framework-native-fixed-build": {
+      "command": [
+        "bash",
+        "-c",
+        "source \"$NATIVE_DEPS/env.sh\"; export MLF_COMPILER=\"$SEED_BUNDLE/bin/emlf\" MLF_PACKAGE_MANAGER=\"$REPO/.mlf-build/pr19-validation/current-manager/mlfpkg\" CC=\"$NATIVE_DEPS/bin/clang\" GC_FREE_SPACE_DIVISOR=4; exec ./mlfpkg --compiler \"$SEED_BUNDLE/bin/emlf\" --clang \"$NATIVE_DEPS/bin/clang\" --runtime \"$REPO/runtime/mlf_runtime.c\" --manifest tests/mlf-package.json --build-dir \"$REPO/.mlf-build/pr19-validation/framework-native-fixed\" --cache-dir \"$REPO/.mlf-build/pr19-validation/cache\" --jobs 1 --timeout 1800 build --target test-framework --target int-set-unions"
+      ],
+      "exit": 0,
+      "seconds": 302.1826663017273,
+      "peak_group_rss_kib": 2379640,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-build.json",
+        "sha256": "4933931fc612edfd8aaf5e967062216d3e4f0d39d8ad6a3f7026b8fd4635c450",
+        "bytes": 1231
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-build.stdout",
+          "sha256": "f792f3103c477eb58adc9c307e6e64263f6e6e09f3525442d6ceb18f199426d8",
+          "bytes": 384
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-build.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-build.memory.jsonl",
+          "sha256": "f0517456debca0fe9d6abb34b421ac7c3f0b6f839114e9896edc7d58b5b94996",
+          "bytes": 30419
+        }
+      ],
+      "rss_accounting": "all process sessions in isolated invocation PID namespace"
+    },
+    "framework-native-fixed-default": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/framework-native-fixed/bin/test-framework"
+      ],
+      "exit": 0,
+      "seconds": 4.385030269622803,
+      "binary_sha256": "b1e60610a3ab72029dfab6ed8f98c79450bf772e451c450e2a8e48031262c12b",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-default.json",
+        "sha256": "e88b1ba948c932c1b610ea8cd715600630d76e6ac3d8905258e95221bd127aae",
+        "bytes": 281
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-default.stdout",
+          "sha256": "a3657f9e39792b7007d257d4e2f3e547c12f2ef5b19245c53226e7a0e3f98a08",
+          "bytes": 148
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-default.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "framework-native-fixed-cli": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/framework-native-fixed/bin/test-framework",
+        "--verify-cli",
+        "$REPO/.mlf-build/pr19-validation/framework-cli-fixed",
+        "$REPO/.mlf-build/pr19-validation/framework-native-fixed/bin/int-set-unions"
+      ],
+      "exit": 0,
+      "seconds": 12.308501482009888,
+      "binary_sha256": "b1e60610a3ab72029dfab6ed8f98c79450bf772e451c450e2a8e48031262c12b",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-cli.json",
+        "sha256": "55ffbeaea5a38c88641d44bda69322ecb4d26062a16e47eb3023add36825ff4e",
+        "bytes": 536
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-cli.stdout",
+          "sha256": "0ab53c52df1c19fea164d732257bfbcb9dbdd5281673ffd41b65effb3bb65d77",
+          "bytes": 321
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/framework-native-fixed-cli.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "tuple-native-build": {
+      "command": [
+        "bash",
+        "-c",
+        "source \"$NATIVE_DEPS/env.sh\"; export MLF_COMPILER=\"$SEED_BUNDLE/bin/emlf\" MLF_PACKAGE_MANAGER=\"$REPO/.mlf-build/pr19-validation/current-manager/mlfpkg\" CC=\"$NATIVE_DEPS/bin/clang\" GC_FREE_SPACE_DIVISOR=4; exec ./mlfpkg --compiler \"$SEED_BUNDLE/bin/emlf\" --clang \"$NATIVE_DEPS/bin/clang\" --runtime \"$REPO/runtime/mlf_runtime.c\" --locked --manifest mlf-package.json --build-dir \"$REPO/.mlf-build/pr19-validation/tuple-native\" --cache-dir \"$REPO/.mlf-build/pr19-validation/cache\" --jobs 1 --timeout 1800 build --target tuple-list"
+      ],
+      "exit": 0,
+      "seconds": 242.1437373161316,
+      "peak_group_rss_kib": 1979740,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-build.json",
+        "sha256": "dd0b1cf937a80b4b99bd8b1d4b50e1fddd75991b561943a21714370f95e012de",
+        "bytes": 1196
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-build.stdout",
+          "sha256": "61eebe80e8cbfe435a6007e04e042f8002021652ffa649f46972a196762d8048",
+          "bytes": 239
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-build.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-build.memory.jsonl",
+          "sha256": "a72a254303fe2279a047dfcb04c43de46765e7353cc8143d850b0b1d4f7dc9e6",
+          "bytes": 25800
+        }
+      ],
+      "rss_accounting": "all process sessions in isolated invocation PID namespace"
+    },
+    "tuple-native-legacy": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/tuple-native/bin/tuple-list"
+      ],
+      "exit": 0,
+      "seconds": 0.9235267639160156,
+      "binary_sha256": "e1303b7a3c897ebf464fef9a0d5292887f791a68c22d35a1351eaa1ec2c751aa",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-legacy.json",
+        "sha256": "ce744656ce41acdb1ca0f0292de758dcfea6111bc10a0964c9225ebfea06d102",
+        "bytes": 268
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-legacy.stdout",
+          "sha256": "ee8791dba00d849bf3b440878559df1b052d0df3b260abf5005c6d92baa71a66",
+          "bytes": 3986
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-legacy.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "tuple-native-framework": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/tuple-native/bin/tuple-list",
+        "--framework",
+        "--format",
+        "json"
+      ],
+      "exit": 0,
+      "seconds": 0.9712531566619873,
+      "binary_sha256": "e1303b7a3c897ebf464fef9a0d5292887f791a68c22d35a1351eaa1ec2c751aa",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-framework.json",
+        "sha256": "6182ae6c72f0c270218093e5633cbf00c2d496cd808a63a64a94f88dafb1b42e",
+        "bytes": 315
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-framework.stdout",
+          "sha256": "2ec704363adc7d35fab13463b6ec453db89998f12ff55427d81852ab6a7f11df",
+          "bytes": 30371
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-framework.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "tuple-native-list": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/tuple-native/bin/tuple-list",
+        "--framework-list",
+        "--format",
+        "json"
+      ],
+      "exit": 0,
+      "seconds": 0.016345500946044922,
+      "binary_sha256": "e1303b7a3c897ebf464fef9a0d5292887f791a68c22d35a1351eaa1ec2c751aa",
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-list.json",
+        "sha256": "1c1681ca2b2b6476e3d4bc15eb1b976819c6638d5c74df4163bb1903520362d4",
+        "bytes": 322
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-list.stdout",
+          "sha256": "7ee6b92d9b16c246cf9091f2e6913a83523fe5c1e7874b3654b59eaf33fb2ed8",
+          "bytes": 21113
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "tuple-native-equivalence": {
+      "legacy_count": 90,
+      "framework_inventory_count": 90,
+      "framework_result_count": 90,
+      "legacy_framework_ordered_names_equal": true,
+      "inventory_results_ordered_ids_equal": true,
+      "summary": {
+        "schema_version": 1,
+        "event": "summary",
+        "total": 90,
+        "selected": 90,
+        "scope": "full",
+        "complete": true,
+        "executed": 90,
+        "passed": 90,
+        "failed": 0
+      },
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-native-equivalence.json",
+        "sha256": "f16b25951ce4d529a49c4651d102470cac7a9e0961cef953ff254f1824b35980",
+        "bytes": 389
+      },
+      "logs": []
+    },
+    "emlf-native-build": {
+      "command": [
+        "bash",
+        "-c",
+        "source \"$NATIVE_DEPS/env.sh\"; export MLF_COMPILER=\"$SEED_BUNDLE/bin/emlf\" MLF_PACKAGE_MANAGER=\"$REPO/.mlf-build/pr19-validation/current-manager/mlfpkg\" CC=\"$NATIVE_DEPS/bin/clang\" GC_FREE_SPACE_DIVISOR=4; exec ./mlfpkg --compiler \"$SEED_BUNDLE/bin/emlf\" --clang \"$NATIVE_DEPS/bin/clang\" --runtime \"$REPO/runtime/mlf_runtime.c\" --locked --manifest mlf-package.json --build-dir \"$REPO/.mlf-build/pr19-validation/emlf-native\" --cache-dir \"$REPO/.mlf-build/pr19-validation/cache\" --jobs 1 --timeout 1800 build --target emlf"
+      ],
+      "exit": 0,
+      "seconds": 384.22735142707825,
+      "peak_group_rss_kib": 2153700,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/emlf-native-build.json",
+        "sha256": "aff3fe68ee5549245975ad6603b82a591afe20cd28c3ce9bf2e42b0cff62819c",
+        "bytes": 1190
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/emlf-native-build.stdout",
+          "sha256": "e9a813a22133720ef24d6478f50d8cab77b0421150c220172e517623a94ba7f5",
+          "bytes": 231
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/emlf-native-build.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/emlf-native-build.memory.jsonl",
+          "sha256": "57c5b3d0da98743e388cbc1ca0a30b787f8e7665ad84ec6bfec257a0594c630d",
+          "bytes": 41508
+        }
+      ],
+      "rss_accounting": "all process sessions in isolated invocation PID namespace"
+    },
+    "tuple-runtime-fixture": {
+      "command": [
+        "bash",
+        "-c",
+        "source \"$NATIVE_DEPS/env.sh\"; export CC=\"$NATIVE_DEPS/bin/clang\" GC_FREE_SPACE_DIVISOR=4; exec bash tools/release/test-tuple-list.sh \"$REPO/.mlf-build/pr19-validation/emlf-native/bin/emlf\" \"$REPO/.mlf-build/pr19-validation/tuple-runtime\""
+      ],
+      "exit": 0,
+      "seconds": 2.0027081966400146,
+      "peak_group_rss_kib": 1040,
+      "termination": null,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-runtime-fixture.json",
+        "sha256": "7eef2befb7627375616b83c3a2c4f1347ff52a33f227139c27cc52b2ff72f503",
+        "bytes": 633
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-runtime-fixture.stdout",
+          "sha256": "27d00935699e709d46fc3ae0ddea9e4684b641ca1784b8770c1cc2ca21e5c29a",
+          "bytes": 67
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-runtime-fixture.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-runtime-fixture.memory.jsonl",
+          "sha256": "e6f3e8ce1fadc4138ea3eadaf5e29a410f305cca2eb0ee200e4cc6301396f0cc",
+          "bytes": 96
+        }
+      ],
+      "rss_accounting": "all process sessions in isolated invocation PID namespace"
+    },
+    "core-native-build": {
+      "command": [
+        "bash",
+        "-c",
+        "source \"$NATIVE_DEPS/env.sh\"; export MLF_COMPILER=\"$SEED_BUNDLE/bin/emlf\" MLF_PACKAGE_MANAGER=\"$REPO/.mlf-build/pr19-validation/current-manager/mlfpkg\" CC=\"$NATIVE_DEPS/bin/clang\" GC_FREE_SPACE_DIVISOR=4; exec ./mlfpkg --compiler \"$SEED_BUNDLE/bin/emlf\" --clang \"$NATIVE_DEPS/bin/clang\" --runtime \"$REPO/runtime/mlf_runtime.c\" --manifest tests/mlf-package.json --build-dir \"$REPO/.mlf-build/pr19-validation/core-native\" --cache-dir \"$REPO/.mlf-build/pr19-validation/cache\" --jobs 1 --timeout 1800 build --target core"
+      ],
+      "exit": 0,
+      "seconds": 712.4357278347015,
+      "peak_group_rss_kib": 3528692,
+      "termination": null,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-build.json",
+        "sha256": "e18a478f7f04fbff8ca3188685055fb346634a316e512540d088d280bd831392",
+        "bytes": 1209
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-build.stdout",
+          "sha256": "30551f252641991e0959868d480826a851073216fb72cdb64ac059ec2fb0d9de",
+          "bytes": 231
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-build.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-build.memory.jsonl",
+          "sha256": "bdd95da74a33f32abf6fa724b40f921b50ee7b6027bfa2acc42780e5475e5afd",
+          "bytes": 75451
+        }
+      ],
+      "rss_accounting": "all process sessions in isolated invocation PID namespace"
+    },
+    "core-native-legacy-list": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/core-native/bin/core",
+        "--list-families"
+      ],
+      "exit": 0,
+      "seconds": 0.008812427520751953,
+      "binary_sha256": "9f928a3a0fb446299fe0070ec0e5d245f943ade6bbe784d8568446d7917e92bf",
+      "stack_limit_bytes": 268435456,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-legacy-list.json",
+        "sha256": "dd14f4ff9b2078d1b7b8ec8f0fe78746916824f8960e09f66d7d0490f4fe3a11",
+        "bytes": 320
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-legacy-list.stdout",
+          "sha256": "4cf445a572a07656a069efe6335a32ce5873789dd1c048906d44b1f68a7fb4d0",
+          "bytes": 733
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-legacy-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "core-native-framework-list": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/core-native/bin/core",
+        "--framework-list",
+        "--format",
+        "json"
+      ],
+      "exit": 0,
+      "seconds": 0.2161865234375,
+      "binary_sha256": "9f928a3a0fb446299fe0070ec0e5d245f943ade6bbe784d8568446d7917e92bf",
+      "stack_limit_bytes": 268435456,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-framework-list.json",
+        "sha256": "e45883cf322712f7bd2fbcbdfa2e6daee350d3724797a9f29a2d20daedbb35ae",
+        "bytes": 344
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-framework-list.stdout",
+          "sha256": "bda65b263f6a275e622042f10b3876817708316ed4e53ffcd531c2d4fff8c1ef",
+          "bytes": 210063
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-framework-list.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "core-native-supervised-substrings": {
+      "command": [
+        "$REPO/.mlf-build/pr19-validation/core-native/bin/core",
+        "--framework",
+        "--work-dir",
+        "$REPO/.mlf-build/pr19-validation/core-supervised",
+        "--timeout",
+        "60",
+        "--filter",
+        "core/substring-adapter/",
+        "--format",
+        "json",
+        "--report",
+        "$REPO/.mlf-build/pr19-validation/core-substrings.jsonl"
+      ],
+      "exit": 0,
+      "seconds": 16.8802273273468,
+      "binary_sha256": "9f928a3a0fb446299fe0070ec0e5d245f943ade6bbe784d8568446d7917e92bf",
+      "stack_limit_bytes": 268435456,
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-supervised-substrings.json",
+        "sha256": "ec453eb01b7f1d52259fd524cb13ce753a42fd7c70e7588b71e04d41b57410b3",
+        "bytes": 658
+      },
+      "logs": [
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-supervised-substrings.stdout",
+          "sha256": "c595904008820a2e137282c870b8b4b2650a89cbdd7f1f06917f0842abe0bf2a",
+          "bytes": 30259
+        },
+        {
+          "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-supervised-substrings.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        }
+      ]
+    },
+    "core-native-inventory-check": {
+      "legacy_family_count": 35,
+      "framework_leaf_count": 752,
+      "source_substring_ids": [
+        "core/substring-adapter/empty-in-empty",
+        "core/substring-adapter/empty-in-nonempty",
+        "core/substring-adapter/nonempty-in-empty",
+        "core/substring-adapter/needle-longer-than-text",
+        "core/substring-adapter/prefix",
+        "core/substring-adapter/interior",
+        "core/substring-adapter/suffix",
+        "core/substring-adapter/overlapping-prefix-match",
+        "core/substring-adapter/overlapping-prefix-miss",
+        "core/substring-adapter/unicode-match",
+        "core/substring-adapter/unicode-order-miss",
+        "core/substring-adapter/nul-match",
+        "core/substring-adapter/nul-miss"
+      ],
+      "listing_source_substring_ids_match": true,
+      "executed_source_substring_ids_match": true,
+      "all_physical_leaves_qualification_ineligible": true,
+      "all_results_qualification_ineligible": true,
+      "all_results_cleanup_unverified": true,
+      "summary": {
+        "complete": true,
+        "crashed": 0,
+        "event": "summary",
+        "executed": 13,
+        "failed": 0,
+        "ids": [
+          "core/substring-adapter/empty-in-empty",
+          "core/substring-adapter/empty-in-nonempty",
+          "core/substring-adapter/nonempty-in-empty",
+          "core/substring-adapter/needle-longer-than-text",
+          "core/substring-adapter/prefix",
+          "core/substring-adapter/interior",
+          "core/substring-adapter/suffix",
+          "core/substring-adapter/overlapping-prefix-match",
+          "core/substring-adapter/overlapping-prefix-miss",
+          "core/substring-adapter/unicode-match",
+          "core/substring-adapter/unicode-order-miss",
+          "core/substring-adapter/nul-match",
+          "core/substring-adapter/nul-miss"
+        ],
+        "passed": 13,
+        "protocol_error": 0,
+        "runner": "process",
+        "schema_version": 1,
+        "scope": "partial",
+        "selected": 13,
+        "timed_out": 0,
+        "total": 752,
+        "unsuccessful": 0,
+        "wall_seconds": 1.397985516
+      },
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/core-native-inventory-check.json",
+        "sha256": "d29d3a93823ae7091f73ebae25ff4201042d68fe0133dad87508f8d6fb18d9ca",
+        "bytes": 1907
+      },
+      "logs": []
+    }
+  },
+  "builds": {
+    "lifecycle-native": {
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/lifecycle-native/build-report.json",
+        "sha256": "ec120fe87e12184a2f1e490b3846a057ebc82fc3529aef24ae3dcc1cae61d6f2",
+        "bytes": 160169
+      },
+      "complete": true,
+      "binaries": [
+        {
+          "path": ".mlf-build/pr19-validation/lifecycle-native/bin/test-lifecycle",
+          "sha256": "fdd6613823fc6429a21a86fff38d48889a737091d731c4fc053dcaf5f7997395",
+          "bytes": 1866216
+        }
+      ]
+    },
+    "framework-native-fixed": {
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/framework-native-fixed/build-report.json",
+        "sha256": "af666cef0a75477f03cb98ea7f6eff1c58f34249ff55e352b9c9fa0e565b3f85",
+        "bytes": 170831
+      },
+      "complete": true,
+      "binaries": [
+        {
+          "path": ".mlf-build/pr19-validation/framework-native-fixed/bin/int-set-unions",
+          "sha256": "bae020c9fdf23463949acf984a698bcc0b74d903b0b918140e6cf29b38f13621",
+          "bytes": 1512904
+        },
+        {
+          "path": ".mlf-build/pr19-validation/framework-native-fixed/bin/test-framework",
+          "sha256": "b1e60610a3ab72029dfab6ed8f98c79450bf772e451c450e2a8e48031262c12b",
+          "bytes": 4875656
+        }
+      ]
+    },
+    "tuple-native": {
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/tuple-native/build-report.json",
+        "sha256": "ea7dd8ef087879f2dd242d48875d5114a54615b3e316feee1db094b48a88ad4e",
+        "bytes": 146559
+      },
+      "complete": true,
+      "binaries": [
+        {
+          "path": ".mlf-build/pr19-validation/tuple-native/bin/tuple-list",
+          "sha256": "e1303b7a3c897ebf464fef9a0d5292887f791a68c22d35a1351eaa1ec2c751aa",
+          "bytes": 5946952
+        }
+      ]
+    },
+    "emlf-native": {
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/emlf-native/build-report.json",
+        "sha256": "4c85f681cf35eb9aeb26e19c2e8836f6cd71d142019c6085dee3cb97a35a5c9d",
+        "bytes": 141824
+      },
+      "complete": true,
+      "binaries": [
+        {
+          "path": ".mlf-build/pr19-validation/emlf-native/bin/emlf",
+          "sha256": "db42a284e655546c72217ff293d29ed6cb5db0df42b90d5293f34e2577f2ed63",
+          "bytes": 12691752
+        }
+      ]
+    },
+    "core-native": {
+      "receipt": {
+        "path": ".mlf-build/pr19-validation/core-native/build-report.json",
+        "sha256": "bd33ccfb647f4d3ceeb405d1ba293a4976ee64938392195b283b14a5f897a3ba",
+        "bytes": 176101
+      },
+      "complete": true,
+      "binaries": [
+        {
+          "path": ".mlf-build/pr19-validation/core-native/bin/core",
+          "sha256": "9f928a3a0fb446299fe0070ec0e5d245f943ade6bbe784d8568446d7917e92bf",
+          "bytes": 17062728
+        }
+      ]
+    }
+  },
+  "known_incomplete_attempts": [
+    {
+      "kind": "Core supervisor failed under default stack",
+      "evidence": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/core-default-stack-failure/core-native-supervised-substrings.json",
+        "sha256": "7318a84f31fe4b37a91303bf09d5e923fdfd88ae9484da5807ae5023a1af5ae6",
+        "bytes": 628
+      },
+      "scope": "SIGSEGV; same binary/arguments passed with explicit256MiB stack, as recorded separately; no production source changes"
+    },
+    {
+      "kind": "tuple shell fixture direct launch",
+      "evidence": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/tuple-script-launch-failure/tuple-runtime-fixture.json",
+        "sha256": "8c6788328ed280304d893a491f7abde77b7883a0c20eed30becdf26cc1f2d991",
+        "bytes": 630
+      },
+      "scope": "exit126 because script mode644; no tests executed; explicit bash invocation subsequently passed"
+    },
+    {
+      "kind": "framework interpreter timeout",
+      "exit": -9,
+      "seconds": 300.38296484947205,
+      "scope": "contracts printed; remaining default checks incomplete, superseded by native pass"
+    },
+    {
+      "kind": "framework build environment interruption",
+      "evidence": {
+        "path": ".mlf-build/pr19-validation/toolchain-checks/framework-environment-interruption/status.json",
+        "sha256": "6c093c09bf5369fee889c7b5234b12be889a55fefe589b55adc54888a62e29e2",
+        "bytes": 343
+      },
+      "scope": "no exit observed; new-directory retry completed using manager-verified cache"
+    }
+  ],
+  "limitations": [
+    "No full739 Core action execution",
+    "No full unit/package/backend/port campaign",
+    "No native self-host fixed point",
+    "Lifecycle first native build memory accounting excludes isolated scheduler sessions",
+    "All build/run statements bind source hashes; prior checkout HEAD is not asserted as a sealed candidate commit"
+  ],
+  "preserved_development_failures": {
+    "reserved_word": "reserved-exists-failure",
+    "type_collision": [
+      "phase-ambiguity-failure",
+      "plan-collision-failure",
+      "binding-collision-failure"
+    ],
+    "required_closed_signatures": [
+      "lookup-signature-failure",
+      "supervise-signature-failure",
+      "validate-signature-failure"
+    ],
+    "new_assertion_status_typo": "typed-status-expectation-failure"
+  },
+  "publication_record": {
+    "recorded_date": "2026-11-05",
+    "original_local_summary_sha256": "f33bff6d1353c4db215cc5c6755ded871c2f66ea9618929fb96649acd254f18d",
+    "path_normalization": "Absolute working, seed-bundle and dependency prefixes are replaced by $REPO, $SEED_BUNDLE and $NATIVE_DEPS. Command arguments and flags otherwise retain their recorded values. These placeholders describe the producer environment, not additional tools or downloadable artifacts.",
+    "retention": "Source inventories and selected exact stdout captures are committed. Other raw logs, tool binaries and cache/build receipts remain local; their recorded hashes are evidence identities, not downloadable files."
+  },
+  "published_stdout": {
+    "lifecycle-native.stdout": {
+      "sha256": "3b42225a2e6c7628b6c5dab88ca32b878ea0b5bc42a3c3b7444dac73e287671e",
+      "bytes": 4078
+    },
+    "framework-native-fixed-default.stdout": {
+      "sha256": "a3657f9e39792b7007d257d4e2f3e547c12f2ef5b19245c53226e7a0e3f98a08",
+      "bytes": 148
+    },
+    "framework-native-fixed-cli.stdout": {
+      "sha256": "0ab53c52df1c19fea164d732257bfbcb9dbdd5281673ffd41b65effb3bb65d77",
+      "bytes": 321
+    },
+    "tuple-native-legacy.stdout": {
+      "sha256": "ee8791dba00d849bf3b440878559df1b052d0df3b260abf5005c6d92baa71a66",
+      "bytes": 3986
+    },
+    "tuple-native-framework.stdout": {
+      "sha256": "2ec704363adc7d35fab13463b6ec453db89998f12ff55427d81852ab6a7f11df",
+      "bytes": 30371
+    },
+    "tuple-native-list.stdout": {
+      "sha256": "7ee6b92d9b16c246cf9091f2e6913a83523fe5c1e7874b3654b59eaf33fb2ed8",
+      "bytes": 21113
+    },
+    "tuple-runtime-fixture.stdout": {
+      "sha256": "27d00935699e709d46fc3ae0ddea9e4684b641ca1784b8770c1cc2ca21e5c29a",
+      "bytes": 67
+    },
+    "core-native-legacy-list.stdout": {
+      "sha256": "4cf445a572a07656a069efe6335a32ce5873789dd1c048906d44b1f68a7fb4d0",
+      "bytes": 733
+    }
+  }
+}

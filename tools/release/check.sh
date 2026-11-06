@@ -19,6 +19,7 @@ tools/release/test-setup-macos.sh
 tools/release/test-package-publishing.sh
 tools/release/test-smoke-receipts.sh
 tools/release/test-fetch-seed.sh
+python3 tools/release/test-fetch-seed-artifact.py
 tools/release/test-pr-gate.sh
 tools/release/test-qualification-gate.sh
 node tools/release/test-benchmark-gate.mjs
@@ -44,6 +45,7 @@ python3 tools/shared/test_guest_state_laws_controls.py
 node tools/release/test-release-tag.mjs
 tools/release/test-shared-candidate.sh
 tools/release/test-unit-evidence.sh
+python3 tools/release/test-tuple-list-qualification.py
 tools/release/test-qualification-jobs.sh
 tools/release/test-source-smoke-diagnostics.sh
 tools/release/test-pr-smoke-cli-watchdog.sh
@@ -51,14 +53,18 @@ tools/release/test-async-bootstrap.sh
 tools/release/test-shared-bootstrap-dispatch.sh
 tools/release/test-shared-bootstrap-orchestration.sh
 tools/release/test-direct-source-smoke.sh
+bash tools/release/test-timed-async-bootstrap.sh
 python3 tools/release/test-async-change-scope.py
 python3 tools/testing/test_manifest_snapshot.py
 python3 tools/testing/check_manifest_snapshot.py
 python3 tools/testing/test_history_refs.py
+python3 tools/testing/test_composed_history_refs.py
 python3 tools/testing/check_tuple_list_migration.py
 python3 tools/testing/test_tuple_list_migration.py
 python3 tools/testing/test_migration_inventory.py
 python3 tools/testing/check_core_leaf_migration.py
 python3 tools/testing/check_reconciliation_inventory.py
 python3 tools/testing/test_reconciliation_inventory.py
+python3 tools/testing/test_history_workflows.py
+python3 tools/testing/test_framework_recovery.py
 printf 'Release metadata and shell syntax passed for %s.\n' "$version"

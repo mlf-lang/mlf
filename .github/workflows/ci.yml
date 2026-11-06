@@ -21,6 +21,7 @@ on:
         default: false
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -32,7 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0 # Frozen migration oracles require their exact Git history.
+          fetch-depth: 0
+      - name: Prepare reviewed historical source objects
+        run: python3 -B tools/testing/prepare_history_refs.py
       - run: tools/release/check.sh
       - name: Test pinned GHC install-input cleanup guards
         run: |

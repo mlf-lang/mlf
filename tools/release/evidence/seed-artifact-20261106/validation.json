@@ -1,0 +1,139 @@
+{
+  "format": 1,
+  "scope": "Temporary transport of unchanged official v0.3.0 seed bytes; not new compiler or full qualification",
+  "prior_pr_head": "5f77c669586e44f31d13b861d4f92130e1f55a47",
+  "main_base": "5d4310381a119c4136a1b9664e2c532ad76323f7",
+  "source_run": 39712937640,
+  "source_commit": "ad299fa17296945ca0cf34d6fc4ac35dc5eb0924",
+  "repository": "mlf-lang/mlf",
+  "repository_id": 1420436874,
+  "expires_date_utc": "2026-11-21",
+  "network_validation": "Original ZIPs and API responses retrieved through authenticated GitHub connector; local gh adapter replays them. Real CI CLI/token access remains to be tested on published candidate.",
+  "artifacts": [
+    {
+      "id": 12402192066,
+      "name": "release-linux-x64",
+      "size_in_bytes": 3807252,
+      "digest": "sha256:a13c1f252130ed1bd588ccdfa7b935e8009c4e19a5fd2b9017f14cbafaa829f2",
+      "expires_at": "2026-11-21T04:41:10Z",
+      "workflow_run": {
+        "id": 39712937640,
+        "repository_id": 1420436874,
+        "head_repository_id": 1420436874,
+        "head_branch": "main",
+        "head_sha": "ad299fa17296945ca0cf34d6fc4ac35dc5eb0924"
+      }
+    },
+    {
+      "id": 12401994144,
+      "name": "release-macos-arm64",
+      "size_in_bytes": 3550102,
+      "digest": "sha256:7f1846b86893ce2a984225224e265b008bd44a8674f78b63a0de673cd77848b8",
+      "expires_at": "2026-11-21T04:41:32Z",
+      "workflow_run": {
+        "id": 39712937640,
+        "repository_id": 1420436874,
+        "head_repository_id": 1420436874,
+        "head_branch": "main",
+        "head_sha": "ad299fa17296945ca0cf34d6fc4ac35dc5eb0924"
+      }
+    }
+  ],
+  "actual_pin_replays": [
+    {
+      "pin": ".github/seed.env",
+      "status": "passed",
+      "archive_sha256": "46d1c56d76f1c119836244318212f06fdedf59a59ccaa60c3979be1033e8965a",
+      "compiler_sha256": "0fc4f1b00ae5a8f00ef0e535f3912bca7f75ef0f042c76548a3b047fd1f83ca7",
+      "manager_sha256": "037f8caf8ed4be0d586feac0a1233a873d299bb087f66ca9d16928c33e79eecb"
+    },
+    {
+      "pin": ".github/smoke-seed.env",
+      "status": "passed",
+      "archive_sha256": "46d1c56d76f1c119836244318212f06fdedf59a59ccaa60c3979be1033e8965a",
+      "compiler_sha256": "0fc4f1b00ae5a8f00ef0e535f3912bca7f75ef0f042c76548a3b047fd1f83ca7",
+      "manager_sha256": "037f8caf8ed4be0d586feac0a1233a873d299bb087f66ca9d16928c33e79eecb"
+    },
+    {
+      "pin": ".github/smoke-seed-linux.env",
+      "status": "passed",
+      "archive_sha256": "ecfa16763745144c7b859354620d9fcad5bbedf4efe14972300b1ec1dacb8aeb",
+      "compiler_sha256": "064e9ee2d5e9a8df38a8d3a56c0595e8aa7757a41d63c46e818c4cd24af0d3a6",
+      "manager_sha256": "182ad0b4e918421dc7e6c1e3bddbb04bb60148273bbbc81655c92f4233e06f20"
+    },
+    {
+      "pin": ".github/package-seed.env",
+      "status": "passed",
+      "archive_sha256": "46d1c56d76f1c119836244318212f06fdedf59a59ccaa60c3979be1033e8965a",
+      "compiler_sha256": "0fc4f1b00ae5a8f00ef0e535f3912bca7f75ef0f042c76548a3b047fd1f83ca7",
+      "manager_sha256": "037f8caf8ed4be0d586feac0a1233a873d299bb087f66ca9d16928c33e79eecb"
+    },
+    {
+      "pin": ".github/benchmark-baseline-macos.env",
+      "status": "passed",
+      "archive_sha256": "46d1c56d76f1c119836244318212f06fdedf59a59ccaa60c3979be1033e8965a",
+      "compiler_sha256": "0fc4f1b00ae5a8f00ef0e535f3912bca7f75ef0f042c76548a3b047fd1f83ca7",
+      "manager_sha256": "037f8caf8ed4be0d586feac0a1233a873d299bb087f66ca9d16928c33e79eecb"
+    }
+  ],
+  "controls": {
+    "artifact_test_methods": 11,
+    "artifact_end_to_end_scenarios": 80,
+    "artifact_success_scenarios": 2,
+    "artifact_rejections": 78,
+    "normal_python": "passed",
+    "optimized_python_and_spawned_helpers": "passed",
+    "legacy_release_checks": 11,
+    "official_linux_seed_receipt_preparation_cases": 5
+  },
+  "files": {
+    "tests.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "tests.stderr": {
+      "sha256": "6a8e1284f9692ecd3cf97ff7f1eab0f033cd26584320a6f873589cc44a7fe723",
+      "bytes": 110
+    },
+    "tests-optimized.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "tests-optimized.stderr": {
+      "sha256": "9a3905c947cf224aa9a7e0cfbaeb3b4c15ae05fbff870eda33b7b813a61d901a",
+      "bytes": 111
+    },
+    "release-mode.stdout": {
+      "sha256": "e2e12953238e3b34e425cf7dfa2509ec3ff232e19ed65c0062b75f2c5c4aa15d",
+      "bytes": 206
+    },
+    "release-mode.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "suite-receipts.json": {
+      "sha256": "ea5a8175d21810e5b82a55d18db9150b93bfb93bcd5d749c0de3db77d275838a",
+      "bytes": 3834
+    },
+    "tools/release/fetch-seed.sh": {
+      "sha256": "8be53795d70af4fea39e672a0f6068e6a725955da9f4a07dd3ca074770cf86be",
+      "bytes": 3108
+    },
+    "tools/release/fetch-seed-artifact.py": {
+      "sha256": "5bc5c0d301a947feec539b617b7c6ace8234e9860320346901e05cf64960fc16",
+      "bytes": 6927
+    },
+    "tools/release/test-fetch-seed-artifact.py": {
+      "sha256": "99f306271b0f79c267eabcec9c3425faac0b58cb0dc22bee99ee2d5fddde2b8c",
+      "bytes": 15504
+    },
+    "tools/release/test-fetch-seed.sh": {
+      "sha256": "1eca27fe4adcee38bfe3e44e7a990d087f03cf94aef9d64d7a042b24b81df2a4",
+      "bytes": 3222
+    }
+  },
+  "unchanged_historical_source_counts": {
+    "final-source-identities.json": 378,
+    "build-source-union.json": 155
+  }
+}
