@@ -4,7 +4,7 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.BuiltinPreludeContext
   (RawPrelude(..), PreparedPrelude, prepareFresh, checkCompilerPrelude,
-   inputIdentity, rawTerm, preparedRaw, prepareObject, interface, linked, names, environment, sourceValues,
+   inputIdentity, rawTerm, preparedRaw, prepareObject, prepareCheckedObject, interface, linked, names, environment, sourceValues,
    protectedNames, contracts, sourceExternals) where {
   import MLF.Primitive;
   import Bootstrap.Types;
@@ -101,8 +101,8 @@ module Bootstrap.BuiltinPreludeContext
     object <- Artifact.builtinPrelude;
     prepareObject identity object
   };
-  prepareObjectV1 :: String -> Artifact.CrateObject -> Either String RawPrelude;
-  prepareObjectV1 identity object = do {
+  prepareCheckedObjectV1 :: String -> Artifact.CrateObject -> Either String PreparedPrelude;
+  prepareCheckedObjectV1 identity object = do {
     let { iface = Artifact.objectInterface object };
     Artifact.validateInterface iface;
     ensure (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
@@ -123,8 +123,7 @@ module Bootstrap.BuiltinPreludeContext
     let { raw = RawPrelude identity (length P.allPrimitives) iface
       (XWithData (Artifact.fragmentData linked) body) (Artifact.fragmentBindings linked)
       (Artifact.fragmentSerial linked) names env sourceValues protectedNames contracts canonicalSources };
-    checkCompilerPrelude raw;
-    Right raw
+    checkCompilerPrelude raw
     } }
   };
   canonicalSources = (:) Modules.preludeSource ((:) Modules.primitiveSource []);
@@ -225,9 +224,11 @@ module Bootstrap.BuiltinPreludeContext
   -- the direct call and the independent checkCompilerPrelude reconstruction.
   -- The marker is not carried as a semantic receipt or attached to RawPrelude.
   prepareObject :: String -> Artifact.CrateObject -> Either String RawPrelude;
-  prepareObject identity object = if Artifact.envelopeMarked object
-    then prepareKnownPreludeObject identity object else prepareObjectV1 identity object;
-  prepareKnownPreludeObject identity object = do {
+  prepareObject identity object = mapEither preparedRaw (prepareCheckedObject identity object);
+  prepareCheckedObject :: String -> Artifact.CrateObject -> Either String PreparedPrelude;
+  prepareCheckedObject identity object = if Artifact.envelopeMarked object
+    then prepareCheckedKnownPreludeObject identity object else prepareCheckedObjectV1 identity object;
+  prepareCheckedKnownPreludeObject identity object = do {
     let { iface = Artifact.objectInterface object };
     ensure (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
       "prepared Prelude is not the builtin crate";
@@ -244,8 +245,7 @@ module Bootstrap.BuiltinPreludeContext
       let { raw = RawPrelude identity (length P.allPrimitives) iface
         (XWithData (Artifact.fragmentData linked) body) (Artifact.fragmentBindings linked)
         (Artifact.fragmentSerial linked) names env sourceValues protectedNames contracts canonicalSources };
-      checkCompilerPrelude raw;
-      Right raw
+      checkCompilerPrelude raw
     } }
   };
 }

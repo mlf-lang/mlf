@@ -1617,6 +1617,7 @@ module Bootstrap.LLVM.Codegen where {
                  PRemInt -> N.numericProduct p a b;
                  PEqInt -> N.numericInteger p a b;
                  PLtInt -> N.numericInteger p a b;
+                 PUnsignedLtInt -> unsignedIntegerCompare a b (primitiveCall p values);
                  PAddDouble -> doubleOperation p a b;
                  PSubDouble -> doubleOperation p a b;
                  PMulDouble -> doubleOperation p a b;

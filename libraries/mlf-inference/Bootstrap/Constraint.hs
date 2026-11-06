@@ -305,7 +305,8 @@ module Bootstrap.Constraint where {
           }
         }
     };
-  data BindingEnv = BindingEnv (Map String Binding) (Map (V.Index Declaration) Binding);
+  data BindingEnv = BindingEnv (Map String Binding) (Map (V.Index Declaration) Binding) |
+    NamedEvidenceImports (Map String ((,) XName XType)) BindingEnv;
   compareRefSlot a b = compareInt (V.toInt a) (V.toInt b);
   compareTermRef a b = case (,) a b of {
     (,) (LexicalRef x) (LexicalRef y) -> compareString x y;
@@ -313,10 +314,18 @@ module Bootstrap.Constraint where {
     (,) (LexicalRef _) _ -> 0 - 1;
     _ -> 1
   };
+  lookupTerm (NamedEvidenceImports _ scope) ref = lookupTerm scope ref;
   lookupTerm (BindingEnv locals globals) ref = case ref of {
     LexicalRef n -> M.lookup compareString n locals;
     DeclRef i _ -> M.lookup compareRefSlot i globals
   };
+  lookupNamedEvidence (NamedEvidenceImports contracts _) (LexicalRef n) = M.lookup compareString n contracts;
+  lookupNamedEvidence _ _ = Nothing;
+  bindTerm (NamedEvidenceImports contracts scope) ref value =
+    let { remaining = case ref of {
+      LexicalRef n -> M.delete compareString n contracts;
+      DeclRef _ _ -> contracts
+    } } in NamedEvidenceImports remaining (bindTerm scope ref value);
   bindTerm (BindingEnv locals globals) ref value = case ref of {
     LexicalRef n -> BindingEnv (M.insert compareString n value locals) globals;
     DeclRef i _ -> BindingEnv locals (M.insert compareRefSlot i value globals)
@@ -334,7 +343,7 @@ module Bootstrap.Constraint where {
         resolved =
           case core of {
             CVar x ->
-              if isJust (lookupTerm env (LexicalRef x))
+              if isJust (lookupTerm env (LexicalRef x)) || isJust (lookupNamedEvidence env (LexicalRef x))
               then core
               else case P.lookupPrimitive x of {
                      Nothing -> core;
@@ -360,7 +369,10 @@ module Bootstrap.Constraint where {
     } in
     let {
       variable ref = case lookupTerm env ref of {
-          Nothing -> failGenerate ("unbound variable: " ++ termRefName ref);
+          Nothing -> case lookupNamedEvidence env ref of {
+            Just _ -> failGenerate ("ordinary read of evidence-only import: " ++ termRefName ref);
+            Nothing -> failGenerate ("unbound variable: " ++ termRefName ref)
+          };
           Just (Mono name identity) ->
             do {
               equality root identity;
@@ -431,7 +443,13 @@ module Bootstrap.Constraint where {
                          return (DeclaredEvidenceBinding role name declared);
                        Just (RecursiveMono _ _ _) ->
                          failGenerate "recursive dictionary interfaces require an explicit signature";
-                       Nothing -> failGenerate ("dictionary candidate is out of scope: " ++ termRefName x)
+                       Nothing -> case lookupNamedEvidence env x of {
+                         Nothing -> failGenerate ("dictionary candidate is out of scope: " ++ termRefName x);
+                         Just ((,) name declared) -> case role of {
+                           InstanceEvidence -> return (DeclaredEvidenceBinding role name declared);
+                           _ -> failGenerate ("evidence-only import has a non-instance role: " ++ termRefName x)
+                         }
+                       }
                      }
                  })
               candidates;

@@ -350,7 +350,7 @@ module Tests.Catalog where {
              ("catalog changed preserved campaign: " ++ name))
         campaigns;
       ensure
-        ((matrixRows (forUnit catalog "backends") == 583) &&
+        ((matrixRows (forUnit catalog "backends") == 593) &&
          (S.sum
             (S.map
                (\entry ->
@@ -360,7 +360,7 @@ module Tests.Catalog where {
                        _ -> "0"
                      }))
                (forUnit catalog "backends")) ==
-          531))
+          541))
         "backend family partition changed";
       ensure (unique (combine "labels" (forUnit catalog "backends")))
         "duplicate backend fixture label";

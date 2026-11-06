@@ -1,0 +1,266 @@
+module Tests.CoreWitnessWorkers (worker, verify) where
+import Bootstrap.Types
+import Bootstrap.Constraint
+import qualified Bootstrap.ArtifactStorage as Storage
+import qualified Bootstrap.Bitstream as Wire
+import qualified Bootstrap.Elaborate as Elaborate
+import qualified Bootstrap.Graph.Solver as Solver
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.X.Type as Type
+import qualified Package.OS as O
+import qualified Tests.CoreGraphImage as Image
+import qualified Tests.Graph as Ref
+import qualified Tests.GraphSolver as T
+import qualified Tests.Helpers as H
+
+data Lane = SnakeLane Int | OtherLane
+data FixtureRows = FixtureRows String Int ([] String)
+
+lanes : [] Lane
+lanes = (:) (SnakeLane 1) ((:) (SnakeLane 2) ((:) (SnakeLane 3) ((:) OtherLane [])))
+
+laneName : Lane -> String
+laneName lane = case lane of
+ SnakeLane index -> "snake-" ++ showInt index
+ OtherLane -> "other"
+
+parseLane : String -> IO Lane
+parseLane name = case S.filter (\lane -> eqString name (laneName lane)) lanes of
+ (:) lane [] -> return lane
+ _ -> H.fail "unknown witness worker lane"
+
+stockFixtures : IO ((,) String ([] String))
+stockFixtures = case T.fixtures of
+ (:) snake others -> do
+  H.assert (eqString snake "examples/snake.emlf") "Snake is not the first stock witness fixture"
+  return ((,) snake others)
+ [] -> H.fail "stock witness fixture inventory is empty"
+
+stockInput : String -> IO ((,,) Constraints Graph Solver)
+stockInput file = do
+ constraints <- T.constraints file
+ graph <- H.right (solve constraints)
+ solver <- H.right (Solver.prepare graph)
+ return ((,,) constraints graph solver)
+
+selectedEdges : Graph -> [] Edge -> [] ((,) Int Edge)
+selectedEdges graph candidates =
+ let context = Elaborate.prepareTypes graph in
+ S.filter (\((,) _ edge) ->
+  S.not (Type.alphaEq (Elaborate.schemeTypeIn context (fromGen edge))
+                      (Elaborate.referenceIn context (toNode edge))))
+  (S.zip (S.range 1 (S.length candidates)) candidates)
+
+snakeLane : forall a. Int -> [] a -> [] a
+snakeLane lane rows =
+ S.map S.snd
+  (S.filter (\((,) ordinal _) -> remInt (ordinal - 1) 3 == lane - 1)
+            (S.zip (S.range 1 (S.length rows)) rows))
+
+compareWitness : Graph -> Solver -> ((,) Int Edge) -> IO ()
+compareWitness graph solver ((,) _ edge) = do
+ (,) expectedCopies expected <- H.right (Ref.runBuild graph (T.expandAndSolve true edge))
+ (,) copies actual <- H.right (Solver.witness (fromGen edge) (toNode edge) solver)
+ S.unless (H.eq copies expectedCopies) (H.fail "witness lost original-to-copy identity")
+ T.sameGraph expected actual
+
+edgeRow : ((,) Int Edge) -> String
+edgeRow ((,) ordinal edge) =
+ showInt ordinal ++ "\t" ++ showInt (fromGen edge) ++ "\t" ++ showInt (toNode edge)
+
+rowsCount : FixtureRows -> Int
+rowsCount (FixtureRows _ _ rows) = S.length rows
+
+-- The fixture header records both counts, even when the selection is empty.
+fixtureLines : FixtureRows -> [] String
+fixtureLines (FixtureRows file candidates rows) =
+ (:) ("FIXTURE\t" ++ file ++ "\t" ++ showInt candidates ++ "\t" ++ showInt (S.length rows)) rows
+
+ledgerImage : [] FixtureRows -> String
+ledgerImage fixtures = S.unlines ((:) "WITNESS LEDGER 1" (S.concatMap fixtureLines fixtures))
+
+imageBound : Int
+imageBound = 67108864
+
+checkDirectory : String -> IO ()
+checkDirectory path = do
+ H.assert (O.absolute path) ("witness directory is not absolute: " ++ path)
+ canonical <- canonicalPath path
+ present <- directoryExists path
+ H.assert (present && eqString canonical path) ("witness directory is not canonical: " ++ path)
+
+imageBytes : Int -> String -> IO ByteArray
+imageBytes bound text = do
+ bytes <- byteArrayFromString text
+ size <- lengthByteArray bytes
+ H.assert (size > 0 && size <= bound) "witness image exceeds its byte bound"
+ return bytes
+
+writeImage : String -> String -> IO ()
+writeImage path image = do
+ bytes <- imageBytes imageBound image
+ written <- Storage.writeRaw path bytes
+ H.right written
+
+readImage : Int -> String -> IO ByteArray
+readImage bound path = do
+ (,) message bytes <- readByteFileOrError path bound
+ H.assert (eqString message "") ("cannot read witness image " ++ path ++ ": " ++ message)
+ size <- lengthByteArray bytes
+ H.assert (size > 0 && size <= bound) ("empty or oversized witness image: " ++ path)
+ return bytes
+
+matchText : Int -> String -> String -> IO ()
+matchText bound path expected = do
+ actual <- readImage bound path
+ wanted <- imageBytes bound expected
+ equal <- Storage.sameBytes actual wanted
+ H.assert equal ("witness bytes differ: " ++ path)
+
+runSnake : Int -> String -> String -> IO Int
+runSnake lane file work = do
+ (,,) constraints graph solver <- stockInput file
+ let candidates = instances constraints
+ let rows = selectedEdges graph candidates
+ let covered = snakeLane lane rows
+ let count = S.length candidates
+ S.mapM_ (compareWitness graph solver) covered
+ writeImage (work ++ "/selected.tsv") (ledgerImage ((:) (FixtureRows file count (S.map edgeRow rows)) []))
+ writeImage (work ++ "/covered.tsv") (ledgerImage ((:) (FixtureRows file count (S.map edgeRow covered)) []))
+ writeImage (work ++ "/seed.graph") (Image.rawGraphImage graph)
+ writeImage (work ++ "/seed.solver") (Image.rawSolverImage solver)
+ writeImage (work ++ "/ordered.input") (Image.orderedInputImage (equalities constraints) (solveSteps constraints))
+ return (S.length covered)
+
+runOtherFixture : String -> IO FixtureRows
+runOtherFixture file = do
+ (,,) constraints graph solver <- stockInput file
+ let candidates = instances constraints
+ let rows = selectedEdges graph candidates
+ S.mapM_ (compareWitness graph solver) rows
+ return (FixtureRows file (S.length candidates) (S.map edgeRow rows))
+
+runOther : [] String -> String -> IO Int
+runOther files work = do
+ fixtures <- S.mapM runOtherFixture files
+ let image = ledgerImage fixtures
+ writeImage (work ++ "/selected.tsv") image
+ writeImage (work ++ "/covered.tsv") image
+ return (S.sum (S.map rowsCount fixtures))
+
+workerMarker : Lane -> Int -> String
+workerMarker lane count = "WITNESS WORKER OK " ++ laneName lane ++ " " ++ showInt count
+
+worker : String -> String -> IO ()
+worker name work = do
+ lane <- parseLane name
+ checkDirectory work
+ entries <- O.entries work
+ H.assert (S.null entries) "witness worker output directory is not fresh"
+ (,) snake others <- stockFixtures
+ count <- case lane of
+  SnakeLane index -> runSnake index snake work
+  OtherLane -> runOther others work
+ putStrLn (workerMarker lane count)
+
+decimal : String -> IO Int
+decimal text = do
+ let value = readInt text
+ H.assert (eqString (showInt value) text) "noncanonical witness ledger integer"
+ return value
+
+checkRows : Int -> Int -> [] String -> IO ()
+checkRows limit previous rows = case rows of
+ [] -> return ()
+ (:) row rest -> case O.split 9 row of
+  (:) ordinalText ((:) sourceText ((:) targetText [])) -> do
+   ordinal <- decimal ordinalText
+   _ <- decimal sourceText
+   _ <- decimal targetText
+   H.assert (ordinal > previous && ordinal <= limit) "witness ledger ordinals are out of order"
+   checkRows limit ordinal rest
+  _ -> H.fail "malformed witness ledger row"
+
+readFixtures : [] String -> [] String -> IO ([] FixtureRows)
+readFixtures files lines = case ((,) files lines) of
+ (,) [] [] -> return []
+ (,) ((:) file restFiles) ((:) header restLines) -> case O.split 9 header of
+  (:) "FIXTURE" ((:) name ((:) candidateText ((:) selectedText []))) -> do
+   H.assert (eqString name file) "witness ledger fixture order differs"
+   candidates <- decimal candidateText
+   selected <- decimal selectedText
+   H.assert (selected >= 0 && selected <= candidates) "invalid witness ledger census"
+   let rows = S.take selected restLines
+   H.assert (S.length rows == selected) "incomplete witness ledger rows"
+   checkRows candidates 0 rows
+   rest <- readFixtures restFiles (S.drop selected restLines)
+   return ((:) (FixtureRows file candidates rows) rest)
+  _ -> H.fail "malformed witness ledger fixture header"
+ _ -> H.fail "witness ledger fixture inventory differs"
+
+readLedger : String -> [] String -> IO ([] FixtureRows)
+readLedger path files = do
+ bytes <- readImage imageBound path
+ decoded <- Wire.strictUtf8 imageBound bytes
+ text <- H.right decoded
+ case O.lines text of
+  (:) "WITNESS LEDGER 1" lines -> case S.reverse lines of
+   (:) "" reversed -> readFixtures files (S.reverse reversed)
+   _ -> H.fail "witness ledger is missing its final newline"
+  _ -> H.fail "malformed witness ledger header"
+
+checkWorkerDirectory : String -> Lane -> IO ()
+checkWorkerDirectory work lane = do
+ let directory = work ++ "/" ++ laneName lane
+ checkDirectory directory
+ entries <- O.entries directory
+ let expected = case lane of
+  SnakeLane _ -> O.words "covered.tsv ordered.input seed.graph seed.solver selected.tsv"
+  OtherLane -> O.words "covered.tsv selected.tsv"
+ H.assert (S.eqList eqString entries expected) ("witness worker output inventory differs: " ++ laneName lane)
+
+checkLogs : String -> Lane -> Int -> IO ()
+checkLogs work lane count = do
+ let path = work ++ "/logs/" ++ laneName lane
+ matchText 256 (path ++ ".stdout") (workerMarker lane count ++ "\n")
+ (,) message bytes <- readByteFileOrError (path ++ ".stderr") 1
+ size <- lengthByteArray bytes
+ H.assert (eqString message "" && size == 0) ("witness worker stderr is absent or nonempty: " ++ laneName lane)
+
+verifyLane : String -> FixtureRows -> [] FixtureRows -> Lane -> IO Int
+verifyLane work snake others lane = do
+ let directory = work ++ "/" ++ laneName lane
+ let selected = case lane of { SnakeLane _ -> (:) snake []; OtherLane -> others }
+ let covered = case ((,) lane snake) of
+  (,) (SnakeLane index) (FixtureRows file count rows) ->
+   (:) (FixtureRows file count (snakeLane index rows)) []
+  (,) OtherLane _ -> others
+ matchText imageBound (directory ++ "/selected.tsv") (ledgerImage selected)
+ matchText imageBound (directory ++ "/covered.tsv") (ledgerImage covered)
+ let count = S.sum (S.map rowsCount covered)
+ checkLogs work lane count
+ return count
+
+compareSeeds : String -> String -> IO ()
+compareSeeds work name = do
+ first <- readImage imageBound (work ++ "/snake-1/" ++ name)
+ S.mapM_ (\lane -> do
+  peer <- readImage imageBound (work ++ "/" ++ lane ++ "/" ++ name)
+  equal <- Storage.sameBytes first peer
+  H.assert equal ("cold Snake witness input bytes differ: " ++ name ++ " / " ++ lane))
+  (O.words "snake-2 snake-3")
+
+verify : String -> IO ()
+verify work = do
+ checkDirectory work
+ checkDirectory (work ++ "/logs")
+ S.mapM_ (checkWorkerDirectory work) lanes
+ (,) snakeFile otherFiles <- stockFixtures
+ snakeRows <- readLedger (work ++ "/snake-1/selected.tsv") ((:) snakeFile [])
+ otherRows <- readLedger (work ++ "/other/selected.tsv") otherFiles
+ counts <- S.forM lanes (verifyLane work (S.head snakeRows) otherRows)
+ S.mapM_ (compareSeeds work) (O.words "seed.graph seed.solver ordered.input")
+ let total = S.sum counts
+ H.assert (total == S.sum (S.map rowsCount (S.append snakeRows otherRows))) "witness lanes do not cover the selected ledger"
+ S.unless (total > 100) (H.fail "vacuous witness comparison")
+ putStrLn (H.append "Component witnesses: " (H.append (H.show total) " full-graph comparisons"))

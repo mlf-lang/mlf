@@ -20,6 +20,13 @@ SCHEMAS['RawUnitObject'] = {241: ('UnitInterface','XTerm')}
 SCHEMAS['DataContext'] = {244: (['list','DataDecl'],)}
 SCHEMAS['Primitive'] = {32: ('PrimitiveCode',)}
 SCHEMAS['Bool'] = {6: (), 7: ()}
+# Existing public open-object ABI, independently described by its 430/401
+# records (also consumed by crate-query-graph/finish_receipts.py).
+SCHEMAS['OpenFinal'] = {401: ('String', 'String', ['list','String'],
+    ['list','XName'], 'XTerm', ['list','XName'], ['list','XName'])}
+SCHEMAS['OpenPackage'] = {430: ('String', 'String', 'String',
+    ['list',['pair','String','String']], ['list',['pair','String','String']], ['list','OpenFinal'])}
+OPEN_FORMAT = 'MLF-OPEN-CRATE-1/checker-1'
 
 
 def frozen(value):
@@ -33,7 +40,7 @@ def validate_type(document, root, family):
         seen.add((index,typ)); node = document.nodes[index]
         if typ in ('Int','PrimitiveCode'):
             require(node.kind == 0, 'typed integer leaf')
-            if typ=='PrimitiveCode': require(0 <= node.data <= 132, 'closed primitive ABI')
+            if typ=='PrimitiveCode': require(0 <= node.data <= 133, 'closed primitive ABI')
         elif typ=='String': require(node.kind == 2, 'typed text leaf')
         elif typ=='Double': require(node.kind == 1, 'typed IEEE bits leaf')
         else:
@@ -161,8 +168,11 @@ def inspect_artifact(raw, schema):
     else:
         require(len(doc.roots)==1,'one artifact root')
         root = doc.roots[0]
-    if schema in (1,3,4): validate_type(doc,root,{1:'DataContext',3:'CrateInterfaceFields',4:'CrateObjectFields'}[schema])
+    if schema in (1,3,4,7):
+        validate_type(doc,root,{1:'DataContext',3:'CrateInterfaceFields',4:'CrateObjectFields',7:'OpenPackage'}[schema])
+        if schema == 7: inspect_open_package(doc)
     else:
+        require(schema == 2, 'closed artifact schema inventory')
         node=doc.nodes[root];require(node.kind==3,'query node root');tag,children=node.data
         if tag==300:
             require(len(children)==2,'inline query arity')
@@ -190,6 +200,172 @@ def inspect_artifact(raw, schema):
                 require(not list_values(value_node(fields[3],240,8)[3]), 'inline data in contextual header')
         else: raise Invalid('closed query envelope tag')
     return doc
+
+
+
+def inspect_open_package(doc):
+    """Validate open syntax and explicit reference identities, not a type proof."""
+    fmt, checker, association, bindings, datatypes, finals = value_node(doc.values()[0],430,6)
+    require(text(fmt) == OPEN_FORMAT, 'open package format')
+    expected = hashlib.sha256(tree_document([n(431,s('MLF/shared-haskell-v1'),s(OPEN_FORMAT),
+        l(*builtin_datatypes()))],schema=6)).hexdigest()
+    require(text(checker) == expected, 'open checker identity')
+    commitments = unpack(text(association))
+    require(commitments and all(re.fullmatch('[0-9a-f]{64}',x) for x in commitments),
+            'open interface association hashes')
+    def references(value):
+        rows = [(text(k),text(h)) for k,h in (value_node(x,2,2) for x in list_values(value))]
+        names = [name for name,_ in rows]
+        require(names == sorted(set(names)), 'open references strictly ordered')
+        require(all(re.fullmatch('[0-9a-f]{64}',h) for _,h in rows), 'open reference SHA256')
+        return set(names)
+    binding_keys, datatype_keys = references(bindings), references(datatypes)
+    def binder(value):
+        number,hint = value_node(value,31,2)
+        require(number[0] == 'int' and number[1] >= 0 and text(hint) and '\0' not in text(hint),
+                'open binder identity')
+        return number[1],text(hint)
+    groups, actual_keys = [], set()
+    for final in list_values(finals):
+        group,stamp,ds,ps,body,owned,used = value_node(final,401,7)
+        groups.append(text(group))
+        require(re.fullmatch('[0-9]+-[0-9]+',text(stamp)), 'open fragment stamp spelling')
+        names = [text(x) for x in list_values(ds)]
+        require(len(names) == len(set(names)) and set(names) <= datatype_keys, 'open datatype references')
+        params = [binder(x) for x in list_values(ps)]
+        exports = [binder(x) for x in list_values(owned)]
+        reads = [binder(x) for x in list_values(used)]
+        require(exports, 'open fragment owns declarations')
+        for values in (params,exports):
+            require(len(values) == len({hint for _,hint in values}), 'open duplicate binding reference')
+        both = params + exports
+        require(len(both) == len({i for i,_ in both}), 'open duplicate binder identity')
+        require(len(reads) == len({i for i,_ in reads}) and set(reads) <= set(params),
+                'open used parameter identity')
+        actual_keys.update(hint for _,hint in both)
+    require(len(groups) == len(set(groups)), 'open duplicate fragment')
+    require(actual_keys == binding_keys, 'open binding reference inventory')
+
+
+def binary_object_schema(raw):
+    # Dispatch is committed by the physical schema; never try another parser
+    # when an identified schema fails CRC, version, shape or semantic checks.
+    require(raw.startswith(MAGIC) and len(raw) >= 80, 'binary object header')
+    schema = int.from_bytes(raw[16:20],'little')
+    require(schema in (4,7), 'closed object schema inventory')
+    return schema
+
+
+def inspect_crate_pair(metadata, body, schema, dependency_metadata=()):
+    interface = inspect_artifact(metadata,3)
+    fields = value_node(interface.values()[0],242,13)
+    require(schema in (4,7), 'closed object schema inventory')
+    object_doc = inspect_artifact(body,schema)
+    if schema == 4:
+        require(value_node(object_doc.values()[0],243,3)[1] == interface.values()[0],
+                'binary full object/interface exact metadata')
+        return interface,object_doc
+    require(text(fields[11]) == hashlib.sha256(body).hexdigest(), 'open crate SHA256')
+    package = value_node(object_doc.values()[0],430,6)
+    def normalized(meta):
+        result = list(meta)
+        result[1] = l(*(n(3,key,s(''),semantic) for key,path,semantic in
+                        (value_node(x,3,3) for x in list_values(meta[1]))))
+        result[11] = s('open-object')
+        return hashlib.sha256(tree_document([n(242,*result)],schema=6)).hexdigest()
+    dependencies = [value_node(inspect_artifact(raw,3).values()[0],242,13) for raw in dependency_metadata]
+    by_name = {text(meta[0]):meta for meta in dependencies}
+    require(len(by_name) == len(dependencies) and text(fields[0]) not in by_name,
+            'open dependency interface inventory')
+    pending = [text(value_node(x,3,3)[0]) for x in list_values(fields[1])]
+    reached = set()
+    while pending:
+        key = pending.pop()
+        require(key in by_name, 'open missing dependency interface')
+        if key in reached: continue
+        reached.add(key)
+        pending.extend(text(value_node(x,3,3)[0]) for x in list_values(by_name[key][1]))
+    require(reached == set(by_name), 'open unrelated dependency interface')
+    require(unpack(text(package[2])) == [normalized(fields),*(normalized(by_name[key]) for key in sorted(by_name))],
+            'open complete interface association')
+    actual = []
+    for final in list_values(package[-1]):
+        group,stamp,ds,ps,term,owned,used = value_node(final,401,7)
+        names = [text(value_node(x,31,2)[1]) for x in list_values(owned)]
+        encode = lambda name: ''.join(str(ord(char))+'_' for char in name)
+        require(text(group) == 'Query_'+encode(text(fields[0]))+'z_'+encode(min(names)),
+                'open fragment owner')
+        actual.extend(names)
+    expected = [text(value_node(x,2,2)[0]) for x in list_values(fields[9])]
+    require(len(actual) == len(set(actual)) and actual == expected, 'open ordered ownership inventory')
+    return interface,object_doc
+
+
+
+def open_pair_controls(pair, dependencies):
+    """Mutate the actual Session pair, repairing transport CRC and paired SHA.
+
+    Ordinary checksum failures alone cannot satisfy these typed/association
+    controls. Production formal-check separately establishes checked terms.
+    """
+    metadata,body = pair
+    interface,document = inspect_crate_pair(metadata,body,7,dependencies)
+    root = document.values()[0]
+    fields = list(value_node(interface.values()[0],242,13))
+    package = list(value_node(root,430,6))
+    finals = list(list_values(package[-1]))
+    require(finals, 'open controls require actual final fragment')
+    rejected = []
+    def refuse(name, action, reason):
+        try: action()
+        except Invalid as error:
+            require(str(error) == reason, 'open negative diagnostic: '+name+': '+str(error))
+            rejected.append(name)
+        else: raise Invalid('accepted open negative: '+name)
+    def changed(value, schema=7):
+        data = tree_document([value],schema=schema)
+        updated = list(fields); updated[11] = s(hashlib.sha256(data).hexdigest())
+        return tree_document([n(242,*updated)],schema=3),data
+    def mutation(name, value, reason):
+        candidate = changed(value)
+        refuse(name,lambda: inspect_crate_pair(*candidate,7,dependencies),reason)
+    def header(name,index,value,reason):
+        altered = list(package); altered[index] = value
+        mutation(name,n(430,*altered),reason)
+    def fragment(name,index,value,reason):
+        altered = list(value_node(finals[0],401,7)); altered[index] = value
+        header(name,5,l(n(401,*altered),*finals[1:]),reason)
+    refuse('open-as-closed',lambda: inspect_crate_pair(metadata,body,4,dependencies),'schema mismatch')
+    unknown = changed(root,8)
+    refuse('unknown-object-schema',lambda: binary_object_schema(unknown[1]),'closed object schema inventory')
+    mutation('wrong-root-tag',n(431,*package),'closed typed constructor tag: OpenPackage')
+    mutation('wrong-root-arity',n(430,*package[:-1]),'typed constructor arity')
+    header('wrong-format',0,s(OPEN_FORMAT+'-other'),'open package format')
+    header('wrong-checker',1,s('0'*64),'open checker identity')
+    header('malformed-association',2,s('64:short'),'legacy scalar length')
+    association = unpack(text(package[2])); association[0] = '0'*64
+    header('wrong-associated-interface',2,s(pack(association)),'open complete interface association')
+    refs = list(list_values(package[3])); require(refs, 'open controls require actual binding reference')
+    header('duplicate-reference',3,l(*refs,refs[0]),'open references strictly ordered')
+    header('missing-reference',3,l(*refs[1:]),'open binding reference inventory')
+    key,digest = value_node(refs[0],2,2)
+    header('malformed-reference-sha',3,l(n(2,key,s('g'*64)),*refs[1:]),'open reference SHA256')
+    fragment('datatype-out-of-scope',2,l(s('missing-datatype')),'open datatype references')
+    fragment('wrong-body-type',4,s('not a term'),'typed constructor node')
+    owned = list(list_values(value_node(finals[0],401,7)[5])); number,hint = value_node(owned[0],31,2)
+    fragment('negative-binder',5,l(n(31,('int',-1),hint),*owned[1:]),'open binder identity')
+    fragment('duplicate-owned-binder',5,l(*owned,owned[0]),'open duplicate binding reference')
+    fragment('used-owned-as-parameter',6,l(owned[0]),'open used parameter identity')
+    fragment('wrong-owner',0,s('different-owner'),'open fragment owner')
+    header('duplicate-fragment',5,l(*finals,finals[0]),'open duplicate fragment')
+    bad_fields = list(fields); bad_fields[11] = s('0'*64)
+    refuse('wrong-paired-sha',lambda: inspect_crate_pair(tree_document([n(242,*bad_fields)],schema=3),
+        body,7,dependencies),'open crate SHA256')
+    if dependencies:
+        refuse('missing-dependency-interface',lambda: inspect_crate_pair(metadata,body,7),
+               'open missing dependency interface')
+    return {'accepted':'actual Session open7 pair with independently reconstructed association',
+            'rejected':rejected,'mutations_repair_crc_and_paired_sha':True}
 
 
 def verify_source_result(doc):

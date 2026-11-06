@@ -1,6 +1,5 @@
 module CoreSolverMain where
 import Bootstrap.Types
-import qualified Tests.CoreSolver as T
-import qualified Tests.CoreRunner as R
+import qualified Tests.CoreSolverNative as Native
 main : IO ()
-main = R.main "core-solver" false 34 T.families
+main = Native.main

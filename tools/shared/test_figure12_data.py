@@ -127,6 +127,67 @@ class Figure12Data(unittest.TestCase):
                 with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
                     data.decode(root)
 
+    def test_reviewed_transcriptions_reconstruct_old_allowlist(self):
+        self.assertEqual(set(data.REVIEWED_SOURCE_TRANSITIONS),
+                         {'tests/Tests/Figure12.emlf', 'tests/Tests/Helpers.emlf'})
+        for relative, transition in data.REVIEWED_SOURCE_TRANSITIONS.items():
+            with self.subTest(relative=relative):
+                current = (data.ROOT / relative).read_text()
+                previous = current
+                for before, after in reversed(transition['edits']):
+                    self.assertEqual(previous.count(after), 1)
+                    previous = previous.replace(after, before, 1)
+                self.assertEqual(hashlib.sha256(previous.encode()).hexdigest(),
+                                 data.REVIEWED_SEMANTIC_SHA256[relative])
+                self.assertEqual(transition['preimage_sha256'], data.REVIEWED_SEMANTIC_SHA256[relative])
+                self.assertEqual(hashlib.sha256(current.encode()).hexdigest(), transition['postimage_sha256'])
+                self.assertEqual(data.authenticate_semantic_source(
+                    relative, previous.encode(), data.REVIEWED_SEMANTIC_SHA256[relative]), previous)
+                root = self.changed(relative, current, previous)
+                self.assertEqual(data.decode(root)['cases'], data.decode()['cases'])
+
+    def test_partial_or_mutated_transcriptions_fail_closed(self):
+        mutations = [
+            ('Figure12.emlf', '  bound (SIndexedStringPattern _ _ _) = [];\n', ''),
+            ('Figure12.emlf', 'SGlobal _ _ -> panic', 'SGlobal _ _ -> Set.empty; -- panic'),
+            ('Figure12.emlf', 'SDeclScope _ _ -> panic', 'SDeclScope _ body -> freeNames body; -- panic'),
+            ('Figure12.emlf', 'SWantedRefs _ _ -> panic', 'SWantedRefs _ _ -> Set.empty; -- panic'),
+            ('Figure12.emlf', 'references (SIndexedStringPattern _ _ _) = panic',
+             'references (SIndexedStringPattern _ _ _) = Set.empty; -- panic'),
+            ('Figure12.emlf', 'bound (SIndexedStringPattern _ _ _) = []',
+             'bound (SIndexedStringPattern _ _ _) = ["hint"]'),
+            ('Helpers.emlf', 'import Prelude hiding (Eq, fail)\n', ''),
+            ('Helpers.emlf', 'SSignature body annotation -> SSignature (layoutExpr body) annotation',
+             'SSignature body annotation -> layoutExpr body'),
+            ('Helpers.emlf', 'SourceSpan package owner "" 0 0 0 0', 'SourceSpan "" "" "" 0 0 0 0'),
+            ('Helpers.emlf', 'S.map layoutInstance instances', 'instances'),
+        ]
+        for filename, old, new in mutations:
+            with self.subTest(filename=filename, old=old):
+                root = self.changed('tests/Tests/' + filename, old, new)
+                with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
+                    data.decode(root)
+
+    def test_postimage_digest_cannot_authorize_unreviewed_source(self):
+        relative = 'tests/Tests/Figure12.emlf'
+        root = self.changed(relative, '(Set.delete x (freeNames b))', '(freeNames b)')
+        transitions = {key: dict(value) for key, value in data.REVIEWED_SOURCE_TRANSITIONS.items()}
+        transitions[relative]['postimage_sha256'] = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+        with patch.object(data, 'REVIEWED_SOURCE_TRANSITIONS', transitions):
+            with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
+                data.decode(root)
+
+    def test_appended_or_reordered_semantics_fail_closed(self):
+        for relative, transition in data.REVIEWED_SOURCE_TRANSITIONS.items():
+            current = (data.ROOT / relative).read_text()
+            before, after = transition['edits'][-1]
+            for mutant in [current + '\nfreeNames expression = Set.empty\n',
+                           current.replace(after, before, 1) + after]:
+                with self.subTest(relative=relative, mutant=hashlib.sha256(mutant.encode()).hexdigest()):
+                    root = self.changed(relative, current, mutant)
+                    with self.assertRaisesRegex(data.FixtureError, 'unreviewed Figure12 oracle semantics'):
+                        data.decode(root)
+
     def test_multiline_or_ambiguous_data_fails_closed(self):
         for new in ['signatures =\n ', 'signatures = []\nsignatures = ']:
             root = self.changed('tests/Tests/Figure12.emlf', 'signatures = ', new)
