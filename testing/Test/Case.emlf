@@ -2,6 +2,9 @@ module Test.Case where
 import Bootstrap.Types
 import qualified Test.Assert as A
 import qualified Bootstrap.Std as S
+import qualified Test.Descriptor as D
+import qualified Test.Expectation as E
+import qualified Test.Outcome as O
 
 -- IDs are stable machine identities; names remain human-readable labels.
 data Case = Case String String (List String) (A.Test Unit)
@@ -32,3 +35,7 @@ fromIO : String -> List String -> Pair String (IO Unit) -> Case
 fromIO identity labels (Pair label body) = test identity label labels (A.liftIO body)
 toLegacy : Case -> Pair String (IO Unit)
 toLegacy entry = Pair (name entry) (A.orExit (action entry))
+
+-- v1 cases retain their original action and wire descriptor. No action runs here.
+descriptor : Case -> D.Descriptor
+descriptor entry = D.Descriptor (id entry) (name entry) 1 (tags entry) D.Required (E.Accept O.Runtime)

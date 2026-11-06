@@ -1,0 +1,195 @@
+{
+  "scope": "lightweight static checks only",
+  "changed_paths": 169,
+  "json_documents_parsed": 17,
+  "shell_syntax_files": 18,
+  "node_syntax_files": 4,
+  "python_ast_files": 0,
+  "unmerged_index_entries": 0,
+  "conflict_markers": 0,
+  "sparse_history_preserved_paths": 2588,
+  "records": [
+    {
+      "name": "diff-check-working",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "diff-check-index",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "diff-check-base",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:scripts/bootstrap-async.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tests/fixtures/async-completion/check.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tests/fixtures/async-gate/check.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/check.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/package.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/qualification-gate.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/run-benchmarks.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/setup-macos.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-async-bootstrap.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-async-package.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-async-process.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-async-task.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-pr-gate.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-qualification-gate.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-setup-macos.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-tuple-list.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/test-unit-evidence.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash-syntax:tools/release/verify-unit-evidence.sh",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "node-syntax:tools/release/test-benchmark-gate.mjs",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "node-syntax:tools/release/test-ci-policy.mjs",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "node-syntax:tools/release/test-release-tag.mjs",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "node-syntax:tools/release/verify-benchmarks.mjs",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "not_run": [
+    "compiler build",
+    "MLF parser execution",
+    "native runtime tests",
+    "full campaigns",
+    "self-host",
+    "performance",
+    "actionlint (unavailable)",
+    "native locked plan (SDK manager missing libgmp.10.dylib)"
+  ],
+  "code_commit": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "yaml_documents_parsed": 10,
+  "cheap_policy_checks": [
+    {
+      "command": "node tools/release/test-ci-policy.mjs",
+      "exit_code": 0,
+      "scope": "workflow text and policy expressions only"
+    },
+    {
+      "command": "bash tools/release/test-pr-gate.sh",
+      "exit_code": 0,
+      "synthetic_controls": 33,
+      "scope": "jq aggregate fault controls; no campaigns"
+    }
+  ],
+  "policy_checks_combined_wall_seconds": 0.177618116,
+  "native_lock_attempt": {
+    "command": "SDK libexec/mlfpkg via ./mlfpkg --offline lock",
+    "exit_code": 134,
+    "outcome": "dyld failed before command entry",
+    "reason": "missing /opt/homebrew/opt/gmp/lib/libgmp.10.dylib"
+  }
+}

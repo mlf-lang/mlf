@@ -1,0 +1,40 @@
+{
+  "recorded_at_utc": "2026-10-23T14:15:26.267467+00:00",
+  "worktree": "/Volumes/HPNVME/Users/ares/Documents/Codex/2026-10-23/task-2/mlf-integrated",
+  "git_storage": "/Volumes/HPNVME/Users/ares/Documents/Codex/2026-10-23/task-2/mlf-integration.git",
+  "branch": "integration/pr-9-11-12-16-20261023",
+  "code_commit": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "code_tree": "ba0ae958b466ca08ffee79a83dadbd8b7d2156fa",
+  "base_main": "77ac8a7bc551ac71747b38c79fc5812d385165e3",
+  "exact_pr_heads": {
+    "9": "9d3d59cd51d3b204c49bcfa7acc8c51c94c1d853",
+    "11": "f29ad8b770eae70b505c40d9ba0d91b123f3db51",
+    "12": "af88e6f417780c9d5f39f53604eb99b409de81a6",
+    "16": "597b107858695a79b095fcca175ccb979b11a9f2"
+  },
+  "all_heads_are_ancestors": true,
+  "status": "clean",
+  "sparse_excludes": [
+    "tools/profile/results/"
+  ],
+  "merge_commits": [
+    [
+      "8a3e69b165765931c3ff762379a78db9659b2cd8",
+      "Merge PR #16 main qualification policy while retaining all async PR gates"
+    ],
+    [
+      "2e394ff375ec3ca86df58a1ad12f27d73122cd66",
+      "Merge PR #12 tuple/list syntax with guard annotation boundaries"
+    ],
+    [
+      "d5f2f1bd9254c8892ac27e67352decc144feefac",
+      "Merge PR #11 guards while preserving main receipt initialization"
+    ],
+    [
+      "02bff16b6f36ce6ea903e72d341ab1ebd947eeee",
+      "Merge PR #9 async utility into local integration"
+    ]
+  ],
+  "pushed": false,
+  "full_validation_run": false
+}

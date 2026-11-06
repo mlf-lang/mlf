@@ -1,0 +1,71 @@
+module Test.Adapter
+ ( Attempt, Ownership(..), initial, plan, prepare, execute, collect, validate,
+   beginCleanup, finishCleanup, seal, successful, cancel ) where
+import Bootstrap.Types
+import qualified Test.Outcome as O
+
+-- A protocol state machine, not an exception-catching IO wrapper. Native
+-- ownership/cancel/join remains the executor's responsibility. Attempt is
+-- opaque: callers cannot synthesize lifecycle or execution evidence.
+data Stage = Described | Planned | Prepared | Executed | Collected | Validated | Cleaning | Sealed
+data Ownership = Unverified | Joined | JoinFailed String
+data ExecutionEvidence = NotExecuted | ExecutedUnvalidated | ExecutionValidated
+data Attempt = Attempt Stage (Maybe O.Outcome) Ownership (Maybe O.Outcome) ExecutionEvidence
+initial = Attempt Described Nothing Unverified Nothing NotExecuted
+plan (Attempt stage primary owner cleanup evidence) = case stage of
+ Described -> Right (Attempt Planned primary owner cleanup evidence)
+ _ -> Left "adapter plan out of order"
+prepare result (Attempt stage _ owner cleanup evidence) = case stage of
+ Planned -> case result of
+  O.Pass -> Right (Attempt Prepared Nothing owner cleanup NotExecuted)
+  O.ExpectedRejection _ _ _ -> Right (Attempt Cleaning (Just (O.InfrastructureError "preparation rejection cannot satisfy a test expectation")) owner cleanup NotExecuted)
+  _ -> Right (Attempt Cleaning (Just result) owner cleanup NotExecuted)
+ _ -> Left "adapter prepare out of order"
+execute result (Attempt stage _ owner cleanup evidence) = case stage of
+ Prepared -> Right (Attempt Executed (Just result) owner cleanup ExecutedUnvalidated)
+ _ -> Left "adapter execute before successful preparation"
+collect (Attempt stage primary owner cleanup evidence) = case stage of
+ Executed -> Right (Attempt Collected primary owner cleanup evidence)
+ _ -> Left "adapter collect before execution"
+validate result (Attempt stage primary owner cleanup evidence) = case stage of
+ Collected -> case primary of
+  Just original -> Right (Attempt Validated (Just (if O.successful original then result else original)) owner cleanup ExecutionValidated)
+  Nothing -> Left "adapter lost its execution outcome"
+ _ -> Left "adapter validation before collection"
+beginCleanup (Attempt stage primary owner cleanup evidence) = case stage of
+ Validated -> Right (Attempt Cleaning primary owner cleanup evidence)
+ Cleaning -> Right (Attempt Cleaning primary owner cleanup evidence)
+ _ -> Left "adapter cleanup before validation or failed preparation"
+finishCleanup ownership result (Attempt stage primary _ cleanup evidence) = case stage of
+ Cleaning -> case cleanup of
+  Nothing -> Right (Attempt Cleaning primary ownership (Just result) evidence)
+  _ -> Left "adapter cleanup result repeated"
+ _ -> Left "adapter cleanup result out of order"
+seal (Attempt stage primary owner cleanup evidence) = case stage of
+ Cleaning -> case owner of
+  Unverified -> Left "cannot seal without child join evidence"
+  _ -> case primary of
+   Nothing -> Left "cannot seal without primary outcome"
+   Just _ -> case cleanup of
+    Nothing -> Left "cannot seal without cleanup outcome"
+    Just _ -> Right (Attempt Sealed primary owner cleanup evidence)
+ _ -> Left "adapter seal before cleanup"
+-- Sealed can be complete but unsuccessful. Preparation and cancellation cannot
+-- manufacture execution evidence; cleanup failure cannot overwrite a failure.
+successful (Attempt stage primary owner cleanup evidence) = case evidence of
+ ExecutionValidated -> case stage of
+  Sealed -> case owner of
+   Joined -> case primary of
+    Just result -> case cleanup of { Just O.Pass -> O.successful result; _ -> false }
+    _ -> false
+   _ -> false
+  _ -> false
+ _ -> false
+-- Cancellation stops admission even during cleanup. Keep existing failures,
+-- but turn every previously successful primary into a cancellation outcome.
+cancel reason (Attempt stage primary owner cleanup evidence) =
+ if stringLength reason == 0 then Left "cancellation requires a reason" else case stage of
+  Sealed -> Left "cannot cancel a sealed attempt"
+  _ -> Right (Attempt Cleaning (case primary of
+    Nothing -> Just (O.Cancelled reason)
+    Just original -> Just (if O.successful original then O.Cancelled reason else original)) owner cleanup evidence)

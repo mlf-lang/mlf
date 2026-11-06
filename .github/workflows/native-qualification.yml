@@ -26,6 +26,9 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ inputs.source }}
+          fetch-depth: 0
+      - name: Prepare reviewed historical source objects
+        run: python3 -B tools/testing/prepare_history_refs.py
       - name: Bind every candidate and artifact to this exact workflow commit
         id: source
         env:
@@ -365,6 +368,9 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.source }}
+          fetch-depth: 0
+      - name: Prepare reviewed historical source objects
+        run: python3 -B tools/testing/prepare_history_refs.py
       - name: Native linking dependencies
         env:
           PLATFORM: macos-arm64
@@ -412,6 +418,9 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ needs.metadata.outputs.source }}
+          fetch-depth: 0
+      - name: Prepare reviewed historical source objects
+        run: python3 -B tools/testing/prepare_history_refs.py
       - name: Native linking dependencies
         env:
           PLATFORM: linux-x64

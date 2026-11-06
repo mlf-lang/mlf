@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "kind": "static-checkpoint-validation",
+  "source_parent": "2f8584423fa3055ca96d1479734357f742c9b3df",
+  "compilation_verified": false,
+  "semantic_execution_verified": false,
+  "qualification_eligible": false,
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "tools/testing/migration_inventory.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"status\": \"static-role-review-valid\", \"counts\": {\"records\": 577, \"families\": 170, \"external_paths\": 202, \"tuple_observations\": 90, \"reviewed_previously_unresolved\": 339, \"tracked_assets\": 3486}, \"execution_verified\": false}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "tools/testing/test_migration_inventory.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "..................\n----------------------------------------------------------------------\nRan 18 tests in 1.192s\n\nOK\n"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/testing/check_tuple_list_migration.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"kind\": \"static-source-preservation\",\n  \"baseline\": \"8a3e69b165765931c3ff762379a78db9659b2cd8\",\n  \"leaf_ids\": 90,\n  \"default_implementation\": \"legacy\",\n  \"literal_calls_preserved\": 72,\n  \"oracle_helpers_preserved\": 12,\n  \"mutation_controls\": 14,\n  \"compilation_verified\": false,\n  \"semantic_execution_verified\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "tools/testing/check_core_leaf_migration.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"kind\": \"static-core-opt-in-controls\",\n  \"baseline\": \"8a3e69b165765931c3ff762379a78db9659b2cd8\",\n  \"family_count\": 35,\n  \"legacy_actions\": 739,\n  \"named_substring_observations\": 13,\n  \"mutation_controls\": 10,\n  \"default_campaign\": \"legacy\",\n  \"qualification_eligible\": false,\n  \"compilation_verified\": false,\n  \"semantic_execution_verified\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "tools/testing/check_manifest_snapshot.py"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"lock_written\": false, \"native_plan_verified\": false, \"packages\": 12, \"snapshot_sha256\": \"93cd77fadc6eb420bde07fb0cc2efa68598b9d91018c93bcb2fcd36f132b7679\", \"source_hashes\": 96, \"static_only\": true}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "tools/testing/check_manifest_snapshot.py",
+        "--manifest",
+        "tests/mlf-package.json",
+        "--graph-only"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"lock_written\": false, \"native_plan_verified\": false, \"packages\": 13, \"snapshot_sha256\": \"8c71a25dc4ee7d98886d9bcd07243fb680611495029c653b751730e30d8e9194\", \"source_hashes\": 210, \"static_only\": true}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "python3",
+        "tools/testing/test_manifest_snapshot.py"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "..........\n----------------------------------------------------------------------\nRan 10 tests in 0.003s\n\nOK\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "reviews": [
+    {
+      "scope": "coverage",
+      "file_hashes": {
+        "tests/Tests/TupleList.emlf": "bee4fee21dc8791783802cc6e1965c8f801f3dc87337054a0b6b7fb5c8c730bc",
+        "tests/Tests/TupleListLegacy.emlf": "0ba5dcc09553048050bab1512a03d6c05329b9b707a98566bdb2b324a69131a3",
+        "tests/TupleListMain.emlf": "846c02e394199ee697d1dabd4ecaacfaa01d5aa92dbb3ab3cce3eb46e7e2af52",
+        "tests/Tests/CoreRunner.emlf": "b7b3699d4422152c34a57b6946534d7fc03d00b50909f89edbdcbe7314233ac5",
+        "tests/Tests/CoreRegistry.emlf": "9af5fa8017816759631fc1c4e2985c645b0362202c3d4ddd5cd2a0493ce64a79",
+        "mlf-package.json": "ecaa63fbb2927abf77f60d42f61c9587ac095aa601d5197ec0381bef16ad6247",
+        "mlf.lock": "93cd77fadc6eb420bde07fb0cc2efa68598b9d91018c93bcb2fcd36f132b7679",
+        "tests/mlf-package.json": "2a5a1d3f1fc5729b5702adf306e71748335510159a180ef22c2695e56af7169f",
+        "tests/testing-migration-ledger.json": "ed3eff43261b8e0cf2e4c7cb604c8190c54557557e3dac66615c84378bacd63c",
+        "tools/testing/check_tuple_list_migration.py": "fa67dc89840cc823e07649c5b05eb115bee5e5b7c4708c66f5db746070521214",
+        "tools/testing/check_core_leaf_migration.py": "1d1cb5bbd114a1cc33b0dc654c9cf3a8df13171951c609089abddf2b4b18f2e0"
+      },
+      "static_review_passed": true,
+      "execution_verified": false
+    },
+    {
+      "scope": "framework-contracts",
+      "file_hashes": {
+        "testing/Test/Adapter.emlf": "f37acf2e2f68406855bb550a28c7606ac644e5d0fc30b0e77106c07175e7c275",
+        "testing/Test/Assert.emlf": "494d4a3973041c7b970aef505adb81991a298c24953f4ed6372cf422227e9588",
+        "testing/Test/Capability.emlf": "4e307f882bd60a192c324ee1ea5910abe6746b259b8954b003ec4da9e94ac63b",
+        "testing/Test/Case.emlf": "8f6a456d796120ec6ee530c0f53e8f2c20f6e491a351c37169244c38a571258d",
+        "testing/Test/Descriptor.emlf": "227e0570436f232f46a75422bd522e989325fbc1066ebe73df7822c7863893dd",
+        "testing/Test/Diagnostics.emlf": "379c1f90f9f9f99fd08a1506743a7f535e8a66d820be19cb372580ddc49a5840",
+        "testing/Test/Evidence.emlf": "6ae7cb79275f54b45948b49ce1d7ca52b04e07d6085c21d14b7d59dcfeefcbef",
+        "testing/Test/Expectation.emlf": "2d1c46369971781701124a097b7a52c042c60aed2cab0621d38c6795a8f91e9c",
+        "testing/Test/Fixture.emlf": "4457400f20dd1a7487e1fbbfc7c92485e151e8eebfe5569eb035c24900ed50cb",
+        "testing/Test/Outcome.emlf": "d35e28cf1b8972b60e2899bd7f67978227bf6a7514f0354e5bfbf3e88dd670bb",
+        "testing/Test/Plan.emlf": "e81411ea7817a700e11c516ade9f9ecf4ee60f8fd61131d64d5ee5f2eab0e0f9",
+        "testing/Test/Registry.emlf": "fbe6d7b2a2a4c39beea0dc77d2f1be2d716b27b1d8c1722ea6f612ca510f6beb",
+        "testing/Test/Resources.emlf": "d0243057a53d697177bd0350c9573a75af69bd0f1bb94cc69817c35033568e07",
+        "testing/Test/Runner.emlf": "f3d81878b97a03f484a9b3cb7c88a0daed44df716cdf508f0b37df213cd45d56",
+        "testing/tools/LifecycleMain.emlf": "dab0b543a584b1481e3540cd194ef8c427daeb82a6b2f97160b8076b97b11121",
+        "testing/tools/Test/NativeProcess.emlf": "a9cbc4b0fec6ae2a0caa42d7629d57df3d33379e1eb3dd87ab4c6ebaed6d5a26",
+        "testing/tools/Test/Process.emlf": "b69609823f1c74e63dc63985278bd018871389640c124d4056fefeccc35788db",
+        "tests/Tests/TestFramework.emlf": "5f87f4a52a14bf12bc0d6b71f128ec9df5a684f178f22a87850b974874b4eeb4"
+      },
+      "static_review_passed": true,
+      "execution_verified": false
+    }
+  ]
+}

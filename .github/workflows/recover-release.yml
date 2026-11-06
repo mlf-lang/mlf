@@ -25,6 +25,11 @@ jobs:
         with:
           ref: ${{ inputs.source }}
           fetch-depth: 0
+      - name: Prepare reviewed historical source objects when required by the selected source
+        run: |
+          if test -f tools/testing/prepare_history_refs.py; then
+            python3 -B tools/testing/prepare_history_refs.py
+          fi
       - name: Require the exact successful qualifications and existing platform packages
         id: verify
         env:
@@ -58,6 +63,12 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ needs.metadata.outputs.source }}
+          fetch-depth: 0
+      - name: Prepare reviewed historical source objects when required by the selected source
+        run: |
+          if test -f tools/testing/prepare_history_refs.py; then
+            python3 -B tools/testing/prepare_history_refs.py
+          fi
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ github.sha }}

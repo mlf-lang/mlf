@@ -16,6 +16,7 @@ tools/release/test-setup-macos.sh
 tools/release/test-package-publishing.sh
 tools/release/test-smoke-receipts.sh
 tools/release/test-fetch-seed.sh
+python3 tools/release/test-fetch-seed-artifact.py
 tools/release/test-pr-gate.sh
 tools/release/test-qualification-gate.sh
 node tools/release/test-benchmark-gate.mjs
@@ -30,4 +31,7 @@ tools/release/test-pr-smoke-cli-watchdog.sh
 tools/release/test-async-bootstrap.sh
 bash tools/release/test-timed-async-bootstrap.sh
 python3 tools/release/test-async-change-scope.py
+python3 tools/testing/test_history_refs.py
+python3 tools/testing/test_history_workflows.py
+python3 tools/testing/test_framework_recovery.py
 printf 'Release metadata and shell syntax passed for %s.\n' "$version"

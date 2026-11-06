@@ -1,0 +1,22 @@
+module Test.Descriptor where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Test.Expectation as E
+
+data Requirement = Required | Optional
+-- Revision is contract metadata, never part of the stable semantic ID.
+-- Build/prepare nodes deliberately are not descriptors and cannot earn coverage.
+data Descriptor = Descriptor String String Int (List String) Requirement E.Expectation
+id (Descriptor value _ _ _ _ _) = value
+name (Descriptor _ value _ _ _ _) = value
+revision (Descriptor _ _ value _ _ _) = value
+tags (Descriptor _ _ _ value _ _) = value
+required (Descriptor _ _ _ _ value _) = case value of { Required -> true; Optional -> false }
+expectation (Descriptor _ _ _ _ _ value) = value
+validId identity = stringLength identity > 0 && S.all (\i ->
+ let c = stringCodeAt identity i in
+ c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || c == 45 || c == 46 || c == 47 || c == 95)
+ (S.range 0 (stringLength identity - 1))
+validate entry = if S.not (validId (id entry)) then Left "invalid stable test ID" else
+ if stringLength (name entry) == 0 then Left "empty test name" else
+ if revision entry < 1 then Left "test contract revision must be positive" else E.validate (expectation entry)

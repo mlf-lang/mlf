@@ -1,0 +1,38 @@
+module Test.NativeProcess where
+import Bootstrap.Types
+import qualified Async.Process as P
+import qualified Test.Outcome as O
+import qualified Test.Expectation as E
+
+-- An actual native-supervisor adapter, separate from the v1 POSIX measurement
+-- transport. A shared scope is injected so nested adapters do not open N slots.
+data Completed = Completed P.ProcessOutcome O.Outcome
+cleanup (Completed _ value) = value
+raw (Completed value _) = value
+cleanupOutcome result = if P.cleanupError result == 0 then O.Pass else O.InfrastructureError ("native child cleanup failed: " ++ showInt (P.cleanupError result))
+-- Ordinary nonzero exits are data. The independently supplied expectation and
+-- verifier decide acceptance; no generic nonzero exit becomes a passing test.
+observation phase reason verified result = E.Observation phase (case result of
+ P.Exited code _ -> if code < 0 || code >= 128 then E.BadProtocol "native exit encoding cannot distinguish signal termination from this exit code" else E.Exit code
+ P.LaunchFailed code _ -> E.Infrastructure ("native process launch failed: " ++ showInt code)
+ P.Cancelled code _ -> E.Interrupted
+ P.TimedOut _ -> E.Deadline) reason verified
+validate expected phase reason verified (Completed result cleanupResult) =
+ Pair (E.match expected (observation phase reason verified result)) cleanupResult
+-- Require both running and total bounds. The native total bound includes
+-- admission wait; awaitProcess services the supervisor until terminal cleanup.
+bounded (P.ProcessSpec _ _ _ _ _ _ _ running total) = running > 0 && total > 0
+execute : P.ProcessScope -> P.ProcessSpec -> IO (Either P.AsyncError Completed)
+execute scope specification = if not (bounded specification) then
+ ioReturn (Left (P.AsyncError 1 "test process requires positive running and total deadlines")) else do
+ submitted <- P.submit scope specification
+ case submitted of
+  Left error -> ioReturn (Left error)
+  Right handle -> do
+   result <- P.awaitProcess scope handle
+   ioReturn (case result of { Left error -> Left error; Right value -> Right (Completed value (cleanupOutcome value)) })
+-- Top-level use only. Normal return joins; Left cancels and joins; panic/exit
+-- and owner death retain the native runtime guardian/Job Object guarantees.
+withSerial : forall a. (P.ProcessScope -> IO (Either P.AsyncError a)) -> IO (Either P.AsyncError a)
+withSerial = P.withProcessScope (P.ScopeOptions 1 1 1024)
+not value = if value then false else true

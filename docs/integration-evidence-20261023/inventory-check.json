@@ -1,0 +1,36 @@
+{
+  "source_commit": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "static_validation": "passed",
+  "checks": [
+    "all frozen tracked paths represented exactly once in JSON and TSV",
+    "entry IDs unique",
+    "every entry has nonempty target/category/adapter/phase/owner",
+    "entry sources exist in frozen tree",
+    "no unread nonhistorical active source",
+    "90 tuple/list authored observations retained",
+    "10 benchmark workloads retained",
+    "9 profiler methods with 6 Linux-only retained",
+    "compile-only counterexample FORBID_RUNTIME retained",
+    "339 unresolved planning bindings explicitly listed",
+    "202-path reviewed external phase map projected consistently into assets, entries and unresolved list"
+  ],
+  "assets": 3486,
+  "matrix_rows": 577,
+  "unresolved": 339,
+  "entry_phase_counts": {
+    "P0": 6,
+    "P1": 29,
+    "P2": 22,
+    "P3": 238,
+    "P4": 85,
+    "P5": 132,
+    "P6": 65
+  },
+  "not_run": [
+    "compiler",
+    "MLF runner discovery",
+    "native probes",
+    "unit or campaign tests",
+    "benchmarks"
+  ]
+}

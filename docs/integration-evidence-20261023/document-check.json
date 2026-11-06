@@ -1,0 +1,18 @@
+{
+  "code_commit": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "tracked_assets": 3486,
+  "planning_rows": 577,
+  "explicit_pending_rows": 339,
+  "external_rows": 202,
+  "relative_doc_links": "all resolve",
+  "source_scan_issues": 0,
+  "cross_matrix_phase_conflicts": 0,
+  "test_execution": false,
+  "scope": "document/inventory static QA only",
+  "tsv_format": "LF line endings; external TSV quotes fields to preserve terminal empty SHA256 values without whitespace errors",
+  "tsv_semantics": "parsed values preserved",
+  "diff_check_against_code_commit": "passed",
+  "code_outside_docs_unchanged": true,
+  "json_tsv_values_equal": true,
+  "unmerged_index_entries": 0
+}

@@ -1,0 +1,18 @@
+module Test.Diagnostics where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Test.Outcome as O
+
+data Raw = Raw String String String
+-- case, phase, source identity, tool identity, replay command, raw references.
+data Diagnostic = Diagnostic String O.Phase String String String (List Raw)
+path (Raw value _ _) = value
+digest (Raw _ value _) = value
+kind (Raw _ _ value) = value
+validate (Diagnostic key phase source tool replay raw) =
+ if S.any (\value -> stringLength value == 0) (Cons key (Cons source (Cons tool (Cons replay Nil)))) then Left "diagnostic is missing identity or replay command" else
+ if S.any (\item -> stringLength (path item) == 0 || stringLength (digest item) == 0 || stringLength (kind item) == 0) raw then Left "raw evidence needs path, digest and kind" else
+ if S.length raw /= S.length (S.nubBy eqString (S.map path raw)) then Left "duplicate raw evidence path" else Right Unit
+-- Truncation is presentation only; the immutable raw file remains authoritative.
+preview limit text = if limit < 0 then Left "negative diagnostic display limit" else Right (if stringLength text <= limit then text else stringSlice text 0 limit ++ "\n[truncated; see raw evidence]")
+verifyRaw expected actual = eqString (path expected) (path actual) && eqString (digest expected) (digest actual) && eqString (kind expected) (kind actual)

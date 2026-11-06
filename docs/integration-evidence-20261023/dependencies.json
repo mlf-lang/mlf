@@ -1,0 +1,41 @@
+{
+  "main": "77ac8a7bc551ac71747b38c79fc5812d385165e3",
+  "prs": {
+    "9": {
+      "head": "9d3d59cd51d3b204c49bcfa7acc8c51c94c1d853",
+      "merge_base_with_current_main": "77ac8a7bc551ac71747b38c79fc5812d385165e3",
+      "head_already_in_main": false,
+      "current_main_in_head": true,
+      "includes_other_pr_heads": [],
+      "unique_commit_count": "11",
+      "commits": "9d3d59c Integrate missing-field suite receipt fixes\n24ba4c3 Integrate jq-compatible split-unit evidence verification\n93d0653 Integrate main qualification runner reuse and split Core closures\nbeec1b5 Integrate Windows path fixes and normalize standalone async process streams\n232fa9e Sync pinned macOS qualification dependencies from main\nec38ec6 Integrate main test catalog and qualify async on Linux PR gates\n0a39251 Qualify async bootstrap and checked package consumers\n15aafce Bootstrap an interface-compatible manager and join root cancellation\nf0b124a Integrate typed cooperative tasks and fail-closed async qualification\n1546f50 Avoid Win32 name collisions in embedded process runtime\nbbe482e Implement dynamic process scopes and typed completion feasibility gate"
+    },
+    "11": {
+      "head": "f29ad8b770eae70b505c40d9ba0d91b123f3db51",
+      "merge_base_with_current_main": "3d33c040e3ea3ef46e6b9981ccb0cf0d3318639f",
+      "head_already_in_main": false,
+      "current_main_in_head": false,
+      "includes_other_pr_heads": [],
+      "unique_commit_count": "6",
+      "commits": "f29ad8b Initialize native suite receipts for fresh test campaigns\na5be424 Update backend coverage documentation for guards\nd9fbe35 Merge corrected unit evidence verifier into guards\nd0ad1f6 Integrate guards with partitioned Core qualification\nce2d991 Merge main test selectors and Linux gate into guards\n3a84368 Add ordered Boolean guards with explicit otherwise fallbacks"
+    },
+    "12": {
+      "head": "af88e6f417780c9d5f39f53604eb99b409de81a6",
+      "merge_base_with_current_main": "0c3464c9880589adea5dfe0c1af8a16f836617b4",
+      "head_already_in_main": false,
+      "current_main_in_head": false,
+      "includes_other_pr_heads": [],
+      "unique_commit_count": "3",
+      "commits": "af88e6f Preserve annotations before surrounding parser delimiters\ne19e55a Merge current main into tuple and list syntax branch\n930f632 Add tuple and list syntax with compatible annotations"
+    },
+    "16": {
+      "head": "597b107858695a79b095fcca175ccb979b11a9f2",
+      "merge_base_with_current_main": "3d33c040e3ea3ef46e6b9981ccb0cf0d3318639f",
+      "head_already_in_main": false,
+      "current_main_in_head": false,
+      "includes_other_pr_heads": [],
+      "unique_commit_count": "4",
+      "commits": "597b107 Merge main jq 1.8 evidence-verifier compatibility fix\n2fb74f0 Merge main qualification reuse and require existing recovery tags\nefe1e44 ci: supersede stale branch validation rehearsals\n21082cb Run complete qualification and Benchmark Game on main; reserve SDK packaging for releases"
+    }
+  }
+}

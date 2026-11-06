@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "kind": "supplemental-source-inventory",
+  "first_parent": "bea6c93980e47946afc22ee99be0d571ed544489",
+  "incoming_main": "cb4c56c3744653c76648e609c06a71afad1ae2d4",
+  "frozen_inventory_unchanged": true,
+  "runtime_migration_complete": false,
+  "selection_is_not_execution": true,
+  "entries": [
+    {
+      "path": "tools/release/async-change-scope.py",
+      "change": "added",
+      "role": "selection-helper",
+      "owner": ".github/workflows/ci.yml",
+      "sha256": "582ccf476e3206f7a502614973373c2d06c8b9f2475c6f0b7d196676f6910c0a",
+      "execution_verified": false,
+      "framework_integrated": false,
+      "remaining_phase": "P6",
+      "incoming_sha256": "582ccf476e3206f7a502614973373c2d06c8b9f2475c6f0b7d196676f6910c0a"
+    },
+    {
+      "path": "tools/release/test-async-change-scope.py",
+      "change": "added",
+      "role": "policy-fault-controls",
+      "owner": "tools/release/check.sh",
+      "sha256": "e08a320b531d36213fe3465738f943575bc46165d3d2aabbb63bfa9fc9c28724",
+      "execution_verified": false,
+      "framework_integrated": false,
+      "remaining_phase": "P6",
+      "incoming_sha256": "e08a320b531d36213fe3465738f943575bc46165d3d2aabbb63bfa9fc9c28724"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "change": "changed",
+      "role": "workflow-dispatch",
+      "owner": "tools/release/test-ci-policy.mjs",
+      "sha256": "b7aa7f562587b7d7fb5905367ec31e559b4ef23bb6af6c42e0e06f6becbfed0c",
+      "execution_verified": false,
+      "framework_integrated": false,
+      "remaining_phase": "P6",
+      "incoming_sha256": "b7aa7f562587b7d7fb5905367ec31e559b4ef23bb6af6c42e0e06f6becbfed0c"
+    },
+    {
+      "path": "tools/release/check.sh",
+      "change": "changed",
+      "role": "metadata-dispatch",
+      "owner": ".github/workflows/ci.yml",
+      "sha256": "b6ac38007fe0eba0dcae5b484bb29e71f636d176810874d46cd03a84336ddf13",
+      "execution_verified": false,
+      "framework_integrated": false,
+      "remaining_phase": "P6",
+      "incoming_sha256": "b6ac38007fe0eba0dcae5b484bb29e71f636d176810874d46cd03a84336ddf13"
+    },
+    {
+      "path": "tools/release/test-ci-policy.mjs",
+      "change": "changed",
+      "role": "policy-fault-controls",
+      "owner": "tools/release/check.sh",
+      "sha256": "b73e4d10c2b91fac1585de989fbc95dc491298d05d19db788bf03a7f4e15fa76",
+      "execution_verified": false,
+      "framework_integrated": false,
+      "remaining_phase": "P6",
+      "incoming_sha256": "b73e4d10c2b91fac1585de989fbc95dc491298d05d19db788bf03a7f4e15fa76"
+    },
+    {
+      "path": "tools/testing/check_reconciliation_inventory.py",
+      "change": "added",
+      "role": "static-provenance-audit",
+      "owner": "docs/main-reconciliation-20261023.md",
+      "sha256": "a2983ccdd56babedfaf1ad801b963fdeb10a4e0876b28262de1b92932fdfdc7f",
+      "execution_verified": false,
+      "framework_integrated": false,
+      "remaining_phase": "P6"
+    }
+  ],
+  "preserved_inputs": {
+    "docs/testing-migration-inventory-20261023.json": "106796a05c3f35504c0e5834929848e9b507d8456b2cb13d3379e17a86b47d3b",
+    "docs/testing-inventory-20261023.tsv": "9eda8926f8b878e45063f76063517db78d84f241aea290c4cefd7faf69db90bf",
+    "docs/testing-external-entrypoints-20261023.tsv": "2f3c2afeba7b8def7bee960f559b3d13a311b22c128102652c920274ce646359",
+    "tests/testing-migration-ledger.json": "ed3eff43261b8e0cf2e4c7cb604c8190c54557557e3dac66615c84378bacd63c",
+    "mlf.lock": "93cd77fadc6eb420bde07fb0cc2efa68598b9d91018c93bcb2fcd36f132b7679",
+    "tests/fixtures/async-gate/counterexample/incorrect-quantifier.emlf": "648d84f765fe664bb046746fd6f5a76b6253976ad9abe4e724190a9906b394ea"
+  }
+}

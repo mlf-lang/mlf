@@ -6,25 +6,80 @@ import qualified Tests.Helpers as H
 import qualified Tests.Coverage as Coverage
 import qualified Tests.Selection as Selection
 import qualified Tests.CorePartitions as P
+import qualified Tests.CoreRegistry as Registry
+import qualified Test.Assert as A
+import qualified Test.Case as C
+import qualified Test.Runner as Runner
+import qualified Test.Process as Process
+
+-- One stimulus definition feeds both the preserved legacy counted metric and
+-- the opt-in named leaves. Thirteen observations are not thirteen new oracles.
+substringInputs : List (Pair String (Triple String String Bool))
+substringInputs =
+ Cons (Pair "empty-in-empty" (Triple "" "" true)) (
+ Cons (Pair "empty-in-nonempty" (Triple "" "abc" true)) (
+ Cons (Pair "nonempty-in-empty" (Triple "a" "" false)) (
+ Cons (Pair "needle-longer-than-text" (Triple "abcd" "abc" false)) (
+ Cons (Pair "prefix" (Triple "ab" "abc" true)) (
+ Cons (Pair "interior" (Triple "bc" "abcd" true)) (
+ Cons (Pair "suffix" (Triple "cd" "abcd" true)) (
+ Cons (Pair "overlapping-prefix-match" (Triple "aaab" "aaaab" true)) (
+ Cons (Pair "overlapping-prefix-miss" (Triple "aaab" "aaaa" false)) (
+ Cons (Pair "unicode-match" (Triple "λ😀" "aλ😀z" true)) (
+ Cons (Pair "unicode-order-miss" (Triple "😀λ" "λ😀" false)) (
+ Cons (Pair "nul-match" (Triple "a\0b" "xa\0by" true)) (
+ Cons (Pair "nul-miss" (Triple "a\0c" "xa\0by" false)) (
+ Nil)))))))))))))
 
 substringChecks : IO Unit
-substringChecks = do
- -- The port's String adapter must retain empty, overlapping, Unicode and NUL
- -- substring semantics independently of the compiler's diagnostic strings.
+substringChecks =
  Coverage.mapCounted "core" "substring-executed" (\(Triple needle text expected) -> O.require (H.eq (H.contains needle text) expected) "substring adapter differs from scalar substring semantics")
-  (Cons (Triple "" "" true)
-  (Cons (Triple "" "abc" true)
-  (Cons (Triple "a" "" false)
-  (Cons (Triple "abcd" "abc" false)
-  (Cons (Triple "ab" "abc" true)
-  (Cons (Triple "bc" "abcd" true)
-  (Cons (Triple "cd" "abcd" true)
-  (Cons (Triple "aaab" "aaaab" true)
-  (Cons (Triple "aaab" "aaaa" false)
-  (Cons (Triple "λ😀" "aλ😀z" true)
-  (Cons (Triple "😀λ" "λ😀" false)
-  (Cons (Triple "a\0b" "xa\0by" true)
-  (Cons (Triple "a\0c" "xa\0by" false) Nil)))))))))))))
+  (S.map S.snd substringInputs)
+substringCases : String -> Bool -> List C.Case
+substringCases target complete = S.map (\(Pair name (Triple needle text expected)) ->
+ Registry.scope target complete (C.test ("core/substring-adapter/" ++ name) ("substring " ++ name)
+  (Cons "family:core/substring-adapter" Nil)
+  (A.assert (H.eq (H.contains needle text) expected) "substring adapter differs from scalar substring semantics"))) substringInputs
+
+-- Opt-in protocol only. Version-1 scope=full means this physical registry,
+-- NEVER full logical Core qualification. All leaves are qualification:ineligible
+-- until a separate exact logical union and original oracle metrics are verified.
+-- Legacy campaigns below stay the default and retain their existing evidence.
+frameworkCases target complete families = do
+ entries <- Registry.register target complete families
+ let substrings = if S.elem eqString "core/substring-adapter" (S.map S.fst families) then substringCases target complete else Nil
+ let all = S.append substrings entries
+ Runner.validate all
+ Right all
+frameworkChild target complete families args = do
+ entries <- case frameworkCases target complete families of { Left error -> O.fatal error; Right value -> return value }
+ Pair options selected <- case Runner.plan args entries of { Left error -> O.fatal error; Right value -> return value }
+ -- Fatal legacy actions must never run as a multi-case child. The process
+ -- supervisor performs discovery, then invokes exactly one leaf per child.
+ let exact = S.any (\selector -> case selector of { Runner.Exact _ -> true; _ -> false }) (Runner.selectors options)
+ O.require (Runner.listing options || exact && S.length selected == 1) "core framework child requires --list or one --exact leaf ID"
+ if Runner.listing options then do
+  code <- Runner.run args entries
+  if code == 0 then return Unit else exitWith code
+ else do
+  directory <- getEnv "MLF_TEST_CASE_WORK"
+  O.require (stringLength directory > 0) "core framework child requires the process supervisor work directory"
+  -- Never append a leaf's metrics into a parent's full-campaign coverage file.
+  setEnv "MLF_TEST_COVERAGE_REPORT" (directory ++ "/legacy-coverage.jsonl")
+  unsetEnv "MLF_TEST_FAMILY_REPORT"
+  Coverage.begin "core" false
+  code <- Runner.run args entries
+  if code == 0 then do
+   let entry = S.head selected
+   if S.elem eqString "family:core/substring-adapter" (C.tags entry) then Coverage.metric "core" "substring-executed" 1
+   else Coverage.passed "core" (C.name entry)
+   Coverage.finish "core"
+  else return Unit
+  if code == 0 then return Unit else exitWith code
+framework target complete families args = do
+ self <- getExecutablePath
+ code <- Process.run (S.append args (Cons "--" (Cons self (Cons "--framework-child" Nil))))
+ if code == 0 then return Unit else exitWith code
 
 runCases : List (Pair String (IO Unit)) -> IO Unit
 runCases cases = S.mapM_ (\(Pair label action) -> do { action; Coverage.passed "core" label; putStrLn ("PASS " ++ label) }) cases
@@ -40,6 +95,13 @@ main target complete count families = do
  let cases = S.concatMap S.snd families
  let expected = if complete then P.familyNames else P.forTarget target
  O.require (S.eqList eqString names expected && Selection.validIds names && S.length cases == count) "core compilation registry changed"
+ case args of
+  Cons "--framework" rest -> framework target complete families rest
+  Cons "--framework-child" rest -> frameworkChild target complete families rest
+  Cons "--framework-list" rest -> frameworkChild target complete families (Cons "--list" rest)
+  _ -> legacyMain target complete families args names cases
+
+legacyMain target complete families args names cases =
  if Selection.listing args then putStr (S.unlines names) else case args of
   Cons "--from" (Cons prefix Nil) -> do
    O.require complete "--from is supported by the complete core entry only"
