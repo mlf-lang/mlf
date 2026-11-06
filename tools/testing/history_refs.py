@@ -35,7 +35,7 @@ def _object_tree(root, identity, kind):
 
 # Two-phase seal: commit all reviewed bytes with this literal zeroed, then
 # make a single child changing only this literal to that precursor's SHA.
-SOURCE_ANCHOR = '0000000000000000000000000000000000000000'
+SOURCE_ANCHOR = 'a7d53dfe1bcb30532ac3a1a49288ad2303f26e66'
 SOURCE_PARENTS = ('5f77c669586e44f31d13b861d4f92130e1f55a47',)
 MAIN_BASE = '5d4310381a119c4136a1b9664e2c532ad76323f7'
 SEAL_PATH = 'tools/testing/history_refs.py'
