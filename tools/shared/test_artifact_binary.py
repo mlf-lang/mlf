@@ -18,6 +18,7 @@ import shlex
 import shutil
 import stat
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 HELPERS = ('artifact_binary_reference.py', 'artifact_binary_cases.py',
@@ -231,12 +232,116 @@ def crate_fields(values):
     return ''.join(str(len(value)) + ':' + value for value in values)
 
 
-def native_crate_spec(rows, directory):
+NATIVE_LIBRARIES = frozenset(('mlf-foundation', 'mlf-language-core', 'mlf-frontend',
+                              'mlf-xmlf', 'mlf-inference', 'mlf-crates'))
+
+
+def native_crate_plan(rows, directory, source):
+    """Partition the exact closure by its authenticated, existing library owners."""
     require([row['module'] for row in rows] == sorted(NATIVE_MODULES),
             'native crate inventory order/identity mismatch')
-    return crate_fields(['MLF-CRATE-1', 'artifact-binary-native', 'Main', 'false',
-        crate_fields([crate_fields([row['module'], row['path']]) for row in rows]), '',
-        str(directory / 'inference-cache'), str(directory / 'builtin/prelude')])
+    libraries = {}
+    for name in sorted(NATIVE_LIBRARIES):
+        path = regular(source / 'libraries' / name / 'mlf-package.json')
+        manifest = json.loads(path.read_text(encoding='utf-8', errors='strict'))
+        require(manifest.get('name') == name, 'native library identity mismatch')
+        libraries[name] = manifest
+    owners, groups = {}, {}
+    for row in rows:
+        module, path = row['module'], Path(row['path'])
+        if module == 'Main':
+            owner = 'fixture'
+        else:
+            relative = path.relative_to(source)
+            require(len(relative.parts) > 2 and relative.parts[0] == 'libraries' and
+                    relative.parts[1] in libraries, 'native source outside library owners')
+            owner = relative.parts[1]
+            declared = libraries[owner]['library']['modules'].get(module)
+            require(type(declared) is str and not Path(declared).is_absolute() and
+                    '..' not in Path(declared).parts and
+                    source / 'libraries' / owner / declared == path,
+                    'native source differs from library module declaration')
+        owners[module] = owner
+        groups.setdefault(owner, []).append(row)
+    require(set(groups) == NATIVE_LIBRARIES | {'fixture'}, 'native library coverage mismatch')
+    dependencies = {}
+    for owner, members in groups.items():
+        imported = {name for row in members for name in row['imports']} - NATIVE_BUILTINS
+        require(imported <= owners.keys(), 'native dependency outside authenticated closure')
+        dependencies[owner] = {owners[name] for name in imported} - {owner}
+        if owner != 'fixture':
+            declared = libraries[owner].get('dependencies', {})
+            require(dependencies[owner] <= declared.keys(), 'undeclared native library dependency')
+            for dependency in dependencies[owner]:
+                require(declared[dependency] == {'path': '../' + dependency},
+                        'native dependency differs from local library owner')
+    prefixes = {name: directory / name / 'unit' for name in NATIVE_LIBRARIES}
+    prefixes['fixture'] = directory / 'fixture'
+    completed, plan = set(), []
+    while len(completed) < len(groups):
+        ready = sorted(name for name in groups if name not in completed and
+                       dependencies[name] <= completed)
+        require(ready, 'cyclic native library dependencies')
+        for name in ready:
+            members = groups[name]
+            deps = sorted(dependencies[name])
+            prefix = prefixes[name]
+            cache = directory / name / 'inference-cache'
+            fields = ['MLF-CRATE-1', 'artifact-binary-native-' + name,
+                      'Main' if name == 'fixture' else '', 'false',
+                      crate_fields([crate_fields([row['module'], row['path']]) for row in members]),
+                      crate_fields([str(prefixes[dep].with_suffix('.mlfci')) for dep in deps]),
+                      str(cache), str(directory / 'builtin/prelude')]
+            plan.append({'name': name, 'modules': [row['module'] for row in members],
+                         'dependencies': deps, 'prefix': str(prefix),
+                         'spec': crate_fields(fields)})
+            completed.add(name)
+    require(plan[-1]['name'] == 'fixture', 'native fixture must be compiled last')
+    return plan
+
+
+# Explicit reviewed stages: these are not inferred from a successful receipt.
+CONTROL_COMMANDS = frozenset("""
+wire-corpus constructors typed-bounds raw-ghc partial-write-ghc
+shared-ghc shared-ghc-typed shared-native shared-native-typed
+production-admission source-admission base64
+lowered-cold lowered-warm lowered-change lowered-changed-warm
+lowered-install-1 lowered-mixed-cache1 lowered-repair-cache1
+lowered-install-2 lowered-mixed-cache2 lowered-repair-cache2
+lowered-identified-binary-corruption distribution-seed open-interface-controls
+formal-seed formal-legacy shared-ghc-public-pair shared-native-public-pair
+shared-ghc-closed-public-pair shared-native-closed-public-pair
+formal-corrupt-3 formal-corrupt-4 formal-corrupt-7
+ distribution-pack-binary distribution-format2-roundtrip distribution-format2-roundtrip-formal
+ distribution-format1-compatibility distribution-format1-compatibility-formal
+ distribution-repack-legacy distribution-format2-old-pair distribution-format2-old-pair-formal
+ distribution-wrong-version distribution-missing-crate distribution-duplicate-crate
+ distribution-extra-crate distribution-escaping-key distribution-unknown-envelope-field
+ distribution-mixed-payload-fields distribution-manifest-pin distribution-base64-padding
+ distribution-base64-length distribution-payload-metadata-sha distribution-payload-object-sha
+ distribution-asset-valid distribution-asset-invalid
+release-builtin-branches release-forged-current release-materialize-cold release-materialize-warm
+""".split())
+CONTROL_REJECTIONS = frozenset("""
+distribution-wrong-version distribution-missing-crate distribution-duplicate-crate
+ distribution-extra-crate distribution-escaping-key distribution-unknown-envelope-field
+ distribution-mixed-payload-fields distribution-manifest-pin distribution-base64-padding
+ distribution-base64-length distribution-payload-metadata-sha distribution-payload-object-sha
+release-forged-current
+""".split())
+
+
+def require_control_commands(commands):
+    require(type(commands) is list and all(type(row) is dict and
+            type(row.get('name')) is str for row in commands), 'malformed control command inventory')
+    names = [row['name'] for row in commands]
+    require(len(names) == len(set(names)) and set(names) == CONTROL_COMMANDS,
+            'complete reviewed control command inventory differs')
+    for row in commands:
+        expected = 1 if row['name'] in CONTROL_REJECTIONS else 0
+        require(row.get('state') == 'passed' and type(row.get('exit_code')) is int and
+                row['exit_code'] == expected, 'control did not meet its fixed exit-status oracle')
+    return names
 
 
 def require_cold_queries(report):
@@ -292,6 +397,8 @@ def main():
     sys.dont_write_bytecode = True
     python = regular(Path(sys.executable).resolve(strict=True))
     source_manifest = regular(source / 'shared-sources.json')
+    native_manifests = [regular(source / 'libraries' / name / 'mlf-package.json')
+                        for name in sorted(NATIVE_LIBRARIES)]
     runtime = regular(source / 'runtime/mlf_runtime.c')
     transport_sources = [regular(source / 'host/ghc/cbits/host.c'),
                          regular(source / 'runtime/mlf_process_supervisor.c')]
@@ -299,7 +406,7 @@ def main():
     require(regular(source / 'runtime/mlf_byte_file.h') in headers,
             'new byte-file transport header missing')
     inputs = [regular(__file__), fixture, shared, controls, *helpers, build_path,
-              direct_path, source_manifest, runtime, *transport_sources, *headers,
+              direct_path, source_manifest, *native_manifests, runtime, *transport_sources, *headers,
               python, clang, pkg_config, gc_archive, *gc_headers]
     require(all(not p.is_relative_to(output) for p in inputs), 'input inside output')
     inputs = {str(p): sha(p) for p in inputs}
@@ -310,7 +417,7 @@ def main():
               'commands': [], 'source_root': str(source), 'inputs': inputs,
               'partial_write_sink': sink_identity,
               'producer_receipt': str(receipt_path), 'producer_receipt_sha256': sha(receipt_path),
-              'native_mode': 'fresh exact50 modular crate, standalone LLVM and current runtime; no installed stdlib',
+              'native_mode': 'fresh exact51 source closure in six existing libraries plus Main, standalone LLVM and current runtime; no installed stdlib',
               'limits': {'compile_link_seconds_each': 120, 'native_compile_crate_seconds': 900,
                          'native_crate_to_llvm_seconds': 300, 'aggregate_output_bytes': 640 * 1024**2,
                          'whole_controls_seconds': 900, 'fixture_seconds_each': 180,
@@ -461,24 +568,45 @@ def main():
         record['native_source_closure'] = closure
         crate = output / 'native-crate'
         crate.mkdir()
-        spec = crate / 'fixture.spec'
-        with spec.open('xb') as stream:
-            stream.write(native_crate_spec(closure, crate).encode('utf-8'))
-        artifacts[str(spec)] = sha(spec)
-        record['native_crate_spec_sha256'] = artifacts[str(spec)]
+        plan = native_crate_plan(closure, crate, source)
+        record['native_crate_plan'] = []
+        for component in plan:
+            prefix = Path(component['prefix'])
+            prefix.parent.mkdir(parents=True, exist_ok=True)
+            spec = prefix.with_suffix('.spec')
+            with spec.open('xb') as stream:
+                stream.write(component['spec'].encode('utf-8'))
+            artifacts[str(spec)] = sha(spec)
+            record['native_crate_plan'].append({
+                key: value for key, value in component.items() if key != 'spec'})
+            record['native_crate_plan'][-1].update(spec=str(spec), spec_sha256=artifacts[str(spec)])
         save(); postcheck()
-        # Modular compilation is the supported bounded alternative to the
-        # monolithic frontend, not a fallback that drops native assertions.
-        runner.run('native-compile-crate', [compiler, '--compile-crate', spec,
-                   '-o', crate / 'fixture'], timeout=900)
-        for relative in ('fixture.mlfci', 'fixture.mlfco', 'fixture.queries',
-                         'builtin/prelude.mlfci', 'builtin/prelude.mlfco'):
-            require(regular(crate / relative).stat().st_size > 0,
-                    'missing fresh native crate artifact: ' + relative)
-        query_report = json.loads((crate / 'fixture.queries').read_text())
-        require_cold_queries(query_report)
-        record['native_cold_queries'] = {key: query_report[key]
-                                        for key in ('inferred_groups', 'reused_groups')}
+        # Preserve the original whole-closure compile allowance. Every current
+        # source is compiled cold exactly once, across normal library interfaces.
+        deadline = time.monotonic() + 900
+        cold = {'inferred_groups': 0, 'reused_groups': 0, 'components': []}
+        for component in record['native_crate_plan']:
+            remaining = deadline - time.monotonic()
+            require(remaining > 0, 'native closure compile deadline exceeded')
+            prefix = Path(component['prefix'])
+            runner.run('native-compile-crate-' + component['name'],
+                       [compiler, '--compile-crate', component['spec'], '-o', prefix],
+                       timeout=remaining)
+            for extension in ('.mlfci', '.mlfco', '.queries'):
+                require(regular(prefix.with_suffix(extension)).stat().st_size > 0,
+                        'missing fresh native crate artifact: ' + str(prefix) + extension)
+            query_report = json.loads(prefix.with_suffix('.queries').read_text())
+            require_cold_queries(query_report)
+            counts = {key: query_report[key] for key in ('inferred_groups', 'reused_groups')}
+            cold['components'].append({'name': component['name'], **counts})
+            for key in ('inferred_groups', 'reused_groups'):
+                cold[key] += counts[key]
+            record['native_cold_queries'] = cold
+            save()
+        require(time.monotonic() <= deadline, 'native closure compile deadline exceeded')
+        for extension in ('.mlfci', '.mlfco'):
+            require(regular((crate / 'builtin/prelude').with_suffix(extension)).stat().st_size > 0,
+                    'missing fresh builtin native crate artifact')
         record['native_crate_outputs'] = {}
         for path in sorted(crate.rglob('*')):
             info = path.lstat()
@@ -517,23 +645,22 @@ def main():
                 'aggregate failure sink identity/post-audit mismatch')
         require(summary['commands'] == len(body['commands']) and
                 summary['reference_cases'] == len(body['reference_cases']), 'aggregate count summary mismatch')
-        required = {'wire-corpus', 'constructors', 'typed-bounds', 'raw-ghc', 'partial-write-ghc',
-                    'shared-ghc', 'shared-native', 'shared-ghc-typed', 'shared-native-typed',
-                    'shared-ghc-public-pair', 'shared-native-public-pair', 'distribution-seed'}
-        names = [row['name'] for row in body['commands']]
-        require(len(names) == len(set(names)) and required <= set(names), 'mandatory host/typed/public commands omitted')
+        names = require_control_commands(body['commands'])
         expected_inputs = {str(p): sha(p) for p in [controls, receipt_path, *binaries.values(), *helpers]}
         require(body['inputs'] == expected_inputs, 'aggregate input identity mismatch')
         for row in body['commands']:
-            require(row['state'] == 'passed' and row['argv'][0] in {str(p) for p in binaries.values()},
-                    'nonpassing or unqualified inner fixture')
+            backend = next((name for name in ('shared-ghc', 'shared-native')
+                            if row['name'].startswith(name)), 'ghc')
+            require(row['argv'][0] == str(binaries[backend]),
+                    'control executed with the wrong qualified backend')
             for stream in ('stdout', 'stderr'):
                 item = row[stream]; path = regular(item['path'])
                 require(path == inner / (row['name'] + '.' + stream) and
                         path.stat().st_size == item['bytes'] and sha(path) == item['sha256'],
                         'inner capture identity mismatch')
         require(set(body['shared_backend_outputs']) == {'shared-ghc', 'shared-native'} and
-                set(body['shared_public_pairs']) == {'shared-ghc', 'shared-native'},
+                set(body['shared_public_pairs']) == {'shared-ghc', 'shared-native'} and
+                set(body['shared_closed_public_pairs']) == {'shared-ghc', 'shared-native'},
                 'both actual hosts must qualify raw and full public artifacts')
         postcheck()
         record.update(complete=True, post_integrity=True, producer_objects_verified_after=True,

@@ -173,8 +173,23 @@ module Bootstrap.IntSet where {
   };
   foldl :: forall a. (a -> Int -> a) -> a -> IntSet -> a;
   foldl action result (IntSet tree) = foldlTree action result tree;
+  -- Specialize only the known cons action; retain the generic folds above.
+  -- Heads and suffixes remain lazy, including for raw noncanonical trees.
+  toListBitmap :: Int -> Int -> [] Int -> [] Int;
+  toListBitmap prefix bits result =
+    if bits == 0 then result
+    else (:) (prefix + countTrailingZerosInt bits)
+      (toListBitmap prefix (andInt bits (bits - 1)) result);
+  toListTree :: [] Int -> IntSetTree -> [] Int;
+  toListTree result tree = case tree of {
+    IntSetNil -> result;
+    IntSetTip count prefix bits -> toListBitmap prefix bits result;
+    IntSetBin count prefix left right ->
+      if P.signBranch prefix then toListTree (toListTree result left) right
+      else toListTree (toListTree result right) left
+  };
   toList :: IntSet -> [] Int;
-  toList tree = foldr (:) [] tree;
+  toList (IntSet tree) = toListTree [] tree;
   toAscList :: IntSet -> [] Int;
   toAscList tree = toList tree;
   unionTree :: IntSetTree -> IntSetTree -> IntSetTree;

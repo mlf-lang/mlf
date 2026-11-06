@@ -9,13 +9,13 @@ import qualified Bootstrap.LLVM.Codegen as C
 import qualified Bootstrap.LLVM.Optimize as O
 
 initial : B.Output
-initial = B.Output 0 Nil "entry" Nil Nil M.empty M.empty S.empty M.empty S.empty S.empty S.empty M.empty true M.empty M.empty M.empty M.empty M.empty S.empty
+initial = B.Output 0 [] "entry" [] [] M.empty M.empty S.empty M.empty S.empty S.empty S.empty M.empty true M.empty M.empty M.empty M.empty M.empty S.empty M.empty M.empty M.empty
 
 contains : String -> String -> Bool
 contains needle text = L.any (\index -> eqString needle (stringSlice text index (stringLength needle)))
   (L.range 0 (stringLength text - stringLength needle))
 
-forceCount : List String -> Int
+forceCount : [] String -> Int
 forceCount code = L.length (L.filter (contains "call ptr @mlf.force(") code)
 
 assert good message = if good then putStrLn message else panic message
@@ -52,12 +52,12 @@ alternatives = do
   let side = XName 0 "side"
   let flag = XName 1 "flag"
   let value = XName 2 "value"
-  let scope = M.fromList O.compareName (B.args3 (Pair side (B.CGBinding "%side" true))
-        (Pair flag (B.CGBinding "%flag" true)) (Pair value (B.CGBinding "%value" false)))
-  B.modify (B.withConstructors (M.fromList compareString (B.args2 (Pair "LeftSide" (Pair 0 0)) (Pair "RightSide" (Pair 1 0)))))
+  let scope = M.fromList O.compareName (B.args3 ((,) side (B.CGBinding "%side" true))
+        ((,) flag (B.CGBinding "%flag" true)) ((,) value (B.CGBinding "%value" false)))
+  B.modify (B.withConstructors (M.fromList compareString (B.args2 ((,) "LeftSide" ((,) 0 0)) ((,) "RightSide" ((,) 1 0)))))
   let conditional = XEApp (XEApp (XEApp (XEPrimitive PIfThenElse) (XEVar flag)) (XEVar value)) (XEInt 0)
-  let cases = B.args2 (XErasedAlternative (XConstructorPattern "LeftSide" Nil) (XEVar value))
-        (XErasedAlternative (XConstructorPattern "RightSide" Nil) conditional)
+  let cases = B.args2 (XErasedAlternative (XConstructorPattern "LeftSide" []) (XEVar value))
+        (XErasedAlternative (XConstructorPattern "RightSide" []) conditional)
   C.evaluate scope (XECase (XEVar side) cases)
   B.forceBinding (B.CGBinding "%value" false)
   state <- B.get
@@ -65,7 +65,7 @@ alternatives = do
 
 check message action = case B.runBuild action initial of
   Left error -> panic error
-  Right (Pair good state) -> assert good message
+  Right ((,) good state) -> assert good message
 
 main = do
   check "WHNF reuse: one successful force" reuse

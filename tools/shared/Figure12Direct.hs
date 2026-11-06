@@ -6,6 +6,8 @@ import Prelude
 import qualified Data.List as L
 import qualified Data.Set as Set
 import qualified System.Environment as Env
+import qualified Control.Exception as Exception
+import qualified Bootstrap.IndexVec as V
 import qualified MLF.Host.Base as H
 import qualified Bootstrap.Types as T
 import qualified Bootstrap.Parser as Parser
@@ -54,6 +56,9 @@ freeNames expression = case expression of
   T.SSourceDefinition body -> freeNames body
   T.SCallSite _ _ body -> freeNames body
   T.SVar x -> referenceFreeNames x
+  T.SGlobal _ _ -> error "Figure12 signature oracle received a resolved global"
+  T.SDeclScope _ _ -> error "Figure12 signature oracle received a declaration scope"
+  T.SWantedRefs _ _ -> error "Figure12 signature oracle received resolved evidence"
   T.SConstructor _ -> Set.empty
   T.SLam x _ b -> Set.delete (H.unpack x) (freeNames b)
   T.SApp a b -> Set.union (freeNames a) (freeNames b)
@@ -87,14 +92,60 @@ freeNames expression = case expression of
     bound (T.SStringPattern _) = Set.empty
     bound (T.SBoolPattern _) = Set.empty
     bound (T.SOverloadedStringPattern _ _ _) = Set.empty
+    bound (T.SIndexedStringPattern _ _ _) = Set.empty
     bound (T.SAsPattern n p) = Set.insert (H.unpack n) (bound p)
     bound (T.SLazyPattern p) = bound p
+    references (T.SIndexedStringPattern _ _ _) =
+      error "Figure12 signature oracle received a resolved string pattern"
     references (T.SOverloadedStringPattern _ equality conversion) =
       Set.union (referenceFreeNames equality) (referenceFreeNames conversion)
     references (T.SNestedPattern _ ps) = Set.unions (map references (list ps))
     references (T.SAsPattern _ p) = references p
     references (T.SLazyPattern p) = references p
     references _ = Set.empty
+
+-- The direct visitor is independent of the maintained guest visitor. These
+-- controls enforce its source-only phase boundary without trusting ID hints.
+oracleControls :: IO ()
+oracleControls = do
+  let t = H.literal
+      slot = V.fromInt 7
+      variable = T.SVar . t
+      indexed = T.SIndexedStringPattern (T.ScalarString (t "text"))
+        (T.DeclRef slot (t "eq")) (T.LexicalRef (t "from"))
+      match pattern = T.SCase (variable "scrutinee")
+        [T.SAlternative pattern (variable "body")]
+      legacy equality conversion = T.SOverloadedStringPattern
+        (T.ScalarString (t "text")) (t equality) (t conversion)
+      positive label expression expected =
+        ensure (Set.toAscList (freeNames expression) == expected) label
+      reject expression reason = do
+        result <- Exception.try (Exception.evaluate (Set.size (freeNames expression)))
+          :: IO (Either Exception.ErrorCall Int)
+        case result of
+          Left failure -> ensure (reason `L.isInfixOf` Exception.displayException failure)
+            "source-only oracle rejected at the wrong boundary"
+          Right _ -> fail "source-only oracle accepted a resolved node"
+  positive "lexical binder subtraction changed"
+    (T.SLam (t "bound") T.Nothing (T.SApp (variable "bound") (variable "free"))) ["free"]
+  positive "legacy string-pattern references changed"
+    (match (legacy "eq" "from")) ["body", "eq", "from", "scrutinee"]
+  positive "builtin pattern references changed"
+    (match (legacy "$MLF.Primitive.==" "$MLF.Primitive.fromString")) ["body", "scrutinee"]
+  positive "legacy evidence candidate names changed"
+    (T.SWanted (t "wanted") [(,) T.GivenEvidence (t "local"), (,) T.InstanceEvidence (t "instance")])
+    ["instance", "local"]
+  reject (T.SLam (t "hint") T.Nothing (T.SGlobal slot (t "hint")))
+    "Figure12 signature oracle received a resolved global"
+  reject (T.SDeclScope [slot] (variable "free"))
+    "Figure12 signature oracle received a declaration scope"
+  reject (T.SWantedRefs (t "wanted") [(,) T.GivenEvidence (T.LexicalRef (t "local")),
+    (,) T.InstanceEvidence (T.DeclRef slot (t "hint"))])
+    "Figure12 signature oracle received resolved evidence"
+  mapM_ (\expression -> reject expression "Figure12 signature oracle received a resolved string pattern")
+    [match indexed, match (T.SNestedPattern (t "Wrap") [T.SAsPattern (t "whole") (T.SLazyPattern indexed)]),
+     T.SEquations [(,) [indexed] (variable "body")],
+     T.SSharedBind indexed (variable "action") (variable "continuation") (variable "binding") (variable "failure")]
 
 assumptions fixture c = do
   e <- right (Parser.parseExpr (H.literal (str "id" c)) (H.literal (str "expression" c)))
@@ -152,6 +203,7 @@ main = do
       ensure (aliases == [("A12.1","A10.1"),("E3a","A12.2")]) "Figure12 execution sharing changed"
       let ix = read index :: Int
       case mode of
+        "oracle-controls" -> oracleControls >> putStrLn "PASS oracle-controls"
         "inventory" -> putStrLn (H.unpack (J.render (object
           [("assumptions",jsonArray (map jsonPair ss)),("programs",jsonArray (map jsonString programs)),("aliases",jsonArray (map jsonPair aliases))])))
         "case" -> checkCase fixture (cases !! ix) >> putStrLn "PASS case"

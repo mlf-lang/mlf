@@ -96,8 +96,21 @@ module Bootstrap.Dependency where {
   -- Prepared input serialization includes declaration markers and their
   -- enclosed occurrences. Dependency selection uses only free references.
   querySyntaxRefs expression = valueRefs (observeSyntax True True expression);
-  observeSyntax includeCandidates inventory expression =
-    let { child = observeSyntax includeCandidates inventory } in
+  data CandidateObservation = OmitCandidates | AllCandidates | NonInstanceCandidates;
+  observeSyntax includeCandidates =
+    observeSyntaxWithCandidates (if includeCandidates then AllCandidates else OmitCandidates);
+  observeNonInstanceUses = observeSyntaxWithCandidates NonInstanceCandidates False;
+  observedCandidates :: forall a. CandidateObservation -> [] ((,) EvidenceRole a) -> [] a;
+  observedCandidates mode candidates = case mode of {
+    OmitCandidates -> [];
+    AllCandidates -> map snd candidates;
+    NonInstanceCandidates -> mapMaybe (\((,) role value) -> case role of {
+      InstanceEvidence -> Nothing;
+      _ -> Just value
+    }) candidates
+  };
+  observeSyntaxWithCandidates candidatesMode inventory expression =
+    let { child = observeSyntaxWithCandidates candidatesMode inventory } in
     case expression of {
       SSourceDefinition body -> child body;
       SCallSite _ _ body -> child body;
@@ -151,8 +164,9 @@ module Bootstrap.Dependency where {
                 (map (\((,,) _ mode b) -> merge (observeRecursiveMode mode) (child b))
                    declarations)));
       SWanted dictionary candidates ->
-        Observation (if includeCandidates then map (compose LexicalRef snd) candidates else []) ((:) dictionary []) [] [];
-      SWantedRefs dictionary candidates -> Observation (if includeCandidates then map snd candidates else []) [dictionary] [] [];
+        Observation (map LexicalRef (observedCandidates candidatesMode candidates)) [dictionary] [] [];
+      SWantedRefs dictionary candidates ->
+        Observation (observedCandidates candidatesMode candidates) [dictionary] [] [];
       SChecked ty b -> merge (observeType ty) (child b);
       _ -> emptyObservation
     };

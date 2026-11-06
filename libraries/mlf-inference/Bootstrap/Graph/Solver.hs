@@ -431,14 +431,43 @@ module Bootstrap.Graph.Solver where {
              ((IM.get parent previous == ancestor) && equalScopeEntries previous rest tail))
         }
     };
+  -- A successful comparison forces the last query and answer. Reuse only
+  -- that query in this immutable level; the next level starts cold again.
+  equalScopeEntriesMemo :: IntMap Int -> [] ((,) Int Int) -> [] ((,) Int Int) ->
+                           Bool -> Int -> Int -> Bool;
+  equalScopeEntriesMemo previous before after warm lastParent lastAnswer =
+    case before of {
+      [] -> L.null after;
+      (:) ((,) n parent) rest ->
+        case after of {
+          [] -> False;
+          (:) ((,) m ancestor) tail ->
+            ((n == m) &&
+             let { answer = if warm
+                            then if (parent == lastParent)
+                                 then lastAnswer
+                                 else IM.get parent previous
+                            else IM.get parent previous } in
+             ((answer == ancestor) &&
+              equalScopeEntriesMemo previous rest tail True parent answer))
+        }
+    };
   scopeLevelCount :: IntMap Int -> Int -> [] (IntMap Int) -> Bool;
   scopeLevelCount previous remaining levels =
+    scopeLevelCountFrom previous (IM.toList previous) remaining levels;
+  -- Each immutable level is the next comparison's previous level. Share its
+  -- enumeration without changing size checks, lookup order or short-circuiting.
+  scopeLevelCountFrom :: IntMap Int -> [] ((,) Int Int) -> Int -> [] (IntMap Int) -> Bool;
+  scopeLevelCountFrom previous before remaining levels =
     if (remaining == 0)
     then L.null levels
     else case levels of {
            [] -> False;
            (:) next rest ->
-             (equalScopeLevel previous next && scopeLevelCount next (remaining - 1) rest)
+             let { after = IM.toList next } in
+             ((IM.size previous == IM.size next) &&
+              (equalScopeEntriesMemo previous before after False 0 0 &&
+               scopeLevelCountFrom next after (remaining - 1) rest))
          };
   scopeCheckedVisit :: IntMap ([] Int) -> IntMap ((,) Int Int) -> Int -> Int -> Maybe Int;
   scopeCheckedVisit descendants intervals position n =

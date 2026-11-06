@@ -8,6 +8,7 @@ module Bootstrap.Crate where {
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Host as Host;
@@ -19,6 +20,7 @@ module Bootstrap.Crate where {
   import qualified Bootstrap.InferenceUnit as Inference;
   import qualified Bootstrap.CrateQuery as Query;
   import qualified Bootstrap.SourceInference as Source;
+  import qualified Bootstrap.SourceEquality as Equality;
   import qualified Bootstrap.Dependency as Dependency;
   import qualified Bootstrap.Surface as Surface;
   import qualified Bootstrap.CrateArtifact as Artifact;
@@ -290,7 +292,106 @@ module Bootstrap.Crate where {
               mapEither (\owner -> (,) owner ((,) name inst)) (Artifact.instanceOwner iface name))
            (Artifact.crateInstances iface))
       interfaces;
-  prepareCrate spec interfaces sources =
+  -- Internal order derived from the original loader's captured sources.
+  data EvidenceOrderWitness = EvidenceOrderWitness
+    ([] ((,,) String String SInstanceDecl)) ([] ((,,,) String SClassDecl Int String));
+  checkedEvidenceOrder :: EvidenceOrderWitness -> [] ((,) String Artifact.CrateInterface) ->
+    [] ((,) String ((,) String SInstanceDecl)) -> [] SClassDecl -> [] SClassDecl -> Either String Classes.EvidenceOrder;
+  checkedEvidenceOrder (EvidenceOrderWitness orderedInstances orderedSupers) interfaces physical ownClasses allClasses = do {
+    ensure (null ownClasses) "private ordered evidence only admits builtin superclass owners";
+    let { rows = M.fromList compareString (map (\((,) owner ((,) key inst)) -> (,) key ((,) owner inst)) physical);
+          headers = M.fromList compareString (map (\c -> (,) (Modules.className c) c) allClasses);
+          instances = map (\((,,) _ key _) -> key) orderedInstances;
+          supers = map (\((,,,) _ _ _ key) -> key) orderedSupers;
+          checkedRows = filter (\p -> eqString (Artifact.crateId (snd p)) Artifact.builtinCrateIdentity) interfaces };
+    builtin <- case checkedRows of {
+      [(,) _ iface] -> Right iface; _ -> Left "ordered evidence needs exactly one actual builtin interface"
+    };
+    let { checkedBindings = M.fromList compareString (Artifact.crateBindings builtin) };
+    ensure (length instances == length physical && M.size rows == length physical &&
+      Set.size (Set.fromList compareString instances) == length instances) "ordered instance witness is incomplete or repeated";
+    traverseEither (\((,,) owner key expected) -> case M.lookup compareString key rows of {
+      Just ((,) actualOwner actual) -> ensure (eqString owner actualOwner &&
+        Equality.eqSInstanceDecl (Separate.stripInstance expected) (Separate.stripInstance actual) &&
+        (not (Modules.isBuiltinModule owner) || M.member compareString key checkedBindings))
+        "ordered instance owner, header or builtin checked binding differs";
+      Nothing -> Left "ordered instance key is not visible in the physical inventory"
+    }) orderedInstances;
+    let { entities = concatMap snd (Artifact.crateExports builtin);
+          declared = concatMap (\c -> map (\i -> (,) (Modules.className c) i)
+            (range 0 (length (Modules.superclasses c) - 1))) allClasses;
+          keyOf ((,) name ordinal) = "super_" ++ (name ++ ("_" ++ showInt ordinal)) };
+    ensure (M.size headers == length allClasses && length supers == length declared &&
+      Set.size (Set.fromList compareString supers) == length supers &&
+      all (\slot -> elem eqString (keyOf slot) supers) declared) "ordered superclass witness is incomplete or repeated";
+    traverseEither (\((,,,) owner expected ordinal key) -> do {
+      let { name = Modules.className expected };
+      actual <- case M.lookup compareString name headers of {
+        Just header -> Right header; Nothing -> Left "ordered superclass has no actual class"
+      };
+      ensure (Equality.eqSClassDecl actual expected && ordinal >= 0 &&
+        ordinal < length (Modules.superclasses actual) && eqString key (keyOf ((,) name ordinal)) &&
+        any (\entity -> Modules.isRole Modules.Class entity && eqString (Modules.owner entity) owner &&
+          eqString (Artifact.definitionName Artifact.builtinCrateIdentity entity) name) entities &&
+        any (\binding -> eqString (fst binding) key) (Artifact.crateBindings builtin))
+        "ordered superclass owner, header, ordinal or checked binding differs"
+    }) orderedSupers;
+    Right (Classes.EvidenceOrder instances supers)
+  };
+  parseDiscoveredSource :: String -> String -> String -> String -> Either String SourceModule;
+  parseDiscoveredSource identity name loaderPath text = do {
+    parsed <- Parser.parseModuleInPackage identity loaderPath text;
+    ensure (eqString name (Modules.moduleIdentity parsed)) "discovered module identity changed";
+    Separate.cleanSource parsed
+  };
+
+  -- Source resolution preserves the parser's instance/class declaration order.
+  -- Ordinary Classes appends superclass slots in class/declaration order.
+  -- Resolve with stable names here to identify the very same authored rows.
+  discoveredEvidenceOrder :: CrateSpec -> [] SourceModule ->
+    [] ((,) String ((,) String SInstanceDecl)) -> [] SClassDecl -> (String -> IntSet) ->
+    Either String EvidenceOrderWitness;
+  discoveredEvidenceOrder spec discovered physical admittedClasses physicalScope = do {
+    let { identity = specIdentity spec;
+          ownerCrate owner = if Modules.isBuiltinModule owner then Artifact.builtinCrateIdentity else identity;
+          stable entity = Artifact.definitionName (ownerCrate (Modules.owner entity)) entity };
+    ordinary <- Modules.resolveCrateDefinitions (specMode spec) M.empty stable discovered;
+    let { rows = Modules.resolvedCrateInstances ordinary;
+          instances = map (\((,) owner inst) ->
+            (,,) owner (Artifact.instanceName (ownerCrate owner) owner inst) (Separate.stripInstance inst)) rows;
+          classes = concatMap (\resolved ->
+            let { owner = Modules.moduleIdentity (Modules.resolvedSource resolved) }
+            in map (\header -> (,) owner (Classes.canonicalSourceClass header))
+              (Modules.renamedClasses (Modules.resolvedContents resolved))) (Modules.resolvedCrateModules ordinary);
+          supers = concatMap (\((,) owner header) -> map (\i ->
+            (,,,) owner header i ("super_" ++ (Modules.className header ++ ("_" ++ showInt i))))
+            (range 0 (length (Modules.superclasses header) - 1))) classes;
+          classNames = M.fromList compareString (map (\header -> (,) (Modules.className header) header) admittedClasses);
+          ordinaryScope = Modules.candidateScope (Modules.resolvedCrateReach ordinary) rows;
+          instanceKeys = map (\((,,) _ key _) -> key) instances;
+          physicalKeys = map (compose fst snd) physical;
+          keysIn keys mask = catMaybes (mapIndexed (\i key -> if IS.member i mask then Just key else Nothing) keys);
+          sameSet a b = eqList eqString (sortBy compareString a) (sortBy compareString b);
+          actualKeys owner = keysIn physicalKeys (physicalScope owner) };
+    ensure (M.size classNames == length admittedClasses &&
+      sameSet (map (compose Modules.className snd) classes) (M.keys classNames))
+      "discovered class inventory differs from the admitted builtin";
+    mapM_ (\((,) owner header) -> case M.lookup compareString (Modules.className header) classNames of {
+      Just admitted -> ensure (Modules.isBuiltinModule owner && Equality.eqSClassDecl header admitted)
+        "discovered class owner or header differs from admitted builtin";
+      Nothing -> Left "discovered class has no admitted header"
+    }) classes;
+    mapM_ (\source -> let { owner = Modules.moduleIdentity source } in
+      ensure (sameSet (keysIn instanceKeys (ordinaryScope owner)) (actualKeys owner))
+        ("discovered evidence visibility differs for " ++ owner)) discovered;
+    ensure (sameSet instanceKeys (actualKeys (specEntry spec)))
+      "discovered crate entry does not have the ordinary global evidence scope";
+    Right (EvidenceOrderWitness instances supers)
+  };
+
+  prepareCrate = prepareCrateUsingOrder Nothing;
+  prepareDiscoveredCrate discovered = prepareCrateUsingOrder (Just discovered);
+  prepareCrateUsingOrder order spec interfaces sources =
     do {
       traverseEither
         (\source ->
@@ -411,7 +512,15 @@ module Bootstrap.Crate where {
               let { closeLocal = Surface.closeIndexedInstance (Surface.helperScope bindings) };
               local <- traverseEither (\((,) metadata row) -> mapEither ((,) (fst (snd metadata))) (closeLocal (snd row)))
                 (zip localInstances localRows);
-              Source.prepareResolvedSourcePlanWithImports conventions bindings imported allData allClasses (map snd instances)
+              prepare <- case order of {
+                Nothing -> Right Source.prepareResolvedSourcePlanWithImports;
+                Just discovered -> do {
+                  witness <- discoveredEvidenceOrder spec discovered instances allClasses candidates;
+                  mapEither Source.prepareResolvedSourcePlanWithImportsOrdered
+                    (checkedEvidenceOrder witness interfaces instances ownClasses allClasses)
+                }
+              };
+              prepare conventions bindings imported allData allClasses (map snd instances)
                 (append importedInstances local) valueScopes (map (\((,) owner _) -> candidates owner) instances)
             });
             lowered <- case sourcePlan of {

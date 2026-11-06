@@ -1,0 +1,285 @@
+module Tests.CoreProviderWorkers where
+import Prelude hiding (Monad, return, bind)
+import MLF.Primitive (Monad, return, bind)
+import Bootstrap.Types
+import qualified Bootstrap.ArtifactStorage as Storage
+import qualified Bootstrap.Bitstream as Wire
+import qualified Bootstrap.BuiltinPreludeContext as Context
+import qualified Bootstrap.Compiler as Compiler
+import qualified Bootstrap.Constraint as C
+import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.Graph as G
+import qualified Bootstrap.Graph.Solver as Solver
+import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.Parser as Parser
+import qualified Bootstrap.PreparedStandalone as Prepared
+import qualified Bootstrap.Standalone as Standalone
+import qualified Bootstrap.Std as S
+import qualified Package.OS as O
+import qualified Tests.CoreGraphImage as Raw
+import qualified Tests.CoreGraphPrelude as PreludeGraph
+import qualified Tests.Graph as Ref
+import qualified Tests.GraphSolver as T
+import qualified Tests.Helpers as H
+
+data PreludeFiles = PreludeFiles String String String
+data Compared = Compared Int Graph Solver ([] String)
+
+prepare : PreludeFiles -> IO ((,) Context.PreparedPrelude Constraints)
+prepare (PreludeFiles identity interface object) = do
+ result <- PreludeGraph.prepareProvider identity interface object
+ H.right result
+
+directory : String -> IO ()
+directory path = do
+ canonical <- canonicalPath path
+ present <- directoryExists path
+ H.assert (O.absolute path && present && eqString path canonical) "invalid provider proof directory"
+
+fresh : String -> IO ()
+fresh path = do
+ directory path
+ entries <- O.entries path
+ H.assert (S.null entries) "provider proof directory is not empty"
+
+proofBound : Int
+proofBound = 67108864
+
+image : String -> IO ByteArray
+image text = do
+ bytes <- byteArrayFromString text
+ size <- lengthByteArray bytes
+ H.assert (size > 0 && size <= proofBound) "provider proof image exceeds its byte bound"
+ return bytes
+
+writeImage : String -> String -> IO ()
+writeImage path text = do
+ bytes <- image text
+ written <- Storage.writeRaw path bytes
+ H.right written
+
+readImage : String -> IO ByteArray
+readImage path = do
+ (,) message bytes <- readByteFileOrError path proofBound
+ size <- lengthByteArray bytes
+ H.assert (eqString message "" && size > 0 && size <= proofBound) ("invalid provider proof file " ++ path)
+ return bytes
+
+readText : String -> IO String
+readText path = do
+ bytes <- readImage path
+ decoded <- Wire.strictUtf8 proofBound bytes
+ H.right decoded
+
+sameFiles : String -> String -> IO ()
+sameFiles a b = do
+ left <- readImage a
+ right <- readImage b
+ equal <- Storage.sameBytes left right
+ H.assert equal ("provider proof bytes differ: " ++ a ++ " and " ++ b)
+
+sameText : String -> String -> IO ()
+sameText path text = do
+ actual <- readImage path
+ expected <- image text
+ equal <- Storage.sameBytes actual expected
+ H.assert equal ("provider proof transcript differs: " ++ path)
+
+empty : String -> IO ()
+empty path = do
+ (,) message bytes <- readByteFileOrError path 1
+ size <- lengthByteArray bytes
+ H.assert (eqString message "" && size == 0) ("provider worker stderr is absent or nonempty: " ++ path)
+
+shape : Constraints -> String
+shape constraints =
+ let actions = C.solveSteps constraints in
+ showInt (IM.size (G.nodes (C.initialGraph constraints))) ++ " " ++
+ showInt (S.length (C.equalities constraints)) ++ " " ++ showInt (S.length actions) ++ " " ++
+ showInt (S.length (S.filter isProjection actions))
+
+isProjection : SolveStep -> Bool
+isProjection step = case step of { Instantiate _ -> false; ProjectCase _ -> true }
+
+pairText : (,) Int Int -> String
+pairText ((,) a b) = showInt a ++ "," ++ showInt b
+
+pairsText : [] ((,) Int Int) -> String
+pairsText pairs = S.intercalate ";" (S.map pairText pairs)
+
+inputRow : Int -> SolveStep -> String
+inputRow ordinal step = "INPUT " ++ showInt ordinal ++ " " ++ case step of
+ Instantiate edge -> "instantiate " ++ pairText ((,) (C.fromGen edge) (C.toNode edge))
+ ProjectCase fields -> "projection " ++ pairsText fields
+
+inputRows : Int -> [] SolveStep -> [] String
+inputRows ordinal actions = case actions of
+ [] -> []
+ (:) step rest -> (:) (inputRow ordinal step) (inputRows (ordinal + 1) rest)
+
+inputLedger : Constraints -> String
+inputLedger c = S.unlines ((:) ("INPUT equalities " ++ pairsText (C.equalities c)) (inputRows 1 (C.solveSteps c)))
+
+expectedConsumerType : String -> IO String
+expectedConsumerType file = case file of
+ "examples/snake.emlf" -> return "IO ()"
+ "examples/monad-state-do.emlf" -> return "Pair Int Int"
+ "examples/monad-maybe.emlf" -> return "Maybe Int"
+ "examples/contextual-instance.emlf" -> return "Bool"
+ "examples/partial-annotation.emlf" -> return "forall a8. a8 -> a8"
+ _ -> H.fail ("missing independent source type for " ++ file)
+
+compareConsumer : Context.PreparedPrelude -> String -> IO Int
+compareConsumer context file = do
+ expectedType <- expectedConsumerType file
+ source <- readFile file
+ program <- H.right (Parser.parseProgram file source)
+ let requiresChecked = S.elem eqString file (O.words "examples/snake.emlf examples/monad-state-do.emlf")
+ c <- case Prepared.admitRoot ImplicitPrelude (Context.names context) (Context.environment context)
+                             (Context.protectedNames context) program of
+  Nothing -> do
+   H.assert (S.not requiresChecked) "checked provider unexpectedly fell back for an imported instance fixture"
+   whole <- H.right (Standalone.normalize ImplicitPrelude program)
+   demanded <- H.right (Standalone.normalizeDemanded ImplicitPrelude program)
+   case ((,) whole demanded) of
+    (,) Nothing Nothing -> return ()
+    _ -> H.fail "no-facade consumer did not retain both ordinary compiler routes"
+   ordinary <- H.right (Compiler.compileProgramWithPrelude ImplicitPrelude program)
+   H.assert (eqString (Compiler.sourceType ordinary) expectedType) ("ordinary source type changed: " ++ file)
+   putStrLn ("Graph consumer: " ++ file ++ " ordinary")
+   T.constraints file
+  Just root -> do
+   H.assert requiresChecked "a no-facade consumer selected the checked provider"
+   ((,,,) _ sourceType _ constraints) <- H.right (Prepared.compileCheckedWithConstraints context root program)
+   H.assert (eqString sourceType expectedType) ("checked provider source type changed: " ++ file)
+   ((,,) sites keys refs) <- H.right (PreludeGraph.inspect context constraints)
+   H.assert (sites > 0 && keys > 0 && refs >= keys) "direct checked FEvidence comparison is vacuous"
+   putStrLn ("Graph consumer: " ++ file ++ " checked evidence " ++ showInt sites ++ " " ++ showInt keys ++ " " ++ showInt refs)
+   return constraints
+ let graph = C.initialGraph c
+ let equations = C.equalities c
+ solver <- H.right (Solver.prepare graph)
+ first <- H.right (Solver.unify equations solver)
+ (,) _ expected <- H.right (Ref.runBuild graph (Ref.unify equations))
+ T.sameGraph expected first
+ _ <- S.foldM T.compareSolveStep ((,) expected first) (C.solveSteps c)
+ putStrLn ("Graph consumer geometry: " ++ file ++ " " ++ shape c)
+ return (S.length (C.solveSteps c) + 1)
+
+-- The consumer also publishes the current canonical producer input. Every
+-- provider worker regenerates it from source independently before comparing.
+consumers : PreludeFiles -> String -> IO ()
+consumers files work = do
+ fresh work
+ (,) context provider <- prepare files
+ let iface = Context.interface context
+ H.assert (eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity &&
+           S.length (Artifact.crateClasses iface) > 0 && S.length (Artifact.crateInstances iface) > 0)
+  "checked provider class and instance inventory is empty"
+ T.validatedKindControls
+ T.fieldProjectionControls
+ counts <- S.forM T.fixtures (compareConsumer context)
+ let total = S.sum counts
+ H.assert (S.length counts == 5 && total > 0) "consumer comparison inventory is incomplete"
+ writeImage (work ++ "/initial.graph") (Raw.rawGraphImage (C.initialGraph provider))
+ writeImage (work ++ "/ordered.input") (Raw.orderedInputImage (C.equalities provider) (C.solveSteps provider))
+ writeImage (work ++ "/input.tsv") (inputLedger provider)
+ writeImage (work ++ "/summary") (showInt total ++ "\n")
+ putStrLn ("Component inference: " ++ showInt total ++ " complete graph/index comparisons")
+
+advance : Solver -> SolveStep -> IO Solver
+advance solver action = case action of
+ Instantiate edge -> H.right (Solver.instantiate (C.fromGen edge) (C.toNode edge) solver)
+ ProjectCase fields -> H.right (Solver.projectCaseFields fields solver)
+
+compareStep : Compared -> SolveStep -> IO Compared
+compareStep (Compared ordinal graph solver rows) action = do
+ (,) expected actual <- T.compareSolveStep ((,) graph solver) action
+ return (Compared (ordinal + 1) expected actual ((:) (inputRow ordinal action) rows))
+
+terminal : Int -> Int -> String
+terminal lo hi = "PROVIDER RANGE OK " ++ showInt lo ++ " " ++ showInt hi
+
+providerRange : PreludeFiles -> Int -> Int -> String -> IO ()
+providerRange files lo hi work = do
+ fresh work
+ (,) _ c <- prepare files
+ let graph = C.initialGraph c
+ let equations = C.equalities c
+ let actions = C.solveSteps c
+ H.assert (lo >= 1 && lo <= hi && hi <= S.length actions) "provider range outside current action bounds"
+ initial <- H.right (Solver.prepare graph)
+ first <- H.right (Solver.unify equations initial)
+ (,) startExpected startActual <- if lo == 1 then do {
+  (,) _ expected <- H.right (Ref.runBuild graph (Ref.unify equations));
+  T.sameGraph expected first;
+  return ((,) expected first)
+ } else do {
+  prefix <- S.foldM advance first (S.take (lo - 1) actions);
+  return ((,) (Solver.solverGraph prefix) prefix)
+ }
+ let slice = S.take (hi - lo + 1) (S.drop (lo - 1) actions)
+ Compared next endExpected endActual covered <- S.foldM compareStep (Compared lo startExpected startActual []) slice
+ H.assert (next == hi + 1) "provider worker did not compare its complete action range"
+ writeImage (work ++ "/initial.graph") (Raw.rawGraphImage graph)
+ writeImage (work ++ "/ordered.input") (Raw.orderedInputImage equations actions)
+ writeImage (work ++ "/covered.tsv") (S.unlines (S.reverse covered))
+ writeImage (work ++ "/start.reference") (Raw.rawGraphImage startExpected)
+ writeImage (work ++ "/start.actual") (Raw.rawSolverImage startActual)
+ writeImage (work ++ "/end.reference") (Raw.rawGraphImage endExpected)
+ writeImage (work ++ "/end.actual") (Raw.rawSolverImage endActual)
+ putStrLn (terminal lo hi)
+
+-- Keep more early, cheaper comparisons in the first range and less in the
+-- final range; derive all cut points from this run's current ordered actions.
+providerRanges : String -> IO ([] ((,,) String Int Int))
+providerRanges work = do
+ text <- readText (work ++ "/consumers/input.tsv")
+ let rows = O.lines text
+ let count = S.length rows - 2
+ H.assert (count >= 3 && eqString (S.last rows) "" && O.starts "INPUT equalities " (S.head rows))
+  "provider action ledger is empty or malformed"
+ let a = S.max 1 (quotInt (count * 3060) 7428)
+ let b = S.max (a + 1) (quotInt (count * 5460) 7428)
+ H.assert (a < b && b < count) "provider ranges do not cover the current action ledger"
+ return ((:) ((,,) "provider-1" 1 a) ((:) ((,,) "provider-2" (a + 1) b) ((:) ((,,) "provider-3" (b + 1) count) [])))
+
+verifyRange : String -> [] String -> ((,,) String Int Int) -> IO ()
+verifyRange work rows ((,,) name lo hi) = do
+ let path = work ++ "/" ++ name
+ directory path
+ entries <- O.entries path
+ H.assert (S.eqList eqString entries (O.words "covered.tsv end.actual end.reference initial.graph ordered.input start.actual start.reference"))
+  "provider range output inventory changed"
+ sameFiles (work ++ "/consumers/initial.graph") (path ++ "/initial.graph")
+ sameFiles (work ++ "/consumers/ordered.input") (path ++ "/ordered.input")
+ sameText (path ++ "/covered.tsv") (S.unlines (S.take (hi - lo + 1) (S.drop lo rows)))
+ sameText (work ++ "/logs/" ++ name ++ ".stdout") (terminal lo hi ++ "\n")
+ empty (work ++ "/logs/" ++ name ++ ".stderr")
+
+seam : String -> String -> String -> IO ()
+seam work left right = do
+ sameFiles (work ++ "/" ++ left ++ "/end.reference") (work ++ "/" ++ right ++ "/start.reference")
+ sameFiles (work ++ "/" ++ left ++ "/end.actual") (work ++ "/" ++ right ++ "/start.actual")
+
+verify : String -> IO ()
+verify work = do
+ ranges <- providerRanges work
+ text <- readText (work ++ "/consumers/input.tsv")
+ let rows = O.lines text
+ S.mapM_ (verifyRange work rows) ranges
+ seam work "provider-1" "provider-2"
+ seam work "provider-2" "provider-3"
+ _ <- readImage (work ++ "/provider-1/start.reference")
+ _ <- readImage (work ++ "/provider-1/start.actual")
+ _ <- readImage (work ++ "/provider-3/end.reference")
+ _ <- readImage (work ++ "/provider-3/end.actual")
+ empty (work ++ "/logs/consumers.stderr")
+ consumerLog <- readText (work ++ "/logs/consumers.stdout")
+ summary <- readText (work ++ "/consumers/summary")
+ let consumerTotal = readInt (S.head (O.lines summary))
+ H.assert (consumerTotal > 0 && eqString (S.last (O.lines summary)) "" &&
+           S.elem eqString ("Component inference: " ++ showInt consumerTotal ++ " complete graph/index comparisons") (O.lines consumerLog))
+  "consumer comparison summary is missing"
+ putStr consumerLog
+ putStrLn ("Checked provider inference: " ++ showInt (S.length rows - 1) ++ " complete graph/index comparisons")
