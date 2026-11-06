@@ -1,0 +1,1 @@
+let id_2 = /\(a6 >= bot) -> \(x_5 : a6) -> x_5 in (/\(a53 >= bot) -> (/\(a18 >= bot) -> primitive ifThenElse(a18))[inner(bot(a53)); elim] (id_2[inner(bot(Bool)); elim] true))[inner(bot(Int)); elim] (id_2[inner(bot(Int)); elim] 42) 0

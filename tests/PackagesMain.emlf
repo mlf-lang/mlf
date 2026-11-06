@@ -6,14 +6,14 @@ import qualified Tests.Packages as P
 import qualified Tests.PackageResolver as R
 import qualified Tests.TargetDependencies as D
 import qualified Tests.PackageReleases as Releases
-main : IO Unit
+main : IO ()
 main = do
  args <- O.allArguments
  case args of
-  Cons "--fail-command" Nil -> exitWith 17
-  Cons "--package-gc-check" (Cons prefix (Cons binary Nil)) -> P.checkGC prefix binary
-  Cons "--integration" Nil -> do { Coverage.begin "packages" false; R.main; P.integration; D.integration; Coverage.finish "packages" }
-  Cons "--releases" Nil -> do { Coverage.begin "packages" false; Releases.main; Coverage.finish "packages" }
-  Cons "release" _ -> Releases.githubFixture args
-  Nil -> do { Coverage.begin "packages" true; R.main; P.integration; D.integration; Releases.main; Coverage.finish "packages" }
+  (:) "--fail-command" [] -> exitWith 17
+  (:) "--package-gc-check" ((:) prefix ((:) binary [])) -> P.checkGC prefix binary
+  (:) "--integration" [] -> do { Coverage.begin "packages" false; R.main; P.integration; D.integration; Coverage.finish "packages" }
+  (:) "--releases" [] -> do { Coverage.begin "packages" false; Releases.main; Coverage.finish "packages" }
+  (:) "release" _ -> Releases.githubFixture args
+  [] -> do { Coverage.begin "packages" true; R.main; P.integration; D.integration; Releases.main; Coverage.finish "packages" }
   _ -> O.fatal "invalid package test arguments"

@@ -1,0 +1,13 @@
+PASS mixed-values-functions-repeat-await
+PASS queued-cancellation
+PASS sleeping-cancellation
+PASS completed-cancellation
+PASS waiting-cancellation-shared-prerequisite
+PASS capture-and-fail-fast
+PASS nested-failure-isolation
+PASS bounded-ordered-combinators
+PASS explicit-admission-errors
+PASS monotonic-deadline-and-join
+PASS scope-cancellation
+PASS jobs-one-dynamic-dependencies
+PASS escaped-and-cross-scope-rejection

@@ -1,0 +1,1178 @@
+{
+  "baseline_ref": "5172c4ade3b3141da2e64593c383892575b36699",
+  "complete": true,
+  "controls": {
+    "dependencies": "Authenticated ordinary O2",
+    "domain_and_outside_domain_diagnostic": {
+      "receipt": ".mlf-build/full-compiler-20261101/projection-spine-02/controls-debug-o2/run/command.json",
+      "result": "Malformed manually constructed IntMap with bottom key and bottom count: O2 old filter first observes count, direct fold first observes key (O0 agrees). Such a count/key pair is unreachable in the private restoration path: count is the finite selected-map size and keys were forced by canonical constructors. Not accepted as equivalent outside this stated domain. Replaced the unsupported fixture by a canonical finite-key/count map with competing partial Node payloads; complete earlier payload/first-error controls retained. No performance sample had run.",
+      "source": ".mlf-build/full-compiler-20261101/projection-spine-02/controls-debug-o2/source/Main.hs"
+    },
+    "local_owner_modes": [
+      "0",
+      "2"
+    ],
+    "new_independent_view_models_per_mode": 720,
+    "new_payload_demand_observations_per_mode": 9,
+    "retained_demand_observations_per_mode": 8,
+    "retained_physical_state_traces_per_mode": 63,
+    "retained_survivor_models_per_mode": 29160
+  },
+  "cost_map": {
+    "delta": {
+      "bins": {
+        "delta/C3/128": [
+          5282,
+          42478321,
+          397379,
+          313205
+        ],
+        "delta/C3/16": [
+          133643,
+          7178343981,
+          1357302,
+          890081
+        ],
+        "delta/C3/256": [
+          143,
+          4821928,
+          25432,
+          24982
+        ],
+        "delta/C3/32": [
+          15901,
+          150672072,
+          355049,
+          263519
+        ],
+        "delta/C3/4": [
+          116050,
+          3298388533,
+          463621,
+          139205
+        ],
+        "delta/C3/512": [
+          10,
+          470970,
+          2670,
+          2640
+        ],
+        "delta/C3/64": [
+          8771,
+          71692328,
+          424657,
+          333454
+        ],
+        "delta/C3/8": [
+          204641,
+          21945052328,
+          1312027,
+          694468
+        ],
+        "delta/ordinary/1024": [
+          1198,
+          40364193,
+          795071,
+          626450
+        ],
+        "delta/ordinary/128": [
+          792,
+          141174201,
+          71918,
+          57947
+        ],
+        "delta/ordinary/131072": [
+          1,
+          457978,
+          116149,
+          82431
+        ],
+        "delta/ordinary/16": [
+          6348,
+          172057325,
+          74502,
+          21171
+        ],
+        "delta/ordinary/16384": [
+          1,
+          35374,
+          8738,
+          6247
+        ],
+        "delta/ordinary/2": [
+          22,
+          40682,
+          44,
+          22
+        ],
+        "delta/ordinary/2048": [
+          72,
+          2225702,
+          90126,
+          67391
+        ],
+        "delta/ordinary/256": [
+          388,
+          50979098,
+          68082,
+          57848
+        ],
+        "delta/ordinary/32": [
+          2032,
+          266138337,
+          45627,
+          26226
+        ],
+        "delta/ordinary/4": [
+          3659,
+          163133954,
+          14048,
+          3127
+        ],
+        "delta/ordinary/4096": [
+          63,
+          927102,
+          190568,
+          139523
+        ],
+        "delta/ordinary/512": [
+          235,
+          45874982,
+          88075,
+          80481
+        ],
+        "delta/ordinary/64": [
+          1299,
+          203873361,
+          59578,
+          43248
+        ],
+        "delta/ordinary/8": [
+          29875,
+          4074191267,
+          191214,
+          66926
+        ],
+        "delta/ordinary/8192": [
+          19,
+          429039,
+          97563,
+          70907
+        ]
+      },
+      "calls": 530445,
+      "global_node_sum": 37853823056,
+      "local_remaining_or_replacements": 4011499,
+      "selected_or_updates": 6249440
+    },
+    "projection": {
+      "bins": {
+        "projection/C3/1024": [
+          248,
+          19886993,
+          170944,
+          171596
+        ],
+        "projection/C3/128": [
+          12652,
+          504102774,
+          1066393,
+          1031918
+        ],
+        "projection/C3/16": [
+          191255,
+          16548475443,
+          2256990,
+          1886190
+        ],
+        "projection/C3/2048": [
+          111,
+          8587003,
+          159318,
+          159539
+        ],
+        "projection/C3/256": [
+          10428,
+          155722770,
+          1931744,
+          1869433
+        ],
+        "projection/C3/32": [
+          80514,
+          7805643686,
+          1931755,
+          1765280
+        ],
+        "projection/C3/4096": [
+          8,
+          4339823,
+          22052,
+          22028
+        ],
+        "projection/C3/512": [
+          7365,
+          93415677,
+          2320636,
+          2234433
+        ],
+        "projection/C3/64": [
+          30398,
+          1616569656,
+          1346429,
+          1268926
+        ],
+        "projection/C3/8": [
+          151460,
+          5934091846,
+          1211033,
+          908113
+        ],
+        "projection/C3/8192": [
+          2,
+          1084790,
+          12172,
+          12166
+        ],
+        "projection/ordinary/1024": [
+          564,
+          98398126,
+          398196,
+          393000
+        ],
+        "projection/ordinary/128": [
+          4409,
+          462881446,
+          387671,
+          363717
+        ],
+        "projection/ordinary/16": [
+          5306,
+          162018872,
+          70949,
+          58131
+        ],
+        "projection/ordinary/16384": [
+          24,
+          2011096,
+          234621,
+          231897
+        ],
+        "projection/ordinary/2048": [
+          1471,
+          66628732,
+          2168470,
+          2030574
+        ],
+        "projection/ordinary/256": [
+          2318,
+          270268196,
+          420838,
+          408779
+        ],
+        "projection/ordinary/262144": [
+          1,
+          457978,
+          261350,
+          261221
+        ],
+        "projection/ordinary/32": [
+          25161,
+          3534594594,
+          466314,
+          381298
+        ],
+        "projection/ordinary/32768": [
+          4,
+          1198594,
+          72106,
+          71089
+        ],
+        "projection/ordinary/4": [
+          22,
+          40682,
+          88,
+          88
+        ],
+        "projection/ordinary/4096": [
+          228,
+          51591037,
+          612112,
+          591924
+        ],
+        "projection/ordinary/512": [
+          1373,
+          233135676,
+          488429,
+          478543
+        ],
+        "projection/ordinary/64": [
+          4899,
+          268573856,
+          220836,
+          200045
+        ],
+        "projection/ordinary/8": [
+          146,
+          1110104,
+          1167,
+          886
+        ],
+        "projection/ordinary/8192": [
+          78,
+          8993606,
+          470838,
+          461043
+        ]
+      },
+      "calls": 530445,
+      "global_node_sum": 37853823056,
+      "local_remaining_or_replacements": 17261857,
+      "selected_or_updates": 18703451
+    }
+  },
+  "current_source_qualification": {
+    "fresh": 3711,
+    "module_count": 81,
+    "performance_sample": false,
+    "raw_comparison_to_different_source_input": false,
+    "reused": 0
+  },
+  "decision": "Accepted under the user-authorized strictly-positive unrounded point rule, retained semantic/fresh/raw/resource checks and fixed guard criteria. Saving is only about0.042s/0.015%; pair directions differ. No stable acceleration or meaningful MLF/GHC-gap reduction claim.",
+  "diagnostic_qualification": {
+    "fresh": 3710,
+    "meaning": "ST source-work counters, not ordinary CPU shares, physical allocation or exclusive phase times",
+    "raw_bytes_equal": true,
+    "reused": 0
+  },
+  "endpoint_pilots": [
+    {
+      "fresh": 3710,
+      "fresh_host_wrapper": null,
+      "fresh_shared_modules": null,
+      "lane": "mlf-checked",
+      "reused": 0,
+      "samples": 1,
+      "stages": [
+        {
+          "argv": [
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-producer/bin/emlf",
+            "--compile-crate",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-checked-01/crate.spec",
+            "-o",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-checked-01/unit"
+          ],
+          "exit_code": 0,
+          "name": "source-to-checked",
+          "stderr": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-checked-01/source-to-checked.stderr",
+          "stdout": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-checked-01/source-to-checked.stdout",
+          "system_seconds": 7.137025,
+          "user_seconds": 273.01422,
+          "wall_seconds": 281.130549333
+        }
+      ],
+      "wall_seconds": 281.198672292
+    },
+    {
+      "fresh": null,
+      "fresh_host_wrapper": 1,
+      "fresh_shared_modules": 81,
+      "lane": "ghc-check",
+      "reused": null,
+      "samples": 1,
+      "stages": [
+        {
+          "argv": [
+            "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+            "--make",
+            "-j1",
+            "-O2",
+            "-fforce-recomp",
+            "-fpedantic-bottoms",
+            "-fno-state-hack",
+            "-v",
+            "-package-env",
+            "-",
+            "-clear-package-db",
+            "-global-package-db",
+            "-package-db",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/setup/dependencies/package-db",
+            "-no-user-package-db",
+            "-hide-all-packages",
+            "-package",
+            "base",
+            "-package",
+            "mlf-shape-primitives",
+            "-i",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-async",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-crates",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-developer-tools",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-foundation",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-frontend",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-inference",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-interpreter",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-language-core",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-llvm",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-package-core",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-xmlf",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/bootstrap",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/package",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/tests",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/tests/shared",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/testing",
+            "-odir",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-check-01/objects",
+            "-hidir",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-check-01/objects",
+            "-fno-code",
+            "-fwrite-interface",
+            "-no-link",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/host/ghc/app/emlf/Main.hs"
+          ],
+          "exit_code": 0,
+          "name": "source-to-ghc-check",
+          "stderr": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-check-01/source-to-ghc-check.stderr",
+          "stdout": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-check-01/source-to-ghc-check.stdout",
+          "system_seconds": 0.306922,
+          "user_seconds": 4.210563,
+          "wall_seconds": 4.530318792
+        }
+      ],
+      "wall_seconds": 4.600926792
+    },
+    {
+      "fresh": null,
+      "fresh_host_wrapper": 1,
+      "fresh_shared_modules": 81,
+      "lane": "ghc-native",
+      "reused": null,
+      "samples": 1,
+      "stages": [
+        {
+          "argv": [
+            "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+            "--make",
+            "-j1",
+            "-O2",
+            "-fforce-recomp",
+            "-fpedantic-bottoms",
+            "-fno-state-hack",
+            "-v",
+            "-package-env",
+            "-",
+            "-clear-package-db",
+            "-global-package-db",
+            "-package-db",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/setup/dependencies/package-db",
+            "-no-user-package-db",
+            "-hide-all-packages",
+            "-package",
+            "base",
+            "-package",
+            "mlf-shape-primitives",
+            "-i",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-async",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-crates",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-developer-tools",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-foundation",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-frontend",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-inference",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-interpreter",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-language-core",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-llvm",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-package-core",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/libraries/mlf-xmlf",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/bootstrap",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/package",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/tests",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/tests/shared",
+            "-i/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/testing",
+            "-odir",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-native-01/objects",
+            "-hidir",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-native-01/objects",
+            "-rtsopts=ignoreAll",
+            "-o",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-native-01/program",
+            "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-source/host/ghc/app/emlf/Main.hs"
+          ],
+          "exit_code": 0,
+          "name": "source-to-ghc-native",
+          "stderr": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-native-01/source-to-ghc-native.stderr",
+          "stdout": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-native-01/source-to-ghc-native.stdout",
+          "system_seconds": 2.2285,
+          "user_seconds": 50.8192,
+          "wall_seconds": 53.351466
+        }
+      ],
+      "wall_seconds": 53.418202916
+    }
+  ],
+  "evidence": {
+    "baseline-auth.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-auth.json",
+      "sha256": "d5f7eb3989bffd7ce5f04f0fd249b7807e42395f85161aa47d1bbf927bec83b9"
+    },
+    "baseline-build/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-build/command.json",
+      "sha256": "09cc444c7a630c0c3909685ab779ba07421086773cb83b5ea38d63965f6ec5da"
+    },
+    "baseline-producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/baseline-producer/receipt.json",
+      "sha256": "d5f7eb3989bffd7ce5f04f0fd249b7807e42395f85161aa47d1bbf927bec83b9"
+    },
+    "candidate-02/command/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/candidate-02/command/command.json",
+      "sha256": "7a896439185bf7f90af57cdcaae7724c386ac2dff3e4954b819cb9a042acabb4"
+    },
+    "candidate-build/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/candidate-build/command.json",
+      "sha256": "46eadeb8d99dc4ebbe499b6adc4ae9e3f9cc44c61677560336effc2fa1023021"
+    },
+    "contract.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/contract.json",
+      "sha256": "a91ad0d63644a05873164b240e357f618a9b220235dee6148f79fcddabcd08a5"
+    },
+    "cost-map.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/cost-map.json",
+      "sha256": "43ca87aa265c89aa5605a9605273f9cec91e737c46df2bc9f569602ae6f98da3"
+    },
+    "discovery/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/discovery/plan.json",
+      "sha256": "454a44f7c64d18eb04854ea4a60db026a10c17266c8fda257a185674556aed0f"
+    },
+    "discovery/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/discovery/receipt.json",
+      "sha256": "c246ab30b7ca85780f409c44ea75b42379f1caf6dde9c08b8f9b20f3846bf000"
+    },
+    "fresh-module-coverage.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/fresh-module-coverage.json",
+      "sha256": "8d7831b068c29d06a487c80d55afd569b388f9b0cf9a8658b7a7020014a2904e"
+    },
+    "mechanism-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/mechanism-01/receipt.json",
+      "sha256": "df44b4aafa3cc1728b148b5b03c10c21cdaf41aded3c047e97e31ea5f03e56ce"
+    },
+    "primary-summary.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/primary-summary.json",
+      "sha256": "2a614a1456b239389d905af7028c6af532dc4091fa97399293f4887df650c05f"
+    },
+    "projection-spine-02/candidate-card.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/candidate-card.json",
+      "sha256": "dd3a1d1522940b9e963cdfcdf91775a8fbfa723f3bc72b8d9bfb32d58497ebe5"
+    },
+    "projection-spine-02/candidate/command/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/candidate/command/command.json",
+      "sha256": "c7dfe5838708da2221ff43117c707561dc8670c73258634f0ef28ec10b4d9355"
+    },
+    "projection-spine-02/candidate/producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/candidate/producer/receipt.json",
+      "sha256": "02c075e034fd65e7c89039cd1495287aa28897277d860a9e5161a572e4fe6dda"
+    },
+    "projection-spine-02/controls-debug-o2/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/controls-debug-o2/receipt.json",
+      "sha256": "32b4bc07c5e71803fdf4eec52d427287c73fb02d90dc76b838a1d169bfd909fa"
+    },
+    "projection-spine-02/controls-final-o0/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/controls-final-o0/receipt.json",
+      "sha256": "c3dabaf1233c8bd1aa200e607375028d1578a009eee367cdc95dc11672277924"
+    },
+    "projection-spine-02/controls-final-o2/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/controls-final-o2/receipt.json",
+      "sha256": "82211fdcc26ede77fba618170ca82384422f9bfb29257aa151e2752564a820f2"
+    },
+    "projection-spine-02/controls-o2/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/controls-o2/receipt.json",
+      "sha256": "ab257c21af1e382d5f010e634fba42edcb4c50873efcb45a0cdbe49da4d8af59"
+    },
+    "projection-spine-02/core-A/compile/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/core-A/compile/command.json",
+      "sha256": "8fb41a5a548403726a79cfb0cf801cb9b845fa85ebc8e0c6f2fe59e8ae72208f"
+    },
+    "projection-spine-02/core-A02/compile/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/core-A02/compile/command.json",
+      "sha256": "a7c03313dfb0916fb757f1fca86ae9dad365c787f5e210cb7789686e9cdca5cd"
+    },
+    "projection-spine-02/core-A02/compile/stdout": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/core-A02/compile/stdout",
+      "sha256": "fe56ccc66930e3a3784fbc7f803dc054cb8546664f95c2089af084d5110017fa"
+    },
+    "projection-spine-02/core-B02/compile/command.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/core-B02/compile/command.json",
+      "sha256": "edb661d72dc2a6d2fe3fd7d91f6a8fc51ceac1766490101caf78b1a0755b58f1"
+    },
+    "projection-spine-02/core-B02/compile/stdout": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/core-B02/compile/stdout",
+      "sha256": "30c95531a7e547272d2bfff1a13e504a87b7932586e8e81fe408ee4978532c0f"
+    },
+    "projection-spine-02/discovery-config.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/discovery-config.json",
+      "sha256": "9f863770b4016bba965b2a28421998403ae17b80ceacda1537986612f8325823"
+    },
+    "projection-spine-02/discovery-summary.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/discovery-summary.json",
+      "sha256": "5dea747fc6439680ba9882533df35cd898baec888b57077e53c7ce9ed7a4f478"
+    },
+    "projection-spine-02/discovery/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/discovery/plan.json",
+      "sha256": "200a7a23a680e54bef7b332e2843b84081eddcbce3e3830c9aa1e55d77cad018"
+    },
+    "projection-spine-02/discovery/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/discovery/receipt.json",
+      "sha256": "53178ff94830dadb0fede40a81dc53365237b420f4db37e2c3f8db2eb9c196f1"
+    },
+    "projection-spine-02/final-auth.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/final-auth.json",
+      "sha256": "5132a0284a9b0cb7a96ae782a4ea774a29eb5b5a4f89edd114b5ab36c3921018"
+    },
+    "projection-spine-02/framework-platform-audit/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/framework-platform-audit/receipt.json",
+      "sha256": "83843d014440798e79f07bf477aabbdf8062dd86c92aa77291ce210091ae565d"
+    },
+    "projection-spine-02/gates.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/gates.json",
+      "sha256": "219aa441ec61a8865e5c51d1920a52de951cab4b2eaeb94d2237deb8d69e27ea"
+    },
+    "projection-spine-02/guard-config.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/guard-config.json",
+      "sha256": "835f1b996f15e319aff74b1841f97c2230d6700a08c7aaa56e857e57af79e309"
+    },
+    "projection-spine-02/guards/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/guards/plan.json",
+      "sha256": "9263ed0d48039f9980e1fc20ad13706df847a4396f733a0e01eae6bb50df6528"
+    },
+    "projection-spine-02/guards/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/guards/receipt.json",
+      "sha256": "7953ec0814061438e1a92ef1e29bef70de42078719fba97c360876c4a3392fc1"
+    },
+    "projection-spine-02/integrated-current-checked/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/integrated-current-checked/receipt.json",
+      "sha256": "00ef435848b7a3f181d547351289796f2d94ae004978909ef0711a2bcdb6dea6"
+    },
+    "projection-spine-02/integrated-workload.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/integrated-workload.json",
+      "sha256": "c3c5a747a614408aaae8a5d103d5c280a222e7aa6c45fbebe22cabaa4fbc07da"
+    },
+    "projection-spine-02/primary-summary.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/primary-summary.json",
+      "sha256": "3c9dea3dfc412da9588681c837c47b52f83bfa4ace620a83b1f890a8f0f71dec"
+    },
+    "projection-spine-02/qualification.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/projection-spine-02/qualification.json",
+      "sha256": "48e4de6db266e8e1b187c874bddf786f46d5f691ef1ef978694822f2dcc3f560"
+    },
+    "qualification-ghc-check-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-check-01/receipt.json",
+      "sha256": "e204c1eff7b0e2979ae5e3c0b26177e03d7d65b87324a4b16890e1a969cc8a2a"
+    },
+    "qualification-ghc-native-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-ghc-native-01/receipt.json",
+      "sha256": "5351f1be9f6cbdf7cc6dd30ad27724fa235efaf38d5b299d995cb1b87ec7a382"
+    },
+    "qualification-mlf-checked-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-checked-01/receipt.json",
+      "sha256": "2ece9eebbb38a76f2992543a812d86cddee89c3ac05d4d12836ce66f520234c5"
+    },
+    "qualification-mlf-llvm-01/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-llvm-01/receipt.json",
+      "sha256": "bb5ad8c291de02356864ef4b964dafd20c34baae220b1040954828bc0ded9e51"
+    },
+    "qualification-mlf-llvm-02/guard-kill-audit.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-llvm-02/guard-kill-audit.json",
+      "sha256": "86ca68915d7ca306d6216f20fdd9c94fb30a4822461c69c3adc53a6343209c59"
+    },
+    "qualification-mlf-llvm-02/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/qualification-mlf-llvm-02/receipt.json",
+      "sha256": "9d17cd11bcc4c1ce2fd7e0eb44dc17147007fac99ccb1dce381426e8fbecedec"
+    },
+    "rejected-bulk-patch-01/candidate-card.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/rejected-bulk-patch-01/candidate-card.json",
+      "sha256": "f7efd41392a8b2e9b4952662ddb38e0a6acce41c3402b714fb05be759344b39b"
+    },
+    "rejected-bulk-patch-01/qualification.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/rejected-bulk-patch-01/qualification.json",
+      "sha256": "84082b2baf93bf30d335aa7bb6a47059ad33d735767c7a2c173b765349fa4a99"
+    },
+    "rejected-bulk-patch-01/snapshot.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/rejected-bulk-patch-01/snapshot.json",
+      "sha256": "62d7d56ed3b24a240df5bf24362706ce18df1703dec6a834254f2a86a5aa5162"
+    },
+    "setup/entry-adapter-exposure.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/setup/entry-adapter-exposure.json",
+      "sha256": "0994319c1c3b36f0129bb197323abe31a4f0dfc425cc9e83eb5a892ca109bd88"
+    },
+    "setup/setup.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/setup/setup.json",
+      "sha256": "703314fa03960d33630f4e0ba1fb69d69d5b8642a2588b001598b34ca39c0146"
+    },
+    "workload.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/workload.json",
+      "sha256": "886fc404b2291912d105f9652d110b19d405a2ba6820c3253087a52b4fca5d7a"
+    }
+  },
+  "evidence_limits": [
+    "Full native MLF pipeline failed within unchanged5GiB RSS protection; no same-endpoint/native self-bootstrap speed ratio.",
+    "GHC check and GHC native results are single pilot observations with different endpoints from MLF checked compilation.",
+    "Primary is one four-leg balanced block; two pair directions differ; no confidence interval, statistical significance, stability or portability claim.",
+    "Strict positive point gain is about0.015128%, roughly0.042s; no extra samples used to turn it into stronger evidence.",
+    "Both shape guards are slower (+1.025% and +2.309%), within the predeclared combined relative/absolute guard.",
+    "All diagnostic work counts and map-size sums are proxies, not phase CPU attribution or proof of quadratic global scanning.",
+    "Private helper assumes finite canonical strict keys/counts; malformed bottom key+count can change O2 first-exception order, explicitly outside the private callsite domain.",
+    "Framework mock-fixture default macOS temporary path mismatch was reproduced on unmodified baseline; all31 methods pass with canonical TMPDIR, no fixture edits."
+  ],
+  "format": "full-compiler-projection-view-results-v1",
+  "full_workload": {
+    "entry": "MLF.Entry.Emlf",
+    "exclusions": "Other executables, tests and unreachable shared modules are outside emlf compiler entry closure.",
+    "freshness": "All listed 81 shared modules compile fresh in each leg; no target query/object reuse. Only primitive/host adapters, installed GHC packages and builtin/runtime may be fixed dependencies.",
+    "module_count": 81,
+    "nonshared_imports": [
+      "MLF.Primitive"
+    ],
+    "source_bytes": 3549918
+  },
+  "integration_suites": [
+    {
+      "exit_code": 0,
+      "name": "c3-delayed-index"
+    },
+    {
+      "exit_code": 0,
+      "name": "c3-survivors"
+    },
+    {
+      "exit_code": 0,
+      "name": "p123"
+    },
+    {
+      "exit_code": 0,
+      "name": "graph"
+    },
+    {
+      "exit_code": 0,
+      "name": "map-balance"
+    },
+    {
+      "exit_code": 0,
+      "name": "validation"
+    },
+    {
+      "exit_code": 0,
+      "name": "builtin"
+    },
+    {
+      "exit_code": 0,
+      "name": "files"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-library"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-containers"
+    },
+    {
+      "exit_code": 0,
+      "name": "fingerprint"
+    },
+    {
+      "exit_code": 0,
+      "name": "direct"
+    },
+    {
+      "exit_code": 0,
+      "name": "batch-optimizer"
+    },
+    {
+      "exit_code": 0,
+      "name": "native-io"
+    },
+    {
+      "exit_code": 0,
+      "name": "locked-plan"
+    },
+    {
+      "exit_code": 0,
+      "name": "manifest"
+    }
+  ],
+  "metadata_controls": {
+    "a1_current": {
+      "normal": 34,
+      "python_O": 34
+    },
+    "decision_arithmetic_fixtures": {
+      "normal": 5
+    },
+    "framework_budget_policy": {
+      "normal": 8
+    },
+    "framework_harness": {
+      "canonical_TMPDIR_baseline": 31,
+      "canonical_TMPDIR_current": 31,
+      "code_changed": false,
+      "unchanged_baseline_reproduces_original_path_alias_failure": true
+    },
+    "historical_metadata": {
+      "normal": 20
+    },
+    "history_refs": {
+      "normal": 8
+    },
+    "io_policy": {
+      "normal": 17
+    },
+    "manifest_snapshot": {
+      "normal": 22
+    },
+    "native_batching": {
+      "normal": 7
+    },
+    "patricia_adapters": {
+      "normal": 35,
+      "python_O": 35
+    },
+    "validation_contract": {
+      "normal": 7,
+      "python_O": 7
+    }
+  },
+  "native_mlf_endpoint": {
+    "IR_bytes": 0,
+    "complete": false,
+    "failure": "process-tree RSS limit on checked-to-LLVM; cleanup EPERM masked original reason",
+    "initial_kill_succeeded": true,
+    "limits_changed": false,
+    "matching_descendants_remaining": false,
+    "rss_limit_bytes": 5368709120,
+    "same_endpoint_ratio_available": false,
+    "sampled_group_peak_bytes": 5369446400
+  },
+  "ordinary_core": {
+    "A": "length originals and filter(toList solved) remain in ordinary optimized worker",
+    "B": "sizeTree selected and a direct filtered foldrTree; graph patch and all checks unchanged",
+    "identical_ordinary_flags_except_dump_options": true
+  },
+  "ordinary_samples": [
+    {
+      "block": 0,
+      "case": "compiler",
+      "child_system_seconds": 6.90138,
+      "child_user_seconds": 271.022236,
+      "fresh": 3710,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 278.963539792,
+      "window": "primary"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "child_system_seconds": 7.042931,
+      "child_user_seconds": 270.756137,
+      "fresh": 3710,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 279.315273875,
+      "window": "primary"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "child_system_seconds": 6.845476,
+      "child_user_seconds": 270.863393,
+      "fresh": 3710,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 278.651391833,
+      "window": "primary"
+    },
+    {
+      "block": 0,
+      "case": "compiler",
+      "child_system_seconds": 6.981531,
+      "child_user_seconds": 270.572789,
+      "fresh": 3710,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 279.087164458,
+      "window": "primary"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "child_system_seconds": 0.727487,
+      "child_user_seconds": 2.925143,
+      "fresh": 515,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 3.712003375,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "child_system_seconds": 0.7016509999999999,
+      "child_user_seconds": 3.019437,
+      "fresh": 515,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 3.779184458,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "child_system_seconds": 0.710399,
+      "child_user_seconds": 2.9736029999999998,
+      "fresh": 515,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 3.751009,
+      "window": "guards"
+    },
+    {
+      "block": 0,
+      "case": "flat_functions-512",
+      "child_system_seconds": 0.682869,
+      "child_user_seconds": 2.933323,
+      "fresh": 515,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 3.741770667,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "child_system_seconds": 0.084829,
+      "child_user_seconds": 0.856667,
+      "fresh": 6,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 0.9007915,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "child_system_seconds": 0.08381799999999999,
+      "child_user_seconds": 0.840835,
+      "fresh": 6,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 0.892982667,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "child_system_seconds": 0.088103,
+      "child_user_seconds": 0.8684569999999999,
+      "fresh": 6,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "A",
+      "wall_seconds": 0.930612375,
+      "window": "guards"
+    },
+    {
+      "block": 1,
+      "case": "higher_order_chain-128",
+      "child_system_seconds": 0.083047,
+      "child_user_seconds": 0.8702179999999999,
+      "fresh": 6,
+      "raw_bytes_equal": true,
+      "reused": 0,
+      "side": "B",
+      "wall_seconds": 0.965631167,
+      "window": "guards"
+    }
+  ],
+  "production_owner_sha256": "1210cfc8605bb8e45fd6801661175f892ebeddef561afa097b3fa3eafdde3c37",
+  "rejected_candidate": {
+    "decision": "Rejected; no extra primary or guard executions",
+    "name": "Bulk Patricia restoration >=8 updates",
+    "ordinary_samples": [
+      {
+        "block": 0,
+        "case": "compiler",
+        "child_system_seconds": 6.799176,
+        "child_user_seconds": 271.76272,
+        "fresh": 3710,
+        "raw_bytes_equal": true,
+        "reused": 0,
+        "side": "A",
+        "wall_seconds": 279.511117333,
+        "window": "rejected-primary"
+      },
+      {
+        "block": 0,
+        "case": "compiler",
+        "child_system_seconds": 6.836044,
+        "child_user_seconds": 271.851022,
+        "fresh": 3710,
+        "raw_bytes_equal": true,
+        "reused": 0,
+        "side": "B",
+        "wall_seconds": 279.925693875,
+        "window": "rejected-primary"
+      },
+      {
+        "block": 0,
+        "case": "compiler",
+        "child_system_seconds": 7.040588,
+        "child_user_seconds": 271.888385,
+        "fresh": 3710,
+        "raw_bytes_equal": true,
+        "reused": 0,
+        "side": "B",
+        "wall_seconds": 280.906640708,
+        "window": "rejected-primary"
+      },
+      {
+        "block": 0,
+        "case": "compiler",
+        "child_system_seconds": 6.925467,
+        "child_user_seconds": 270.597837,
+        "fresh": 3710,
+        "raw_bytes_equal": true,
+        "reused": 0,
+        "side": "A",
+        "wall_seconds": 278.90554325,
+        "window": "rejected-primary"
+      }
+    ],
+    "owner_sha256": "20189f63c73dec775d6b51326abee0883611c4f956e8bc4316e010276549af93",
+    "source_snapshot": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/full-compiler-20261101/rejected-bulk-patch-01/source",
+    "timing": {
+      "complete": true,
+      "evidence": "Fixed small descriptive window, one full-task block; no significance, confidence interval, stable/portable or native end-to-end claim.",
+      "guards": {},
+      "guards_complete": false,
+      "positive_primary": false,
+      "primary": {
+        "compiler": {
+          "blocks": [
+            {
+              "block": 0,
+              "log_ratio": 0.0043156630782485534,
+              "order": "ABBA",
+              "pair_log_ratios": [
+                0.001482121339122763,
+                0.007149204817374344
+              ]
+            }
+          ],
+          "gain": -0.004324988963117171,
+          "geometric_seconds": {
+            "A": 279.2081661129825,
+            "B": 280.41573834983353
+          },
+          "median_seconds": {
+            "A": 279.20833029150003,
+            "B": 280.41616729149996
+          },
+          "ratio": 1.0043249889631172,
+          "runs": 4
+        }
+      },
+      "timing_rule_passed": false
+    }
+  },
+  "timing": {
+    "complete": true,
+    "evidence": "Fixed small descriptive window, one full-task block; no significance, confidence interval, stable/portable or native end-to-end claim.",
+    "guards": {
+      "flat_functions-512": {
+        "blocks": [
+          {
+            "block": 0,
+            "log_ratio": 0.010201220529383112,
+            "order": "ABBA",
+            "pair_log_ratios": [
+              0.017936510364962552,
+              0.002465930693803673
+            ]
+          }
+        ],
+        "gain": -0.010253430363178717,
+        "geometric_seconds": {
+          "A": 3.7268573013170228,
+          "B": 3.765070373129581
+        },
+        "meaningful_regression": false,
+        "median_seconds": {
+          "A": 3.726887021,
+          "B": 3.7650967289999997
+        },
+        "ratio": 1.0102534303631787,
+        "runs": 4
+      },
+      "higher_order_chain-128": {
+        "blocks": [
+          {
+            "block": 1,
+            "log_ratio": 0.022822879929413085,
+            "order": "BAAB",
+            "pair_log_ratios": [
+              0.008706650450365576,
+              0.036939109408460596
+            ]
+          }
+        ],
+        "gain": -0.023085314555269187,
+        "geometric_seconds": {
+          "A": 0.9116033789816184,
+          "B": 0.9326480297350552
+        },
+        "meaningful_regression": false,
+        "median_seconds": {
+          "A": 0.911797521,
+          "B": 0.9332113335
+        },
+        "ratio": 1.0230853145552692,
+        "runs": 4
+      }
+    },
+    "guards_complete": true,
+    "positive_primary": true,
+    "primary": {
+      "compiler": {
+        "blocks": [
+          {
+            "block": 0,
+            "log_ratio": -0.0001512876655389516,
+            "order": "ABBA",
+            "pair_log_ratios": [
+              0.0012600661924780762,
+              -0.0015626415235559794
+            ]
+          }
+        ],
+        "gain": 0.0001512762221371755,
+        "geometric_seconds": {
+          "A": 279.0253452783738,
+          "B": 278.98313537825953
+        },
+        "median_seconds": {
+          "A": 279.02535212500004,
+          "B": 278.98333285399997
+        },
+        "ratio": 0.9998487237778628,
+        "runs": 4
+      }
+    },
+    "timing_rule_passed": true
+  }
+}

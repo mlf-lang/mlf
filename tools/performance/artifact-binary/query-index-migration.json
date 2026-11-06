@@ -1,0 +1,48 @@
+{
+  "format": "query-index-source-migration-v1",
+  "roots_contract_sha256": "65402542a1e0b0fa58bfc1a11d25b2adf4951582eac56c58149a8405ef2918aa",
+  "roots_manifest_sha256": "153cb1b7a10f473cebed5c60256481b00b70591c65f1e1c13926314434ff08f5",
+  "roots_value_sha256": "60817957fd858410f766b45a23271d3e99f4410cab2e9a46e1d28433531c9bf5",
+  "base_head": "9ef905033caa654ca07507d8b5ac2363f3207269",
+  "base_tree": "5688ecefcfce0eaa9f79a4ddf39d122f35d8195a",
+  "module_count": 135,
+  "primitive_count": 132,
+  "file_count": 196,
+  "parent_registry_sha256": "0bc8a2934cc7b41d2d71e4ede119c4273dbe33bda79175253196939004790b93",
+  "parent_inventory_sha256": "0e19351adb45a3a71841f946a174505656299a8774a0f497333feebf23b730b7",
+  "current_registry_sha256": "24a3527efba157413cdae5657c28767f262120fc5493ec6b94e380411f27d011",
+  "current_inventory_sha256": "34eab53906c266ccbd819f051df8da3fb315a36671523219f84b007f0adf8e94",
+  "transition": {
+    "changed_paths": [
+      "bootstrap/MLF/BuiltinPreludeData.hs",
+      "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "mlf.lock"
+    ],
+    "added_paths": [],
+    "deltas": {
+      "bootstrap/MLF/BuiltinPreludeData.hs": {
+        "file": "query-index-deltas/000.json",
+        "sha256": "1875686a59986955beadbbd3228cb1996e6c76d7b3f644299a9b35e98eb7bcea",
+        "old": "cec037c459cd0ef0eb057c1593268adf115492feb14d69f4dddcf0be3d860a36",
+        "new": "0e04f145d180c5b3b54f29bc4cb288ab59249be62ac58f346647df8c848f9679"
+      },
+      "libraries/mlf-crates/Bootstrap/QueryGraph.hs": {
+        "file": "query-index-deltas/001.json",
+        "sha256": "3b8e09127b96fc46a099caa4eb41f8a63cc80b988a00871aef560920c37a9e73",
+        "old": "e20aa382dfbaa0d3422d7d18b6417ffac5d511c897e7f949569ffa4b263f4990",
+        "new": "0a872320d3e59ce85db09fa5c04e3d168b4c172560396a8875e0a83ba47ff040"
+      },
+      "mlf.lock": {
+        "file": "query-index-deltas/002.json",
+        "sha256": "7b4ab441cc141f0253ae551bd742a84c482b21e6e4e28f29d5ab0d98eccd677b",
+        "old": "3a845410aa2cd8cad95ab421e25d8d0dd0d045627a75ea675b3effd82e49f040",
+        "new": "79cb056a1456d4b3e94ef86d3dda7379b9614db2dbe8fae90965f8cdea77996e"
+      }
+    }
+  },
+  "evidence": {
+    "file": "query-index-provenance.json",
+    "sha256": "6f7183254dc1f3448eb6b547cc5de9f0f58069bf6fbb5ceae44c4929cbd284b5"
+  },
+  "qualification_scope": "Source identity and reversible projection only; no new runtime or generation qualification."
+}

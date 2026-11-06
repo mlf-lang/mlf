@@ -1,0 +1,11 @@
+PASS cold-construction-spawn-once
+PASS scope-exit-joins-child
+PASS dynamic-submission-while-independent-process-runs
+PASS running-process-cancellation-joins
+PASS failure-cancels-and-joins-process-sibling
+PASS process-outcomes-and-checked-failure
+PASS cancelled-pending-process-never-admitted
+PASS ancestor-cancellation-before-nested-admission
+PASS pending-process-total-deadline-includes-task-queue
+PASS task-owned-process-pending-limit
+PASS synthetic-dynamic-diamond-jobs-one-and-four

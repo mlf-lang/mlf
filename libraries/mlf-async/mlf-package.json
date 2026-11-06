@@ -2,11 +2,19 @@
   "format": 1,
   "name": "mlf-async",
   "version": "0.3.0",
-  "dependencies": {"mlf-foundation": {"path": "../mlf-foundation"}},
-  "library": {"modules": {
-    "Async.Process": "Async/Process.emlf",
-    "Async.Process.Internal": "Async/Process/Internal.emlf",
-    "Async.Task": "Async/Task.emlf",
-    "Async.Task.Internal": "Async/Task/Internal.emlf"
-  }}
+  "dependencies": {
+    "mlf-foundation": {
+      "path": "../mlf-foundation"
+    }
+  },
+  "library": {
+    "modules": {
+      "Async.Process": "Async/Process.hs",
+      "Async.Process.Internal": "Async/Process/Internal.hs",
+      "Async.Task": "Async/Task.hs",
+      "Async.Task.Internal": "Async/Task/Internal.hs",
+      "Async.Task.Core": "Async/Task/Core.hs"
+    }
+  },
+  "source-syntax": "shared-haskell-v1"
 }

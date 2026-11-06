@@ -42,7 +42,7 @@ main = do
       constraints <- checked "generate" F.forceConstraints (C.generateProgram lowered)
       prepared <- checked "prepare" F.forceSolver (S.prepare (C.initialGraph constraints))
       initial <- checked "unify" F.forceSolver (S.solverUnify (C.equalities constraints) prepared)
-      instantiated <- checked "instantiate" F.forceSolver (L.foldM (\solver e -> S.instantiateClosed (C.fromGen e) (C.toNode e) solver) initial (C.instances constraints))
+      instantiated <- checked "instantiate" F.forceSolver (C.evaluateSteps initial (C.solveSteps constraints))
       solved <- checked "finish-normalize" F.forceSolver (S.finishNormalized instantiated)
       let graph = S.solverGraph solved
       let types = E.prepareTypes graph

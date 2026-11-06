@@ -12,7 +12,7 @@ set b i field x = writeDoubleArray b (i + field) x
 
 norm2 x y z = addDouble (addDouble (mulDouble x x) (mulDouble y y)) (mulDouble z z)
 
-initialize : DoubleArray -> IO Unit
+initialize : DoubleArray -> IO ()
 initialize b = do
   set b 0 6 solarMass
   set b 7 0 4.84143144246472090e+00
@@ -44,7 +44,7 @@ initialize b = do
   set b 28 5 (mulDouble (-9.51592254519715870e-05) year)
   set b 28 6 (mulDouble 5.15138902046611451e-05 solarMass)
 
-offset : DoubleArray -> Int -> Double -> Double -> Double -> IO Unit
+offset : DoubleArray -> Int -> Double -> Double -> Double -> IO ()
 offset b i px py pz =
   if i == 35 then do
     set b 0 3 (divDouble (subDouble 0.0 px) solarMass)
@@ -84,7 +84,7 @@ energy b i e =
     potential <- pairEnergy b i (i + 7) (addDouble e (mulDouble (mulDouble 0.5 mass) (norm2 vx vy vz)))
     energy b (i + 7) potential
 
-pairs : DoubleArray -> Int -> Int -> IO Unit
+pairs : DoubleArray -> Int -> Int -> IO ()
 pairs b i j =
   if j == 35 then return ()
   else do
@@ -115,14 +115,14 @@ pairs b i j =
     set b j 5 (addDouble vz2 (mulDouble (mulDouble dz m) mag))
     pairs b i (j + 7)
 
-velocities : DoubleArray -> Int -> IO Unit
+velocities : DoubleArray -> Int -> IO ()
 velocities b i =
   if i == 35 then return ()
   else do
     pairs b i (i + 7)
     velocities b (i + 7)
 
-positions : DoubleArray -> Int -> IO Unit
+positions : DoubleArray -> Int -> IO ()
 positions b i =
   if i == 35 then return ()
   else do
@@ -137,7 +137,7 @@ positions b i =
     set b i 2 (addDouble z (mulDouble 0.01 vz))
     positions b (i + 7)
 
-advance : DoubleArray -> Int -> IO Unit
+advance : DoubleArray -> Int -> IO ()
 advance b n =
   if n == 0 then return ()
   else do

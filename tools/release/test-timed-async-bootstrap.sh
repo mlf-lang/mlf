@@ -27,7 +27,7 @@ sample=$(mktemp -d "$directory/commands/$kind.XXXXXX")
 code=0
 "$@" || code=$?
 rss=100
-if [ "$kind" = async-bootstrap ] && [ "$CONTROL" = rss ]; then rss=2000; fi
+if [[ "$kind" = async-bootstrap || "$kind" = manager-bootstrap ]] && [ "$CONTROL" = rss ]; then rss=2000; fi
 jq -n --arg kind "$kind" --argjson rss "$rss" --argjson code "$code" \
   '{kind:$kind,phase:$kind,started_utc:"fixture",complete:true,exit_code:$code,
     wall_seconds:1,user_seconds:1,system_seconds:0,peak_rss_bytes:$rss}' > "$sample/result.json"
@@ -122,3 +122,71 @@ for control in success transition-failed bad-capability bad-hash missing-helper 
   printf 'PASS timed primitive transition control: %s\n' "$control"
 done
 printf '%s bounded timed-bootstrap controls passed; no native compiler was built.\n' "$checks"
+
+# Repeat the route-boundary controls with the shared-source marker. The manager
+# bridge must receive original seed bytes, not the timing compiler wrapper.
+printf '{}\n' > "$project/shared-sources.json"
+cat > "$project/tools/release/bootstrap-manager.sh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+test "$MLF_COMPILER" = "$TEST_SEED_COMPILER"
+test "$MLF_PACKAGE_MANAGER" = "$TEST_SEED_MANAGER"
+test "$CC" = "$MLF_TIMING_DIR/bin/clang"
+test "$CONTROL" != transition-failed || exit 77
+b=$1
+mkdir -p "$b/bin"
+printf '#!/bin/sh\necho shared-aware-native\n' > "$b/bin/emlf"
+printf '#!/bin/sh\necho shared-aware-manager\n' > "$b/bin/mlfpkg"
+printf '#!/bin/sh\ntest "$1" = --protocol-version\necho 1\n' > "$b/bin/mlf-build-runner"
+chmod +x "$b/bin/"*
+printf '%s\n' "$b/bin/emlf" > "$b/compiler.path"
+case "$CONTROL" in
+  missing-compiler) rm "$b/bin/emlf" ;;
+  nonexecutable-compiler) chmod -x "$b/bin/emlf" ;;
+esac
+SH
+# The shared route must never call the legacy primitive bridge.
+printf '#!/bin/sh\nexit 98\n' > "$project/scripts/bootstrap-async.sh"
+python3 - "$project" <<'PYTHON'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+p = root/'mlfpkg'
+s = p.read_text().replace('$MLF_ASYNC_BOOTSTRAP_DIR/stage2', '$TEST_SHARED_BUILD/manager-bootstrap/bin/emlf').replace('$MLF_ASYNC_BOOTSTRAP_DIR/manager/bin/mlfpkg', '$TEST_SHARED_BUILD/manager-bootstrap/bin/mlfpkg')
+p.write_text(s)
+p = root/'tools/release/ensure-build-runner.sh'
+p.write_text(p.read_text().replace('$MLF_ASYNC_BOOTSTRAP_DIR/manager/bin/mlf-build-runner', '$TEST_SHARED_BUILD/manager-bootstrap/bin/mlf-build-runner'))
+PYTHON
+chmod +x "$project/tools/release/bootstrap-manager.sh"
+export TEST_SEED_COMPILER="$work/seed-compiler"
+for control in success transition-failed missing-compiler nonexecutable-compiler root-failed rss; do
+  build="$work/shared-$control"
+  github_env="$work/shared-$control.env"
+  status=0
+  (cd "$project"; CONTROL="$control" TEST_SHARED_BUILD="$build" \
+    MLF_COMPILER="$TEST_SEED_COMPILER" MLF_PACKAGE_MANAGER="$TEST_SEED_MANAGER" \
+    MLF_BOOTSTRAP_MAX_RSS_BYTES=1500 GITHUB_ENV="$github_env" GITHUB_STEP_SUMMARY= \
+    tools/release/timed-bootstrap.sh "$build") > "$work/shared-$control.log" 2>&1 || status=$?
+  if [ "$control" = success ]; then
+    test "$status" -eq 0
+    grep -Fx "MLF_COMPILER=$build/bin/emlf" "$github_env"
+    jq -e --arg compiler "$build/manager-bootstrap/bin/emlf" \
+      '.current_compiler.path == $compiler and .bootstrap_compiler == null and .async_source_identity == null' "$build/timing/context.json" >/dev/null
+    jq -e '.memory_budget.passed and (.manager_bootstrap|length)==1 and (.async_bootstrap|length)==0 and all(.totals[];.kind!="manager-bootstrap")' "$build/timing/summary.json" >/dev/null
+    test -e "$build/root-invoked"
+    test ! -e "$build/async-bootstrap"
+  else
+    test "$status" -ne 0
+    test "$status" -ne 98
+    test ! -s "$github_env"
+    case "$control" in
+      transition-failed) test "$status" -eq 77 ;;
+      root-failed) test "$status" -eq 79 ;;
+      rss) test "$status" -eq 78; jq -e '.memory_budget.passed==false and .memory_budget.peak_process_rss_bytes==2000' "$build/timing/summary.json" >/dev/null ;;
+    esac
+    case "$control" in root-failed|rss) ;; *) test ! -e "$build/root-invoked" ;; esac
+  fi
+  checks=$((checks+1))
+  printf 'PASS timed shared-source transition control: %s\n' "$control"
+done
+printf '%s total bounded timed-bootstrap controls passed; no native compiler was built.\n' "$checks"

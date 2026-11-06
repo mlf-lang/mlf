@@ -1,0 +1,2374 @@
+Glasgow Haskell Compiler, Version 9.14.1, stage 2 booted by GHC version 9.10.1
+*** initializing unit database:
+package flags [-package base{package base True ([])},
+               -package array{package array True ([])},
+               -package bytestring{package bytestring True ([])},
+               -package text{package text True ([])},
+               -package containers{package containers True ([])},
+               -package directory{package directory True ([])}]
+loading package database /workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/lib/ghc-9.14.1/lib/package.conf.d
+wired-in package ghc-internal mapped to ghc-internal-9.1401.0-555c
+wired-in package rts mapped to rts-1.0.3
+!!! initializing unit database: finished in 1.03 milliseconds, allocated 2.489 megabytes
+*** Chasing dependencies:
+Chasing modules from: main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process/Internal.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Core.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Internal.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Classes.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Compiler.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/CompilerCore.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Constraint.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Crate.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateArtifact.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateCodegen.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateQuery.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Data.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Dependency.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Desugar.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Elaborate.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Evidence.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Fresh.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph/Solver.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Host.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/InferenceUnit.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntMap.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntSet.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kind.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kinding.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Layout.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Lexer.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Map.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parsec.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parser.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Prelude.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Primitive.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Regex.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/Runtime.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/ST.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Separate.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Set.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/SourceEquality.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Surface.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Types.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Unicode.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Version.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Check.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Checked.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Parser.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Type.hs,main:/workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/CompilerTests.hs,main:/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs,main:/workspace/shared/mlf-shared-source-migration/package/MLF/Entry/Mlfpkg.hs,main:/workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/TupleList.hs,main:/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessMain.hs,main:/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessPanic.hs,main:/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskMain.hs,main:/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskProcesses.hs,main:/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskWaitGraph.hs,main:/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/BuildReceipts.hs,main:/workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/SharedFrontend.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Benchmark.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Build.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Command.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Distribution.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Json.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Manifest.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/OS.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Release.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Scheduler.hs,main:/workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Verification.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/BuildReceipts.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/Catalog.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/CompilerTests.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/CorePartitions.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/Coverage.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentCheck.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentType.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/Selection.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/TestDrivers.hs,main:/workspace/shared/mlf-shared-source-migration/tests/Tests/TestSources.hs
+!!! Chasing dependencies: finished in 126.58 milliseconds, allocated 25.280 megabytes
+Ready for upsweep
+  [SingleModule(P: rts), SingleModule(P: ghc-internal),
+   SingleModule(P: ghc-prim-0.13.1-d287),
+   SingleModule(P: base-4.22.0.0-66f8),
+   SingleModule(P: deepseq-1.5.1.0-2129),
+   SingleModule(P: pretty-1.1.3.6-72f5),
+   SingleModule(P: ghc-boot-th-9.14.1-1fb7),
+   SingleModule(P: array-0.5.8.0-93e8),
+   SingleModule(P: template-haskell-2.24.0.0-7769),
+   SingleModule(P: containers-0.8-9e90),
+   SingleModule(P: bytestring-0.12.2.0-f1bc),
+   SingleModule(P: binary-0.8.9.3-0d14),
+   SingleModule(P: text-2.1.3-075e),
+   SingleModule(main:MLF.Host.Base [base-4.22.0.0-66f8,
+                                    base-4.22.0.0-66f8, base-4.22.0.0-66f8, base-4.22.0.0-66f8,
+                                    base-4.22.0.0-66f8, base-4.22.0.0-66f8, array-0.5.8.0-93e8,
+                                    base-4.22.0.0-66f8, base-4.22.0.0-66f8, base-4.22.0.0-66f8,
+                                    base-4.22.0.0-66f8, array-0.5.8.0-93e8, base-4.22.0.0-66f8,
+                                    base-4.22.0.0-66f8, bytestring-0.12.2.0-f1bc, text-2.1.3-075e,
+                                    text-2.1.3-075e, base-4.22.0.0-66f8, base-4.22.0.0-66f8]),
+   SingleModule(main:MLF.Host.Async [base-4.22.0.0-66f8,
+                                     base-4.22.0.0-66f8, base-4.22.0.0-66f8, base-4.22.0.0-66f8,
+                                     base-4.22.0.0-66f8, containers-0.8-9e90, base-4.22.0.0-66f8,
+                                     main:MLF.Host.Base, base-4.22.0.0-66f8, base-4.22.0.0-66f8]),
+   SingleModule(main:MLF.Host.IO [base-4.22.0.0-66f8,
+                                  base-4.22.0.0-66f8, base-4.22.0.0-66f8, base-4.22.0.0-66f8,
+                                  base-4.22.0.0-66f8, base-4.22.0.0-66f8, base-4.22.0.0-66f8,
+                                  base-4.22.0.0-66f8, base-4.22.0.0-66f8, containers-0.8-9e90,
+                                  array-0.5.8.0-93e8, bytestring-0.12.2.0-f1bc, main:MLF.Host.Base,
+                                  base-4.22.0.0-66f8, base-4.22.0.0-66f8]),
+   SingleModule(main:MLF.Primitive [main:MLF.Host.Async,
+                                    main:MLF.Host.IO, main:MLF.Host.Base, main:MLF.Host.Async,
+                                    main:MLF.Host.IO, main:MLF.Host.Base, base-4.22.0.0-66f8,
+                                    base-4.22.0.0-66f8]),
+   SingleModule(main:Bootstrap.Version [main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Unicode [main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Types [main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Std [main:Bootstrap.Types,
+                                    main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.ST [main:Bootstrap.Types,
+                                   main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.ProcessHost [main:Bootstrap.Types,
+                                            main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Primitive [main:Bootstrap.Std,
+                                          main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.SourceEquality [main:Bootstrap.Primitive,
+                                               main:Bootstrap.Std, main:Bootstrap.Types,
+                                               main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Map [main:Bootstrap.Std,
+                                    main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Set [main:Bootstrap.Map,
+                                    main:Bootstrap.Std, main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Lexer [main:Bootstrap.Unicode,
+                                      main:Bootstrap.Std, main:Bootstrap.Types,
+                                      main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Parsec [main:Bootstrap.Lexer,
+                                       main:Bootstrap.Std, main:Bootstrap.Types,
+                                       main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Layout [main:Bootstrap.Lexer,
+                                       main:Bootstrap.Std, main:Bootstrap.Types,
+                                       main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Kind [main:Bootstrap.Types,
+                                     main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.X.Syntax [main:Bootstrap.Kind,
+                                         main:Bootstrap.Primitive, main:Bootstrap.Std,
+                                         main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM.Optimize [main:Bootstrap.X.Syntax,
+                                              main:Bootstrap.Set, main:Bootstrap.Map,
+                                              main:Bootstrap.Std, main:Bootstrap.Types,
+                                              main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM.Analysis [main:Bootstrap.LLVM.Optimize,
+                                              main:Bootstrap.X.Syntax, main:Bootstrap.Primitive,
+                                              main:Bootstrap.Set, main:Bootstrap.Map,
+                                              main:Bootstrap.Std, main:Bootstrap.Types,
+                                              main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM.StrictFields [main:Bootstrap.LLVM.Analysis,
+                                                  main:Bootstrap.LLVM.Optimize,
+                                                  main:Bootstrap.X.Syntax, main:Bootstrap.Primitive,
+                                                  main:Bootstrap.Set, main:Bootstrap.Map,
+                                                  main:Bootstrap.Std, main:Bootstrap.Types,
+                                                  main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM.StrictWrappers [main:Bootstrap.LLVM.StrictFields,
+                                                    main:Bootstrap.LLVM.Analysis,
+                                                    main:Bootstrap.LLVM.Optimize,
+                                                    main:Bootstrap.Set, main:Bootstrap.Map,
+                                                    main:Bootstrap.Std, main:Bootstrap.Types,
+                                                    main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM.Kernel [main:Bootstrap.LLVM.Optimize,
+                                            main:Bootstrap.LLVM.Analysis, main:Bootstrap.Primitive,
+                                            main:Bootstrap.Set, main:Bootstrap.Map,
+                                            main:Bootstrap.Std, main:Bootstrap.Types,
+                                            main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM.Build [main:Bootstrap.LLVM.Optimize,
+                                           main:Bootstrap.LLVM.Analysis, main:Bootstrap.Primitive,
+                                           main:Bootstrap.Set, main:Bootstrap.Map,
+                                           main:Bootstrap.Std, main:Bootstrap.Types,
+                                           main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM.Native [main:Bootstrap.LLVM.Optimize,
+                                            main:Bootstrap.LLVM.Kernel,
+                                            main:Bootstrap.LLVM.Analysis, main:Bootstrap.X.Syntax,
+                                            main:Bootstrap.Primitive, main:Bootstrap.Set,
+                                            main:Bootstrap.Map, main:Bootstrap.Std,
+                                            main:Bootstrap.LLVM.Build, main:Bootstrap.Types,
+                                            main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM.Codegen [main:Bootstrap.LLVM.Native,
+                                             main:Bootstrap.LLVM.Optimize,
+                                             main:Bootstrap.LLVM.Kernel,
+                                             main:Bootstrap.LLVM.StrictFields,
+                                             main:Bootstrap.LLVM.Analysis, main:Bootstrap.Primitive,
+                                             main:Bootstrap.Set, main:Bootstrap.Map,
+                                             main:Bootstrap.Std, main:Bootstrap.LLVM.Build,
+                                             main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.IntMap [main:Bootstrap.Map,
+                                       main:Bootstrap.Std, main:Bootstrap.Types,
+                                       main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.IntSet [main:Bootstrap.IntMap,
+                                       main:Bootstrap.Map, main:Bootstrap.Std, main:Bootstrap.Types,
+                                       main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Regex [main:Bootstrap.IntSet,
+                                      main:Bootstrap.IntMap, main:Bootstrap.Std,
+                                      main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Host [main:Bootstrap.Std,
+                                     main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Graph [main:Bootstrap.ST,
+                                      main:Bootstrap.IntSet, main:Bootstrap.IntMap,
+                                      main:Bootstrap.Map, main:Bootstrap.Std, main:Bootstrap.Types,
+                                      main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Graph.Solver [main:Bootstrap.Graph,
+                                             main:Bootstrap.IntSet, main:Bootstrap.IntMap,
+                                             main:Bootstrap.Map, main:Bootstrap.Std,
+                                             main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Fresh [main:Bootstrap.Set,
+                                      main:Bootstrap.Std, main:Bootstrap.Types,
+                                      main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Desugar [main:Bootstrap.Fresh,
+                                        main:Bootstrap.Std, main:Bootstrap.Types,
+                                        main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Dependency [main:Bootstrap.Desugar,
+                                           main:Bootstrap.Set, main:Bootstrap.Map,
+                                           main:Bootstrap.Std, main:Bootstrap.Types,
+                                           main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Surface [main:Bootstrap.Map,
+                                        main:Bootstrap.Dependency, main:Bootstrap.Desugar,
+                                        main:Bootstrap.Fresh, main:Bootstrap.Std,
+                                        main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Prelude [main:Bootstrap.Surface,
+                                        main:Bootstrap.Set, main:Bootstrap.Std,
+                                        main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Parser [main:Bootstrap.Std,
+                                       main:Bootstrap.Fresh, main:Bootstrap.Desugar,
+                                       main:Bootstrap.Surface, main:Bootstrap.Unicode,
+                                       main:Bootstrap.Layout, main:Bootstrap.Parsec,
+                                       main:Bootstrap.Lexer, main:Bootstrap.Std,
+                                       main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Data [main:Bootstrap.Unicode,
+                                     main:Bootstrap.Kind, main:Bootstrap.Map, main:Bootstrap.Std,
+                                     main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.X.Type [main:Bootstrap.Kind,
+                                       main:Bootstrap.Data, main:Bootstrap.Set, main:Bootstrap.Map,
+                                       main:Bootstrap.Std, main:Bootstrap.Types,
+                                       main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.X.Parser [main:Bootstrap.Kind,
+                                         main:Bootstrap.X.Type, main:Bootstrap.Primitive,
+                                         main:Bootstrap.Unicode, main:Bootstrap.Parsec,
+                                         main:Bootstrap.Lexer, main:Bootstrap.Std,
+                                         main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.X.Pretty [main:Bootstrap.Kind,
+                                         main:Bootstrap.Primitive, main:Bootstrap.Data,
+                                         main:Bootstrap.Std, main:Bootstrap.Types,
+                                         main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.X.Check [main:Bootstrap.X.Syntax,
+                                        main:Bootstrap.X.Type, main:Bootstrap.Primitive,
+                                        main:Bootstrap.Data, main:Bootstrap.Set, main:Bootstrap.Map,
+                                        main:Bootstrap.Std, main:Bootstrap.Kind,
+                                        main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.X.Checked [main:Bootstrap.X.Check,
+                                          main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Evidence [main:Bootstrap.X.Pretty,
+                                         main:Bootstrap.X.Check, main:Bootstrap.X.Syntax,
+                                         main:Bootstrap.X.Type, main:Bootstrap.Kind,
+                                         main:Bootstrap.Set, main:Bootstrap.Map, main:Bootstrap.Std,
+                                         main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Runtime [main:Bootstrap.X.Syntax,
+                                        main:Bootstrap.X.Check, main:Bootstrap.ProcessHost,
+                                        main:Bootstrap.Primitive, main:Bootstrap.Data,
+                                        main:Bootstrap.Map, main:Bootstrap.Std,
+                                        main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Module [main:Bootstrap.Dependency,
+                                       main:Bootstrap.Lexer, main:Bootstrap.Unicode,
+                                       main:Bootstrap.Prelude, main:Bootstrap.Desugar,
+                                       main:Bootstrap.Surface, main:Bootstrap.Parser,
+                                       main:Bootstrap.Primitive, main:Bootstrap.Data,
+                                       main:Bootstrap.IntSet, main:Bootstrap.Set,
+                                       main:Bootstrap.Map, main:Bootstrap.Std, main:Bootstrap.Types,
+                                       main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.LLVM [main:Bootstrap.LLVM.StrictWrappers,
+                                     main:Bootstrap.LLVM.Optimize, main:Bootstrap.LLVM.Codegen,
+                                     main:Bootstrap.X.Syntax, main:Bootstrap.X.Checked,
+                                     main:Bootstrap.Primitive, main:Bootstrap.Data,
+                                     main:Bootstrap.Set, main:Bootstrap.Map, main:Bootstrap.Std,
+                                     main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Kinding [main:Bootstrap.Data,
+                                        main:Bootstrap.Kind, main:Bootstrap.Map, main:Bootstrap.Std,
+                                        main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Constraint [main:Bootstrap.X.Syntax,
+                                           main:Bootstrap.Desugar, main:Bootstrap.Surface,
+                                           main:Bootstrap.Graph.Solver, main:Bootstrap.Graph,
+                                           main:Bootstrap.Primitive, main:Bootstrap.Kind,
+                                           main:Bootstrap.Kinding, main:Bootstrap.Data,
+                                           main:Bootstrap.IntSet, main:Bootstrap.IntMap,
+                                           main:Bootstrap.Map, main:Bootstrap.Std,
+                                           main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Elaborate [main:Bootstrap.X.Pretty,
+                                          main:Bootstrap.X.Check, main:Bootstrap.X.Syntax,
+                                          main:Bootstrap.X.Type, main:Bootstrap.Evidence,
+                                          main:Bootstrap.Data, main:Bootstrap.Constraint,
+                                          main:Bootstrap.Graph.Solver, main:Bootstrap.Graph,
+                                          main:Bootstrap.Kind, main:Bootstrap.IntSet,
+                                          main:Bootstrap.IntMap, main:Bootstrap.Map,
+                                          main:Bootstrap.Std, main:Bootstrap.Types,
+                                          main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Classes [main:Bootstrap.X.Pretty,
+                                        main:Bootstrap.Surface, main:Bootstrap.Desugar,
+                                        main:Bootstrap.Kinding, main:Bootstrap.Data,
+                                        main:Bootstrap.IntSet, main:Bootstrap.Set,
+                                        main:Bootstrap.Map, main:Bootstrap.Fresh,
+                                        main:Bootstrap.Std, main:Bootstrap.Types,
+                                        main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Separate [main:Bootstrap.X.Pretty,
+                                         main:Bootstrap.X.Parser, main:Bootstrap.X.Checked,
+                                         main:Bootstrap.X.Check, main:Bootstrap.X.Syntax,
+                                         main:Bootstrap.X.Type, main:Bootstrap.Kind,
+                                         main:Bootstrap.Data, main:Bootstrap.Surface,
+                                         main:Bootstrap.Desugar, main:Bootstrap.Primitive,
+                                         main:Bootstrap.Parser, main:Bootstrap.Classes,
+                                         main:Bootstrap.Module, main:Bootstrap.Set,
+                                         main:Bootstrap.Map, main:Bootstrap.Fresh,
+                                         main:Bootstrap.Std, main:Bootstrap.Types,
+                                         main:Bootstrap.Lexer, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.CompilerCore [main:Bootstrap.X.Type,
+                                             main:Bootstrap.X.Syntax, main:Bootstrap.X.Checked,
+                                             main:Bootstrap.Classes, main:Bootstrap.Graph.Solver,
+                                             main:Bootstrap.Elaborate, main:Bootstrap.Constraint,
+                                             main:Bootstrap.Map, main:Bootstrap.Std,
+                                             main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.InferenceUnit [main:Bootstrap.X.Pretty,
+                                              main:Bootstrap.X.Checked, main:Bootstrap.X.Check,
+                                              main:Bootstrap.X.Syntax, main:Bootstrap.X.Type,
+                                              main:Bootstrap.Data, main:Bootstrap.Separate,
+                                              main:Bootstrap.CompilerCore, main:Bootstrap.Classes,
+                                              main:Bootstrap.Dependency, main:Bootstrap.Surface,
+                                              main:Bootstrap.Set, main:Bootstrap.Map,
+                                              main:Bootstrap.Std, main:Bootstrap.Types,
+                                              main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.CrateQuery [main:Bootstrap.X.Pretty,
+                                           main:Bootstrap.X.Checked, main:Bootstrap.X.Check,
+                                           main:Bootstrap.X.Syntax, main:Bootstrap.X.Type,
+                                           main:Bootstrap.Data, main:Bootstrap.Host,
+                                           main:Bootstrap.Primitive, main:Bootstrap.Separate,
+                                           main:Bootstrap.InferenceUnit, main:Bootstrap.Desugar,
+                                           main:Bootstrap.Dependency, main:Bootstrap.Set,
+                                           main:Bootstrap.Map, main:Bootstrap.Std,
+                                           main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.CrateArtifact [main:Bootstrap.Separate,
+                                              main:Bootstrap.X.Pretty, main:Bootstrap.X.Parser,
+                                              main:Bootstrap.X.Checked, main:Bootstrap.X.Check,
+                                              main:Bootstrap.X.Type, main:Bootstrap.X.Syntax,
+                                              main:Bootstrap.SourceEquality, main:Bootstrap.Data,
+                                              main:Bootstrap.Surface, main:Bootstrap.Parser,
+                                              main:Bootstrap.CompilerCore, main:Bootstrap.Classes,
+                                              main:Bootstrap.Host, main:Bootstrap.Module,
+                                              main:Bootstrap.Set, main:Bootstrap.Map,
+                                              main:Bootstrap.Std, main:Bootstrap.Types,
+                                              main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.CrateCodegen [main:Bootstrap.Separate,
+                                             main:Bootstrap.CrateQuery,
+                                             main:Bootstrap.CrateArtifact, main:Bootstrap.X.Checked,
+                                             main:Bootstrap.LLVM, main:Bootstrap.Std,
+                                             main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Crate [main:Bootstrap.CrateArtifact,
+                                      main:Bootstrap.CrateQuery, main:Bootstrap.InferenceUnit,
+                                      main:Bootstrap.Separate, main:Bootstrap.Data,
+                                      main:Bootstrap.Classes, main:Bootstrap.Parser,
+                                      main:Bootstrap.Host, main:Bootstrap.Module,
+                                      main:Bootstrap.Set, main:Bootstrap.Map, main:Bootstrap.Std,
+                                      main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Bootstrap.Compiler [main:Bootstrap.CompilerCore,
+                                         main:Bootstrap.Classes, main:Bootstrap.Prelude,
+                                         main:Bootstrap.Module, main:Bootstrap.Parser,
+                                         main:Bootstrap.Map, main:Bootstrap.Std,
+                                         main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:MLF.Entry.Emlf [main:Bootstrap.CrateCodegen,
+                                     main:Bootstrap.CrateArtifact, main:Bootstrap.Crate,
+                                     main:Bootstrap.LLVM, main:Bootstrap.Runtime,
+                                     main:Bootstrap.X.Pretty, main:Bootstrap.X.Parser,
+                                     main:Bootstrap.X.Checked, main:Bootstrap.X.Check,
+                                     main:Bootstrap.Compiler, main:Bootstrap.Std,
+                                     main:Bootstrap.Version, main:Bootstrap.Map,
+                                     main:Bootstrap.Module, main:Bootstrap.Parser,
+                                     main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Async.Process.Internal [main:Bootstrap.Std,
+                                             main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Async.Process [main:Async.Process.Internal,
+                                    main:Bootstrap.Std, main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Async.Task.Core [main:Async.Process.Internal,
+                                      main:Async.Process, main:Async.Process, main:Bootstrap.Std,
+                                      main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Async.Task.Internal [main:Async.Task.Core,
+                                          main:Async.Process, main:MLF.Primitive]),
+   SingleModule(main:Async.Task [main:Async.Task.Internal,
+                                 main:Async.Task.Internal, main:MLF.Primitive]),
+   SingleModule(main:MLF.Tests.Async.ProcessMain [main:Async.Process,
+                                                  main:Bootstrap.Std, main:Bootstrap.Types,
+                                                  main:MLF.Primitive]),
+   SingleModule(main:MLF.Tests.Async.ProcessPanic [main:Async.Process,
+                                                   main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:MLF.Tests.Async.TaskMain [main:Async.Process,
+                                               main:Async.Task, main:Bootstrap.Std,
+                                               main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:MLF.Tests.Async.TaskProcesses [main:Async.Process,
+                                                    main:Async.Task, main:Bootstrap.Std,
+                                                    main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:MLF.Tests.Async.TaskWaitGraph [main:Async.Process,
+                                                    main:Async.Task.Core, main:Bootstrap.Types,
+                                                    main:MLF.Primitive]),
+   SingleModule(main:MLF.Tests.SharedFrontend [main:Bootstrap.Map,
+                                               main:Bootstrap.Surface, main:Bootstrap.Module,
+                                               main:Bootstrap.Lexer, main:Bootstrap.Parser,
+                                               main:Bootstrap.Std, main:Bootstrap.Types,
+                                               main:MLF.Primitive]),
+   SingleModule(main:Package.OS [main:Bootstrap.Host,
+                                 main:Bootstrap.Std, main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Package.Json [main:Package.OS,
+                                   main:Bootstrap.Set, main:Bootstrap.Std, main:Bootstrap.Types,
+                                   main:MLF.Primitive]),
+   SingleModule(main:Package.Release [main:Package.Json,
+                                      main:Package.OS, main:Bootstrap.CrateArtifact,
+                                      main:Bootstrap.Std, main:Bootstrap.Types,
+                                      main:MLF.Primitive]),
+   SingleModule(main:Package.Distribution [main:Package.Release,
+                                           main:Package.Json, main:Package.OS, main:Bootstrap.Std,
+                                           main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Package.Manifest [main:Package.Distribution,
+                                       main:Package.Release, main:Package.Json, main:Package.OS,
+                                       main:Bootstrap.Lexer, main:Bootstrap.Parser,
+                                       main:Bootstrap.Std, main:Bootstrap.Types,
+                                       main:MLF.Primitive]),
+   SingleModule(main:Package.Build [main:Package.Release,
+                                    main:Package.Manifest, main:Package.Json, main:Package.OS,
+                                    main:Bootstrap.Host, main:Bootstrap.CrateArtifact,
+                                    main:Bootstrap.Std, main:Bootstrap.Lexer, main:Bootstrap.Types,
+                                    main:MLF.Primitive]),
+   SingleModule(main:Package.Scheduler [main:Package.Build,
+                                        main:Package.Manifest, main:Package.Json, main:Package.OS,
+                                        main:Bootstrap.Std, main:Bootstrap.Types,
+                                        main:MLF.Primitive]),
+   SingleModule(main:Package.Command [main:Package.Scheduler,
+                                      main:Package.Distribution, main:Package.Build,
+                                      main:Package.Manifest, main:Package.Json, main:Package.OS,
+                                      main:Bootstrap.Std, main:Bootstrap.Types,
+                                      main:MLF.Primitive]),
+   SingleModule(main:MLF.Entry.Mlfpkg [main:Package.Command,
+                                       main:Package.OS, main:Bootstrap.Version,
+                                       main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Package.Verification [main:Bootstrap.Std,
+                                           main:Package.OS, main:Package.Json, main:Bootstrap.Std,
+                                           main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Package.Benchmark [main:Bootstrap.Std,
+                                        main:Package.Build, main:Package.Verification,
+                                        main:Package.OS, main:Package.Json, main:Bootstrap.Map,
+                                        main:Bootstrap.Std, main:Bootstrap.Types,
+                                        main:MLF.Primitive]),
+   SingleModule(main:Tests.BuildReceipts [main:Package.Json,
+                                          main:Bootstrap.Std, main:Bootstrap.Types,
+                                          main:MLF.Primitive]),
+   SingleModule(main:MLF.Tests.BuildReceipts [main:Tests.BuildReceipts,
+                                              main:Package.Json, main:Bootstrap.Types,
+                                              main:MLF.Primitive]),
+   SingleModule(main:Tests.Catalog [main:Package.OS,
+                                    main:Package.Json, main:Bootstrap.Std, main:Bootstrap.Types,
+                                    main:MLF.Primitive]),
+   SingleModule(main:Tests.CorePartitions [main:Package.OS,
+                                           main:Bootstrap.Std, main:Bootstrap.Types,
+                                           main:MLF.Primitive]),
+   SingleModule(main:Tests.Coverage [main:Package.OS,
+                                     main:Package.Json, main:Bootstrap.Std, main:Bootstrap.Types,
+                                     main:MLF.Primitive]),
+   SingleModule(main:Tests.IndependentType [main:Bootstrap.Kind,
+                                            main:Bootstrap.Data, main:Bootstrap.Set,
+                                            main:Bootstrap.Map, main:Bootstrap.Std,
+                                            main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Tests.IndependentCheck [main:Bootstrap.X.Syntax,
+                                             main:Tests.IndependentType, main:Bootstrap.Primitive,
+                                             main:Bootstrap.Data, main:Bootstrap.Set,
+                                             main:Bootstrap.Map, main:Bootstrap.Std,
+                                             main:Bootstrap.Kind, main:Bootstrap.Types,
+                                             main:MLF.Primitive]),
+   SingleModule(main:MLF.Entry.TupleList [main:Tests.IndependentType,
+                                          main:Tests.IndependentCheck, main:Bootstrap.X.Syntax,
+                                          main:Bootstrap.X.Pretty, main:Bootstrap.X.Parser,
+                                          main:Bootstrap.X.Check, main:Bootstrap.Runtime,
+                                          main:Bootstrap.Compiler, main:Bootstrap.SourceEquality,
+                                          main:Bootstrap.Parsec, main:Bootstrap.Parser,
+                                          main:Bootstrap.Map, main:Bootstrap.Std,
+                                          main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Tests.Selection [main:Package.OS,
+                                      main:Package.Json, main:Bootstrap.Std, main:Bootstrap.Types,
+                                      main:MLF.Primitive]),
+   SingleModule(main:Tests.TestDrivers [main:Package.Build,
+                                        main:Package.Json, main:Package.OS, main:Bootstrap.Std,
+                                        main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Tests.TestSources [main:Package.Manifest,
+                                        main:Package.OS, main:Package.Json, main:Bootstrap.Module,
+                                        main:Bootstrap.Parser, main:Bootstrap.Std,
+                                        main:Bootstrap.Types, main:MLF.Primitive]),
+   SingleModule(main:Tests.CompilerTests [main:Tests.CorePartitions,
+                                          main:Tests.Selection, main:Tests.Catalog,
+                                          main:Tests.TestSources, main:Tests.TestDrivers,
+                                          main:Tests.Coverage, main:Package.Manifest,
+                                          main:Package.Verification, main:Package.Command,
+                                          main:Package.Build, main:Package.Json, main:Package.OS,
+                                          main:Bootstrap.Map, main:Bootstrap.Std,
+                                          main:Bootstrap.Types, main:Tests.BuildReceipts,
+                                          main:MLF.Primitive]),
+   SingleModule(main:MLF.Entry.CompilerTests [main:Tests.CompilerTests,
+                                              main:Package.OS, main:Bootstrap.Types,
+                                              main:MLF.Primitive])]
+compile: input file /workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/Base.hs
+*** Checking old interface for MLF.Host.Base (use -ddump-hi-diffs for more details):
+[ 1 of 97] Compiling MLF.Host.Base    ( /workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/Base.hs, nothing )
+*** Parser [MLF.Host.Base]:
+!!! Parser [MLF.Host.Base]: finished in 7.70 milliseconds, allocated 7.502 megabytes
+*** Renamer/typechecker [MLF.Host.Base]:
+*** ConsistencyCheck [MLF.Host.Base]:
+!!! ConsistencyCheck [MLF.Host.Base]: finished in 0.03 milliseconds, allocated 0.033 megabytes
+!!! Renamer/typechecker [MLF.Host.Base]: finished in 133.50 milliseconds, allocated 62.864 megabytes
+*** Desugar [MLF.Host.Base]:
+Result size of Desugar (before optimization)
+  = {terms: 1,735, types: 1,597, coercions: 13, joins: 0/144}
+Result size of Desugar (after optimization)
+  = {terms: 1,307, types: 1,206, coercions: 30, joins: 5/22}
+!!! Desugar [MLF.Host.Base]: finished in 10.33 milliseconds, allocated 9.422 megabytes
+*** CoreTidy [MLF.Host.Base]:
+!!! CoreTidy [MLF.Host.Base]: finished in 0.07 milliseconds, allocated 0.095 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/Async.hs
+*** Checking old interface for MLF.Host.Async (use -ddump-hi-diffs for more details):
+[ 2 of 97] Compiling MLF.Host.Async   ( /workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/Async.hs, nothing )
+*** Parser [MLF.Host.Async]:
+!!! Parser [MLF.Host.Async]: finished in 4.27 milliseconds, allocated 6.191 megabytes
+*** Renamer/typechecker [MLF.Host.Async]:
+*** ConsistencyCheck [MLF.Host.Async]:
+!!! ConsistencyCheck [MLF.Host.Async]: finished in 0.03 milliseconds, allocated 0.023 megabytes
+!!! Renamer/typechecker [MLF.Host.Async]: finished in 25.30 milliseconds, allocated 24.530 megabytes
+*** Desugar [MLF.Host.Async]:
+Result size of Desugar (before optimization)
+  = {terms: 1,982, types: 2,386, coercions: 0, joins: 0/107}
+Result size of Desugar (after optimization)
+  = {terms: 1,498, types: 1,804, coercions: 0, joins: 1/17}
+!!! Desugar [MLF.Host.Async]: finished in 6.48 milliseconds, allocated 6.810 megabytes
+*** CoreTidy [MLF.Host.Async]:
+!!! CoreTidy [MLF.Host.Async]: finished in 0.04 milliseconds, allocated 0.057 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/IO.hs
+*** Checking old interface for MLF.Host.IO (use -ddump-hi-diffs for more details):
+[ 3 of 97] Compiling MLF.Host.IO      ( /workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/IO.hs, nothing )
+*** Parser [MLF.Host.IO]:
+!!! Parser [MLF.Host.IO]: finished in 3.94 milliseconds, allocated 7.445 megabytes
+*** Renamer/typechecker [MLF.Host.IO]:
+*** ConsistencyCheck [MLF.Host.IO]:
+!!! ConsistencyCheck [MLF.Host.IO]: finished in 0.03 milliseconds, allocated 0.028 megabytes
+!!! Renamer/typechecker [MLF.Host.IO]: finished in 84.76 milliseconds, allocated 27.712 megabytes
+*** Desugar [MLF.Host.IO]:
+Result size of Desugar (before optimization)
+  = {terms: 1,780, types: 1,804, coercions: 54, joins: 0/74}
+Result size of Desugar (after optimization)
+  = {terms: 1,359, types: 1,349, coercions: 66, joins: 0/8}
+!!! Desugar [MLF.Host.IO]: finished in 4.64 milliseconds, allocated 6.926 megabytes
+/workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Host/IO.hs:128:82: warning: [GHC-68441] [-Wdeprecations]
+    In the use of ‘hGetLine’ (imported from Data.ByteString):
+    Deprecated: "Deprecated since @bytestring-0.12@. Use 'Data.ByteString.Char8.hGetLine' instead. (Functions that rely on ASCII encodings belong in "Data.ByteString.Char8")"
+    |
+128 |   if end then throwIO (HostError "IO error: getLine reached EOF or failed") else B.hGetLine H.stdin >>= evaluate . fromUtf8
+    |                                                                                  ^^^^^^^^^^
+
+*** CoreTidy [MLF.Host.IO]:
+!!! CoreTidy [MLF.Host.IO]: finished in 0.12 milliseconds, allocated 0.084 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Primitive.hs
+*** Checking old interface for MLF.Primitive (use -ddump-hi-diffs for more details):
+[ 4 of 97] Compiling MLF.Primitive    ( /workspace/shared/mlf-shared-source-migration/host/ghc/MLF/Primitive.hs, nothing )
+*** Parser [MLF.Primitive]:
+!!! Parser [MLF.Primitive]: finished in 2.86 milliseconds, allocated 8.023 megabytes
+*** Renamer/typechecker [MLF.Primitive]:
+*** ConsistencyCheck [MLF.Primitive]:
+!!! ConsistencyCheck [MLF.Primitive]: finished in 0.03 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [MLF.Primitive]: finished in 11.14 milliseconds, allocated 16.218 megabytes
+*** Desugar [MLF.Primitive]:
+Result size of Desugar (before optimization)
+  = {terms: 288, types: 513, coercions: 0, joins: 0/1}
+Result size of Desugar (after optimization)
+  = {terms: 258, types: 455, coercions: 0, joins: 0/0}
+!!! Desugar [MLF.Primitive]: finished in 1.44 milliseconds, allocated 2.731 megabytes
+*** CoreTidy [MLF.Primitive]:
+!!! CoreTidy [MLF.Primitive]: finished in 0.05 milliseconds, allocated 0.131 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Version.hs
+*** Checking old interface for Bootstrap.Version (use -ddump-hi-diffs for more details):
+[ 5 of 97] Compiling Bootstrap.Version ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Version.hs, nothing )
+*** Parser [Bootstrap.Version]:
+!!! Parser [Bootstrap.Version]: finished in 0.27 milliseconds, allocated 0.184 megabytes
+*** Renamer/typechecker [Bootstrap.Version]:
+*** ConsistencyCheck [Bootstrap.Version]:
+!!! ConsistencyCheck [Bootstrap.Version]: finished in 0.01 milliseconds, allocated 0.006 megabytes
+!!! Renamer/typechecker [Bootstrap.Version]: finished in 0.82 milliseconds, allocated 0.402 megabytes
+*** Desugar [Bootstrap.Version]:
+Result size of Desugar (before optimization)
+  = {terms: 13, types: 5, coercions: 0, joins: 0/0}
+Result size of Desugar (after optimization)
+  = {terms: 11, types: 3, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.Version]: finished in 0.17 milliseconds, allocated 0.162 megabytes
+*** CoreTidy [Bootstrap.Version]:
+!!! CoreTidy [Bootstrap.Version]: finished in 0.00 milliseconds, allocated 0.002 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Unicode.hs
+*** Checking old interface for Bootstrap.Unicode (use -ddump-hi-diffs for more details):
+[ 6 of 97] Compiling Bootstrap.Unicode ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Unicode.hs, nothing )
+*** Parser [Bootstrap.Unicode]:
+!!! Parser [Bootstrap.Unicode]: finished in 3.51 milliseconds, allocated 14.557 megabytes
+*** Renamer/typechecker [Bootstrap.Unicode]:
+*** ConsistencyCheck [Bootstrap.Unicode]:
+!!! ConsistencyCheck [Bootstrap.Unicode]: finished in 0.01 milliseconds, allocated 0.006 megabytes
+!!! Renamer/typechecker [Bootstrap.Unicode]: finished in 4.57 milliseconds, allocated 2.903 megabytes
+*** Desugar [Bootstrap.Unicode]:
+Result size of Desugar (before optimization)
+  = {terms: 269, types: 59, coercions: 0, joins: 0/6}
+Result size of Desugar (after optimization)
+  = {terms: 249, types: 44, coercions: 0, joins: 0/1}
+!!! Desugar [Bootstrap.Unicode]: finished in 0.57 milliseconds, allocated 0.757 megabytes
+*** CoreTidy [Bootstrap.Unicode]:
+!!! CoreTidy [Bootstrap.Unicode]: finished in 0.01 milliseconds, allocated 0.008 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Types.hs
+*** Checking old interface for Bootstrap.Types (use -ddump-hi-diffs for more details):
+[ 7 of 97] Compiling Bootstrap.Types  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Types.hs, nothing )
+*** Parser [Bootstrap.Types]:
+!!! Parser [Bootstrap.Types]: finished in 4.08 milliseconds, allocated 9.276 megabytes
+*** Renamer/typechecker [Bootstrap.Types]:
+*** ConsistencyCheck [Bootstrap.Types]:
+!!! ConsistencyCheck [Bootstrap.Types]: finished in 0.01 milliseconds, allocated 0.006 megabytes
+!!! Renamer/typechecker [Bootstrap.Types]: finished in 20.06 milliseconds, allocated 20.484 megabytes
+*** Desugar [Bootstrap.Types]:
+Result size of Desugar (before optimization)
+  = {terms: 5,127, types: 1,037, coercions: 0, joins: 0/0}
+Result size of Desugar (after optimization)
+  = {terms: 5,127, types: 1,037, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.Types]: finished in 5.17 milliseconds, allocated 11.745 megabytes
+*** CoreTidy [Bootstrap.Types]:
+!!! CoreTidy [Bootstrap.Types]: finished in 0.76 milliseconds, allocated 1.270 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs
+*** Checking old interface for Bootstrap.Std (use -ddump-hi-diffs for more details):
+[ 8 of 97] Compiling Bootstrap.Std    ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs, nothing )
+*** Parser [Bootstrap.Std]:
+!!! Parser [Bootstrap.Std]: finished in 7.20 milliseconds, allocated 18.585 megabytes
+*** Renamer/typechecker [Bootstrap.Std]:
+*** ConsistencyCheck [Bootstrap.Std]:
+!!! ConsistencyCheck [Bootstrap.Std]: finished in 0.03 milliseconds, allocated 0.016 megabytes
+!!! Renamer/typechecker [Bootstrap.Std]: finished in 37.34 milliseconds, allocated 35.151 megabytes
+*** Desugar [Bootstrap.Std]:
+Result size of Desugar (before optimization)
+  = {terms: 2,722, types: 3,492, coercions: 0, joins: 0/131}
+Result size of Desugar (after optimization)
+  = {terms: 2,131, types: 2,815, coercions: 0, joins: 0/7}
+!!! Desugar [Bootstrap.Std]: finished in 11.60 milliseconds, allocated 13.069 megabytes
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:525:25: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+525 |   mapM :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> List a -> m (List b);
+    |                         ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:525:30: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+525 |   mapM :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> List a -> m (List b);
+    |                              ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:536:26: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+536 |   mapM_ :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> List a -> m Unit;
+    |                          ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:536:31: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+536 |   mapM_ :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> List a -> m Unit;
+    |                               ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:546:25: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+546 |   forM :: forall (m :: (* -> *)) a b. (Monad m) => List a -> (a -> m b) -> m (List b);
+    |                         ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:546:30: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+546 |   forM :: forall (m :: (* -> *)) a b. (Monad m) => List a -> (a -> m b) -> m (List b);
+    |                              ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:548:26: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+548 |   forM_ :: forall (m :: (* -> *)) a b. (Monad m) => List a -> (a -> m b) -> m Unit;
+    |                          ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:548:31: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+548 |   forM_ :: forall (m :: (* -> *)) a b. (Monad m) => List a -> (a -> m b) -> m Unit;
+    |                               ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:550:26: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+550 |   foldM :: forall (m :: (* -> *)) b a. (Monad m) => (b -> a -> m b) -> b -> List a -> m b;
+    |                          ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:550:31: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+550 |   foldM :: forall (m :: (* -> *)) b a. (Monad m) => (b -> a -> m b) -> b -> List a -> m b;
+    |                               ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:560:29: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+560 |   sequence :: forall (m :: (* -> *)) a. (Monad m) => List (m a) -> m (List a);
+    |                             ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:560:34: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+560 |   sequence :: forall (m :: (* -> *)) a. (Monad m) => List (m a) -> m (List a);
+    |                                  ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:562:25: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+562 |   when :: forall (m :: (* -> *)). (Monad m) => Bool -> m Unit -> m Unit;
+    |                         ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:562:30: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+562 |   when :: forall (m :: (* -> *)). (Monad m) => Bool -> m Unit -> m Unit;
+    |                              ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:564:27: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+564 |   unless :: forall (m :: (* -> *)). (Monad m) => Bool -> m Unit -> m Unit;
+    |                           ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Std.hs:564:32: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+564 |   unless :: forall (m :: (* -> *)). (Monad m) => Bool -> m Unit -> m Unit;
+    |                                ^
+
+*** CoreTidy [Bootstrap.Std]:
+!!! CoreTidy [Bootstrap.Std]: finished in 0.12 milliseconds, allocated 0.271 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/ST.hs
+*** Checking old interface for Bootstrap.ST (use -ddump-hi-diffs for more details):
+[ 9 of 97] Compiling Bootstrap.ST     ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/ST.hs, nothing )
+*** Parser [Bootstrap.ST]:
+!!! Parser [Bootstrap.ST]: finished in 1.11 milliseconds, allocated 2.000 megabytes
+*** Renamer/typechecker [Bootstrap.ST]:
+*** ConsistencyCheck [Bootstrap.ST]:
+!!! ConsistencyCheck [Bootstrap.ST]: finished in 0.02 milliseconds, allocated 0.016 megabytes
+!!! Renamer/typechecker [Bootstrap.ST]: finished in 4.84 milliseconds, allocated 3.817 megabytes
+*** Desugar [Bootstrap.ST]:
+Result size of Desugar (before optimization)
+  = {terms: 196, types: 379, coercions: 0, joins: 0/6}
+Result size of Desugar (after optimization)
+  = {terms: 166, types: 344, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.ST]: finished in 0.96 milliseconds, allocated 1.222 megabytes
+*** CoreTidy [Bootstrap.ST]:
+!!! CoreTidy [Bootstrap.ST]: finished in 0.02 milliseconds, allocated 0.034 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs
+*** Checking old interface for Bootstrap.ProcessHost (use -ddump-hi-diffs for more details):
+[10 of 97] Compiling Bootstrap.ProcessHost ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs, nothing )
+*** Parser [Bootstrap.ProcessHost]:
+!!! Parser [Bootstrap.ProcessHost]: finished in 0.82 milliseconds, allocated 1.217 megabytes
+*** Renamer/typechecker [Bootstrap.ProcessHost]:
+*** ConsistencyCheck [Bootstrap.ProcessHost]:
+!!! ConsistencyCheck [Bootstrap.ProcessHost]: finished in 0.02 milliseconds, allocated 0.016 megabytes
+!!! Renamer/typechecker [Bootstrap.ProcessHost]: finished in 2.51 milliseconds, allocated 2.426 megabytes
+*** Desugar [Bootstrap.ProcessHost]:
+Result size of Desugar (before optimization)
+  = {terms: 222, types: 145, coercions: 0, joins: 0/14}
+Result size of Desugar (after optimization)
+  = {terms: 167, types: 84, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.ProcessHost]: finished in 1.30 milliseconds, allocated 0.900 megabytes
+*** CoreTidy [Bootstrap.ProcessHost]:
+!!! CoreTidy [Bootstrap.ProcessHost]: finished in 0.01 milliseconds, allocated 0.006 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Primitive.hs
+*** Checking old interface for Bootstrap.Primitive (use -ddump-hi-diffs for more details):
+[11 of 97] Compiling Bootstrap.Primitive ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Primitive.hs, nothing )
+*** Parser [Bootstrap.Primitive]:
+!!! Parser [Bootstrap.Primitive]: finished in 9.06 milliseconds, allocated 24.384 megabytes
+*** Renamer/typechecker [Bootstrap.Primitive]:
+*** ConsistencyCheck [Bootstrap.Primitive]:
+!!! ConsistencyCheck [Bootstrap.Primitive]: finished in 0.03 milliseconds, allocated 0.018 megabytes
+!!! Renamer/typechecker [Bootstrap.Primitive]: finished in 40.59 milliseconds, allocated 46.094 megabytes
+*** Desugar [Bootstrap.Primitive]:
+Result size of Desugar (before optimization)
+  = {terms: 9,475, types: 6,956, coercions: 0, joins: 0/7}
+Result size of Desugar (after optimization)
+  = {terms: 4,185, types: 1,942, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.Primitive]: finished in 22.64 milliseconds, allocated 28.162 megabytes
+*** CoreTidy [Bootstrap.Primitive]:
+!!! CoreTidy [Bootstrap.Primitive]: finished in 0.11 milliseconds, allocated 0.051 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/SourceEquality.hs
+*** Checking old interface for Bootstrap.SourceEquality (use -ddump-hi-diffs for more details):
+[12 of 97] Compiling Bootstrap.SourceEquality ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/SourceEquality.hs, nothing )
+*** Parser [Bootstrap.SourceEquality]:
+!!! Parser [Bootstrap.SourceEquality]: finished in 5.93 milliseconds, allocated 9.787 megabytes
+*** Renamer/typechecker [Bootstrap.SourceEquality]:
+*** ConsistencyCheck [Bootstrap.SourceEquality]:
+!!! ConsistencyCheck [Bootstrap.SourceEquality]: finished in 0.03 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Bootstrap.SourceEquality]: finished in 16.36 milliseconds, allocated 16.467 megabytes
+*** Desugar [Bootstrap.SourceEquality]:
+Result size of Desugar (before optimization)
+  = {terms: 1,798, types: 1,396, coercions: 0, joins: 0/212}
+Result size of Desugar (after optimization)
+  = {terms: 1,069, types: 757, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.SourceEquality]: finished in 4.88 milliseconds, allocated 8.757 megabytes
+*** CoreTidy [Bootstrap.SourceEquality]:
+!!! CoreTidy [Bootstrap.SourceEquality]: finished in 0.02 milliseconds, allocated 0.024 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Map.hs
+*** Checking old interface for Bootstrap.Map (use -ddump-hi-diffs for more details):
+[13 of 97] Compiling Bootstrap.Map    ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Map.hs, nothing )
+*** Parser [Bootstrap.Map]:
+!!! Parser [Bootstrap.Map]: finished in 10.85 milliseconds, allocated 14.168 megabytes
+*** Renamer/typechecker [Bootstrap.Map]:
+*** ConsistencyCheck [Bootstrap.Map]:
+!!! ConsistencyCheck [Bootstrap.Map]: finished in 0.03 milliseconds, allocated 0.018 megabytes
+!!! Renamer/typechecker [Bootstrap.Map]: finished in 30.08 milliseconds, allocated 24.459 megabytes
+*** Desugar [Bootstrap.Map]:
+Result size of Desugar (before optimization)
+  = {terms: 1,964, types: 3,103, coercions: 0, joins: 0/84}
+Result size of Desugar (after optimization)
+  = {terms: 1,587, types: 2,614, coercions: 0, joins: 0/12}
+!!! Desugar [Bootstrap.Map]: finished in 11.04 milliseconds, allocated 8.428 megabytes
+*** CoreTidy [Bootstrap.Map]:
+!!! CoreTidy [Bootstrap.Map]: finished in 0.13 milliseconds, allocated 0.209 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Set.hs
+*** Checking old interface for Bootstrap.Set (use -ddump-hi-diffs for more details):
+[14 of 97] Compiling Bootstrap.Set    ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Set.hs, nothing )
+*** Parser [Bootstrap.Set]:
+!!! Parser [Bootstrap.Set]: finished in 1.91 milliseconds, allocated 3.808 megabytes
+*** Renamer/typechecker [Bootstrap.Set]:
+*** ConsistencyCheck [Bootstrap.Set]:
+!!! ConsistencyCheck [Bootstrap.Set]: finished in 0.05 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Bootstrap.Set]: finished in 9.32 milliseconds, allocated 8.009 megabytes
+*** Desugar [Bootstrap.Set]:
+Result size of Desugar (before optimization)
+  = {terms: 401, types: 733, coercions: 0, joins: 0/2}
+Result size of Desugar (after optimization)
+  = {terms: 370, types: 690, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.Set]: finished in 1.51 milliseconds, allocated 1.995 megabytes
+*** CoreTidy [Bootstrap.Set]:
+!!! CoreTidy [Bootstrap.Set]: finished in 0.05 milliseconds, allocated 0.061 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Lexer.hs
+*** Checking old interface for Bootstrap.Lexer (use -ddump-hi-diffs for more details):
+[15 of 97] Compiling Bootstrap.Lexer  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Lexer.hs, nothing )
+*** Parser [Bootstrap.Lexer]:
+!!! Parser [Bootstrap.Lexer]: finished in 18.36 milliseconds, allocated 22.970 megabytes
+*** Renamer/typechecker [Bootstrap.Lexer]:
+*** ConsistencyCheck [Bootstrap.Lexer]:
+!!! ConsistencyCheck [Bootstrap.Lexer]: finished in 0.04 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Bootstrap.Lexer]: finished in 52.68 milliseconds, allocated 37.642 megabytes
+*** Desugar [Bootstrap.Lexer]:
+Result size of Desugar (before optimization)
+  = {terms: 5,780, types: 3,408, coercions: 0, joins: 0/131}
+Result size of Desugar (after optimization)
+  = {terms: 3,972, types: 1,577, coercions: 0, joins: 0/47}
+!!! Desugar [Bootstrap.Lexer]: finished in 19.89 milliseconds, allocated 13.815 megabytes
+*** CoreTidy [Bootstrap.Lexer]:
+!!! CoreTidy [Bootstrap.Lexer]: finished in 0.09 milliseconds, allocated 0.091 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parsec.hs
+*** Checking old interface for Bootstrap.Parsec (use -ddump-hi-diffs for more details):
+[16 of 97] Compiling Bootstrap.Parsec ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parsec.hs, nothing )
+*** Parser [Bootstrap.Parsec]:
+!!! Parser [Bootstrap.Parsec]: finished in 5.24 milliseconds, allocated 7.290 megabytes
+*** Renamer/typechecker [Bootstrap.Parsec]:
+*** ConsistencyCheck [Bootstrap.Parsec]:
+!!! ConsistencyCheck [Bootstrap.Parsec]: finished in 0.04 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Bootstrap.Parsec]: finished in 17.10 milliseconds, allocated 12.049 megabytes
+*** Desugar [Bootstrap.Parsec]:
+Result size of Desugar (before optimization)
+  = {terms: 1,371, types: 1,356, coercions: 0, joins: 0/60}
+Result size of Desugar (after optimization)
+  = {terms: 989, types: 986, coercions: 0, joins: 2/9}
+!!! Desugar [Bootstrap.Parsec]: finished in 6.15 milliseconds, allocated 5.556 megabytes
+*** CoreTidy [Bootstrap.Parsec]:
+!!! CoreTidy [Bootstrap.Parsec]: finished in 0.06 milliseconds, allocated 0.094 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Layout.hs
+*** Checking old interface for Bootstrap.Layout (use -ddump-hi-diffs for more details):
+[17 of 97] Compiling Bootstrap.Layout ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Layout.hs, nothing )
+*** Parser [Bootstrap.Layout]:
+!!! Parser [Bootstrap.Layout]: finished in 7.42 milliseconds, allocated 12.148 megabytes
+*** Renamer/typechecker [Bootstrap.Layout]:
+*** ConsistencyCheck [Bootstrap.Layout]:
+!!! ConsistencyCheck [Bootstrap.Layout]: finished in 0.04 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Bootstrap.Layout]: finished in 24.58 milliseconds, allocated 20.541 megabytes
+*** Desugar [Bootstrap.Layout]:
+Result size of Desugar (before optimization)
+  = {terms: 3,257, types: 2,379, coercions: 0, joins: 0/191}
+Result size of Desugar (after optimization)
+  = {terms: 2,090, types: 1,146, coercions: 0, joins: 7/21}
+!!! Desugar [Bootstrap.Layout]: finished in 11.00 milliseconds, allocated 9.500 megabytes
+*** CoreTidy [Bootstrap.Layout]:
+!!! CoreTidy [Bootstrap.Layout]: finished in 0.07 milliseconds, allocated 0.069 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kind.hs
+*** Checking old interface for Bootstrap.Kind (use -ddump-hi-diffs for more details):
+[18 of 97] Compiling Bootstrap.Kind   ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kind.hs, nothing )
+*** Parser [Bootstrap.Kind]:
+!!! Parser [Bootstrap.Kind]: finished in 0.66 milliseconds, allocated 0.871 megabytes
+*** Renamer/typechecker [Bootstrap.Kind]:
+*** ConsistencyCheck [Bootstrap.Kind]:
+!!! ConsistencyCheck [Bootstrap.Kind]: finished in 0.02 milliseconds, allocated 0.016 megabytes
+!!! Renamer/typechecker [Bootstrap.Kind]: finished in 2.49 milliseconds, allocated 1.797 megabytes
+*** Desugar [Bootstrap.Kind]:
+Result size of Desugar (before optimization)
+  = {terms: 177, types: 111, coercions: 0, joins: 0/7}
+Result size of Desugar (after optimization)
+  = {terms: 129, types: 60, coercions: 0, joins: 1/1}
+!!! Desugar [Bootstrap.Kind]: finished in 1.46 milliseconds, allocated 0.808 megabytes
+*** CoreTidy [Bootstrap.Kind]:
+!!! CoreTidy [Bootstrap.Kind]: finished in 0.01 milliseconds, allocated 0.006 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs
+*** Checking old interface for Bootstrap.X.Syntax (use -ddump-hi-diffs for more details):
+[19 of 97] Compiling Bootstrap.X.Syntax ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs, nothing )
+*** Parser [Bootstrap.X.Syntax]:
+!!! Parser [Bootstrap.X.Syntax]: finished in 2.04 milliseconds, allocated 3.697 megabytes
+*** Renamer/typechecker [Bootstrap.X.Syntax]:
+*** ConsistencyCheck [Bootstrap.X.Syntax]:
+!!! ConsistencyCheck [Bootstrap.X.Syntax]: finished in 0.07 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Bootstrap.X.Syntax]: finished in 8.78 milliseconds, allocated 6.893 megabytes
+*** Desugar [Bootstrap.X.Syntax]:
+Result size of Desugar (before optimization)
+  = {terms: 759, types: 563, coercions: 0, joins: 0/69}
+Result size of Desugar (after optimization)
+  = {terms: 473, types: 316, coercions: 0, joins: 3/3}
+!!! Desugar [Bootstrap.X.Syntax]: finished in 3.90 milliseconds, allocated 3.822 megabytes
+*** CoreTidy [Bootstrap.X.Syntax]:
+!!! CoreTidy [Bootstrap.X.Syntax]: finished in 0.02 milliseconds, allocated 0.014 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs
+*** Checking old interface for Bootstrap.LLVM.Optimize (use -ddump-hi-diffs for more details):
+[20 of 97] Compiling Bootstrap.LLVM.Optimize ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs, nothing )
+*** Parser [Bootstrap.LLVM.Optimize]:
+!!! Parser [Bootstrap.LLVM.Optimize]: finished in 15.71 milliseconds, allocated 25.553 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM.Optimize]:
+*** ConsistencyCheck [Bootstrap.LLVM.Optimize]:
+!!! ConsistencyCheck [Bootstrap.LLVM.Optimize]: finished in 0.05 milliseconds, allocated 0.021 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM.Optimize]: finished in 97.04 milliseconds, allocated 39.594 megabytes
+*** Desugar [Bootstrap.LLVM.Optimize]:
+Result size of Desugar (before optimization)
+  = {terms: 4,689, types: 4,691, coercions: 0, joins: 0/216}
+Result size of Desugar (after optimization)
+  = {terms: 3,401, types: 3,280, coercions: 0, joins: 10/22}
+!!! Desugar [Bootstrap.LLVM.Optimize]: finished in 14.27 milliseconds, allocated 20.682 megabytes
+*** CoreTidy [Bootstrap.LLVM.Optimize]:
+!!! CoreTidy [Bootstrap.LLVM.Optimize]: finished in 0.08 milliseconds, allocated 0.115 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs
+*** Checking old interface for Bootstrap.LLVM.Analysis (use -ddump-hi-diffs for more details):
+[21 of 97] Compiling Bootstrap.LLVM.Analysis ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs, nothing )
+*** Parser [Bootstrap.LLVM.Analysis]:
+!!! Parser [Bootstrap.LLVM.Analysis]: finished in 5.37 milliseconds, allocated 6.158 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM.Analysis]:
+*** ConsistencyCheck [Bootstrap.LLVM.Analysis]:
+!!! ConsistencyCheck [Bootstrap.LLVM.Analysis]: finished in 0.09 milliseconds, allocated 0.024 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM.Analysis]: finished in 8.72 milliseconds, allocated 10.951 megabytes
+*** Desugar [Bootstrap.LLVM.Analysis]:
+Result size of Desugar (before optimization)
+  = {terms: 950, types: 929, coercions: 0, joins: 0/48}
+Result size of Desugar (after optimization)
+  = {terms: 747, types: 698, coercions: 0, joins: 2/5}
+!!! Desugar [Bootstrap.LLVM.Analysis]: finished in 3.39 milliseconds, allocated 4.789 megabytes
+*** CoreTidy [Bootstrap.LLVM.Analysis]:
+!!! CoreTidy [Bootstrap.LLVM.Analysis]: finished in 0.03 milliseconds, allocated 0.025 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs
+*** Checking old interface for Bootstrap.LLVM.StrictFields (use -ddump-hi-diffs for more details):
+[22 of 97] Compiling Bootstrap.LLVM.StrictFields ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs, nothing )
+*** Parser [Bootstrap.LLVM.StrictFields]:
+!!! Parser [Bootstrap.LLVM.StrictFields]: finished in 2.47 milliseconds, allocated 6.053 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM.StrictFields]:
+*** ConsistencyCheck [Bootstrap.LLVM.StrictFields]:
+!!! ConsistencyCheck [Bootstrap.LLVM.StrictFields]: finished in 0.06 milliseconds, allocated 0.025 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM.StrictFields]: finished in 10.55 milliseconds, allocated 11.001 megabytes
+*** Desugar [Bootstrap.LLVM.StrictFields]:
+Result size of Desugar (before optimization)
+  = {terms: 1,160, types: 906, coercions: 0, joins: 0/40}
+Result size of Desugar (after optimization)
+  = {terms: 814, types: 567, coercions: 0, joins: 2/3}
+!!! Desugar [Bootstrap.LLVM.StrictFields]: finished in 2.72 milliseconds, allocated 4.654 megabytes
+*** CoreTidy [Bootstrap.LLVM.StrictFields]:
+!!! CoreTidy [Bootstrap.LLVM.StrictFields]: finished in 0.02 milliseconds, allocated 0.023 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs
+*** Checking old interface for Bootstrap.LLVM.StrictWrappers (use -ddump-hi-diffs for more details):
+[23 of 97] Compiling Bootstrap.LLVM.StrictWrappers ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs, nothing )
+*** Parser [Bootstrap.LLVM.StrictWrappers]:
+!!! Parser [Bootstrap.LLVM.StrictWrappers]: finished in 1.07 milliseconds, allocated 2.333 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM.StrictWrappers]:
+*** ConsistencyCheck [Bootstrap.LLVM.StrictWrappers]:
+!!! ConsistencyCheck [Bootstrap.LLVM.StrictWrappers]: finished in 0.04 milliseconds, allocated 0.024 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM.StrictWrappers]: finished in 3.07 milliseconds, allocated 4.174 megabytes
+*** Desugar [Bootstrap.LLVM.StrictWrappers]:
+Result size of Desugar (before optimization)
+  = {terms: 365, types: 325, coercions: 0, joins: 0/22}
+Result size of Desugar (after optimization)
+  = {terms: 286, types: 246, coercions: 0, joins: 5/7}
+!!! Desugar [Bootstrap.LLVM.StrictWrappers]: finished in 1.38 milliseconds, allocated 2.050 megabytes
+*** CoreTidy [Bootstrap.LLVM.StrictWrappers]:
+!!! CoreTidy [Bootstrap.LLVM.StrictWrappers]: finished in 0.01 milliseconds, allocated 0.008 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs
+*** Checking old interface for Bootstrap.LLVM.Kernel (use -ddump-hi-diffs for more details):
+[24 of 97] Compiling Bootstrap.LLVM.Kernel ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs, nothing )
+*** Parser [Bootstrap.LLVM.Kernel]:
+!!! Parser [Bootstrap.LLVM.Kernel]: finished in 3.21 milliseconds, allocated 8.022 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM.Kernel]:
+*** ConsistencyCheck [Bootstrap.LLVM.Kernel]:
+!!! ConsistencyCheck [Bootstrap.LLVM.Kernel]: finished in 0.04 milliseconds, allocated 0.024 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM.Kernel]: finished in 13.53 milliseconds, allocated 14.913 megabytes
+*** Desugar [Bootstrap.LLVM.Kernel]:
+Result size of Desugar (before optimization)
+  = {terms: 1,679, types: 1,133, coercions: 0, joins: 0/99}
+Result size of Desugar (after optimization)
+  = {terms: 1,395, types: 824, coercions: 0, joins: 14/16}
+!!! Desugar [Bootstrap.LLVM.Kernel]: finished in 4.79 milliseconds, allocated 10.619 megabytes
+*** CoreTidy [Bootstrap.LLVM.Kernel]:
+!!! CoreTidy [Bootstrap.LLVM.Kernel]: finished in 0.02 milliseconds, allocated 0.026 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs
+*** Checking old interface for Bootstrap.LLVM.Build (use -ddump-hi-diffs for more details):
+[25 of 97] Compiling Bootstrap.LLVM.Build ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs, nothing )
+*** Parser [Bootstrap.LLVM.Build]:
+!!! Parser [Bootstrap.LLVM.Build]: finished in 9.77 milliseconds, allocated 22.483 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM.Build]:
+*** ConsistencyCheck [Bootstrap.LLVM.Build]:
+!!! ConsistencyCheck [Bootstrap.LLVM.Build]: finished in 0.12 milliseconds, allocated 0.024 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM.Build]: finished in 39.79 milliseconds, allocated 39.539 megabytes
+*** Desugar [Bootstrap.LLVM.Build]:
+Result size of Desugar (before optimization)
+  = {terms: 4,829, types: 5,972, coercions: 0, joins: 0/80}
+Result size of Desugar (after optimization)
+  = {terms: 3,330, types: 4,089, coercions: 0, joins: 0/10}
+!!! Desugar [Bootstrap.LLVM.Build]: finished in 8.71 milliseconds, allocated 17.194 megabytes
+*** CoreTidy [Bootstrap.LLVM.Build]:
+!!! CoreTidy [Bootstrap.LLVM.Build]: finished in 0.10 milliseconds, allocated 0.158 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs
+*** Checking old interface for Bootstrap.LLVM.Native (use -ddump-hi-diffs for more details):
+[26 of 97] Compiling Bootstrap.LLVM.Native ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs, nothing )
+*** Parser [Bootstrap.LLVM.Native]:
+!!! Parser [Bootstrap.LLVM.Native]: finished in 20.44 milliseconds, allocated 35.087 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM.Native]:
+*** ConsistencyCheck [Bootstrap.LLVM.Native]:
+!!! ConsistencyCheck [Bootstrap.LLVM.Native]: finished in 0.08 milliseconds, allocated 0.027 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM.Native]: finished in 82.57 milliseconds, allocated 68.097 megabytes
+*** Desugar [Bootstrap.LLVM.Native]:
+Result size of Desugar (before optimization)
+  = {terms: 8,615, types: 6,260, coercions: 0, joins: 0/294}
+Result size of Desugar (after optimization)
+  = {terms: 6,385, types: 3,905, coercions: 0, joins: 16/43}
+!!! Desugar [Bootstrap.LLVM.Native]: finished in 46.60 milliseconds, allocated 39.219 megabytes
+*** CoreTidy [Bootstrap.LLVM.Native]:
+!!! CoreTidy [Bootstrap.LLVM.Native]: finished in 0.11 milliseconds, allocated 0.122 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs
+*** Checking old interface for Bootstrap.LLVM.Codegen (use -ddump-hi-diffs for more details):
+[27 of 97] Compiling Bootstrap.LLVM.Codegen ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs, nothing )
+*** Parser [Bootstrap.LLVM.Codegen]:
+!!! Parser [Bootstrap.LLVM.Codegen]: finished in 21.74 milliseconds, allocated 37.815 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM.Codegen]:
+*** ConsistencyCheck [Bootstrap.LLVM.Codegen]:
+!!! ConsistencyCheck [Bootstrap.LLVM.Codegen]: finished in 0.10 milliseconds, allocated 0.029 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM.Codegen]: finished in 79.52 milliseconds, allocated 55.477 megabytes
+*** Desugar [Bootstrap.LLVM.Codegen]:
+Result size of Desugar (before optimization)
+  = {terms: 8,104, types: 6,406, coercions: 0, joins: 0/198}
+Result size of Desugar (after optimization)
+  = {terms: 5,254, types: 3,502, coercions: 0, joins: 9/37}
+!!! Desugar [Bootstrap.LLVM.Codegen]: finished in 28.60 milliseconds, allocated 31.940 megabytes
+*** CoreTidy [Bootstrap.LLVM.Codegen]:
+!!! CoreTidy [Bootstrap.LLVM.Codegen]: finished in 0.06 milliseconds, allocated 0.093 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntMap.hs
+*** Checking old interface for Bootstrap.IntMap (use -ddump-hi-diffs for more details):
+[28 of 97] Compiling Bootstrap.IntMap ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntMap.hs, nothing )
+*** Parser [Bootstrap.IntMap]:
+!!! Parser [Bootstrap.IntMap]: finished in 3.73 milliseconds, allocated 7.397 megabytes
+*** Renamer/typechecker [Bootstrap.IntMap]:
+*** ConsistencyCheck [Bootstrap.IntMap]:
+!!! ConsistencyCheck [Bootstrap.IntMap]: finished in 0.04 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Bootstrap.IntMap]: finished in 15.34 milliseconds, allocated 14.186 megabytes
+*** Desugar [Bootstrap.IntMap]:
+Result size of Desugar (before optimization)
+  = {terms: 827, types: 1,331, coercions: 0, joins: 0/12}
+Result size of Desugar (after optimization)
+  = {terms: 788, types: 1,273, coercions: 0, joins: 0/1}
+!!! Desugar [Bootstrap.IntMap]: finished in 4.12 milliseconds, allocated 3.932 megabytes
+*** CoreTidy [Bootstrap.IntMap]:
+!!! CoreTidy [Bootstrap.IntMap]: finished in 0.04 milliseconds, allocated 0.114 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntSet.hs
+*** Checking old interface for Bootstrap.IntSet (use -ddump-hi-diffs for more details):
+[29 of 97] Compiling Bootstrap.IntSet ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/IntSet.hs, nothing )
+*** Parser [Bootstrap.IntSet]:
+!!! Parser [Bootstrap.IntSet]: finished in 1.61 milliseconds, allocated 3.301 megabytes
+*** Renamer/typechecker [Bootstrap.IntSet]:
+*** ConsistencyCheck [Bootstrap.IntSet]:
+!!! ConsistencyCheck [Bootstrap.IntSet]: finished in 0.04 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Bootstrap.IntSet]: finished in 6.09 milliseconds, allocated 6.564 megabytes
+*** Desugar [Bootstrap.IntSet]:
+Result size of Desugar (before optimization)
+  = {terms: 370, types: 468, coercions: 0, joins: 0/2}
+Result size of Desugar (after optimization)
+  = {terms: 346, types: 433, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.IntSet]: finished in 2.78 milliseconds, allocated 1.987 megabytes
+*** CoreTidy [Bootstrap.IntSet]:
+!!! CoreTidy [Bootstrap.IntSet]: finished in 0.02 milliseconds, allocated 0.026 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Regex.hs
+*** Checking old interface for Bootstrap.Regex (use -ddump-hi-diffs for more details):
+[30 of 97] Compiling Bootstrap.Regex  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Regex.hs, nothing )
+*** Parser [Bootstrap.Regex]:
+!!! Parser [Bootstrap.Regex]: finished in 7.60 milliseconds, allocated 12.498 megabytes
+*** Renamer/typechecker [Bootstrap.Regex]:
+*** ConsistencyCheck [Bootstrap.Regex]:
+!!! ConsistencyCheck [Bootstrap.Regex]: finished in 0.04 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Bootstrap.Regex]: finished in 22.53 milliseconds, allocated 20.166 megabytes
+*** Desugar [Bootstrap.Regex]:
+Result size of Desugar (before optimization)
+  = {terms: 3,185, types: 1,736, coercions: 0, joins: 0/85}
+Result size of Desugar (after optimization)
+  = {terms: 2,285, types: 877, coercions: 0, joins: 0/10}
+!!! Desugar [Bootstrap.Regex]: finished in 8.85 milliseconds, allocated 8.823 megabytes
+*** CoreTidy [Bootstrap.Regex]:
+!!! CoreTidy [Bootstrap.Regex]: finished in 0.04 milliseconds, allocated 0.080 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Host.hs
+*** Checking old interface for Bootstrap.Host (use -ddump-hi-diffs for more details):
+[31 of 97] Compiling Bootstrap.Host   ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Host.hs, nothing )
+*** Parser [Bootstrap.Host]:
+!!! Parser [Bootstrap.Host]: finished in 1.02 milliseconds, allocated 2.029 megabytes
+*** Renamer/typechecker [Bootstrap.Host]:
+*** ConsistencyCheck [Bootstrap.Host]:
+!!! ConsistencyCheck [Bootstrap.Host]: finished in 0.03 milliseconds, allocated 0.018 megabytes
+!!! Renamer/typechecker [Bootstrap.Host]: finished in 4.99 milliseconds, allocated 4.458 megabytes
+*** Desugar [Bootstrap.Host]:
+Result size of Desugar (before optimization)
+  = {terms: 617, types: 390, coercions: 0, joins: 0/46}
+Result size of Desugar (after optimization)
+  = {terms: 409, types: 170, coercions: 0, joins: 0/1}
+!!! Desugar [Bootstrap.Host]: finished in 1.29 milliseconds, allocated 1.566 megabytes
+*** CoreTidy [Bootstrap.Host]:
+!!! CoreTidy [Bootstrap.Host]: finished in 0.01 milliseconds, allocated 0.008 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph.hs
+*** Checking old interface for Bootstrap.Graph (use -ddump-hi-diffs for more details):
+[32 of 97] Compiling Bootstrap.Graph  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph.hs, nothing )
+*** Parser [Bootstrap.Graph]:
+!!! Parser [Bootstrap.Graph]: finished in 92.00 milliseconds, allocated 70.822 megabytes
+*** Renamer/typechecker [Bootstrap.Graph]:
+*** ConsistencyCheck [Bootstrap.Graph]:
+!!! ConsistencyCheck [Bootstrap.Graph]: finished in 0.06 milliseconds, allocated 0.023 megabytes
+!!! Renamer/typechecker [Bootstrap.Graph]: finished in 127.39 milliseconds, allocated 110.344 megabytes
+*** Desugar [Bootstrap.Graph]:
+Result size of Desugar (before optimization)
+  = {terms: 9,802, types: 11,524, coercions: 0, joins: 0/515}
+Result size of Desugar (after optimization)
+  = {terms: 7,537, types: 8,875, coercions: 0, joins: 2/67}
+!!! Desugar [Bootstrap.Graph]: finished in 62.55 milliseconds, allocated 43.953 megabytes
+*** CoreTidy [Bootstrap.Graph]:
+!!! CoreTidy [Bootstrap.Graph]: finished in 0.31 milliseconds, allocated 0.317 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+*** Checking old interface for Bootstrap.Graph.Solver (use -ddump-hi-diffs for more details):
+[33 of 97] Compiling Bootstrap.Graph.Solver ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Graph/Solver.hs, nothing )
+*** Parser [Bootstrap.Graph.Solver]:
+!!! Parser [Bootstrap.Graph.Solver]: finished in 26.61 milliseconds, allocated 35.254 megabytes
+*** Renamer/typechecker [Bootstrap.Graph.Solver]:
+*** ConsistencyCheck [Bootstrap.Graph.Solver]:
+!!! ConsistencyCheck [Bootstrap.Graph.Solver]: finished in 0.08 milliseconds, allocated 0.023 megabytes
+!!! Renamer/typechecker [Bootstrap.Graph.Solver]: finished in 72.66 milliseconds, allocated 56.945 megabytes
+*** Desugar [Bootstrap.Graph.Solver]:
+Result size of Desugar (before optimization)
+  = {terms: 5,132, types: 5,457, coercions: 0, joins: 0/355}
+Result size of Desugar (after optimization)
+  = {terms: 3,766, types: 3,837, coercions: 0, joins: 0/70}
+!!! Desugar [Bootstrap.Graph.Solver]: finished in 24.74 milliseconds, allocated 21.540 megabytes
+*** CoreTidy [Bootstrap.Graph.Solver]:
+!!! CoreTidy [Bootstrap.Graph.Solver]: finished in 0.08 milliseconds, allocated 0.101 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Fresh.hs
+*** Checking old interface for Bootstrap.Fresh (use -ddump-hi-diffs for more details):
+[34 of 97] Compiling Bootstrap.Fresh  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-foundation/Bootstrap/Fresh.hs, nothing )
+*** Parser [Bootstrap.Fresh]:
+!!! Parser [Bootstrap.Fresh]: finished in 1.12 milliseconds, allocated 1.861 megabytes
+*** Renamer/typechecker [Bootstrap.Fresh]:
+*** ConsistencyCheck [Bootstrap.Fresh]:
+!!! ConsistencyCheck [Bootstrap.Fresh]: finished in 0.04 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Bootstrap.Fresh]: finished in 4.91 milliseconds, allocated 4.238 megabytes
+*** Desugar [Bootstrap.Fresh]:
+Result size of Desugar (before optimization)
+  = {terms: 393, types: 525, coercions: 0, joins: 0/14}
+Result size of Desugar (after optimization)
+  = {terms: 325, types: 404, coercions: 0, joins: 0/1}
+!!! Desugar [Bootstrap.Fresh]: finished in 1.77 milliseconds, allocated 1.725 megabytes
+*** CoreTidy [Bootstrap.Fresh]:
+!!! CoreTidy [Bootstrap.Fresh]: finished in 0.03 milliseconds, allocated 0.023 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Desugar.hs
+*** Checking old interface for Bootstrap.Desugar (use -ddump-hi-diffs for more details):
+[35 of 97] Compiling Bootstrap.Desugar ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Desugar.hs, nothing )
+*** Parser [Bootstrap.Desugar]:
+!!! Parser [Bootstrap.Desugar]: finished in 1.71 milliseconds, allocated 3.970 megabytes
+*** Renamer/typechecker [Bootstrap.Desugar]:
+*** ConsistencyCheck [Bootstrap.Desugar]:
+!!! ConsistencyCheck [Bootstrap.Desugar]: finished in 0.03 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Bootstrap.Desugar]: finished in 6.61 milliseconds, allocated 7.109 megabytes
+*** Desugar [Bootstrap.Desugar]:
+Result size of Desugar (before optimization)
+  = {terms: 788, types: 833, coercions: 0, joins: 0/20}
+Result size of Desugar (after optimization)
+  = {terms: 477, types: 526, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.Desugar]: finished in 6.83 milliseconds, allocated 3.952 megabytes
+*** CoreTidy [Bootstrap.Desugar]:
+!!! CoreTidy [Bootstrap.Desugar]: finished in 0.01 milliseconds, allocated 0.010 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Dependency.hs
+*** Checking old interface for Bootstrap.Dependency (use -ddump-hi-diffs for more details):
+[36 of 97] Compiling Bootstrap.Dependency ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Dependency.hs, nothing )
+*** Parser [Bootstrap.Dependency]:
+!!! Parser [Bootstrap.Dependency]: finished in 2.70 milliseconds, allocated 6.448 megabytes
+*** Renamer/typechecker [Bootstrap.Dependency]:
+*** ConsistencyCheck [Bootstrap.Dependency]:
+!!! ConsistencyCheck [Bootstrap.Dependency]: finished in 0.05 milliseconds, allocated 0.021 megabytes
+!!! Renamer/typechecker [Bootstrap.Dependency]: finished in 14.84 milliseconds, allocated 11.459 megabytes
+*** Desugar [Bootstrap.Dependency]:
+Result size of Desugar (before optimization)
+  = {terms: 1,200, types: 1,391, coercions: 0, joins: 0/53}
+Result size of Desugar (after optimization)
+  = {terms: 818, types: 928, coercions: 0, joins: 0/3}
+!!! Desugar [Bootstrap.Dependency]: finished in 3.90 milliseconds, allocated 4.937 megabytes
+*** CoreTidy [Bootstrap.Dependency]:
+!!! CoreTidy [Bootstrap.Dependency]: finished in 0.05 milliseconds, allocated 0.040 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Surface.hs
+*** Checking old interface for Bootstrap.Surface (use -ddump-hi-diffs for more details):
+[37 of 97] Compiling Bootstrap.Surface ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Surface.hs, nothing )
+*** Parser [Bootstrap.Surface]:
+!!! Parser [Bootstrap.Surface]: finished in 8.81 milliseconds, allocated 12.879 megabytes
+*** Renamer/typechecker [Bootstrap.Surface]:
+*** ConsistencyCheck [Bootstrap.Surface]:
+!!! ConsistencyCheck [Bootstrap.Surface]: finished in 0.06 milliseconds, allocated 0.023 megabytes
+!!! Renamer/typechecker [Bootstrap.Surface]: finished in 24.65 milliseconds, allocated 21.468 megabytes
+*** Desugar [Bootstrap.Surface]:
+Result size of Desugar (before optimization)
+  = {terms: 2,399, types: 2,672, coercions: 0, joins: 0/118}
+Result size of Desugar (after optimization)
+  = {terms: 1,572, types: 1,807, coercions: 0, joins: 6/18}
+!!! Desugar [Bootstrap.Surface]: finished in 14.25 milliseconds, allocated 9.994 megabytes
+*** CoreTidy [Bootstrap.Surface]:
+!!! CoreTidy [Bootstrap.Surface]: finished in 0.06 milliseconds, allocated 0.043 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Prelude.hs
+*** Checking old interface for Bootstrap.Prelude (use -ddump-hi-diffs for more details):
+[38 of 97] Compiling Bootstrap.Prelude ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Prelude.hs, nothing )
+*** Parser [Bootstrap.Prelude]:
+!!! Parser [Bootstrap.Prelude]: finished in 3.80 milliseconds, allocated 10.777 megabytes
+*** Renamer/typechecker [Bootstrap.Prelude]:
+*** ConsistencyCheck [Bootstrap.Prelude]:
+!!! ConsistencyCheck [Bootstrap.Prelude]: finished in 0.05 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Bootstrap.Prelude]: finished in 30.49 milliseconds, allocated 24.589 megabytes
+*** Desugar [Bootstrap.Prelude]:
+Result size of Desugar (before optimization)
+  = {terms: 4,541, types: 3,390, coercions: 0, joins: 0/82}
+Result size of Desugar (after optimization)
+  = {terms: 2,205, types: 1,295, coercions: 0, joins: 0/6}
+!!! Desugar [Bootstrap.Prelude]: finished in 14.20 milliseconds, allocated 10.519 megabytes
+*** CoreTidy [Bootstrap.Prelude]:
+!!! CoreTidy [Bootstrap.Prelude]: finished in 0.05 milliseconds, allocated 0.048 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parser.hs
+*** Checking old interface for Bootstrap.Parser (use -ddump-hi-diffs for more details):
+[39 of 97] Compiling Bootstrap.Parser ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Parser.hs, nothing )
+*** Parser [Bootstrap.Parser]:
+!!! Parser [Bootstrap.Parser]: finished in 30.87 milliseconds, allocated 36.513 megabytes
+*** Renamer/typechecker [Bootstrap.Parser]:
+*** ConsistencyCheck [Bootstrap.Parser]:
+!!! ConsistencyCheck [Bootstrap.Parser]: finished in 0.11 milliseconds, allocated 0.026 megabytes
+!!! Renamer/typechecker [Bootstrap.Parser]: finished in 99.98 milliseconds, allocated 71.428 megabytes
+*** Desugar [Bootstrap.Parser]:
+Result size of Desugar (before optimization)
+  = {terms: 9,087, types: 8,841, coercions: 0, joins: 0/254}
+Result size of Desugar (after optimization)
+  = {terms: 5,724, types: 5,307, coercions: 0, joins: 4/12}
+!!! Desugar [Bootstrap.Parser]: finished in 42.95 milliseconds, allocated 30.830 megabytes
+*** CoreTidy [Bootstrap.Parser]:
+!!! CoreTidy [Bootstrap.Parser]: finished in 0.16 milliseconds, allocated 0.203 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Data.hs
+*** Checking old interface for Bootstrap.Data (use -ddump-hi-diffs for more details):
+[40 of 97] Compiling Bootstrap.Data   ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Data.hs, nothing )
+*** Parser [Bootstrap.Data]:
+!!! Parser [Bootstrap.Data]: finished in 4.80 milliseconds, allocated 8.386 megabytes
+*** Renamer/typechecker [Bootstrap.Data]:
+*** ConsistencyCheck [Bootstrap.Data]:
+!!! ConsistencyCheck [Bootstrap.Data]: finished in 0.05 milliseconds, allocated 0.021 megabytes
+!!! Renamer/typechecker [Bootstrap.Data]: finished in 18.61 milliseconds, allocated 17.389 megabytes
+*** Desugar [Bootstrap.Data]:
+Result size of Desugar (before optimization)
+  = {terms: 2,294, types: 2,144, coercions: 0, joins: 0/85}
+Result size of Desugar (after optimization)
+  = {terms: 1,374, types: 1,181, coercions: 0, joins: 0/7}
+!!! Desugar [Bootstrap.Data]: finished in 63.55 milliseconds, allocated 7.094 megabytes
+*** CoreTidy [Bootstrap.Data]:
+!!! CoreTidy [Bootstrap.Data]: finished in 0.02 milliseconds, allocated 0.039 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Type.hs
+*** Checking old interface for Bootstrap.X.Type (use -ddump-hi-diffs for more details):
+[41 of 97] Compiling Bootstrap.X.Type ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Type.hs, nothing )
+*** Parser [Bootstrap.X.Type]:
+!!! Parser [Bootstrap.X.Type]: finished in 1.94 milliseconds, allocated 6.646 megabytes
+*** Renamer/typechecker [Bootstrap.X.Type]:
+*** ConsistencyCheck [Bootstrap.X.Type]:
+!!! ConsistencyCheck [Bootstrap.X.Type]: finished in 0.04 milliseconds, allocated 0.023 megabytes
+!!! Renamer/typechecker [Bootstrap.X.Type]: finished in 6.43 milliseconds, allocated 12.212 megabytes
+*** Desugar [Bootstrap.X.Type]:
+Result size of Desugar (before optimization)
+  = {terms: 1,282, types: 1,026, coercions: 0, joins: 0/69}
+Result size of Desugar (after optimization)
+  = {terms: 903, types: 665, coercions: 0, joins: 1/4}
+!!! Desugar [Bootstrap.X.Type]: finished in 2.91 milliseconds, allocated 5.606 megabytes
+*** CoreTidy [Bootstrap.X.Type]:
+!!! CoreTidy [Bootstrap.X.Type]: finished in 0.02 milliseconds, allocated 0.020 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Parser.hs
+*** Checking old interface for Bootstrap.X.Parser (use -ddump-hi-diffs for more details):
+[42 of 97] Compiling Bootstrap.X.Parser ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Parser.hs, nothing )
+*** Parser [Bootstrap.X.Parser]:
+!!! Parser [Bootstrap.X.Parser]: finished in 2.78 milliseconds, allocated 10.304 megabytes
+*** Renamer/typechecker [Bootstrap.X.Parser]:
+*** ConsistencyCheck [Bootstrap.X.Parser]:
+!!! ConsistencyCheck [Bootstrap.X.Parser]: finished in 0.05 milliseconds, allocated 0.025 megabytes
+!!! Renamer/typechecker [Bootstrap.X.Parser]: finished in 12.19 milliseconds, allocated 21.540 megabytes
+*** Desugar [Bootstrap.X.Parser]:
+Result size of Desugar (before optimization)
+  = {terms: 2,621, types: 1,989, coercions: 0, joins: 0/63}
+Result size of Desugar (after optimization)
+  = {terms: 1,807, types: 1,194, coercions: 0, joins: 0/5}
+!!! Desugar [Bootstrap.X.Parser]: finished in 9.16 milliseconds, allocated 7.870 megabytes
+*** CoreTidy [Bootstrap.X.Parser]:
+!!! CoreTidy [Bootstrap.X.Parser]: finished in 0.04 milliseconds, allocated 0.060 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs
+*** Checking old interface for Bootstrap.X.Pretty (use -ddump-hi-diffs for more details):
+[43 of 97] Compiling Bootstrap.X.Pretty ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs, nothing )
+*** Parser [Bootstrap.X.Pretty]:
+!!! Parser [Bootstrap.X.Pretty]: finished in 2.19 milliseconds, allocated 5.220 megabytes
+*** Renamer/typechecker [Bootstrap.X.Pretty]:
+*** ConsistencyCheck [Bootstrap.X.Pretty]:
+!!! ConsistencyCheck [Bootstrap.X.Pretty]: finished in 0.04 milliseconds, allocated 0.021 megabytes
+!!! Renamer/typechecker [Bootstrap.X.Pretty]: finished in 7.08 milliseconds, allocated 10.240 megabytes
+*** Desugar [Bootstrap.X.Pretty]:
+Result size of Desugar (before optimization)
+  = {terms: 1,349, types: 555, coercions: 0, joins: 0/43}
+Result size of Desugar (after optimization)
+  = {terms: 1,092, types: 317, coercions: 0, joins: 0/9}
+!!! Desugar [Bootstrap.X.Pretty]: finished in 2.77 milliseconds, allocated 4.320 megabytes
+*** CoreTidy [Bootstrap.X.Pretty]:
+!!! CoreTidy [Bootstrap.X.Pretty]: finished in 0.03 milliseconds, allocated 0.021 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Check.hs
+*** Checking old interface for Bootstrap.X.Check (use -ddump-hi-diffs for more details):
+[44 of 97] Compiling Bootstrap.X.Check ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Check.hs, nothing )
+*** Parser [Bootstrap.X.Check]:
+!!! Parser [Bootstrap.X.Check]: finished in 3.27 milliseconds, allocated 9.107 megabytes
+*** Renamer/typechecker [Bootstrap.X.Check]:
+*** ConsistencyCheck [Bootstrap.X.Check]:
+!!! ConsistencyCheck [Bootstrap.X.Check]: finished in 0.07 milliseconds, allocated 0.026 megabytes
+!!! Renamer/typechecker [Bootstrap.X.Check]: finished in 13.14 milliseconds, allocated 17.333 megabytes
+*** Desugar [Bootstrap.X.Check]:
+Result size of Desugar (before optimization)
+  = {terms: 1,922, types: 2,032, coercions: 0, joins: 0/57}
+Result size of Desugar (after optimization)
+  = {terms: 1,291, types: 1,323, coercions: 0, joins: 0/4}
+!!! Desugar [Bootstrap.X.Check]: finished in 11.74 milliseconds, allocated 7.089 megabytes
+*** CoreTidy [Bootstrap.X.Check]:
+!!! CoreTidy [Bootstrap.X.Check]: finished in 0.05 milliseconds, allocated 0.049 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Checked.hs
+*** Checking old interface for Bootstrap.X.Checked (use -ddump-hi-diffs for more details):
+[45 of 97] Compiling Bootstrap.X.Checked ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-xmlf/Bootstrap/X/Checked.hs, nothing )
+*** Parser [Bootstrap.X.Checked]:
+!!! Parser [Bootstrap.X.Checked]: finished in 0.48 milliseconds, allocated 0.540 megabytes
+*** Renamer/typechecker [Bootstrap.X.Checked]:
+*** ConsistencyCheck [Bootstrap.X.Checked]:
+!!! ConsistencyCheck [Bootstrap.X.Checked]: finished in 0.02 milliseconds, allocated 0.018 megabytes
+!!! Renamer/typechecker [Bootstrap.X.Checked]: finished in 1.74 milliseconds, allocated 1.096 megabytes
+*** Desugar [Bootstrap.X.Checked]:
+Result size of Desugar (before optimization)
+  = {terms: 77, types: 46, coercions: 0, joins: 0/0}
+Result size of Desugar (after optimization)
+  = {terms: 67, types: 36, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.X.Checked]: finished in 0.57 milliseconds, allocated 0.376 megabytes
+*** CoreTidy [Bootstrap.X.Checked]:
+!!! CoreTidy [Bootstrap.X.Checked]: finished in 0.01 milliseconds, allocated 0.007 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Evidence.hs
+*** Checking old interface for Bootstrap.Evidence (use -ddump-hi-diffs for more details):
+[46 of 97] Compiling Bootstrap.Evidence ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Evidence.hs, nothing )
+*** Parser [Bootstrap.Evidence]:
+!!! Parser [Bootstrap.Evidence]: finished in 3.48 milliseconds, allocated 7.931 megabytes
+*** Renamer/typechecker [Bootstrap.Evidence]:
+*** ConsistencyCheck [Bootstrap.Evidence]:
+!!! ConsistencyCheck [Bootstrap.Evidence]: finished in 0.08 milliseconds, allocated 0.026 megabytes
+!!! Renamer/typechecker [Bootstrap.Evidence]: finished in 11.35 milliseconds, allocated 14.230 megabytes
+*** Desugar [Bootstrap.Evidence]:
+Result size of Desugar (before optimization)
+  = {terms: 1,440, types: 1,943, coercions: 0, joins: 0/96}
+Result size of Desugar (after optimization)
+  = {terms: 921, types: 1,253, coercions: 0, joins: 4/15}
+!!! Desugar [Bootstrap.Evidence]: finished in 9.59 milliseconds, allocated 5.782 megabytes
+*** CoreTidy [Bootstrap.Evidence]:
+!!! CoreTidy [Bootstrap.Evidence]: finished in 0.02 milliseconds, allocated 0.030 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/Runtime.hs
+*** Checking old interface for Bootstrap.Runtime (use -ddump-hi-diffs for more details):
+[47 of 97] Compiling Bootstrap.Runtime ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-interpreter/Bootstrap/Runtime.hs, nothing )
+*** Parser [Bootstrap.Runtime]:
+!!! Parser [Bootstrap.Runtime]: finished in 16.76 milliseconds, allocated 38.937 megabytes
+*** Renamer/typechecker [Bootstrap.Runtime]:
+*** ConsistencyCheck [Bootstrap.Runtime]:
+!!! ConsistencyCheck [Bootstrap.Runtime]: finished in 0.06 milliseconds, allocated 0.025 megabytes
+!!! Renamer/typechecker [Bootstrap.Runtime]: finished in 55.06 milliseconds, allocated 61.686 megabytes
+*** Desugar [Bootstrap.Runtime]:
+Result size of Desugar (before optimization)
+  = {terms: 8,060, types: 8,908, coercions: 0, joins: 0/399}
+Result size of Desugar (after optimization)
+  = {terms: 5,533, types: 5,807, coercions: 0, joins: 2/28}
+!!! Desugar [Bootstrap.Runtime]: finished in 25.14 milliseconds, allocated 31.794 megabytes
+*** CoreTidy [Bootstrap.Runtime]:
+!!! CoreTidy [Bootstrap.Runtime]: finished in 0.18 milliseconds, allocated 0.225 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs
+*** Checking old interface for Bootstrap.Module (use -ddump-hi-diffs for more details):
+[48 of 97] Compiling Bootstrap.Module ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs, nothing )
+*** Parser [Bootstrap.Module]:
+!!! Parser [Bootstrap.Module]: finished in 26.97 milliseconds, allocated 41.509 megabytes
+*** Renamer/typechecker [Bootstrap.Module]:
+*** ConsistencyCheck [Bootstrap.Module]:
+!!! ConsistencyCheck [Bootstrap.Module]: finished in 0.09 milliseconds, allocated 0.032 megabytes
+!!! Renamer/typechecker [Bootstrap.Module]: finished in 85.34 milliseconds, allocated 70.614 megabytes
+*** Desugar [Bootstrap.Module]:
+Result size of Desugar (before optimization)
+  = {terms: 9,881, types: 10,028, coercions: 0, joins: 0/727}
+Result size of Desugar (after optimization)
+  = {terms: 6,271, types: 5,999, coercions: 0, joins: 1/70}
+!!! Desugar [Bootstrap.Module]: finished in 51.07 milliseconds, allocated 33.076 megabytes
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs:54:30: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+54 |   loadGraph :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
+   |                              ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs:54:35: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+54 |   loadGraph :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
+   |                                   ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs:62:26: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+62 |   visit :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
+   |                          ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs:62:31: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+62 |   visit :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
+   |                               ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs:85:38: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+85 |   visitDependencies :: forall (m :: (* -> *)). (Monad m) => (String ->
+   |                                      ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs:85:43: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+85 |   visitDependencies :: forall (m :: (* -> *)). (Monad m) => (String ->
+   |                                           ^
+
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-frontend/Bootstrap/Module.hs:742:15: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: Abstract -> ...
+    |
+742 |               Abstract -> Nil;
+    |               ^^^^^^^^^^^^^^^
+
+*** CoreTidy [Bootstrap.Module]:
+!!! CoreTidy [Bootstrap.Module]: finished in 0.22 milliseconds, allocated 0.230 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM.hs
+*** Checking old interface for Bootstrap.LLVM (use -ddump-hi-diffs for more details):
+[49 of 97] Compiling Bootstrap.LLVM   ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-llvm/Bootstrap/LLVM.hs, nothing )
+*** Parser [Bootstrap.LLVM]:
+!!! Parser [Bootstrap.LLVM]: finished in 6.08 milliseconds, allocated 9.148 megabytes
+*** Renamer/typechecker [Bootstrap.LLVM]:
+*** ConsistencyCheck [Bootstrap.LLVM]:
+!!! ConsistencyCheck [Bootstrap.LLVM]: finished in 0.09 milliseconds, allocated 0.029 megabytes
+!!! Renamer/typechecker [Bootstrap.LLVM]: finished in 17.24 milliseconds, allocated 15.458 megabytes
+*** Desugar [Bootstrap.LLVM]:
+Result size of Desugar (before optimization)
+  = {terms: 2,114, types: 1,786, coercions: 0, joins: 0/96}
+Result size of Desugar (after optimization)
+  = {terms: 1,212, types: 852, coercions: 0, joins: 1/12}
+!!! Desugar [Bootstrap.LLVM]: finished in 9.05 milliseconds, allocated 6.876 megabytes
+*** CoreTidy [Bootstrap.LLVM]:
+!!! CoreTidy [Bootstrap.LLVM]: finished in 0.03 milliseconds, allocated 0.038 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kinding.hs
+*** Checking old interface for Bootstrap.Kinding (use -ddump-hi-diffs for more details):
+[50 of 97] Compiling Bootstrap.Kinding ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-language-core/Bootstrap/Kinding.hs, nothing )
+*** Parser [Bootstrap.Kinding]:
+!!! Parser [Bootstrap.Kinding]: finished in 0.84 milliseconds, allocated 1.252 megabytes
+*** Renamer/typechecker [Bootstrap.Kinding]:
+*** ConsistencyCheck [Bootstrap.Kinding]:
+!!! ConsistencyCheck [Bootstrap.Kinding]: finished in 0.04 milliseconds, allocated 0.021 megabytes
+!!! Renamer/typechecker [Bootstrap.Kinding]: finished in 2.54 milliseconds, allocated 2.619 megabytes
+*** Desugar [Bootstrap.Kinding]:
+Result size of Desugar (before optimization)
+  = {terms: 228, types: 228, coercions: 0, joins: 0/5}
+Result size of Desugar (after optimization)
+  = {terms: 149, types: 137, coercions: 0, joins: 0/0}
+!!! Desugar [Bootstrap.Kinding]: finished in 1.12 milliseconds, allocated 1.206 megabytes
+*** CoreTidy [Bootstrap.Kinding]:
+!!! CoreTidy [Bootstrap.Kinding]: finished in 0.01 milliseconds, allocated 0.004 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Constraint.hs
+*** Checking old interface for Bootstrap.Constraint (use -ddump-hi-diffs for more details):
+[51 of 97] Compiling Bootstrap.Constraint ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Constraint.hs, nothing )
+*** Parser [Bootstrap.Constraint]:
+!!! Parser [Bootstrap.Constraint]: finished in 14.97 milliseconds, allocated 21.178 megabytes
+*** Renamer/typechecker [Bootstrap.Constraint]:
+*** ConsistencyCheck [Bootstrap.Constraint]:
+!!! ConsistencyCheck [Bootstrap.Constraint]: finished in 0.11 milliseconds, allocated 0.032 megabytes
+!!! Renamer/typechecker [Bootstrap.Constraint]: finished in 40.61 milliseconds, allocated 39.009 megabytes
+*** Desugar [Bootstrap.Constraint]:
+Result size of Desugar (before optimization)
+  = {terms: 4,771, types: 4,819, coercions: 0, joins: 0/194}
+Result size of Desugar (after optimization)
+  = {terms: 3,093, types: 3,062, coercions: 0, joins: 8/33}
+!!! Desugar [Bootstrap.Constraint]: finished in 15.24 milliseconds, allocated 20.338 megabytes
+*** CoreTidy [Bootstrap.Constraint]:
+!!! CoreTidy [Bootstrap.Constraint]: finished in 0.05 milliseconds, allocated 0.089 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Elaborate.hs
+*** Checking old interface for Bootstrap.Elaborate (use -ddump-hi-diffs for more details):
+[52 of 97] Compiling Bootstrap.Elaborate ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Elaborate.hs, nothing )
+*** Parser [Bootstrap.Elaborate]:
+!!! Parser [Bootstrap.Elaborate]: finished in 8.13 milliseconds, allocated 14.991 megabytes
+*** Renamer/typechecker [Bootstrap.Elaborate]:
+*** ConsistencyCheck [Bootstrap.Elaborate]:
+!!! ConsistencyCheck [Bootstrap.Elaborate]: finished in 0.11 milliseconds, allocated 0.033 megabytes
+!!! Renamer/typechecker [Bootstrap.Elaborate]: finished in 32.74 milliseconds, allocated 25.001 megabytes
+*** Desugar [Bootstrap.Elaborate]:
+Result size of Desugar (before optimization)
+  = {terms: 2,669, types: 2,592, coercions: 0, joins: 0/181}
+Result size of Desugar (after optimization)
+  = {terms: 1,756, types: 1,626, coercions: 0, joins: 1/35}
+!!! Desugar [Bootstrap.Elaborate]: finished in 9.61 milliseconds, allocated 10.363 megabytes
+*** CoreTidy [Bootstrap.Elaborate]:
+!!! CoreTidy [Bootstrap.Elaborate]: finished in 55.86 milliseconds, allocated 0.053 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Classes.hs
+*** Checking old interface for Bootstrap.Classes (use -ddump-hi-diffs for more details):
+[53 of 97] Compiling Bootstrap.Classes ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Classes.hs, nothing )
+*** Parser [Bootstrap.Classes]:
+!!! Parser [Bootstrap.Classes]: finished in 10.05 milliseconds, allocated 31.213 megabytes
+*** Renamer/typechecker [Bootstrap.Classes]:
+*** ConsistencyCheck [Bootstrap.Classes]:
+!!! ConsistencyCheck [Bootstrap.Classes]: finished in 0.08 milliseconds, allocated 0.029 megabytes
+!!! Renamer/typechecker [Bootstrap.Classes]: finished in 50.76 milliseconds, allocated 53.996 megabytes
+*** Desugar [Bootstrap.Classes]:
+Result size of Desugar (before optimization)
+  = {terms: 6,295, types: 7,662, coercions: 0, joins: 0/252}
+Result size of Desugar (after optimization)
+  = {terms: 4,124, types: 5,264, coercions: 0, joins: 9/40}
+!!! Desugar [Bootstrap.Classes]: finished in 21.23 milliseconds, allocated 24.146 megabytes
+*** CoreTidy [Bootstrap.Classes]:
+!!! CoreTidy [Bootstrap.Classes]: finished in 0.08 milliseconds, allocated 0.096 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Separate.hs
+*** Checking old interface for Bootstrap.Separate (use -ddump-hi-diffs for more details):
+[54 of 97] Compiling Bootstrap.Separate ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Separate.hs, nothing )
+*** Parser [Bootstrap.Separate]:
+!!! Parser [Bootstrap.Separate]: finished in 9.17 milliseconds, allocated 28.376 megabytes
+*** Renamer/typechecker [Bootstrap.Separate]:
+*** ConsistencyCheck [Bootstrap.Separate]:
+!!! ConsistencyCheck [Bootstrap.Separate]: finished in 0.14 milliseconds, allocated 0.039 megabytes
+!!! Renamer/typechecker [Bootstrap.Separate]: finished in 55.88 milliseconds, allocated 48.110 megabytes
+*** Desugar [Bootstrap.Separate]:
+Result size of Desugar (before optimization)
+  = {terms: 6,329, types: 5,888, coercions: 1, joins: 0/458}
+Result size of Desugar (after optimization)
+  = {terms: 4,047, types: 3,414, coercions: 1, joins: 2/32}
+!!! Desugar [Bootstrap.Separate]: finished in 26.94 milliseconds, allocated 22.696 megabytes
+*** CoreTidy [Bootstrap.Separate]:
+!!! CoreTidy [Bootstrap.Separate]: finished in 0.08 milliseconds, allocated 0.100 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/CompilerCore.hs
+*** Checking old interface for Bootstrap.CompilerCore (use -ddump-hi-diffs for more details):
+[55 of 97] Compiling Bootstrap.CompilerCore ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/CompilerCore.hs, nothing )
+*** Parser [Bootstrap.CompilerCore]:
+!!! Parser [Bootstrap.CompilerCore]: finished in 2.08 milliseconds, allocated 1.988 megabytes
+*** Renamer/typechecker [Bootstrap.CompilerCore]:
+*** ConsistencyCheck [Bootstrap.CompilerCore]:
+!!! ConsistencyCheck [Bootstrap.CompilerCore]: finished in 0.08 milliseconds, allocated 0.027 megabytes
+!!! Renamer/typechecker [Bootstrap.CompilerCore]: finished in 4.16 milliseconds, allocated 4.083 megabytes
+*** Desugar [Bootstrap.CompilerCore]:
+Result size of Desugar (before optimization)
+  = {terms: 398, types: 303, coercions: 0, joins: 0/30}
+Result size of Desugar (after optimization)
+  = {terms: 280, types: 197, coercions: 0, joins: 0/4}
+!!! Desugar [Bootstrap.CompilerCore]: finished in 1.34 milliseconds, allocated 1.717 megabytes
+*** CoreTidy [Bootstrap.CompilerCore]:
+!!! CoreTidy [Bootstrap.CompilerCore]: finished in 0.02 milliseconds, allocated 0.015 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/InferenceUnit.hs
+*** Checking old interface for Bootstrap.InferenceUnit (use -ddump-hi-diffs for more details):
+[56 of 97] Compiling Bootstrap.InferenceUnit ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/InferenceUnit.hs, nothing )
+*** Parser [Bootstrap.InferenceUnit]:
+!!! Parser [Bootstrap.InferenceUnit]: finished in 2.38 milliseconds, allocated 6.110 megabytes
+*** Renamer/typechecker [Bootstrap.InferenceUnit]:
+*** ConsistencyCheck [Bootstrap.InferenceUnit]:
+!!! ConsistencyCheck [Bootstrap.InferenceUnit]: finished in 0.11 milliseconds, allocated 0.033 megabytes
+!!! Renamer/typechecker [Bootstrap.InferenceUnit]: finished in 9.05 milliseconds, allocated 10.840 megabytes
+*** Desugar [Bootstrap.InferenceUnit]:
+Result size of Desugar (before optimization)
+  = {terms: 1,055, types: 1,532, coercions: 0, joins: 0/58}
+Result size of Desugar (after optimization)
+  = {terms: 658, types: 1,046, coercions: 0, joins: 0/6}
+!!! Desugar [Bootstrap.InferenceUnit]: finished in 7.93 milliseconds, allocated 4.030 megabytes
+*** CoreTidy [Bootstrap.InferenceUnit]:
+!!! CoreTidy [Bootstrap.InferenceUnit]: finished in 0.03 milliseconds, allocated 0.021 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateQuery.hs
+*** Checking old interface for Bootstrap.CrateQuery (use -ddump-hi-diffs for more details):
+[57 of 97] Compiling Bootstrap.CrateQuery ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateQuery.hs, nothing )
+*** Parser [Bootstrap.CrateQuery]:
+!!! Parser [Bootstrap.CrateQuery]: finished in 15.86 milliseconds, allocated 22.558 megabytes
+*** Renamer/typechecker [Bootstrap.CrateQuery]:
+*** ConsistencyCheck [Bootstrap.CrateQuery]:
+!!! ConsistencyCheck [Bootstrap.CrateQuery]: finished in 0.13 milliseconds, allocated 0.035 megabytes
+!!! Renamer/typechecker [Bootstrap.CrateQuery]: finished in 55.32 milliseconds, allocated 40.005 megabytes
+*** Desugar [Bootstrap.CrateQuery]:
+Result size of Desugar (before optimization)
+  = {terms: 5,544, types: 5,180, coercions: 0, joins: 0/315}
+Result size of Desugar (after optimization)
+  = {terms: 3,363, types: 2,755, coercions: 0, joins: 2/37}
+!!! Desugar [Bootstrap.CrateQuery]: finished in 12.43 milliseconds, allocated 18.724 megabytes
+*** CoreTidy [Bootstrap.CrateQuery]:
+!!! CoreTidy [Bootstrap.CrateQuery]: finished in 0.07 milliseconds, allocated 0.103 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateArtifact.hs
+*** Checking old interface for Bootstrap.CrateArtifact (use -ddump-hi-diffs for more details):
+[58 of 97] Compiling Bootstrap.CrateArtifact ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateArtifact.hs, nothing )
+*** Parser [Bootstrap.CrateArtifact]:
+!!! Parser [Bootstrap.CrateArtifact]: finished in 16.22 milliseconds, allocated 39.162 megabytes
+*** Renamer/typechecker [Bootstrap.CrateArtifact]:
+*** ConsistencyCheck [Bootstrap.CrateArtifact]:
+!!! ConsistencyCheck [Bootstrap.CrateArtifact]: finished in 0.12 milliseconds, allocated 0.038 megabytes
+!!! Renamer/typechecker [Bootstrap.CrateArtifact]: finished in 70.49 milliseconds, allocated 61.859 megabytes
+*** Desugar [Bootstrap.CrateArtifact]:
+Result size of Desugar (before optimization)
+  = {terms: 7,867, types: 9,547, coercions: 0, joins: 0/700}
+Result size of Desugar (after optimization)
+  = {terms: 5,073, types: 6,072, coercions: 0, joins: 6/58}
+!!! Desugar [Bootstrap.CrateArtifact]: finished in 37.25 milliseconds, allocated 27.088 megabytes
+*** CoreTidy [Bootstrap.CrateArtifact]:
+!!! CoreTidy [Bootstrap.CrateArtifact]: finished in 0.12 milliseconds, allocated 0.153 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateCodegen.hs
+*** Checking old interface for Bootstrap.CrateCodegen (use -ddump-hi-diffs for more details):
+[59 of 97] Compiling Bootstrap.CrateCodegen ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/CrateCodegen.hs, nothing )
+*** Parser [Bootstrap.CrateCodegen]:
+!!! Parser [Bootstrap.CrateCodegen]: finished in 5.66 milliseconds, allocated 6.878 megabytes
+*** Renamer/typechecker [Bootstrap.CrateCodegen]:
+*** ConsistencyCheck [Bootstrap.CrateCodegen]:
+!!! ConsistencyCheck [Bootstrap.CrateCodegen]: finished in 0.07 milliseconds, allocated 0.024 megabytes
+!!! Renamer/typechecker [Bootstrap.CrateCodegen]: finished in 13.44 milliseconds, allocated 11.834 megabytes
+*** Desugar [Bootstrap.CrateCodegen]:
+Result size of Desugar (before optimization)
+  = {terms: 1,506, types: 1,816, coercions: 1, joins: 0/147}
+Result size of Desugar (after optimization)
+  = {terms: 945, types: 1,107, coercions: 1, joins: 0/9}
+!!! Desugar [Bootstrap.CrateCodegen]: finished in 5.14 milliseconds, allocated 5.344 megabytes
+*** CoreTidy [Bootstrap.CrateCodegen]:
+!!! CoreTidy [Bootstrap.CrateCodegen]: finished in 0.04 milliseconds, allocated 0.029 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Crate.hs
+*** Checking old interface for Bootstrap.Crate (use -ddump-hi-diffs for more details):
+[60 of 97] Compiling Bootstrap.Crate  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-crates/Bootstrap/Crate.hs, nothing )
+*** Parser [Bootstrap.Crate]:
+!!! Parser [Bootstrap.Crate]: finished in 8.31 milliseconds, allocated 14.858 megabytes
+*** Renamer/typechecker [Bootstrap.Crate]:
+*** ConsistencyCheck [Bootstrap.Crate]:
+!!! ConsistencyCheck [Bootstrap.Crate]: finished in 0.12 milliseconds, allocated 0.031 megabytes
+!!! Renamer/typechecker [Bootstrap.Crate]: finished in 37.18 milliseconds, allocated 23.289 megabytes
+*** Desugar [Bootstrap.Crate]:
+Result size of Desugar (before optimization)
+  = {terms: 2,866, types: 3,782, coercions: 0, joins: 0/276}
+Result size of Desugar (after optimization)
+  = {terms: 1,827, types: 2,453, coercions: 0, joins: 0/23}
+!!! Desugar [Bootstrap.Crate]: finished in 18.17 milliseconds, allocated 10.942 megabytes
+*** CoreTidy [Bootstrap.Crate]:
+!!! CoreTidy [Bootstrap.Crate]: finished in 0.05 milliseconds, allocated 0.041 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Compiler.hs
+*** Checking old interface for Bootstrap.Compiler (use -ddump-hi-diffs for more details):
+[61 of 97] Compiling Bootstrap.Compiler ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-inference/Bootstrap/Compiler.hs, nothing )
+*** Parser [Bootstrap.Compiler]:
+!!! Parser [Bootstrap.Compiler]: finished in 1.79 milliseconds, allocated 3.388 megabytes
+*** Renamer/typechecker [Bootstrap.Compiler]:
+*** ConsistencyCheck [Bootstrap.Compiler]:
+!!! ConsistencyCheck [Bootstrap.Compiler]: finished in 0.08 milliseconds, allocated 0.025 megabytes
+!!! Renamer/typechecker [Bootstrap.Compiler]: finished in 9.29 milliseconds, allocated 5.856 megabytes
+*** Desugar [Bootstrap.Compiler]:
+Result size of Desugar (before optimization)
+  = {terms: 367, types: 473, coercions: 0, joins: 0/13}
+Result size of Desugar (after optimization)
+  = {terms: 272, types: 364, coercions: 0, joins: 0/1}
+!!! Desugar [Bootstrap.Compiler]: finished in 1.76 milliseconds, allocated 1.791 megabytes
+*** CoreTidy [Bootstrap.Compiler]:
+!!! CoreTidy [Bootstrap.Compiler]: finished in 0.02 milliseconds, allocated 0.016 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs
+*** Checking old interface for MLF.Entry.Emlf (use -ddump-hi-diffs for more details):
+[62 of 97] Compiling MLF.Entry.Emlf   ( /workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs, nothing )
+*** Parser [MLF.Entry.Emlf]:
+!!! Parser [MLF.Entry.Emlf]: finished in 12.12 milliseconds, allocated 20.584 megabytes
+*** Renamer/typechecker [MLF.Entry.Emlf]:
+*** ConsistencyCheck [MLF.Entry.Emlf]:
+!!! ConsistencyCheck [MLF.Entry.Emlf]: finished in 0.16 milliseconds, allocated 0.035 megabytes
+!!! Renamer/typechecker [MLF.Entry.Emlf]: finished in 28.72 milliseconds, allocated 19.518 megabytes
+*** Desugar [MLF.Entry.Emlf]:
+Result size of Desugar (before optimization)
+  = {terms: 2,657, types: 1,925, coercions: 0, joins: 0/224}
+Result size of Desugar (after optimization)
+  = {terms: 1,710, types: 908, coercions: 0, joins: 1/2}
+!!! Desugar [MLF.Entry.Emlf]: finished in 15.26 milliseconds, allocated 9.897 megabytes
+/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs:73:21: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+   |
+73 |                     _ ->
+   |                     ^^^^...
+
+/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs:268:68: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+268 |                                                                    _ ->
+    |                                                                    ^^^^...
+
+/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs:284:55: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+284 |                                                       _ ->
+    |                                                       ^^^^...
+
+/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs:368:73: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+368 |                                                                         _ ->
+    |                                                                         ^^^^...
+
+/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs:384:60: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+384 |                                                            _ ->
+    |                                                            ^^^^...
+
+/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs:680:21: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+680 |                     _ -> Left usage
+    |                     ^^^^^^^^^^^^^^^
+
+/workspace/shared/mlf-shared-source-migration/bootstrap/MLF/Entry/Emlf.hs:692:7: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+692 |       _ -> Left usage
+    |       ^^^^^^^^^^^^^^^
+
+*** CoreTidy [MLF.Entry.Emlf]:
+!!! CoreTidy [MLF.Entry.Emlf]: finished in 0.09 milliseconds, allocated 0.064 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process/Internal.hs
+*** Checking old interface for Async.Process.Internal (use -ddump-hi-diffs for more details):
+[63 of 97] Compiling Async.Process.Internal ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process/Internal.hs, nothing )
+*** Parser [Async.Process.Internal]:
+!!! Parser [Async.Process.Internal]: finished in 1.14 milliseconds, allocated 1.620 megabytes
+*** Renamer/typechecker [Async.Process.Internal]:
+*** ConsistencyCheck [Async.Process.Internal]:
+!!! ConsistencyCheck [Async.Process.Internal]: finished in 0.03 milliseconds, allocated 0.018 megabytes
+!!! Renamer/typechecker [Async.Process.Internal]: finished in 4.61 milliseconds, allocated 2.958 megabytes
+*** Desugar [Async.Process.Internal]:
+Result size of Desugar (before optimization)
+  = {terms: 322, types: 297, coercions: 0, joins: 0/17}
+Result size of Desugar (after optimization)
+  = {terms: 186, types: 128, coercions: 0, joins: 0/0}
+!!! Desugar [Async.Process.Internal]: finished in 1.45 milliseconds, allocated 1.111 megabytes
+*** CoreTidy [Async.Process.Internal]:
+!!! CoreTidy [Async.Process.Internal]: finished in 0.01 milliseconds, allocated 0.006 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process.hs
+*** Checking old interface for Async.Process (use -ddump-hi-diffs for more details):
+[64 of 97] Compiling Async.Process    ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Process.hs, nothing )
+*** Parser [Async.Process]:
+!!! Parser [Async.Process]: finished in 5.10 milliseconds, allocated 7.146 megabytes
+*** Renamer/typechecker [Async.Process]:
+*** ConsistencyCheck [Async.Process]:
+!!! ConsistencyCheck [Async.Process]: finished in 0.04 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Async.Process]: finished in 17.62 milliseconds, allocated 11.440 megabytes
+*** Desugar [Async.Process]:
+Result size of Desugar (before optimization)
+  = {terms: 1,705, types: 1,441, coercions: 0, joins: 0/56}
+Result size of Desugar (after optimization)
+  = {terms: 1,135, types: 833, coercions: 0, joins: 4/7}
+!!! Desugar [Async.Process]: finished in 7.27 milliseconds, allocated 5.809 megabytes
+*** CoreTidy [Async.Process]:
+!!! CoreTidy [Async.Process]: finished in 0.07 milliseconds, allocated 0.076 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Core.hs
+*** Checking old interface for Async.Task.Core (use -ddump-hi-diffs for more details):
+[65 of 97] Compiling Async.Task.Core  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Core.hs, nothing )
+*** Parser [Async.Task.Core]:
+!!! Parser [Async.Task.Core]: finished in 19.85 milliseconds, allocated 25.651 megabytes
+*** Renamer/typechecker [Async.Task.Core]:
+*** ConsistencyCheck [Async.Task.Core]:
+!!! ConsistencyCheck [Async.Task.Core]: finished in 0.05 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Async.Task.Core]: finished in 44.27 milliseconds, allocated 34.300 megabytes
+*** Desugar [Async.Task.Core]:
+Result size of Desugar (before optimization)
+  = {terms: 4,542, types: 4,105, coercions: 0, joins: 0/195}
+Result size of Desugar (after optimization)
+  = {terms: 3,343, types: 2,832, coercions: 0, joins: 2/12}
+!!! Desugar [Async.Task.Core]: finished in 20.89 milliseconds, allocated 16.869 megabytes
+*** CoreTidy [Async.Task.Core]:
+!!! CoreTidy [Async.Task.Core]: finished in 0.13 milliseconds, allocated 0.139 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Internal.hs
+*** Checking old interface for Async.Task.Internal (use -ddump-hi-diffs for more details):
+[66 of 97] Compiling Async.Task.Internal ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task/Internal.hs, nothing )
+*** Parser [Async.Task.Internal]:
+!!! Parser [Async.Task.Internal]: finished in 0.44 milliseconds, allocated 0.632 megabytes
+*** Renamer/typechecker [Async.Task.Internal]:
+*** ConsistencyCheck [Async.Task.Internal]:
+!!! ConsistencyCheck [Async.Task.Internal]: finished in 0.04 milliseconds, allocated 0.018 megabytes
+!!! Renamer/typechecker [Async.Task.Internal]: finished in 1.01 milliseconds, allocated 0.939 megabytes
+*** Desugar [Async.Task.Internal]:
+Result size of Desugar (before optimization)
+  = {terms: 6, types: 1, coercions: 0, joins: 0/0}
+Result size of Desugar (after optimization)
+  = {terms: 6, types: 1, coercions: 0, joins: 0/0}
+!!! Desugar [Async.Task.Internal]: finished in 0.20 milliseconds, allocated 0.149 megabytes
+*** CoreTidy [Async.Task.Internal]:
+!!! CoreTidy [Async.Task.Internal]: finished in 0.01 milliseconds, allocated 0.001 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task.hs
+*** Checking old interface for Async.Task (use -ddump-hi-diffs for more details):
+[67 of 97] Compiling Async.Task       ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-async/Async/Task.hs, nothing )
+*** Parser [Async.Task]:
+!!! Parser [Async.Task]: finished in 0.45 milliseconds, allocated 0.919 megabytes
+*** Renamer/typechecker [Async.Task]:
+*** ConsistencyCheck [Async.Task]:
+!!! ConsistencyCheck [Async.Task]: finished in 0.02 milliseconds, allocated 0.016 megabytes
+!!! Renamer/typechecker [Async.Task]: finished in 1.49 milliseconds, allocated 1.465 megabytes
+*** Desugar [Async.Task]:
+Result size of Desugar (before optimization)
+  = {terms: 20, types: 38, coercions: 0, joins: 0/0}
+Result size of Desugar (after optimization)
+  = {terms: 14, types: 26, coercions: 0, joins: 0/0}
+!!! Desugar [Async.Task]: finished in 0.28 milliseconds, allocated 0.249 megabytes
+*** CoreTidy [Async.Task]:
+!!! CoreTidy [Async.Task]: finished in 0.01 milliseconds, allocated 0.015 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessMain.hs
+*** Checking old interface for MLF.Tests.Async.ProcessMain (use -ddump-hi-diffs for more details):
+[68 of 97] Compiling MLF.Tests.Async.ProcessMain ( /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessMain.hs, nothing )
+*** Parser [MLF.Tests.Async.ProcessMain]:
+!!! Parser [MLF.Tests.Async.ProcessMain]: finished in 4.55 milliseconds, allocated 12.170 megabytes
+*** Renamer/typechecker [MLF.Tests.Async.ProcessMain]:
+*** ConsistencyCheck [MLF.Tests.Async.ProcessMain]:
+!!! ConsistencyCheck [MLF.Tests.Async.ProcessMain]: finished in 0.03 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [MLF.Tests.Async.ProcessMain]: finished in 31.00 milliseconds, allocated 22.499 megabytes
+*** Desugar [MLF.Tests.Async.ProcessMain]:
+Result size of Desugar (before optimization)
+  = {terms: 4,069, types: 3,067, coercions: 0, joins: 0/484}
+Result size of Desugar (after optimization)
+  = {terms: 2,783, types: 1,784, coercions: 0, joins: 3/4}
+!!! Desugar [MLF.Tests.Async.ProcessMain]: finished in 6.73 milliseconds, allocated 10.918 megabytes
+*** CoreTidy [MLF.Tests.Async.ProcessMain]:
+!!! CoreTidy [MLF.Tests.Async.ProcessMain]: finished in 0.03 milliseconds, allocated 0.030 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessPanic.hs
+*** Checking old interface for MLF.Tests.Async.ProcessPanic (use -ddump-hi-diffs for more details):
+[69 of 97] Compiling MLF.Tests.Async.ProcessPanic ( /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/ProcessPanic.hs, nothing )
+*** Parser [MLF.Tests.Async.ProcessPanic]:
+!!! Parser [MLF.Tests.Async.ProcessPanic]: finished in 1.40 milliseconds, allocated 1.190 megabytes
+*** Renamer/typechecker [MLF.Tests.Async.ProcessPanic]:
+*** ConsistencyCheck [MLF.Tests.Async.ProcessPanic]:
+!!! ConsistencyCheck [MLF.Tests.Async.ProcessPanic]: finished in 0.03 milliseconds, allocated 0.018 megabytes
+!!! Renamer/typechecker [MLF.Tests.Async.ProcessPanic]: finished in 4.03 milliseconds, allocated 2.502 megabytes
+*** Desugar [MLF.Tests.Async.ProcessPanic]:
+Result size of Desugar (before optimization)
+  = {terms: 254, types: 203, coercions: 0, joins: 0/21}
+Result size of Desugar (after optimization)
+  = {terms: 178, types: 127, coercions: 0, joins: 0/0}
+!!! Desugar [MLF.Tests.Async.ProcessPanic]: finished in 2.29 milliseconds, allocated 0.903 megabytes
+*** CoreTidy [MLF.Tests.Async.ProcessPanic]:
+!!! CoreTidy [MLF.Tests.Async.ProcessPanic]: finished in 0.01 milliseconds, allocated 0.006 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskMain.hs
+*** Checking old interface for MLF.Tests.Async.TaskMain (use -ddump-hi-diffs for more details):
+[70 of 97] Compiling MLF.Tests.Async.TaskMain ( /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskMain.hs, nothing )
+*** Parser [MLF.Tests.Async.TaskMain]:
+!!! Parser [MLF.Tests.Async.TaskMain]: finished in 7.37 milliseconds, allocated 6.632 megabytes
+*** Renamer/typechecker [MLF.Tests.Async.TaskMain]:
+*** ConsistencyCheck [MLF.Tests.Async.TaskMain]:
+!!! ConsistencyCheck [MLF.Tests.Async.TaskMain]: finished in 0.12 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [MLF.Tests.Async.TaskMain]: finished in 24.27 milliseconds, allocated 14.542 megabytes
+*** Desugar [MLF.Tests.Async.TaskMain]:
+Result size of Desugar (before optimization)
+  = {terms: 1,832, types: 1,574, coercions: 0, joins: 0/201}
+Result size of Desugar (after optimization)
+  = {terms: 1,261, types: 1,045, coercions: 0, joins: 1/1}
+!!! Desugar [MLF.Tests.Async.TaskMain]: finished in 3.73 milliseconds, allocated 5.404 megabytes
+*** CoreTidy [MLF.Tests.Async.TaskMain]:
+!!! CoreTidy [MLF.Tests.Async.TaskMain]: finished in 0.02 milliseconds, allocated 0.025 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskProcesses.hs
+*** Checking old interface for MLF.Tests.Async.TaskProcesses (use -ddump-hi-diffs for more details):
+[71 of 97] Compiling MLF.Tests.Async.TaskProcesses ( /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskProcesses.hs, nothing )
+*** Parser [MLF.Tests.Async.TaskProcesses]:
+!!! Parser [MLF.Tests.Async.TaskProcesses]: finished in 6.27 milliseconds, allocated 9.494 megabytes
+*** Renamer/typechecker [MLF.Tests.Async.TaskProcesses]:
+*** ConsistencyCheck [MLF.Tests.Async.TaskProcesses]:
+!!! ConsistencyCheck [MLF.Tests.Async.TaskProcesses]: finished in 0.15 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [MLF.Tests.Async.TaskProcesses]: finished in 13.32 milliseconds, allocated 16.689 megabytes
+*** Desugar [MLF.Tests.Async.TaskProcesses]:
+Result size of Desugar (before optimization)
+  = {terms: 2,724, types: 1,926, coercions: 0, joins: 0/323}
+Result size of Desugar (after optimization)
+  = {terms: 1,866, types: 1,065, coercions: 0, joins: 0/2}
+!!! Desugar [MLF.Tests.Async.TaskProcesses]: finished in 3.76 milliseconds, allocated 7.579 megabytes
+*** CoreTidy [MLF.Tests.Async.TaskProcesses]:
+!!! CoreTidy [MLF.Tests.Async.TaskProcesses]: finished in 0.02 milliseconds, allocated 0.027 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskWaitGraph.hs
+*** Checking old interface for MLF.Tests.Async.TaskWaitGraph (use -ddump-hi-diffs for more details):
+[72 of 97] Compiling MLF.Tests.Async.TaskWaitGraph ( /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/Async/TaskWaitGraph.hs, nothing )
+*** Parser [MLF.Tests.Async.TaskWaitGraph]:
+!!! Parser [MLF.Tests.Async.TaskWaitGraph]: finished in 2.09 milliseconds, allocated 5.330 megabytes
+*** Renamer/typechecker [MLF.Tests.Async.TaskWaitGraph]:
+*** ConsistencyCheck [MLF.Tests.Async.TaskWaitGraph]:
+!!! ConsistencyCheck [MLF.Tests.Async.TaskWaitGraph]: finished in 0.05 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [MLF.Tests.Async.TaskWaitGraph]: finished in 7.61 milliseconds, allocated 8.576 megabytes
+*** Desugar [MLF.Tests.Async.TaskWaitGraph]:
+Result size of Desugar (before optimization)
+  = {terms: 1,137, types: 1,067, coercions: 0, joins: 0/81}
+Result size of Desugar (after optimization)
+  = {terms: 773, types: 654, coercions: 0, joins: 6/6}
+!!! Desugar [MLF.Tests.Async.TaskWaitGraph]: finished in 2.42 milliseconds, allocated 3.985 megabytes
+*** CoreTidy [MLF.Tests.Async.TaskWaitGraph]:
+!!! CoreTidy [MLF.Tests.Async.TaskWaitGraph]: finished in 0.01 milliseconds, allocated 0.011 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/SharedFrontend.hs
+*** Checking old interface for MLF.Tests.SharedFrontend (use -ddump-hi-diffs for more details):
+[73 of 97] Compiling MLF.Tests.SharedFrontend ( /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/SharedFrontend.hs, nothing )
+*** Parser [MLF.Tests.SharedFrontend]:
+!!! Parser [MLF.Tests.SharedFrontend]: finished in 1.75 milliseconds, allocated 6.250 megabytes
+*** Renamer/typechecker [MLF.Tests.SharedFrontend]:
+*** ConsistencyCheck [MLF.Tests.SharedFrontend]:
+!!! ConsistencyCheck [MLF.Tests.SharedFrontend]: finished in 0.07 milliseconds, allocated 0.024 megabytes
+!!! Renamer/typechecker [MLF.Tests.SharedFrontend]: finished in 10.19 milliseconds, allocated 10.415 megabytes
+*** Desugar [MLF.Tests.SharedFrontend]:
+Result size of Desugar (before optimization)
+  = {terms: 2,248, types: 1,582, coercions: 0, joins: 0/320}
+Result size of Desugar (after optimization)
+  = {terms: 1,472, types: 798, coercions: 0, joins: 3/3}
+!!! Desugar [MLF.Tests.SharedFrontend]: finished in 9.38 milliseconds, allocated 6.526 megabytes
+*** CoreTidy [MLF.Tests.SharedFrontend]:
+!!! CoreTidy [MLF.Tests.SharedFrontend]: finished in 0.02 milliseconds, allocated 0.011 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/OS.hs
+*** Checking old interface for Package.OS (use -ddump-hi-diffs for more details):
+[74 of 97] Compiling Package.OS       ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/OS.hs, nothing )
+*** Parser [Package.OS]:
+!!! Parser [Package.OS]: finished in 3.36 milliseconds, allocated 6.984 megabytes
+*** Renamer/typechecker [Package.OS]:
+*** ConsistencyCheck [Package.OS]:
+!!! ConsistencyCheck [Package.OS]: finished in 0.04 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Package.OS]: finished in 14.65 milliseconds, allocated 13.821 megabytes
+*** Desugar [Package.OS]:
+Result size of Desugar (before optimization)
+  = {terms: 1,924, types: 1,268, coercions: 0, joins: 0/184}
+Result size of Desugar (after optimization)
+  = {terms: 1,388, types: 689, coercions: 0, joins: 0/12}
+!!! Desugar [Package.OS]: finished in 13.04 milliseconds, allocated 5.603 megabytes
+*** CoreTidy [Package.OS]:
+!!! CoreTidy [Package.OS]: finished in 0.05 milliseconds, allocated 0.044 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Json.hs
+*** Checking old interface for Package.Json (use -ddump-hi-diffs for more details):
+[75 of 97] Compiling Package.Json     ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Json.hs, nothing )
+*** Parser [Package.Json]:
+!!! Parser [Package.Json]: finished in 4.90 milliseconds, allocated 10.227 megabytes
+*** Renamer/typechecker [Package.Json]:
+*** ConsistencyCheck [Package.Json]:
+!!! ConsistencyCheck [Package.Json]: finished in 0.04 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Package.Json]: finished in 18.07 milliseconds, allocated 17.775 megabytes
+*** Desugar [Package.Json]:
+Result size of Desugar (before optimization)
+  = {terms: 2,328, types: 1,556, coercions: 0, joins: 0/113}
+Result size of Desugar (after optimization)
+  = {terms: 1,780, types: 941, coercions: 0, joins: 0/17}
+!!! Desugar [Package.Json]: finished in 15.45 milliseconds, allocated 6.123 megabytes
+*** CoreTidy [Package.Json]:
+!!! CoreTidy [Package.Json]: finished in 0.07 milliseconds, allocated 0.062 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Release.hs
+*** Checking old interface for Package.Release (use -ddump-hi-diffs for more details):
+[76 of 97] Compiling Package.Release  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Release.hs, nothing )
+*** Parser [Package.Release]:
+!!! Parser [Package.Release]: finished in 5.60 milliseconds, allocated 12.939 megabytes
+*** Renamer/typechecker [Package.Release]:
+*** ConsistencyCheck [Package.Release]:
+!!! ConsistencyCheck [Package.Release]: finished in 0.07 milliseconds, allocated 0.021 megabytes
+!!! Renamer/typechecker [Package.Release]: finished in 34.78 milliseconds, allocated 25.329 megabytes
+*** Desugar [Package.Release]:
+Result size of Desugar (before optimization)
+  = {terms: 3,448, types: 2,847, coercions: 0, joins: 0/296}
+Result size of Desugar (after optimization)
+  = {terms: 2,300, types: 1,607, coercions: 0, joins: 0/21}
+!!! Desugar [Package.Release]: finished in 9.80 milliseconds, allocated 10.291 megabytes
+*** CoreTidy [Package.Release]:
+!!! CoreTidy [Package.Release]: finished in 0.08 milliseconds, allocated 0.044 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Distribution.hs
+*** Checking old interface for Package.Distribution (use -ddump-hi-diffs for more details):
+[77 of 97] Compiling Package.Distribution ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Distribution.hs, nothing )
+*** Parser [Package.Distribution]:
+!!! Parser [Package.Distribution]: finished in 5.04 milliseconds, allocated 7.997 megabytes
+*** Renamer/typechecker [Package.Distribution]:
+*** ConsistencyCheck [Package.Distribution]:
+!!! ConsistencyCheck [Package.Distribution]: finished in 0.06 milliseconds, allocated 0.021 megabytes
+!!! Renamer/typechecker [Package.Distribution]: finished in 16.37 milliseconds, allocated 16.013 megabytes
+*** Desugar [Package.Distribution]:
+Result size of Desugar (before optimization)
+  = {terms: 2,341, types: 1,601, coercions: 0, joins: 0/225}
+Result size of Desugar (after optimization)
+  = {terms: 1,519, types: 766, coercions: 0, joins: 1/20}
+!!! Desugar [Package.Distribution]: finished in 6.13 milliseconds, allocated 6.615 megabytes
+*** CoreTidy [Package.Distribution]:
+!!! CoreTidy [Package.Distribution]: finished in 0.06 milliseconds, allocated 0.017 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Manifest.hs
+*** Checking old interface for Package.Manifest (use -ddump-hi-diffs for more details):
+[78 of 97] Compiling Package.Manifest ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Manifest.hs, nothing )
+*** Parser [Package.Manifest]:
+!!! Parser [Package.Manifest]: finished in 9.69 milliseconds, allocated 16.032 megabytes
+*** Renamer/typechecker [Package.Manifest]:
+*** ConsistencyCheck [Package.Manifest]:
+!!! ConsistencyCheck [Package.Manifest]: finished in 0.09 milliseconds, allocated 0.025 megabytes
+!!! Renamer/typechecker [Package.Manifest]: finished in 47.42 milliseconds, allocated 29.595 megabytes
+*** Desugar [Package.Manifest]:
+Result size of Desugar (before optimization)
+  = {terms: 4,019, types: 2,863, coercions: 0, joins: 0/413}
+Result size of Desugar (after optimization)
+  = {terms: 2,970, types: 1,730, coercions: 0, joins: 0/30}
+!!! Desugar [Package.Manifest]: finished in 11.13 milliseconds, allocated 11.808 megabytes
+*** CoreTidy [Package.Manifest]:
+!!! CoreTidy [Package.Manifest]: finished in 0.08 milliseconds, allocated 0.066 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Build.hs
+*** Checking old interface for Package.Build (use -ddump-hi-diffs for more details):
+[79 of 97] Compiling Package.Build    ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Build.hs, nothing )
+*** Parser [Package.Build]:
+!!! Parser [Package.Build]: finished in 30.13 milliseconds, allocated 48.245 megabytes
+*** Renamer/typechecker [Package.Build]:
+*** ConsistencyCheck [Package.Build]:
+!!! ConsistencyCheck [Package.Build]: finished in 0.08 milliseconds, allocated 0.026 megabytes
+!!! Renamer/typechecker [Package.Build]: finished in 120.81 milliseconds, allocated 87.260 megabytes
+*** Desugar [Package.Build]:
+Result size of Desugar (before optimization)
+  = {terms: 13,099, types: 9,232, coercions: 0, joins: 0/659}
+Result size of Desugar (after optimization)
+  = {terms: 8,601, types: 4,718, coercions: 0, joins: 0/101}
+!!! Desugar [Package.Build]: finished in 52.59 milliseconds, allocated 36.226 megabytes
+*** CoreTidy [Package.Build]:
+!!! CoreTidy [Package.Build]: finished in 0.13 milliseconds, allocated 0.164 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Scheduler.hs
+*** Checking old interface for Package.Scheduler (use -ddump-hi-diffs for more details):
+[80 of 97] Compiling Package.Scheduler ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Scheduler.hs, nothing )
+*** Parser [Package.Scheduler]:
+!!! Parser [Package.Scheduler]: finished in 8.41 milliseconds, allocated 12.770 megabytes
+*** Renamer/typechecker [Package.Scheduler]:
+*** ConsistencyCheck [Package.Scheduler]:
+!!! ConsistencyCheck [Package.Scheduler]: finished in 0.06 milliseconds, allocated 0.023 megabytes
+!!! Renamer/typechecker [Package.Scheduler]: finished in 25.88 milliseconds, allocated 25.839 megabytes
+*** Desugar [Package.Scheduler]:
+Result size of Desugar (before optimization)
+  = {terms: 3,954, types: 2,782, coercions: 0, joins: 0/467}
+Result size of Desugar (after optimization)
+  = {terms: 2,463, types: 1,294, coercions: 0, joins: 0/40}
+!!! Desugar [Package.Scheduler]: finished in 13.59 milliseconds, allocated 10.118 megabytes
+*** CoreTidy [Package.Scheduler]:
+!!! CoreTidy [Package.Scheduler]: finished in 0.02 milliseconds, allocated 0.022 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Command.hs
+*** Checking old interface for Package.Command (use -ddump-hi-diffs for more details):
+[81 of 97] Compiling Package.Command  ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Command.hs, nothing )
+*** Parser [Package.Command]:
+!!! Parser [Package.Command]: finished in 22.81 milliseconds, allocated 54.003 megabytes
+*** Renamer/typechecker [Package.Command]:
+*** ConsistencyCheck [Package.Command]:
+!!! ConsistencyCheck [Package.Command]: finished in 0.07 milliseconds, allocated 0.025 megabytes
+!!! Renamer/typechecker [Package.Command]: finished in 78.26 milliseconds, allocated 66.655 megabytes
+*** Desugar [Package.Command]:
+Result size of Desugar (before optimization)
+  = {terms: 10,119, types: 6,220, coercions: 0, joins: 0/548}
+Result size of Desugar (after optimization)
+  = {terms: 7,031, types: 3,157, coercions: 0, joins: 9/75}
+!!! Desugar [Package.Command]: finished in 23.24 milliseconds, allocated 29.631 megabytes
+/workspace/shared/mlf-shared-source-migration/libraries/mlf-package-core/Package/Command.hs:80:7: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+   |
+80 |       _ -> O.fatal usage
+   |       ^^^^^^^^^^^^^^^^^^
+
+*** CoreTidy [Package.Command]:
+!!! CoreTidy [Package.Command]: finished in 0.09 milliseconds, allocated 0.079 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/package/MLF/Entry/Mlfpkg.hs
+*** Checking old interface for MLF.Entry.Mlfpkg (use -ddump-hi-diffs for more details):
+[82 of 97] Compiling MLF.Entry.Mlfpkg ( /workspace/shared/mlf-shared-source-migration/package/MLF/Entry/Mlfpkg.hs, nothing )
+*** Parser [MLF.Entry.Mlfpkg]:
+!!! Parser [MLF.Entry.Mlfpkg]: finished in 0.38 milliseconds, allocated 0.501 megabytes
+*** Renamer/typechecker [MLF.Entry.Mlfpkg]:
+*** ConsistencyCheck [MLF.Entry.Mlfpkg]:
+!!! ConsistencyCheck [MLF.Entry.Mlfpkg]: finished in 0.03 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [MLF.Entry.Mlfpkg]: finished in 44.63 milliseconds, allocated 1.086 megabytes
+*** Desugar [MLF.Entry.Mlfpkg]:
+Result size of Desugar (before optimization)
+  = {terms: 75, types: 57, coercions: 0, joins: 0/12}
+Result size of Desugar (after optimization)
+  = {terms: 41, types: 19, coercions: 0, joins: 0/0}
+!!! Desugar [MLF.Entry.Mlfpkg]: finished in 0.55 milliseconds, allocated 0.417 megabytes
+*** CoreTidy [MLF.Entry.Mlfpkg]:
+!!! CoreTidy [MLF.Entry.Mlfpkg]: finished in 0.01 milliseconds, allocated 0.002 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Verification.hs
+*** Checking old interface for Package.Verification (use -ddump-hi-diffs for more details):
+[83 of 97] Compiling Package.Verification ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Verification.hs, nothing )
+*** Parser [Package.Verification]:
+!!! Parser [Package.Verification]: finished in 4.62 milliseconds, allocated 17.717 megabytes
+*** Renamer/typechecker [Package.Verification]:
+*** ConsistencyCheck [Package.Verification]:
+!!! ConsistencyCheck [Package.Verification]: finished in 0.05 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Package.Verification]: finished in 27.27 milliseconds, allocated 33.852 megabytes
+*** Desugar [Package.Verification]:
+Result size of Desugar (before optimization)
+  = {terms: 4,821, types: 3,311, coercions: 0, joins: 0/224}
+Result size of Desugar (after optimization)
+  = {terms: 3,278, types: 1,745, coercions: 0, joins: 1/45}
+!!! Desugar [Package.Verification]: finished in 16.52 milliseconds, allocated 13.448 megabytes
+*** CoreTidy [Package.Verification]:
+!!! CoreTidy [Package.Verification]: finished in 0.04 milliseconds, allocated 0.063 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Benchmark.hs
+*** Checking old interface for Package.Benchmark (use -ddump-hi-diffs for more details):
+[84 of 97] Compiling Package.Benchmark ( /workspace/shared/mlf-shared-source-migration/libraries/mlf-developer-tools/Package/Benchmark.hs, nothing )
+*** Parser [Package.Benchmark]:
+!!! Parser [Package.Benchmark]: finished in 16.28 milliseconds, allocated 34.199 megabytes
+*** Renamer/typechecker [Package.Benchmark]:
+*** ConsistencyCheck [Package.Benchmark]:
+!!! ConsistencyCheck [Package.Benchmark]: finished in 0.07 milliseconds, allocated 0.024 megabytes
+!!! Renamer/typechecker [Package.Benchmark]: finished in 60.60 milliseconds, allocated 63.396 megabytes
+*** Desugar [Package.Benchmark]:
+Result size of Desugar (before optimization)
+  = {terms: 8,672, types: 5,937, coercions: 0, joins: 0/372}
+Result size of Desugar (after optimization)
+  = {terms: 5,805, types: 3,060, coercions: 0, joins: 0/85}
+!!! Desugar [Package.Benchmark]: finished in 23.35 milliseconds, allocated 22.342 megabytes
+*** CoreTidy [Package.Benchmark]:
+!!! CoreTidy [Package.Benchmark]: finished in 0.08 milliseconds, allocated 0.116 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/BuildReceipts.hs
+*** Checking old interface for Tests.BuildReceipts (use -ddump-hi-diffs for more details):
+[85 of 97] Compiling Tests.BuildReceipts ( /workspace/shared/mlf-shared-source-migration/tests/Tests/BuildReceipts.hs, nothing )
+*** Parser [Tests.BuildReceipts]:
+!!! Parser [Tests.BuildReceipts]: finished in 0.35 milliseconds, allocated 0.470 megabytes
+*** Renamer/typechecker [Tests.BuildReceipts]:
+*** ConsistencyCheck [Tests.BuildReceipts]:
+!!! ConsistencyCheck [Tests.BuildReceipts]: finished in 0.03 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Tests.BuildReceipts]: finished in 1.29 milliseconds, allocated 1.180 megabytes
+*** Desugar [Tests.BuildReceipts]:
+Result size of Desugar (before optimization)
+  = {terms: 44, types: 29, coercions: 0, joins: 0/0}
+Result size of Desugar (after optimization)
+  = {terms: 35, types: 19, coercions: 0, joins: 0/0}
+!!! Desugar [Tests.BuildReceipts]: finished in 0.39 milliseconds, allocated 0.367 megabytes
+*** CoreTidy [Tests.BuildReceipts]:
+!!! CoreTidy [Tests.BuildReceipts]: finished in 0.01 milliseconds, allocated 0.003 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/BuildReceipts.hs
+*** Checking old interface for MLF.Tests.BuildReceipts (use -ddump-hi-diffs for more details):
+[86 of 97] Compiling MLF.Tests.BuildReceipts ( /workspace/shared/mlf-shared-source-migration/tests/shared/MLF/Tests/BuildReceipts.hs, nothing )
+*** Parser [MLF.Tests.BuildReceipts]:
+!!! Parser [MLF.Tests.BuildReceipts]: finished in 0.48 milliseconds, allocated 1.160 megabytes
+*** Renamer/typechecker [MLF.Tests.BuildReceipts]:
+*** ConsistencyCheck [MLF.Tests.BuildReceipts]:
+!!! ConsistencyCheck [MLF.Tests.BuildReceipts]: finished in 0.02 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [MLF.Tests.BuildReceipts]: finished in 1.62 milliseconds, allocated 2.539 megabytes
+*** Desugar [MLF.Tests.BuildReceipts]:
+Result size of Desugar (before optimization)
+  = {terms: 332, types: 178, coercions: 0, joins: 0/10}
+Result size of Desugar (after optimization)
+  = {terms: 233, types: 79, coercions: 0, joins: 0/2}
+!!! Desugar [MLF.Tests.BuildReceipts]: finished in 0.60 milliseconds, allocated 0.949 megabytes
+*** CoreTidy [MLF.Tests.BuildReceipts]:
+!!! CoreTidy [MLF.Tests.BuildReceipts]: finished in 0.01 milliseconds, allocated 0.005 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/Catalog.hs
+*** Checking old interface for Tests.Catalog (use -ddump-hi-diffs for more details):
+[87 of 97] Compiling Tests.Catalog    ( /workspace/shared/mlf-shared-source-migration/tests/Tests/Catalog.hs, nothing )
+*** Parser [Tests.Catalog]:
+!!! Parser [Tests.Catalog]: finished in 4.55 milliseconds, allocated 15.591 megabytes
+*** Renamer/typechecker [Tests.Catalog]:
+*** ConsistencyCheck [Tests.Catalog]:
+!!! ConsistencyCheck [Tests.Catalog]: finished in 0.05 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Tests.Catalog]: finished in 30.58 milliseconds, allocated 27.511 megabytes
+*** Desugar [Tests.Catalog]:
+Result size of Desugar (before optimization)
+  = {terms: 4,467, types: 3,232, coercions: 0, joins: 0/316}
+Result size of Desugar (after optimization)
+  = {terms: 2,933, types: 1,630, coercions: 0, joins: 0/20}
+!!! Desugar [Tests.Catalog]: finished in 7.41 milliseconds, allocated 12.380 megabytes
+/workspace/shared/mlf-shared-source-migration/tests/Tests/Catalog.hs:630:7: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+630 |       _ ->
+    |       ^^^^...
+
+*** CoreTidy [Tests.Catalog]:
+!!! CoreTidy [Tests.Catalog]: finished in 0.09 milliseconds, allocated 0.060 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/CorePartitions.hs
+*** Checking old interface for Tests.CorePartitions (use -ddump-hi-diffs for more details):
+[88 of 97] Compiling Tests.CorePartitions ( /workspace/shared/mlf-shared-source-migration/tests/Tests/CorePartitions.hs, nothing )
+*** Parser [Tests.CorePartitions]:
+!!! Parser [Tests.CorePartitions]: finished in 1.05 milliseconds, allocated 2.135 megabytes
+*** Renamer/typechecker [Tests.CorePartitions]:
+*** ConsistencyCheck [Tests.CorePartitions]:
+!!! ConsistencyCheck [Tests.CorePartitions]: finished in 0.03 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [Tests.CorePartitions]: finished in 5.16 milliseconds, allocated 3.867 megabytes
+*** Desugar [Tests.CorePartitions]:
+Result size of Desugar (before optimization)
+  = {terms: 286, types: 274, coercions: 0, joins: 0/2}
+Result size of Desugar (after optimization)
+  = {terms: 200, types: 182, coercions: 0, joins: 0/1}
+!!! Desugar [Tests.CorePartitions]: finished in 0.74 milliseconds, allocated 1.079 megabytes
+*** CoreTidy [Tests.CorePartitions]:
+!!! CoreTidy [Tests.CorePartitions]: finished in 0.01 milliseconds, allocated 0.007 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/Coverage.hs
+*** Checking old interface for Tests.Coverage (use -ddump-hi-diffs for more details):
+[89 of 97] Compiling Tests.Coverage   ( /workspace/shared/mlf-shared-source-migration/tests/Tests/Coverage.hs, nothing )
+*** Parser [Tests.Coverage]:
+!!! Parser [Tests.Coverage]: finished in 3.66 milliseconds, allocated 10.334 megabytes
+*** Renamer/typechecker [Tests.Coverage]:
+*** ConsistencyCheck [Tests.Coverage]:
+!!! ConsistencyCheck [Tests.Coverage]: finished in 0.04 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Tests.Coverage]: finished in 22.26 milliseconds, allocated 18.844 megabytes
+*** Desugar [Tests.Coverage]:
+Result size of Desugar (before optimization)
+  = {terms: 2,763, types: 2,038, coercions: 0, joins: 0/218}
+Result size of Desugar (after optimization)
+  = {terms: 1,926, types: 1,168, coercions: 0, joins: 0/25}
+!!! Desugar [Tests.Coverage]: finished in 4.48 milliseconds, allocated 7.858 megabytes
+*** CoreTidy [Tests.Coverage]:
+!!! CoreTidy [Tests.Coverage]: finished in 0.06 milliseconds, allocated 0.042 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentType.hs
+*** Checking old interface for Tests.IndependentType (use -ddump-hi-diffs for more details):
+[90 of 97] Compiling Tests.IndependentType ( /workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentType.hs, nothing )
+*** Parser [Tests.IndependentType]:
+!!! Parser [Tests.IndependentType]: finished in 4.36 milliseconds, allocated 6.658 megabytes
+*** Renamer/typechecker [Tests.IndependentType]:
+*** ConsistencyCheck [Tests.IndependentType]:
+!!! ConsistencyCheck [Tests.IndependentType]: finished in 0.06 milliseconds, allocated 0.023 megabytes
+!!! Renamer/typechecker [Tests.IndependentType]: finished in 9.14 milliseconds, allocated 12.176 megabytes
+*** Desugar [Tests.IndependentType]:
+Result size of Desugar (before optimization)
+  = {terms: 1,282, types: 1,026, coercions: 0, joins: 0/69}
+Result size of Desugar (after optimization)
+  = {terms: 903, types: 665, coercions: 0, joins: 1/4}
+!!! Desugar [Tests.IndependentType]: finished in 3.53 milliseconds, allocated 5.594 megabytes
+*** CoreTidy [Tests.IndependentType]:
+!!! CoreTidy [Tests.IndependentType]: finished in 0.03 milliseconds, allocated 0.019 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentCheck.hs
+*** Checking old interface for Tests.IndependentCheck (use -ddump-hi-diffs for more details):
+[91 of 97] Compiling Tests.IndependentCheck ( /workspace/shared/mlf-shared-source-migration/tests/Tests/IndependentCheck.hs, nothing )
+*** Parser [Tests.IndependentCheck]:
+!!! Parser [Tests.IndependentCheck]: finished in 4.64 milliseconds, allocated 9.123 megabytes
+*** Renamer/typechecker [Tests.IndependentCheck]:
+*** ConsistencyCheck [Tests.IndependentCheck]:
+!!! ConsistencyCheck [Tests.IndependentCheck]: finished in 0.09 milliseconds, allocated 0.026 megabytes
+!!! Renamer/typechecker [Tests.IndependentCheck]: finished in 12.97 milliseconds, allocated 17.270 megabytes
+*** Desugar [Tests.IndependentCheck]:
+Result size of Desugar (before optimization)
+  = {terms: 1,922, types: 2,032, coercions: 0, joins: 0/57}
+Result size of Desugar (after optimization)
+  = {terms: 1,291, types: 1,323, coercions: 0, joins: 0/4}
+!!! Desugar [Tests.IndependentCheck]: finished in 10.41 milliseconds, allocated 7.105 megabytes
+*** CoreTidy [Tests.IndependentCheck]:
+!!! CoreTidy [Tests.IndependentCheck]: finished in 0.04 milliseconds, allocated 0.049 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/TupleList.hs
+*** Checking old interface for MLF.Entry.TupleList (use -ddump-hi-diffs for more details):
+[92 of 97] Compiling MLF.Entry.TupleList ( /workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/TupleList.hs, nothing )
+*** Parser [MLF.Entry.TupleList]:
+!!! Parser [MLF.Entry.TupleList]: finished in 3.31 milliseconds, allocated 11.624 megabytes
+*** Renamer/typechecker [MLF.Entry.TupleList]:
+*** ConsistencyCheck [MLF.Entry.TupleList]:
+!!! ConsistencyCheck [MLF.Entry.TupleList]: finished in 0.11 milliseconds, allocated 0.032 megabytes
+!!! Renamer/typechecker [MLF.Entry.TupleList]: finished in 16.78 milliseconds, allocated 20.655 megabytes
+*** Desugar [MLF.Entry.TupleList]:
+Result size of Desugar (before optimization)
+  = {terms: 3,577, types: 2,266, coercions: 0, joins: 0/60}
+Result size of Desugar (after optimization)
+  = {terms: 2,257, types: 1,028, coercions: 0, joins: 1/10}
+!!! Desugar [MLF.Entry.TupleList]: finished in 12.99 milliseconds, allocated 10.103 megabytes
+*** CoreTidy [MLF.Entry.TupleList]:
+!!! CoreTidy [MLF.Entry.TupleList]: finished in 0.04 milliseconds, allocated 0.066 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/Selection.hs
+*** Checking old interface for Tests.Selection (use -ddump-hi-diffs for more details):
+[93 of 97] Compiling Tests.Selection  ( /workspace/shared/mlf-shared-source-migration/tests/Tests/Selection.hs, nothing )
+*** Parser [Tests.Selection]:
+!!! Parser [Tests.Selection]: finished in 1.63 milliseconds, allocated 5.103 megabytes
+*** Renamer/typechecker [Tests.Selection]:
+*** ConsistencyCheck [Tests.Selection]:
+!!! ConsistencyCheck [Tests.Selection]: finished in 0.04 milliseconds, allocated 0.020 megabytes
+!!! Renamer/typechecker [Tests.Selection]: finished in 10.50 milliseconds, allocated 10.455 megabytes
+*** Desugar [Tests.Selection]:
+Result size of Desugar (before optimization)
+  = {terms: 1,464, types: 1,135, coercions: 0, joins: 0/77}
+Result size of Desugar (after optimization)
+  = {terms: 939, types: 579, coercions: 0, joins: 0/6}
+!!! Desugar [Tests.Selection]: finished in 1.98 milliseconds, allocated 4.083 megabytes
+/workspace/shared/mlf-shared-source-migration/tests/Tests/Selection.hs:53:9: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+   |
+53 |         _ -> Left "test [--list-families | --families ID ...]"
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*** CoreTidy [Tests.Selection]:
+!!! CoreTidy [Tests.Selection]: finished in 0.03 milliseconds, allocated 0.025 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/TestDrivers.hs
+*** Checking old interface for Tests.TestDrivers (use -ddump-hi-diffs for more details):
+[94 of 97] Compiling Tests.TestDrivers ( /workspace/shared/mlf-shared-source-migration/tests/Tests/TestDrivers.hs, nothing )
+*** Parser [Tests.TestDrivers]:
+!!! Parser [Tests.TestDrivers]: finished in 1.58 milliseconds, allocated 4.873 megabytes
+*** Renamer/typechecker [Tests.TestDrivers]:
+*** ConsistencyCheck [Tests.TestDrivers]:
+!!! ConsistencyCheck [Tests.TestDrivers]: finished in 0.05 milliseconds, allocated 0.021 megabytes
+!!! Renamer/typechecker [Tests.TestDrivers]: finished in 10.27 milliseconds, allocated 9.440 megabytes
+*** Desugar [Tests.TestDrivers]:
+Result size of Desugar (before optimization)
+  = {terms: 1,199, types: 700, coercions: 0, joins: 0/44}
+Result size of Desugar (after optimization)
+  = {terms: 860, types: 366, coercions: 0, joins: 0/9}
+!!! Desugar [Tests.TestDrivers]: finished in 1.56 milliseconds, allocated 3.297 megabytes
+*** CoreTidy [Tests.TestDrivers]:
+!!! CoreTidy [Tests.TestDrivers]: finished in 0.02 milliseconds, allocated 0.013 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/TestSources.hs
+*** Checking old interface for Tests.TestSources (use -ddump-hi-diffs for more details):
+[95 of 97] Compiling Tests.TestSources ( /workspace/shared/mlf-shared-source-migration/tests/Tests/TestSources.hs, nothing )
+*** Parser [Tests.TestSources]:
+!!! Parser [Tests.TestSources]: finished in 0.58 milliseconds, allocated 1.212 megabytes
+*** Renamer/typechecker [Tests.TestSources]:
+*** ConsistencyCheck [Tests.TestSources]:
+!!! ConsistencyCheck [Tests.TestSources]: finished in 0.05 milliseconds, allocated 0.024 megabytes
+!!! Renamer/typechecker [Tests.TestSources]: finished in 2.21 milliseconds, allocated 2.801 megabytes
+*** Desugar [Tests.TestSources]:
+Result size of Desugar (before optimization)
+  = {terms: 223, types: 231, coercions: 0, joins: 0/2}
+Result size of Desugar (after optimization)
+  = {terms: 129, types: 129, coercions: 0, joins: 0/0}
+!!! Desugar [Tests.TestSources]: finished in 0.83 milliseconds, allocated 1.116 megabytes
+*** CoreTidy [Tests.TestSources]:
+!!! CoreTidy [Tests.TestSources]: finished in 0.01 milliseconds, allocated 0.004 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/Tests/CompilerTests.hs
+*** Checking old interface for Tests.CompilerTests (use -ddump-hi-diffs for more details):
+[96 of 97] Compiling Tests.CompilerTests ( /workspace/shared/mlf-shared-source-migration/tests/Tests/CompilerTests.hs, nothing )
+*** Parser [Tests.CompilerTests]:
+!!! Parser [Tests.CompilerTests]: finished in 40.77 milliseconds, allocated 55.874 megabytes
+*** Renamer/typechecker [Tests.CompilerTests]:
+*** ConsistencyCheck [Tests.CompilerTests]:
+!!! ConsistencyCheck [Tests.CompilerTests]: finished in 0.12 milliseconds, allocated 0.035 megabytes
+!!! Renamer/typechecker [Tests.CompilerTests]: finished in 127.62 milliseconds, allocated 104.921 megabytes
+*** Desugar [Tests.CompilerTests]:
+Result size of Desugar (before optimization)
+  = {terms: 16,724, types: 11,907, coercions: 0, joins: 0/719}
+Result size of Desugar (after optimization)
+  = {terms: 10,667, types: 5,810, coercions: 0, joins: 0/120}
+!!! Desugar [Tests.CompilerTests]: finished in 113.88 milliseconds, allocated 47.183 megabytes
+*** CoreTidy [Tests.CompilerTests]:
+!!! CoreTidy [Tests.CompilerTests]: finished in 0.10 milliseconds, allocated 0.169 megabytes
+compile: input file /workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/CompilerTests.hs
+*** Checking old interface for MLF.Entry.CompilerTests (use -ddump-hi-diffs for more details):
+[97 of 97] Compiling MLF.Entry.CompilerTests ( /workspace/shared/mlf-shared-source-migration/tests/MLF/Entry/CompilerTests.hs, nothing )
+*** Parser [MLF.Entry.CompilerTests]:
+!!! Parser [MLF.Entry.CompilerTests]: finished in 0.27 milliseconds, allocated 0.295 megabytes
+*** Renamer/typechecker [MLF.Entry.CompilerTests]:
+*** ConsistencyCheck [MLF.Entry.CompilerTests]:
+!!! ConsistencyCheck [MLF.Entry.CompilerTests]: finished in 0.02 milliseconds, allocated 0.019 megabytes
+!!! Renamer/typechecker [MLF.Entry.CompilerTests]: finished in 1.12 milliseconds, allocated 0.936 megabytes
+*** Desugar [MLF.Entry.CompilerTests]:
+Result size of Desugar (before optimization)
+  = {terms: 20, types: 16, coercions: 0, joins: 0/0}
+Result size of Desugar (after optimization)
+  = {terms: 16, types: 12, coercions: 0, joins: 0/0}
+!!! Desugar [MLF.Entry.CompilerTests]: finished in 0.36 milliseconds, allocated 0.298 megabytes
+*** CoreTidy [MLF.Entry.CompilerTests]:
+!!! CoreTidy [MLF.Entry.CompilerTests]: finished in 0.00 milliseconds, allocated 0.002 megabytes
+Upsweep completely successful.

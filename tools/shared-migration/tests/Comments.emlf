@@ -1,0 +1,14 @@
+-- leading-comment-must-survive
+module Comments where
+{- outer-block-must-survive {- nested-block-must-survive -} end -}
+text : String
+text = "-- inside literal {- inside -}"
+gapped : String
+gapped = "text\
+  \"
+-- gap-trailer-must-survive
+after : String
+after = "-- still only data"
+escaped : String
+escaped = "quote: \" -- data"
+-- final-comment-must-survive

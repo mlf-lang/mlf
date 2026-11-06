@@ -71,11 +71,11 @@ record_inputs() {
     mv "$destination.tmp" "$destination"
   done < <({ find "$fixtures" "$root/runtime" -type f; printf '%s\n' \
     "$root/tests/native/completion_cell_tests.c" "$root/tests/native/async_completion_primitives.c" \
-    "$root/libraries/mlf-foundation/Bootstrap/Types.emlf" \
-    "$root/libraries/mlf-language-core/Bootstrap/Data.emlf" "$root/libraries/mlf-language-core/Bootstrap/Primitive.emlf" \
-    "$root/libraries/mlf-frontend/Bootstrap/Module.emlf" \
-    "$root/libraries/mlf-interpreter/Bootstrap/Runtime.emlf" "$root/libraries/mlf-interpreter/Bootstrap/ProcessHost.emlf" \
-    "$root/libraries/mlf-llvm/Bootstrap/LLVM.emlf"; } | LC_ALL=C sort)
+    "$root/libraries/mlf-foundation/Bootstrap/Types.hs" \
+    "$root/libraries/mlf-language-core/Bootstrap/Data.hs" "$root/libraries/mlf-language-core/Bootstrap/Primitive.hs" \
+    "$root/libraries/mlf-frontend/Bootstrap/Module.hs" \
+    "$root/libraries/mlf-interpreter/Bootstrap/Runtime.hs" "$root/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs" \
+    "$root/libraries/mlf-llvm/Bootstrap/LLVM.hs"; } | LC_ALL=C sort)
 }
 record_inputs "$work/inputs.json"
 compiler_hash=$(sha256 "$compiler")

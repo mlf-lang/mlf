@@ -1,0 +1,870 @@
+{
+  "started_utc": "20261023T205752Z",
+  "ghc": "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+  "platform": "Linux x86_64",
+  "steps": [
+    {
+      "name": "ghc-version",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--version"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "ghc-version.log"
+    },
+    {
+      "name": "contracts-O0-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O0",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/contracts-O0",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/contracts-O0",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/ContractProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/contracts-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "contracts-O0-build.log"
+    },
+    {
+      "name": "contracts-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/contracts-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "TOTAL 71 FAILED 0",
+      "passed": true,
+      "log": "contracts-O0.log"
+    },
+    {
+      "name": "numeric-O0-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O0",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O0",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O0",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/NumericProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/NumericOracle.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "numeric-O0-build.log"
+    },
+    {
+      "name": "numeric-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "TOTAL 590 FAILED 0",
+      "passed": true,
+      "log": "numeric-O0.log"
+    },
+    {
+      "name": "identity-O0-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O0",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/identity-O0",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/identity-O0",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/IdentityProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/identity-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "identity-O0-build.log"
+    },
+    {
+      "name": "identity-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/identity-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "PASS actual Prelude.Bool",
+      "passed": true,
+      "log": "identity-O0.log"
+    },
+    {
+      "name": "filesystem-O0-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O0",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/FilesystemProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "filesystem-O0-build.log"
+    },
+    {
+      "name": "file-exists-regular-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "file-exists",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/regular"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "True",
+      "passed": true,
+      "log": "file-exists-regular-O0.log"
+    },
+    {
+      "name": "file-exists-directory-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "file-exists",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "file-exists-directory-O0.log"
+    },
+    {
+      "name": "file-exists-fifo-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "file-exists",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/fifo"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "file-exists-fifo-O0.log"
+    },
+    {
+      "name": "file-exists-device-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "file-exists",
+        "/dev/null"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "file-exists-device-O0.log"
+    },
+    {
+      "name": "file-exists-missing-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "file-exists",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/missing"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "file-exists-missing-O0.log"
+    },
+    {
+      "name": "canonical-discard-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "canonical-discard",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/invalid-target-link"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Left (HostError \"IO error: invalid UTF-8 input\")",
+      "passed": true,
+      "log": "canonical-discard-O0.log"
+    },
+    {
+      "name": "canonical-force-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "canonical-force",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/invalid-target-link"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Left (HostError \"IO error: invalid UTF-8 input\")",
+      "passed": true,
+      "log": "canonical-force-O0.log"
+    },
+    {
+      "name": "canonical-valid-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "canonical-discard",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/regular"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Right ()",
+      "passed": true,
+      "log": "canonical-valid-O0.log"
+    },
+    {
+      "name": "canonical-missing-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "canonical-discard",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/missing"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Left (HostError \"IO error: canonical path failed\")",
+      "passed": true,
+      "log": "canonical-missing-O0.log"
+    },
+    {
+      "name": "contents-byte-line-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "contents-byte-line"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Right 0",
+      "passed": true,
+      "log": "contents-byte-line-O0.log"
+    },
+    {
+      "name": "executable-valid-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O0/probe",
+        "executable-discard"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Right ()",
+      "passed": true,
+      "log": "executable-valid-O0.log"
+    },
+    {
+      "name": "executable-invalid-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/invalid-\udcff/probe-O0",
+        "executable-discard"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Left (HostError \"IO error: invalid UTF-8 input\")",
+      "passed": true,
+      "log": "executable-invalid-O0.log"
+    },
+    {
+      "name": "cancellation-O0-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O0",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/cancellation-O0",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/cancellation-O0",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/CancellationProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/CancellationProbe.c",
+        "-threaded",
+        "-optl-Wl,--wrap=mlf_ghc_host",
+        "-optl-Wl,--wrap=free",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/cancellation-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "cancellation-O0-build.log"
+    },
+    {
+      "name": "cancellation-O0",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/cancellation-O0/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "returned C buffer freed=True",
+      "passed": true,
+      "log": "cancellation-O0.log"
+    },
+    {
+      "name": "contracts-O2-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O2",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/contracts-O2",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/contracts-O2",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/ContractProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/contracts-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "contracts-O2-build.log"
+    },
+    {
+      "name": "contracts-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/contracts-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "TOTAL 71 FAILED 0",
+      "passed": true,
+      "log": "contracts-O2.log"
+    },
+    {
+      "name": "numeric-O2-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O2",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/NumericProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/NumericOracle.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "numeric-O2-build.log"
+    },
+    {
+      "name": "numeric-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/numeric-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "TOTAL 590 FAILED 0",
+      "passed": true,
+      "log": "numeric-O2.log"
+    },
+    {
+      "name": "identity-O2-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O2",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/identity-O2",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/identity-O2",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/IdentityProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/identity-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "identity-O2-build.log"
+    },
+    {
+      "name": "identity-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/identity-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "PASS actual Prelude.Bool",
+      "passed": true,
+      "log": "identity-O2.log"
+    },
+    {
+      "name": "filesystem-O2-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O2",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/FilesystemProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "filesystem-O2-build.log"
+    },
+    {
+      "name": "file-exists-regular-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "file-exists",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/regular"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "True",
+      "passed": true,
+      "log": "file-exists-regular-O2.log"
+    },
+    {
+      "name": "file-exists-directory-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "file-exists",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "file-exists-directory-O2.log"
+    },
+    {
+      "name": "file-exists-fifo-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "file-exists",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/fifo"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "file-exists-fifo-O2.log"
+    },
+    {
+      "name": "file-exists-device-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "file-exists",
+        "/dev/null"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "file-exists-device-O2.log"
+    },
+    {
+      "name": "file-exists-missing-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "file-exists",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/missing"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "file-exists-missing-O2.log"
+    },
+    {
+      "name": "canonical-discard-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "canonical-discard",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/invalid-target-link"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Left (HostError \"IO error: invalid UTF-8 input\")",
+      "passed": true,
+      "log": "canonical-discard-O2.log"
+    },
+    {
+      "name": "canonical-force-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "canonical-force",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/invalid-target-link"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Left (HostError \"IO error: invalid UTF-8 input\")",
+      "passed": true,
+      "log": "canonical-force-O2.log"
+    },
+    {
+      "name": "canonical-valid-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "canonical-discard",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/regular"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Right ()",
+      "passed": true,
+      "log": "canonical-valid-O2.log"
+    },
+    {
+      "name": "canonical-missing-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "canonical-discard",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/missing"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Left (HostError \"IO error: canonical path failed\")",
+      "passed": true,
+      "log": "canonical-missing-O2.log"
+    },
+    {
+      "name": "contents-byte-line-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "contents-byte-line"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Right 0",
+      "passed": true,
+      "log": "contents-byte-line-O2.log"
+    },
+    {
+      "name": "executable-valid-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/filesystem-O2/probe",
+        "executable-discard"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Right ()",
+      "passed": true,
+      "log": "executable-valid-O2.log"
+    },
+    {
+      "name": "executable-invalid-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/invalid-\udcff/probe-O2",
+        "executable-discard"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "Left (HostError \"IO error: invalid UTF-8 input\")",
+      "passed": true,
+      "log": "executable-invalid-O2.log"
+    },
+    {
+      "name": "cancellation-O2-build",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-O2",
+        "-XHaskell2010",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-dcore-lint",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/cancellation-O2",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/cancellation-O2",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/CancellationProbe.hs",
+        "host/ghc/cbits/host.c",
+        "runtime/mlf_process_supervisor.c",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/CancellationProbe.c",
+        "-threaded",
+        "-optl-Wl,--wrap=mlf_ghc_host",
+        "-optl-Wl,--wrap=free",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/cancellation-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "cancellation-O2-build.log"
+    },
+    {
+      "name": "cancellation-O2",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/cancellation-O2/probe"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "returned C buffer freed=True",
+      "passed": true,
+      "log": "cancellation-O2.log"
+    },
+    {
+      "name": "pure-not-polymorphic",
+      "argv": [
+        "/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc",
+        "--make",
+        "-fno-code",
+        "-XHaskell2010",
+        "-package-env",
+        "-",
+        "-ihost/ghc",
+        "-itests/shared-host",
+        "-odir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/negative",
+        "-hidir",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/negative",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/PureNotPolymorphic.hs"
+      ],
+      "returncode": 1,
+      "expected_returncode": 1,
+      "expected_text": "with actual type: IO",
+      "passed": true,
+      "log": "pure-not-polymorphic.log"
+    },
+    {
+      "name": "ownership-build",
+      "argv": [
+        "cc",
+        "-std=c11",
+        "-D_POSIX_C_SOURCE=200809L",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/c-ownership-probe.c",
+        "runtime/mlf_process_supervisor.c",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/ownership"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "ownership-build.log"
+    },
+    {
+      "name": "ownership",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/ownership"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "outstanding_adapter_allocations=0",
+      "passed": true,
+      "log": "ownership.log"
+    },
+    {
+      "name": "native-oracle-build",
+      "argv": [
+        "cc",
+        "-std=c11",
+        "-O0",
+        "-I/workspace/shared/mlf-toolchain/gc/include",
+        "-Iruntime",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/NativeFilesystemOracle.c",
+        "/workspace/shared/mlf-toolchain/gc/lib/libgc.a",
+        "-lgmp",
+        "-lm",
+        "-lpthread",
+        "-o",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/native-oracle"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": null,
+      "passed": true,
+      "log": "native-oracle-build.log"
+    },
+    {
+      "name": "native-file-device",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/native-oracle",
+        "file-exists",
+        "/dev/null"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "False",
+      "passed": true,
+      "log": "native-file-device.log"
+    },
+    {
+      "name": "native-canonical-invalid",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/native-oracle",
+        "canonical",
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/invalid-target-link"
+      ],
+      "returncode": 1,
+      "expected_returncode": 1,
+      "expected_text": "Runtime: IO error: invalid UTF-8 input",
+      "passed": true,
+      "log": "native-canonical-invalid.log"
+    },
+    {
+      "name": "native-contents-byte-line",
+      "argv": [
+        "/workspace/shared/mlf-shared-source-migration/tests/shared-host/.runs/20261023T205752Z/native-oracle",
+        "contents-byte-line"
+      ],
+      "returncode": 0,
+      "expected_returncode": 0,
+      "expected_text": "0",
+      "passed": true,
+      "log": "native-contents-byte-line.log"
+    }
+  ],
+  "passed": true,
+  "sources": {
+    "host/ghc/MLF/Host/Async.hs": "f96128f3494d7525178205d58fcf4870a41fdef92874342af44318453c261c35",
+    "host/ghc/MLF/Host/Base.hs": "71be4d20a9d73fb040b9b6e9e1e9914e3c4c26a84bbb818e793dc90d86e0ff08",
+    "host/ghc/MLF/Host/IO.hs": "d0723c91b6299fbf85323bc170f2468d4f754e42796a1d7cee614faa15cbccff",
+    "host/ghc/MLF/Primitive.hs": "d6275901d9816a8654725f90a6e7883376c56c8f927d6618ee48359e8af390fe",
+    "host/ghc/cbits/host.c": "724319a99dfa36bf54fc6f5da8e272a6172d19c34e8d8bfb3ef312eeb7b781ce",
+    "runtime/mlf_completion.h": "7eb127736e53948a324b58715abdea3f8df98900ca4724a94f59ca66b79388c5",
+    "runtime/mlf_process_binding.h": "cce45265d51657e674e7f68d08f0bf33f8d2f26913a53977d2158fcaf92903de",
+    "runtime/mlf_process_supervisor.c": "a96b93a30f8ade5cebbfca070ad36bd77ef5bcbd9560ac371a3d36c5c45d22e9",
+    "runtime/mlf_runtime.c": "8ff628289e64907a262301e31b9118d56f35ef80b3c6bdde429f12df55813fe6",
+    "runtime/mlf_system.h": "2f1faaea2c81bee88b9b68201a37bd36e6ebede3809d9a5771ec3ab545c3c6ef",
+    "tests/shared-host/CancellationProbe.c": "0d645f704ac9d278d6c2c2fb1a8b3e0bde3d85de51d1137d4a371e02184f5560",
+    "tests/shared-host/CancellationProbe.hs": "a277d40551f24fe43faa271bb715f1ae08cb672dfdf1b25391bf4071ba221fe7",
+    "tests/shared-host/ContractProbe.hs": "52ef620633892f9e5283ebde185ce05301ab8010a7a0a137dc9bbde01892fb8e",
+    "tests/shared-host/FilesystemProbe.hs": "7f60973d8f318e2fba1666df0597bdd36baac4c9ba1e0a6a4349e96cbfe8366d",
+    "tests/shared-host/IdentityProbe.hs": "1e2029d6d4f94d33bfe06b09938265078b8d5098f1a365569958405e34aa3dcb",
+    "tests/shared-host/NativeFilesystemOracle.c": "491d4988612d1468e467b4d98f3ba69a46022ab7d2609a8f3ff240abbaa39181",
+    "tests/shared-host/NumericOracle.c": "950e991430ea622ff4a3b4985c03d6cc97d5f7547ac382ad697ae034660d5876",
+    "tests/shared-host/NumericProbe.hs": "860d9f14ec4fb66da5bdcd46d71c5c5d71788ecfda5a37e697ef082fc3dc4449",
+    "tests/shared-host/PureNotPolymorphic.hs": "85129a44452647a9a6ac87cbe37acc99d3cc5b4256fc5af157f10a90ae583bde",
+    "tests/shared-host/SharedIdentity.hs": "89a561046952aa4eb5887ad706660cc9ce1a3214fa129e4d80327d0f0a83a6ac",
+    "tests/shared-host/c-ownership-probe.c": "f3f6fb9bd6bcbb271c3948a6de91aef3fee9a50daa4074b2ac91ed344167df59",
+    "tests/shared-host/run.py": "5da1d6aa738a95f17d6bd2f514e4f63d076dd4ff20fce8b818394a8f0b2bdac3"
+  }
+}

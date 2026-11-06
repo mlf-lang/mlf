@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/testing/check_core_leaf_migration.py", line 169, in <module>
+    main()
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/testing/check_core_leaf_migration.py", line 157, in main
+    require((ROOT / path).read_text() == frozen(path), f"original Core family composition changed: {path}")
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/testing/check_core_leaf_migration.py", line 19, in require
+    raise ValueError(message)
+ValueError: original Core family composition changed: tests/Tests/CoreSolver.emlf

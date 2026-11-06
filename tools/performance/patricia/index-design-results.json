@@ -1,0 +1,226 @@
+{
+  "format": 1,
+  "date": "2026-10-31",
+  "purpose": "qualified integer-index design refactor; no speedup claim",
+  "parent_commit": "a047e81f716256ecfa99ce851d248f1b74bddc3d",
+  "changes": [
+    "checked nextSlot supply independent of cardinality",
+    "rank/select owner with immutable shared views and compatibility entry points",
+    "shared Patricia interpreter state, datatype pool, identity inventories and renaming",
+    "lossless host IntTable specialization with narrow-host fallback"
+  ],
+  "retained_contracts": [
+    "constant-time size still uses per-node cached counts",
+    "lazy map payloads and unchanged Name-keyed maps",
+    "signed ordering and independent original raw checked artifacts",
+    "original historical oracles and Int64 source-admission manifest retained; separate design delta"
+  ],
+  "correctness": {
+    "design_modes": [
+      "all shared source typecheck",
+      "O0",
+      "O2",
+      "O2-narrow"
+    ],
+    "signed_rank_shapes": 20,
+    "frozen_planner_cases": 150,
+    "frozen_identity_inventory_cases": 529,
+    "graph_checks": [
+      "PatriciaOracleControls",
+      "PublicControls",
+      "C4TransactionControls",
+      "SessionTests",
+      "AdmissionTests",
+      "HeteroinputControls",
+      "private-OpenSession",
+      "private-SolvePrepared",
+      "private-SessionConstructor",
+      "private-RawSolverRebind"
+    ],
+    "native_inventory": {
+      "index_view_checks": 35,
+      "lazy_payload_checks": 9,
+      "map_cases": 9,
+      "output_lines": 4107,
+      "selected_payload_error_checks": 1,
+      "set_cases": 7,
+      "signed_keys": 199
+    },
+    "native_modes": [
+      "GHC",
+      "standalone LLVM Clang -O2",
+      "default installed LLVM Clang -O2"
+    ],
+    "direct_commands": 12,
+    "fresh_target_groups": 711,
+    "reused_target_groups": 0,
+    "raw_checked_bytes_equal": true,
+    "all_current_production_inputs_match_ordinary_binary": true,
+    "production_and_manifest_files": 148
+  },
+  "screen": {
+    "scope": "fixed ordinary compiler executables on this macOS host; checked compiler workload, shared dependencies reused, target inference always fresh",
+    "role": "discovery only; no confidence interval, equivalence or speedup claim",
+    "orders": [
+      "ABBA",
+      "BAAB"
+    ],
+    "ordinary_legs": 8,
+    "source_workload_sha256": "eb84f10588585e94ce9c89afa0699fd5d164c54f662588d37f3cc28bde986a15",
+    "geometric_wall_seconds": {
+      "A": 47.598360286249566,
+      "B": 47.641066641162794
+    },
+    "candidate_over_baseline": 1.0008972232374476,
+    "descriptive_percent_change": 0.08972232374475642,
+    "block_candidate_over_baseline": [
+      1.0016621183904353,
+      1.000132912178222
+    ],
+    "predeclared_regression_investigation_threshold_percent": 2,
+    "decision": "accept design refactor; no descriptive regression above the investigation threshold; speedup unproven",
+    "extra_or_replaced_samples": 0,
+    "runs": [
+      {
+        "block": 0,
+        "position": 0,
+        "side": "A",
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "started_utc": "2026-10-31T12:49:13Z",
+        "wall_seconds": 47.949865875,
+        "child_user_seconds": 46.193128,
+        "child_system_seconds": 1.381709,
+        "sampled_process_tree_peak_rss_bytes": 365559808
+      },
+      {
+        "block": 0,
+        "position": 1,
+        "side": "B",
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "started_utc": "2026-10-31T12:50:01Z",
+        "wall_seconds": 47.928015583,
+        "child_user_seconds": 45.922606,
+        "child_system_seconds": 1.417033,
+        "sampled_process_tree_peak_rss_bytes": 357171200
+      },
+      {
+        "block": 0,
+        "position": 2,
+        "side": "B",
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "started_utc": "2026-10-31T12:50:49Z",
+        "wall_seconds": 47.765584041,
+        "child_user_seconds": 45.908144,
+        "child_system_seconds": 1.345715,
+        "sampled_process_tree_peak_rss_bytes": 330842112
+      },
+      {
+        "block": 0,
+        "position": 3,
+        "side": "A",
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "started_utc": "2026-10-31T12:51:37Z",
+        "wall_seconds": 47.585500791,
+        "child_user_seconds": 45.962051,
+        "child_system_seconds": 1.33946,
+        "sampled_process_tree_peak_rss_bytes": 361070592
+      },
+      {
+        "block": 1,
+        "position": 0,
+        "side": "B",
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "started_utc": "2026-10-31T12:52:27Z",
+        "wall_seconds": 47.4863665,
+        "child_user_seconds": 45.91073,
+        "child_system_seconds": 1.314582,
+        "sampled_process_tree_peak_rss_bytes": 357089280
+      },
+      {
+        "block": 1,
+        "position": 1,
+        "side": "A",
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "started_utc": "2026-10-31T12:53:15Z",
+        "wall_seconds": 47.554050583,
+        "child_user_seconds": 46.019241,
+        "child_system_seconds": 1.332023,
+        "sampled_process_tree_peak_rss_bytes": 339050496
+      },
+      {
+        "block": 1,
+        "position": 2,
+        "side": "A",
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "started_utc": "2026-10-31T12:54:03Z",
+        "wall_seconds": 47.306237916,
+        "child_user_seconds": 45.809501,
+        "child_system_seconds": 1.31355,
+        "sampled_process_tree_peak_rss_bytes": 339460096
+      },
+      {
+        "block": 1,
+        "position": 3,
+        "side": "B",
+        "fresh": 711,
+        "reused": 0,
+        "raw_bytes_equal": true,
+        "started_utc": "2026-10-31T12:54:50Z",
+        "wall_seconds": 47.386259166,
+        "child_user_seconds": 45.855251,
+        "child_system_seconds": 1.289178,
+        "sampled_process_tree_peak_rss_bytes": 329924608
+      }
+    ]
+  },
+  "local_evidence_root": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/index-design-20261031",
+  "receipts": {
+    "controls-v6/receipt.json": "5e4681eb6560888f59d7d8cd878d033743df8b3534557088b0cdcbb0d34c0df6",
+    "qualification.json": "b6059220909568c4e7ddcdd886f43fa447f7616795f12a6ba299c4a32ecdd395",
+    "native-v4-work/command/command.json": "81670c4c59fbfae1778e07ac0328899293917ed569a2d85e91a5ffdeec59dddd",
+    "p123/receipt.json": "b3aadad30a20bdf125e00c69d934cf523d42017ab3f8611372d5f466633883b5",
+    "graph/receipt.json": "255c2d582ea7dc706258b2f59cef21560b3a16bbbc388409103add9e9487d9c0",
+    "map-balance/receipt.json": "103f276f35ea36daf2c5ea7db1cf4523cac5eda321d5c3c70a3fe7409ca59745",
+    "validation/receipt.json": "bf0e783423143ae092a9d3e0095fc7a6f4f812c82fdb7770f274f7f256e5c1bd",
+    "builtin/receipt.json": "027c8b4f0462b9628024fd6801f02446ad2a5df425ed955b11542bddf8a0003d",
+    "focused/receipt.json": "dfaf1434e8ffdd81508a7fe997329df5db871355aea67e1a7c9e1207ca58bc4d",
+    "files/receipt.json": "fecf1193e4ec66aa1d7bc1bad07ec59f3910ca13a925ee9291d7405065a35485",
+    "native-views/receipt.json": "3cfaf63cde6ec690fa639ffe8102bd2eca2186e12bfd64e8932806e7808bf0c6",
+    "fingerprint/receipt.json": "5d590ec07cbdcb443ba31fa90b0d3f4eadbbdbafc68cd1dbb04c0b02225ccaca",
+    "direct/results/receipt.json": "c1801390a0586d20cee58922c5760d4b094706bd9cebdfff58587c6a549418a6",
+    "direct/guard-adaptation.json": "9821db54ca88ea5aef674d517808d19b7523e488d9673af347a5c807e0f3aa22",
+    "release-local-v4/command/command.json": "16d0857a18c5f60b5b2726b2d1f56e30336f148c07837ace13965c6aa1e460ff",
+    "baseline-source-audit.json": "f25f5ba9720b55b9e07aeca34b02190e0c22cd8df7bb324b7c4a6466b78f9b86",
+    "candidate-source-audit.json": "e44f61400167359b1085775612b35af21a4bf9e77c08d1a3e6542700bfa0b7e9",
+    "target/receipt.json": "12bbb90048374dfb4d11a0012daf133b8bc9d1d319a7cc5511100e922f370f37",
+    "screen/receipt.json": "f5905e33219408c0fcb6bd2ab75ef72643035f427737921a0dff13db7735c979"
+  },
+  "protocol_sha256": "a1fc33cc4c0e0db478d2e6b9b3c085765dc36c48381a8356ac4a3e904ee53588",
+  "production_source_inventory_sha256": "e44f61400167359b1085775612b35af21a4bf9e77c08d1a3e6542700bfa0b7e9",
+  "limitations": [
+    "fixed local artifacts and two blocks; not a statistical noninferiority result",
+    "forced fallback branch is not a 32-bit ABI emulation",
+    "five Linux live-proc release controls are unavailable on macOS; production guards retained",
+    "no full MLF-hosted compiler bootstrap or new generated-program performance claim"
+  ],
+  "superseded_before_sampling": [
+    "initial full build exposed a missed CrateSession rank consumer; corrected and full source checked",
+    "an incomplete build was superseded to finish remaining integer-table migration",
+    "canonical Prelude required regeneration; generated bytes changed only the source identity",
+    "release metadata caught benchmark dependency pins and source-admission adapters; corrected without altering original oracle or original Int64 migration pins"
+  ]
+}

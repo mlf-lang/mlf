@@ -2,5 +2,5 @@ module BackendSuiteMain where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Tests.BackendSuite as T
-main : IO Unit
+main : IO ()
 main = T.main

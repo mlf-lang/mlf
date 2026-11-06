@@ -1,0 +1,32 @@
+{
+  "result": "PASS",
+  "checks": 30,
+  "ghc": "9.14.1",
+  "optimization": "0",
+  "tool_sha256": "e3c762594c7b1801e04a6499b44f7dba64b3d9f50dc0569fcbd7d693b6514186",
+  "inputs": {
+    "tools/shared-migration/Main.hs": "b4ff70c5bb185f85cb53a4ee37f3d952beb9f418c1e47ede818a562ee3d667fb",
+    "tools/shared-migration/Migrate.hs": "6115d45ca686839f262efde337b4d6efc10cca26d0eef84c20d44721e072a62c",
+    "tools/shared-migration/README.md": "0b0ec86c4f533b085359696c7ec5c3e52bebd723fa7b4e7c10e03df9afd81593",
+    "tools/shared-migration/migrate.py": "e6c86d418e359cfcc468793132aee4f499869ae828c4c8d7f8af0453453869f3",
+    "tools/shared-migration/tests/RejectedUnreachable.emlf": "e957eeb08b14249f4782c462fac5ae13830deefa80881aa7e10ab331c6830419",
+    "tools/shared-migration/tests/NegativeDouble.emlf": "2aa531d78274f12c1c0ab635c07c0263861fa8c86a75e5216c61d26f7b7d7220",
+    "tools/shared-migration/tests/RejectedUnsignedRec.emlf": "ff765e8629580482331011183659f2c48900fde6c8ccd1706cc75664928b368a",
+    "tools/shared-migration/tests/RejectedLambda.emlf": "3a27b98436b0417d7db0ff18883429a73fef86f49e90ca8ea9a51cdb41aefa45",
+    "tools/shared-migration/tests/DemandScope.emlf": "60889f4f5ffbe1171c44ea310cfc18e51cf30110c6c96aed7af1440132b299cf",
+    "tools/shared-migration/tests/run.sh": "30b574f6530f5327fe76b28ff97c06881458251d2bdf4d9417407e419349f54a",
+    "tools/shared-migration/tests/RejectedOpenRec.emlf": "4afff8dea9ae3d22e7e07c24138c2bb24d3ec1a464f4dc19fdff51f83ddc0d6d",
+    "tools/shared-migration/tests/PrimitiveShadow.emlf": "49f75337c08df3263d44151a1edc03370a609e0e7dce4d9c06576a3dadfa807e",
+    "tools/shared-migration/tests/Comments.emlf": "e6fbc56782cd3736686aba31007ddf8492696668d298895d8dc837a33cd70e34",
+    "tools/shared-migration/tests/README.md": "73c8a2896bdd56137518f8de4c9768b70e84c66962a95f03c59f1f8e21deb532",
+    "tools/shared-migration/tests/Runner.hs": "87a7cca7a3c7de55616b52528e49a57e3670b0c1fad10226aa6a6c4519fd630e",
+    "tools/shared-migration/tests/support/MLF/Primitive.hs": "bb6d114f99a2670bcece89254449a3234da3d402c05bad0b3051f2c92ecba305",
+    "tools/shared-migration/tests/legacy/Bootstrap/Std.emlf": "5975437c9ba42c095ce5e5c15423e2dbddf2002aaf614c03b905a4db26559700",
+    "tools/shared-migration/MLF/Host/Parser.hs": "90e4a2a1072df3d2aaa91206df603f34bb9b3c66a8b13a87db313c804a5120c0",
+    "tools/shared-migration/MLF/Host/Lexer.hs": "954d7945571def6c776de9ac817969adbabedb4026b657976eddf4962680b737",
+    "tools/shared-migration/MLF/Host/Layout.hs": "d7c43137890ba17e89aa7a742d8106f6d638face1b2b52770d089c5b2812e8ef",
+    "tools/shared-migration/MLF/Host/Syntax.hs": "75b0286a7b3b502ed8e43390db1e1f434ff7d7ef04b962698c72bea955babd44"
+  },
+  "command": "GHC=/workspace/shared/mlf-ghcup/.ghcup/ghc/9.14.1/bin/ghc OUT=/tmp/mlf-migration-fixtures-final2 tools/shared-migration/tests/run.sh",
+  "full_compiler_corpus_built": false
+}

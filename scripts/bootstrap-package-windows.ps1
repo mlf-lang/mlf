@@ -11,6 +11,16 @@ $root = Split-Path $PSScriptRoot
 if (!$Compiler) { $Compiler = (Get-Command emlf -ErrorAction Stop).Source }
 if (!$Clang) { $Clang = (Get-Command clang -ErrorAction Stop).Source }
 $Compiler = (Resolve-Path -LiteralPath $Compiler).Path
+$sourceExtension = '*.emlf'
+$managerEntry = 'package/Main.emlf'
+if (Test-Path -LiteralPath "$root/shared-sources.json") {
+    $sourceIdentity = (& $Compiler --implementation-identity 2>$null | Out-String).Trim()
+    if ($LASTEXITCODE -or $sourceIdentity -notin @('MLF/shared-haskell-v1 native-MLF','MLF/shared-haskell-v1 GHC')) {
+        throw 'Shared package sources require a shared-aware compiler. Bootstrap the frozen bridge with scripts/bootstrap-shared.sh on a supported native host, then supply its stage2 compiler (or another qualified shared-aware compiler).'
+    }
+    $sourceExtension = '*.hs'
+    $managerEntry = 'package/MLF/Entry/Mlfpkg.hs'
+}
 $NativePrefix = (Resolve-Path -LiteralPath $NativePrefix).Path
 $Output = [IO.Path]::GetFullPath($Output)
 New-Item -ItemType Directory -Force "$Output/bin","$Output/lib/pkgconfig","$Output/include","$Output/runtime","$Output/evidence" | Out-Null
@@ -40,7 +50,7 @@ if ($LASTEXITCODE) { throw 'Cannot identify Clang' }
 $irFlags = @()
 if ($version -match 'clang version (\d+)' -and [int]$Matches[1] -lt 15) { $irFlags = @('-mllvm','-opaque-pointers') }
 $identity = [ordered]@{complete=$false;implementation='MLF';compiler_sha256=(Get-FileHash -LiteralPath $Compiler).Hash.ToLower();clang=$version;sources=@{}}
-foreach ($source in (Get-ChildItem "$root/package","$root/libraries" -Recurse -File -Filter '*.emlf')) {
+foreach ($source in (Get-ChildItem "$root/package","$root/libraries" -Recurse -File -Filter $sourceExtension)) {
     $identity.sources[[IO.Path]::GetRelativePath($root,$source.FullName)] = (Get-FileHash -LiteralPath $source.FullName).Hash.ToLower()
 }
 $report = "$Output/evidence/package-manager-bootstrap.json"
@@ -52,7 +62,7 @@ $start.WorkingDirectory = $root
 $start.RedirectStandardOutput = $true
 $start.RedirectStandardError = $true
 foreach ($library in (Get-ChildItem "$root/libraries" -Directory | Sort-Object Name)) { $start.ArgumentList.Add('-i'); $start.ArgumentList.Add($library.FullName) }
-foreach ($arg in @('--emit-llvm-gc','package/Main.emlf')) { $start.ArgumentList.Add($arg) }
+foreach ($arg in @('--emit-llvm-gc',$managerEntry)) { $start.ArgumentList.Add($arg) }
 $process = [Diagnostics.Process]::Start($start)
 $errors = $process.StandardError.ReadToEndAsync()
 $stream = [IO.File]::Create("$Output/evidence/mlfpkg.ll")

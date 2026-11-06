@@ -1,0 +1,71 @@
+{
+  "changed_sources": {
+    "Bootstrap.BuiltinPreludeContext": {
+      "new": "772f01e5e082e03399d8d55a7b3ba78184778786ffc858a649555f93240bf8dc",
+      "old": "1c78b34b5dc5389558ec221117439ac6637b9be4c268540e4892b5a3a068a501",
+      "reviewed_change": "Expose the prepared raw witness and its existing object checker."
+    },
+    "Bootstrap.BuiltinPreludeLiteral": {
+      "new": "888e286d19c52145b34ecb03e4de6b209ab5d06ca7b22174208c214aa3f0530f",
+      "old": "883469137d8f82f43a1912f7d6c92af69117d181ec9442c3d9da018b6e393109",
+      "reviewed_change": "Check and render the bounded split Prelude object."
+    },
+    "Bootstrap.Crate": {
+      "new": "16a80b07b63c1ccc957b80dc412e35dfc53d6c447b926d480d9c41b55ef878ba",
+      "old": "594af7881473256dcf2bdbb5f57289cfd8cb6cfd471f95f088748d63b1f6150a",
+      "reviewed_change": "Validate the installed pair against the witness and retain the existing text writer."
+    },
+    "Bootstrap.CrateSession": {
+      "new": "2bc7f098613df7d744601647ef3b7fa983e5daacfe95e0adc43bd657604032d0",
+      "old": "1210cfc8605bb8e45fd6801661175f892ebeddef561afa097b3fa3eafdde3c37",
+      "reviewed_change": "Thread an optional compiler-owned witness through the source crate driver."
+    },
+    "MLF.BuiltinPreludeData": {
+      "new": "e1a43eaadd53fefa1420ee59e05c6a7fc75eaf703acdf499f5538f6c944bcaca",
+      "old": "4f296f9009fad3b75842125f0107e5aefc2591a5fe26b4c53aac4a95aed32236",
+      "reviewed_change": "Regenerate the compiler-owned literal and its split object from this source closure."
+    },
+    "MLF.Entry.BuiltinPrelude": {
+      "new": "740f515891b0a77e8139906a16917d14ca043cb098b5e2c617f3b04c2252ca92",
+      "old": "0bbc1bd3d42303d37f2e7e8ce9123780e55795f4bd1a7de5d0145ff399e6ea49",
+      "reviewed_change": "Emit both the exact linked witness and the canonical split object."
+    },
+    "MLF.Entry.Emlf": {
+      "new": "d52b9ba6295b31ef4686291e80c2fbdeba9d669c6f2eb362ed41c9787f9cfda3",
+      "old": "d5da6a564e6227a65ddb88a0c328495256e0ad817ca94f32957ba2d64b13ee19",
+      "reviewed_change": "Supply the checked witness to the ordinary crate command."
+    },
+    "MLF.PreparedCompiler": {
+      "new": "dad3043d15f6590a5c19314a8ec5e18189906f6b1fcf70f0e895987927989a40",
+      "old": "9a36850ff04404b488316feb169b869b28acaf9c226b33c6810a0a3eecb95c47",
+      "reviewed_change": "Expose and verify the crate Prelude object against fresh preparation."
+    }
+  },
+  "current_registry": "7ad764d9834e1b19c767287660164d0adc81cb6a31cd78a4ebef4198bdef5195",
+  "format": "crate-prelude-source-migration-v1",
+  "module_count": 128,
+  "parent": "c5928b5be73cd78d194405e734aa012415570e1a",
+  "parent_registry": "3843ccebb5581db27d6ec385a7e8f403e07acb9856712e7db9aa5a1106af0538",
+  "session_edits": [
+    {
+      "new": "             KindSignatures, FlexibleContexts, FlexibleInstances,\n             MultiParamTypeClasses, OverloadedStrings #-}\n-- File-owned candidate route. No raw AST, Solver, region, or callback escapes.\nmodule Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude) where {\n  import MLF.Primitive;\n  import Bootstrap.Types;\n  import Bootstrap.Std;\n",
+      "old": "             KindSignatures, FlexibleContexts, FlexibleInstances,\n             MultiParamTypeClasses, OverloadedStrings #-}\n-- File-owned candidate route. No raw AST, Solver, region, or callback escapes.\nmodule Bootstrap.CrateSession (compileSpecFile) where {\n  import MLF.Primitive;\n  import Bootstrap.Types;\n  import Bootstrap.Std;\n"
+    },
+    {
+      "new": "  import qualified Bootstrap.IntMap as IM;\n  import qualified Bootstrap.IntSet as IS;\n  import qualified Bootstrap.IntRank as Rank;\n  import qualified Bootstrap.BuiltinPreludeContext as Builtin;\n  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate,\n    withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,\n    specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,\n    preparedResolution, preparedNames, preparedLayouts, preparedReach,\n",
+      "old": "  import qualified Bootstrap.IntMap as IM;\n  import qualified Bootstrap.IntSet as IS;\n  import qualified Bootstrap.IntRank as Rank;\n  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPrelude, prepareCrate,\n    withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,\n    specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,\n    preparedResolution, preparedNames, preparedLayouts, preparedReach,\n"
+    },
+    {
+      "new": "      }\n    };\n\n  compileSourcesWithEncoding :: Maybe ((,) Builtin.PreparedPrelude String) -> Bool -> CrateSpec -> [] SourceModule ->\n    [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());\n  compileSourcesWithEncoding witness shareEncoding spec sources interfaces prefix =\n    do {\n      dependencies <- withPreludeUsing (ensureBuiltinWith witness) spec sources interfaces;\n      case do {\n             boundValueShared20 <- dependencies;\n             case boundValueShared20 of {\n",
+      "old": "      }\n    };\n\n  compileSourcesWithEncoding :: Bool -> CrateSpec -> [] SourceModule ->\n    [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());\n  compileSourcesWithEncoding shareEncoding spec sources interfaces prefix =\n    do {\n      dependencies <- withPrelude spec sources interfaces;\n      case do {\n             boundValueShared20 <- dependencies;\n             case boundValueShared20 of {\n"
+    },
+    {
+      "new": "    };\n\n  compileSpecFile :: String -> String -> IO (Either String ());\n  compileSpecFile = compileSpecFileWithPrelude Nothing;\n  compileSpecFileWithPrelude :: Maybe ((,) Builtin.PreparedPrelude String) -> String -> String -> IO (Either String ());\n  compileSpecFileWithPrelude witness file prefix =\n    do {\n      present <- fileExists file;\n      if not present\n",
+      "old": "    };\n\n  compileSpecFile :: String -> String -> IO (Either String ());\n  compileSpecFile file prefix =\n    do {\n      present <- fileExists file;\n      if not present\n"
+    },
+    {
+      "new": "                     Right ((,) sources interfaces) ->\n                       -- Both source and dependency values originate in the\n                       -- parsers/decoders above, not caller-supplied lazy ASTs.\n                       compileSourcesWithEncoding witness True normalized sources interfaces prefix\n                   }\n                 }\n             }\n",
+      "old": "                     Right ((,) sources interfaces) ->\n                       -- Both source and dependency values originate in the\n                       -- parsers/decoders above, not caller-supplied lazy ASTs.\n                       compileSourcesWithEncoding True normalized sources interfaces prefix\n                   }\n                 }\n             }\n"
+    }
+  ]
+}

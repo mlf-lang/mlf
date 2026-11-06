@@ -1,0 +1,80 @@
+{
+  "artifact": {
+    "artifact_id": 13295993845,
+    "bytes": 767657,
+    "run_id": 41774064227,
+    "sha256": "d3da9cafbaedf4f2e8ab10dd2574b857ae8607528130079bb53ffb343826e5ca",
+    "url": "https://github.com/mlf-lang/mlf/actions/runs/41774064227/artifacts/13295993845"
+  },
+  "collector": {
+    "authenticated_input_count": 2156,
+    "candidate_verified": false,
+    "complete": true,
+    "diagnostic_driver_sha256": "181f748533867c97488552777831aecaddd72232cd30c4850ec772017c30670a",
+    "entry": "builtin-generation-guard/results/receipt.json",
+    "format": "builtin-generation-evidence-v1",
+    "generation_only": true,
+    "generation_succeeded": true,
+    "immutable_inputs_verified_after": true,
+    "optimization": "0",
+    "original_build_complete": false,
+    "producer_build_complete": false,
+    "receipt_bytes": 442730,
+    "receipt_sha256": "b7efb51ba0e0844998fd24f27776d06c504a74c8848b36fd0c9e9eef235e56a4",
+    "source_files_rewritten": false,
+    "toolchain_qualification": false
+  },
+  "comparison": {
+    "canonical_bytes": 2219103,
+    "canonical_sha256": "02481fb9c2460ab5e2ca6577416ffc36b66085dc95bd04df491d9c14ce610f56",
+    "generated_bytes": 2219103,
+    "generated_sha256": "f5ec5f115ed013bc40993039f02249eb809c5aa1ecf22d0c39bc4564a8c73e78",
+    "identity_only": true,
+    "length": 64,
+    "new_identity": "8a985e28c3b29d21bdd5d50a488d85fec7f0608a01d8905ae4f45dde3599f74e",
+    "offset": 776,
+    "old_identity": "6252afcb6e2ee3fd333ed6ebce6c672996bf282caca3a1d2187903dd2828a21e"
+  },
+  "format": "builtin-regeneration-portable-provenance-v1",
+  "generator": {
+    "exit_code": 0,
+    "incomplete_compiler_sha256": "a19e1021d45ec7b72f98c2c8a7ae894adf080c9c2dfd97a8f7538395e1ab87de",
+    "input_pins_verified_after": true,
+    "input_pins_verified_before": true,
+    "label": "fresh-literal",
+    "sha256": "08dd853995043d5213fe412f1282f69a56eb4877878b7d1b6619e72cad876d03",
+    "stderr_bytes": 0,
+    "stderr_entry": "builtin-generation-guard/results/fresh-literal.stderr",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 2219103,
+    "stdout_entry": "builtin-generation-guard/results/fresh-literal.stdout",
+    "stdout_sha256": "f5ec5f115ed013bc40993039f02249eb809c5aa1ecf22d0c39bc4564a8c73e78",
+    "timeout_seconds": 600.0
+  },
+  "original_build_receipt": {
+    "bytes": 989904,
+    "complete": false,
+    "entry": "shared-ghc/receipt.json",
+    "sha256": "7ccadff46adcfcf2d0e9947138331b757729fa8cdbbc5c6ea2fa3afa0af5511f"
+  },
+  "original_failed_verification": {
+    "bytes": 24061,
+    "complete": false,
+    "entry": "shared-ghc/builtin-verification/receipt.json",
+    "error": "ValueError: builtin verification command failed: check-candidate",
+    "exit_code": 1,
+    "sha256": "6579a9d3ff203d4319ee1c16f7599751e94f84ee40caed674ee6acb01bd1f1f1"
+  },
+  "other_qualification": {
+    "O2_generation_verified": false,
+    "native_candidate_verified": false
+  },
+  "scope": "Actual independently collected CI O0 generator output; incomplete producer and original failure remain unqualified.",
+  "source": {
+    "generator_commit": "ca1d322845dd76081fd7cf5371b6a25b4a451e6c",
+    "head": "aa661e80f159d4851f05b71bbf77fa868da23b7e",
+    "nongenerated_module_count": 54,
+    "source_identity": "builtin-source-v1:8a985e28c3b29d21bdd5d50a488d85fec7f0608a01d8905ae4f45dde3599f74e",
+    "tree": "8fd27c3bd6b715b8be00b731cf974a6bd35e269a"
+  }
+}

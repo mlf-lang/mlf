@@ -6,7 +6,7 @@ import qualified Package.OS as O
 import qualified Tests.TestSources as TS
 import qualified Tests.Basic as H
 
-assertFiles : J.Json -> List String -> IO Unit
+assertFiles : J.Json -> [] String -> IO ()
 assertFiles inputs expected = do
  paths <- S.mapM canonicalPath expected
  let files = J.get "files" inputs
@@ -15,24 +15,24 @@ assertFiles inputs expected = do
   hash <- fileDigest path
   H.assert (eqString hash (J.getText path "" files)) "source cache dependency digest differs from the resolved file") paths
 
-main : IO Unit
+main : IO ()
 main = H.withScratch (\directory -> do
  let local = directory ++ "/entry"
  let first = directory ++ "/first"
  let second = directory ++ "/second"
  let missing = directory ++ "/unused-missing-root"
- S.mapM_ O.mkdir (Cons local (Cons first (Cons second Nil)))
+ S.mapM_ O.mkdir ((:) local ((:) first ((:) second [])))
  let entry = local ++ "/CacheEntry.emlf"
  let dependency = second ++ "/CacheDependency.emlf"
  let leaf = second ++ "/CacheLeaf.emlf"
- let roots = Cons first (Cons second (Cons missing Nil))
+ let roots = (:) first ((:) second ((:) missing []))
  let dependencyText = "module CacheDependency where\nimport CacheLeaf\ndependencyValue = leafValue\n"
  let leafText = "module CacheLeaf where\nleafValue = 42\n"
  writeFile entry "module CacheEntry where\nimport CacheDependency\nentryValue = dependencyValue\n"
  writeFile dependency dependencyText
  writeFile leaf leafText
  baseline <- TS.sourceInputs roots entry
- assertFiles baseline (Cons entry (Cons dependency (Cons leaf Nil)))
+ assertFiles baseline ((:) entry ((:) dependency ((:) leaf [])))
  absent <- directoryExists missing
  H.assert (S.not absent) "unused source include root unexpectedly exists"
  repeated <- TS.sourceInputs roots entry
@@ -43,7 +43,7 @@ main = H.withScratch (\directory -> do
  H.assert (J.equal baseline unrelated) "unrelated source edit invalidated a dependency cache key"
  writeFile leaf "module CacheLeaf where\nleafValue = 43\n"
  changed <- TS.sourceInputs roots entry
- assertFiles changed (Cons entry (Cons dependency (Cons leaf Nil)))
+ assertFiles changed ((:) entry ((:) dependency ((:) leaf [])))
  H.assert (S.not (J.equal baseline changed)) "transitive source edit reused a stale dependency identity"
  writeFile leaf leafText
  restored <- TS.sourceInputs roots entry
@@ -52,34 +52,34 @@ main = H.withScratch (\directory -> do
  let shadow = first ++ "/CacheDependency.emlf"
  writeFile shadow dependencyText
  shadowed <- TS.sourceInputs roots entry
- assertFiles shadowed (Cons entry (Cons shadow (Cons leaf Nil)))
+ assertFiles shadowed ((:) entry ((:) shadow ((:) leaf [])))
  H.assert (S.not (J.equal baseline shadowed)) "new higher-priority module shadow reused the old resolution"
  writeFile dependency "module CacheDependency where\nimport CacheLeaf\ndependencyValue = leafValue + 1\n"
  hiddenEdit <- TS.sourceInputs roots entry
  H.assert (J.equal shadowed hiddenEdit) "editing a shadowed module invalidated the selected dependency closure"
  H.removeFile shadow
  revealed <- TS.sourceInputs roots entry
- assertFiles revealed (Cons entry (Cons dependency (Cons leaf Nil)))
+ assertFiles revealed ((:) entry ((:) dependency ((:) leaf [])))
  H.assert (S.not (J.equal shadowed revealed) && S.not (J.equal baseline revealed)) "removing a shadow failed to rediscover the changed fallback"
  writeFile dependency dependencyText
  fallback <- TS.sourceInputs roots entry
  H.assert (J.equal baseline fallback) "restored fallback module did not restore the original identity"
 
  writeFile shadow dependencyText
- reversed <- TS.sourceInputs (Cons second (Cons first (Cons missing Nil))) entry
- assertFiles reversed (Cons entry (Cons dependency (Cons leaf Nil)))
+ reversed <- TS.sourceInputs ((:) second ((:) first ((:) missing []))) entry
+ assertFiles reversed ((:) entry ((:) dependency ((:) leaf [])))
  H.assert (S.not (J.equal shadowed reversed)) "source cache identity ignored ordered include roots"
  let adjacent = local ++ "/CacheDependency.emlf"
  writeFile adjacent dependencyText
  adjacentInputs <- TS.sourceInputs roots entry
- assertFiles adjacentInputs (Cons entry (Cons adjacent (Cons leaf Nil)))
+ assertFiles adjacentInputs ((:) entry ((:) adjacent ((:) leaf [])))
 
  let cycleA = local ++ "/CycleA.emlf"
  let cycleB = second ++ "/CycleB.emlf"
  writeFile cycleA "module CycleA where\nimport CycleB\nfirstValue = 1\n"
  writeFile cycleB "module CycleB where\nimport CycleA\nsecondValue = 2\n"
  cycleInputs <- TS.sourceInputs roots cycleA
- assertFiles cycleInputs (Cons cycleA (Cons cycleB Nil))
+ assertFiles cycleInputs ((:) cycleA ((:) cycleB []))
  cycleAgain <- TS.sourceInputs roots cycleA
  H.assert (J.equal cycleInputs cycleAgain) "cyclic import discovery changed the dependency identity"
 
@@ -92,7 +92,7 @@ main = H.withScratch (\directory -> do
  writeFile (local ++ "/Prelude.emlf") "invalid source that must never shadow the built-in Prelude\n"
  implicitAfter <- TS.sourceInputs roots implicit
  explicitAfter <- TS.sourceInputs roots explicit
- assertFiles implicitAfter (Cons implicit Nil)
- assertFiles explicitAfter (Cons explicit Nil)
+ assertFiles implicitAfter ((:) implicit [])
+ assertFiles explicitAfter ((:) explicit [])
  H.assert (J.equal implicitBefore implicitAfter && J.equal explicitBefore explicitAfter) "built-in Prelude incorrectly became a filesystem cache dependency"
  putStrLn "source dependency cache controls passed")

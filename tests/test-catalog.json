@@ -714,6 +714,7 @@
       "evidence": {
         "kind": "coverage",
         "executions": [
+          "recursive exports preserve scoped identities and independent copies",
           "expansion resets scheme flag and binding",
           "all inert nodes normalized",
           "well-domination enforced"
@@ -1093,7 +1094,7 @@
           "do: optional trailing semicolon",
           "do: nested blocks",
           "do: bind statement sees the outer binding",
-          "do: local let sees the outer binding",
+          "do: distinct do-let binder sees the outer binding",
           "do: local let is generalized",
           "do: local let annotation",
           "do: let-in expression is an action",
@@ -1103,7 +1104,10 @@
           "do: constructor wildcard field",
           "do: discarded action cannot capture an outer name",
           "do: pattern temporary cannot capture an outer name",
-          "do: uses the lexical bind function",
+          "do: explicit bind remains lexical",
+          "do rejection: lexical bind cannot intercept do",
+          "do rejection: same-name do-let is recursive, not an outer reference",
+          "do: annotated recursive do-let keeps its own binding",
           "do rejection: empty block",
           "do rejection: final statement must be an expression",
           "do rejection: cannot end with a local declaration",
@@ -1114,7 +1118,7 @@
           "do rejection: later binding is unavailable",
           "do rejection: action type mismatch",
           "do rejection: final action has the right monadic type",
-          "do rejection: refutable pattern requires an explicit case",
+          "do rejection: refutable pattern requires canonical MonadFail",
           "do rejection: pattern binder duplicates",
           "do: parser preserves statement forms",
           "do: lowering preserves binding order and the final action",
@@ -1174,21 +1178,22 @@
           "surface checking: inline whole-function signature",
           "surface checking: annotated local function",
           "surface checking: do-local function generalizes",
-          "surface checking: do-local function sees outer binding",
+          "surface checking: distinct do-local function sees outer binding",
           "surface checking: conditional returns polymorphic function",
           "surface checking: conditional works in a case scrutinee",
           "surface checking: keyword prefixes remain identifiers",
           "surface checking: instance method parameters",
           "surface checking: qualified function declaration",
           "surface checking: syntax needs no implicit prelude",
-          "surface rejection: recursion needs a signature",
+          "surface checking: same-name do-local function is recursive",
+          "surface checking: unsigned recursion infers bottom",
           "surface checking: forward value references",
           "surface rejection: branch types must agree",
           "surface rejection: condition must be Bool",
           "surface rejection: arithmetic does not overload Double",
           "surface rejection: unary plus requires a number",
           "surface rejection: unary minus requires a number",
-          "surface rejection: comparisons do not overload String",
+          "surface checking: equality supports annotated strings",
           "surface rejection: whole function signature is checked",
           "surface rejection: chained comparisons",
           "surface rejection: mixed chained comparisons",
@@ -1256,8 +1261,8 @@
           "recursion: unused explicit quantified variables are discharged",
           "equations: parameter can shadow the function name",
           "readability rejection: recursive forall cannot specialize to Int",
-          "readability rejection: mutual recursion needs every signature",
-          "readability rejection: local recursion needs a signature",
+          "recursion: mixed signed and inferred group",
+          "recursion: unsigned local group",
           "readability rejection: recursive existentials are not closed signatures",
           "readability rejection: recursive signature free variable",
           "readability rejection: equation arity",
@@ -1378,7 +1383,7 @@
           "modules rejection: explicit empty Prelude removes value names",
           "modules rejection: qualified Prelude suppresses implicit Prelude",
           "modules rejection: Prelude cannot be redefined",
-          "modules rejection: primitive constructor cannot be redefined",
+          "modules rejection: ordinary Unit constructor is not builtin unit",
           "modules rejection: primitive type cannot be redefined",
           "modules rejection: unused private definitions still checked",
           "modules rejection: export list cannot name missing value",
@@ -1387,7 +1392,6 @@
           "modules rejection: instance not visible in another instance",
           "modules rejection: cyclic private constructor remains hidden",
           "modules rejection: cyclic reexports cannot invent a missing identity",
-          "modules rejection: cross-module recursion retains existing signature requirement",
           "modules rejection: downstream orphan cannot leak into an import cycle",
           "modules: original source type names",
           "modules: unit syntax is intrinsic",
@@ -1397,6 +1401,8 @@
           "modules: unused imports do not cause value ambiguity",
           "modules: legacy compile path preserves checked output",
           "modules: file loader, includes, hierarchy and errors",
+          "modules typing: cross-module recursion infers unsigned cycle",
+          "modules typing: cross-module qualified recursion generalizes shared exports",
           "crate namespaces resolve recursive declarations before inference",
           "crate namespace resolution preserves external ownership and mangling",
           "cyclic export fixed point is invariant under source order"
@@ -1496,7 +1502,7 @@
           "crate rejects: explicit empty Prelude removes value names",
           "crate rejects: qualified Prelude suppresses implicit Prelude",
           "crate rejects: Prelude cannot be redefined",
-          "crate rejects: primitive constructor cannot be redefined",
+          "crate rejects: ordinary Unit constructor is not builtin unit",
           "crate rejects: primitive type cannot be redefined",
           "crate rejects: unused private definitions still checked",
           "crate rejects: export list cannot name missing value",
@@ -1505,8 +1511,9 @@
           "crate rejects: instance not visible in another instance",
           "crate rejects: cyclic private constructor remains hidden",
           "crate rejects: cyclic reexports cannot invent a missing identity",
-          "crate rejects: cross-module recursion retains existing signature requirement",
           "crate rejects: downstream orphan cannot leak into an import cycle",
+          "crate typing: cross-module recursion infers unsigned cycle",
+          "crate typing: cross-module qualified recursion generalizes shared exports",
           "crate paths and native cache commands",
           "crate metadata version rejection",
           "crate object binding schemes are independently checked",
@@ -3038,6 +3045,60 @@
       }
     },
     {
+      "id": "harness/split-runtime-compiles-independent-objects-before-linking",
+      "unit": "harness",
+      "name": "split runtime compiles independent objects before linking",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_split_runtime_compiles_independent_objects_before_linking"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
+      "id": "harness/split-runtime-failed-producers-reap-every-child",
+      "unit": "harness",
+      "name": "split runtime failed producers reap every child",
+      "group": "packages-build",
+      "level": "integration",
+      "inputs": [
+        "fixed",
+        "fault-injected"
+      ],
+      "oracles": [
+        "fixed-expected",
+        "contract"
+      ],
+      "purposes": [
+        "regression",
+        "conformance",
+        "robustness"
+      ],
+      "evidence": {
+        "kind": "coverage",
+        "executions": [
+          "test_split_runtime_failed_producers_reap_every_child"
+        ],
+        "aliases": {},
+        "metrics": {}
+      }
+    },
+    {
       "id": "harness/prestarted-link-waits-for-complete-objects-and-reaps-failed-producers",
       "unit": "harness",
       "name": "prestarted link waits for complete objects and reaps failed producers",
@@ -3725,7 +3786,7 @@
         "labels": [
           "IO: greeting and input order",
           "IO: integer printing and string conversion",
-          "IO: integer arithmetic is signed and unbounded",
+          "IO: integer arithmetic is signed and wraps at 64 bits",
           "IO: integer equality and strict ordering",
           "IO: string equality respects case, empty strings, and Unicode",
           "IO: primitives are curried ordinary values",
@@ -4022,7 +4083,7 @@
           "backend: readability: local equation group",
           "backend: surface: declarations, signatures and precedence",
           "backend: surface: ordered scope and polymorphic functions",
-          "backend: surface: signed literals, negation and arbitrary precision",
+          "backend: surface: signed literals, negation and Int64 wrapping",
           "backend: surface: operator and conditional hygiene",
           "backend: surface: all integer comparisons",
           "backend: surface: dynamic short circuit true",
@@ -4499,16 +4560,16 @@
           "native scalar arguments: IEEE values survive recursive calls",
           "native scalar arguments: payload reads stay within their branch",
           "native scalar arguments: unused failing floating arguments remain lazy",
-          "native numeric region: specialized integer ranges permit negative results and GMP promotion",
+          "native numeric region: specialized integer ranges permit negative and boxed Int64 results",
           "native numeric region: reused actions execute and snapshots stay immutable",
           "native numeric region: unforced unused arguments take the lazy boundary",
           "native numeric region: aliased Double arrays preserve write and read order",
           "native numeric region: range facts do not escape a conditional branch",
           "native numeric region: lazy write operands retain bounds-error ordering",
           "native numeric region: negative native index",
-          "native numeric region: GMP native index",
+          "native numeric region: boxed Int64 native index",
           "native numeric region: empty native array",
-          "native numeric region: multiplication and division retain arbitrary precision",
+          "native numeric region: multiplication wraps and division retains signed Int64 rules",
           "native scalar arguments: recursive permutations bound specialization"
         ]
       }
@@ -4565,9 +4626,9 @@
         "rows": 41,
         "fixtures": 40,
         "labels": [
-          "numeric: read unbounded signed decimals",
-          "numeric: curried GMP primitives",
-          "numeric: curried unbounded bitwise AND",
+          "numeric: read signed decimals with Int64 wrapping",
+          "numeric: curried signed Int64 primitives",
+          "numeric: curried 64-bit bitwise AND",
           "numeric: unused bitwise arguments remain lazy",
           "numeric: binary64 arithmetic and scientific literals",
           "numeric: rounding ties and signed zero",
@@ -5277,8 +5338,8 @@
           "bootstrap primitive failure: surrogate",
           "bootstrap primitive failure: past maximum scalar",
           "bootstrap primitive failure: negative scalar",
-          "bootstrap primitive failure: negative double bits",
-          "bootstrap primitive failure: oversize double bits",
+          "bootstrap primitive failure: signed integer division overflow",
+          "bootstrap primitive failure: wrapped divisor is zero",
           "bootstrap primitive failure: seq demands first",
           "bootstrap primitive failure: panic preserves embedded NUL and newline",
           "bootstrap primitive failure: missing argument",

@@ -1,0 +1,10 @@
+module Fixed.Class (Render(..), exposePrivate) where
+import Prelude
+class Render a where
+  render : a -> String
+class Private a where
+  privateTag : a -> String
+instance Private Int where
+  privateTag n = "private:" ++ showInt n
+exposePrivate : Int -> String
+exposePrivate n = privateTag n

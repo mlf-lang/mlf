@@ -1,0 +1,424 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Bootstrap.X.Check where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import Bootstrap.Kind;
+  import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.Data as D;
+  import qualified Bootstrap.Primitive as P;
+  import qualified Bootstrap.X.Type as T;
+  import qualified Bootstrap.X.Syntax as X;
+  emptyEnv = XEnv M.empty M.empty;
+  typeEnv (XEnv ts _) = ts;
+  termEnv (XEnv _ es) = es;
+  ensure :: Bool -> String -> Either String ();
+  ensure condition message = if condition then Right () else Left message;
+  wellFormed :: Map XTyVar XType -> XType -> Either String ();
+  wellFormed env ty = wellFormedIn D.emptyDataEnv env ty;
+  wellFormedIn :: DataEnv -> Map XTyVar XType -> XType -> Either String ();
+  wellFormedIn ds env ty =
+    do {
+      k <- T.kindOf ds env ty;
+      return ()
+    };
+  termType :: DataEnv -> Map XTyVar XType -> XType -> Either String ();
+  termType ds env ty =
+    do {
+      k <- T.kindOf ds env ty;
+      if eqKind k Star
+      then Right ()
+      else case ty of {
+             XCon c args ->
+               do {
+                 D.checkArity ds c (L.length args);
+                 Left "term type must have kind *"
+               };
+             _ -> Left "term type must have kind *"
+           }
+    };
+  fresh :: Map XTyVar XType -> XTyVar -> Either String ();
+  fresh env a =
+    ensure (L.not (M.member T.compareTyVar a env))
+      ("type binder already in scope: " ++ showInt (T.tyVarId a));
+  checkComputation :: Map XTyVar XType -> XComputation -> XType -> Either String XType;
+  checkComputation env p source = checkComputationIn D.emptyDataEnv env p source;
+  checkComputationIn :: DataEnv -> Map XTyVar XType -> XComputation -> XType -> Either String XType;
+  checkComputationIn ds env p source =
+    do {
+      validateTypeEnv ds env;
+      checkComputationScoped ds env p source
+    };
+  checkComputationScoped :: DataEnv ->
+                            Map XTyVar XType -> XComputation -> XType -> Either String XType;
+  checkComputationScoped ds env p source =
+    do {
+      wellFormedIn ds env source;
+      result <- computeResult ds env p source;
+      wellFormedIn ds env result;
+      return result
+    };
+  computeResult :: DataEnv -> Map XTyVar XType -> XComputation -> XType -> Either String XType;
+  computeResult ds env p source =
+    case p of {
+      XRefl -> Right source;
+      XBottom t ->
+        case source of {
+          XBot ->
+            do {
+              termType ds env t;
+              return t
+            };
+          XBotKind k ->
+            do {
+              actual <- T.kindOf ds env t;
+              ensure (eqKind actual k) "Inst-Bot kind mismatch";
+              return t
+            };
+          _ -> Left "Inst-Bot requires a bottom source"
+        };
+      XHyp a ->
+        case M.lookup T.compareTyVar a env of {
+          Just bound ->
+            if T.alphaEq bound source then Right (XVar a) else Left "Inst-Hyp bound mismatch";
+          Nothing -> Left "Inst-Hyp unbound variable"
+        };
+      XThen p1 p2 ->
+        do {
+          t <- checkComputationScoped ds env p1 source;
+          checkComputationScoped ds env p2 t
+        };
+      XInner q ->
+        case source of {
+          XForall a bound body ->
+            do {
+              newBound <- checkComputationScoped ds env q bound;
+              return (XForall a newBound body)
+            };
+          _ -> Left "Inst-Inner requires a forall source"
+        };
+      XOuter a q ->
+        case source of {
+          XForall b bound body ->
+            do {
+              fresh env a;
+              ensure (T.equalTyVar a b || L.not (S.member T.compareTyVar a (T.freeVars body)))
+                "Inst-Outer would capture a variable";
+              result <-
+                checkComputationScoped ds (M.insert T.compareTyVar a bound env) q
+                  (T.substitute b (XVar a) body);
+              return (XForall a bound result)
+            };
+          _ -> Left "Inst-Outer requires a forall source"
+        };
+      XElim ->
+        case source of {
+          XForall a bound body -> Right (T.substitute a bound body);
+          _ -> Left "Inst-Elim requires a forall source"
+        };
+      XIntro a -> introduce ds env a XBot source;
+      XIntroKind a k -> introduce ds env a (T.bottomKind k) source
+    };
+  introduce :: DataEnv -> Map XTyVar XType -> XTyVar -> XType -> XType -> Either String XType;
+  introduce ds env a bound source =
+    do {
+      fresh env a;
+      ensure (L.not (S.member T.compareTyVar a (T.freeVars source)))
+        "Inst-Quant-Intro would capture a variable";
+      return (XForall a bound source)
+    };
+  infer :: XEnv -> XTerm -> Either String XType;
+  infer env term =
+    case term of {
+      XWithData declarations body ->
+        do {
+          ds <- D.validateDeclarations declarations;
+          inferWithData ds env body
+        };
+      _ -> inferWithData D.emptyDataEnv env term
+    };
+  inferWithData :: DataEnv -> XEnv -> XTerm -> Either String XType;
+  inferWithData ds env body =
+    do {
+      validateTypeEnv ds (typeEnv env);
+      L.mapM (termType ds (typeEnv env)) (M.elems (termEnv env));
+      inferIn ds env body
+    };
+  inferIn :: DataEnv -> XEnv -> XTerm -> Either String XType;
+  inferIn ds env term =
+    case term of {
+      XVarTerm x ->
+        case M.lookup X.compareName x (termEnv env) of {
+          Nothing -> Left ("unbound term variable " ++ X.nameHint x);
+          Just t -> Right t
+        };
+      XAbs x t body ->
+        do {
+          termType ds (typeEnv env) t;
+          ensure (L.not (M.member X.compareName x (termEnv env))) "term binder already in scope";
+          result <- inferIn ds (XEnv (typeEnv env) (M.insert X.compareName x t (termEnv env))) body;
+          return (XArrow t result)
+        };
+      XApp f a ->
+        do {
+          ft <- inferIn ds env f;
+          at <- inferIn ds env a;
+          case ft of {
+            XArrow domain result ->
+              if T.alphaEq domain at then Right result else Left "application type mismatch";
+            _ -> Left "application of a non-function"
+          }
+        };
+      XTypeAbs a bound body ->
+        do {
+          fresh (typeEnv env) a;
+          wellFormedIn ds (typeEnv env) bound;
+          result <-
+            inferIn ds (XEnv (M.insert T.compareTyVar a bound (typeEnv env)) (termEnv env)) body;
+          return (XForall a bound result)
+        };
+      XTypeApp t p ->
+        do {
+          source <- inferIn ds env t;
+          checkComputationScoped ds (typeEnv env) p source
+        };
+      XLet x a b ->
+        do {
+          t <- inferLetBinding ds env x a;
+          inferIn ds (XEnv (typeEnv env) (M.insert X.compareName x t (termEnv env))) b
+        };
+      XLetRec bindings body ->
+        do {
+          scope <- inferRecursiveScope ds env bindings;
+          inferIn ds scope body
+        };
+      XIntTerm _ -> Right (XCon "Int" []);
+      XDoubleTerm n ->
+        do {
+          ensure (remInt (quotInt (doubleToBits n) 4503599627370496) 2048 /= 2047)
+            "non-finite Double literal";
+          return (XCon "Double" [])
+        };
+      XBoolTerm _ -> Right (XCon "Bool" []);
+      XStringTerm text ->
+        do {
+          ensure (validScalars text 0) "invalid Unicode scalar in string literal";
+          return (XCon "String" [])
+        };
+      XPrimitive p arguments ->
+        case P.primitiveSignature p of {
+          (,) parameters signature ->
+            do {
+              ensure (L.length arguments == L.length parameters)
+                "primitive type argument arity mismatch";
+              actualKinds <- L.mapM (T.kindOf ds (typeEnv env)) arguments;
+              ensure (X.equalList eqKind actualKinds (L.map L.snd parameters))
+                "primitive type argument kind mismatch";
+              T.instantiateField
+                (M.fromList compareString (L.zip (L.map L.fst parameters) arguments))
+                signature
+            }
+        };
+      XConstructor c arguments ->
+        do {
+          boundValueShared1 <- D.lookupConstructor ds c;
+          case boundValueShared1 of {
+            (,) d ctor ->
+              do {
+                ensure (L.length arguments == L.length (D.datatypeParameters d))
+                  ("constructor type argument arity mismatch: " ++ c);
+                actualKinds <- L.mapM (T.kindOf ds (typeEnv env)) arguments;
+                ensure (X.equalList eqKind actualKinds (L.map L.snd (D.datatypeBinders d)))
+                  "constructor type argument kind mismatch";
+                let {
+                  parameters = M.fromList compareString (L.zip (D.datatypeParameters d) arguments)
+                };
+                fields <- L.mapM (T.instantiateField parameters) (D.constructorFields ctor);
+                return (L.foldr XArrow (XCon (D.datatypeName d) arguments) fields)
+              }
+          }
+        };
+      XCase scrutinee result alternatives ->
+        do {
+          st <- inferIn ds env scrutinee;
+          termType ds (typeEnv env) result;
+          owner <- D.checkAlternatives ds (L.map shape alternatives);
+          parameters <- caseParameters ds st owner;
+          L.mapM (checkAlternative ds env st result parameters) alternatives;
+          return result
+        };
+      XWithData _ _ -> Left "data declarations must be at the outermost level"
+    };
+  inferLetBinding :: DataEnv -> XEnv -> XName -> XTerm -> Either String XType;
+  inferLetBinding ds env name rhs = do {
+    ensure (L.not (M.member X.compareName name (termEnv env))) "term binder already in scope";
+    inferIn ds env rhs
+  };
+  inferRecursiveScope :: DataEnv -> XEnv -> [] ((,,) XName XType XTerm) -> Either String XEnv;
+  inferRecursiveScope ds env bindings = do {
+    let { names = L.map bindingName bindings };
+    ensure (uniqueNames names) "duplicate recursive binder";
+    ensure (L.not (L.any (\n -> M.member X.compareName n (termEnv env)) names))
+      "recursive binder already in scope";
+    L.mapM (\b -> termType ds (typeEnv env) (bindingType b)) bindings;
+    let { scope = XEnv (typeEnv env)
+      (M.union X.compareName (M.fromList X.compareName (L.map bindingPair bindings)) (termEnv env)) };
+    L.mapM (checkBinding ds scope) bindings;
+    Right scope
+  };
+  -- Capture only the outer declaration spine during its independent check.
+  -- RHS checks use inferIn, so their local bindings never become exports.
+  -- Fragment-shape/closed-export requirements remain a separate result: an
+  -- arbitrary valid closed term must not be rejected by Checked.check merely
+  -- because it is not a linkable declaration fragment.
+  closedBindingInventory :: [] ((,) XName XType) ->
+    Either String ([] ((,) XName XType)) -> Either String ([] ((,) XName XType));
+  closedBindingInventory entries remaining = do {
+    ensure (L.all (\entry -> S.null (T.freeVars (L.snd entry))) entries)
+      "inference binding has an open type";
+    rest <- remaining;
+    Right (L.append entries rest)
+  };
+  inferDeclarationSpine :: DataEnv -> XEnv -> XTerm ->
+    Either String ((,) XType (Either String ([] ((,) XName XType))));
+  inferDeclarationSpine ds env source = case source of {
+    XLet name rhs body -> do {
+      ty <- inferLetBinding ds env name rhs;
+      answer <- inferDeclarationSpine ds
+        (XEnv (typeEnv env) (M.insert X.compareName name ty (termEnv env))) body;
+      Right ((,) (L.fst answer) (closedBindingInventory ((:) ((,) name ty) []) (L.snd answer)))
+    };
+    XLetRec bindings body -> do {
+      scope <- inferRecursiveScope ds env bindings;
+      answer <- inferDeclarationSpine ds scope body;
+      Right ((,) (L.fst answer) (closedBindingInventory (L.map bindingPair bindings) (L.snd answer)))
+    };
+    _ -> do {
+      ty <- inferIn ds env source;
+      let { inventory = case source of {
+        XConstructor name [] -> if eqString name "()" then Right []
+          else Left "invalid inference fragment: expected declarations ending in ()";
+        _ -> Left "invalid inference fragment: expected declarations ending in ()"
+      } };
+      Right ((,) ty inventory)
+    }
+  };
+  inferParameterSpine :: DataEnv -> XEnv -> XTerm ->
+    Either String ((,) XType (Either String ([] ((,) XName XType))));
+  inferParameterSpine ds env source = case source of {
+    XAbs name ty body -> do {
+      termType ds (typeEnv env) ty;
+      ensure (L.not (M.member X.compareName name (termEnv env))) "term binder already in scope";
+      answer <- inferParameterSpine ds
+        (XEnv (typeEnv env) (M.insert X.compareName name ty (termEnv env))) body;
+      Right ((,) (XArrow ty (L.fst answer)) (L.snd answer))
+    };
+    _ -> inferDeclarationSpine ds env source
+  };
+  checkClosedWithBindings :: XTerm ->
+    Either String ((,) XType (Either String ([] ((,) XName XType))));
+  checkClosedWithBindings source = case source of {
+    XWithData declarations body -> do {
+      ds <- D.validateDeclarations declarations;
+      inferParameterSpine ds emptyEnv body
+    };
+    _ -> inferParameterSpine D.emptyDataEnv emptyEnv source
+  };
+  validScalars :: String -> Int -> Bool;
+  validScalars text i =
+    if (i >= stringLength text)
+    then True
+    else let {
+           c = stringCodeAt text i
+         } in
+         (((c < 55296) || (c > 57343)) && validScalars text (i + 1));
+  bindingName ((,,) n _ _) = n;
+  bindingType ((,,) _ t _) = t;
+  bindingPair ((,,) n t _) = (,) n t;
+  uniqueNames :: [] XName -> Bool;
+  uniqueNames ns = (L.length ns == S.size (S.fromList X.compareName ns));
+  checkBinding :: DataEnv -> XEnv -> (,,) XName XType XTerm -> Either String ();
+  checkBinding ds env ((,,) _ expected rhs) =
+    do {
+      actual <- inferIn ds env rhs;
+      ensure (T.alphaEq expected actual) "recursive definition does not have its declared type"
+    };
+  shape (XAlternative (XConstructorPattern c ns) _) = (,) (Just c) (L.length ns);
+  shape (XAlternative (XDefaultPattern _) _) = (,) Nothing 0;
+  caseParameters :: DataEnv -> XType -> Maybe DataDecl -> Either String (Map String XType);
+  caseParameters ds st Nothing = Right M.empty;
+  caseParameters ds st (Just d) =
+    case st of {
+      XCon c args ->
+        if eqString c (D.datatypeName d)
+        then do {
+               D.checkArity ds c (L.length args);
+               return (M.fromList compareString (L.zip (D.datatypeParameters d) args))
+             }
+        else Left "case scrutinee has the wrong data type";
+      _ -> Left "case scrutinee has the wrong data type"
+    };
+  checkAlternative :: DataEnv ->
+                      XEnv ->
+                      XType -> XType -> Map String XType -> XAlternative -> Either String ();
+  checkAlternative ds env st result parameters (XAlternative pat body) =
+    do {
+      let {
+        names = X.patternNames pat
+      };
+      ensure (uniqueNames names) "duplicate pattern variable";
+      ensure (L.not (L.any (\n -> M.member X.compareName n (termEnv env)) names))
+        "pattern binder already in scope";
+      bindings <- patternBindings ds st parameters pat;
+      bt <-
+        inferIn ds
+          (XEnv (typeEnv env)
+             (M.union X.compareName (M.fromList X.compareName bindings) (termEnv env)))
+          body;
+      ensure (T.alphaEq bt result) "case alternative result type mismatch"
+    };
+  patternBindings :: DataEnv ->
+                     XType ->
+                     Map String XType -> XPattern -> Either String ([] ((,) XName XType));
+  patternBindings ds st parameters (XDefaultPattern n) =
+    Right (L.map (\x -> (,) x st) (L.maybeToList n));
+  patternBindings ds st parameters (XConstructorPattern c ns) =
+    do {
+      boundValueShared2 <- D.lookupConstructor ds c;
+      case boundValueShared2 of {
+        (,) d ctor ->
+          do {
+            fields <- L.mapM (T.instantiateField parameters) (D.constructorFields ctor);
+            return (L.concatMap namedBinding (L.zip ns fields))
+          }
+      }
+    };
+  namedBinding ((,) Nothing t) = [];
+  namedBinding ((,) (Just n) t) = (:) ((,) n t) [];
+  checkClosed :: XTerm -> Either String XType;
+  checkClosed term = infer emptyEnv term;
+  validateTypeEnv :: DataEnv -> Map XTyVar XType -> Either String ();
+  validateTypeEnv ds env =
+    do {
+      L.mapM (visitTypeEnv ds env S.empty) (M.keys env);
+      return ()
+    };
+  visitTypeEnv :: DataEnv -> Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String ();
+  visitTypeEnv ds env path a =
+    if S.member T.compareTyVar a path
+    then Left "cyclic type environment"
+    else case M.lookup T.compareTyVar a env of {
+           Nothing -> Left ("unbound variable in type environment: " ++ showInt (T.tyVarId a));
+           Just bound ->
+             do {
+               wellFormedIn ds (M.delete T.compareTyVar a env) bound;
+               L.mapM (visitTypeEnv ds env (S.insert T.compareTyVar a path))
+                 (S.toList (T.freeVars bound));
+               return ()
+             }
+         }
+}

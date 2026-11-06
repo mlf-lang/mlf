@@ -1,0 +1,40 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 9941,
+  "new_sha256": "6663a6763870d437bae0ae5b7b64aefab8fda362dec4b82ff288552c6599e40e",
+  "old_bytes": 9582,
+  "old_sha256": "4abe10d19f79d531d2182159fd2a40141f6b5341ad4ac87fb43137eb36469087",
+  "path": "libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs",
+  "splices": [
+    {
+      "new": "ICAgIEFydGlmYWN0Lk9wZW5DcmF0ZU9iamVjdCBfIF8gLT4gb2JqZWN0VjEgKEFydGlmYWN0LmxlZ2FjeU9iamVjdCB2YWx1ZSk7Cg==",
+      "new_at": 1804,
+      "old": "",
+      "old_at": 1804
+    },
+    {
+      "new": "b3JpZ2luYWwgc2VyaWFsID0gb2JqZWN0UGllY2VDbG9zZWQgKEFydGlmYWN0LmxlZ2FjeU9iamVjdCBvcmlnaW5hbCkgc2VyaWFsOwogIG9iamVjdFBpZWNlQ2xvc2VkIA==",
+      "new_at": 4337,
+      "old": "",
+      "old_at": 4261
+    },
+    {
+      "new": "ICAgICAgQXJ0aWZhY3QuT3BlbkNyYXRlT2JqZWN0IF8gXyAtPiBwYW5pYyAibGl0ZXJhbCBsZWdhY3kgYWRhcHRlciBpbnZhcmlhbnQiOwo=",
+      "new_at": 4635,
+      "old": "",
+      "old_at": 4462
+    },
+    {
+      "new": "b3JpZ2luYWwgPSBsZXQgeyB2YWx1ZSA9IEFydGlmYWN0LmxlZ2FjeU9iamVjdCBvcmlnaW5hbCB9IGlu",
+      "new_at": 7624,
+      "old": "dmFsdWUgPQ==",
+      "old_at": 7371
+    },
+    {
+      "new": "b3JpZ2luYWwgPSBsZXQgeyB2YWx1ZSA9IEFydGlmYWN0LmxlZ2FjeU9iamVjdCBvcmlnaW5hbCB9IGlu",
+      "new_at": 9720,
+      "old": "dmFsdWUgPQ==",
+      "old_at": 9414
+    }
+  ]
+}

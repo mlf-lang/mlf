@@ -1,0 +1,6 @@
+{-# LANGUAGE NoImplicitPrelude, RebindableSyntax #-}
+module PureNotPolymorphic where
+import MLF.Primitive
+import SharedIdentity (Box(..))
+bad :: Box Int
+bad = pure 1

@@ -7,10 +7,10 @@ import qualified Tests.Helpers as H
 data Position = Position Int Int
 data Direction = North | South | West | East
 data Command = Turn Direction | Forward | Quit | Invalid
-data Snake = Snake Position (List Position)
+data Snake = Snake Position ([] Position)
 data Game = Game Snake Direction Position Int
 data Outcome = Continue Game | Lost String Int | Won Int
-data Console (m : * -> *) = Console (m String) (String -> m Unit)
+data Console (m : * -> *) = Console (m String) (String -> m ())
 readLine (Console a _) = a
 writeText (Console _ a) = a
 instance H.Eq Position where { eq (Position x y) (Position a b) = x == a && y == b }
@@ -27,12 +27,12 @@ width = 12
 height : Int
 height = 8
 
-dropLast : forall a. (List ( a )) -> (List ( a ))
-dropLast Nil = Nil
+dropLast : forall a. ([] ( a )) -> ([] ( a ))
+dropLast [] = []
 
-dropLast (Cons _ Nil) = Nil
+dropLast ((:) _ []) = []
 
-dropLast (Cons first rest) = (Cons first (dropLast rest))
+dropLast ((:) first rest) = ((:) first (dropLast rest))
 
 move : Direction -> Position -> Position
 move direction (Position x y) = (case direction of { North -> (Position x (y - 1)); South -> (Position x (y + 1)); West -> (Position (x - 1) y); East -> (Position (x + 1) y) })
@@ -43,11 +43,11 @@ opposite a b = (case a of { North -> (H.eq b South); South -> (H.eq b North); We
 outside : Position -> Bool
 outside (Position x y) = ((x < 0) || ((y < 0) || ((H.eq x width) || (H.eq y height))))
 
-findFood : (List ( Position )) -> Maybe Position
+findFood : ([] ( Position )) -> Maybe Position
 findFood occupied = (let rec { scan : Int -> Int -> Maybe Position; scan x y = (let { candidate = (Position x y) } in (if (H.eq y height) then Nothing else (if (H.eq x width) then (scan 0 (y + 1)) else (if (H.elem candidate occupied) then (scan (x + 1) y) else (if true then (Just candidate) else (panic "non-exhaustive test guard")))))) } in (scan 0 0))
 
 step : Direction -> Game -> Outcome
-step requested (Game (Snake headPosition body) heading food score) = (let { direction = (if (opposite heading requested) then heading else requested) } in (let { next = (move direction headPosition) } in (let { eating = (H.eq next food) } in (let { remaining = (if eating then (Cons headPosition body) else (dropLast (Cons headPosition body))) } in (let { moved = (Snake next remaining) } in (if (outside next) then (Lost "wall" score) else (if (H.elem next remaining) then (Lost "body" score) else (if eating then (case (findFood (Cons next remaining)) of { Nothing -> (Won (score + 1)); (Just newFood) -> (Continue (Game moved direction newFood (score + 1))) }) else (if true then (Continue (Game moved direction food score)) else (panic "non-exhaustive test guard"))))))))))
+step requested (Game (Snake headPosition body) heading food score) = (let { direction = (if (opposite heading requested) then heading else requested) } in (let { next = (move direction headPosition) } in (let { eating = (H.eq next food) } in (let { remaining = (if eating then ((:) headPosition body) else (dropLast ((:) headPosition body))) } in (let { moved = (Snake next remaining) } in (if (outside next) then (Lost "wall" score) else (if (H.elem next remaining) then (Lost "body" score) else (if eating then (case (findFood ((:) next remaining)) of { Nothing -> (Won (score + 1)); (Just newFood) -> (Continue (Game moved direction newFood (score + 1))) }) else (if true then (Continue (Game moved direction food score)) else (panic "non-exhaustive test guard"))))))))))
 
 parseCommand : String -> Command
 parseCommand text = (case text of { "q" -> Quit; "w" -> (Turn North); "s" -> (Turn South); "a" -> (Turn West); "d" -> (Turn East); "" -> Forward; _ -> Invalid })
@@ -64,17 +64,17 @@ rows game y = (if (H.eq y height) then "" else (if true then (H.append (row game
 directionName : Direction -> String
 directionName direction = (case direction of { North -> "up"; South -> "down"; West -> "left"; East -> "right" })
 
-writeLine : forall (m : * -> *). Monad m => Console m -> String -> m Unit
+writeLine : forall (m : * -> *). Monad m => Console m -> String -> m ()
 writeLine console text = (writeText console (H.append text "\n"))
 
-draw : forall (m : * -> *). Monad m => Console m -> Game -> m Unit
+draw : forall (m : * -> *). Monad m => Console m -> Game -> m ()
 draw console game = (case game of { (Game _ heading _ score) -> do { (writeLine console (H.append "\nScore: " (H.append (H.show score) (H.append "  Direction: " (directionName heading))))); do { (writeLine console "+------------+"); do { (writeText console (rows game 0)); (writeLine console "+------------+") } } } })
 
-play : forall (m : * -> *). Monad m => Console m -> Game -> m Unit
+play : forall (m : * -> *). Monad m => Console m -> Game -> m ()
 play console game = (case game of { (Game _ heading _ score) -> (let { advance direction = (case (step direction game) of { (Continue next) -> (play console next); (Lost reason finalScore) -> (writeLine console (H.append "Game over: hit " (H.append reason (H.append ". Score: " (H.show finalScore))))); (Won finalScore) -> (writeLine console (H.append "You filled the board! Score: " (H.show finalScore))) }) } in do { (draw console game); do { (writeText console "Move [w/a/s/d, Enter, q]: "); do { input <- (readLine console); (case (parseCommand input) of { Quit -> (writeLine console (H.append "Goodbye. Score: " (H.show score))); Invalid -> do { (writeLine console "Use w, a, s, d, Enter, or q. No move made."); (play console game) }; Forward -> (advance heading); (Turn direction) -> (advance direction) }) } } }) })
 
 initial : Game
-initial = (Game (Snake (Position 4 3) (Cons (Position 3 3) (Cons (Position 2 3) Nil))) East (Position 6 3) 0)
+initial = (Game (Snake (Position 4 3) ((:) (Position 3 3) ((:) (Position 2 3) []))) East (Position 6 3) 0)
 
-runGame : forall (m : * -> *). Monad m => Console m -> m Unit
+runGame : forall (m : * -> *). Monad m => Console m -> m ()
 runGame console = do { (writeLine console "Snake: @ head, o body, * food. The board is 12 by 8."); do { (writeLine console "WASD + Enter moves; Enter continues; q quits. Reverse turns are ignored."); do { (writeLine console "Eat food to grow. Avoid walls and your body. Food uses the first free square."); (play console initial) } } }

@@ -18,18 +18,18 @@ import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.Primitive as Primitive
 import qualified Bootstrap.Data as D
-names : List String
+names : [] String
 names = O.words "foundation MapFolds IntegerContainers OptimizerQueries ConstructorProjection ForceReuse StrictFields prelude Target frontend LexerCounters LLVMBuild RuntimeCases StateRuntime StateTypes GraphConformance GraphScopes GraphDense OrderedTraversal SolverReuse TypeCache GraphStack EmbeddingPruning InferenceConformance PrimitiveMetadata"
 familyId name = "port/" ++ name
 familyIds = S.map familyId names
-references : List (Pair String String)
-references = Cons (Pair "GraphConformance" "GraphReference") (Cons (Pair "GraphScopes" "GraphScopesReference") (Cons (Pair "GraphDense" "GraphDenseReference") (Cons (Pair "OrderedTraversal" "OrderedTraversalReference") (Cons (Pair "EmbeddingPruning" "EmbeddingPruningReference") (Cons (Pair "InferenceConformance" "InferenceReference") Nil)))))
+references : [] ((,) String String)
+references = (:) ((,) "GraphConformance" "GraphReference") ((:) ((,) "GraphScopes" "GraphScopesReference") ((:) ((,) "GraphDense" "GraphDenseReference") ((:) ((,) "OrderedTraversal" "OrderedTraversalReference") ((:) ((,) "EmbeddingPruning" "EmbeddingPruningReference") ((:) ((,) "InferenceConformance" "InferenceReference") [])))))
 metadata : String
 metadata = S.unlines (S.map (\primitive -> case Primitive.primitiveSignature primitive of
- Pair variables field -> showInt (Primitive.primitiveCode primitive) ++ "\t" ++ Primitive.primitiveName primitive ++ "\t" ++ showInt (Primitive.primitiveArity primitive) ++ "\t" ++ (if Primitive.primitiveStrict primitive then "strict" else "lazy") ++ "\t" ++ D.prettyDeclaration (DataDeclK "Sig" variables (Cons (ConstructorDecl "M" (Cons field Nil)) Nil))) Primitive.allPrimitives)
+ (,) variables field -> showInt (Primitive.primitiveCode primitive) ++ "\t" ++ Primitive.primitiveName primitive ++ "\t" ++ showInt (Primitive.primitiveArity primitive) ++ "\t" ++ (if Primitive.primitiveStrict primitive then "strict" else "lazy") ++ "\t" ++ D.prettyDeclaration (DataDeclK "Sig" variables ((:) (ConstructorDecl "M" ((:) field [])) []))) Primitive.allPrimitives)
 -- Preparation runs once for a source/tool identity. The immutable target bytes
 -- can then be executed natively and independently by each runtime layout.
-prepareFixture : String -> String -> IO Unit
+prepareFixture : String -> String -> IO ()
 prepareFixture name destination = do
  H.assert (S.elem eqString name names) "unknown port fixture"
  let source = "bootstrap/tests/" ++ name ++ ".emlf"
@@ -48,11 +48,11 @@ prepareFixture name destination = do
  H.assert (T.alphaEq transportedType ty) "port transport changed the target type"
  writeFile destination serialized
  hash <- fileDigest destination
- J.write (destination ++ ".checks.json") (J.Object (Cons (Pair "format" (J.num 1)) (Cons (Pair "fixture" (J.str name)) (Cons (Pair "target_sha256" (J.str hash)) (Cons (Pair "entry_type" (J.str "IO Unit")) (Cons (Pair "inferred_type" (J.str (Pretty.prettyType ty))) (Cons (Pair "checks" V.portTargetChecks) Nil)))))))
+ J.write (destination ++ ".checks.json") (J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "fixture" (J.str name)) ((:) ((,) "target_sha256" (J.str hash)) ((:) ((,) "entry_type" (J.str "IO Unit")) ((:) ((,) "inferred_type" (J.str (Pretty.prettyType ty))) ((:) ((,) "checks" V.portTargetChecks) [])))))))
  putStrLn ("CHECKED " ++ name)
 preparedSource : String -> IO String
 preparedSource name = preparedSourceFor names true name
-preparedSourceFor : List String -> Bool -> String -> IO String
+preparedSourceFor : [] String -> Bool -> String -> IO String
 preparedSourceFor selected full name = do
  path <- getEnv "MLF_TEST_PORT_TARGETS"
  expected <- getEnv "MLF_TEST_PORT_TARGETS_SHA256"
@@ -76,53 +76,53 @@ preparedSourceFor selected full name = do
  after <- fileDigest target
  H.assert (eqString digest after) "prepared port target changed while reading"
  return source
-runFixture : B.Backends -> String -> IO Unit
+runFixture : B.Backends -> String -> IO ()
 runFixture backends name = runPreparedFixture backends names true name
-runPreparedFixture : B.Backends -> List String -> Bool -> String -> IO Unit
+runPreparedFixture : B.Backends -> [] String -> Bool -> String -> IO ()
 runPreparedFixture backends selected full name = do
  let source = "bootstrap/tests/" ++ name ++ ".emlf"
  expected <- if eqString name "PrimitiveMetadata" then return (Bytes.encode metadata) else Bytes.readFile ("bootstrap/tests/" ++ name ++ ".expected")
  H.assert (S.not (Bytes.null expected)) "empty port fixture expectation"
  case S.lookup eqString name references of
-  Nothing -> return Unit
+  Nothing -> return ()
   Just reference -> do
    exe <- getEnv "MLF_TEST_REFERENCES"
    work <- getEnv "MLF_TEST_WORK"
-   code <- O.exec "" (Cons exe (Cons reference Nil)) "" (work ++ "/oracle.out") (work ++ "/oracle.err") 1800
+   code <- O.exec "" ((:) exe ((:) reference [])) "" (work ++ "/oracle.out") (work ++ "/oracle.err") 1800
    output <- Bytes.readFile (work ++ "/oracle.out")
    error <- readFile (work ++ "/oracle.err")
    H.assert (code == 0 && eqString error "" && H.eq output expected) ("independent reference differs: " ++ name)
    if eqString name "InferenceConformance" then do
-    code <- O.exec "" (Cons exe (Cons reference (Cons "--generate" Nil))) "" (work ++ "/generated.emlf") (work ++ "/generated.err") 1800
+    code <- O.exec "" ((:) exe ((:) reference ((:) "--generate" []))) "" (work ++ "/generated.emlf") (work ++ "/generated.err") 1800
     generated <- Bytes.readFile (work ++ "/generated.emlf")
     original <- Bytes.readFile source
     H.assert (code == 0 && H.eq generated original && H.contains "Fig12-A8\tREJECT Inference\n" (Bytes.decodeText expected)) "inference input generation or A8 coverage differs"
-    else return Unit
+    else return ()
  serialized <- preparedSourceFor selected full name
  let heavy = S.elem eqString name (O.words "GraphConformance GraphDense InferenceConformance SolverReuse StateTypes")
  let execution = B.withExecutionTimeout (if heavy then 1800 else 60) backends
  observed <- B.executeNativeSerialized execution B.IOEntry (B.Input "" false) serialized
  H.right (B.outcome observed)
  H.assert (H.eq (B.outputBytes observed) expected && eqString (B.stderrOutput observed) "" && eqString (B.remaining observed) "") ("port runtime output differs: " ++ name)
-main : IO Unit
+main : IO ()
 main = do
  args <- O.allArguments
  if Selection.listing args then putStr (S.unlines familyIds) else do
-  H.assert (S.length names == 25 && S.length (S.nubBy eqString names) == 25 && S.length references == 6 && S.all (\(Pair name _) -> S.elem eqString name names) references) "port fixture or independent-reference coverage changed"
+  H.assert (S.length names == 25 && S.length (S.nubBy eqString names) == 25 && S.length references == 6 && S.all (\((,) name _) -> S.elem eqString name names) references) "port fixture or independent-reference coverage changed"
   case args of
-   Cons "--list" Nil -> putStr (S.unlines names)
-   Cons "--prepare" (Cons name (Cons destination Nil)) -> prepareFixture name destination
+   (:) "--list" [] -> putStr (S.unlines names)
+   (:) "--prepare" ((:) name ((:) destination [])) -> prepareFixture name destination
    _ -> executeFixtures args
-executeFixtures : List String -> IO Unit
+executeFixtures : [] String -> IO ()
 executeFixtures args = do
- Pair full selected <- case args of
-  Cons "--only" names' -> do
+ (,) full selected <- case args of
+  (:) "--only" names' -> do
    H.assert (S.not (S.null names') && S.length names' == S.length (S.nubBy eqString names') && S.all (\name -> S.elem eqString name names) names') "invalid port fixture selection"
-   return (Pair false names')
+   return ((,) false names')
   _ -> do
-   Pair full identities <- H.right (Selection.choose familyIds args)
-   return (Pair full (S.filter (\name -> S.elem eqString (familyId name) identities) names))
- let focused = case args of { Cons "--families" _ -> true; _ -> false }
+   (,) full identities <- H.right (Selection.choose familyIds args)
+   return ((,) full (S.filter (\name -> S.elem eqString (familyId name) identities) names))
+ let focused = case args of { (:) "--families" _ -> true; _ -> false }
  let expectedPrepared = if focused then selected else names
  Selection.begin "port" full (S.map familyId selected)
  B.withBackends (\backends -> do

@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/figure12_data.py", line 290, in <module>
+    main()
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/figure12_data.py", line 286, in main
+    print(json.dumps(decode(args.root), indent=2, ensure_ascii=True))
+                     ^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/figure12_data.py", line 213, in decode
+    raise FixtureError(f'unreviewed Figure12 oracle semantics: {relative}; '
+FixtureError: unreviewed Figure12 oracle semantics: tests/Tests/Helpers.emlf; review harness/oracle parity before updating semantic digest allowlist

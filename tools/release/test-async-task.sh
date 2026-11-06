@@ -58,9 +58,9 @@ record_inputs() {
  local destination=$1 file
  printf '{}\n' > "$destination"
  for file in "$fixtures"/* "$root/tools/release/test-async-task.sh" "$root/tests/async-process/fixture.c" \
-  "$root/libraries/mlf-foundation/Bootstrap/Types.emlf" "$root/libraries/mlf-foundation/Bootstrap/Std.emlf" \
-  "$root/libraries/mlf-async/Async/Task.emlf" "$root/libraries/mlf-async/Async/Task/Internal.emlf" \
-  "$root/libraries/mlf-async/Async/Process.emlf" "$root/libraries/mlf-async/Async/Process/Internal.emlf" \
+  "$root/libraries/mlf-foundation/Bootstrap/Types.hs" "$root/libraries/mlf-foundation/Bootstrap/Std.hs" \
+  "$root/libraries/mlf-async/Async/Task/Core.hs" "$root/libraries/mlf-async/Async/Task.hs" "$root/libraries/mlf-async/Async/Task/Internal.hs" \
+  "$root/libraries/mlf-async/Async/Process.hs" "$root/libraries/mlf-async/Async/Process/Internal.hs" \
   "$root/runtime/mlf_runtime.c" "$root/runtime/mlf_runtime.h" "$root/runtime/mlf_completion.h" "$root"/runtime/mlf_process*; do
    jq --arg path "${file#"$root"/}" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
    mv "$destination.tmp" "$destination"
@@ -102,24 +102,21 @@ if [ "$(uname -s)" = Linux ]; then libs+=(-ldl); fi
 success fixture "$clang" -O2 -std=c11 -Wall -Wextra -Werror "$fixtures/fixture.c" -o "$work/fixture"
 success runtime "$clang" -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c "$root/runtime/mlf_runtime.c" -o "$work/runtime.o"
 
-# This overlay changes only the export header for white-box scheduler tests.
-# It is never packaged or used for the public API and process integration tests.
-mkdir -p "$work/whitebox/Async/Task"
-awk 'BEGIN { header=1; print "module Async.Task.Internal where" } header { if ($0 ~ /where$/) header=0; next } { print }' \
- "$root/libraries/mlf-async/Async/Task/Internal.emlf" > "$work/whitebox/Async/Task/Internal.emlf"
+# White-box tests import the committed Async.Task.Core module directly.
 
 export MLF_ASYNC_FIXTURE="$work/fixture"
 for suite in main processes wait-graph guards; do
  args=("${include_args[@]}")
+ type_oracle=io-unit.type
  case $suite in
   main) entry=Main.emlf; oracle=suite.stdout ;;
   processes) entry=Processes.emlf; oracle=processes.stdout ;;
-  wait-graph) entry=WaitGraph.emlf; oracle=wait-graph.stdout; args=(-i "$work/whitebox" "${include_args[@]}") ;;
-  guards) entry=Guards.emlf; oracle=guards.stdout ;;
+  wait-graph) entry=WaitGraph.emlf; oracle=wait-graph.stdout ;;
+  guards) entry=Guards.emlf; oracle=guards.stdout; type_oracle=guards.type ;;
  esac
  success "$suite.compile" "$compiler" "${args[@]}" "$fixtures/$entry"
  success "$suite.check" "$compiler" --check "$work/$suite.compile.stdout"
- cmp "$fixtures/io-unit.type" "$work/$suite.check.stdout" || fail "$suite target type"
+ cmp "$fixtures/$type_oracle" "$work/$suite.check.stdout" || fail "$suite target type"
  success "$suite.emit" "$compiler" --xmlf-to-llvm-io-gc "$work/$suite.compile.stdout"
  grep -F 'mlf_require_async_completion_v2_abi' "$work/$suite.emit.stdout" >/dev/null || fail "$suite lacks async ABI guard"
  success "$suite.link" "$clang" -O2 -Wno-override-module -x ir "$work/$suite.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/$suite.native"
@@ -154,10 +151,10 @@ for label in "${labels[@]}"; do
  done
 done
 jq -n --arg compiler_sha256 "$compiler_hash" --arg work "$work" \
- --arg overlay_sha256 "$(sha256 "$work/whitebox/Async/Task/Internal.emlf")" \
+ --arg core_sha256 "$(sha256 "$root/libraries/mlf-async/Async/Task/Core.hs")" \
  --slurpfile inputs "$work/inputs.json" --slurpfile observations "$work/observations.json" --slurpfile artifacts "$work/artifacts.json" \
  '{complete:true,cases:31,source_rejections:5,backends:["interpreter","llvm"],whitebox_cases:6,
- compiler_sha256:$compiler_sha256,work:$work,whitebox_source_sha256:$overlay_sha256,
+ compiler_sha256:$compiler_sha256,work:$work,whitebox_source_sha256:$core_sha256,whitebox_source:"libraries/mlf-async/Async/Task/Core.hs",
  inputs:$inputs[0],observations:$observations[0],artifacts:$artifacts[0]}' > "$output/result.tmp"
 mv "$output/result.tmp" "$output/result.json"
 echo 'Async.Task language parity passed: 31 contracts (6 white-box), 5 source rejections.'

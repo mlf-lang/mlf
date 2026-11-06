@@ -1,0 +1,242 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c",
+    "3",
+    "python3",
+    "tools/shared/test_figure12_direct.py",
+    "--build-receipt",
+    ".mlf-build/recovery-ghc-O2/receipt.json",
+    "--output",
+    ".mlf-build/guest-campaign-figure12-O2"
+  ],
+  "limits": {
+    "wall_seconds": 600,
+    "address_space_per_process": 3221225472,
+    "process_tree_rss_bytes": 1610612736,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368,
+    "max_output_bytes": 104857600
+  },
+  "samples": [
+    {
+      "seconds": 0.001745621000736719,
+      "group_rss": 258048,
+      "host_available": 7662166016,
+      "disk_free": 19528593408,
+      "output_bytes": 0
+    },
+    {
+      "seconds": 0.2028573809984664,
+      "group_rss": 14389248,
+      "host_available": 7666286592,
+      "disk_free": 19528581120,
+      "output_bytes": 751
+    },
+    {
+      "seconds": 0.40414517499812064,
+      "group_rss": 13721600,
+      "host_available": 7676768256,
+      "disk_free": 19528581120,
+      "output_bytes": 924
+    },
+    {
+      "seconds": 0.6051569849987573,
+      "group_rss": 15867904,
+      "host_available": 7676768256,
+      "disk_free": 19528581120,
+      "output_bytes": 1098
+    },
+    {
+      "seconds": 0.8064919999997073,
+      "group_rss": 15872000,
+      "host_available": 7676768256,
+      "disk_free": 19528581120,
+      "output_bytes": 1272
+    },
+    {
+      "seconds": 1.0076159759992152,
+      "group_rss": 15872000,
+      "host_available": 7676768256,
+      "disk_free": 19528581120,
+      "output_bytes": 1446
+    },
+    {
+      "seconds": 1.2087078490003478,
+      "group_rss": 177938432,
+      "host_available": 7663411200,
+      "disk_free": 19528564736,
+      "output_bytes": 1620
+    },
+    {
+      "seconds": 1.4101582180010155,
+      "group_rss": 207056896,
+      "host_available": 7638429696,
+      "disk_free": 19528564736,
+      "output_bytes": 1795
+    },
+    {
+      "seconds": 1.611611485001049,
+      "group_rss": 232378368,
+      "host_available": 7613681664,
+      "disk_free": 19528564736,
+      "output_bytes": 1970
+    },
+    {
+      "seconds": 1.8130537809993257,
+      "group_rss": 232443904,
+      "host_available": 7613681664,
+      "disk_free": 19528564736,
+      "output_bytes": 2144
+    },
+    {
+      "seconds": 2.0141114779980853,
+      "group_rss": 233725952,
+      "host_available": 7613681664,
+      "disk_free": 19528564736,
+      "output_bytes": 2319
+    },
+    {
+      "seconds": 2.215176155001245,
+      "group_rss": 40755200,
+      "host_available": 7636688896,
+      "disk_free": 19528351744,
+      "output_bytes": 2494
+    },
+    {
+      "seconds": 2.4165908389986726,
+      "group_rss": 47833088,
+      "host_available": 7630151680,
+      "disk_free": 19528351744,
+      "output_bytes": 2667
+    },
+    {
+      "seconds": 2.617763529000513,
+      "group_rss": 43466752,
+      "host_available": 7640776704,
+      "disk_free": 19528323072,
+      "output_bytes": 2841
+    },
+    {
+      "seconds": 2.819033436000609,
+      "group_rss": 50216960,
+      "host_available": 7632814080,
+      "disk_free": 19528294400,
+      "output_bytes": 3014
+    },
+    {
+      "seconds": 3.0200828589986486,
+      "group_rss": 270815232,
+      "host_available": 7527665664,
+      "disk_free": 19528294400,
+      "output_bytes": 3187
+    },
+    {
+      "seconds": 3.221773689998372,
+      "group_rss": 411656192,
+      "host_available": 7396593664,
+      "disk_free": 19528294400,
+      "output_bytes": 3362
+    },
+    {
+      "seconds": 3.423114107998117,
+      "group_rss": 412925952,
+      "host_available": 7396184064,
+      "disk_free": 19528294400,
+      "output_bytes": 3536
+    },
+    {
+      "seconds": 3.6268151629992644,
+      "group_rss": 419479552,
+      "host_available": 7395311616,
+      "disk_free": 19526348800,
+      "output_bytes": 3710
+    },
+    {
+      "seconds": 3.827946696001163,
+      "group_rss": 21651456,
+      "host_available": 7510315008,
+      "disk_free": 19522441216,
+      "output_bytes": 3885
+    },
+    {
+      "seconds": 4.029104206998454,
+      "group_rss": 24150016,
+      "host_available": 7508430848,
+      "disk_free": 19522355200,
+      "output_bytes": 4058
+    },
+    {
+      "seconds": 4.2324051249997865,
+      "group_rss": 25092096,
+      "host_available": 7539638272,
+      "disk_free": 19522281472,
+      "output_bytes": 4231
+    },
+    {
+      "seconds": 4.43358802000148,
+      "group_rss": 26775552,
+      "host_available": 7545270272,
+      "disk_free": 19522224128,
+      "output_bytes": 4405
+    },
+    {
+      "seconds": 4.634971923998819,
+      "group_rss": 24875008,
+      "host_available": 7545368576,
+      "disk_free": 19522154496,
+      "output_bytes": 4577
+    },
+    {
+      "seconds": 4.836028498000815,
+      "group_rss": 18223104,
+      "host_available": 7545380864,
+      "disk_free": 19522105344,
+      "output_bytes": 4750
+    },
+    {
+      "seconds": 5.037201118000667,
+      "group_rss": 18223104,
+      "host_available": 7545380864,
+      "disk_free": 19522105344,
+      "output_bytes": 4923
+    },
+    {
+      "seconds": 5.238299284999812,
+      "group_rss": 18227200,
+      "host_available": 7563972608,
+      "disk_free": 19522105344,
+      "output_bytes": 5096
+    },
+    {
+      "seconds": 5.4394618250007625,
+      "group_rss": 18231296,
+      "host_available": 7563972608,
+      "disk_free": 19522105344,
+      "output_bytes": 5269
+    },
+    {
+      "seconds": 5.640601625000272,
+      "group_rss": 18231296,
+      "host_available": 7564234752,
+      "disk_free": 19522105344,
+      "output_bytes": 5443
+    },
+    {
+      "seconds": 5.841748766000819,
+      "group_rss": 0,
+      "host_available": 7576936448,
+      "disk_free": 19522105344,
+      "output_bytes": 5616
+    }
+  ],
+  "process_group": 190,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 5.842944217998593,
+  "peak_group_rss": 419479552
+}

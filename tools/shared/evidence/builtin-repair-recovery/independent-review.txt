@@ -1,0 +1,1 @@
+Independent reviewer /root/review_native_builtin_failure inspected actual maintained and frozen code, constructor inventory, strict source/metadata boundary, adversarial defaults/encoded-name tests, archive byte inventory and foundation receipt. No static blocker. The reviewer did not perform duplicate builds and does not claim native bootstrap qualification.

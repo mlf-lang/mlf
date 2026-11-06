@@ -1,0 +1,85 @@
+{
+  "complete": true,
+  "mode": "direct-host",
+  "tool": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/build-receipts",
+  "tool_sha256": "e2837d3f1e1c7632227d5b7321ef52e0e660f93be8deb8d6c65ee3bc671feeb2",
+  "inputs": {
+    "tests/shared/MLF/Tests/BuildReceipts.hs": "340fb1cc2b7b7f1949bcd458715b8465fb8084549b5e144b4a919e2131bd6176",
+    "tests/Tests/BuildReceipts.hs": "4a767a44500b9dcf923ebc348d4ae6fdb4dd0c661929b87daf9b6250d3db781c",
+    "tests/Tests/CompilerTests.hs": "6707f5874e40a8159f6295fc271397ac71c4aacf73e1447881ee9c281c931310",
+    "shared-sources.json": "0fcdcc88f6ba5c1f7b149dc7cee8d6d7025b8ca1e8e61b6888f3362d871324a1",
+    "tools/release/test-suite-build-receipts.py": "4bef144548256ca2adafc24c427f73352554c185d8d81f59740baff31021ee3b",
+    "libraries/mlf-foundation/Bootstrap/Fresh.hs": "7eeec3f65a6b8172bc76b3acb09f699642e4e6d93cb0c6e0bc6ae3d88c3b1869",
+    "libraries/mlf-foundation/Bootstrap/Host.hs": "5b1bd1f2a05ec496981630665df70190990420b27d5b4d288c471d3ea3ac42bf",
+    "libraries/mlf-foundation/Bootstrap/IntMap.hs": "4f7039cc12fd0bd038b3e73b23700a3add88f5c827502c3360d48b79b8e303b8",
+    "libraries/mlf-foundation/Bootstrap/IntSet.hs": "30ea33591d154b771067fe8c2c6c20eac4b3be3d86f1f5ebf3d91642ca6d8836",
+    "libraries/mlf-foundation/Bootstrap/Map.hs": "625bcced6d11149505155cd2bcb22d10ee176c87f4513146af6536dd941afa8d",
+    "libraries/mlf-foundation/Bootstrap/Regex.hs": "3dbfc4a497c506fbcc7fead39ba5b0dbcb4113ef54ee89d7f78e13f5f001e403",
+    "libraries/mlf-foundation/Bootstrap/ST.hs": "b57dfe7a9a89fd6edda046445342c47c649d1b4f9ea3dd6c9acfc7aae925302f",
+    "libraries/mlf-foundation/Bootstrap/Set.hs": "94cc73baef625734a9f76a4702eb9fb7f1b8ff6266d3ff1cbf61ac4efaae3509",
+    "libraries/mlf-foundation/Bootstrap/Std.hs": "edf7d3c66565b6c11639236d5d9f54ffdaac871137c07c68e3c8be0c6a75892d",
+    "libraries/mlf-foundation/Bootstrap/Types.hs": "94df8a8cb1e1c1fdb23c638631b42e99ad29d30490f149e6df676fd2f405f771",
+    "libraries/mlf-foundation/Bootstrap/Unicode.hs": "a20db5c9ba597befc1c8be873b5845b765fbd53b7f9977e3948c4d5349c36541",
+    "libraries/mlf-foundation/Bootstrap/Version.hs": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+    "libraries/mlf-package-core/Package/Build.hs": "40ecf600b645ba41dfa5bc27cb83c1e988fc2b8c0fd2f3adb8695b72908c3329",
+    "libraries/mlf-package-core/Package/Command.hs": "065836466ad242a0d5c12487d5c457c6d6323a33cb5c5459af43fecefd1ac07a",
+    "libraries/mlf-package-core/Package/Distribution.hs": "ffe329d4fe8289622635b8dc79add6b594874d3ccaba628883adaf04960af04c",
+    "libraries/mlf-package-core/Package/Json.hs": "2be8fca3db0cc3ebe39032abab1294b7578530cf9d97bb9654ba0e4c33a00f74",
+    "libraries/mlf-package-core/Package/Manifest.hs": "553e42e787cb1cf1b1ae2b2cfe572aab9a8a4319e46ba3e47c56ace5cc165c5b",
+    "libraries/mlf-package-core/Package/OS.hs": "42db40981c9a9c1b145b4b91da51a48369feebe0578208e4ec9a5237f4f54555",
+    "libraries/mlf-package-core/Package/Release.hs": "1d98f341903ae04028a99509affbe7585dfeaecd688886f7b14fe9128cd8f938",
+    "libraries/mlf-package-core/Package/Scheduler.hs": "3b2fce51037c376f9908948684b5bfbbe96f355b5dd9ece3e527dec63dce98b0"
+  },
+  "cases": [
+    {
+      "name": "first-and-second",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/build-receipts",
+        "first-and-second"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "3ebb25e1bffb9ff5b02bdbe430bd4566cb9465b8690d38da1361efd39014b105",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "reject-null",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/build-receipts",
+        "reject-null"
+      ],
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c86ac2e2fd7ff9c42f63fef71562eedbf318b9cf6f791dad4f2a33c2c2a8f182"
+    },
+    {
+      "name": "reject-object",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/build-receipts",
+        "reject-object"
+      ],
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c86ac2e2fd7ff9c42f63fef71562eedbf318b9cf6f791dad4f2a33c2c2a8f182"
+    },
+    {
+      "name": "reject-string",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/build-receipts",
+        "reject-string"
+      ],
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c86ac2e2fd7ff9c42f63fef71562eedbf318b9cf6f791dad4f2a33c2c2a8f182"
+    },
+    {
+      "name": "reject-prepared-null",
+      "command": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O0/bin/build-receipts",
+        "reject-prepared-null"
+      ],
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "5b2407e0516bf26d41bf80a5131f3e9ce0c6895ba99b96a4fd4ff120d48d4133"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+-- Exact ordinary signatures justified by GHC -ddump-types evidence.
+-- This is only the one-time proposal tool; normal builds read the .hs sources.
+module LiteralSignatures (literalSignatures) where
+literalSignatures :: [(String,String,String)]
+literalSignatures =
+ [
+  ("Bootstrap.Layout", "continuationPrevious", "List String"),
+  ("Bootstrap.Layout", "continuationTokens", "List String"),
+  ("Bootstrap.Prelude", "standardMethodClass", "String -> String"),
+  ("Bootstrap.Parser", "reservedWords", "List String"),
+  ("Bootstrap.Parser", "sharedComparisons", "List String"),
+  ("Bootstrap.Parser", "sharedLevel4Operators", "List String"),
+  ("Bootstrap.Data", "keywords", "List String"),
+  ("Bootstrap.X.Parser", "dataReserved", "List String"),
+  ("Bootstrap.X.Parser", "reservedWords", "List String"),
+  ("Bootstrap.Evidence", "superclassArgument", "forall a p. List a -> p -> Either String a"),
+  ("Bootstrap.Runtime", "rAsyncCellHandle", "Either String RValue -> Either String (Pair Int Int)"),
+  ("Bootstrap.Runtime", "rAsyncClose", "RAsyncStore -> Int -> Either String RAsyncStore"),
+  ("Bootstrap.Runtime", "rAsyncLookupCell", "RAsyncStore -> Int -> Either String RAsyncCellState"),
+  ("Bootstrap.Runtime", "rAsyncLookupScope", "RAsyncStore -> Int -> Either String RAsyncScopeState"),
+  ("Bootstrap.Runtime", "rAsyncMature", "RAsyncStore -> Int -> Int -> Either String RAsyncStore"),
+  ("Bootstrap.Runtime", "rAsyncNewCell", "RAsyncStore -> Int -> Either String (Pair RAsyncStore (Maybe RValue))"),
+  ("Bootstrap.Runtime", "rAsyncResolve", "RAsyncStore -> Int -> Int -> Either String RValue -> Either String (Pair RAsyncStore Int)"),
+  ("Bootstrap.Runtime", "rAsyncScopeHandle", "Either String RValue -> Either String Int"),
+  ("Bootstrap.Runtime", "rAsyncSetBusy", "RAsyncStore -> Int -> Bool -> Either String RAsyncStore"),
+  ("Bootstrap.Runtime", "rAsyncTicketHandle", "Either String RValue -> Either String (Triple Int Int Int)"),
+  ("Bootstrap.Runtime", "rAsyncTicketStatus", "RAsyncStore -> Int -> Int -> Int -> Either String Int"),
+  ("Bootstrap.Module", "primitiveTypeNames", "List String"),
+  ("Bootstrap.LLVM", "runtimeBool", "Bool -> String"),
+  ("Bootstrap.Separate", "noEntityArg", "forall a. a -> String -> Either String a"),
+  ("Bootstrap.CompilerCore", "prettyPhase", "Phase -> String"),
+  ("Bootstrap.CrateQuery", "boolean", "Bool -> String"),
+  ("Bootstrap.CrateQuery", "encodeFlag", "Flag -> String"),
+  ("Bootstrap.CrateQuery", "encodeRole", "EvidenceRole -> String"),
+  ("Bootstrap.CrateQuery", "ensureDirectory", "String -> IO (Either String Unit)"),
+  ("Bootstrap.CrateQuery", "writeAtomic", "String -> String -> IO (Either String Unit)"),
+  ("Bootstrap.CrateQuery", "writeCache", "String -> String -> IO (Either String Unit)"),
+  ("Bootstrap.CrateArtifact", "entryOwner", "CrateInterface -> Either String String"),
+  ("Bootstrap.CrateCodegen", "cacheFields", "String -> String -> String -> List String"),
+  ("Bootstrap.CrateCodegen", "saveReport", "String -> CodegenResult -> IO (Either String CodegenResult)"),
+  ("MLF.Entry.Emlf", "baseUsage", "String"),
+  ("MLF.Entry.Emlf", "crateUsage", "String"),
+  ("MLF.Tests.SharedFrontend", "prologue", "String"),
+  ("Package.Build", "objectFlags", "Builder -> List String"),
+  ("Package.Benchmark", "alu", "String"),
+  ("Package.Benchmark", "humanBounds", "List Int"),
+  ("Tests.Selection", "scope", "Bool -> String")
+ ]

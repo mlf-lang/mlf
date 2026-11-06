@@ -1,0 +1,73 @@
+{
+  "complete": false,
+  "command": [
+    "nice",
+    "-n",
+    "15",
+    "ionice",
+    "-c",
+    "3",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/emlf",
+    "--compile-crate",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2/crate.spec",
+    "-o",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2/artifact/unit"
+  ],
+  "limits": {
+    "wall_seconds": 600,
+    "address_space_per_process": 4294967296,
+    "process_tree_rss_bytes": 2147483648,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368,
+    "max_output_bytes": 104857600
+  },
+  "samples": [
+    {
+      "seconds": 0.0020343570067780092,
+      "group_rss": 749568,
+      "host_available": 6644768768,
+      "disk_free": 933822464,
+      "output_bytes": 6132
+    },
+    {
+      "seconds": 0.20338750499649905,
+      "group_rss": 19980288,
+      "host_available": 6628868096,
+      "disk_free": 933818368,
+      "output_bytes": 6305
+    },
+    {
+      "seconds": 0.40472802400472574,
+      "group_rss": 29417472,
+      "host_available": 6621556736,
+      "disk_free": 933818368,
+      "output_bytes": 6478
+    },
+    {
+      "seconds": 0.6057339850085555,
+      "group_rss": 29597696,
+      "host_available": 6628278272,
+      "disk_free": 933818368,
+      "output_bytes": 6650
+    },
+    {
+      "seconds": 0.8073458529979689,
+      "group_rss": 33611776,
+      "host_available": 6624542720,
+      "disk_free": 933818368,
+      "output_bytes": 6822
+    },
+    {
+      "seconds": 1.0083844479959225,
+      "group_rss": 33792000,
+      "host_available": 6624542720,
+      "disk_free": 933818368,
+      "output_bytes": 6994
+    }
+  ],
+  "process_group": 8,
+  "exit_code": 1,
+  "reason": null,
+  "elapsed_seconds": 1.2103935420018388,
+  "peak_group_rss": 33792000
+}

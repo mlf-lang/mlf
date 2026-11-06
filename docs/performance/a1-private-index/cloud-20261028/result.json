@@ -1,0 +1,40 @@
+{
+  "complete": true,
+  "all_nine_terminal_receipts_and_actual_checked_artifacts_verified": true,
+  "execution_sha256": "cb9e75590c8a179b8dd9bfe43f1f5910ed0699e5bbc36feea8754f0f7107ed02",
+  "fixed_samples": {
+    "a1": [
+      91.52555585,
+      87.533069313,
+      87.533935668
+    ],
+    "p3": [
+      92.692393149,
+      89.958440899,
+      89.911456895
+    ],
+    "ghc": [
+      8.979014288,
+      8.282240412,
+      7.987367313
+    ]
+  },
+  "medians_seconds": {
+    "a1": 87.533935668,
+    "p3": 89.958440899,
+    "ghc": 8.282240412
+  },
+  "candidate_over_p3": 0.973048607704061,
+  "median_improvement_percent": 2.6951392295939014,
+  "candidate_over_ghc": 10.56887162333196,
+  "paired_ratios": [
+    0.9874117253923487,
+    0.9730389770902871,
+    0.9735570826109902
+  ],
+  "accepted": false,
+  "goal_met": false,
+  "decision": "NOT ACCEPTED: correctness and scoped source qualification passed, but measured2.695% median improvement misses predeclared5% minimum. Exploratory singlepair benefit not reproduced. No additional ordinary timing resamples for this unchanged candidate. P3 remains accepted baseline.",
+  "endpoint_asymmetry": "GHC plain -O2 objects vs MLF independently checked xMLF crate and per-group query files",
+  "raw_receipts_retained_privately": true
+}

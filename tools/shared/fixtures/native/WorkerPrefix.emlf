@@ -1,0 +1,17 @@
+first x y = x
+identity value = value
+plus first second = addInt first second
+constant ignored = 5
+joined pieces suffix = concatString (identity (concatStringList pieces)) suffix
+division first later = addInt (identity (quotInt first 0)) later
+constantBefore later = addInt (constant (panic "ignored argument")) later
+unusedCapture suffix = let partial = first (panic "unused capture") in seq partial suffix
+usedCapture later = let partial = plus (panic "capture first") in addInt (partial 1) later
+run mode =
+  if eqString mode "join" then stringLength (joined [panic "head first"] (panic "suffix later"))
+  else if eqString mode "division" then division 5 (panic "later")
+  else if eqString mode "constant-panic" then constantBefore (panic "later required")
+  else if eqString mode "constant-value" then constantBefore 2
+  else if eqString mode "partial-unused" then unusedCapture (panic "suffix required")
+  else usedCapture (panic "later")
+main = ioBind (getArg 0) (\mode -> ioBind (putStrLn "before") (\ignored -> printInt (run mode)))

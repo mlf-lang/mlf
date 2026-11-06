@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-compiler/0.3.0/target-mlfpkg",
+  "MLF.Entry.Mlfpkg",
+  "false",
+  "95:16:MLF.Entry.Mlfpkg73:/workspace/scratch/3f83e2ebe290/pr22-recovery/package/MLF/Entry/Mlfpkg.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci109:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/package-core/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/target-mlfpkg/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

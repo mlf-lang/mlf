@@ -1,0 +1,335 @@
+{
+  "schema": "historical-installed-prelude-results-20261026-1",
+  "scope": "Research evidence identifiers, not qualification of final publication tree. Large scratch receipts not vendored.",
+  "producer_source_commit": "4712ddcee86ff4c369641189ef2c739d3ed40066",
+  "ghc_version": "9.14.1",
+  "clang_version": "19.1.7",
+  "fullcompile_scope": "Fresh runtime object each application; required artifact authentication/load/check/infer/LLVM/native link included; installation and host build excluded.",
+  "summary": {
+    "n-body": {
+      "median_seconds": {
+        "c": 0.11385879700537771,
+        "baseline": 21.453278170985868,
+        "installed": 3.01656635600375
+      },
+      "ratios": {
+        "baseline/c": {
+          "per_round": [
+            197.90433906070734,
+            125.59550569220208,
+            191.63769108672477
+          ],
+          "geometric_mean": 168.2558275386944,
+          "ratio_of_medians": 188.42003196268269
+        },
+        "installed/c": {
+          "per_round": [
+            26.936137177609158,
+            19.06814996154087,
+            26.493924363712306
+          ],
+          "geometric_mean": 23.874267484526253,
+          "ratio_of_medians": 26.493924363712306
+        },
+        "baseline/installed": {
+          "per_round": [
+            7.347168517734482,
+            6.586664461183674,
+            7.233269350961213
+          ],
+          "geometric_mean": 7.047580733010837,
+          "ratio_of_medians": 7.111820407427231
+        }
+      },
+      "installed_compile_le3x_C_by_medians": false,
+      "scope": "Three descriptive samples each; no confidence interval or runtime acceptance"
+    },
+    "binary-trees": {
+      "median_seconds": {
+        "c": 0.08568655498675071,
+        "baseline": 20.7336794520088,
+        "installed": 1.9399876410025172
+      },
+      "ratios": {
+        "baseline/c": {
+          "per_round": [
+            235.20006695150167,
+            198.60043353558052,
+            241.97121071345146
+          ],
+          "geometric_mean": 224.4194241109833,
+          "ratio_of_medians": 241.97121071345146
+        },
+        "installed/c": {
+          "per_round": [
+            22.85027880894451,
+            17.84501656009101,
+            24.130861444015796
+          ],
+          "geometric_mean": 21.42859819937255,
+          "ratio_of_medians": 22.64051392079525
+        },
+        "baseline/installed": {
+          "per_round": [
+            10.293093966951291,
+            11.1291818008023,
+            10.02745845915326
+          ],
+          "geometric_mean": 10.47289337468442,
+          "ratio_of_medians": 10.687531721230124
+        }
+      },
+      "installed_compile_le3x_C_by_medians": false,
+      "scope": "Three descriptive samples each; no confidence interval or runtime acceptance"
+    },
+    "pidigits": {
+      "median_seconds": {
+        "c": 0.09705929399933666,
+        "baseline": 20.090592869993998,
+        "installed": 1.7860508610028774
+      },
+      "ratios": {
+        "baseline/c": {
+          "per_round": [
+            213.42420826403665,
+            201.96401107282804,
+            209.2414546685246
+          ],
+          "geometric_mean": 208.15577564954577,
+          "ratio_of_medians": 206.99298379536228
+        },
+        "installed/c": {
+          "per_round": [
+            20.06791536976428,
+            18.401646945990397,
+            18.1048219123861
+          ],
+          "geometric_mean": 18.838706096468893,
+          "ratio_of_medians": 18.401646945990397
+        },
+        "baseline/installed": {
+          "per_round": [
+            10.635096089033565,
+            10.975322571159031,
+            11.55722247261519
+          ],
+          "geometric_mean": 11.049366903630519,
+          "ratio_of_medians": 11.248611844521056
+        }
+      },
+      "installed_compile_le3x_C_by_medians": false,
+      "scope": "Three descriptive samples each; no confidence interval or runtime acceptance"
+    }
+  },
+  "counts": {
+    "qualification_builds": 9,
+    "qualification_native_oracles": 30,
+    "cohort_builds": 36,
+    "excluded_warmup_builds": 9,
+    "measured_builds": 27,
+    "untimed_cohort_oracles": 36
+  },
+  "measured_samples": [
+    {
+      "workload": "n-body",
+      "label": "c",
+      "round": 1,
+      "wall_seconds": 0.10685296700103208
+    },
+    {
+      "workload": "n-body",
+      "label": "baseline",
+      "round": 1,
+      "wall_seconds": 21.146665811014827
+    },
+    {
+      "workload": "n-body",
+      "label": "installed",
+      "round": 1,
+      "wall_seconds": 2.878206176974345
+    },
+    {
+      "workload": "n-body",
+      "label": "baseline",
+      "round": 2,
+      "wall_seconds": 21.453278170985868
+    },
+    {
+      "workload": "n-body",
+      "label": "installed",
+      "round": 2,
+      "wall_seconds": 3.257077735994244
+    },
+    {
+      "workload": "n-body",
+      "label": "c",
+      "round": 2,
+      "wall_seconds": 0.17081246699672192
+    },
+    {
+      "workload": "n-body",
+      "label": "installed",
+      "round": 3,
+      "wall_seconds": 3.01656635600375
+    },
+    {
+      "workload": "n-body",
+      "label": "c",
+      "round": 3,
+      "wall_seconds": 0.11385879700537771
+    },
+    {
+      "workload": "n-body",
+      "label": "baseline",
+      "round": 3,
+      "wall_seconds": 21.819636968022678
+    },
+    {
+      "workload": "binary-trees",
+      "label": "c",
+      "round": 1,
+      "wall_seconds": 0.08224649299518205
+    },
+    {
+      "workload": "binary-trees",
+      "label": "baseline",
+      "round": 1,
+      "wall_seconds": 19.344380658993032
+    },
+    {
+      "workload": "binary-trees",
+      "label": "installed",
+      "round": 1,
+      "wall_seconds": 1.8793552959978115
+    },
+    {
+      "workload": "binary-trees",
+      "label": "baseline",
+      "round": 2,
+      "wall_seconds": 21.5904751480266
+    },
+    {
+      "workload": "binary-trees",
+      "label": "installed",
+      "round": 2,
+      "wall_seconds": 1.9399876410025172
+    },
+    {
+      "workload": "binary-trees",
+      "label": "c",
+      "round": 2,
+      "wall_seconds": 0.10871313200914301
+    },
+    {
+      "workload": "binary-trees",
+      "label": "installed",
+      "round": 3,
+      "wall_seconds": 2.067690386000322
+    },
+    {
+      "workload": "binary-trees",
+      "label": "c",
+      "round": 3,
+      "wall_seconds": 0.08568655498675071
+    },
+    {
+      "workload": "binary-trees",
+      "label": "baseline",
+      "round": 3,
+      "wall_seconds": 20.7336794520088
+    },
+    {
+      "workload": "pidigits",
+      "label": "c",
+      "round": 1,
+      "wall_seconds": 0.09413455499452539
+    },
+    {
+      "workload": "pidigits",
+      "label": "baseline",
+      "round": 1,
+      "wall_seconds": 20.090592869993998
+    },
+    {
+      "workload": "pidigits",
+      "label": "installed",
+      "round": 1,
+      "wall_seconds": 1.8890842830005568
+    },
+    {
+      "workload": "pidigits",
+      "label": "baseline",
+      "round": 2,
+      "wall_seconds": 19.6024843280029
+    },
+    {
+      "workload": "pidigits",
+      "label": "installed",
+      "round": 2,
+      "wall_seconds": 1.7860508610028774
+    },
+    {
+      "workload": "pidigits",
+      "label": "c",
+      "round": 2,
+      "wall_seconds": 0.09705929399933666
+    },
+    {
+      "workload": "pidigits",
+      "label": "installed",
+      "round": 3,
+      "wall_seconds": 1.7647936229768675
+    },
+    {
+      "workload": "pidigits",
+      "label": "c",
+      "round": 3,
+      "wall_seconds": 0.09747644199524075
+    },
+    {
+      "workload": "pidigits",
+      "label": "baseline",
+      "round": 3,
+      "wall_seconds": 20.396112518996233
+    }
+  ],
+  "artifact_policy": {
+    "schema": "installed-three-workload-artifact-policy-2",
+    "exact_workloads": [
+      "n-body",
+      "pidigits"
+    ],
+    "frozen_binarytrees_pair": {
+      "baseline": {
+        "binary_sha256": "f0d16ee29774cc62da56c703482da0d94b6581e340ecb20e361707be8a45554c",
+        "IR_sha256": "a59b44894cdc02b1c6b8d1979bf55ddd73167a92a7f2a05b513f9ac00f818335",
+        "runtime_object_sha256": "94cedcfe35b6154fe889ff5d3295a1a48fa4c6676cc9a8f8c2a0f6e0f0da2058"
+      },
+      "installed": {
+        "binary_sha256": "7dc577edad4c646401602ba39b5f5b89caddedd6a72b0384a65dc7e9504b7b7e",
+        "IR_sha256": "d5656241e0a4ee9a9d5b9edca8521f0555bdc9328303a32d2bfb427edd05979a",
+        "runtime_object_sha256": "94cedcfe35b6154fe889ff5d3295a1a48fa4c6676cc9a8f8c2a0f6e0f0da2058"
+      }
+    }
+  },
+  "evidence_sha256": {
+    "regex-compiler-evidence/installed-standalone-expansion/run2/cohort/receipt.json": "0185723b61078ceeac42301638f5c5c3d7f439fb19b2363c86a44dd6b8cf8f2d",
+    "regex-compiler-evidence/installed-standalone-expansion/run2-independent-audit.json": "61e09cb5c5965a45549f2b7e88ed57062591437b4d431379d4d7d97a7c5f0eed",
+    "regex-compiler-evidence/installed-standalone-expansion/run2/interpretation.json": "dfeea798ea99fe3e9aa7b82504a49b070b661783c857474dbfea4917c1fb21a5",
+    "regex-compiler-evidence/installed-standalone-expansion/run1/cohort/receipt.json": "94eecd2d27553e228f20b76c40f057659bfb9a8b7ee19a4afa5d6a096fec4d10",
+    "regex-compiler-evidence/installed-standalone-expansion/run1/binarytrees-constructor-bijection-independent-v1.json": "6db9dd9a5d8ddc80d161c6f6ce55b3570f37ad8ff389f7e67459a0cb60c56be4",
+    "regex-compiler-evidence/installed-binarytrees-tag-diagnostic/run1/cohort/receipt.json": "83a71ba969c0f1eae9c11ffb1b9ab09811a3f4d68c1871ccd9204fb0d16ce614",
+    "regex-compiler-evidence/installed-binarytrees-tag-diagnostic/run1-independent-audit.json": "6192342e44a8e0ce1cdb6a0524345ce995168b6310c52d50f841e658ccaed156",
+    "regex-compiler-evidence/native-prerequisites/host-ascii-native-ab-v1/receipt.json": "85b285ae6bbcdfab6d2f5395b2af08cdd725cd58e28918869b1183fc509833c8"
+  },
+  "limits": [
+    "Only three fixed descriptive measured rounds perlabel/workload. No CI claim.",
+    "No runtime benchmark; smallnativeoracles establish observations only, not <=2xC runtime.",
+    "Fullcompile includes fresh runtime.o; frontend/runtime overlap, then LLVM/link. Do not sum phase medians or subtract them to invent an installed-runtime result.",
+    "Allthree installed/C fullcompile medianratios exceed3; large baseline speedups do not mean compiletarget achieved.",
+    "Nbody/pidigits baseline-installed rawIR/native exact; binarytrees only the explicitly pre-reviewed frozen raw pair. No arbitrary IRnormalization or renewed alignment.",
+    "Original failedrun1 and separate diagnostic samples are preserved and not pooled.",
+    "Required installed artifact authentication/read/hash/pack/restore/check/infer/LLVM costs included. Producerbuild and artifactinstallation separate.",
+    "C/MLF existingalgorithm correspondence and documented representation differences retained, no sourcechanges or new samealgorithmproof."
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "producer_reauthenticated_after_smoke": true,
+  "source_checkpoint": "98d6df3914f888c635181c31c5d27752647d659b",
+  "cases_passed": 5,
+  "full_unit_guest_campaign_run": false,
+  "O2_run": false,
+  "native_bootstrap_run": false
+}

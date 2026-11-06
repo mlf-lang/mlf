@@ -12,8 +12,10 @@ The shared [BSD license](../LICENSE.BenchmarksGame) applies to the baselines.
 - Haskell: `pidigits-ghc-6`, by Bryan O'Sullivan, Eugene Kirpichov, and
   W. Gordon Goodsman. Unchanged source; the three-integer spigot state matches
   C/Rust, including the early unsafe-digit guard and both extractions.
-- MLF: the same recurrence in `mlf/main.emlf`, using `mulInt`, `quotInt`,
-  `remInt`, recursion, and prelude IO. Digits accumulate into output rows;
+- MLF: the same recurrence in `mlf/main.emlf`, using explicit `Integer` state with
+  `mulInteger`, `quotInteger`, `remInteger`, recursion, and prelude IO.
+  Loop counters remain signed `Int64`; the spigot state retains arbitrary
+  precision after the language-level `Int` migration. Digits accumulate into output rows;
   every extracted digit is calculated, including both extract(3)/extract(4).
 
 All implementations are single threaded and use arbitrary-precision arithmetic.

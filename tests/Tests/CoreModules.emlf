@@ -16,17 +16,17 @@ import Tests.Modules (moduleTests)
 import Tests.Separate (separateTests)
 import Tests.StateTypes (stateTypeTests)
 
-oracleTest : IO Unit
+oracleTest : IO ()
 oracleTest = do
  let exhaustive = closedTerms 6
  let seeded = generatedTerms 5000
  let unique = distinctTermCases seeded
- let terms = S.append (S.zip (S.range 1 1712) exhaustive) (S.map (\(Pair seed e) -> Pair (1712 + seed) e) unique)
- let cases = S.map (\(Pair i e) -> Triple i e (hmTypable e)) terms
+ let terms = S.append (S.zip (S.range 1 1712) exhaustive) (S.map (\((,) seed e) -> (,) (1712 + seed) e) unique)
+ let cases = S.map (\((,) i e) -> (,,) i e (hmTypable e)) terms
  H.assert (S.length exhaustive == 1712 && S.length seeded == 5000 && S.length unique == 4991) "independent HM corpus coverage changed"
- let typed = S.length (S.filter (\(Triple _ _ expected) -> expected) cases)
+ let typed = S.length (S.filter (\((,,) _ _ expected) -> expected) cases)
  H.assert (typed > 100 && typed < S.length cases) "oracle corpus lacks positive or negative cases"
- Coverage.forCounted "core" "hm-executed" cases (\(Triple i e expected) -> case compileExpr e of
+ Coverage.forCounted "core" "hm-executed" cases (\((,,) i e expected) -> case compileExpr e of
   Right _ -> H.assert expected ("accepted non-ML term " ++ H.show i ++ ": " ++ H.show e)
   Left err -> do
    H.assert (H.eq (phase err) Inference) ("compiler failure on " ++ H.show e ++ ": " ++ H.show err)
@@ -38,19 +38,19 @@ oracleTest = do
  Coverage.metric "core" "hm-distinct-generated" (S.length unique)
  Coverage.metric "core" "hm-typable" typed
 
-annotationCorpus : IO Unit
-annotationCorpus = (let { identityExpr = (SLam "x" Nothing (SVar "x")) } in (let { identityType = (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) } in (let { types = (Cons SBottom (Cons (SCon "Int" Nil) (Cons (SCon "Bool" Nil) (Cons identityType (Cons (SForall Flexible "a" SBottom (SCon "List" (Cons (STVar "a") Nil))) (Cons (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) Nil)))))) } in (let { nested = (H.append types (S.concatMap (\a -> (S.concatMap (\b -> (Cons (SArrow a b) Nil)) types)) types)) } in (let { programs = (S.concat (S.concatMap (\t -> (Cons (Cons (SAnn identityExpr (SAnnotation Nil (SArrow t t))) (Cons (SLam "x" (Just (SAnnotation Nil t)) (SVar "x")) (Cons (SLet "f" (SAnn identityExpr (SAnnotation Nil (SArrow t t))) (SVar "f")) Nil))) Nil)) nested)) } in do { ((Coverage.forCounted "core" "annotation-executed" programs) (\e -> (case (compileExpr e) of { (Left err) -> (H.fail (H.append "failed annotated identity " (H.append (H.show e) (H.append "\n" (H.show err))))); (Right r) -> do { parsed <- (H.right (XP.parseTerm "<annotation xMLF>" (prettyTerm (compiledTerm r)))); do { ty <- (H.right (C.checkClosed parsed)); (sameType ty (inferredType r)) } } }))); (putStrLn (H.append "Annotations: " (H.append (H.show (H.length programs)) " typed programs"))) })))))
+annotationCorpus : IO ()
+annotationCorpus = (let { identityExpr = (SLam "x" Nothing (SVar "x")) } in (let { identityType = (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) } in (let { types = ((:) SBottom ((:) (SCon "Int" []) ((:) (SCon "Bool" []) ((:) identityType ((:) (SForall Flexible "a" SBottom (SCon "List" ((:) (STVar "a") []))) ((:) (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) [])))))) } in (let { nested = (H.append types (S.concatMap (\a -> (S.concatMap (\b -> ((:) (SArrow a b) [])) types)) types)) } in (let { programs = (S.concat (S.concatMap (\t -> ((:) ((:) (SAnn identityExpr (SAnnotation [] (SArrow t t))) ((:) (SLam "x" (Just (SAnnotation [] t)) (SVar "x")) ((:) (SLet "f" (SAnn identityExpr (SAnnotation [] (SArrow t t))) (SVar "f")) []))) [])) nested)) } in do { ((Coverage.forCounted "core" "annotation-executed" programs) (\e -> (case (compileExpr e) of { (Left err) -> (H.fail (H.append "failed annotated identity " (H.append (H.show e) (H.append "\n" (H.show err))))); (Right r) -> do { parsed <- (H.right (XP.parseTerm "<annotation xMLF>" (prettyTerm (compiledTerm r)))); do { ty <- (H.right (C.checkClosed parsed)); (sameType ty (inferredType r)) } } }))); (putStrLn (H.append "Annotations: " (H.append (H.show (H.length programs)) " typed programs"))) })))))
 
-examplesTest : IO Unit
-examplesTest = do { files <- (H.fmap (S.compose H.sort (S.filter (\section1 -> (H.contains ".emlf" section1)))) (listDirectory "examples")); do { (H.assert ((H.length files) >= 6) "example files are missing"); ((H.forM_ files) (\file -> (bind (bind (readFile (H.append "examples/" file)) compileOK) (\ignored -> (return Unit))))) } }
+examplesTest : IO ()
+examplesTest = do { files <- (H.fmap (S.compose H.sort (S.filter (\section1 -> (H.contains ".emlf" section1)))) (listDirectory "examples")); do { (H.assert ((H.length files) >= 6) "example files are missing"); ((H.forM_ files) (\file -> (bind (bind (readFile (H.append "examples/" file)) compileOK) (\ignored -> (return ()))))) } }
 
-families : List (Pair String (List (Pair String (IO Unit))))
+families : [] ((,) String ([] ((,) String (IO ()))))
 families =
- Cons (Pair "core/readability" readabilityTests)
- (Cons (Pair "core/modules" moduleTests)
- (Cons (Pair "core/separate-compilation" separateTests)
- (Cons (Pair "core/state-types" stateTypeTests)
- (Cons (Pair "core/hm-oracle" (Cons (Pair "independent ML typability oracle" oracleTest) Nil))
- (Cons (Pair "core/annotation-corpus" (Cons (Pair "annotation corpus" annotationCorpus) Nil))
- (Cons (Pair "core/example-files" (Cons (Pair "example files" examplesTest) Nil))
- Nil))))))
+ (:) ((,) "core/readability" readabilityTests)
+ ((:) ((,) "core/modules" moduleTests)
+ ((:) ((,) "core/separate-compilation" separateTests)
+ ((:) ((,) "core/state-types" stateTypeTests)
+ ((:) ((,) "core/hm-oracle" ((:) ((,) "independent ML typability oracle" oracleTest) []))
+ ((:) ((,) "core/annotation-corpus" ((:) ((,) "annotation corpus" annotationCorpus) []))
+ ((:) ((,) "core/example-files" ((:) ((,) "example files" examplesTest) []))
+ []))))))

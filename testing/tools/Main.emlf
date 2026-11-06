@@ -3,8 +3,8 @@ import Bootstrap.Types
 import qualified Package.OS as O
 import qualified Test.Process as Process
 
-main : IO Unit
+main : IO ()
 main = do
   args <- O.allArguments
   code <- Process.run args
-  if code == 0 then return Unit else exitWith code
+  if code == 0 then return () else exitWith code

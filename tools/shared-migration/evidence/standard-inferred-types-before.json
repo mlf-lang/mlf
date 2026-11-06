@@ -1,0 +1,257 @@
+{
+  "shared_module_count": 94,
+  "seen_module_count": 94,
+  "missing_modules": [],
+  "top_level_signature_count": 3428,
+  "generalized": [
+    {
+      "module": "Bootstrap.Layout",
+      "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "name": "continuationPrevious",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.Layout",
+      "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "name": "continuationTokens",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.Prelude",
+      "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "name": "standardMethodClass",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => String -> a"
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "name": "reservedWords",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "name": "sharedComparisons",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "name": "sharedLevel4Operators",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.Data",
+      "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+      "name": "keywords",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.X.Parser",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "name": "dataReserved",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.X.Parser",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "name": "reservedWords",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.Evidence",
+      "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "name": "superclassArgument",
+      "inferred": "forall {e} {a} {p}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => List a -> p -> Either e a"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncCellHandle",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => Either e RValue -> Either e (Pair ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer)"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncClose",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e RAsyncStore"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncLookupCell",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e RAsyncCellState"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncLookupScope",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e RAsyncScopeState"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncMature",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e RAsyncStore"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncNewCell",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e (Pair RAsyncStore (Maybe RValue))"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncResolve",
+      "inferred": "forall {b}. ghc-internal-9.1401.0:GHC.Internal.Num.Num b => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either String RValue -> Either String (Pair RAsyncStore b)"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncScopeHandle",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => Either e RValue -> Either e ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncSetBusy",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Bool -> Either e RAsyncStore"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncTicketHandle",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => Either e RValue -> Either e (Triple ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer)"
+    },
+    {
+      "module": "Bootstrap.Runtime",
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "name": "rAsyncTicketStatus",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer"
+    },
+    {
+      "module": "Bootstrap.Module",
+      "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "name": "primitiveTypeNames",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a"
+    },
+    {
+      "module": "Bootstrap.LLVM",
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM.hs",
+      "name": "runtimeBool",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Bool -> a"
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "name": "noEntityArg",
+      "inferred": "forall {e} {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => a -> String -> Either e a"
+    },
+    {
+      "module": "Bootstrap.CompilerCore",
+      "path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "name": "prettyPhase",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Phase -> a"
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "name": "boolean",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Bool -> a"
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "name": "encodeFlag",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Flag -> a"
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "name": "encodeRole",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => EvidenceRole -> a"
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "name": "ensureDirectory",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => String -> IO (Either e Unit)"
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "name": "writeAtomic",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => String -> String -> IO (Either e Unit)"
+    },
+    {
+      "module": "Bootstrap.CrateQuery",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "name": "writeCache",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => String -> String -> IO (Either e Unit)"
+    },
+    {
+      "module": "Bootstrap.CrateArtifact",
+      "path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "name": "entryOwner",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => CrateInterface -> Either e String"
+    },
+    {
+      "module": "Bootstrap.CrateCodegen",
+      "path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "name": "cacheFields",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a -> a -> a -> List a"
+    },
+    {
+      "module": "Bootstrap.CrateCodegen",
+      "path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "name": "saveReport",
+      "inferred": "forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => String -> CodegenResult -> IO (Either e CodegenResult)"
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "path": "bootstrap/MLF/Entry/Emlf.hs",
+      "name": "baseUsage",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a"
+    },
+    {
+      "module": "MLF.Entry.Emlf",
+      "path": "bootstrap/MLF/Entry/Emlf.hs",
+      "name": "crateUsage",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a"
+    },
+    {
+      "module": "MLF.Tests.SharedFrontend",
+      "path": "tests/shared/MLF/Tests/SharedFrontend.hs",
+      "name": "prologue",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a"
+    },
+    {
+      "module": "Package.Build",
+      "path": "libraries/mlf-package-core/Package/Build.hs",
+      "name": "objectFlags",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Builder -> List a"
+    },
+    {
+      "module": "Package.Benchmark",
+      "path": "libraries/mlf-developer-tools/Package/Benchmark.hs",
+      "name": "alu",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a"
+    },
+    {
+      "module": "Package.Benchmark",
+      "path": "libraries/mlf-developer-tools/Package/Benchmark.hs",
+      "name": "humanBounds",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Num.Num a => List a"
+    },
+    {
+      "module": "Tests.Selection",
+      "path": "tests/Tests/Selection.hs",
+      "name": "scope",
+      "inferred": "forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Bool -> a"
+    }
+  ],
+  "format": 1,
+  "log_sha256": "d1aeade9826ff00f836036f8bcf86988ef213b4d68cec0f6ac8fbd8bc4db4066",
+  "manifest_sha256": "0fcdcc88f6ba5c1f7b149dc7cee8d6d7025b8ca1e8e61b6888f3362d871324a1"
+}

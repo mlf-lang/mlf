@@ -9,37 +9,37 @@ import qualified Tests.Coverage as Coverage
 
 -- Compile the measured source itself. These executions check the library and
 -- workload together against the independent scanner oracle, outside timing.
-main : IO Unit
+main : IO ()
 main = H.withScratch (\directory -> do
   compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
   H.assert (stringLength compiler > 0) "regex-redux test requires the selected compiler"
   let source = "benchmarks/regex-redux/mlf/main.emlf"
   let ir = directory ++ "/regex-redux.ll"
-  code <- O.exec "" (Cons compiler (S.append (O.words "-i libraries/mlf-foundation --emit-llvm-gc") (Cons source Nil))) "" ir (directory ++ "/compile.err") 1800
+  code <- O.exec "" ((:) compiler (S.append (O.words "-i libraries/mlf-foundation --emit-llvm-gc") ((:) source []))) "" ir (directory ++ "/compile.err") 1800
   H.assert (code == 0) "regex-redux LLVM compilation failed"
   gmp <- ABI.flags directory
   gc <- ABI.collectorFlags directory
   let binary = directory ++ "/regex-redux"
-  let libraries = S.append gmp (S.append gc (Cons "-lm" (Cons "-o" (Cons binary Nil))))
-  O.run "" (S.append (O.words "clang -O2 -Wno-override-module") (Cons ir (Cons "runtime/mlf_runtime.c" libraries)))
+  let libraries = S.append gmp (S.append gc ((:) "-lm" ((:) "-o" ((:) binary []))))
+  O.run "" (S.append (O.words "clang -O2 -Wno-override-module") ((:) ir ((:) "runtime/mlf_runtime.c" libraries)))
   pinnedInput <- readFile "benchmarks/regex-redux/input-1000.txt"
   pinnedOutput <- readFile "benchmarks/regex-redux/expected-1000.txt"
   H.assert (eqString (B.regexRedux pinnedInput) pinnedOutput) "independent regex-redux oracle disagrees with upstream"
   let adversarial = ">agggtaaa hidden\nagggtaaaagggtaaa\ntttacccttttaccct\ntHaNaNDcaNHaDHaSWaSaNaSa tBY\n<x><>||a|b|c||\n>last header without newline"
-  let boundary = Cons "" (Cons (B.fasta 0) (Cons (B.fasta 1) (Cons (B.fasta 7) (Cons (B.fasta 31) (Cons pinnedInput (Cons adversarial Nil))))))
-  Coverage.mapCounted "harness" "regex-redux-native-executed" (runCase directory (Cons binary Nil)) boundary
+  let boundary = (:) "" ((:) (B.fasta 0) ((:) (B.fasta 1) ((:) (B.fasta 7) ((:) (B.fasta 31) ((:) pinnedInput ((:) adversarial []))))))
+  Coverage.mapCounted "harness" "regex-redux-native-executed" (runCase directory ((:) binary [])) boundary
   Coverage.passed "harness" "test_regex_redux_measured_native_source_matches_independent_oracle"
   putStrLn "PASS test_regex_redux_measured_native_source_matches_independent_oracle"
   -- Small but non-vacuous cases exercise interpreted matching and replacement;
   -- the larger pinned fixture is checked by the native execution above.
-  let interpreted = Cons compiler (S.append (O.words "-i libraries/mlf-foundation --run") (Cons source Nil))
-  Coverage.mapCounted "harness" "regex-redux-interpreted-executed" (runCase directory interpreted) (Cons (B.fasta 1) (Cons adversarial Nil))
+  let interpreted = (:) compiler (S.append (O.words "-i libraries/mlf-foundation --run") ((:) source []))
+  Coverage.mapCounted "harness" "regex-redux-interpreted-executed" (runCase directory interpreted) ((:) (B.fasta 1) ((:) adversarial []))
   Coverage.passed "harness" "test_regex_redux_measured_interpreter_source_matches_independent_oracle"
   putStrLn "PASS test_regex_redux_measured_interpreter_source_matches_independent_oracle")
 
-runCase : String -> List String -> String -> IO Unit
+runCase : String -> [] String -> String -> IO ()
 runCase directory command source = do
   let input = directory ++ "/input"
   writeFile input source
-  Triple status output errors <- ABI.capture directory command input
+  (,,) status output errors <- ABI.capture directory command input
   H.assert (status == 0 && eqString errors "" && eqString output (B.regexRedux source)) "regex-redux measured output differs from independent oracle"

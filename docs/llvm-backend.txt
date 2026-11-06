@@ -112,17 +112,18 @@ Values outside that interval retain the general worker. Floating, allocating
 and table kernels do not request this extra variant. Equality with a known
 interval endpoint and comparisons between bounded operands refine each
 branch, letting proven arithmetic omit overflow checks.
-Other values retain checked tagged arithmetic and GMP fallback. Each function
+Other values retain checked tagged arithmetic and the full Int64 runtime fallback. Each function
 has at most eight specialized variants plus its general worker; a new mode
 past that limit boxes its arguments and uses the general ABI.
 
 Native multiplication checks both i64 overflow and the signed 63-bit tagged
 range. Native quotient/remainder use truncating signed operations, keeping
 zero and small-minimum / -1 on the runtime path. Interval-proved products can
-omit the checks. All large operands and promoted results keep GMP semantics.
+omit the checks. Boxed Int64 operands and results retain wrapping arithmetic;
+the minimum Int64 quotient by -1 reports overflow, and its remainder is zero.
 Array access checks the index before loading or storing a cell.
-IntTable operations call the khash-backed runtime with evaluated arbitrary-
-precision integers. Adjacent read/add/write operations on the identical table
+IntTable operations call the khash-backed runtime with evaluated signed
+64-bit integers. Adjacent read/add/write operations on the identical table
 and key fuse into one call if the increment is total and independent of the
 old value. The call returns that immutable old value for subsequent uses.
 Intervening effects or different keys prevent fusion. No whole counting loop
@@ -130,7 +131,8 @@ or workload is delegated to the runtime.
 ByteArray reads zero-extend i8 cells into Int values, and writes check the
 0–255 range after the index check before storing i8; tagged bytes use an inline
 check and other values retain the runtime check. Integer-to-Double conversion
-uses sitofp for tagged values and a nearest-rounding runtime helper for GMP.
+uses sitofp for tagged values and a nearest-rounding runtime helper for boxed Int64.
+The separate integerToDouble primitive converts unbounded Integer values.
 A successful check establishes an integer interval; subsequent arithmetic
 uses unchecked machine operations only when its result is proved in range.
 Facts are scoped by control flow and merged conservatively at branch joins.
@@ -155,7 +157,7 @@ array cells. It does not assert that different array references are disjoint.
 
 Checked STArray reads, writes and lengths use these same header loads inside
 direct state workers. Index checks require a tagged integer and an unsigned
-index below the length, rejecting negative and GMP-sized indices before the
+index below the length, rejecting negative and boxed wide indices before the
 cell access. Pointer cells remain lazy: reading returns the stored value and
 writing does not force it. Cell loads are never reused across writes. Array
 allocation and opaque state actions retain the runtime path, including the
@@ -179,22 +181,24 @@ unchanged, and collection never occurs in the middle of a pure operand.
 Runtime
 -------
 runtime/mlf_runtime.c provides memoized thunks, closures, application spines,
-curried constructors/primitives, unbounded integers, binary64 doubles,
+curried constructors/primitives, signed Int64 and explicit unbounded Integer,
+binary64 doubles,
 mutable numeric and byte arrays, UTF-8 strings, and
 explicit IO actions. Typeclass dictionaries are ordinary recursive data and
 closures; they have no special execution path.
 
 The low pointer bits distinguish signed 63-bit integers, booleans, and nullary
-constructors from aligned heap objects. Native integer arithmetic checks
-signed overflow and falls back to GMP; results that fit become immediate
-again. Integer equality/ordering support all small/large combinations.
-Multiplication uses checked machine arithmetic then GMP. Quotient/remainder
-truncate toward zero, checking for division by zero before invoking GMP.
-Large-operand GMP calls read immutable operands directly, avoiding full
-operand copies; mixed operations use GMP's machine-integer entry points
-where applicable. A newly allocated result that fits the tagged range
-returns an immediate value; BDWGC reclaims the unreachable boxed allocation.
-readInt validates the full length-delimited decimal input before conversion.
+constructors from aligned heap objects. Int values outside the signed 63-bit
+immediate range are boxed int64_t values. Addition, subtraction, multiplication,
+negation, literals and decimal readInt wrap modulo 2^64, implemented through
+unsigned operations without C signed-overflow undefined behavior. Comparisons
+support all immediate/boxed combinations. Quotient/remainder truncate toward
+zero and reject zero divisors; minimum Int64 divided by -1 reports overflow,
+while the corresponding remainder is zero. unsignedLtInt compares the complete
+64-bit patterns without allocating sign-flipped intermediate values.
+The separate Integer tag uses GMP. Its arithmetic reads immutable operands
+directly and does not narrow results; integerToInt explicitly wraps.
+readInt and readInteger validate the full length-delimited decimal input.
 Unary/binary constructors store their fields inline. Larger constructors
 use a contiguous tail. Constructor identity is at byte 8, packed fields start
 at byte 16, and wide fields start at byte 24, as specified in mlf_runtime.h.
@@ -212,7 +216,7 @@ for the bind chain. Ordinary nested pure evaluation can still use the native
 stack. Memoizing an action does not execute it: the IO driver executes its
 description every time it is sequenced, including repeated getLine and array
 read/write/allocation actions. IntArray stores evaluated integer values (tagged
-or GMP-backed), DoubleArray stores unboxed doubles, and ByteArray stores unsigned
+or boxed Int64), DoubleArray stores unboxed doubles, and ByteArray stores unsigned
 bytes in contiguous buffers. Raw getByteLine returns a fresh byte array
 including LF, or an empty array at EOF. IntTable stores evaluated keys and
 values in khash. Tagged-key tables use pointer equality and promote all their

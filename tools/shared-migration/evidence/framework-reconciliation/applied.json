@@ -1,0 +1,138 @@
+{
+  "base": "4d732f31982ebe18124511f2ca4cb412770d6bd6",
+  "applied": [
+    {
+      "module": "Test.Assert",
+      "target_module": "Test.Assert",
+      "source": "testing/Test/Assert.emlf",
+      "sha256": "494d4a3973041c7b970aef505adb81991a298c24953f4ed6372cf422227e9588",
+      "target": "testing/Test/Assert.hs",
+      "ast_output_sha256": "220e2040581163de795b04706231460348e43f26252dfa7da7a291e0db9b7ecf",
+      "final_sha256": "220e2040581163de795b04706231460348e43f26252dfa7da7a291e0db9b7ecf",
+      "reviewed_adjustments": []
+    },
+    {
+      "module": "Test.Case",
+      "target_module": "Test.Case",
+      "source": "testing/Test/Case.emlf",
+      "sha256": "8f6a456d796120ec6ee530c0f53e8f2c20f6e491a351c37169244c38a571258d",
+      "target": "testing/Test/Case.hs",
+      "ast_output_sha256": "0de05c7eb13566f35c57c52ab7dc6b97fe0d61aad90b46cea4195203a237cc39",
+      "final_sha256": "0de05c7eb13566f35c57c52ab7dc6b97fe0d61aad90b46cea4195203a237cc39",
+      "reviewed_adjustments": []
+    },
+    {
+      "module": "Test.Descriptor",
+      "target_module": "Test.Descriptor",
+      "source": "testing/Test/Descriptor.emlf",
+      "sha256": "227e0570436f232f46a75422bd522e989325fbc1066ebe73df7822c7863893dd",
+      "target": "testing/Test/Descriptor.hs",
+      "ast_output_sha256": "230fc2306b848f00c582686b02365eb76cf603335dc591136264dfeec98838c4",
+      "final_sha256": "230fc2306b848f00c582686b02365eb76cf603335dc591136264dfeec98838c4",
+      "reviewed_adjustments": []
+    },
+    {
+      "module": "Test.Expectation",
+      "target_module": "Test.Expectation",
+      "source": "testing/Test/Expectation.emlf",
+      "sha256": "2d1c46369971781701124a097b7a52c042c60aed2cab0621d38c6795a8f91e9c",
+      "target": "testing/Test/Expectation.hs",
+      "ast_output_sha256": "dc0606e1c1484935e1d0a287224974025e3a8c4728f64a9a79236bc699aee53a",
+      "final_sha256": "8388b84467229b9e9a8085de6b619956927a815b0748c562f5f2727088dc3331",
+      "reviewed_adjustments": [
+        {
+          "explicit_original_literal_domains": {
+            "nonemptyReason": "String -> Either String Unit",
+            "validObservation": "Termination -> Either String Unit"
+          }
+        }
+      ]
+    },
+    {
+      "module": "Test.Outcome",
+      "target_module": "Test.Outcome",
+      "source": "testing/Test/Outcome.emlf",
+      "sha256": "d35e28cf1b8972b60e2899bd7f67978227bf6a7514f0354e5bfbf3e88dd670bb",
+      "target": "testing/Test/Outcome.hs",
+      "ast_output_sha256": "792f137600ab7742f4b7e2f004deb5dea9d4f521870efc92d449567e03175702",
+      "final_sha256": "fecc98b6da70df3bfb8bc03bb627cf71d103afe7a45f9f524fa17194c5c9059f",
+      "reviewed_adjustments": [
+        "Hide imported Bootstrap.Types.Phase so ordinary Haskell preserves the existing local Test.Outcome.Phase binding",
+        {
+          "explicit_original_literal_domains": {
+            "phaseName": "Phase -> String",
+            "status": "Outcome -> String"
+          }
+        }
+      ]
+    },
+    {
+      "module": "Test.Registry",
+      "target_module": "Test.Registry",
+      "source": "testing/Test/Registry.emlf",
+      "sha256": "fbe6d7b2a2a4c39beea0dc77d2f1be2d716b27b1d8c1722ea6f612ca510f6beb",
+      "target": "testing/Test/Registry.hs",
+      "ast_output_sha256": "31cdf3d83d8baab1ec17c6c8dadd6819af8ac82a73cd6ffe5d14863a143c0ec0",
+      "final_sha256": "6967c8dae4c973cefc6fa7514508d528d59bdb92c923a3ee5b10ac35ea5fd218",
+      "reviewed_adjustments": [
+        {
+          "explicit_original_literal_domains": {
+            "validIds": "List String -> Either String Unit"
+          }
+        }
+      ]
+    },
+    {
+      "module": "Test.Runner",
+      "target_module": "Test.Runner",
+      "source": "testing/Test/Runner.emlf",
+      "sha256": "f3d81878b97a03f484a9b3cb7c88a0daed44df716cdf508f0b37df213cd45d56",
+      "target": "testing/Test/Runner.hs",
+      "ast_output_sha256": "df8f4a84164f80802e78ced1c95f1cf82bab864461384a9f9055f74ebe1f210c",
+      "final_sha256": "908eba5573c63bea3cecafdf821638a91224079d6bbec4b3daae3043cfe15bf3",
+      "reviewed_adjustments": [
+        {
+          "explicit_original_literal_domains": {
+            "scope": "Int -> Int -> String",
+            "usage": "String"
+          }
+        }
+      ]
+    },
+    {
+      "module": "Tests.TupleList",
+      "target_module": "Tests.TupleList",
+      "source": "tests/Tests/TupleList.emlf",
+      "sha256": "bee4fee21dc8791783802cc6e1965c8f801f3dc87337054a0b6b7fb5c8c730bc",
+      "target": "tests/Tests/TupleList.hs",
+      "ast_output_sha256": "1c899778d021a66b30e937ebbeb31f17ad0971e77e0842cb12a453dfee0db201",
+      "final_sha256": "85ee364d92530114332c9b37723141bf008fda960d9f7db4ddfcc6f1d8e6a954",
+      "reviewed_adjustments": [
+        "Append wildcard for shared SourceModule syntax-profile metadata field; assertion unchanged"
+      ]
+    },
+    {
+      "module": "Tests.TupleListLegacy",
+      "target_module": "Tests.TupleListLegacy",
+      "source": "tests/Tests/TupleListLegacy.emlf",
+      "sha256": "0ba5dcc09553048050bab1512a03d6c05329b9b707a98566bdb2b324a69131a3",
+      "target": "tests/Tests/TupleListLegacy.hs",
+      "ast_output_sha256": "9ac0cd6d19aad37ccdd47e74e779a864a2d0566618aa656bf11b1edf8bcae457",
+      "final_sha256": "35085423a20b13cb04ec4c330ccb246cf9f0d9bf0c6c1e45f3b9aead98ad0790",
+      "reviewed_adjustments": [
+        "Append wildcard for shared SourceModule syntax-profile metadata field; assertion unchanged"
+      ]
+    },
+    {
+      "module": "TupleListMain",
+      "target_module": "MLF.Entry.TupleList",
+      "source": "tests/TupleListMain.emlf",
+      "sha256": "846c02e394199ee697d1dabd4ecaacfaa01d5aa92dbb3ab3cce3eb46e7e2af52",
+      "target": "tests/MLF/Entry/TupleList.hs",
+      "ast_output_sha256": "a6de5a49e9cf14dbb9fa9b840ade22fb27c6e06478703b04c9671ac9b84fee4d",
+      "final_sha256": "a6de5a49e9cf14dbb9fa9b840ade22fb27c6e06478703b04c9671ac9b84fee4d",
+      "reviewed_adjustments": []
+    }
+  ],
+  "legacy_matches_prior_shared_body": true
+}

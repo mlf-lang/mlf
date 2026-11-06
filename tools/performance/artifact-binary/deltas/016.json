@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 44635,
+  "new_sha256": "5089cd7c59afff73e0f89660a84259d1f5dcf18fbfec07a7e5ad0ae1d22b4f08",
+  "old_bytes": 44635,
+  "old_sha256": "3573e0c0abb403c9b8e24e65f93c0552de5bee982626c39d75d850370655685c",
+  "path": "libraries/mlf-frontend/Bootstrap/Lexer.hs",
+  "splices": [
+    {
+      "new": "MQ==",
+      "new_at": 44630,
+      "old": "MA==",
+      "old_at": 44630
+    }
+  ]
+}

@@ -89,6 +89,10 @@ jobs:
           include-hidden-files: true
           path: |
             .mlf-build/bootstrap-stage1/build-report.json
+            .mlf-build/bootstrap-stage1/manager-bootstrap/**/*.json
+            .mlf-build/bootstrap-stage1/manager-bootstrap/**/*.sha256
+            .mlf-build/bootstrap-stage1/manager-bootstrap/**/*.txt
+            .mlf-build/bootstrap-stage1/manager-bootstrap/**/commands/
             .mlf-build/bootstrap-stage1/timing/
             .mlf-build/bootstrap-stage1/async-bootstrap/capability.txt
             .mlf-build/bootstrap-stage1/async-bootstrap/source-identity.txt

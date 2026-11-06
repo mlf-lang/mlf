@@ -1,0 +1,12 @@
+{
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-async/mlf-package.json": "15e9ac789b283257d3ff3f1ab3053f03430859a6cbadd621d214f113994778ff",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-async/Async/Process.hs": "70d466818728f7b80ee732df654e083006cc33f6038623d22f52086bd9613b87",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-async/Async/Process/Internal.hs": "03e65dccf009af52f072a7fc0ef8d5eee555e9452962dd254f453bc3afc42e42",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-async/Async/Task.hs": "1f4ae8f633e3cf78dfadeaa9bde2999a9bc31c7c37769a8f30351a3f99b4afca",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-async/Async/Task/Core.hs": "33e30b6c2f055619b8da163b39621b08eaab1b77eda39bf3bbaf61a77c4bcdce",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-async/Async/Task/Internal.hs": "a87ab11e316ec7c4ff28a5f9974b61ecb58aebeeb3f3227646d02ed3e7416e00",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci": "caa83e4396eee57d327f5bd15b6fe95af21e83539d26e3068a9b28a0b96db6d2",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfco": "6358bfce412ef5b0194c99bb435401fc0ac04e697c5bddd9c5decf20307b149f",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/receipt.json": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/async/crate.spec": "a2f9bcf1544e16580be11ae3ce0fe9ffac85ca08a054759a1bd05b431c8e72a9"
+}

@@ -2,7 +2,7 @@
 
 `mlfpkg` builds MLF packages and runs their tests without invoking Cabal. It is
 written in MLF under `libraries/mlf-package-core/` and
-`libraries/mlf-developer-tools/`, with its entry point in `package/Main.emlf`. JSON parsing, local dependency resolution,
+`libraries/mlf-developer-tools/`, with its entry point in `package/MLF/Entry/Mlfpkg.hs`. JSON parsing, local dependency resolution,
 content-addressed caching, compilation, linking, and test orchestration all run
 in the native MLF executable. The source-tree `mlfpkg` is a thin shell launcher;
 it never invokes a Python package-manager implementation. Parsing, inference,
@@ -28,14 +28,19 @@ groups plus Windows runtime and relocation checks.
 
 ## Build and test this compiler
 
-Provide a working native MLF compiler as the bootstrap seed, Clang, GMP with
-`pkg-config` metadata, and a local BDWGC installation:
+Use the two explicit native seed routes in [Build and run](../README.md#build-and-run):
 
-The seed must implement `--compile-crate`. An earlier native release can bridge
-the migration by building the first generation with its matching earlier
-`mlfpkg`; see [the seed transition](../README.md#build-and-run). Keep that tool
-pair outside the output directory, then select the generated compiler and
-manager for subsequent crate builds.
+- Released 0.3.0 compiler and manager from the same complete, externally verified
+  release bundle must first run `scripts/bootstrap-shared.sh`. Bare copied
+  binaries and timing wrappers do not carry that bundle provenance.
+- A qualified locally built shared-aware native compiler may build its manager
+  using `scripts/bootstrap-package.sh`. Both tools must identify as
+  `MLF/shared-haskell-v1 native-MLF` before manager-bootstrap accepts the pair.
+  A GHC-produced manager is not accepted as a native seed.
+
+Clang, GMP with `pkg-config` metadata and a local BDWGC installation are required.
+Keep input tools outside the output directory. The commands below assume the
+selected compiler is already shared-aware native, not an unbridged old release.
 
 ```sh
 export MLF_COMPILER=/path/to/emlf

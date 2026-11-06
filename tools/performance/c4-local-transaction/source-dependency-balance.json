@@ -1,0 +1,12 @@
+{
+  "format": "c4-candidate-map-dependency-v1",
+  "before_reference_unchanged": "823f3060ea379ddb7d865764ae2b097e8fcf29bc",
+  "prior_manifest_sha256": "9e7942fdb9dd759d1a9f840bcb9aa537bb7093d1abb62a5e1b8bfda381b83148",
+  "current_manifest_sha256": "11aa01a0e00a964c8a97f1f1f4b04490e80dd1691f355de8e226942085808bb4",
+  "candidate_map_path": "libraries/mlf-foundation/Bootstrap/Map.hs",
+  "old_map_sha256": "1fdf24d3b3874c76d246f098ee9361a7f93e7eb01f741e064347452976cdaf0a",
+  "new_map_sha256": "7ec3d3c0499ee17f6b51d7c9ad15892d1f356d83ad8f4692b6d1d4094bda2d30",
+  "scope": "Only candidate Map dependency changes. The two C4 algorithm hashes, all 179 before inputs, complete old Graph/Solver/Constraint oracles, expected outputs and query/Darwin migrations remain byte-for-byte unchanged.",
+  "independence": "C4 oracle shares current Map primitives as explicitly stated in the existing runner. Independent frozen-Map tests now additionally qualify this dependency: 24649 raw shapes, 400 physical-tree mutation steps and 30 manual demand/order probes. Native O2 controls retain all existing 1024 Map subset pairs plus nine literal shapes, lazy values and four first-error cases.",
+  "proof": "After unchanged total<=1, L<R implies R>0 and L<=3R; L>=R implies L>0 and R<=3L. Same node/rotation and arguments are selected for all signed Integer sizes. Initial total demand and all selected-branch demands remain unchanged."
+}

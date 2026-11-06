@@ -1,0 +1,2 @@
+module RejectedUnreachable where
+unreachable input = case input of {"a" -> 1; _ -> 2; "b" -> 3}

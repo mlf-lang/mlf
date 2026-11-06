@@ -17,7 +17,7 @@ static int64_t mlf_z_get_i64(mpz_srcptr z) {
     uint64_t n = mlf_z_get_u64(z);
     return (int64_t)(mpz_sgn(z) < 0 ? -n : n);
 }
-static int mlf_z_fits_u64(mpz_srcptr z) { return mpz_sgn(z) >= 0 && mpz_sizeinbase(z,2) <= 64; }
+static inline int mlf_z_fits_u64(mpz_srcptr z) { return mpz_sgn(z) >= 0 && mpz_sizeinbase(z,2) <= 64; }
 static int mlf_z_fits_i64(mpz_srcptr z) {
     size_t bits = mpz_sizeinbase(z,2);
     return bits < 64 || (bits == 64 && mpz_sgn(z) < 0 && mlf_z_get_u64(z) == (UINT64_C(1)<<63));

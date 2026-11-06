@@ -23,7 +23,7 @@ choice : SExpr -> SExpr -> SExpr -> SExpr
 choice a b c = SApp (int2 PIfThenElse a b) c
 moduleTest : Bool
 moduleTest = case P.parseModule "test" "module Library (f, Box(..), module Support) where\nimport qualified Support as S hiding (hidden)\ndata Box a = Box a\nf x = Box x\n" of
-  Right (SourceModule path (Just name) (Just exports) imports datatypes Nil Nil values Nothing) ->
+  Right (SourceModule path (Just name) (Just exports) imports datatypes Nil Nil values Nothing _) ->
     eqString path "test" && eqString name "Library" && length exports == 3 && length imports == 1 && length datatypes == 1 && length values == 1
   _ -> false
 annotationTest : Bool

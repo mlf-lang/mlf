@@ -24,13 +24,29 @@
   },
   "library": {
     "modules": {
-      "Bootstrap.Crate": "Bootstrap/Crate.emlf",
-      "Bootstrap.CrateArtifact": "Bootstrap/CrateArtifact.emlf",
-      "Bootstrap.CrateCodegen": "Bootstrap/CrateCodegen.emlf",
-      "Bootstrap.CrateQuery": "Bootstrap/CrateQuery.emlf",
-      "Bootstrap.InferenceUnit": "Bootstrap/InferenceUnit.emlf",
-      "Bootstrap.Separate": "Bootstrap/Separate.emlf",
-      "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.emlf"
+      "Bootstrap.ArtifactStorage": "Bootstrap/ArtifactStorage.hs",
+      "Bootstrap.ArtifactStructure": "Bootstrap/ArtifactStructure.hs",
+      "Bootstrap.Bitstream": "Bootstrap/Bitstream.hs",
+      "Bootstrap.BuiltinPreludeContext": "Bootstrap/BuiltinPreludeContext.hs",
+      "Bootstrap.BuiltinPreludeLiteral": "Bootstrap/BuiltinPreludeLiteral.hs",
+      "Bootstrap.Crate": "Bootstrap/Crate.hs",
+      "Bootstrap.CrateArtifact": "Bootstrap/CrateArtifact.hs",
+      "Bootstrap.CrateCodegen": "Bootstrap/CrateCodegen.hs",
+      "Bootstrap.CrateQuery": "Bootstrap/CrateQuery.hs",
+      "Bootstrap.CrateSession": "Bootstrap/CrateSession.hs",
+      "Bootstrap.ImportParameters": "Bootstrap/ImportParameters.hs",
+      "Bootstrap.ImportedRoot": "Bootstrap/ImportedRoot.hs",
+      "Bootstrap.InferenceUnit": "Bootstrap/InferenceUnit.hs",
+      "Bootstrap.PreparedLibraries": "Bootstrap/PreparedLibraries.hs",
+      "Bootstrap.PreparedLibraryLiteral": "Bootstrap/PreparedLibraryLiteral.hs",
+      "Bootstrap.Separate": "Bootstrap/Separate.hs",
+      "Bootstrap.SourceEquality": "Bootstrap/SourceEquality.hs",
+      "Bootstrap.SourceInference": "Bootstrap/SourceInference.hs",
+      "Bootstrap.OpenFragment": "Bootstrap/OpenFragment.hs",
+      "Bootstrap.QueryGraph": "Bootstrap/QueryGraph.hs",
+      "Bootstrap.CrateGraph": "Bootstrap/CrateGraph.hs",
+      "Bootstrap.SourceUnit": "Bootstrap/SourceUnit.hs"
     }
-  }
+  },
+  "source-syntax": "shared-haskell-v1"
 }

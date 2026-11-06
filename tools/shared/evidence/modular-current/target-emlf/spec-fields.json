@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-compiler/0.3.0/target-emlf",
+  "MLF.Entry.Emlf",
+  "false",
+  "93:14:MLF.Entry.Emlf73:/workspace/scratch/3f83e2ebe290/pr22-recovery/bootstrap/MLF/Entry/Emlf.hs",
+  "103:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/crates/artifact/unit.mlfci118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci103:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-frontend-crate-O2/artifact/unit.mlfci106:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/inference/artifact/unit.mlfci108:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/interpreter/artifact/unit.mlfci101:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/llvm/artifact/unit.mlfci101:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/xmlf/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/target-emlf/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

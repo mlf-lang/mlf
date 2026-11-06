@@ -12,7 +12,7 @@ choose n
   | panic "unselected function guard predicate ran" = wrong
   | otherwise = wrong
 
-main : IO Unit
+main : IO ()
 main = do
   input <- newIntArray 1 41
   n <- readIntArray input 0

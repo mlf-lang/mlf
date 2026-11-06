@@ -1,0 +1,15 @@
+{
+  "source_checkpoint": "98d6df3914f888c635181c31c5d27752647d659b",
+  "O0_and_O2_reauthenticated_after_tests": true,
+  "producer_receipt_sha256": "0e8700da68f50620cb8c9386ec97d98b6e6053a8aeaffef2f913936c463f0764",
+  "producer_complete": true,
+  "producer_host": "GHC",
+  "optimization": "2",
+  "modules": 94,
+  "executables": 12,
+  "direct_commands_passed": 12,
+  "tuplelist_explicit_passes": 90,
+  "source_smoke_cases": 5,
+  "full_unit_guest_campaign_run": false,
+  "native_bootstrap_run": false
+}

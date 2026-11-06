@@ -26,7 +26,7 @@ static MlfValue *os_setEnv(MlfValue *name, MlfValue *contents) {
     if (!failed && !*value) failed=!SetEnvironmentVariableW(wide,L"");
     free(wide); free(value);
     if (failed) fail("IO error: setEnv failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 static MlfValue *os_unsetEnv(MlfValue *name) {
     const char *key=file_path(name);
@@ -35,13 +35,13 @@ static MlfValue *os_unsetEnv(MlfValue *name) {
     int failed=!wide || _wputenv_s(wide,L"");
     free(wide);
     if (failed) fail("IO error: unsetEnv failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 static MlfValue *os_directoryExists(MlfValue *name) {
     DWORD attributes=mlf_windows_attributes(file_path(name));
     return mlf_boolean(attributes!=INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY));
 }
-static MlfValue *os_listDirectory(MlfValue *name) {
+static MLF_NOINLINE MlfValue *os_listDirectory(MlfValue *name) {
     const char *path=file_path(name);
     DWORD attributes=mlf_windows_attributes(path);
     if (attributes==INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY)) fail("IO error: listDirectory failed");
@@ -82,7 +82,7 @@ static MlfValue *os_acquireFileLock(MlfValue *name) {
 static MlfValue *os_releaseFileLock(MlfValue *handle) {
     HANDLE file=(HANDLE)(uintptr_t)bounded_integer(handle,INTPTR_MAX,"invalid file lock");
     if (!CloseHandle(file)) fail("IO error: releaseFileLock failed");
-    return mlf_constructor(0,0);
+    return mlf_constructor(1,0);
 }
 /* Always quote each argument, using the Microsoft CRT backslash/quote rules. */
 static wchar_t *mlf_windows_command(char **arguments) {
@@ -123,7 +123,7 @@ static HANDLE mlf_windows_redirect(const char *path, int stream) {
     HANDLE result=wide ? CreateFileW(wide,stream ? GENERIC_WRITE : GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,&security,stream ? CREATE_ALWAYS : OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL) : INVALID_HANDLE_VALUE;
     free(wide); return result;
 }
-static MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
+static MLF_NOINLINE MlfValue *os_runProcess(MlfValue *directory, MlfValue *specification) {
     const char *cwd=file_path(directory);
     specification=expect(specification,STRING);
     size_t length=specification->as.string.length, count=0;

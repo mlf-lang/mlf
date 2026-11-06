@@ -1,0 +1,651 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Package.Manifest where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import qualified Bootstrap.Std as S;
+  import qualified Bootstrap.Parser as P;
+  import qualified Bootstrap.Lexer as Lexer;
+  import qualified Package.OS as O;
+  import qualified Package.Json as J;
+  import qualified Package.Release as R;
+  import qualified Package.Distribution as Distribution;
+  data Package = Package String J.Json ([] Module);
+  data Module = Module String String String ([] String);
+  data PackageGraph = PackageGraph Package ([] Package) ([] Module);
+  packageRoot (Package path _ _) = O.parent path;
+  packagePath (Package path _ _) = path;
+  packageData (Package _ value _) = value;
+  packageName p = J.getText "name" "" (packageData p);
+  isRelease p = J.has "release-sha256" (packageData p);
+  crateIdentity p kind =
+    (packageName p ++ ("/" ++ (J.getText "version" "" (packageData p) ++ ("/" ++ kind))));
+  packageModules (Package _ _ modules) = modules;
+  moduleName (Module name _ _ _) = name;
+  moduleSource (Module _ _ source _) = source;
+  moduleOwner (Module _ owner _ _) = owner;
+  moduleImports (Module _ _ _ imports) = imports;
+  rootPackage (PackageGraph p _ _) = p;
+  packages (PackageGraph _ ps _) = ps;
+  modules (PackageGraph _ _ ms) = ms;
+  keys value = S.map S.fst (J.items value);
+  lookupModule name ms =
+    S.fromMaybe (panic ("missing module " ++ name))
+      (S.find (\m -> eqString (moduleName m) name) ms);
+  lookupPackage name ps =
+    S.fromMaybe (panic ("missing package " ++ name))
+      (S.find (\p -> eqString (packageName p) name) ps);
+  lower n = ((n >= 97) && (n <= 122));
+  upper n = ((n >= 65) && (n <= 90));
+  digit n = ((n >= 48) && (n <= 57));
+  codes text = S.map (stringCodeAt text) (S.range 0 (stringLength text - 1));
+  validName text =
+    ((stringLength text > 0) &&
+     (lower (stringCodeAt text 0) &&
+      S.all (\c -> (lower c || (digit c || (c == 45)))) (codes text)));
+  validModule text =
+    (S.all
+       (\part ->
+          ((stringLength part > 0) &&
+           (upper (stringCodeAt part 0) &&
+            S.all (\c -> (lower c || (upper c || (digit c || ((c == 95) || (c == 39))))))
+              (codes part))))
+       (O.split 46 text) &&
+     S.not (eqString text "Prelude" || eqString text "MLF.Primitive"));
+  validVersion text =
+    let {
+      parts = O.split 46 text
+    } in
+    ((S.length parts == 3) &&
+     S.all (\part -> ((stringLength part > 0) && S.all digit (codes part))) parts);
+  localFile root value =
+    do {
+      let {
+        name = J.text value
+      };
+      O.require ((stringLength name > 0) && (S.not (O.absolute name) && S.not (O.drivePath name)))
+        "source paths must be relative";
+      present <- fileExists (O.join root name);
+      O.require present ("missing source: " ++ O.join root name);
+      actual <- canonicalPath (O.join root name);
+      let {
+        path = O.normalize actual
+      };
+      O.require (O.starts (root ++ "/") path) ("source path outside package: " ++ path);
+      ioReturn path
+    };
+  readModule owner source =
+    do {
+      text <- readFile source;
+      case P.parseModule source text of {
+        Left error -> O.fatal error;
+        Right parsed ->
+          case parsed of {
+            SourceModule _ _ _ imports _ _ _ _ _ _ ->
+              ioReturn
+                (Module (P.moduleIdentity parsed) owner source
+                   (S.nubBy eqString
+                      (S.filter (\n -> S.not (eqString n "Prelude" || eqString n "MLF.Primitive"))
+                         (S.map
+                            (\entry ->
+                               case entry of {
+                                 Import name _ _ _ -> name
+                               })
+                            imports))))
+          }
+      }
+    };
+  sourceSyntaxExpectation value fallback = J.getText "source-syntax" fallback value;
+  validateSourceSyntax expected source =
+    do {
+      O.require (S.elem eqString expected ((:) "" (O.words "legacy-emlf-v1 shared-haskell-v1")))
+        "unsupported source-syntax; expected legacy-emlf-v1 or shared-haskell-v1";
+      text <- readFile source;
+      case Lexer.sourceSyntax source text of {
+        Left error -> O.fatal error;
+        Right syntax ->
+          O.require (eqString expected "" || eqString expected (Lexer.sourceSyntaxName syntax))
+            (source ++ ": source-syntax does not match source marker")
+      }
+    };
+  readModules root owner value = readModulesWithSyntax "" root owner value;
+  readModulesWithSyntax expected root owner value =
+    S.mapM
+      (\entry ->
+         do {
+           let {
+             name = S.fst entry
+           };
+           O.require (validModule name) ("invalid or reserved module name: " ++ name);
+           source <- localFile root (S.snd entry);
+           validateSourceSyntax expected source;
+           m <- readModule owner source;
+           O.require (eqString name (moduleName m))
+             ("manifest declares " ++ (name ++ (", source declares " ++ moduleName m)));
+           ioReturn m
+         })
+      (J.items value);
+  fields value allowed context = J.fields value (O.words allowed) context;
+  readPackage path =
+    do {
+      value <- J.read path;
+      fields value "format name version dependencies library executables tests source-syntax" path;
+      O.require (J.equal (J.get "format" value) (J.num 1)) (path ++ ": expected format 1");
+      let {
+        name = J.getText "name" "" value
+      };
+      O.require (validName name) (path ++ ": invalid package name");
+      O.require (validVersion (J.getText "version" "" value)) "version must be MAJOR.MINOR.PATCH";
+      let {
+        deps = J.getObject "dependencies" value
+      };
+      S.mapM_
+        (\entry ->
+           do {
+             O.require (validName (S.fst entry)) "invalid dependency name";
+             let {
+               dep = S.snd entry
+             };
+             fields dep "path release github sha256 asset_sha256" ("dependency " ++ S.fst entry);
+             O.require
+               (S.length (S.filter (\key -> J.has key dep) (O.words "path release github")) == 1)
+               "dependency must select exactly one of path, release, or github";
+             if J.has "github" dep
+             then Distribution.validateDependency dep
+             else if J.has "release" dep
+                  then do {
+                         O.require (S.not (J.has "asset_sha256" dep))
+                           "asset_sha256 requires a GitHub release dependency";
+                         O.require (stringLength (J.getText "release" "" dep) > 0)
+                           "dependency requires a release directory";
+                         O.require (validDigest (J.getText "sha256" "" dep))
+                           "release dependency requires a lowercase SHA-256 pin"
+                       }
+                  else do {
+                         O.require (S.not (J.has "sha256" dep || J.has "asset_sha256" dep))
+                           "sha256 requires a release dependency";
+                         O.require (stringLength (J.getText "path" "" dep) > 0)
+                           "dependency requires a local path"
+                       }
+           })
+        (J.items deps);
+      fields (J.getObject "library" value) "modules" "library";
+      ms <-
+        readModulesWithSyntax (sourceSyntaxExpectation value "") (O.parent path) name
+          (J.getObject "modules" (J.getObject "library" value));
+      let {
+        p = Package path value ms
+      };
+      S.mapM_ (validateTarget p False) (J.items (J.getObject "executables" value));
+      S.mapM_ (validateTarget p True) (J.items (J.getObject "tests" value));
+      O.require
+        (S.not (S.null ms) ||
+         (S.not (S.null (keys (J.getObject "executables" value))) ||
+          S.not (S.null (keys (J.getObject "tests" value)))))
+        "package contains no targets";
+      ioReturn p
+    };
+  validDigest text =
+    ((stringLength text == 64) &&
+     S.all (\c -> (digit c || ((c >= 97) && (c <= 102)))) (codes text));
+  readRelease path digest =
+    do {
+      value <- R.readPinnedManifest (O.parent path) digest;
+      let {
+        name = J.getText "name" "" value
+      };
+      O.require (validName name && validVersion (J.getText "version" "" value))
+        "invalid release package identity";
+      let {
+        names = J.getStrings "modules" value
+      };
+      O.require
+        (S.not (S.null names) &&
+         (S.all validModule names && (S.length names == S.length (S.nubBy eqString names))))
+        "invalid release module inventory";
+      let {
+        releaseData =
+          J.set "release-sha256" (J.str digest)
+            (J.set "version" (J.get "version" value) (J.set "name" (J.str name) J.empty))
+      };
+      ioReturn
+        (Package path releaseData (S.map (\moduleName -> Module moduleName name "" []) names))
+    };
+  visitRelease path digest done = visitReleaseFrom path digest J.Null done;
+  visitReleaseFrom path digest origin done =
+    do {
+      original <- readRelease path digest;
+      let {
+        p =
+          case original of {
+            Package source value modules ->
+              if J.equal origin J.Null
+              then original
+              else Package source (J.set "github-source" origin value) modules
+          }
+      };
+      case S.find (\q -> eqString (packageName p) (packageName q)) done of {
+        Just q ->
+          do {
+            O.require
+              (isRelease q && eqString digest (J.getText "release-sha256" "" (packageData q)))
+              ("conflicting release for package " ++ packageName p);
+            O.require (J.equal origin (J.getOr "github-source" J.Null (packageData q)))
+              ("conflicting release source for package " ++ packageName p);
+            ioReturn done
+          };
+        Nothing -> ioReturn (S.snoc done p)
+      }
+    };
+  validateTarget p testing entry =
+    do {
+      let {
+        name = S.fst entry
+      };
+      let {
+        target = S.snd entry
+      };
+      O.require (validName name) ("invalid target name: " ++ name);
+      if (testing && J.has "command" target)
+      then do {
+             fields target "command requires" ("test " ++ name);
+             let {
+               argv = J.getStrings "command" target
+             };
+             O.require (S.not (S.null argv) && S.all (\x -> (stringLength x >= 0)) argv)
+               "test command cannot be empty";
+             let {
+               required = J.getStrings "requires" target
+             };
+             O.require (S.all (\n -> J.has n (J.getObject "executables" (packageData p))) required)
+               "unknown required executable"
+           }
+      else do {
+             fields target
+               "main modules dependencies link profile source-syntax no-prelude arguments stdin stdout"
+               ("target " ++ name);
+             let {
+               dependencies = targetDependencyNames p target
+             };
+             O.require (S.length (S.nubBy eqString dependencies) == S.length dependencies)
+               "duplicate target dependency";
+             O.require
+               (S.all (\name -> J.has name (J.getObject "dependencies" (packageData p)))
+                  dependencies)
+               "target dependency is not a direct package dependency";
+             source <- localFile (packageRoot p) (J.get "main" target);
+             let {
+               syntax = sourceSyntaxExpectation target (sourceSyntaxExpectation (packageData p) "")
+             };
+             validateSourceSyntax syntax source;
+             ms <-
+               readModulesWithSyntax syntax (packageRoot p) (packageName p)
+                 (J.getObject "modules" target);
+             O.require
+               (S.elem eqString (J.getText "link" "separate" target) (O.words "separate source"))
+               "invalid link mode";
+             O.require
+               (S.elem eqString (J.getText "profile" "compact-gc" target)
+                  (O.words "compact-gc compiler"))
+               "invalid runtime profile; expected compact-gc (compiler is a compatibility alias)";
+             O.require
+               (J.getBool "no-prelude" False target || S.not (J.getBool "no-prelude" False target))
+               "invalid no-prelude";
+             O.require (S.all (\x -> (stringLength x >= 0)) (J.getStrings "arguments" target))
+               "invalid arguments";
+             O.require
+               ((stringLength (J.getText "stdin" "" target) >= 0) &&
+                (stringLength (J.getText "stdout" "" target) >= 0))
+               "invalid test streams";
+             O.require (S.not testing || J.has "stdout" target) "expected stdout is required"
+           }
+    };
+  visit :: String -> [] String -> [] Package -> IO ([] Package);
+  visit path trail done = visitWith J.empty path trail done;
+  visitWith :: J.Json -> String -> [] String -> [] Package -> IO ([] Package);
+  visitWith options path trail done =
+    do {
+      canonical <- canonicalPath path;
+      O.require (S.not (S.elem eqString canonical trail))
+        ("dependency cycle: " ++ S.intercalate " -> " (S.snoc trail canonical));
+      case S.find (\p -> eqString canonical (packagePath p)) done of {
+        Just _ -> ioReturn done;
+        Nothing ->
+          do {
+            p <- readPackage canonical;
+            O.require (S.not (S.any (\q -> eqString (packageName p) (packageName q)) done))
+              ("package " ++ (packageName p ++ " resolves to multiple local paths"));
+            children <-
+              visitDependencies options p (S.snoc trail canonical) done
+                (S.sortBy (\a b -> compareString (S.fst a) (S.fst b))
+                   (J.items (J.getObject "dependencies" (packageData p))));
+            O.require (S.not (S.any (\q -> eqString (packageName p) (packageName q)) children))
+              ("package " ++ (packageName p ++ " resolves to multiple local paths"));
+            ioReturn (S.snoc children p)
+          }
+      }
+    };
+  visitDependencies :: J.Json ->
+                       Package ->
+                       [] String ->
+                       [] Package -> [] ((,) String J.Json) -> IO ([] Package);
+  visitDependencies options p trail done deps =
+    case deps of {
+      [] -> ioReturn done;
+      (:) ((,) name dep) rest ->
+        do {
+          let {
+            remote = J.has "github" dep
+          };
+          let {
+            released = (remote || J.has "release" dep)
+          };
+          path <-
+            if remote
+            then Distribution.fetch options dep
+            else canonicalPath
+                   (O.join
+                      (O.join (packageRoot p)
+                         (J.getText (if released then "release" else "path") "" dep))
+                      (if released then "release.json" else "mlf-package.json"));
+          next <-
+            if released
+            then visitReleaseFrom path (J.getText "sha256" "" dep) (if remote then dep else J.Null)
+                   done
+            else visitWith options path trail done;
+          let {
+            child =
+              if released
+              then S.fromMaybe (panic "missing release dependency")
+                     (S.find
+                        (\q ->
+                           (isRelease q &&
+                            eqString (J.getText "release-sha256" "" (packageData q))
+                              (J.getText "sha256" "" dep)))
+                        next)
+              else S.fromMaybe (panic "missing dependency")
+                     (S.find (\q -> eqString path (packagePath q)) next)
+          };
+          O.require (eqString name (packageName child))
+            ("dependency " ++ (name ++ (" resolves to package " ++ packageName child)));
+          visitDependencies options p trail next rest
+        }
+    };
+  targetDependencyNames p target =
+    S.sortBy compareString
+      (if J.has "dependencies" target
+       then J.getStrings "dependencies" target
+       else keys (J.getObject "dependencies" (packageData p)));
+  targetDependencies graph p target =
+    S.map (\name -> lookupPackage name (packages graph)) (targetDependencyNames p target);
+  visibleWith ps p dependencies =
+    S.concat
+      ((:) (S.map moduleName (packageModules p))
+         (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps))) dependencies));
+  visible ps p =
+    S.concat
+      ((:) (S.map moduleName (packageModules p))
+         (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps)))
+            (keys (J.getObject "dependencies" (packageData p)))));
+  checkImports ps p local =
+    S.mapM_
+      (\m ->
+         S.mapM_
+           (\name ->
+              O.require (S.elem eqString name (S.append (visible ps p) (S.map moduleName local)))
+                (packageName p ++
+                 (":" ++
+                  (moduleName m ++
+                   (": import " ++
+                    (name ++ " is not declared in this package or a direct dependency"))))))
+           (moduleImports m))
+      local;
+  moduleClosure ms names = discoverMany ms [] [] names;
+  discoverMany :: [] Module -> [] String -> [] Module -> [] String -> IO ([] Module);
+  discoverMany ms trail done names =
+    case names of {
+      [] -> ioReturn done;
+      (:) name rest ->
+        do {
+          next <- discoverModule ms trail done name;
+          discoverMany ms trail next rest
+        }
+    };
+  discoverModule :: [] Module -> [] String -> [] Module -> String -> IO ([] Module);
+  -- Imports discover namespaces, not separately compiled module prerequisites.
+  -- The package DAG above owns compilation-cycle rejection.
+  discoverModule ms trail done name =
+    do {
+      if (S.elem eqString name trail || S.any (\m -> eqString (moduleName m) name) done)
+      then ioReturn done
+      else do {
+             let {
+               m = lookupModule name ms
+             };
+             next <- discoverMany ms (S.snoc trail name) done (moduleImports m);
+             ioReturn (S.snoc next m)
+           }
+    };
+  targetCrateModules graph p target =
+    do {
+      local <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target);
+      source <- localFile (packageRoot p) (J.get "main" target);
+      entry <- readModule (packageName p) source;
+      O.require (S.not (S.any (\m -> eqString (moduleName m) (moduleName entry)) local))
+        "entry module also appears in target modules";
+      let {
+        private = (:) entry local
+      };
+      O.require
+        (S.not
+           (S.any (\m -> S.any (\n -> eqString (moduleName m) (moduleName n)) (modules graph))
+              private))
+        "entry/private module conflicts with a library module";
+      let {
+        visible =
+          S.append (visibleWith (packages graph) p (targetDependencyNames p target))
+            (S.map moduleName private)
+      };
+      S.mapM_
+        (\m ->
+           S.mapM_
+             (\name ->
+                O.require (S.elem eqString name visible)
+                  (packageName p ++
+                   (":" ++
+                    (moduleName m ++
+                     (": import " ++
+                      (name ++
+                       " is not declared in this target or a selected direct dependency"))))))
+             (moduleImports m))
+        private;
+      ioReturn ((,) (moduleName entry) private)
+    };
+  load path = loadWith path J.empty;
+  loadWith path options =
+    do {
+      let {
+        selected =
+          J.set "cache-dir"
+            (J.getOr "cache-dir" (J.str (O.parent path ++ "/.mlf-build/cache")) options)
+            options
+      };
+      ps <- visitWith selected path [] [];
+      let {
+        p = S.last ps
+      };
+      let {
+        ms = S.concatMap packageModules ps
+      };
+      O.require (S.length (S.nubBy eqString (S.map moduleName ms)) == S.length ms)
+        "module is provided by multiple packages";
+      S.mapM_ (\q -> checkImports ps q (packageModules q)) ps;
+      sorted <- moduleClosure ms (S.sortBy compareString (S.map moduleName ms));
+      let {
+        graph = PackageGraph p ps sorted
+      };
+      S.mapM_
+        (\q ->
+           S.mapM_
+             (\target ->
+                if J.has "main" target
+                then do {
+                       ignored <- targetCrateModules graph q target;
+                       ioReturn ()
+                     }
+                else ioReturn ())
+             (S.map S.snd
+                (S.append (J.items (J.getObject "executables" (packageData q)))
+                   (J.items (J.getObject "tests" (packageData q))))))
+        ps;
+      ioReturn graph
+    };
+  libraryDependencies graph p =
+    S.map (\q -> crateIdentity q "library")
+      (S.filter (\q -> S.not (S.null (packageModules q)))
+         (S.map (\name -> lookupPackage name (packages graph))
+            (S.sortBy compareString (keys (J.getObject "dependencies" (packageData p))))));
+  targetLibraryDependencies graph p target =
+    S.map (\q -> crateIdentity q "library")
+      (S.filter (\q -> S.not (S.null (packageModules q))) (targetDependencies graph p target));
+  targetCrateDependencies graph p target =
+    S.append (targetLibraryDependencies graph p target)
+      (if S.null (packageModules p) then [] else (:) (crateIdentity p "library") []);
+  cratePlanRow identity entry ms deps =
+    J.Object
+      ((:) ((,) "crate" (J.str identity))
+         ((:) ((,) "entry" (J.str entry))
+            ((:) ((,) "modules" (J.stringArray (S.sortBy compareString (S.map moduleName ms))))
+               ((:) ((,) "dependencies" (J.stringArray deps)) []))));
+  cratePlan graph =
+    do {
+      let {
+        p = rootPackage graph
+      };
+      let {
+        libraries =
+          S.map
+            (\q ->
+               cratePlanRow (crateIdentity q "library") "" (packageModules q)
+                 (libraryDependencies graph q))
+            (S.filter (\q -> S.not (S.null (packageModules q))) (packages graph))
+      };
+      executables <-
+        S.mapM
+          (\((,) name target) ->
+             do {
+               boundValueShared1 <- targetCrateModules graph p target;
+               case boundValueShared1 of {
+                 (,) entry ms ->
+                   do {
+                     ioReturn
+                       (cratePlanRow (crateIdentity p ("target-" ++ name)) entry ms
+                          (targetCrateDependencies graph p target))
+                   }
+               }
+             })
+          (J.items (J.getObject "executables" (packageData p)));
+      tests <-
+        S.mapM
+          (\((,) name target) ->
+             do {
+               boundValueShared2 <- targetCrateModules graph p target;
+               case boundValueShared2 of {
+                 (,) entry ms ->
+                   do {
+                     ioReturn
+                       (cratePlanRow (crateIdentity p ("target-test-" ++ name)) entry ms
+                          (targetCrateDependencies graph p target))
+                   }
+               }
+             })
+          (S.filter (\entry -> J.has "main" (S.snd entry))
+             (J.items (J.getObject "tests" (packageData p))));
+      ioReturn (J.Array (S.append libraries (S.append executables tests)))
+    };
+  sourceFiles p =
+    if isRelease p
+    then ioReturn []
+    else do {
+           nested <-
+             S.mapM
+               (\target ->
+                  if J.has "main" target
+                  then do {
+                         source <- localFile (packageRoot p) (J.get "main" target);
+                         let {
+                           syntax =
+                             sourceSyntaxExpectation target
+                               (sourceSyntaxExpectation (packageData p) "")
+                         };
+                         validateSourceSyntax syntax source;
+                         ms <-
+                           readModulesWithSyntax syntax (packageRoot p) (packageName p)
+                             (J.getObject "modules" target);
+                         ioReturn ((:) source (S.map moduleSource ms))
+                       }
+                  else ioReturn [])
+               (S.map S.snd
+                  (S.append (J.items (J.getObject "executables" (packageData p)))
+                     (J.items (J.getObject "tests" (packageData p)))));
+           ioReturn
+             (S.sortBy compareString
+                (S.nubBy eqString
+                   (S.append (S.map moduleSource (packageModules p)) (S.concat nested))))
+         };
+  snapshot graph =
+    do {
+      rows <-
+        S.mapM
+          (\p ->
+             do {
+               if isRelease p
+               then do {
+                      ignored <-
+                        readRelease (packagePath p) (J.getText "release-sha256" "" (packageData p));
+                      ioReturn ()
+                    }
+               else ioReturn ();
+               paths <- sourceFiles p;
+               hashes <-
+                 S.mapM
+                   (\path ->
+                      do {
+                        hash <- fileDigest path;
+                        ioReturn ((,) (O.relative (packageRoot p) path) (J.str hash))
+                      })
+                   paths;
+               manifest <- fileDigest (packagePath p);
+               let {
+                 row =
+                   J.Object
+                     ((:) ((,) "name" (J.str (packageName p)))
+                        ((:) ((,) "version" (J.get "version" (packageData p)))
+                           ((:)
+                              ((,) "path"
+                                 (J.str
+                                    (O.relative (packageRoot (rootPackage graph)) (packageRoot p))))
+                              ((:) ((,) "manifest" (J.str manifest))
+                                 ((:) ((,) "sources" (J.Object hashes)) [])))))
+               };
+               let {
+                 released = if isRelease p then J.set "release" (J.str manifest) row else row
+               };
+               let {
+                 source = J.getOr "github-source" J.Null (packageData p)
+               };
+               ioReturn
+                 (if J.equal source J.Null
+                  then released
+                  else J.set "source" source
+                         (J.Object
+                            (S.filter (\entry -> S.not (eqString (S.fst entry) "path"))
+                               (J.items released))))
+             })
+          (packages graph);
+      ioReturn
+        (J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "packages" (J.Array rows)) [])))
+    }
+}

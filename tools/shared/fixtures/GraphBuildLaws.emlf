@@ -1,0 +1,52 @@
+module Main where
+import Prelude hiding (Monad, return, bind, pure, fail)
+import MLF.Primitive (Functor, fmap, Applicative, pure, (<*>), Monad, (>>=), return, bind)
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Bootstrap.IntMap as IM
+import qualified Tests.Graph as G
+
+-- Exercise the maintained guest Build, never a copied implementation. Expected
+-- values/states below are explicit; no expected result uses the new instances.
+state n = Graph IM.empty IM.empty n
+fail label = do { putErr ("FAIL graph build: " ++ label ++ "\n"); exitWith 1 }
+check : String -> Int -> Int -> G.Build Int -> IO ()
+check label value fresh action = case G.runBuild (state 0) action of
+ Left _ -> fail label
+ Right ((,) actual graph) ->
+  if actual == value && G.nextId graph == fresh && IM.null (G.nodes graph) && IM.null (G.links graph)
+  then ioReturn () else fail label
+checkLeft : String -> G.Build Int -> IO ()
+checkLeft label action = case G.runBuild (state 0) action of
+ Left message -> if eqString message "stop" then ioReturn () else fail label
+ Right _ -> fail label
+f : Int -> G.Build Int
+f x = do { G.put (state x); return (x + 1) }
+g : Int -> G.Build Int
+g x = do { graph <- G.get; return (x + G.nextId graph) }
+functionAction : G.Build (Int -> Int)
+functionAction = do { G.put (state 7); return (\x -> x + 1) }
+argumentAction : G.Build Int
+argumentAction = do { graph <- G.get; G.put (state 9); return (G.nextId graph) }
+main : IO ()
+main = do
+ negative <- getEnv "MLF_GRAPH_BUILD_NEGATIVE"
+ check "pure/oracle" (if eqString negative "1" then 43 else 42) 0 (pure 42)
+ check "functor" 42 0 (fmap (\x -> x + 1) (pure 41))
+ check "left identity" 6 5 (bind (pure 5) f)
+ check "right identity" 6 5 (bind (f 5) pure)
+ check "associativity left" 11 5 (bind (bind (pure 5) f) g)
+ check "associativity right" 11 5 (bind (pure 5) (\x -> bind (f x) g))
+ check "put/get" 7 7 (do { G.put (state 7); graph <- G.get; return (G.nextId graph) })
+ check "applicative function-before-argument" 8 9 ((<*>) functionAction argumentAction)
+ checkLeft "bind short circuit" (bind (G.lift (Left "stop" :: Either String Int)) (\_ -> panic "continuation evaluated"))
+ checkLeft "applicative short circuit" ((<*>) (G.lift (Left "stop" :: Either String (Int -> Int))) (panic "argument action evaluated" :: G.Build Int))
+ check "lazy functor payload" 42 0 (fmap (\_ -> 42) (pure (panic "payload evaluated" :: Int)))
+ check "lazy applicative payload" 42 0 ((<*>) (pure (\_ -> 42)) (pure (panic "argument payload evaluated" :: Int)))
+ case S.mapOptional (\_ -> panic "Nothing mapper evaluated") (Nothing :: Maybe Int) of
+  Nothing -> ioReturn ()
+  Just _ -> fail "Nothing mapping"
+ case S.mapEither (\_ -> panic "Left mapper evaluated") (Left "stop" :: Either String Int) of
+  Left message -> if eqString message "stop" then ioReturn () else fail "Left mapping"
+  Right _ -> fail "Left mapping"
+ putStrLn "PASS graph build standard classes (14 checks)"

@@ -1,5 +1,6 @@
 -- Independent Algorithm W; no imports of the compiler, graph solver or xMLF checker.
 module Tests.Oracle where
+import Prelude hiding (fail)
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
 import qualified Bootstrap.Map as M
@@ -7,17 +8,27 @@ import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.IntSet as IS
 
 data Mono = Meta Int | Fun Mono Mono | IntegerType | BooleanType
-data Scheme = Scheme (List Int) Mono
+data Scheme = Scheme ([] Int) Mono
 data WState = WState Int (IntMap Mono)
-data W a = W (WState -> Either String (Pair a WState))
+data W a = W (WState -> Either String ((,) a WState))
 runW (W f) state = f state
-returnW x = W (\s -> Right (Pair x s))
+returnW x = W (\s -> Right ((,) x s))
 bindW : forall a b. W a -> (a -> W b) -> W b
-bindW (W f) next = W (\s -> S.eitherBind (f s) (\(Pair x changed) -> runW (next x) changed))
-instance Monad W where { return = returnW; bind = bindW }
+bindW (W f) next = W (\s -> S.eitherBind (f s) (\((,) x changed) -> runW (next x) changed))
+instance Functor W where { fmap f action = bindW action (\x -> returnW (f x)) }
+instance Applicative W where {
+ pure = returnW;
+ (<*>) functions arguments = bindW functions (\f -> bindW arguments (\x -> returnW (f x)))
+}
+instance Monad W where { (>>=) = bindW }
+-- Keep this oracle's explicit traversal and W kernels independent of compiler code.
+mapW : forall a b. (a -> W b) -> [] a -> W ([] b)
+mapW f xs = case xs of
+ [] -> returnW []
+ (:) x rest -> bindW (f x) (\y -> bindW (mapW f rest) (\ys -> returnW ((:) y ys)))
 get : W WState
-get = W (\s -> Right (Pair s s))
-put s = W (\old -> Right (Pair Unit s))
+get = W (\s -> Right ((,) s s))
+put s = W (\old -> Right ((,) () s))
 fail message = W (\s -> Left message)
 apply : IntMap Mono -> Mono -> Mono
 apply subst ty = case ty of
@@ -36,27 +47,27 @@ equal BooleanType BooleanType = true
 equal _ _ = false
 fresh : W Mono
 fresh = do { WState n subst <- get; put (WState (n + 1) subst); return (Meta n) }
-unify : Mono -> Mono -> W Unit
+unify : Mono -> Mono -> W ()
 unify t u = do
   WState n subst <- get
   let a = apply subst t
   let b = apply subst u
-  if equal a b then return Unit else case Pair a b of
-    Pair (Meta i) value -> if S.not (IS.member i (free value)) then put (WState n (IM.insert i value subst)) else fail "HM mismatch"
-    Pair value (Meta i) -> if S.not (IS.member i (free value)) then put (WState n (IM.insert i value subst)) else fail "HM mismatch"
-    Pair (Fun a b) (Fun c d) -> do { unify a c; unify b d }
+  if equal a b then return () else case (,) a b of
+    (,) (Meta i) value -> if S.not (IS.member i (free value)) then put (WState n (IM.insert i value subst)) else fail "HM mismatch"
+    (,) value (Meta i) -> if S.not (IS.member i (free value)) then put (WState n (IM.insert i value subst)) else fail "HM mismatch"
+    (,) (Fun a b) (Fun c d) -> do { unify a c; unify b d }
     _ -> fail "HM mismatch"
 infer : Map String Scheme -> SExpr -> W Mono
 infer env expression = case expression of
   SVar x -> case M.lookup compareString x env of
     Nothing -> fail "unbound"
     Just (Scheme variables ty) -> do
-      replacements <- S.mapM (\ignored -> fresh) variables
+      replacements <- mapW (\ignored -> fresh) variables
       WState n subst <- get
       return (apply (IM.fromList (S.zip variables replacements)) (apply subst ty))
   SLam x Nothing body -> do
     a <- fresh
-    result <- infer (M.insert compareString x (Scheme Nil a) env) body
+    result <- infer (M.insert compareString x (Scheme [] a) env) body
     WState n subst <- get
     return (Fun (apply subst a) (apply subst result))
   SApp function argument -> do
@@ -77,14 +88,14 @@ infer env expression = case expression of
   SBoolLit b -> return BooleanType
   _ -> fail "oracle accepts only unannotated terms"
 hmTypable expression = S.isRight (runW (infer M.empty expression) (WState 0 IM.empty))
-closedTerms limit = S.concatMap (\n -> terms n Nil) (S.range 1 limit)
-terms : Int -> List String -> List SExpr
-terms n env = if n == 1 then Cons (SIntLit 0) (Cons (SBoolLit true) (S.map SVar env)) else
-  let x = "x" ++ showInt (S.length env) in S.concat (Cons (S.map (SLam x Nothing) (terms (n - 1) (Cons x env)))
-    (Cons (S.concatMap (\k -> S.concatMap (\a -> S.map (SApp a) (terms (n - 1 - k) env)) (terms k env)) (S.range 1 (n - 2)))
-    (Cons (S.concatMap (\k -> S.concatMap (\a -> S.map (SLet x a) (terms (n - 1 - k) (Cons x env))) (terms k env)) (S.range 1 (n - 2))) Nil)))
-pick size seed = let next = remInt (seed * 48271) 2147483647 in Pair (remInt next size) next
-generatedTerms count = S.map (\seed -> S.fst (gen (7 + remInt seed 19) Nil seed)) (S.range 1 count)
+closedTerms limit = S.concatMap (\n -> terms n []) (S.range 1 limit)
+terms : Int -> [] String -> [] SExpr
+terms n env = if n == 1 then (:) (SIntLit 0) ((:) (SBoolLit true) (S.map SVar env)) else
+  let x = "x" ++ showInt (S.length env) in S.concat ((:) (S.map (SLam x Nothing) (terms (n - 1) ((:) x env)))
+    ((:) (S.concatMap (\k -> S.concatMap (\a -> S.map (SApp a) (terms (n - 1 - k) env)) (terms k env)) (S.range 1 (n - 2)))
+    ((:) (S.concatMap (\k -> S.concatMap (\a -> S.map (SLet x a) (terms (n - 1 - k) ((:) x env))) (terms k env)) (S.range 1 (n - 2))) [])))
+pick size seed = let next = remInt (seed * 48271) 2147483647 in (,) (remInt next size) next
+generatedTerms count = S.map (\seed -> S.fst (gen (7 + remInt seed 19) [] seed)) (S.range 1 count)
 -- An injective structural encoding of this oracle's unannotated input language.
 -- Keep the full seeded stream for archive reproduction; unit execution uses
 -- the first occurrence of each AST rather than repeating identical programs.
@@ -98,21 +109,21 @@ termKey expression = case expression of
  SIntLit n -> "i" ++ termField (showInt n)
  SBoolLit b -> if b then "t" else "f"
  _ -> panic "annotated expression outside the independent HM generator"
-distinctTermCases : List SExpr -> List (Pair Int SExpr)
+distinctTermCases : [] SExpr -> [] ((,) Int SExpr)
 distinctTermCases expressions =
- let add (Triple position seen kept) expression =
+ let add ((,,) position seen kept) expression =
        let key = termKey expression in
        let next = position + 1 in
-       seq next (if M.member compareString key seen then Triple next seen kept
-       else Triple next (M.insert compareString key Unit seen) (Cons (Pair position expression) kept)) in
- case S.foldlStrict add (Triple 1 M.empty Nil) expressions of { Triple _ _ kept -> S.reverse kept }
-gen : Int -> List String -> Int -> Pair SExpr Int
+       seq next (if M.member compareString key seen then (,,) next seen kept
+       else (,,) next (M.insert compareString key () seen) ((:) ((,) position expression) kept)) in
+ case S.foldlStrict add ((,,) 1 M.empty []) expressions of { (,,) _ _ kept -> S.reverse kept }
+gen : Int -> [] String -> Int -> (,) SExpr Int
 gen n env seed = if n <= 1 then case pick (2 + S.length env) seed of
-  Pair i next -> Pair (if i == 0 then SIntLit 0 else if i == 1 then SBoolLit true else SVar (S.index env (i - 2))) next
-  else case (if n == 2 then Pair 0 seed else pick 3 seed) of
-    Pair shape next -> let x = "x" ++ showInt (S.length env) in
-      if shape == 0 then case gen (n - 1) (Cons x env) next of { Pair body final -> Pair (SLam x Nothing body) final } else
+  (,) i next -> (,) (if i == 0 then SIntLit 0 else if i == 1 then SBoolLit true else SVar (S.index env (i - 2))) next
+  else case (if n == 2 then (,) 0 seed else pick 3 seed) of
+    (,) shape next -> let x = "x" ++ showInt (S.length env) in
+      if shape == 0 then case gen (n - 1) ((:) x env) next of { (,) body final -> (,) (SLam x Nothing body) final } else
         case pick (n - 2) next of
-          Pair smaller next -> let k = smaller + 1 in case gen k env next of
-            Pair left next -> case gen (n - 1 - k) (if shape == 1 then env else Cons x env) next of
-              Pair right final -> Pair (if shape == 1 then SApp left right else SLet x left right) final
+          (,) smaller next -> let k = smaller + 1 in case gen k env next of
+            (,) left next -> case gen (n - 1 - k) (if shape == 1 then env else (:) x env) next of
+              (,) right final -> (,) (if shape == 1 then SApp left right else SLet x left right) final

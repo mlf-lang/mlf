@@ -1,0 +1,450 @@
+{
+  "format": 1,
+  "operation": "GHC-observed literal-variable concretization",
+  "diagnostic": "standard-inferred-types-before.log",
+  "checks": {
+    "only_literal_free_signature_insertions": true,
+    "all_other_source_bytes_unchanged": true
+  },
+  "files": [
+    {
+      "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "old_sha256": "0d7557a5d37824bdf8801f02d0c4b15cff393cd6aa1832c9bc01d78363b567e0",
+      "new_sha256": "9a12ffe991aa002d1f5f3987e654b260def999703dddf9306463d49b0636b308",
+      "annotations": [
+        {
+          "module": "Bootstrap.Layout",
+          "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+          "name": "continuationPrevious",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        },
+        {
+          "module": "Bootstrap.Layout",
+          "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+          "name": "continuationTokens",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        }
+      ],
+      "added": 2
+    },
+    {
+      "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "old_sha256": "2ebe13bdb4af50be50a4391bcd893697c89caadf839dde1c48de24dce6887596",
+      "new_sha256": "d6a97b1cf4de032a5c04af9fba9d190aa4aead2e8bfc94cf14f544d43b272d1c",
+      "annotations": [
+        {
+          "module": "Bootstrap.Prelude",
+          "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+          "name": "standardMethodClass",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => String -> a",
+          "signature": "String -> String"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "old_sha256": "987bc6ef318006c32707434559886eeeb8f076a63f86e37573c83bc3741a6177",
+      "new_sha256": "92e8fe77c064b3eed37c14e5f7cfafc8cc7db9dd4a75b296875cbe4f5b15817e",
+      "annotations": [
+        {
+          "module": "Bootstrap.Parser",
+          "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+          "name": "reservedWords",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        },
+        {
+          "module": "Bootstrap.Parser",
+          "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+          "name": "sharedComparisons",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        },
+        {
+          "module": "Bootstrap.Parser",
+          "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+          "name": "sharedLevel4Operators",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        }
+      ],
+      "added": 3
+    },
+    {
+      "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+      "old_sha256": "9c414bdf4a699c001e953e42842f3904491ce7af7e2a5e36001a65216bda8c68",
+      "new_sha256": "a681598a968509ae820f05d8e6a10a8179b892e327ff0ee6ca8b52d6d8802f9b",
+      "annotations": [
+        {
+          "module": "Bootstrap.Data",
+          "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+          "name": "keywords",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "old_sha256": "1dafad97a593ae1c32928b696c0753559870e713a11ddd609a4cc57468fba9c7",
+      "new_sha256": "e7a530bf8bf067530750fc31678d6455fb5cd370703f0733470c75e4d6f64eac",
+      "annotations": [
+        {
+          "module": "Bootstrap.X.Parser",
+          "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+          "name": "dataReserved",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        },
+        {
+          "module": "Bootstrap.X.Parser",
+          "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+          "name": "reservedWords",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        }
+      ],
+      "added": 2
+    },
+    {
+      "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "old_sha256": "27fd8a246d9792ac950e15ae0b4187c8513d0cf455f259bbfb34407b83359361",
+      "new_sha256": "9675674e386e129437d23def664b418cd16c385cf75fe880fe9407d7847462e0",
+      "annotations": [
+        {
+          "module": "Bootstrap.Evidence",
+          "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+          "name": "superclassArgument",
+          "inferred": " forall {e} {a} {p}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => List a -> p -> Either e a",
+          "signature": "forall a p. List a -> p -> Either String a"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "old_sha256": "3e325c475293e50b7021b017ac934770ae59f2144c86cc59605d4d376ef245f0",
+      "new_sha256": "1e446a0145e36edb1fff1e579039f294c22e4e472a577ba85c2cb3717fcc4386",
+      "annotations": [
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncCellHandle",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => Either e RValue -> Either e (Pair ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer)",
+          "signature": "Either String RValue -> Either String (Pair Int Int)"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncClose",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e RAsyncStore",
+          "signature": "RAsyncStore -> Int -> Either String RAsyncStore"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncLookupCell",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e RAsyncCellState",
+          "signature": "RAsyncStore -> Int -> Either String RAsyncCellState"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncLookupScope",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e RAsyncScopeState",
+          "signature": "RAsyncStore -> Int -> Either String RAsyncScopeState"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncMature",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e RAsyncStore",
+          "signature": "RAsyncStore -> Int -> Int -> Either String RAsyncStore"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncNewCell",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e (Pair RAsyncStore (Maybe RValue))",
+          "signature": "RAsyncStore -> Int -> Either String (Pair RAsyncStore (Maybe RValue))"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncResolve",
+          "inferred": " forall {b}. ghc-internal-9.1401.0:GHC.Internal.Num.Num b => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either String RValue -> Either String (Pair RAsyncStore b)",
+          "signature": "RAsyncStore -> Int -> Int -> Either String RValue -> Either String (Pair RAsyncStore Int)"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncScopeHandle",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => Either e RValue -> Either e ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer",
+          "signature": "Either String RValue -> Either String Int"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncSetBusy",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Bool -> Either e RAsyncStore",
+          "signature": "RAsyncStore -> Int -> Bool -> Either String RAsyncStore"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncTicketHandle",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => Either e RValue -> Either e (Triple ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer)",
+          "signature": "Either String RValue -> Either String (Triple Int Int Int)"
+        },
+        {
+          "module": "Bootstrap.Runtime",
+          "path": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+          "name": "rAsyncTicketStatus",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => RAsyncStore -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer -> Either e ghc-internal-9.1401.0:GHC.Internal.Bignum.Integer.Integer",
+          "signature": "RAsyncStore -> Int -> Int -> Int -> Either String Int"
+        }
+      ],
+      "added": 11
+    },
+    {
+      "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "old_sha256": "0ef17923bdd836532cf454b9069e4cbe11844657000656dea9d93f2d7443e4da",
+      "new_sha256": "a825a9682f7ef9e2ab01f20905e804464b55aa56cb7d6f8eff6be3c522b0737d",
+      "annotations": [
+        {
+          "module": "Bootstrap.Module",
+          "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+          "name": "primitiveTypeNames",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => List a",
+          "signature": "List String"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-llvm/Bootstrap/LLVM.hs",
+      "old_sha256": "014859a83ddc9e609a3952300f19cc2a8c65974c829767ae1531fc73e60b1d56",
+      "new_sha256": "fef504fdb41307fbacf094fa9368d0bf4adb2f6213eafc15e2caab5c7702618c",
+      "annotations": [
+        {
+          "module": "Bootstrap.LLVM",
+          "path": "libraries/mlf-llvm/Bootstrap/LLVM.hs",
+          "name": "runtimeBool",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Bool -> a",
+          "signature": "Bool -> String"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "old_sha256": "02ad26d81acf5d380f2cc2096be5087ea9cf239b791589944a988caa7599c8a5",
+      "new_sha256": "d509107a006461cdf43f20f49a60bcc26b8bce859c5b1d80cd5e4a11892fe448",
+      "annotations": [
+        {
+          "module": "Bootstrap.Separate",
+          "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+          "name": "noEntityArg",
+          "inferred": " forall {e} {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => a -> String -> Either e a",
+          "signature": "forall a. a -> String -> Either String a"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "old_sha256": "ba168375f092a060bee2973baec578bd2ce3506d125d9c7760330dc78b8dd924",
+      "new_sha256": "2ab32a36a409fae72d77c8a1d001e7ba11313c9e285bb616ba61d038e007fd42",
+      "annotations": [
+        {
+          "module": "Bootstrap.CompilerCore",
+          "path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+          "name": "prettyPhase",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Phase -> a",
+          "signature": "Phase -> String"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "old_sha256": "9045d0e0b4615c85e642d49230520d86070e8a116c3dc3eb5c7adf5c4f807980",
+      "new_sha256": "5eea9de5d7139e43ee87ed5ea5b1610b28e69644f34962dceea8bce7b33c16c8",
+      "annotations": [
+        {
+          "module": "Bootstrap.CrateQuery",
+          "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+          "name": "boolean",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Bool -> a",
+          "signature": "Bool -> String"
+        },
+        {
+          "module": "Bootstrap.CrateQuery",
+          "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+          "name": "encodeFlag",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Flag -> a",
+          "signature": "Flag -> String"
+        },
+        {
+          "module": "Bootstrap.CrateQuery",
+          "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+          "name": "encodeRole",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => EvidenceRole -> a",
+          "signature": "EvidenceRole -> String"
+        },
+        {
+          "module": "Bootstrap.CrateQuery",
+          "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+          "name": "ensureDirectory",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => String -> IO (Either e Unit)",
+          "signature": "String -> IO (Either String Unit)"
+        },
+        {
+          "module": "Bootstrap.CrateQuery",
+          "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+          "name": "writeAtomic",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => String -> String -> IO (Either e Unit)",
+          "signature": "String -> String -> IO (Either String Unit)"
+        },
+        {
+          "module": "Bootstrap.CrateQuery",
+          "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+          "name": "writeCache",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => String -> String -> IO (Either e Unit)",
+          "signature": "String -> String -> IO (Either String Unit)"
+        }
+      ],
+      "added": 6
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "old_sha256": "e230057bad129a7c8415bad3393409022bd3bfbfeebf97a084668e05919a1c6c",
+      "new_sha256": "d530296287e4fc637cf6e275b4c36334d9044853dff1c4dba6962d22a980b51e",
+      "annotations": [
+        {
+          "module": "Bootstrap.CrateArtifact",
+          "path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+          "name": "entryOwner",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => CrateInterface -> Either e String",
+          "signature": "CrateInterface -> Either String String"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "old_sha256": "f27d23156701fb2bc1aa0d53b3d3d130b255e47a2230b306e47df26b18e2cdb3",
+      "new_sha256": "ada6f176e601c2c06da35c4504595f1e0b2daeded68f79a530153486c79776af",
+      "annotations": [
+        {
+          "module": "Bootstrap.CrateCodegen",
+          "path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+          "name": "cacheFields",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a -> a -> a -> List a",
+          "signature": "String -> String -> String -> List String"
+        },
+        {
+          "module": "Bootstrap.CrateCodegen",
+          "path": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+          "name": "saveReport",
+          "inferred": " forall {e}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString e => String -> CodegenResult -> IO (Either e CodegenResult)",
+          "signature": "String -> CodegenResult -> IO (Either String CodegenResult)"
+        }
+      ],
+      "added": 2
+    },
+    {
+      "path": "bootstrap/MLF/Entry/Emlf.hs",
+      "old_sha256": "67345c82aadfc57dbf460a34b7ee956df559b3818f782fbc61c8b3138a751940",
+      "new_sha256": "f1a417a4918d4d9231a5b31100a2fc52d54f7853712fa0a646b1956c10509f04",
+      "annotations": [
+        {
+          "module": "MLF.Entry.Emlf",
+          "path": "bootstrap/MLF/Entry/Emlf.hs",
+          "name": "baseUsage",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a",
+          "signature": "String"
+        },
+        {
+          "module": "MLF.Entry.Emlf",
+          "path": "bootstrap/MLF/Entry/Emlf.hs",
+          "name": "crateUsage",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a",
+          "signature": "String"
+        }
+      ],
+      "added": 2
+    },
+    {
+      "path": "tests/shared/MLF/Tests/SharedFrontend.hs",
+      "old_sha256": "aec1dc6b1c94c610be0b5a17f0db18a6163f55334156e8b9cd38ff637c4e5dbe",
+      "new_sha256": "d99df70c0a9b033fbe787d230cd794238da21af1808d0b82b40966d90280d705",
+      "annotations": [
+        {
+          "module": "MLF.Tests.SharedFrontend",
+          "path": "tests/shared/MLF/Tests/SharedFrontend.hs",
+          "name": "prologue",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a",
+          "signature": "String"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-package-core/Package/Build.hs",
+      "old_sha256": "23a2b196f3e14e8d938c61e10bd91ad8935d03dcabce2a6f9d794c5e2949596b",
+      "new_sha256": "40ecf600b645ba41dfa5bc27cb83c1e988fc2b8c0fd2f3adb8695b72908c3329",
+      "annotations": [
+        {
+          "module": "Package.Build",
+          "path": "libraries/mlf-package-core/Package/Build.hs",
+          "name": "objectFlags",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Builder -> List a",
+          "signature": "Builder -> List String"
+        }
+      ],
+      "added": 1
+    },
+    {
+      "path": "libraries/mlf-developer-tools/Package/Benchmark.hs",
+      "old_sha256": "e5d16234525d26107515b9ea1f2b7af3f69cac38fc7401c2086bab9664712f4d",
+      "new_sha256": "88c252bc896b5110fcf4352c97f84fe83f1d954e139dfa80445c203501adb70e",
+      "annotations": [
+        {
+          "module": "Package.Benchmark",
+          "path": "libraries/mlf-developer-tools/Package/Benchmark.hs",
+          "name": "alu",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => a",
+          "signature": "String"
+        },
+        {
+          "module": "Package.Benchmark",
+          "path": "libraries/mlf-developer-tools/Package/Benchmark.hs",
+          "name": "humanBounds",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Num.Num a => List a",
+          "signature": "List Int"
+        }
+      ],
+      "added": 2
+    },
+    {
+      "path": "tests/Tests/Selection.hs",
+      "old_sha256": "1b7bbdc0616c7f34d8119304e82ccc8e798b75a270bde0e544ec514af048a52f",
+      "new_sha256": "633858901fc8357424659a521f0bf419149d4b35abb966a53d7e4c2063ff7aff",
+      "annotations": [
+        {
+          "module": "Tests.Selection",
+          "path": "tests/Tests/Selection.hs",
+          "name": "scope",
+          "inferred": " forall {a}. ghc-internal-9.1401.0:GHC.Internal.Data.String.IsString a => Bool -> a",
+          "signature": "Bool -> String"
+        }
+      ],
+      "added": 1
+    }
+  ]
+}

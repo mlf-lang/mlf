@@ -1,0 +1,88 @@
+PASS cold ioReturn
+PASS cold ioBind
+PASS cold stReturn
+PASS cold stBind
+PASS cold newSTArray
+PASS cold readSTArray
+PASS cold writeSTArray
+PASS cold lengthSTArray
+PASS cold newIntArray
+PASS cold readIntArray
+PASS cold writeIntArray
+PASS cold lengthIntArray
+PASS cold newDoubleArray
+PASS cold readDoubleArray
+PASS cold writeDoubleArray
+PASS cold lengthDoubleArray
+PASS cold newByteArray
+PASS cold readByteArray
+PASS cold writeByteArray
+PASS cold lengthByteArray
+PASS cold byteArrayFromString
+PASS cold putBytes
+PASS cold readIntTable
+PASS cold writeIntTable
+PASS cold putStr
+PASS cold putStrLn
+PASS cold printInt
+PASS cold readFile
+PASS cold writeFile
+PASS cold fileExists
+PASS cold canonicalPath
+PASS cold getArg
+PASS cold exitWith
+PASS cold getEnv
+PASS cold setEnv
+PASS cold unsetEnv
+PASS cold runProcess
+PASS cold listDirectory
+PASS cold directoryExists
+PASS cold fileDigest
+PASS cold acquireFileLock
+PASS cold releaseFileLock
+PASS cold processSupervisor
+PASS cold asyncScopeNew
+PASS cold asyncScopeClose
+PASS cold asyncNewCompletion
+PASS cold asyncResolveCompletion
+PASS cold asyncReadCompletion
+PASS cold asyncSubscribeCompletion
+PASS cold asyncSubscriptionStatus
+PASS cold asyncCancelSubscription
+PASS cold asyncStep
+PASS cold asyncEnqueue
+PASS cold asyncDelay
+PASS cold asyncWait
+PASS arbitrary precision
+PASS comparison right-first <=
+PASS comparison right-first >
+PASS comparison left-first >=
+PASS format value before bound check
+PASS empty ST initializer lazy
+PASS ST snapshot execution time
+PASS empty IO initializer strict
+PASS array index checks despite result discarded
+PASS Unicode scalar and NUL indexing
+PASS invalid UTF8 action-time
+PASS file path NUL rejected during action
+PASS writeFile validates filename before contents
+PASS writeFile forces contents before truncation
+PASS runProcess validates cwd before specification
+PASS setEnv validates name before contents
+PASS setEnv forces name before contents
+PASS exitWith exact native bound diagnostic
+PASS nested panic message demand
+PASS zero length byte initializer validation
+PASS nominal array read write and length
+PASS UTF8 byte array conversion
+PASS file lock narrowing is checked
+PASS huge array length is checked
+PASS huge index is checked
+PASS huge async delay is checked
+PASS huge async wait is checked
+PASS Double bits outside Word64 rejected
+PASS Double negative zero bits
+PASS String scalar maximum
+PASS String surrogate rejected
+PASS async lazy payload, rejection, FIFO, close
+TOTAL 87 FAILED 0

@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 31938,
+  "new_sha256": "c1f6ee40041e9be3b8056bc1a9e03c539269cd1dcfec3ce69e717cfbf48948d7",
+  "old_bytes": 31834,
+  "old_sha256": "b3d43f1a3a46b62107b0301e6278225c97dac4477c7c8bb21e981fc887933f4b",
+  "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+  "splices": [
+    {
+      "new": "OjogW10gUGFja2FnZUZpbmFsRmllbGRzOCAtPiBbXSBYVGVybSAtPgogICAgRWl0aGVyIFN0cmluZyAoW10gKCgsKSBTdHJpbmcgRnJhZ21lbnQpKTsKICByZXN0b3JlRmluYWxzOCA=",
+      "new_at": 23993,
+      "old": "",
+      "old_at": 23993
+    }
+  ]
+}

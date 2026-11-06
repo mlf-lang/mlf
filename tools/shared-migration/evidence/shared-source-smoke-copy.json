@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "operation": "retained-guest-fixture-to-direct-shared-source-smoke",
+  "tool_proposal": "92-module frozen-input standard-hierarchy proposal",
+  "input_revision": "249d8d79c0ec4907d44944c3bc44e490985c297a",
+  "file": {
+    "module": "MLF.Tests.PRQuickMain",
+    "old_path": "tests/PRQuickMain.emlf",
+    "new_path": "tests/shared/MLF/Tests/PRQuickMain.hs",
+    "old_sha256": "e10507542e183e8b5a9129472e73edad963a7e9f84fe692d0a405283093603f9",
+    "old_lines": 85,
+    "membership": "direct-test",
+    "operation": "copy",
+    "new_sha256": "6e33aa58790726269a7158cc54a10744962c1d5588a65c7694558afbc9655f98",
+    "new_lines": 118,
+    "counts": {
+      "string_patterns": 0,
+      "expression_strings": 45,
+      "annotation_tokens": 8,
+      "legacy_boolean_tokens": 2,
+      "pattern_binders": 31,
+      "resolved_value_references": 182,
+      "sequential_bindings": 4,
+      "signatures": 8,
+      "standard_monad_instances": 0
+    },
+    "postprint_comment_change": "Updated obsolete seed-runner comment only; no literal or executable AST change."
+  },
+  "wrapper": {
+    "path": "host/ghc/app/source-smoke/Main.hs",
+    "sha256": "a2f18f3d62bb70bf2817d615acfb5ff88434fdd73cb9094a75e2cdca1f416bb4"
+  }
+}

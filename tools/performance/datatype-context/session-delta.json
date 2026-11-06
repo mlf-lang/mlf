@@ -1,0 +1,25 @@
+{
+  "edits": [
+    {
+      "new": "    IO (Either String ((,,) ([] Separate.UnitObject) Query.QueryReport (Map String Source.SourceContract)));\n  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan groups contracts\n    objects inferred reused results =\n    runSourceGroupsWithContext encodings Nothing crateId compilerHash cacheDir inventory plan groups contracts\n      objects inferred reused results;\n  runSourceGroupsWithContext encodings datatypeContext crateId compilerHash cacheDir inventory plan groups contracts\n    objects inferred reused results = case groups of {\n    [] -> ioReturn (Right ((,,) (reverse objects)\n",
+      "old": "    IO (Either String ((,,) ([] Separate.UnitObject) Query.QueryReport (Map String Source.SourceContract)));\n  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan groups contracts\n    objects inferred reused results = case groups of {\n    [] -> ioReturn (Right ((,,) (reverse objects)\n"
+    },
+    {
+      "new": "          (append bindings (Source.groupCandidateBindings prepared)) };\n        let { name = Query.groupName crateId names };\n        let { context = case encodings of {\n          Nothing -> (,) (Query.encodeDatatypeContext datatypes) Nothing;\n          Just pool -> case datatypeContext of {\n            Nothing -> (,) (Query.encodeDatatypeContextWithPool pool datatypes) Nothing;\n            Just previous -> case Query.reuseDatatypeContext pool previous datatypes of {\n              (,) text next -> (,) text (Just next)\n            }\n          }\n        }; key = Query.sourceQueryKeyWithContext crateId compilerHash prepared contracts (fst context) };\n        writeFile (cacheDir ++ \"/query-key.new\") key;\n        digest <- fileDigest (cacheDir ++ \"/query-key.new\");\n",
+      "old": "          (append bindings (Source.groupCandidateBindings prepared)) };\n        let { name = Query.groupName crateId names };\n        let { key = case encodings of {\n          Nothing -> Query.sourceQueryKey crateId compilerHash prepared contracts datatypes;\n          Just pool -> Query.sourceQueryKeyWithContext crateId compilerHash prepared contracts\n            (Query.encodeDatatypeContextWithPool pool datatypes)\n        } };\n        writeFile (cacheDir ++ \"/query-key.new\") key;\n        digest <- fileDigest (cacheDir ++ \"/query-key.new\");\n"
+    },
+    {
+      "new": "                  let { semantic = Separate.fingerprint (Query.list Query.encodeBinding\n                    (Separate.unitBindings (Separate.objectInterface finalObject))) };\n                  runSourceGroupsWithContext encodings (snd context) crateId compilerHash cacheDir inventory plan rest\n                    (M.union compareString finalContracts contracts)\n                    ((:) finalObject objects) (inferred + (if hit then 0 else 1))\n",
+      "old": "                  let { semantic = Separate.fingerprint (Query.list Query.encodeBinding\n                    (Separate.unitBindings (Separate.objectInterface finalObject))) };\n                  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan rest\n                    (M.union compareString finalContracts contracts)\n                    ((:) finalObject objects) (inferred + (if hit then 0 else 1))\n"
+    },
+    {
+      "new": "                let { encodings = if shareEncoding\n                      then Just (Query.prepareSourceEncodings (Source.planData plan)) else Nothing };\n                result <- runSourceGroupsWithContext encodings (case encodings of {\n                  Nothing -> Nothing;\n                  Just pool -> Just (Query.emptyDatatypeContextEncoding pool)\n                })\n                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];\n                releaseFileLock lock;\n",
+      "old": "                let { encodings = if shareEncoding\n                      then Just (Query.prepareSourceEncodings (Source.planData plan)) else Nothing };\n                result <- runSourceGroupsWithEncodings encodings\n                  crateId compilerHash cacheDir inventory plan (Source.planGroups plan) contracts [] 0 0 [];\n                releaseFileLock lock;\n"
+    }
+  ],
+  "format": "datatype-context-session-projection-v1",
+  "new_sha256": "1d837ed6dfb21a54d78e491dc90b24c42e11e702bec53dd72d85f2f291d305b6",
+  "old_sha256": "da9727970cf184031b547c5c877a083a31d43bbaf03d4a1e647f7f49be38d88b",
+  "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+  "scope": "Invert only the four datatype-context driver edits for the retained validation-reuse source proof. Runtime controls exercise the complete unprojected candidate."
+}

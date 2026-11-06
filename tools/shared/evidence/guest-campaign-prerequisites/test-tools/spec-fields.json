@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-test-tools/0.1.0/library",
+  "",
+  "false",
+  "107:18:Test.NativeProcess83:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/tools/Test/NativeProcess.emlf95:12:Test.Process77:/workspace/scratch/3f83e2ebe290/pr22-recovery/testing/tools/Test/Process.emlf",
+  "102:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/async/artifact/unit.mlfci118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci109:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/package-core/artifact/unit.mlfci101:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/test/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/test-tools/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]
