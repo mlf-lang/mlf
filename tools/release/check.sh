@@ -16,6 +16,7 @@ tools/release/test-setup-macos.sh
 tools/release/test-package-publishing.sh
 tools/release/test-smoke-receipts.sh
 tools/release/test-fetch-seed.sh
+python3 tools/release/test-fetch-seed-artifact.py
 tools/release/test-pr-gate.sh
 tools/release/test-qualification-gate.sh
 node tools/release/test-benchmark-gate.mjs

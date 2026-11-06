@@ -15,7 +15,27 @@ esac
 mkdir -p "$destination"
 destination=$(cd "$destination" && pwd)
 archive="mlf-$MLF_SEED_VERSION-$platform.tar.gz"
-gh release download "v$MLF_SEED_VERSION" --repo mlf-lang/mlf --pattern "$archive" --pattern SHA256SUMS --dir "$destination"
+case "${MLF_SEED_TRANSPORT:-release}" in
+  release)
+    gh release download "v$MLF_SEED_VERSION" --repo mlf-lang/mlf --pattern "$archive" --pattern SHA256SUMS --dir "$destination"
+    ;;
+  github-actions-artifact)
+    # Temporary, explicitly pinned transport for the original release bytes.
+    # Never select a new artifact or fall back after a release download fails.
+    : "${MLF_SEED_SOURCE_COMMIT:?artifact transport requires a source pin}"
+    : "${MLF_SEED_ARCHIVE_SHA256:?artifact transport requires an archive pin}"
+    : "${MLF_SEED_COMPILER_SHA256:?artifact transport requires a compiler pin}"
+    : "${MLF_SEED_MANAGER_SHA256:?artifact transport requires a manager pin}"
+    python3 "$root/tools/release/fetch-seed-artifact.py" \
+      --run-id "${MLF_SEED_ARTIFACT_RUN_ID:?artifact run pin required}" \
+      --artifact-id "${MLF_SEED_ARTIFACT_ID:?artifact ID pin required}" \
+      --name "${MLF_SEED_ARTIFACT_NAME:?artifact name pin required}" \
+      --sha256 "${MLF_SEED_ARTIFACT_SHA256:?artifact ZIP digest pin required}" \
+      --source "$MLF_SEED_SOURCE_COMMIT" --archive "$archive" \
+      --archive-sha256 "$MLF_SEED_ARCHIVE_SHA256" --destination "$destination"
+    ;;
+  *) printf 'Unsupported seed transport: %s\n' "$MLF_SEED_TRANSPORT" >&2; exit 2 ;;
+esac
 # A release can also publish supplementary validation archives. Verify the
 # archive downloaded here; both native executable hashes are checked below.
 awk -v archive="$archive" '$2 == archive { print; found++ } END { if (found != 1) exit 1 }' \

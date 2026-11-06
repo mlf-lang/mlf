@@ -35,9 +35,8 @@ def _object_tree(root, identity, kind):
 
 # Two-phase seal: commit all reviewed bytes with this literal zeroed, then
 # make a single child changing only this literal to that precursor's SHA.
-SOURCE_ANCHOR = 'f54351bd57a48f3e97d9f956f14ade8363c6f5d1'
-SOURCE_PARENTS = ('e0f11f9c39b40f54f30e0eecbea7cebdf8cf0e74',
-                  '5d4310381a119c4136a1b9664e2c532ad76323f7')
+SOURCE_ANCHOR = '0000000000000000000000000000000000000000'
+SOURCE_PARENTS = ('5f77c669586e44f31d13b861d4f92130e1f55a47',)
 MAIN_BASE = '5d4310381a119c4136a1b9664e2c532ad76323f7'
 SEAL_PATH = 'tools/testing/history_refs.py'
 TRANSPORTED = frozenset((
@@ -256,12 +255,15 @@ def checked_current(path, current, expected_sha256):
             raise ValueError('reviewed incoming main differs: ' + path)
         value = incoming.decode('utf-8')
     if path == '.github/workflows/ci.yml':
-        changes = [(
+        changes = [('permissions:\n  contents: read\n',
+                    'permissions:\n  contents: read\n  actions: read\n'), (
             '      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6\n      - run: tools/release/check.sh\n',
             '      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6\n        with:\n          fetch-depth: 0\n      - name: Prepare reviewed historical source objects\n        run: python3 -B tools/testing/prepare_history_refs.py\n      - run: tools/release/check.sh\n',
         )]
     elif path == 'tools/release/check.sh':
-        changes = [("python3 tools/release/test-async-change-scope.py\n",
+        changes = [("tools/release/test-fetch-seed.sh\n",
+                    "tools/release/test-fetch-seed.sh\npython3 tools/release/test-fetch-seed-artifact.py\n"),
+                   ("python3 tools/release/test-async-change-scope.py\n",
                     "python3 tools/release/test-async-change-scope.py\npython3 tools/testing/test_history_refs.py\npython3 tools/testing/test_history_workflows.py\npython3 tools/testing/test_framework_recovery.py\n")]
     elif path == 'tools/testing/check_reconciliation_inventory.py':
         changes = [

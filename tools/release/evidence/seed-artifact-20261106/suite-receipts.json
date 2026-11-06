@@ -1,0 +1,89 @@
+{
+  "complete": true,
+  "compiler": "$REPO/.mlf-build/seed-artifact-replay/smoke-seed-linux/mlf-0.3.0-linux-x64/libexec/emlf",
+  "compiler_sha256": "064e9ee2d5e9a8df38a8d3a56c0595e8aa7757a41d63c46e818c4cd24af0d3a6",
+  "source": "$REPO/tests/Tests/CompilerTests.emlf",
+  "source_sha256": "b20f33c4fb833f25b534567068e1ae24bc5e783472d17efdbdc6a772ff841ad6",
+  "cases": [
+    {
+      "name": "first-and-second",
+      "command": [
+        "$REPO/.mlf-build/seed-artifact-replay/smoke-seed-linux/mlf-0.3.0-linux-x64/libexec/emlf",
+        "-i",
+        "$REPO/libraries/mlf-foundation",
+        "-i",
+        "$REPO/libraries/mlf-package-core",
+        "--run",
+        "$REPO/.mlf-build/seed-artifact-replay/suite-receipt-regression/first-and-second.emlf"
+      ],
+      "exit_code": 0,
+      "program_sha256": "d3128faa2cf6b8970ba78a493d83a248acc28e2c36fcbf6c27a962ab09e14a99",
+      "stdout_sha256": "3ebb25e1bffb9ff5b02bdbe430bd4566cb9465b8690d38da1361efd39014b105",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "reject-null",
+      "command": [
+        "$REPO/.mlf-build/seed-artifact-replay/smoke-seed-linux/mlf-0.3.0-linux-x64/libexec/emlf",
+        "-i",
+        "$REPO/libraries/mlf-foundation",
+        "-i",
+        "$REPO/libraries/mlf-package-core",
+        "--run",
+        "$REPO/.mlf-build/seed-artifact-replay/suite-receipt-regression/reject-null.emlf"
+      ],
+      "exit_code": 1,
+      "program_sha256": "a24e4b04a3ee32af964fd2f58867eba94d79d1b25fefd709fb6ce8ee0bc31960",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c86ac2e2fd7ff9c42f63fef71562eedbf318b9cf6f791dad4f2a33c2c2a8f182"
+    },
+    {
+      "name": "reject-object",
+      "command": [
+        "$REPO/.mlf-build/seed-artifact-replay/smoke-seed-linux/mlf-0.3.0-linux-x64/libexec/emlf",
+        "-i",
+        "$REPO/libraries/mlf-foundation",
+        "-i",
+        "$REPO/libraries/mlf-package-core",
+        "--run",
+        "$REPO/.mlf-build/seed-artifact-replay/suite-receipt-regression/reject-object.emlf"
+      ],
+      "exit_code": 1,
+      "program_sha256": "9a38951bdfa47e545d2c5fddfaddcdf0cce87f8685a859bd75348a2f0569d743",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c86ac2e2fd7ff9c42f63fef71562eedbf318b9cf6f791dad4f2a33c2c2a8f182"
+    },
+    {
+      "name": "reject-string",
+      "command": [
+        "$REPO/.mlf-build/seed-artifact-replay/smoke-seed-linux/mlf-0.3.0-linux-x64/libexec/emlf",
+        "-i",
+        "$REPO/libraries/mlf-foundation",
+        "-i",
+        "$REPO/libraries/mlf-package-core",
+        "--run",
+        "$REPO/.mlf-build/seed-artifact-replay/suite-receipt-regression/reject-string.emlf"
+      ],
+      "exit_code": 1,
+      "program_sha256": "1810054ac91bf1e8ea90ed6efb94511311fb3b7c852acdd4bb2c2e2a497800b1",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c86ac2e2fd7ff9c42f63fef71562eedbf318b9cf6f791dad4f2a33c2c2a8f182"
+    },
+    {
+      "name": "reject-prepared-null",
+      "command": [
+        "$REPO/.mlf-build/seed-artifact-replay/smoke-seed-linux/mlf-0.3.0-linux-x64/libexec/emlf",
+        "-i",
+        "$REPO/libraries/mlf-foundation",
+        "-i",
+        "$REPO/libraries/mlf-package-core",
+        "--run",
+        "$REPO/.mlf-build/seed-artifact-replay/suite-receipt-regression/reject-prepared-null.emlf"
+      ],
+      "exit_code": 1,
+      "program_sha256": "2c37e32dc4db176efe932d977f10a1eb3edd8e1b8221e92ecfa2b1ab464152a0",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "5b2407e0516bf26d41bf80a5131f3e9ce0c6895ba99b96a4fd4ff120d48d4133"
+    }
+  ]
+}

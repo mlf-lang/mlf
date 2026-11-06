@@ -1,0 +1,3 @@
+PASS seed fetch: macos-arm64 archive selection and four independent pin rejections
+PASS seed fetch: linux-x64 archive selection and four independent pin rejections
+11 seed fetch platform/pin checks passed.
