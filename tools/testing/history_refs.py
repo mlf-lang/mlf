@@ -40,7 +40,7 @@ def _object_tree(root, identity, kind):
 
 # Two-phase seal: commit all reviewed bytes with this literal zeroed, then
 # make a single child changing only this literal to that precursor's SHA.
-SOURCE_ANCHOR = '0000000000000000000000000000000000000000'
+SOURCE_ANCHOR = 'ef8dcc77b732084da9b00055dd54b8696edc499f'
 SOURCE_PARENTS = ('33804e720af071350941cd87d9f010ef5e09ef28',
                   'afbe7219806881301831d79f43596811eca3279d')
 MAIN_BASE = 'afbe7219806881301831d79f43596811eca3279d'
