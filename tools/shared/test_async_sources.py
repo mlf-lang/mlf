@@ -6,8 +6,9 @@ import shutil
 import unittest
 import json
 import shlex
+import re
 from unittest.mock import patch
-from check_async_sources import ROOT, DIRECTORIES, check_static, stale_names, run, capture_inputs, unchanged, check_lookup_roots, SOURCE_COMPILE_SECONDS, TARGET_CHECK_SECONDS
+from check_async_sources import ROOT, DIRECTORIES, check_static, stale_names, run, capture_inputs, unchanged, check_lookup_roots, SOURCE_COMPILE_SECONDS, TARGET_CHECK_SECONDS, completion_rejection_pattern
 
 
 class AsyncSourceControls(unittest.TestCase):
@@ -31,6 +32,27 @@ class AsyncSourceControls(unittest.TestCase):
         for name in ('List', 'Nil', 'Cons', 'Pair', 'Triple', 'class Monad'):
             self.assertTrue(stale_names(name))
         self.assertFalse(stale_names('-- Unit\n"List Pair" IO ()'))
+
+    def test_wrong_kind_cannot_regress_to_expression_colon(self):
+        p = self.root / 'tests/fixtures/async-completion/negative/wrong-kind.emlf'
+        p.write_text('main = panic "unused" : Completion IO\n')
+        with self.assertRaisesRegex(ValueError, 'explicit invalid kind signature'):
+            check_static(self.root)
+
+    def test_wrong_kind_cannot_become_well_kinded(self):
+        p = self.root / 'tests/fixtures/async-completion/negative/wrong-kind.emlf'
+        p.write_text('main :: Completion Int\nmain = panic "unused"\n')
+        with self.assertRaisesRegex(ValueError, 'explicit invalid kind signature'):
+            check_static(self.root)
+
+    def test_wrong_kind_requires_kind_or_arity_diagnostic(self):
+        pattern = completion_rejection_pattern('wrong-kind')
+        for diagnostic in ('Inference: unknown data constructor: Completion',
+                           'Parse error: expected annotation',
+                           'Inference: type constructor mismatch: String versus Int'):
+            self.assertIsNone(re.search(pattern, diagnostic))
+        for diagnostic in ('Inference: kind mismatch', 'Inference: type argument arity mismatch'):
+            self.assertIsNotNone(re.search(pattern, diagnostic))
 
     def test_stale_checked_type(self):
         (self.root / 'tests/async-process/io-unit.type').write_text('IO Unit\n')

@@ -1,0 +1,1331 @@
+{
+  "format": "native-shared-transition-primitive-matrix-v1",
+  "qualification": "unverified target semantics; names and opcodes only",
+  "old_host_primitive_count": 95,
+  "target_primitive_count": 132,
+  "old_source_sha256": "657ee8de16c2a00b8ac8f573340d125bf46af4a72605923b7ec1e8c55fc2dece",
+  "current_source_sha256": "924cd0a7ac6a3a8b1790ab28e4c2124e608a6519e1746d38fe3044595d2a34a5",
+  "scope": "All 0..131 opcodes require target signature, representation, forcing and runtime review, including retained 0..94. Name/opcode equality is not semantic equality.",
+  "rows": [
+    {
+      "code": 0,
+      "constructor": "PIOReturn",
+      "name": "ioReturn",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 1,
+      "constructor": "PIOBind",
+      "name": "ioBind",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 2,
+      "constructor": "PPutStr",
+      "name": "putStr",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 3,
+      "constructor": "PPutStrLn",
+      "name": "putStrLn",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 4,
+      "constructor": "PGetLine",
+      "name": "getLine",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 5,
+      "constructor": "PPrintInt",
+      "name": "printInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 6,
+      "constructor": "PConcatString",
+      "name": "concatString",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 7,
+      "constructor": "PShowInt",
+      "name": "showInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 8,
+      "constructor": "PAddInt",
+      "name": "addInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 9,
+      "constructor": "PSubInt",
+      "name": "subInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 10,
+      "constructor": "PEqInt",
+      "name": "eqInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 11,
+      "constructor": "PLtInt",
+      "name": "ltInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 12,
+      "constructor": "PEqString",
+      "name": "eqString",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 13,
+      "constructor": "PIfThenElse",
+      "name": "ifThenElse",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 14,
+      "constructor": "PMulInt",
+      "name": "mulInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 15,
+      "constructor": "PQuotInt",
+      "name": "quotInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 16,
+      "constructor": "PRemInt",
+      "name": "remInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 17,
+      "constructor": "PReadInt",
+      "name": "readInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 18,
+      "constructor": "PAddDouble",
+      "name": "addDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 19,
+      "constructor": "PSubDouble",
+      "name": "subDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 20,
+      "constructor": "PMulDouble",
+      "name": "mulDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 21,
+      "constructor": "PDivDouble",
+      "name": "divDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 22,
+      "constructor": "PSqrtDouble",
+      "name": "sqrtDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 23,
+      "constructor": "PEqDouble",
+      "name": "eqDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 24,
+      "constructor": "PLtDouble",
+      "name": "ltDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 25,
+      "constructor": "PIntToDouble",
+      "name": "intToDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 26,
+      "constructor": "PFormatDouble",
+      "name": "formatDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 27,
+      "constructor": "PNewIntArray",
+      "name": "newIntArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 28,
+      "constructor": "PReadIntArray",
+      "name": "readIntArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 29,
+      "constructor": "PWriteIntArray",
+      "name": "writeIntArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 30,
+      "constructor": "PLengthIntArray",
+      "name": "lengthIntArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 31,
+      "constructor": "PNewDoubleArray",
+      "name": "newDoubleArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 32,
+      "constructor": "PReadDoubleArray",
+      "name": "readDoubleArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 33,
+      "constructor": "PWriteDoubleArray",
+      "name": "writeDoubleArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 34,
+      "constructor": "PLengthDoubleArray",
+      "name": "lengthDoubleArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 35,
+      "constructor": "PNewByteArray",
+      "name": "newByteArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 36,
+      "constructor": "PReadByteArray",
+      "name": "readByteArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 37,
+      "constructor": "PWriteByteArray",
+      "name": "writeByteArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 38,
+      "constructor": "PLengthByteArray",
+      "name": "lengthByteArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 39,
+      "constructor": "PByteArrayFromString",
+      "name": "byteArrayFromString",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 40,
+      "constructor": "PPutBytes",
+      "name": "putBytes",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 41,
+      "constructor": "PGetByteLine",
+      "name": "getByteLine",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 42,
+      "constructor": "PNewIntTable",
+      "name": "newIntTable",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 43,
+      "constructor": "PReadIntTable",
+      "name": "readIntTable",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 44,
+      "constructor": "PWriteIntTable",
+      "name": "writeIntTable",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 45,
+      "constructor": "PAndInt",
+      "name": "andInt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 46,
+      "constructor": "PStringLength",
+      "name": "stringLength",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 47,
+      "constructor": "PStringCodeAt",
+      "name": "stringCodeAt",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 48,
+      "constructor": "PStringSlice",
+      "name": "stringSlice",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 49,
+      "constructor": "PStringFromCode",
+      "name": "stringFromCode",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 50,
+      "constructor": "PCompareString",
+      "name": "compareString",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 51,
+      "constructor": "PReadDouble",
+      "name": "readDouble",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 52,
+      "constructor": "PDoubleToBits",
+      "name": "doubleToBits",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 53,
+      "constructor": "PDoubleFromBits",
+      "name": "doubleFromBits",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 54,
+      "constructor": "PSeq",
+      "name": "seq",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 55,
+      "constructor": "PPanic",
+      "name": "panic",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 56,
+      "constructor": "PReadFile",
+      "name": "readFile",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 57,
+      "constructor": "PWriteFile",
+      "name": "writeFile",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 58,
+      "constructor": "PFileExists",
+      "name": "fileExists",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 59,
+      "constructor": "PCanonicalPath",
+      "name": "canonicalPath",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 60,
+      "constructor": "PGetArgCount",
+      "name": "getArgCount",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 61,
+      "constructor": "PGetArg",
+      "name": "getArg",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 62,
+      "constructor": "PPutErr",
+      "name": "putErr",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 63,
+      "constructor": "PExitWith",
+      "name": "exitWith",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 64,
+      "constructor": "PGetExecutablePath",
+      "name": "getExecutablePath",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 65,
+      "constructor": "PGetContents",
+      "name": "getContents",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 66,
+      "constructor": "PSTReturn",
+      "name": "stReturn",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 67,
+      "constructor": "PSTBind",
+      "name": "stBind",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 68,
+      "constructor": "PRunST",
+      "name": "runST",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 69,
+      "constructor": "PNewSTArray",
+      "name": "newSTArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 70,
+      "constructor": "PReadSTArray",
+      "name": "readSTArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 71,
+      "constructor": "PWriteSTArray",
+      "name": "writeSTArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 72,
+      "constructor": "PLengthSTArray",
+      "name": "lengthSTArray",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 73,
+      "constructor": "PGetEnv",
+      "name": "getEnv",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 74,
+      "constructor": "PSetEnv",
+      "name": "setEnv",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 75,
+      "constructor": "PUnsetEnv",
+      "name": "unsetEnv",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 76,
+      "constructor": "PRunProcess",
+      "name": "runProcess",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 77,
+      "constructor": "PListDirectory",
+      "name": "listDirectory",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 78,
+      "constructor": "PDirectoryExists",
+      "name": "directoryExists",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 79,
+      "constructor": "PFileDigest",
+      "name": "fileDigest",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 80,
+      "constructor": "PAcquireFileLock",
+      "name": "acquireFileLock",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 81,
+      "constructor": "PReleaseFileLock",
+      "name": "releaseFileLock",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 82,
+      "constructor": "PProcessSupervisor",
+      "name": "processSupervisor",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 83,
+      "constructor": "PAsyncScopeNew",
+      "name": "asyncScopeNew",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 84,
+      "constructor": "PAsyncScopeClose",
+      "name": "asyncScopeClose",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 85,
+      "constructor": "PAsyncNewCompletion",
+      "name": "asyncNewCompletion",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 86,
+      "constructor": "PAsyncResolveCompletion",
+      "name": "asyncResolveCompletion",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 87,
+      "constructor": "PAsyncReadCompletion",
+      "name": "asyncReadCompletion",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 88,
+      "constructor": "PAsyncSubscribeCompletion",
+      "name": "asyncSubscribeCompletion",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 89,
+      "constructor": "PAsyncSubscriptionStatus",
+      "name": "asyncSubscriptionStatus",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 90,
+      "constructor": "PAsyncCancelSubscription",
+      "name": "asyncCancelSubscription",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 91,
+      "constructor": "PAsyncStep",
+      "name": "asyncStep",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 92,
+      "constructor": "PAsyncEnqueue",
+      "name": "asyncEnqueue",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 93,
+      "constructor": "PAsyncDelay",
+      "name": "asyncDelay",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 94,
+      "constructor": "PAsyncWait",
+      "name": "asyncWait",
+      "old_host_available": true,
+      "current_closure_reference_count": null,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.emlf",
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 95,
+      "constructor": "PTextToChars",
+      "name": "textToChars",
+      "old_host_available": false,
+      "current_closure_reference_count": 5,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 96,
+      "constructor": "PTextFromChars",
+      "name": "textFromChars",
+      "old_host_available": false,
+      "current_closure_reference_count": 17,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 97,
+      "constructor": "PCharCode",
+      "name": "charCode",
+      "old_host_available": false,
+      "current_closure_reference_count": 6,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 98,
+      "constructor": "PCharFromCode",
+      "name": "charFromCode",
+      "old_host_available": false,
+      "current_closure_reference_count": 6,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 99,
+      "constructor": "PUserError",
+      "name": "userError",
+      "old_host_available": false,
+      "current_closure_reference_count": 1,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 100,
+      "constructor": "PIOError",
+      "name": "ioError",
+      "old_host_available": false,
+      "current_closure_reference_count": 1,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 101,
+      "constructor": "PCatchIOError",
+      "name": "catchIOError",
+      "old_host_available": false,
+      "current_closure_reference_count": 13,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 102,
+      "constructor": "PIOErrorString",
+      "name": "ioeGetErrorString",
+      "old_host_available": false,
+      "current_closure_reference_count": 13,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 103,
+      "constructor": "PEmptyCallStack",
+      "name": "mlfEmptyCallStack",
+      "old_host_available": false,
+      "current_closure_reference_count": 0,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 104,
+      "constructor": "PPushCallStack",
+      "name": "mlfPushCallStack",
+      "old_host_available": false,
+      "current_closure_reference_count": 0,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 105,
+      "constructor": "PPrettyCallStack",
+      "name": "mlfPrettyCallStack",
+      "old_host_available": false,
+      "current_closure_reference_count": 0,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 106,
+      "constructor": "PIOErrorWithStack",
+      "name": "mlfIOErrorWithStack",
+      "old_host_available": false,
+      "current_closure_reference_count": 0,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 107,
+      "constructor": "PConcatStringList",
+      "name": "concatStringList",
+      "old_host_available": false,
+      "current_closure_reference_count": 12,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 108,
+      "constructor": "POrInt",
+      "name": "orInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 24,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 109,
+      "constructor": "PXorInt",
+      "name": "xorInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 17,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 110,
+      "constructor": "PShiftLInt",
+      "name": "shiftLInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 13,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 111,
+      "constructor": "PShiftRInt",
+      "name": "shiftRInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 2,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 112,
+      "constructor": "PUnsignedShiftRInt",
+      "name": "unsignedShiftRInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 19,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 113,
+      "constructor": "PCountLeadingZerosInt",
+      "name": "countLeadingZerosInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 5,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 114,
+      "constructor": "PCountTrailingZerosInt",
+      "name": "countTrailingZerosInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 7,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 115,
+      "constructor": "PPopCountInt",
+      "name": "popCountInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 5,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 116,
+      "constructor": "PIntToInteger",
+      "name": "intToInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 21,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 117,
+      "constructor": "PIntegerToInt",
+      "name": "integerToInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 4,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 118,
+      "constructor": "PAddInteger",
+      "name": "addInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 3,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 119,
+      "constructor": "PSubInteger",
+      "name": "subInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 3,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 120,
+      "constructor": "PMulInteger",
+      "name": "mulInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 6,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 121,
+      "constructor": "PQuotInteger",
+      "name": "quotInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 1,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 122,
+      "constructor": "PRemInteger",
+      "name": "remInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 1,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 123,
+      "constructor": "PEqInteger",
+      "name": "eqInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 2,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 124,
+      "constructor": "PLtInteger",
+      "name": "ltInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 6,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 125,
+      "constructor": "PShowInteger",
+      "name": "showInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 3,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 126,
+      "constructor": "PReadInteger",
+      "name": "readInteger",
+      "old_host_available": false,
+      "current_closure_reference_count": 2,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 127,
+      "constructor": "PIntegerToDouble",
+      "name": "integerToDouble",
+      "old_host_available": false,
+      "current_closure_reference_count": 1,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 128,
+      "constructor": "PUnsignedLtInt",
+      "name": "unsignedLtInt",
+      "old_host_available": false,
+      "current_closure_reference_count": 6,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 129,
+      "constructor": "PReadByteFileOrError",
+      "name": "readByteFileOrError",
+      "old_host_available": false,
+      "current_closure_reference_count": 3,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 130,
+      "constructor": "PWriteByteFileOrError",
+      "name": "writeByteFileOrError",
+      "old_host_available": false,
+      "current_closure_reference_count": 2,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    },
+    {
+      "code": 131,
+      "constructor": "PByteArrayDigest",
+      "name": "byteArrayDigest",
+      "old_host_available": false,
+      "current_closure_reference_count": 16,
+      "signature_and_semantics": "requires_target_review",
+      "old_signature_owner": null,
+      "current_signature_owner": "libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    }
+  ]
+}

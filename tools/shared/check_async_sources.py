@@ -49,6 +49,12 @@ def check_static(root=ROOT):
         actual = {p.stem for p in (root / DIRECTORIES[-1] / subdir).glob('*.emlf')}
         if actual != expected:
             raise ValueError('completion source inventory changed: ' + subdir)
+    # A single colon in an expression can be parsed as list construction.
+    # Keep this deliberate kind error in an unambiguous declaration signature:
+    # Completion expects *, while the supplied IO has kind * -> *.
+    wrong_kind = root / DIRECTORIES[-1] / 'negative/wrong-kind.emlf'
+    if wrong_kind.read_text() != 'main :: Completion IO\nmain = panic "unused"\n':
+        raise ValueError('wrong-kind fixture must retain its explicit invalid kind signature')
     for p in files:
         if stale_names(p.read_text()):
             raise ValueError('stale nominal async identity: ' + str(p))
@@ -59,6 +65,13 @@ def check_static(root=ROOT):
     if "printf 'IO ()\\n'" not in script:
         raise ValueError('stale completion checked IO type oracle')
     return files
+
+
+def completion_rejection_pattern(name):
+    # Match the existing native parity rejection-phase requirements exactly.
+    return (r'cannot redefine|primitive type' if name.startswith('forge-') else
+            r'kind|arity' if name == 'wrong-kind' else
+            r'^Inference: cannot raise a protected type variable' if name == 'generalize-allocated' else r'^Inference:')
 
 
 def check_lookup_roots(root, files, cwd):
@@ -129,9 +142,7 @@ def run(producer, output):
         for source in sorted((ROOT / DIRECTORIES[-1] / 'negative').glob('*.emlf')):
             name = source.stem
             result = command('negative-' + name, [compiler, *includes, source], status=1, expected=b'', timeout=SOURCE_COMPILE_SECONDS)
-            pattern = (r'cannot redefine|primitive type' if name.startswith('forge-') else
-                       r'kind|arity' if name == 'wrong-kind' else
-                       r'^Inference: cannot raise a protected type variable' if name == 'generalize-allocated' else r'^Inference:')
+            pattern = completion_rejection_pattern(name)
             if not re.search(pattern.encode(), result.stderr):
                 raise ValueError('wrong rejection phase: ' + name)
         authenticate_build(receipt, producer / 'bin')

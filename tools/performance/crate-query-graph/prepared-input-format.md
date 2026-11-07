@@ -145,3 +145,27 @@ Cold object SHA256:
 
 This confirms the repaired full cold source chain, not the remaining warm,
 actual package recovery, native, bootstrap, async or aggregate merge gates.
+
+## Actual package-core warm replay
+
+A single warm invocation used the same authenticated ordinary O2 producer,
+unchanged cold package-core spec and query directory, and a fresh artifact
+prefix. The watchdog covered the entire campaign tree, including the reused
+cache, under the unchanged 900-second / 2-GiB RSS / 4-GiB address-space /
+256-MiB output limits. It passed in 23.450 seconds with peak RSS 321,335,296
+bytes and no resource-stop reason.
+
+The warm report had zero inferred groups and 343 reused groups; all group
+cached flags were true. The semantic fingerprint and every group record
+apart from its cached flag matched cold. Interface and object files were
+compared byte-for-byte and were identical to the cold artifacts above.
+All recorded cold inputs, specs, artifacts and receipts retained their hashes,
+and producer authentication passed before and after the invocation.
+Warm guard receipt SHA256:
+`deadf9456c6283f16353ca1063163ed1d554354151f4f84f30326739417182ee`.
+Warm comparison receipt SHA256:
+`d0298ab863972bd6f5ed248206a919d447a7983a3f9bdb32d6c08e541cc15355`.
+
+This completes the actual full cold source chain and package-core warm parity
+check. It does not substitute for native, bootstrap, async or aggregate gates,
+or claim an additional package-core publication-failure injection was run.

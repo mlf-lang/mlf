@@ -1,0 +1,86 @@
+{
+  "format": "native-shared-transition-plan-v1",
+  "status": "design-only",
+  "bootstrap_qualified": false,
+  "preferred_route": [
+    "O",
+    "H",
+    "C"
+  ],
+  "stages": {
+    "O": {
+      "source": "Unchanged c83 frozen archive",
+      "host_runtime": "compact/process-supervisor-v1/async-completion-v2",
+      "host_primitive_count": 95,
+      "artifact_format": "MLFCI-1",
+      "purpose": "Released-seed-derived tools; original inputs remain immutable"
+    },
+    "H": {
+      "source": "New maintained legacy-source compiler and matching manager, not implemented",
+      "built_by": "O",
+      "own_host_runtime": "Exact O runtime",
+      "own_host_primitive_codes": [
+        0,
+        94
+      ],
+      "emitted_target_runtime": "Exact current haskell-boundary-v4 and byte-file-v2 runtime",
+      "emitted_target_primitive_codes": [
+        0,
+        131
+      ],
+      "artifact_format": "New private intermediate epoch; MLFCI-1 shape only if lossless closure and evidence representation is proved",
+      "purpose": "Compile unchanged current source under explicitly implemented target semantics",
+      "emitted_target_identity": {
+        "source_commit": "c34996ea87bb4d0e96dc21695c352551024d0982",
+        "frontend_semantics": "mlf-frontend/shared-haskell-v1/8",
+        "builtin_interface": "mlf-primitive/shared-haskell-v1/11",
+        "primitive_abi": "mlf-primitive-132-v7",
+        "runtime_guards": [
+          "mlf_require_haskell_boundary_v4_abi",
+          "mlf_require_byte_file_v2_abi"
+        ]
+      }
+    },
+    "C": {
+      "source": "Unchanged current source inventory",
+      "built_by": "H",
+      "own_host_runtime": "Exact current runtime",
+      "artifact_format": "Current MLFCI-5 and binary artifact formats",
+      "purpose": "Current compiler and matching manager; qualification remains separate"
+    }
+  },
+  "cache_policy": "Disjoint generation roots and distinct builtin, artifact and target identities; mixed generations must reject",
+  "source_translation": "No source translator, decoder shortcut, private source profile or generated reverse translation is implemented or part of this batch",
+  "required_prototype_gates": [
+    "old-host-compilation-and-primitive-use-closure",
+    "native-target-numbers-char-exceptions-byte-io-digest",
+    "wrong-runtime-and-stale-guard-rejection",
+    "two-module-two-crate-canonical-pattern-class-literal-import-export",
+    "paired-artifact-lossless-and-mixed-generation-refusal",
+    "complete-original-manifest-scan-including-independent-oracle"
+  ],
+  "open_questions": [
+    "Whether H can directly support the complete unchanged source semantics without porting a larger inference closure",
+    "Whether a new intermediate format using MLFCI-1 shape can losslessly carry all required build type, provenance, evidence and layout data",
+    "The complete transitive H source owner set and measured native construction resources"
+  ],
+  "source_admission": "Existing 196 source and 108 metadata files remain unchanged; any future covered change requires a separate exact append-only admission",
+  "initial_static_budget": {
+    "seconds": 120,
+    "rss_mib": 1024,
+    "new_output_mib": 32
+  },
+  "future_native_estimates": {
+    "measured": false,
+    "observation_seconds_each": 3600,
+    "rss_mib_each": 4096,
+    "address_space_mib_each": 8192,
+    "available_memory_floor_mib": 3072,
+    "disk_free_floor_mib": 8192,
+    "h_retained_output_mib": 1536,
+    "c_retained_output_mib": 2048,
+    "qualification_additional_retained_output_mib": 4096,
+    "completion_time": "Unknown; an observation budget is not a completion estimate"
+  },
+  "target_selection": "Exact pinned target only; unknown or newer builtin, primitive or runtime identities must reject"
+}

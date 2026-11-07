@@ -1,1 +1,2 @@
-main = panic "unused" : Completion IO
+main :: Completion IO
+main = panic "unused"
