@@ -555,7 +555,8 @@ module Bootstrap.Classes where {
   withScopedClassInventory externals instanceNames valueScopes =
     withClassScopes externals instanceNames (Dependency.NamedScopes valueScopes);
   withClassScopes = withClassScopesAndImports M.empty;
-  withClassScopesAndImports conventions externals instanceNames valueScopes instanceScopes original action =
+  withClassScopesAndImports = withClassScopesAndImportsUsing Nothing;
+  withClassScopesAndImportsUsing order conventions externals instanceNames valueScopes instanceScopes original action =
     do {
       surface <- Surface.lowerSurface (case original of {
         SProgram ds body -> SClassProgram ds [] [] body;
@@ -566,7 +567,7 @@ module Bootstrap.Classes where {
           withValidatedClasses (Just ((,) externals instanceNames)) S.empty M.empty
             (Just instanceScopes) ds declarations instances body
             (\base classes -> do {
-              inventory <- prepareClassesWithImports conventions (Just ((,) externals instanceNames)) S.empty
+              inventory <- prepareClassesWithImportsUsing order conventions (Just ((,) externals instanceNames)) S.empty
                 valueScopes (Just instanceScopes) ds instances base classes;
               action inventory
             });
@@ -636,7 +637,24 @@ module Bootstrap.Classes where {
                         Fresh ClassInventory;
   prepareClassesBody config imported indices = prepareClassesInScopes config imported (Dependency.NamedScopes indices);
   prepareClassesInScopes = prepareClassesWithImports M.empty;
-  prepareClassesWithImports conventions config imported valueIndices instanceIndices datatypes instances base classes =
+  -- Crate authenticates the authorship; here require the actual allocated keys.
+  data EvidenceOrder = EvidenceOrder ([] String) ([] String);
+  orderedCandidateKeys :: Dependency.GeneratedTable -> [] String ->
+    [] ((,) String Int) -> Either String ([] ((,) String Int));
+  orderedCandidateKeys table keys physical = do {
+    let { rows = M.fromList compareString physical; symbols = Dependency.generatedSymbols table };
+    ensure (length keys == length physical && M.size rows == length physical &&
+      S.size (S.fromList compareString keys) == length keys) "ordered evidence keys are not a permutation";
+    traverseEither (\key -> case (,) (M.lookup compareString key rows) (Dependency.generatedNameId table key) of {
+      (,) (Just ordinal) (Just slot) -> do {
+        ensure (eqString (Dependency.symbolName symbols slot) key) "ordered evidence key changed its allocated slot";
+        Right ((,) key ordinal)
+      };
+      _ -> Left "ordered evidence key has no actual role or allocated slot"
+    }) keys
+  };
+  prepareClassesWithImports = prepareClassesWithImportsUsing Nothing;
+  prepareClassesWithImportsUsing order conventions config imported valueIndices instanceIndices datatypes instances base classes =
     do {
       entries <-
         mapM
@@ -693,19 +711,6 @@ module Bootstrap.Classes where {
             entries
       };
       let {
-        globalCandidates = append (map (\n -> (,) InstanceEvidence n) names) supers
-      };
-      let {
-        select = selectCandidates names supers
-      };
-      let {
-        instanceScopes =
-          case instanceIndices of {
-            Nothing -> replicate (length instances) globalCandidates;
-            Just scopes -> map select scopes
-          }
-      };
-      let {
         externalSchemes =
           case config of {
             Nothing -> M.empty;
@@ -726,6 +731,27 @@ module Bootstrap.Classes where {
         generation = classSlots valueIndices (filter (\n -> not (M.member compareString n externalSchemes))
           (append (map (\((,,) n _ _) -> n) (concat selectorGroups)) names)) externalSchemes baseMethodEnv ownedMethods
       };
+      (,) globalCandidates select <- freshLift (case order of {
+        Nothing -> Right ((,) (append (map (\n -> (,) InstanceEvidence n) names) supers)
+          (selectCandidates names supers));
+        Just (EvidenceOrder orderedInstances orderedSupers) -> do {
+          table <- case generation of {
+            Just actual -> Right actual; Nothing -> Left "ordered evidence requires actual indexed slots"
+          };
+          ensure (S.size (S.fromList compareString (append orderedInstances orderedSupers)) ==
+            length orderedInstances + length orderedSupers) "ordered evidence keys overlap roles";
+          chosen <- orderedCandidateKeys table orderedInstances (zip names (range 0 (length names - 1)));
+          projected <- orderedCandidateKeys table orderedSupers (zip (map snd supers) (range 0 (length supers - 1)));
+          let { instanceRow ((,) n _) = (,) InstanceEvidence n;
+                selectors = map (\((,) n _) -> (,) SuperclassEvidence n) projected;
+                scoped indices = append
+                  (map instanceRow (filter (\((,) _ ordinal) -> I.member ordinal indices) chosen)) selectors };
+          Right ((,) (append (map instanceRow chosen) selectors) scoped)
+        }
+      });
+      let { instanceScopes = case instanceIndices of {
+        Nothing -> replicate (length instances) globalCandidates; Just scopes -> map select scopes
+      } };
       let { context = mapOptional (\table -> let {
               remember acc key ty = case Dependency.generatedImportId table key of {
                 Nothing -> acc; Just i -> let { classes = importedClasses conventions key ty } in

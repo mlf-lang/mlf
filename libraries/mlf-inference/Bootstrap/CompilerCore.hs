@@ -40,7 +40,15 @@ module Bootstrap.CompilerCore where {
       Right a -> Right a
     };
   finishCompilation :: (,) SProgram (Map String String) -> Either CompileError Compilation;
-  finishCompilation ((,) program names) =
+  finishCompilation = finishCompilationUsing (\compiled _ -> compiled);
+  -- The comparison harness receives the input of the successful checked
+  -- compilation itself. It does not regenerate or supply a second graph.
+  finishCompilationWithConstraints :: (,) SProgram (Map String String) ->
+    Either CompileError ((,) Compilation Constraints);
+  finishCompilationWithConstraints = finishCompilationUsing (,);
+  finishCompilationUsing :: forall a. (Compilation -> Constraints -> a) ->
+    (,) SProgram (Map String String) -> Either CompileError a;
+  finishCompilationUsing report ((,) program names) =
     case program of {
       SClassProgram _ _ _ _ ->
         Left (CompileError Inference "class translation did not produce a core program");
@@ -74,7 +82,7 @@ module Bootstrap.CompilerCore where {
                     (X.equalErased (X.erase term)
                        (C.eraseSourceWith evidence (C.skeleton constraints)))
                then Left (CompileError Verification "elaboration changed source erasure")
-               else Right (Compilation checked graph (Classes.prettyQualified names ty))
+               else Right (report (Compilation checked graph (Classes.prettyQualified names ty)) constraints)
         }
     }
 }

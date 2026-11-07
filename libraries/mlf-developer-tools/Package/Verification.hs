@@ -18,7 +18,7 @@ module Package.Verification where {
     (J.equal (J.get "format" value) (J.num 1) &&
      (eqString (J.getText "fixture" "" value) name &&
       (eqString (J.getText "target_sha256" "" value) hash &&
-       (eqString (J.getText "entry_type" "" value) "IO Unit" &&
+       (eqString (J.getText "entry_type" "" value) "IO ()" &&
         ((stringLength (J.getText "inferred_type" "" value) > 0) &&
          J.equal (J.get "checks" value) portTargetChecks)))));
   -- Only pure generated programs may share an execution. Every configuration

@@ -14,7 +14,8 @@ class BenchmarkTransition(unittest.TestCase):
         cls.root = bridge.ROOT
         cls.contract = bridge.load_contract(cls.root)
         cls.inputs = [(cls.root / name).read_bytes() for name in
-                      ['benchmarks/manifest.json', bridge.HISTORY, bridge.TYPES, bridge.OLD_TYPES]]
+                      ['benchmarks/manifest.json', bridge.HISTORY, bridge.TYPES, bridge.OLD_TYPES,
+                       bridge.STD, bridge.INTSET]]
 
     def check(self, inputs):
         bridge.validate_bridge(*inputs, self.contract)
@@ -43,6 +44,9 @@ class BenchmarkTransition(unittest.TestCase):
 
     def test_current_source_drift(self):
         self.reject(2, lambda raw: raw + b'\n')
+
+    def test_current_std_source_drift(self):
+        self.reject(4, lambda raw: raw + b'\n')
 
     def test_old_source_is_not_live_source(self):
         self.reject(2, lambda raw: self.inputs[3])
@@ -82,6 +86,38 @@ class BenchmarkTransition(unittest.TestCase):
             path.write_bytes(path.read_bytes() + b'\n')
             with self.assertRaises(ValueError):
                 self.contract.live_source_inventory(root)
+
+    def test_current_intset_source_drift(self):
+        self.reject(5, lambda raw: raw + b'\n')
+
+    def test_wrong_intset_source(self):
+        self.reject(5, lambda raw: self.inputs[2])
+
+    def test_current_intset_pin_drift(self):
+        self.mutate_manifest(lambda value: value['pinned_sha256'].__setitem__(
+            bridge.INTSET, '0' * 64))
+
+    def test_rehashed_intset_source_drift(self):
+        values = list(self.inputs)
+        values[5] += b'\n'
+        manifest = json.loads(values[0])
+        manifest['pinned_sha256'][bridge.INTSET] = bridge.sha(values[5])
+        values[0] = json.dumps(manifest).encode()
+        with self.assertRaises(ValueError):
+            self.check(values)
+
+    def test_missing_intset_pin(self):
+        self.mutate_manifest(lambda value: value['pinned_sha256'].pop(bridge.INTSET))
+
+    def test_other_foundation_pin_drift(self):
+        self.mutate_manifest(lambda value: value['pinned_sha256'].__setitem__(
+            'libraries/mlf-foundation/Bootstrap/IntMap.hs', '0' * 64))
+
+    def test_flags_drift(self):
+        self.mutate_manifest(lambda value: value['workloads'][0]['flags'].__setitem__('mlf', ['-O0']))
+
+    def test_upstream_drift(self):
+        self.mutate_manifest(lambda value: value['upstream'].__setitem__('revision', '0' * 40))
 
 
 if __name__ == '__main__':

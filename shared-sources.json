@@ -349,6 +349,11 @@
       "role": "implementation"
     },
     {
+      "module": "Bootstrap.PreparedStandalone",
+      "path": "libraries/mlf-crates/Bootstrap/PreparedStandalone.hs",
+      "role": "implementation"
+    },
+    {
       "module": "Bootstrap.PreparedLibraryLiteral",
       "path": "libraries/mlf-crates/Bootstrap/PreparedLibraryLiteral.hs",
       "role": "implementation"
@@ -661,6 +666,16 @@
     {
       "module": "Tests.CompilerTests",
       "path": "tests/Tests/CompilerTests.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.CoreGraphImage",
+      "path": "tests/Tests/CoreGraphImage.hs",
+      "role": "implementation"
+    },
+    {
+      "module": "Tests.CoreGraphPrelude",
+      "path": "tests/Tests/CoreGraphPrelude.hs",
       "role": "implementation"
     },
     {

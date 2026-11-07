@@ -1,0 +1,171 @@
+{
+  "format": "declid-c4-file-controls-v1",
+  "complete": true,
+  "test_commit": "b82644b8a38f13750919b66ca7c8550804c2b76e",
+  "integrated_source_commit": "e971f44f706865b62ff4cc87869975544e4b2e57",
+  "source_contract_sha256": "fa765d8c50f6a1efcbbea19c81135d3e8e788ca7e2b2c27c250aed9b83e649cd",
+  "host": {
+    "system": "Darwin",
+    "machine": "arm64",
+    "producer": "GHC 9.14.1 -O2",
+    "implementation_identity": "MLF/shared-haskell-v1 GHC"
+  },
+  "producer": "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-3",
+  "producer_receipt_sha256": "b5504ba4cc254346d95b0576f9af2d28b599c007e9f1c4f3aa4b51834bad98ba",
+  "source_relation": {
+    "matched_current_files": 196,
+    "total_current_files": 198,
+    "public_install_generated_modules": [
+      "bootstrap/MLF/PreparedLibraryData.hs",
+      "bootstrap/MLF/PreparedNativeData.hs"
+    ],
+    "actual_installed_source_authenticated_before_and_after": true
+  },
+  "command": [
+    "python3",
+    "-B",
+    "tools/performance/patricia/run_file_controls.py",
+    "--reference-source",
+    "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-3/sources",
+    "--reference-producer",
+    "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-3",
+    "--source",
+    "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-3/sources",
+    "--producer",
+    "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-3",
+    "--builtin-prefix",
+    "/Users/ares/.codex/worktrees/declid-final-evidence/candidate-install-3/artifacts/builtin",
+    "--output",
+    "/private/tmp/declid-r5-file-boundary-fixed-r3"
+  ],
+  "exit_code": 0,
+  "receipt": {
+    "path": "/private/tmp/declid-r5-file-boundary-fixed-r3/receipt.json",
+    "sha256": "16569a5cb20b25f7c2a4ce7026b0a4bb723c8b0033c2acc69955722b0e002a0f",
+    "bytes": 247793
+  },
+  "scope": "nine authored file cases, same ordinary producer: retained Crate algorithm versus CrateSession; handwritten status/type/errors, ordinary exact bytes and complete open boundary comparison; shared numeric/typechecking dependencies",
+  "independent_binary_reference": false,
+  "performance_sample": false,
+  "closed_cases": 9,
+  "session_cases": 9,
+  "positive_cases": [
+    {
+      "name": "polymorphic-two-uses",
+      "states": [
+        {
+          "inferred_groups": 4,
+          "reused_groups": 0
+        },
+        {
+          "inferred_groups": 4,
+          "reused_groups": 0
+        },
+        {
+          "inferred_groups": 0,
+          "reused_groups": 4
+        }
+      ],
+      "same_format_fresh_fresh_and_warm_bytes_equal": true,
+      "audited_open_complete_bytes_equal": true,
+      "complete_stored_fragments_equal": true,
+      "omitted_unreachable_group_count": 1
+    },
+    {
+      "name": "higher-rank-argument",
+      "states": [
+        {
+          "inferred_groups": 4,
+          "reused_groups": 0
+        },
+        {
+          "inferred_groups": 4,
+          "reused_groups": 0
+        },
+        {
+          "inferred_groups": 0,
+          "reused_groups": 4
+        }
+      ],
+      "same_format_fresh_fresh_and_warm_bytes_equal": true,
+      "audited_open_complete_bytes_equal": true,
+      "complete_stored_fragments_equal": true,
+      "omitted_unreachable_group_count": 0
+    },
+    {
+      "name": "project-polymorphic-field",
+      "states": [
+        {
+          "inferred_groups": 2,
+          "reused_groups": 0
+        },
+        {
+          "inferred_groups": 2,
+          "reused_groups": 0
+        },
+        {
+          "inferred_groups": 0,
+          "reused_groups": 2
+        }
+      ],
+      "same_format_fresh_fresh_and_warm_bytes_equal": true,
+      "audited_open_complete_bytes_equal": true,
+      "complete_stored_fragments_equal": true,
+      "omitted_unreachable_group_count": 0
+    },
+    {
+      "name": "recursive-import-cycle",
+      "states": [
+        {
+          "inferred_groups": 3,
+          "reused_groups": 0
+        },
+        {
+          "inferred_groups": 3,
+          "reused_groups": 0
+        },
+        {
+          "inferred_groups": 0,
+          "reused_groups": 3
+        }
+      ],
+      "same_format_fresh_fresh_and_warm_bytes_equal": true,
+      "audited_open_complete_bytes_equal": true,
+      "complete_stored_fragments_equal": true,
+      "omitted_unreachable_group_count": 0
+    }
+  ],
+  "native_negative_controls": [
+    {
+      "name": "receipt-sha-recomputed",
+      "complete": true,
+      "expected_helper_exit": 1
+    },
+    {
+      "name": "used-inventory-sha-recomputed",
+      "complete": true,
+      "expected_helper_exit": 0
+    },
+    {
+      "name": "old-object-checksum",
+      "complete": true,
+      "expected_helper_exit": 1
+    }
+  ],
+  "python_controls": {
+    "comparator": 34,
+    "plumbing": 12,
+    "normal_and_optimized": true,
+    "independent_review": true
+  },
+  "provenance": {
+    "complete": true,
+    "exact_patch_reconstructions": 19,
+    "log": "/private/tmp/declid-r5-file-boundary-provenance.log",
+    "log_sha256": "12bc2cb7fa59139b238befd5f0398bb8d3bb8e55e76fba79c3d078bbc6327b7d"
+  },
+  "limitations": [
+    "Finite C4 corpus; entry selection uses actual used references, not general support-root semantics.",
+    "Qualifies the recorded public installation; later production changes require their own final qualification."
+  ]
+}

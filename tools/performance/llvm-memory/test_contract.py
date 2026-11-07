@@ -3,32 +3,43 @@
 from pathlib import Path
 import importlib.util
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
+sys.path.insert(0, str(HERE.parent / 'patricia'))
+from source_migration import binary_contract
+
+OWNER = 'host/ghc/MLF/Host/Base.hs'
 spec = importlib.util.spec_from_file_location('utf8_contract', HERE / 'source_contract.py')
 C = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(C)
 
 
 class HostContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.current = (ROOT / OWNER).read_bytes()
+        cls.transition = binary_contract(source_root=ROOT)
+        cls.utf8_owner = cls.transition.restore_path(cls.current, OWNER)
+
     def test_full_owner_inverse_matches_frozen_git_source(self):
-        current = (ROOT / 'host/ghc/MLF/Host/Base.hs').read_bytes()
         old = subprocess.check_output([
             'git', 'show',
             '9dfcd6625775819568eaaa5065f8dd1431df52f8:host/ghc/MLF/Host/Base.hs',
         ], cwd=ROOT)
-        self.assertEqual(C.restore_before(current), old)
+        self.assertEqual(C.restore_before(self.utf8_owner), old)
 
     def test_mutation_outside_string_regions_is_rejected(self):
-        current = (ROOT / 'host/ghc/MLF/Host/Base.hs').read_bytes()
-        for altered in [current + b'\n', current[:-1], current.replace(b'Fixed.Int64', b'Integer')]:
-            self.assertNotEqual(altered, current)
-            with self.assertRaises(ValueError):
-                C.restore_before(altered)
+        for raw, restore in [(self.utf8_owner, C.restore_before),
+                             (self.current, lambda data: self.transition.restore_path(data, OWNER))]:
+            for altered in [raw + b'\n', raw[:-1], raw.replace(b'Fixed.Int64', b'Integer')]:
+                self.assertNotEqual(altered, raw)
+                with self.assertRaises(ValueError):
+                    restore(altered)
 
     def test_manifest_corruption_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -46,7 +57,7 @@ class HostContract(unittest.TestCase):
             before, after = edit['old'].encode(), edit['new'].encode()
             self.assertEqual(old.count(before), 1)
             old = old.replace(before, after)
-        self.assertEqual(old, (ROOT / delta['path']).read_bytes())
+        self.assertEqual(old, self.utf8_owner)
 
 
 if __name__ == '__main__':

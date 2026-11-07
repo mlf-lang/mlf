@@ -711,7 +711,16 @@ module Bootstrap.CrateArtifact where {
   linkCrate (interfaceMap [decodedInterface]) layouts (FragmentState 0 M.empty [] [] Set.empty) decoded;
   Right decoded
  };
-  builtinPrelude =
+  builtinPrelude :: Either String CrateObject;
+  builtinPrelude = builtinPreludeUsing
+    (\lowered -> mapEither (\compiled -> (,) compiled ()) (Compiler.finishCompilation lowered))
+    (\object _ -> object);
+  builtinPreludeWithConstraints :: Either String ((,) CrateObject Constraints);
+  builtinPreludeWithConstraints = builtinPreludeUsing Compiler.finishCompilationWithConstraints (,);
+  builtinPreludeUsing :: forall observation result.
+    ((,) SProgram (Map String String) -> Either CompileError ((,) Compiler.Compilation observation)) ->
+    (CrateObject -> observation -> result) -> Either String result;
+  builtinPreludeUsing compile report =
     do {
       let {
         identity = builtinCrateIdentity
@@ -750,9 +759,9 @@ module Bootstrap.CrateArtifact where {
       lowered <-
         Classes.lowerSeparateClasses M.empty (map fst instances)
           (SClassProgram sourceData classes (map snd instances) body);
-      compiled <- mapLeft Compiler.prettyError (Compiler.finishCompilation lowered);
+      compiled <- mapLeft Compiler.prettyError (compile lowered);
       let {
-        term = Compiler.compiledTerm compiled
+        term = Compiler.compiledTerm (fst compiled)
       };
       let {
         datatypes =
@@ -812,7 +821,8 @@ module Bootstrap.CrateArtifact where {
         object = makeObject iface ((:) (Separate.UnitObject fragmentInterface term) [])
       };
       validateInterface (objectInterface object);
-      splitClosedDeclarationObject object
+      published <- splitClosedDeclarationObject object;
+      Right (report published (snd compiled))
     };
   -- The supplied interface text must be the encoding of this immutable iface.
   -- This helper shares bytes, not a digest inferred from different text.

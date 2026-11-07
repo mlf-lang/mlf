@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sparse source contract selection against complete frozen 48275901 sources."""
 from pathlib import Path
-import argparse, hashlib, types
+import argparse, hashlib, sys, types
 
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -62,6 +62,11 @@ def main():
     H.require(mainAdapted.count(fullMainImport)==1 and mainAdapted.replace(fullMainImport,mainImport,1)==mainRaw,
               'control import adaptation reversible')
     generated=out/'independent-oracles';generated.mkdir()
+    adapter_dir=HERE.parent/'source-key-builtins'
+    sys.path.insert(0,str(adapter_dir))
+    from frozen_query import prepare_frozen_query
+    adapted_query=prepare_frozen_query(HERE/'FrozenCrateQuery.hs',generated,
+                                       expected_sha256=oracle['sources']['CrateQuery']['frozen_sha256'])
     (generated/'FullyFrozenSourceInference.hs').write_bytes(adapted)
     (generated/'Main.hs').write_bytes(mainAdapted)
     adaptations={'source_original_sha256':hashlib.sha256(rawSource).hexdigest(),
@@ -73,7 +78,8 @@ def main():
     manifest=H.load(ROOT/'shared-sources.json')
     files=[ROOT/x['path'] for x in manifest['modules']]+list((ROOT/'host/ghc').rglob('*.hs'))
     files+=list(HERE.glob('*.hs'))+[HERE/'oracle.json',HERE/'classes-oracle.json',Path(__file__),hp,generated/'FullyFrozenSourceInference.hs',generated/'Main.hs']
-    bridge=HERE.parent/'source-key-builtins/FrozenSourceKey.hs'
+    files += [adapter_dir/'frozen_query.py', adapted_query]
+    bridge=adapter_dir/'FrozenSourceKey.hs'
     pins={str(f):H.sha(f) for f in [*files,bridge]}
     limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,
         host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)

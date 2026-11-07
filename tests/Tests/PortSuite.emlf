@@ -1,6 +1,8 @@
 module Tests.PortSuite where
 import Bootstrap.Types
 import qualified Bootstrap.Std as S
+import qualified Bootstrap.Map as Dict
+import qualified Bootstrap.Set as Set
 import qualified Package.OS as O
 import qualified Package.Json as J
 import qualified Package.Verification as V
@@ -11,7 +13,12 @@ import qualified Tests.Backends as B
 import qualified Tests.Bytes as Bytes
 import qualified Tests.Selection as Selection
 import qualified Bootstrap.Compiler as C
+import qualified Bootstrap.CrateSession as Session
+import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Tests.IndependentCheck as Check
+import qualified Test.NativeProcess as Native
+import qualified Bootstrap.X.Checked as Checked
 import qualified Bootstrap.X.Parser as P
 import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.X.Syntax as X
@@ -36,20 +43,465 @@ prepareFixture name destination = do
  graph <- M.load "mlf-package.json"
  result <- C.compileFile (TS.portRoots graph) source
  compilation <- H.right result
- ty <- H.right (Check.checkClosed (C.compiledTerm compilation))
- expected <- H.right (P.parseType "IO Unit")
- H.assert (T.alphaEq ty (C.inferredType compilation) && T.alphaEq ty expected) "port inferred/target type differs"
- parsed <- H.right (P.parseTerm source (Pretty.prettyTerm (C.compiledTerm compilation)))
+ prepareCheckedTarget name source destination (C.compiledTerm compilation) (C.inferredType compilation)
+ putStrLn ("CHECKED " ++ name)
+prepareCheckedTarget : String -> String -> String -> XTerm -> XType -> IO ()
+prepareCheckedTarget name source destination term inferred = do
+ ty <- H.right (Check.checkClosed term)
+ expected <- H.right (P.parseType "IO ()")
+ H.assert (T.alphaEq ty inferred && T.alphaEq ty expected) "port inferred/target type differs"
+ parsed <- H.right (P.parseTerm source (Pretty.prettyTerm term))
  parsedType <- H.right (Check.checkClosed parsed)
- H.assert (T.alphaEq parsedType ty && X.equalErased (X.erase parsed) (X.erase (C.compiledTerm compilation))) "port target serialization changed"
+ H.assert (T.alphaEq parsedType ty && X.equalErased (X.erase parsed) (X.erase term)) "port target serialization changed"
  let serialized = B.serializeTerm parsed
  transported <- H.right (P.parseTerm source serialized)
  transportedType <- H.right (Check.checkClosed transported)
  H.assert (T.alphaEq transportedType ty) "port transport changed the target type"
  writeFile destination serialized
  hash <- fileDigest destination
- J.write (destination ++ ".checks.json") (J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "fixture" (J.str name)) ((:) ((,) "target_sha256" (J.str hash)) ((:) ((,) "entry_type" (J.str "IO Unit")) ((:) ((,) "inferred_type" (J.str (Pretty.prettyType ty))) ((:) ((,) "checks" V.portTargetChecks) [])))))))
+ J.write (destination ++ ".checks.json") (J.Object ((:) ((,) "format" (J.num 1)) ((:) ((,) "fixture" (J.str name)) ((:) ((,) "target_sha256" (J.str hash)) ((:) ((,) "entry_type" (J.str "IO ()")) ((:) ((,) "inferred_type" (J.str (Pretty.prettyType ty))) ((:) ((,) "checks" V.portTargetChecks) [])))))))
+
+splitText config key = J.getText key "" config
+splitPrefix config = splitText config "scratch" ++ "/producer/unit"
+splitProofPath config = splitText config "scratch" ++ "/producer/ordered-proof.json"
+splitDigestFields = O.words "source_inputs_sha256 builtin_interface_sha256 builtin_object_sha256 checker_sha256"
+splitProductFields = O.words "interface_sha256 object_sha256 queries_sha256"
+splitOutputFields = O.words "target_sha256 checks_sha256 discovered_sha256"
+validSplitDigest text = stringLength text == 64 && S.all (\i ->
+ let code = stringCodeAt text i in (code >= 48 && code <= 57) || (code >= 97 && code <= 102)) (S.range 0 63)
+validSplitDigests object keys = S.all (\key -> validSplitDigest (splitText object key)) keys
+readPinnedSplitJson : String -> String -> IO J.Json
+readPinnedSplitJson path expected = do
+ H.assert (validSplitDigest expected) "invalid StateTypes split digest"
+ before <- fileDigest path
+ H.assert (eqString before expected) ("StateTypes split input changed: " ++ path)
+ value <- J.read path
+ after <- fileDigest path
+ H.assert (eqString after expected) ("StateTypes split input changed while reading: " ++ path)
+ return value
+
+withinSplitPath directory path = eqString directory path || O.starts (directory ++ "/") path
+requireCanonicalSplitPath path = do
+ H.assert (O.absolute path) "StateTypes split path must be absolute"
+ canonical <- canonicalPath path
+ H.assert (eqString canonical path) "StateTypes split path must be canonical"
+checkSplitBuiltin config = do
+ let builtin = splitText config "builtin_interface"
+ ci <- fileDigest builtin
+ co <- fileDigest (Artifact.objectPath builtin)
+ H.assert (eqString ci (splitText config "builtin_interface_sha256") &&
+  eqString co (splitText config "builtin_object_sha256")) "StateTypes split builtin changed"
+data SplitFixture = SplitStateTypes | SplitInferenceConformance
+
+splitFixtureName : SplitFixture -> String
+splitFixtureName fixture = case fixture of
+ SplitStateTypes -> "StateTypes"
+ SplitInferenceConformance -> "InferenceConformance"
+
+splitFixtureMode : SplitFixture -> String
+splitFixtureMode fixture = case fixture of
+ SplitStateTypes -> TS.portStateTypesMode
+ SplitInferenceConformance -> TS.portInferenceMode
+
+splitFixtureSource : SplitFixture -> String
+splitFixtureSource fixture = case fixture of
+ SplitStateTypes -> TS.portStateTypesSource
+ SplitInferenceConformance -> TS.portInferenceSource
+
+splitFixtureIdentity : SplitFixture -> M.PackageGraph -> String
+splitFixtureIdentity fixture = case fixture of
+ SplitStateTypes -> TS.portStateTypesIdentity
+ SplitInferenceConformance -> TS.portInferenceIdentity
+
+splitFixtureInputs : SplitFixture -> M.PackageGraph -> IO J.Json
+splitFixtureInputs fixture = case fixture of
+ SplitStateTypes -> TS.portStateTypesInputs
+ SplitInferenceConformance -> TS.portInferenceInputs
+
+splitProduceOption : SplitFixture -> String
+splitProduceOption fixture = case fixture of
+ SplitStateTypes -> "--produce-statetypes-split"
+ SplitInferenceConformance -> "--produce-inferenceconformance-discovered"
+
+splitConsumeOption : SplitFixture -> String
+splitConsumeOption fixture = case fixture of
+ SplitStateTypes -> "--consume-statetypes-split"
+ SplitInferenceConformance -> "--consume-inferenceconformance-discovered"
+
+readSplitConfig : SplitFixture -> String -> String -> IO J.Json
+readSplitConfig fixture = readDiscoveredConfig (splitFixtureName fixture) (splitFixtureMode fixture)
+
+readDiscoveredConfig : String -> String -> String -> String -> IO J.Json
+readDiscoveredConfig fixture mode path digest = do
+ requireCanonicalSplitPath path
+ config <- readPinnedSplitJson path digest
+ let scratch = splitText config "scratch"
+ let target = splitText config "target"
+ let targetDirectory = O.parent target
+ let sourceInputs = splitText config "source_inputs"
+ let builtin = splitText config "builtin_interface"
+ let fields = O.words "format fixture preparation_mode crate_identity source_inputs source_inputs_sha256 builtin_interface builtin_interface_sha256 builtin_object_sha256 checker_sha256 scratch target"
+ H.assert (S.eqList eqString (S.sortBy compareString (S.map S.fst (J.items config))) (S.sortBy compareString fields) &&
+  J.equal (J.get "format" config) (J.num 1) && eqString (splitText config "fixture") fixture &&
+  eqString (splitText config "preparation_mode") mode && validSplitDigests config splitDigestFields)
+  ("invalid discovered Port configuration: " ++ fixture)
+ H.assert (eqString (O.base target) "unit.xmlf" && O.ends ".mlfci" builtin) "invalid StateTypes split output or builtin"
+ S.mapM_ requireCanonicalSplitPath ((:) scratch ((:) targetDirectory ((:) sourceInputs ((:) builtin []))))
+ H.assert (S.not (withinSplitPath scratch targetDirectory || withinSplitPath targetDirectory scratch) &&
+  S.all (\input -> S.not (withinSplitPath scratch input || withinSplitPath targetDirectory input))
+   ((:) path ((:) sourceInputs ((:) builtin ((:) (Artifact.objectPath builtin) [])))))
+  "StateTypes split inputs and output directories overlap"
+ executable <- getExecutablePath
+ checker <- fileDigest executable
+ H.assert (eqString checker (splitText config "checker_sha256")) "StateTypes split checker changed"
+ checkSplitBuiltin config
+ return config
+
+splitSourceRow : J.Json -> Either String ((,,,) String String String String)
+splitSourceRow row = case row of
+ J.Array ((:) (J.String name) ((:) (J.String spelling) ((:) (J.String canonical) ((:) (J.String digest) [])))) ->
+  if stringLength name > 0 && stringLength spelling > 0 && O.absolute canonical && validSplitDigest digest
+  then Right ((,,,) name spelling canonical digest) else Left "invalid StateTypes split loader row"
+ _ -> Left "invalid StateTypes split loader row"
+readSplitInputs : SplitFixture -> J.Json -> IO ((,,) J.Json ([] ((,,,) String String String String)) ([] String))
+readSplitInputs fixture = readDiscoveredInputs (splitFixtureIdentity fixture) (splitFixtureSource fixture)
+
+readDiscoveredInputs : (M.PackageGraph -> String) -> String -> J.Json ->
+ IO ((,,) J.Json ([] ((,,,) String String String String)) ([] String))
+readDiscoveredInputs crateIdentity source config = do
+ graph <- M.load "mlf-package.json"
+ cwd <- canonicalPath "."
+ inputs <- readPinnedSplitJson (splitText config "source_inputs") (splitText config "source_inputs_sha256")
+ let roots = TS.portRoots graph
+ H.assert (eqString (splitText config "crate_identity") (crateIdentity graph) &&
+  eqString (splitText inputs "cwd") cwd && eqString (splitText inputs "entry") source &&
+  J.equal (J.get "includes" inputs) (J.stringArray roots)) "discovered Port source roots differ from cache authority"
+ rows <- H.right (S.traverseEither splitSourceRow (J.values (J.get "loader_rows" inputs)))
+ let files = S.map (\((,,,) _ _ canonical digest) -> (,) canonical (J.str digest)) rows
+ H.assert (S.not (S.null rows) && J.equal (J.get "files" inputs) (J.Object files)) "invalid StateTypes split source inventory"
+ return ((,,) inputs rows roots)
+
+splitFileFields : [] ((,) String String) -> IO ([] ((,) String J.Json))
+splitFileFields paths = S.mapM (\((,) key path) -> do
+ digest <- fileDigest path
+ H.assert (validSplitDigest digest) ("invalid StateTypes split file digest: " ++ path)
+ return ((,) key (J.str digest))) paths
+splitProducerProducts : J.Json -> IO ([] ((,) String J.Json))
+splitProducerProducts config = discoveredCrateProducts (splitPrefix config)
+discoveredCrateProducts : String -> IO ([] ((,) String J.Json))
+discoveredCrateProducts prefix =
+ splitFileFields ((:) ((,) "interface_sha256" (prefix ++ ".mlfci"))
+  ((:) ((,) "object_sha256" (prefix ++ ".mlfco")) ((:) ((,) "queries_sha256" (prefix ++ ".queries")) [])))
+splitTargetProducts : J.Json -> IO ([] ((,) String J.Json))
+splitTargetProducts config = do
+ let target = splitText config "target"
+ splitFileFields ((:) ((,) "target_sha256" target)
+  ((:) ((,) "checks_sha256" (target ++ ".checks.json")) ((:) ((,) "discovered_sha256" (target ++ ".discovered.json")) [])))
+splitIdentityFields = O.words "fixture preparation_mode crate_identity"
+splitHeader config products = J.Object (S.append
+ (S.map (\key -> (,) key (J.get key config)) (S.append splitIdentityFields splitDigestFields)) products)
+
+-- The compact wire shares ordered choice vectors without changing site order.
+splitRole role = case role of
+ InstanceEvidence -> "instance"
+ SuperclassEvidence -> "superclass"
+ GivenEvidence -> "given"
+splitSameChoice ((,) role key) ((,) other otherKey) = eqString (splitRole role) (splitRole other) && eqString key otherKey
+splitMembers : [] ([] ((,,) Int String Bool)) -> Either String (Map Int String)
+splitMembers groups =
+ let members = S.concat groups in
+ let slots = Dict.fromList S.compareInt (S.map (\((,,) slot key _) -> (,) slot key) members) in
+ let keys = Set.fromList compareString (S.map (\((,,) _ key _) -> key) members) in
+ if S.not (S.null groups) && S.all (\group -> S.not (S.null group)) groups &&
+    S.all (\((,,) slot key _) -> slot >= 0 && stringLength key > 0) members &&
+    Dict.size slots == S.length members && Set.size keys == S.length members
+ then Right slots else Left "StateTypes compact ordered member inventory differs"
+splitEncodeSite : Map Int String -> [] ((,) Int ([] ((,) EvidenceRole String))) ->
+ ((,,) Int String ([] ((,) EvidenceRole String))) -> Either String J.Json
+splitEncodeSite slots vectors ((,,) slot key choices) =
+ case ((,) (Dict.lookup S.compareInt slot slots) (S.find (\((,) _ row) -> S.eqList splitSameChoice choices row) vectors)) of
+  (,) (Just owned) (Just ((,) ordinal _)) ->
+   if eqString key owned then Right (J.Array ((:) (J.num slot) ((:) (J.num ordinal) [])))
+   else Left "StateTypes compact site key differs from its checked group slot"
+  _ -> Left "StateTypes compact site slot or candidate vector missing"
+splitEncode : J.Json -> Session.OrderedPlanReceipt -> Either String J.Json
+splitEncode header (Session.OrderedPlanReceipt sites groups) = do
+ slots <- splitMembers groups
+ let vectors = S.nubBy (S.eqList splitSameChoice) (S.map (\((,,) _ _ choices) -> choices) sites)
+ let indexed = S.zip (S.range 0 (S.length vectors - 1)) vectors
+ let choice ((,) role key) = J.stringArray ((:) (splitRole role) ((:) key []))
+ let member ((,,) slot key recursive) = J.Array ((:) (J.num slot) ((:) (J.str key) ((:) (J.Boolean recursive) [])))
+ rows <- S.traverseEither (splitEncodeSite slots indexed) sites
+ let siteSlots = Set.fromList S.compareInt (S.map (\((,,) slot _ _) -> slot) sites)
+ if S.not (S.null sites) && Set.size siteSlots == S.length sites
+ then Right (J.Array ((:) header ((:) (J.Array (S.map (\group -> J.Array (S.map member group)) groups))
+  ((:) (J.Array (S.map (\vector -> J.Array (S.map choice vector)) vectors)) ((:) (J.Array rows) [])))))
+ else Left "StateTypes compact evidence site inventory differs"
+splitInt : J.Json -> Either String Int
+splitInt value = case value of
+ J.Number text ->
+  let size = stringLength text in
+  if size > 0 && size <= 19 && S.all (\i -> let digit = stringCodeAt text i in digit >= 48 && digit <= 57) (S.range 0 (size - 1))
+  then let index = readInt text in
+   if index >= 0 && eqString text (showInt index) then Right index else Left "noncanonical StateTypes compact index"
+  else Left "invalid StateTypes compact index"
+ _ -> Left "invalid StateTypes compact index"
+splitChoice : J.Json -> Either String ((,) EvidenceRole String)
+splitChoice value = case value of
+ J.Array ((:) (J.String role) ((:) (J.String key) [])) ->
+  if stringLength key == 0 then Left "empty StateTypes compact evidence key" else case role of
+   "instance" -> Right ((,) InstanceEvidence key)
+   "superclass" -> Right ((,) SuperclassEvidence key)
+   "given" -> Right ((,) GivenEvidence key)
+   _ -> Left "invalid StateTypes compact evidence role"
+ _ -> Left "invalid StateTypes compact role/key"
+splitVector : J.Json -> Either String ([] ((,) EvidenceRole String))
+splitVector value = case value of
+ J.Array rows -> S.traverseEither splitChoice rows
+ _ -> Left "invalid StateTypes compact candidate vector"
+splitMember : J.Json -> Either String ((,,) Int String Bool)
+splitMember value = case value of
+ J.Array ((:) rawSlot ((:) (J.String key) ((:) (J.Boolean recursive) []))) -> do
+  slot <- splitInt rawSlot
+  Right ((,,) slot key recursive)
+ _ -> Left "invalid StateTypes compact SCC member"
+splitGroup : J.Json -> Either String ([] ((,,) Int String Bool))
+splitGroup value = case value of
+ J.Array members -> S.traverseEither splitMember members
+ _ -> Left "invalid StateTypes compact SCC group"
+splitDecodeSite : Map Int String -> Map Int ([] ((,) EvidenceRole String)) -> J.Json ->
+ Either String ((,) Int ((,,) Int String ([] ((,) EvidenceRole String))))
+splitDecodeSite slots vectors value = case value of
+ J.Array ((:) rawSlot ((:) rawOrdinal [])) -> do
+  slot <- splitInt rawSlot
+  ordinal <- splitInt rawOrdinal
+  case ((,) (Dict.lookup S.compareInt slot slots) (Dict.lookup S.compareInt ordinal vectors)) of
+   (,) (Just key) (Just choices) -> Right ((,) ordinal ((,,) slot key choices))
+   _ -> Left "StateTypes compact slot/vector reference absent"
+ _ -> Left "invalid StateTypes compact site"
+splitDecode : J.Json -> J.Json -> Either String Session.OrderedPlanReceipt
+splitDecode expected wire = case wire of
+ J.Array ((:) header ((:) (J.Array rawGroups) ((:) (J.Array rawVectors) ((:) (J.Array rawSites) [])))) ->
+  if J.equal header expected && S.not (S.null rawSites) && S.not (S.null rawVectors) && S.length rawVectors <= S.length rawSites
+  then do
+   groups <- S.traverseEither splitGroup rawGroups
+   slots <- splitMembers groups
+   vectors <- S.traverseEither splitVector rawVectors
+   let ordinals = S.range 0 (S.length vectors - 1)
+   let table = Dict.fromList S.compareInt (S.zip ordinals vectors)
+   decoded <- S.traverseEither (splitDecodeSite slots table) rawSites
+   let sites = S.map S.snd decoded
+   let siteSlots = Set.fromList S.compareInt (S.map (\((,,) slot _ _) -> slot) sites)
+   if Set.size siteSlots == S.length sites && S.eqList eqInt (S.nubBy eqInt (S.map S.fst decoded)) ordinals &&
+      S.length (S.nubBy (S.eqList splitSameChoice) vectors) == S.length vectors
+   then Right (Session.OrderedPlanReceipt sites groups) else Left "StateTypes compact site or vector inventory differs"
+  else Left "StateTypes compact header or geometry differs"
+ _ -> Left "invalid StateTypes compact ordered receipt"
+
+writeDiscoveredProof mode name identity builtin prefix destination inputs sourceRows
+ (Session.OrderedPlanReceipt sites groups) interface = do
+ let groupKeys = S.map (S.map (\((,,) _ key _) -> key)) groups
+ let keys = S.sortBy compareString (S.map S.fst (Artifact.crateBindings interface))
+ let owned = Set.fromList compareString keys
+ let modules = S.sortBy compareString (S.map (\((,,,) owner _ _ _) -> owner) sourceRows)
+ let instanceKeys = S.map S.fst (Artifact.crateInstances interface)
+ query <- J.read (prefix ++ ".queries")
+ let rows = J.values (J.get "groups" query)
+ let observed = S.map (J.getStrings "members") rows
+ H.assert (eqString (Artifact.crateId interface) identity &&
+  S.eqList eqString modules (S.sortBy compareString (Artifact.crateModules interface)) &&
+  S.eqList eqString keys (S.sortBy compareString (S.concat groupKeys)) &&
+  S.length keys == Set.size owned &&
+  S.all (\((,,) _ key _) -> Set.member compareString key owned) sites)
+  "discovered Port checked ownership differs from its actual plan"
+ H.assert (J.equal (J.get "format" query) (J.num 1) &&
+  J.equal (J.get "inferred_groups" query) (J.num (S.length groups)) &&
+  J.equal (J.get "reused_groups" query) (J.num 0) &&
+  eqString (J.getText "crate" "" query) identity &&
+  eqString (J.getText "semantic_fingerprint" "" query) (Artifact.semanticFingerprint interface) &&
+  S.all (\row -> S.not (J.getBool "cached" true row)) rows &&
+  S.eqList (S.eqList eqString) observed groupKeys)
+  "discovered Port did not check its exact groups cold"
+ case Artifact.crateDependencies interface of
+  (:) dependency [] -> H.assert (eqString (Artifact.dependencyId dependency) Artifact.builtinCrateIdentity &&
+   eqString (Artifact.dependencyPath dependency) builtin) "discovered Port builtin dependency differs"
+  _ -> H.fail "discovered Port artifact has an unexpected dependency graph"
+ targetHash <- fileDigest destination
+ checksHash <- fileDigest (destination ++ ".checks.json")
+ interfaceHash <- fileDigest (prefix ++ ".mlfci")
+ objectHash <- fileDigest (prefix ++ ".mlfco")
+ queryHash <- fileDigest (prefix ++ ".queries")
+ builtinInterface <- fileDigest builtin
+ builtinObject <- fileDigest (Artifact.objectPath builtin)
+ let builtinIdentity = J.Object
+       ((:) ((,) "interface_sha256" (J.str builtinInterface))
+        ((:) ((,) "object_sha256" (J.str builtinObject)) []))
+ let choice ((,) role binding) = J.stringArray ((:) (splitRole role) ((:) binding []))
+ let site ((,,) slot key choices) = J.Array
+       ((:) (J.num slot) ((:) (J.str key) ((:) (J.Array (S.map choice choices)) [])))
+ let member ((,,) slot key recursive) = J.Array
+       ((:) (J.num slot) ((:) (J.str key) ((:) (J.Boolean recursive) [])))
+ J.write (destination ++ ".discovered.json") (J.Object
+  ((:) ((,) "format" (J.num 1))
+   ((:) ((,) "preparation_mode" (J.str mode))
+    ((:) ((,) "fixture" (J.str name))
+     ((:) ((,) "crate_identity" (J.str identity))
+      ((:) ((,) "source_inputs" inputs)
+       ((:) ((,) "builtin" builtinIdentity)
+        ((:) ((,) "target_sha256" (J.str targetHash))
+         ((:) ((,) "checks_sha256" (J.str checksHash))
+          ((:) ((,) "interface_sha256" (J.str interfaceHash))
+           ((:) ((,) "object_sha256" (J.str objectHash))
+            ((:) ((,) "queries_sha256" (J.str queryHash))
+             ((:) ((,) "sites" (J.Array (S.map site sites)))
+              ((:) ((,) "groups" (J.Array (S.map (\group -> J.Array (S.map member group)) groups)))
+               ((:) ((,) "owned_keys" (J.stringArray keys))
+                ((:) ((,) "modules" (J.stringArray modules))
+                 ((:) ((,) "instance_keys" (J.stringArray instanceKeys)) [])))))))))))))))))
+
+produceDiscoveredSplit : SplitFixture -> String -> String -> IO ()
+produceDiscoveredSplit fixture configPath configDigest = do
+ config <- readSplitConfig fixture configPath configDigest
+ (,,) _ sourceRows roots <- readSplitInputs fixture config
+ let name = splitFixtureName fixture
+ let prefix = splitPrefix config
+ let builtin = splitText config "builtin_interface"
+ let cache = splitText config "scratch" ++ "/producer/query"
+ entries <- O.entries (O.parent prefix)
+ H.assert (S.null entries) (name ++ " split producer directory is not fresh")
+ result <- Session.compileDiscoveredRootMatching sourceRows false (splitText config "crate_identity") roots
+  (splitFixtureSource fixture) cache builtin prefix
+ ordered <- H.right result
+ products <- splitProducerProducts config
+ wire <- H.right (splitEncode (splitHeader config products) ordered)
+ checkSplitBuiltin config
+ J.write (splitProofPath config) wire
+ putStrLn ("PRODUCED " ++ name)
+
+consumeDiscoveredSplit : SplitFixture -> String -> String -> String -> IO ()
+consumeDiscoveredSplit fixture configPath configDigest proofDigest = do
+ config <- readSplitConfig fixture configPath configDigest
+ (,,) inputs sourceRows _ <- readSplitInputs fixture config
+ let name = splitFixtureName fixture
+ let prefix = splitPrefix config
+ let target = splitText config "target"
+ let builtin = splitText config "builtin_interface"
+ let identity = splitText config "crate_identity"
+ let proofPath = splitProofPath config
+ before <- fileDigest proofPath
+ H.assert (validSplitDigest proofDigest && eqString before proofDigest) (name ++ " producer proof changed before consumption")
+ products <- splitProducerProducts config
+ interface <- checkDiscoveredEntry name (splitFixtureSource fixture) prefix target
+ wire <- readPinnedSplitJson proofPath proofDigest
+ ordered <- H.right (splitDecode (splitHeader config products) wire)
+ writeDiscoveredProof (splitFixtureMode fixture) name identity builtin prefix target inputs sourceRows ordered interface
+ after <- splitProducerProducts config
+ H.assert (J.equal (J.Object products) (J.Object after)) (name ++ " producer products changed during consumption")
+ checkSplitBuiltin config
  putStrLn ("CHECKED " ++ name)
+
+
+checkDiscoveredEntry : String -> String -> String -> String -> IO Artifact.CrateInterface
+checkDiscoveredEntry name source prefix target = do
+ let ci = prefix ++ ".mlfci"
+ rawInterface <- Artifact.readInterface ci
+ interface <- H.right rawInterface
+ inferred <- case S.filter (\((,) key _) -> eqString key (Artifact.crateEntry interface)) (Artifact.crateBindings interface) of
+  (:) ((,) _ ty) [] -> return ty
+  _ -> H.fail (name ++ " interface has no unique checked entry")
+ rawLinked <- Artifact.linkCheckedFile ci
+ linked <- H.right rawLinked
+ H.assert (T.alphaEq inferred (Checked.typeOf linked)) (name ++ " linked entry type differs")
+ prepareCheckedTarget name source target (Checked.term linked) inferred
+ return interface
+
+runSplitChild : String -> String -> [] String -> String -> String -> IO ()
+runSplitChild binary scratch args stage expected = do
+ let output = scratch ++ "/" ++ stage ++ ".stdout"
+ let errors = scratch ++ "/" ++ stage ++ ".stderr"
+ let job = Native.SuiteJob stage binary args (scratch ++ "/empty.stdin") output errors
+ result <- Native.runSuitePhase ((:) job [])
+ H.right result
+ expectedBytes <- byteArrayFromString expected
+ expectedSize <- lengthByteArray expectedBytes
+ (,) stdoutError stdout <- readByteFileOrError output expectedSize
+ (,) stderrError stderr <- readByteFileOrError errors 1
+ same <- Storage.sameBytes stdout expectedBytes
+ stderrSize <- lengthByteArray stderr
+ H.assert (eqString stdoutError "" && eqString stderrError "" && same && stderrSize == 0)
+  ("StateTypes split streams differ: " ++ stage)
+
+prepareDiscoveredSplit : SplitFixture -> String -> String -> IO ()
+prepareDiscoveredSplit fixture configPath configDigest = do
+ config <- readSplitConfig fixture configPath configDigest
+ (,,) inputs _ _ <- readSplitInputs fixture config
+ let name = splitFixtureName fixture
+ let scratch = splitText config "scratch"
+ let target = splitText config "target"
+ let sealPath = target ++ ".preparation.json"
+ checkFreshDiscoveredOutput scratch target
+ O.mkdir (O.parent (splitPrefix config))
+ writeFile (scratch ++ "/empty.stdin") ""
+ binary <- getExecutablePath
+ runSplitChild binary scratch ((:) (splitProduceOption fixture) ((:) configPath ((:) configDigest [])))
+  "producer" ("PRODUCED " ++ name ++ "\n")
+ products <- splitProducerProducts config
+ proofDigest <- fileDigest (splitProofPath config)
+ H.assert (validSplitDigest proofDigest) (name ++ " producer did not seal its ordered proof")
+ runSplitChild binary scratch ((:) (splitConsumeOption fixture) ((:) configPath ((:) configDigest ((:) proofDigest []))))
+  "consumer" ("CHECKED " ++ name ++ "\n")
+ after <- splitProducerProducts config
+ proofAfter <- fileDigest (splitProofPath config)
+ H.assert (J.equal (J.Object products) (J.Object after) && eqString proofDigest proofAfter) (name ++ " producer evidence changed")
+ _ <- readSplitConfig fixture configPath configDigest
+ graph <- M.load "mlf-package.json"
+ current <- splitFixtureInputs fixture graph
+ H.assert (J.equal current inputs) (name ++ " source inventory changed during preparation")
+ outputs <- splitTargetProducts config
+ let outputDigests = J.Object outputs
+ checks <- readPinnedSplitJson (target ++ ".checks.json") (splitText outputDigests "checks_sha256")
+ let targetDigest = splitText outputDigests "target_sha256"
+ H.assert (V.validPortTargetChecks name targetDigest checks) (name ++ " split check receipt differs")
+ let sealed = S.append ((:) ((,) "format" (J.num 1)) ((:) ((,) "ordered_proof_sha256" (J.str proofDigest)) [])) (S.append products outputs)
+ J.write sealPath (splitHeader config sealed)
+ putStrLn ("CHECKED " ++ name)
+
+
+checkFreshDiscoveredOutput : String -> String -> IO ()
+checkFreshDiscoveredOutput scratch target = do
+ let sealPath = target ++ ".preparation.json"
+ entries <- O.entries scratch
+ H.assert (S.null entries) "discovered Port scratch is not fresh"
+ S.mapM_ (\path -> do
+  present <- fileExists path
+  directory <- directoryExists path
+  H.assert (S.not (present || directory)) "discovered Port target or sidecar already exists")
+  ((:) target ((:) (target ++ ".checks.json") ((:) (target ++ ".discovered.json") ((:) sealPath []))))
+
+validateSplitRuntime : String -> J.Json -> String -> String -> String -> IO ()
+validateSplitRuntime name row target targetDigest checksDigest = do
+ let state = eqString name "StateTypes"
+ let inference = eqString name "InferenceConformance"
+ required <- if state then getEnv "MLF_TEST_PORT_REQUIRE_STATE_TYPES_SPLIT"
+  else if inference then getEnv "MLF_TEST_PORT_REQUIRE_INFERENCE_DISCOVERED" else return ""
+ let mode = splitText row "preparation_mode"
+ let marked = J.has "preparation_mode" row || J.has "preparation_sha256" row || J.has "discovered_sha256" row
+ H.assert (S.not (eqString required "1") || marked) ("missing required Port preparation: " ++ name)
+ if S.not marked then return () else do
+  H.assert ((state && eqString mode TS.portStateTypesMode) || (inference && eqString mode TS.portInferenceMode))
+   "invalid discovered Port preparation row"
+  seal <- readPinnedSplitJson (target ++ ".preparation.json") (splitText row "preparation_sha256")
+  discovered <- fileDigest (target ++ ".discovered.json")
+  let fields = S.append splitDigestFields (S.append splitProductFields (S.append splitOutputFields ((:) "ordered_proof_sha256" [])))
+  let keys = S.append (O.words "format fixture preparation_mode crate_identity") fields
+  H.assert (S.not inference || S.eqList eqString (S.sortBy compareString keys)
+   (S.sortBy compareString (S.map S.fst (J.items seal)))) "InferenceConformance preparation seal fields differ"
+  H.assert (J.equal (J.get "format" seal) (J.num 1) && eqString (splitText seal "fixture") name &&
+   eqString (splitText seal "preparation_mode") mode && stringLength (splitText seal "crate_identity") > 0 &&
+   validSplitDigests seal fields && eqString (splitText seal "target_sha256") targetDigest &&
+   eqString (splitText seal "checks_sha256") checksDigest && eqString discovered (splitText seal "discovered_sha256") &&
+   eqString discovered (splitText row "discovered_sha256")) "Port split preparation seal changed"
+
 preparedSource : String -> IO String
 preparedSource name = preparedSourceFor names true name
 preparedSourceFor : [] String -> Bool -> String -> IO String
@@ -72,6 +524,7 @@ preparedSourceFor selected full name = do
  checks <- J.read (target ++ ".checks.json")
  checksHash <- fileDigest (target ++ ".checks.json")
  H.assert (eqString checksHash (J.getText "checks_sha256" "" row) && V.validPortTargetChecks name digest checks) "prepared port check receipt changed"
+ validateSplitRuntime name row target digest checksHash
  source <- readFile target
  after <- fileDigest target
  H.assert (eqString digest after) "prepared port target changed while reading"
@@ -112,7 +565,21 @@ main = do
   case args of
    (:) "--list" [] -> putStr (S.unlines names)
    (:) "--prepare" ((:) name ((:) destination [])) -> prepareFixture name destination
+   (:) "--prepare-inferenceconformance-discovered" rest -> splitConfigArguments (prepareDiscoveredSplit SplitInferenceConformance) rest
+   (:) "--produce-inferenceconformance-discovered" rest -> splitConfigArguments (produceDiscoveredSplit SplitInferenceConformance) rest
+   (:) "--consume-inferenceconformance-discovered" rest -> splitConsumeArguments SplitInferenceConformance rest
+   (:) "--prepare-statetypes-split" rest -> splitConfigArguments (prepareDiscoveredSplit SplitStateTypes) rest
+   (:) "--produce-statetypes-split" rest -> splitConfigArguments (produceDiscoveredSplit SplitStateTypes) rest
+   (:) "--consume-statetypes-split" rest -> splitConsumeArguments SplitStateTypes rest
    _ -> executeFixtures args
+splitConfigArguments : (String -> String -> IO ()) -> [] String -> IO ()
+splitConfigArguments action args = case args of
+ (:) config ((:) digest []) -> action config digest
+ _ -> H.fail "StateTypes split requires CONFIG CONFIG_SHA256"
+splitConsumeArguments : SplitFixture -> [] String -> IO ()
+splitConsumeArguments fixture args = case args of
+ (:) config ((:) digest ((:) proof [])) -> consumeDiscoveredSplit fixture config digest proof
+ _ -> H.fail "StateTypes split consumer requires CONFIG CONFIG_SHA256 PROOF_SHA256"
 executeFixtures : [] String -> IO ()
 executeFixtures args = do
  (,) full selected <- case args of

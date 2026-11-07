@@ -1,5 +1,6 @@
 module Test.NativeProcess where
 import Bootstrap.Types
+import qualified Bootstrap.Std as S
 import qualified Async.Process as P
 import qualified Test.Outcome as O
 import qualified Test.Expectation as E
@@ -36,3 +37,47 @@ execute scope specification = if not (bounded specification) then
 withSerial : forall a. (P.ProcessScope -> IO (Either P.AsyncError a)) -> IO (Either P.AsyncError a)
 withSerial = P.withProcessScope (P.ScopeOptions 1 1 1024)
 not value = if value then false else true
+
+-- A caller which is already inside the suite capture may share that one
+-- deadline across an entire phase. Keep execute's independently bounded API
+-- for framework leaves. These jobs have no additional child timers.
+data SuiteJob = SuiteJob String String ([] String) String String String
+
+suiteSubmit : P.ProcessScope -> [] SuiteJob -> IO (Either P.AsyncError ([] ((,) String P.ProcessHandle)))
+suiteSubmit scope jobs = case jobs of
+ [] -> ioReturn (Right [])
+ (:) (SuiteJob name executable args input stdout stderr) tail -> do
+  launched <- P.submit scope (P.ProcessSpec executable args "" input stdout stderr P.InheritEnvironment 0 0)
+  case launched of
+   Left failure -> ioReturn (Left failure)
+   Right handle -> do
+    rest <- suiteSubmit scope tail
+    ioReturn (case rest of { Left failure -> Left failure; Right handles -> Right ((:) ((,) name handle) handles) })
+
+suiteAwait : P.ProcessScope -> [] ((,) String P.ProcessHandle) -> IO (Either P.AsyncError ())
+suiteAwait scope handles = case handles of
+ [] -> ioReturn (Right ())
+ (:) ((,) name handle) tail -> do
+  result <- P.awaitProcess scope handle
+  case result of
+   Left failure -> ioReturn (Left failure)
+   Right outcome -> case outcome of
+    P.Exited code cleanup ->
+     if code == 0 && cleanup == 0 then suiteAwait scope tail
+     else ioReturn (Left (P.AsyncError (if code == 0 then cleanup else code)
+      (name ++ " exited " ++ showInt code ++ " with cleanup status " ++ showInt cleanup)))
+    P.LaunchFailed code cleanup -> ioReturn (Left (P.AsyncError code
+     (name ++ " launch failed; cleanup status " ++ showInt cleanup)))
+    P.Cancelled code cleanup -> ioReturn (Left (P.AsyncError code
+     (name ++ " was cancelled; cleanup status " ++ showInt cleanup)))
+    P.TimedOut cleanup -> ioReturn (Left (P.AsyncError 124
+     (name ++ " has an unexpected child timeout; cleanup status " ++ showInt cleanup)))
+
+runSuitePhase : [] SuiteJob -> IO (Either String ())
+runSuitePhase jobs = do
+ let slots = S.length jobs
+ if slots < 1 || slots > 4 then ioReturn (Left "invalid test suite phase width") else do
+  result <- P.withProcessScope (P.ScopeOptions slots slots slots) (\scope -> do
+   handles <- suiteSubmit scope jobs
+   case handles of { Left failure -> ioReturn (Left failure); Right ready -> suiteAwait scope ready })
+  ioReturn (case result of { Left failure -> Left (P.errorMessage failure); Right _ -> Right () })

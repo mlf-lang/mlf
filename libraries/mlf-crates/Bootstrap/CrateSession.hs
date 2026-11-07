@@ -3,7 +3,7 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 -- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
-module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller) where {
+module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller, compileDiscoveredRoot, compileDiscoveredRootMatching, OrderedPlanReceipt(..)) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
@@ -18,7 +18,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntRank as Rank;
   import qualified Bootstrap.BuiltinPreludeContext as Builtin;
-  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate,
+  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate, prepareDiscoveredCrate, parseDiscoveredSource,
     withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
     specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
     preparedResolution, preparedNames, preparedLayouts, preparedReach, CrateEntry(..), preparedEntryId,
@@ -32,6 +32,8 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.SourceInference as Source;
   import qualified Bootstrap.SourceUnit as Unit;
+  import qualified Bootstrap.Parser as Parser;
+  import qualified Bootstrap.Host as Host;
   import qualified Bootstrap.CompilerCore as Compiler;
   import qualified Bootstrap.Constraint as C;
   import qualified Bootstrap.Elaborate as E;
@@ -47,165 +49,50 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Pretty as Pretty;
 
-  compilePreparedWithEncoding :: forall a. Bool -> Bool ->
-    (Artifact.CrateObject -> String -> Query.QueryReport -> a) ->
-    CrateSpec -> [] ((,) String Artifact.CrateInterface) -> PreparedCrate ->
-    IO (Either String a);
-  compilePreparedWithEncoding verifyAll shareEncoding complete spec interfaces prepared =
-    do {
-      let {
-        lowered = preparedLowered prepared
+  data OrderedPlanReceipt = OrderedPlanReceipt
+    ([] ((,,) Int String ([] ((,) EvidenceRole String)))) ([] ([] ((,,) Int String Bool)));
+  orderedPlanReceipt :: PreparedCrate -> Either String OrderedPlanReceipt;
+  orderedPlanReceipt prepared = case preparedSourcePlan prepared of {
+    Just plan -> case Source.planGraph plan of {
+      Source.IndexedPlan symbols _ locals _ groups -> case Classes.inventoryDeclarations (Source.planInventory plan) of {
+        Nothing -> Left "ordered plan lost allocated evidence authority";
+        Just generation -> let {
+          inventory = Source.planInventory plan; evidence = Dependency.generatedSymbols generation;
+          row i = (,,) (V.toInt i) (Dependency.symbolKey symbols i)
+            (map (\((,) role slot) -> (,) role (Dependency.symbolKey evidence slot)) (Classes.inventoryCandidateIds inventory i));
+          member ((,) i recursive) = (,,) (V.toInt i) (Dependency.symbolKey symbols i) recursive
+        } in Right (OrderedPlanReceipt (map row locals) (map (map member) groups))
       };
-      let {
-        imported =
-          map
-            (\((,) _ iface) ->
-               Separate.UnitInterface (Artifact.crateId iface) [] [] [] [] []
-                 (Artifact.crateBindings iface)
-                 "metadata")
-            interfaces
-      };
-      let {
-        protected = foldl
-          (\acc entry -> M.insert compareString (fst entry)
-            (snd entry || M.findWithDefault compareString False (fst entry) acc) acc)
-          M.empty (concatMap (\p -> Artifact.crateProtection (snd p)) interfaces)
-      };
-      compiled <- case preparedSourcePlan prepared of {
-        Just plan -> if shareEncoding
-          then compileParsedSourceGroups verifyAll (specIdentity spec) (specCache spec)
-            imported protected plan
-          else Query.compileSourceGroups (specIdentity spec) (specCache spec)
-            imported protected plan;
-        Nothing -> do {
-          result <- Query.compileLoweredFileGroups (specIdentity spec) (specCache spec) imported lowered;
-          ioReturn (mapEither (\((,) fragments report) -> (,,) fragments report
-            (M.fromList compareString
-              (map (\((,) name ty) -> (,) name (Source.SourceContract ty [] True))
-                (concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments)))) result)
-        }
-      };
-      case compiled of {
-        Left message -> ioReturn (Left message);
-        Right ((,,) fragments report contracts) ->
-          ioReturn
-            (do {
-               let {
-                 resolved = Modules.resolvedCrateModules (preparedResolution prepared)
-               };
-               exports <-
-                 traverseEither
-                   (\r ->
-                      mapEither
-                        (\scope ->
-                           (,) (Modules.moduleIdentity (Modules.resolvedSource r))
-                             (Set.toList (Modules.visible scope)))
-                        (Modules.resolvedExports (specMode spec) r))
-                   resolved;
-               let {
-                 dependencies =
-                   map
-                     (\path ->
-                        case find (\p -> eqString (fst p) path) interfaces of {
-                          Nothing -> panic "missing direct crate metadata";
-                          Just ((,) _ iface) ->
-                            (,,) (Artifact.crateId iface) path
-                              (Artifact.semanticFingerprint iface)
-                        })
-                     (specDependencies spec)
-               };
-               let {
-                 externalLayouts =
-                   Set.fromList compareString
-                     (concatMap
-                        (\((,) _ iface) -> map D.datatypeName (Artifact.crateLoweredData iface))
-                        interfaces)
-               };
-               let {
-                 layouts =
-                   filter (\d -> not (Set.member compareString (D.datatypeName d) externalLayouts))
-                     (preparedLayouts prepared)
-               };
-               let {
-                 modules = map (\r -> Modules.moduleIdentity (Modules.resolvedSource r)) resolved
-               };
-               let {
-                 reach =
-                   map
-                     (\name ->
-                        (,) name
-                          (Set.toList
-                             (M.findWithDefault compareString Set.empty name
-                                (preparedReach prepared))))
-                     modules
-               };
-               let {
-                 bindings =
-                   concatMap (\f -> Separate.unitBindings (Separate.objectInterface f)) fragments
-               };
-               protection <- traverseEither
-                 (\((,) name _) -> case M.lookup compareString name contracts of {
-                   Just contract -> Right ((,) name (Source.contractProtected contract));
-                   Nothing -> Left ("final source binding lacks a protection contract: " ++ name)
-                 }) bindings;
-               let {
-                 iface =
-                   Artifact.CrateInterface (specIdentity spec) dependencies modules exports reach
-                     (preparedData prepared)
-                     (preparedClasses prepared)
-                     (preparedInstances prepared)
-                     layouts
-                     bindings
-                     (preparedEntry prepared)
-                     "pending"
-                     protection
-               };
-               case Artifact.makeObjectWithPayload iface fragments of {
-                 (,) object payload -> do {
-                   Artifact.validateInterface (Artifact.objectInterface object);
-                   Right (complete object payload report)
-                 }
-               }
-             })
-      }
+      _ -> Left "ordered file route did not produce indexed SCCs"
     };
-
-  compileSourcesWithEncoding :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> Bool -> CrateSpec -> [] SourceModule ->
-    [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
-  compileSourcesWithEncoding verifyAll witness = compileSourcesUsingInstaller verifyAll (ensureBuiltinWith witness);
+    Nothing -> Left "ordered file route cannot enter fallback"
+  };
   compileSourcesUsingInstaller verifyAll install shareEncoding spec sources interfaces prefix =
     do {
       dependencies <- withPreludeUsing install spec sources interfaces;
-      case do {
-             boundValueShared20 <- dependencies;
-             case boundValueShared20 of {
-               (,) updated loaded ->
-                 do {
-                   prepared <- prepareCrate updated loaded sources;
-                   Right ((,,) updated loaded prepared)
-                 }
-             }
-           } of {
+      case dependencies of {
         Left message -> ioReturn (Left message);
-        Right ((,,) updated loaded prepared) ->
-          do {
-            result <- compileGraphSources verifyAll updated loaded prepared (preparedSourcePlan prepared) prefix;
-            case result of {
-              Left message ->
-                let {
-                  names = Modules.resolvedCrateDisplayNames (preparedResolution prepared)
-                } in
-                let {
-                  diagnostics =
-                    M.union compareString
-                      (M.map (Modules.displayNames names)
-                         (preparedNames prepared))
-                      names
-                } in
-                ioReturn (Left (Modules.displayNames diagnostics message));
-              Right _ -> ioReturn (Right ())
-            }
-          }
+        Right ((,) updated loaded) ->
+          compileLoadedSourcesWith prepareCrate (\_ -> Right ()) verifyAll updated sources loaded prefix
+      }
+    };
+  compileLoadedSourcesWith prepare receipt verifyAll spec sources interfaces prefix =
+    case do {
+      prepared <- prepare spec interfaces sources;
+      report <- receipt prepared;
+      Right ((,) prepared report)
+    } of {
+      Left message -> ioReturn (Left message);
+      Right ((,) prepared report) -> do {
+        result <- compileGraphSources verifyAll spec interfaces prepared (preparedSourcePlan prepared) prefix;
+        case result of {
+          Left message ->
+            let { names = Modules.resolvedCrateDisplayNames (preparedResolution prepared);
+                  diagnostics = M.union compareString (M.map (Modules.displayNames names)
+                    (preparedNames prepared)) names }
+            in ioReturn (Left (Modules.displayNames diagnostics message));
+          Right _ -> ioReturn (Right report)
+        }
       }
     };
 
@@ -351,274 +238,106 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
            }
     };
 
-  runSourceGroupsWithEncodings :: Maybe Query.SourceEncodings -> String -> String -> String ->
-    Query.TypeInventory -> Source.SourcePlan -> [] ([] String) -> Map String Source.SourceContract ->
-    [] Separate.UnitObject -> Int -> Int -> [] Query.GroupResult ->
-    IO (Either String ((,,) ([] Separate.UnitObject) Query.QueryReport (Map String Source.SourceContract)));
-  runSourceGroupsWithEncodings encodings crateId compilerHash cacheDir inventory plan groups contracts
-    objects inferred reused results =
-    runSourceGroupsWithContext encodings Nothing crateId compilerHash cacheDir inventory plan groups contracts
-      objects inferred reused results;
-  runSourceGroupsWithContext encodings datatypeContext crateId compilerHash cacheDir inventory plan groups contracts
-    objects inferred reused results =
-    runSourceGroupsWithOwnedContracts encodings datatypeContext Nothing crateId compilerHash cacheDir inventory plan
-      groups contracts objects inferred reused results;
-  runSourceGroupsWithOwnedContracts encodings datatypeContext contractEncodings crateId compilerHash cacheDir inventory plan groups contracts
-    objects inferred reused results =
-    runSourceGroupsWithOwnedContext False encodings datatypeContext contractEncodings Nothing crateId compilerHash cacheDir inventory plan
-      groups contracts objects inferred reused results;
-  runSourceGroupsWithOwnedContext verifyAll encodings datatypeContext contractEncodings ownedContext crateId compilerHash cacheDir inventory plan groups contracts
-    objects inferred reused results =
-      runSourceGroupsWithReadContext verifyAll encodings datatypeContext contractEncodings ownedContext []
-        crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
-  runSourceGroupsWithReadContext verifyAll encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
-    objects inferred reused results =
-    runSourceGroupsPublishing Query.DirectRecords verifyAll encodings datatypeContext contractEncodings ownedContext readWindow
-      crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
-  runSourceGroupsPublishing publisher verifyAll encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
-    objects inferred reused results = case groups of {
-    [] -> ioReturn (Right ((,,) (reverse objects)
-      (Query.QueryReport inferred reused (reverse results)) contracts));
-    (:) names rest -> case (case ownedContext of {
-      Just owned -> Source.prepareGroupOwned owned plan contracts names;
-      Nothing -> case contractEncodings of {
-        Nothing -> Source.prepareGroup plan contracts names;
-        Just _ -> Source.prepareGroupSparse plan contracts names
-      }
-    }) of {
-      Left error -> ioReturn (Left error);
-      Right prepared -> do {
-        let { bindings = Source.groupBindings prepared };
-        let { members = Source.groupMembers prepared };
-        let { datatypes = Query.requiredDataIn inventory members
-          (append bindings (Source.groupCandidateBindings prepared)) };
-        let { name = Query.groupName crateId names };
-        let { context = case encodings of {
-          Nothing -> (,) (Query.encodeSourceDatatypes datatypes) Nothing;
-          Just pool -> case datatypeContext of {
-            Nothing -> (,) (Query.encodeSourceDatatypesWithPool pool datatypes) Nothing;
-            Just previous -> case Query.reuseDatatypeContext pool previous datatypes of {
-              (,) text next -> (,) text (Just next)
-            }
-          }
-        }; key = case contractEncodings of {
-          Nothing -> Query.sourceQueryKeyWithContext crateId compilerHash prepared contracts (fst context);
-          Just pool -> Query.sourceQueryKeyWithContractEncodings pool crateId compilerHash prepared contracts (fst context)
-        } };
-        digest <- Query.sourceLookupHash cacheDir key;
-        if not (Query.validSourceContextDigest digest) then ioReturn (Left "cannot fingerprint source inference inputs")
-        else do {
-        let { destination = cacheDir ++ "/" ++ digest ++ ".mlfq" };
-        present <- fileExists destination;
-        cachedRead <- if present then do {
-          observed <- Query.readLocalSourceUnit verifyAll readWindow cacheDir key digest (fst context) name
-            bindings datatypes names destination;
-          ioReturn (case observed of {
-            (,,) next _ decoded -> case (do {
-              unit <- decoded;
-              Source.validatePreparedRaw prepared (Unit.object unit);
-              Right unit
-            }) of {
-              Left error -> (,) [] (Left error);
-              Right object -> (,) next (Right object)
-            }
-          })
-        } else ioReturn ((,) [] (Left "cache miss"));
-        let { cached = snd cachedRead };
-        let { raw = case cached of {
-          Right object -> Right ((,) True object);
-          Left _ -> mapEither (\object -> (,) False (Unit.pending object)) (Query.compilePreparedUnit (case encodings of {
-            Nothing -> compileLoweredGroup name
-              ((:) (Query.dependencyInterface bindings) []) datatypes members;
-            Just (Query.SourceEncodings pool _) -> compileLoweredGroupWithDatatypes pool name
-              ((:) (Query.dependencyInterface bindings) []) datatypes members
-          }) encodings prepared name datatypes)
-        } };
-        case raw of {
-          Left error -> ioReturn (Left error);
-          Right ((,) hit unit) -> case Source.finishSourceUnit prepared unit of {
-            Left error -> ioReturn (Left error);
-            Right finalized -> do {
-              saved <- if hit then ioReturn (Right ())
-                else Query.writeSourceRecordWith publisher encodings cacheDir destination digest (fst context) (Unit.object unit);
-              case saved of {
-                Left error -> ioReturn (Left error);
-                Right _ -> do {
-                  let { finalObject = Source.finalGroupObject finalized };
-                  let { finalContracts = Source.finalGroupContracts finalized };
-                  let { semantic = Separate.fingerprint (Query.list Query.encodeBinding
-                    (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsPublishing publisher verifyAll encodings (snd context) (case contractEncodings of {
-                    Nothing -> Nothing;
-                    Just pool -> Just (Query.extendSourceContractEncodings finalContracts pool)
-                  }) (case ownedContext of {
-                    Nothing -> Nothing;
-                    Just owned -> Just (Source.extendOwnedSourceContext finalContracts owned)
-                  }) (if hit then fst cachedRead else [])
-                    crateId compilerHash cacheDir inventory plan rest
-                    (M.union compareString finalContracts contracts)
-                    ((:) finalObject objects) (inferred + (if hit then 0 else 1))
-                    (reused + (if hit then 1 else 0))
-                    ((:) (Query.GroupResult name names hit semantic digest) results)
-                }
+  -- Named root discovery uses the direct compiler's loader and search roots.
+  -- Both parsers consume the captured text; there is no second source read.
+  -- Only the separately admitted builtin may be an artifact dependency.
+  compileDiscoveredRoot :: Bool -> String -> [] String -> String -> String -> String -> String ->
+    IO (Either String OrderedPlanReceipt);
+  compileDiscoveredRoot = compileDiscoveredRootUsing Nothing;
+  compileDiscoveredRootMatching :: [] ((,,,) String String String String) ->
+    Bool -> String -> [] String -> String -> String -> String -> String -> IO (Either String OrderedPlanReceipt);
+  compileDiscoveredRootMatching expected = compileDiscoveredRootUsing (Just expected);
+  compileDiscoveredRootUsing expected verifyAll identity roots entry cache builtinMetadata prefix =
+    if not (Host.absolutePath cache) || eqString identity Artifact.builtinCrateIdentity
+    then ioReturn (Left "invalid discovered crate identity or query cache")
+    else do {
+      present <- fileExists entry;
+      if not present then ioReturn (Left ("discovered source root does not exist: " ++ entry))
+      else do {
+        text <- readFile entry;
+        case Parser.parseModule entry text of {
+          Left message -> ioReturn (Left message);
+          Right root -> case Modules.sourceModuleName root of {
+            Nothing -> ioReturn (Left "discovered ordered crate requires a named source root");
+            Just entryName -> do {
+              discovered <- Modules.loadModuleFilesWithEvidence roots root text;
+              case discovered of {
+                Left message -> ioReturn (Left message);
+                Right loaded -> compileDiscoveredSources expected verifyAll identity entryName cache builtinMetadata loaded prefix
               }
             }
           }
         }
-        }
-      }
-    }
-  };
-
-  compileParsedSourceGroups :: Bool -> String -> String -> [] Separate.UnitInterface ->
-    Map String Bool -> Source.SourcePlan ->
-    IO (Either String ((,,) ([] Separate.UnitObject) Query.QueryReport (Map String Source.SourceContract)));
-  compileParsedSourceGroups verifyAll crateId directory imports protected originalPlan =
-    compileSourceGroupsWithEncoding verifyAll True crateId directory imports protected originalPlan;
-  compileSourceGroupsWithEncoding :: Bool -> Bool -> String -> String -> [] Separate.UnitInterface ->
-    Map String Bool -> Source.SourcePlan ->
-    IO (Either String ((,,) ([] Separate.UnitObject) Query.QueryReport (Map String Source.SourceContract)));
-  compileSourceGroupsWithEncoding verifyAll shareEncoding crateId directory imports protected originalPlan =
-    case Source.initializeProtection originalPlan protected of {
-      Left error -> ioReturn (Left error);
-      Right plan -> case Query.prepareData (Source.planData plan) of {
-      Left error -> ioReturn (Left error);
-      Right inventory -> case foldM Inference.mergeExternal M.empty
-        (concatMap Separate.unitBindings imports) of {
-        Left error -> ioReturn (Left error);
-        Right types -> case Source.initialContracts plan types protected of {
-          Left error -> ioReturn (Left error);
-          Right contracts ->
-            if stringLength directory == 0 then ioReturn (Left "inference cache directory is empty")
-            else do {
-              let { cacheDir = Query.cachePath directory };
-              code <- Query.cacheCommand ((:) "/bin/mkdir" ((:) "-p" ((:) cacheDir [])));
-              if code /= 0 then ioReturn (Left "cannot create inference cache directory") else do {
-                lock <- acquireFileLock (cacheDir ++ "/.lock");
-                executable <- getExecutablePath;
-                compilerHash <- fileDigest executable;
-                let { owned = Source.querySourceContext shareEncoding plan contracts;
-                      encodings = if shareEncoding
-                      then Just (Query.prepareSourceEncodings (Source.planData plan)) else Nothing };
-                result <- if not (Query.validSourceContextDigest compilerHash)
-                  then ioReturn (Left "cannot fingerprint source query compiler")
-                  else Query.withSourcePublisher cacheDir (\publisher -> runSourceGroupsPublishing publisher verifyAll encodings (case encodings of {
-                  Nothing -> Nothing;
-                  Just pool -> Just (Query.emptyDatatypeContextEncoding pool)
-                }) (if shareEncoding then Just (Query.prepareSourceContractEncodings contracts) else Nothing)
-                  owned []
-                  crateId compilerHash cacheDir inventory plan (Source.filePlanGroups plan owned) contracts [] 0 0 []);
-                cleaned <- Query.cleanupQueryKey cacheDir result;
-                releaseFileLock lock;
-                ioReturn cleaned
-              }
-            }
-        }
-      }
-    }
-  };
-
-  compileLoweredGroup :: String ->
-                         [] Separate.UnitInterface ->
-                         [] DataDecl ->
-                         [] ((,,) String (Maybe SAnnotation) SExpr) ->
-                         Either String Separate.UnitObject;
-  -- SCC fragments are parameters, not independently imported modules. The
-  -- crate artifact validates the selected schemes and owns the crate DAG;
-  -- module interface dependency hashes would cause transitive invalidation.
-  compileLoweredGroup name dependencies datatypes members =
-    compileLoweredGroupUsing (\term -> Separate.fingerprint (Pretty.prettyTerm term))
-      name dependencies datatypes members;
-  compileLoweredGroupWithDatatypes :: Separate.DatatypeEncodings -> String ->
-    [] Separate.UnitInterface -> [] DataDecl ->
-    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Separate.UnitObject;
-  compileLoweredGroupWithDatatypes pool name dependencies datatypes members =
-    compileLoweredGroupUsing (Separate.fingerprintTermWithDatatypes pool)
-      name dependencies datatypes members;
-  compileLoweredGroupUsing :: (XTerm -> String) -> String ->
-    [] Separate.UnitInterface -> [] DataDecl ->
-    [] ((,,) String (Maybe SAnnotation) SExpr) -> Either String Separate.UnitObject;
-  compileLoweredGroupUsing payloadFingerprint name dependencies datatypes members =
-    do {
-      ensure (not (null members)) "cannot infer an empty declaration group";
-      externalTypes <- foldM Inference.mergeExternal M.empty (concatMap Separate.unitBindings dependencies);
-      traverseEither
-        (\((,,) n _ _) ->
-           ensure (not (M.member compareString n externalTypes))
-             ("inference group also imports its own binding: " ++ n))
-        members;
-      body <- Surface.bindValues members (SConstructor "()");
-      let {
-        -- Members already contain explicit evidence applications. Recovering
-        -- source qualifications here would insert the managed argument twice.
-        externals = M.map (Separate.sourceSchemeIn M.empty False) externalTypes
-      };
-      lowered <- Classes.lowerSeparateClasses externals [] (SProgram datatypes body);
-      compiled <- mapLeft Compiler.prettyError (finishCompilation lowered);
-      let {
-        coreAndData =
-          case Compiler.compiledTerm compiled of {
-            XWithData ds term -> (,) ds term;
-            term -> (,) [] term
-          }
-      };
-      let {
-        declarations = fst coreAndData
-      };
-      let {
-        core = snd coreAndData
-      };
-      boundValueShared9 <-
-        if M.null externalTypes
-        then Right ((,) [] core)
-        else case core of {
-               XLetRec bindings rest ->
-                 do {
-                   ensure
-                     (eqList eqString (map (\((,,) n _ _) -> X.nameHint n) bindings)
-                        (M.keys externalTypes))
-                     "inference parameter order mismatch";
-                   traverseEither
-                     (\((,,) n ty _) ->
-                        ensure
-                          (case M.lookup compareString (X.nameHint n) externalTypes of {
-                             Nothing -> False;
-                             Just expected -> T.alphaEq ty expected
-                           })
-                          ("dependency scheme changed during inference: " ++ X.nameHint n))
-                     bindings;
-                   Right ((,) (map (\((,,) n ty _) -> (,) n ty) bindings) rest)
-                 };
-               _ -> Left "inference did not retain external parameters"
-             };
-      case boundValueShared9 of {
-        (,) parameters implementation ->
-          do {
-            dataEnv <- D.validateDeclarations declarations;
-            bindings <-
-              Separate.collectBindings dataEnv (XEnv M.empty (M.fromList X.compareName parameters))
-                implementation;
-            ensure
-              (eqList eqString (sortBy compareString (map (\((,) n _) -> X.nameHint n) bindings))
-                 (sortBy compareString (map (\((,,) n _ _) -> n) members)))
-              "inference fragment changed declaration ownership";
-            let {
-              payload =
-                XWithData declarations
-                  (foldr (\((,) n ty) term -> XAbs n ty term) implementation parameters)
-            };
-            checked <- Checked.check payload;
-            let {
-              iface =
-                Separate.UnitInterface name [] [] declarations [] []
-                  (Separate.sortBindings
-                     (map (\((,) n ty) -> (,) (X.nameHint n) (Separate.normalType ty)) bindings))
-                  (payloadFingerprint payload)
-            };
-            Right (Separate.CheckedUnitObject iface checked)
-          }
       }
     };
+  compileDiscoveredSources expected verifyAll identity entryName cache builtinMetadata loaded prefix = do {
+    captured <- mapM (\item -> do {
+      let { source = Modules.loadedSource item; loaderPath = Modules.sourcePath source };
+      canonical <- canonicalPath loaderPath;
+      ioReturn ((,,,) (Modules.moduleIdentity source) loaderPath canonical (Modules.loadedText item))
+    }) (Modules.loadedEntries loaded);
+    sourceMatches <- case expected of {
+      Nothing -> ioReturn True;
+      Just rows -> do {
+        observed <- mapM (\((,,,) name loaderPath canonical body) -> do {
+          bytes <- byteArrayFromString body;
+          digest <- byteArrayDigest bytes;
+          ioReturn ((,,,) name loaderPath canonical digest)
+        }) captured;
+        let { same ((,,,) a b c d) ((,,,) w x y z) =
+                eqString a w && eqString b x && eqString c y && eqString d z };
+        ioReturn (eqList same rows observed)
+      }
+    };
+    if sourceMatches
+    then compileDiscoveredCaptured verifyAll identity entryName cache builtinMetadata loaded captured prefix
+    else ioReturn (Left "discovered source snapshot differs from the expected loader rows")
+  };
+  compileDiscoveredCaptured verifyAll identity entryName cache builtinMetadata loaded captured prefix = do {
+    builtin <- canonicalPath builtinMetadata;
+    let { extension = stringSlice builtin (stringLength builtin - 6) 6 };
+    if not (stringLength builtin > 6 && eqString extension ".mlfci")
+    then ioReturn (Left "discovered ordered crate needs a builtin .mlfci")
+    else do {
+      let { sorted = sortBy (\((,,,) a _ _ _) ((,,,) b _ _ _) -> compareString a b) captured;
+            sourcePaths = map (\((,,,) _ _ canonical _) -> canonical) sorted;
+            builtinPrefix = stringSlice builtin 0 (stringLength builtin - 6);
+            wire = Separate.pack ["MLF-CRATE-1",identity,entryName,"false",
+              Separate.pack (map (\((,,,) name _ canonical _) -> Separate.pack [name,canonical]) sorted),
+              Separate.pack [builtin],cache ++ "/discovered-order-v1",builtinPrefix] };
+      case do {
+        ensure (Set.size (Set.fromList compareString sourcePaths) == length sourcePaths)
+          "discovered source path has multiple module owners";
+        spec <- decodeSpec wire;
+        -- Suffix and SourceSpan depend on the spelling the loader read.
+        sources <- traverseEither (\((,,,) name loaderPath _ text) ->
+          parseDiscoveredSource identity name loaderPath text) sorted;
+        Right ((,) spec sources)
+      } of {
+        Left message -> ioReturn (Left message);
+        Right ((,) spec sources) -> do {
+          loadedInterfaces <- Artifact.loadInterfaces [builtin];
+          case loadedInterfaces of {
+            Left message -> ioReturn (Left message);
+            Right interfaces -> case interfaces of {
+              [(,) path iface] -> if not (eqString builtin path && eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity)
+                then ioReturn (Left "unexpected discovered crate builtin identity")
+                else do {
+                  raw <- Artifact.readObject (Artifact.objectPath builtin) iface;
+                  case bindEither raw (Builtin.prepareObject "discovered-order-v1") of {
+                    Left message -> ioReturn (Left message);
+                    Right _ ->
+                      compileLoadedSourcesWith (prepareDiscoveredCrate (Modules.loadedSources loaded))
+                        orderedPlanReceipt verifyAll spec sources interfaces prefix
+                  }
+                };
+              _ -> ioReturn (Left "discovered ordered crate requires only its admitted builtin")
+            }
+          }
+        }
+      }
+    }
+  };
 
   finishCompilation :: (,) SProgram (Map String String) -> Either CompileError Compiler.Compilation;
   finishCompilation ((,) program names) =

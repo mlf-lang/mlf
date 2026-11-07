@@ -2892,13 +2892,16 @@ module Bootstrap.Graph where {
     };
   denseFinalNodes :: forall s. DenseRebinding s ->
                                [] ((,) Int Node) -> ST s (Either String ([] ((,) Int Node)));
-  denseFinalNodes state values =
+  denseFinalNodes state values = denseFinalNodesRev state values [];
+  -- Accumulate answer pointers lazily, then restore the original result order.
+  denseFinalNodesRev :: forall s. DenseRebinding s -> [] ((,) Int Node) ->
+                                  [] ((,) Int Node) -> ST s (Either String ([] ((,) Int Node)));
+  denseFinalNodesRev state values accumulated =
     case values of {
-      [] -> ST.pureE [];
+      [] -> ST.pureE (L.reverse accumulated);
       (:) entry rest ->
         ST.bindE (denseFinalNode state entry)
-          (\answer ->
-             ST.bindE (denseFinalNodes state rest) (\answers -> ST.pureE ((:) answer answers)))
+          (\answer -> denseFinalNodesRev state rest ((:) answer accumulated))
     };
   denseRaiseOriginals :: forall s. DenseRebinding s ->
                                    [] ((,) Int Node) -> ST s (Either String ());

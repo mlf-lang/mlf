@@ -186,6 +186,7 @@
       "main": "ReferencesMain.emlf",
       "profile": "compiler",
       "modules": {
+        "Tests.CoreHelpers": "Tests/CoreHelpers.emlf",
         "Tests.EmbeddingPruning": "Tests/EmbeddingPruning.emlf",
         "Tests.Figure12": "Tests/Figure12.emlf",
         "Tests.Graph": "Tests/Graph.emlf",
@@ -275,9 +276,14 @@
       "profile": "compiler",
       "modules": {
         "Tests.ComponentProjection": "Tests/ComponentProjection.emlf",
+        "Tests.CoreGraphImage": "Tests/CoreGraphImage.hs",
+        "Tests.CoreGraphPrelude": "Tests/CoreGraphPrelude.hs",
         "Tests.CoreHelpers": "Tests/CoreHelpers.emlf",
+        "Tests.CoreProviderWorkers": "Tests/CoreProviderWorkers.emlf",
         "Tests.CoreRunner": "Tests/CoreRunner.emlf",
         "Tests.CoreSolver": "Tests/CoreSolver.emlf",
+        "Tests.CoreSolverNative": "Tests/CoreSolverNative.emlf",
+        "Tests.CoreWitnessWorkers": "Tests/CoreWitnessWorkers.emlf",
         "Tests.DenseNormalization": "Tests/DenseNormalization.emlf",
         "Tests.EmbeddingPruning": "Tests/EmbeddingPruning.emlf",
         "Tests.Graph": "Tests/Graph.emlf",

@@ -11,6 +11,7 @@ import qualified Bootstrap.Compiler as Compiler
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as Artifact
+import qualified Bootstrap.ArtifactStorage as Storage
 import qualified Bootstrap.Separate as Separate
 import qualified Bootstrap.CrateCodegen as Cache
 import qualified Bootstrap.LLVM as LLVM
@@ -170,8 +171,8 @@ abiSeparation = System.withScratch (\directory -> do
   rejected <- Cache.emitChecked directory true pure
   H.reject rejected
   let declaration = \name -> DataDecl name [] ((:) (ConstructorDecl name []) [])
-  firstLayout <- H.right (Checked.check (XWithData ((:) (declaration "First") []) (XConstructor "Unit" [])))
-  secondLayout <- H.right (Checked.check (XWithData ((:) (declaration "Second") []) (XConstructor "Unit" [])))
+  firstLayout <- H.right (Checked.check (XWithData ((:) (declaration "First") []) (XConstructor "()" [])))
+  secondLayout <- H.right (Checked.check (XWithData ((:) (declaration "Second") []) (XConstructor "()" [])))
   _ <- emit directory false firstLayout
   different <- emit directory false secondLayout
   H.assert (S.not (Cache.inputReused different) && S.not (Cache.optimizedReused different)) "different nominal constructor tables reused a code generation ABI")
@@ -209,8 +210,17 @@ compileFixture directory identity entry dependencies prefix moduleName text = do
   compiled <- Crate.compileSources spec ((:) source []) interfaces prefix
   _ <- H.right compiled
   metadata <- Artifact.readInterface (prefix ++ ".mlfci")
-  iface <- H.right metadata
-  input <- readFile (prefix ++ ".mlfco")
+  storedInterface <- H.right metadata
+  loadedObject <- Artifact.readObject (prefix ++ ".mlfco") storedInterface
+  storedObject <- H.right loadedObject
+  H.assert (eqString (Artifact.encodeInterface storedInterface) (Artifact.encodeInterface (Artifact.objectInterface storedObject))) "binary object changed its admitted interface"
+  corruptStoredObject prefix storedInterface
+  -- Current crate files use the binary open-object format. Keep those files
+  -- intact for the visibility links below; explicitly project their admitted
+  -- contents to the legacy closed format for its pooled/text codec checks.
+  let closed = Artifact.legacyObject storedObject
+  let iface = Artifact.objectInterface closed
+  let input = Artifact.encodeObject closed
   object <- H.right (Artifact.decodeObject iface input)
   let fragments = Artifact.objectFragments object
   H.assert (eqString input (Artifact.encodeObject object)) "pooled crate object changed on roundtrip"
@@ -237,6 +247,22 @@ compileFixture directory identity entry dependencies prefix moduleName text = do
   pooledFailures prefix iface (Artifact.encodePooledPayload fragments)
   H.reject (Artifact.decodeObject iface ("0" ++ input))
   return ()
+
+-- Corrupt a private byte snapshot, never the compiled object used by the
+-- subsequent source-free visibility links.
+corruptStoredObject : String -> Artifact.CrateInterface -> IO ()
+corruptStoredObject prefix iface = do
+  loaded <- Storage.readRaw (prefix ++ ".mlfco")
+  bytes <- H.right loaded
+  size <- lengthByteArray bytes
+  H.assert (size > 0) "compiled crate object is empty"
+  first <- readByteArray bytes 0
+  writeByteArray bytes 0 (remInt (first + 1) 256)
+  let corrupt = prefix ++ ".bad-binary.mlfco"
+  written <- Storage.writeRawAtomic corrupt bytes
+  _ <- H.right written
+  rejected <- Artifact.readObject corrupt iface
+  H.reject rejected
 
 pooledPacket : Artifact.CrateInterface -> String -> (,) Artifact.CrateInterface String
 pooledPacket iface payload =

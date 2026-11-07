@@ -282,7 +282,7 @@ superviseBudget : B.Budget -> Config -> String -> String -> String -> R.Options 
 superviseBudget budget config helper cwd directory options total entries index = case entries of
   [] -> return []
   (:) entry rest -> do
-    let acquired = B.acquire (C.id entry) B.serial budget
+    let acquired = (B.acquire (C.id entry) B.serial budget :: Either String (Maybe B.Budget))
     granted <- case acquired of
       Right (Just value) -> return value
       _ -> do { O.require false "process lease unavailable"; return budget }

@@ -5,30 +5,30 @@ import qualified Bootstrap.Map as M
 import qualified Bootstrap.Data as D
 import qualified Bootstrap.Runtime as R
 
-expectEnvironment : Int -> XName -> R.REnv -> String -> IO Unit
+expectEnvironment : Int -> XName -> R.REnv -> String -> IO ()
 expectEnvironment expected name environment label = expect (case R.envLookup name environment of
   Just value -> case R.integer value of {Right observed -> observed == expected; _ -> false}
   Nothing -> false) label
-environmentFrames : IO Unit
+environmentFrames : IO ()
 environmentFrames = do
   let outer = XName (-7) "outer"
-  let local = XName 1267650600228229401496703205376 "local"
+  let local = XName 4611686018427392000 "local"
   let base = R.REnv (M.singleton outer (Right (R.RInteger 42)))
-  let extended = R.envExtend (two (Pair local (Right (R.RInteger 7))) (Pair local (Right (R.RInteger 9)))) base
+  let extended = R.envExtend (two ((,) local (Right (R.RInteger 7))) ((,) local (Right (R.RInteger 9)))) base
   expectEnvironment 9 local extended "environment extension keeps the last duplicate"
   expectEnvironment 42 outer extended "local frames preserve outer bindings"
-  expectEnvironment 9 (XName 1267650600228229401496703205376 "different hint") extended "runtime lookup uses variable identity"
+  expectEnvironment 9 (XName 4611686018427392000 "different hint") extended "runtime lookup uses variable identity"
   let lazy = R.envInsert local (panic "environment forced an unused value") base
   expectEnvironment 42 outer lazy "environment frames retain lazy values"
   let first = XName 81 "first"
   let second = XName 82 "second"
-  let recursive = R.recursiveEnv ds extended (two (Pair first (XEVar second)) (Pair second (XEInt 23)))
+  let recursive = R.recursiveEnv ds extended (two ((,) first (XEVar second)) ((,) second (XEInt 23)))
   expectEnvironment 23 first recursive "recursive frames share the recursive environment"
   expectEnvironment 42 outer recursive "recursive frames preserve captured bindings"
 
-one a = Cons a Nil
-two a b = Cons a (one b)
-three a b c = Cons a (two b c)
+one a = (:) a []
+two a b = (:) a (one b)
+three a b c = (:) a (two b c)
 call primitive arguments = S.foldl XEApp (XEPrimitive primitive) arguments
 ret value = call PSTReturn (one value)
 region action = call PRunST (one action)
@@ -53,13 +53,13 @@ counter = XName 9 "counter"
 
 declarations = two
   (DataDecl "Box" (one "a") (one (ConstructorDecl "BoxValue" (one (Parameter "a")))))
-  (DataDecl "Stream" Nil (one (ConstructorDecl "StreamValue" (two (Applied "Int" Nil) (Applied "Stream" Nil)))))
+  (DataDecl "Stream" [] (one (ConstructorDecl "StreamValue" (two (Applied "Int" []) (Applied "Stream" [])))))
 ds = case D.validateDeclarations declarations of
   Left message -> panic message
   Right value -> value
 evaluate term = R.evaluate ds (R.REnv M.empty) term
 
-expect condition label = if condition then ioReturn Unit else panic label
+expect condition label = if condition then ioReturn () else panic label
 expectInt expected term label = case R.integer (evaluate term) of
   Left message -> panic (label ++ ": " ++ message)
   Right actual -> expect (actual == expected) (label ++ ": expected " ++ showInt expected ++ ", got " ++ showInt actual)
@@ -100,21 +100,21 @@ functionCell = region (bindST array (new 1 (XEAbs parameter (add (XEVar paramete
   (bindST first (read (XEVar array) 0) (ret (XEApp (XEVar first) (XEInt 4)))))
 boxedCell = region (bindST array (new 1 (XEApp (XEConstructor "BoxValue") poison)) (read (XEVar array) 0))
 recursiveCell = XELetRec
-  (one (Pair stream (XEApp (XEApp (XEConstructor "StreamValue") (XEInt 1)) (XEVar stream))))
+  (one ((,) stream (XEApp (XEApp (XEConstructor "StreamValue") (XEInt 1)) (XEVar stream))))
   (region (bindST array (new 1 (XEVar stream)) (read (XEVar array) 0)))
 isRecursive value = case value of
-  Right (R.RConstructor tag (Cons head (Cons tail Nil))) -> eqString tag "StreamValue" &&
+  Right (R.RConstructor tag ((:) head ((:) tail []))) -> eqString tag "StreamValue" &&
     (case R.integer head of {Right 1 -> true; _ -> false}) &&
     (case tail of
-      Right (R.RConstructor nextTag (Cons nextHead rest)) -> eqString nextTag "StreamValue" &&
+      Right (R.RConstructor nextTag ((:) nextHead rest)) -> eqString nextTag "StreamValue" &&
         (case R.integer nextHead of {Right 1 -> true; _ -> false})
       _ -> false)
   _ -> false
 
-manyBinds = XELetRec (one (Pair loop (XEAbs counter
+manyBinds = XELetRec (one ((,) loop (XEAbs counter
   (call PIfThenElse (three (call PEqInt (two (XEVar counter) (XEInt 0)))
     (ret (XEInt 23))
-    (thenST (ret (XEConstructor "Unit"))
+    (thenST (ret (XEConstructor "()"))
       (XEApp (XEVar loop) (call PSubInt (two (XEVar counter) (XEInt 1))))))))))
   (region (XEApp (XEVar loop) (XEInt 10000)))
 
@@ -149,20 +149,20 @@ main = do
     _ -> false) "Double-valued cells"
   expect (case evaluate boxedCell of {Right (R.RConstructor tag fields) -> eqString tag "BoxValue"; _ -> false}) "lazy boxed fields and callback data environment"
   expect (isRecursive (evaluate recursiveCell)) "recursive lazy cells"
-  expectInt 1267650600228229401496703205376
-    (region (bindST array (new 1 (XEInt 1267650600228229401496703205376)) (read (XEVar array) 0))) "unbounded elements"
-  expectInt (-1267650600228229401496703205376)
+  expectInt 4611686018427392000
+    (region (bindST array (new 1 (XEInt 4611686018427392000)) (read (XEVar array) 0))) "boxed Int64 elements"
+  expectInt (-4611686018427392000)
     (region (bindST array (new 1 (XEInt 0))
-      (thenST (write (XEVar array) 0 (XEInt (-1267650600228229401496703205376))) (read (XEVar array) 0)))) "negative unbounded elements"
+      (thenST (write (XEVar array) 0 (XEInt (-4611686018427392000))) (read (XEVar array) 0)))) "negative boxed Int64 elements"
   expectInt 42 (region (bindST ignored (ret poison) (ret (XEInt 42)))) "bindST leaves ignored result lazy"
   expectInt 5 (region (call PSTBind (two (ret (XEInt 5)) (XEPrimitive PSTReturn)))) "primitive callback"
   expectInt 23 manyBinds "continuation loop"
   expectError "invalid array length" (region (new (-1) poison)) "negative length"
-  expectError "invalid array length" (region (new 1267650600228229401496703205376 poison)) "unbounded invalid length"
+  expectError "invalid array length" (region (new 4611686018427392000 poison)) "large Int64 invalid length"
   expectError "array index out of bounds" (region (bindST array (new 0 poison) (read (XEVar array) 0))) "zero array read"
   expectError "array index out of bounds" (region (bindST array (new 1 poison) (read (XEVar array) (-1)))) "negative read index"
   expectError "array index out of bounds" (region (bindST array (new 1 poison) (read (XEVar array) 1))) "upper read boundary"
-  expectError "array index out of bounds" (region (bindST array (new 1 poison) (read (XEVar array) 1267650600228229401496703205376))) "unbounded read index"
+  expectError "array index out of bounds" (region (bindST array (new 1 poison) (read (XEVar array) 4611686018427392000))) "large Int64 read index"
   expectError "array index out of bounds" (region (bindST array (new 1 poison) (write (XEVar array) 1 poison))) "write bounds before value"
   expectError "runtime primitive expected STArray" (region (len (XEInt 0))) "invalid handle value"
   expectError "runtime expected an ST action" (region (call PIOReturn (one (XEInt 0)))) "IO action rejected by state interpreter"
@@ -170,7 +170,7 @@ main = do
   expect (case R.runStateRegion ds (R.runtimePrimitive ds PLengthSTArray (one (Right (R.RSTArrayHandle 0)))) of
     Left message -> eqString message "STArray does not belong to this region"
     _ -> false) "missing region handle"
-  result <- R.runAction Nil ds (evaluate (ret (XEInt 0)))
+  result <- R.runAction [] ds (evaluate (ret (XEInt 0)))
   expect (case result of {Left message -> eqString message "runtime expected an IO action"; _ -> false}) "state action rejected by IO interpreter"
   environmentFrames
   putStrLn "ST runtime: lazy actions, snapshots, regions, polymorphic cells, bounds, and 10000 binds passed"

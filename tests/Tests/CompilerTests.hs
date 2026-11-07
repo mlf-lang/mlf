@@ -8,6 +8,8 @@ module Tests.CompilerTests where {
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
   import qualified Bootstrap.Map as Map;
+  import qualified Bootstrap.CrateArtifact as Artifact;
+  import qualified Bootstrap.Bitstream as Wire;
   import qualified Package.OS as O;
   import qualified Package.Json as J;
   import qualified Package.Build as B;
@@ -59,13 +61,31 @@ module Tests.CompilerTests where {
   capture :: TestContext -> [] String -> String -> IO ();
   capture c argv destination = captureWithin c argv destination 1800;
   captureWithin :: TestContext -> [] String -> String -> Int -> IO ();
-  captureWithin c argv destination seconds =
+  captureWithin c argv destination seconds = captureWithCoreGraph c argv destination seconds Nothing;
+  coreGraphReceiptEnv :: String;
+  coreGraphReceiptEnv = "MLF_TEST_CORE_GRAPH_RECEIPT";
+  captureWithCoreGraph :: TestContext -> [] String -> String -> Int -> Maybe String -> IO ();
+  captureWithCoreGraph c argv destination seconds graphReceipt =
     do {
       let {
-        errors = (destination ++ ".stderr")
+        errors = (destination ++ ".stderr");
+        execute = O.exec (root c) argv "" destination errors seconds
       };
       putStrLn ("+ " ++ S.intercalate " " argv);
-      code <- O.exec (root c) argv "" destination errors seconds;
+      code <- case graphReceipt of {
+        Nothing -> execute;
+        Just path -> do {
+          previous <- getEnv coreGraphReceiptEnv;
+          let {
+            restore = if eqString previous "" then unsetEnv coreGraphReceiptEnv
+                      else setEnv coreGraphReceiptEnv previous
+          };
+          setEnv coreGraphReceiptEnv path;
+          result <- catchIOError execute (\error -> do { restore; ioError error });
+          restore;
+          return result
+        }
+      };
       if (code == 0)
       then ioReturn ()
       else do {
@@ -116,8 +136,8 @@ module Tests.CompilerTests where {
   clearDrivers :: IO ();
   clearDrivers =
     S.mapM_ unsetEnv
-      (O.words
-         "MLF_BENCH_SPLIT_RUNTIME MLF_MOCK_FAIL_SUPERVISOR MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT MLF_TEST_PORT_TARGETS MLF_TEST_PORT_TARGETS_SHA256");
+      ((:) coreGraphReceiptEnv (O.words
+         "MLF_BENCH_SPLIT_RUNTIME MLF_MOCK_FAIL_SUPERVISOR MLF_BENCH_STREAM_LINK MLF_MOCK_FAIL_RUNTIME MLF_BENCH_STREAM_LLVM MLF_BENCH_MLF_CLANG MLF_MOCK_FAST_FRONTEND MLF_BOOTSTRAP_INTERPRETER MLF_BOOTSTRAP_LLVM MLF_BOOTSTRAP_TIMEOUT_SECONDS MLF_TEST_TRACE MLF_TEST_FAIL_WRITE MLF_LLVM_TEST_ABI MLF_LLVM_TEST_CFLAGS MLF_LLVM_TEST_LIBS MLF_LLVM_TEST_OPT MLF_TEST_PORT_TARGETS MLF_TEST_PORT_TARGETS_SHA256 MLF_TEST_PORT_REQUIRE_STATE_TYPES_SPLIT MLF_TEST_PORT_REQUIRE_INFERENCE_DISCOVERED"));
   nativeFlags :: TestContext -> IO ([] String);
   nativeFlags c =
     do {
@@ -286,6 +306,124 @@ module Tests.CompilerTests where {
         (target ++ ": prepared test executable changed");
       return binary
     };
+  verifyTargetBuildFile :: String -> String -> J.Json -> IO String;
+  verifyTargetBuildFile target path expected = do {
+    O.require (O.absolute path && B.validDigest expected) (("invalid " ++ target ++ " file receipt: ") ++ path);
+    digest <- fileDigest path;
+    O.require (J.equal (J.str digest) expected) ((target ++ " build input changed: ") ++ path);
+    return digest
+  };
+  verifyTargetBuildTool :: String -> String -> J.Json -> IO ();
+  verifyTargetBuildTool target selected tool = do {
+    path <- canonicalPath selected;
+    O.require (eqString path (J.getText "path" "" tool)) (target ++ " build selected a different tool");
+    _ <- verifyTargetBuildFile target path (J.get "sha256" tool);
+    return ()
+  };
+  -- Only the invocation that built this target can authorize its linked Prelude.
+  -- The retained report and its publication proof work for cold and cached builds.
+  targetBuiltinReceipt :: TestContext -> String -> String -> String -> IO J.Json;
+  targetBuiltinReceipt c target binary binaryHash = do {
+    saved <- J.read (report c);
+    let {
+      builds = S.reverse (J.values (J.get "suite_builds" saved));
+      selected = S.find (\row -> S.elem eqString target (J.getStrings "targets" row)) builds
+    };
+    invocation <- case selected of {
+      Nothing -> O.fatal (target ++ " has no retained native build invocation");
+      Just row -> return row
+    };
+    O.require (J.equal (J.get "exit_code" invocation) (J.num 0)) (target ++ " native build did not succeed");
+    let { buildPath = J.getText "path" "" invocation; buildHash = J.get "sha256" invocation };
+    _ <- verifyTargetBuildFile target buildPath buildHash;
+    build <- J.read buildPath;
+    _ <- verifyTargetBuildFile target buildPath buildHash;
+    O.require (J.getBool "complete" False build) (target ++ " native build report is incomplete");
+    let { toolchain = J.get "toolchain" build };
+    verifyTargetBuildTool target (compiler c) (J.get "compiler" toolchain);
+    verifyTargetBuildTool target (packageManager c) (J.get "manager" toolchain);
+    let {
+      publications = S.filter (\row -> eqString (J.getText "name" "" row) target)
+        (J.values (J.get "pending-publications" build));
+      manifestPath = root c ++ "/tests/mlf-package.json"
+    };
+    publication <- case publications of {
+      (:) row [] -> return row;
+      _ -> O.fatal (target ++ " build must have exactly one publication")
+    };
+    manifest <- J.read manifestPath;
+    let {
+      identity = M.crateIdentity (M.Package manifestPath manifest []) ("target-" ++ target);
+      crates = S.filter (\row -> eqString (J.getText "crate" "" row) identity)
+        (J.values (J.get "crates" build));
+      directory = J.getText "artifact" "" publication;
+      files = J.get "files" publication;
+      targetInterface = directory ++ "/unit.mlfci";
+      targetObject = Artifact.objectPath targetInterface;
+      dependencies = directory ++ "/dependency-files.json"
+    };
+    crate <- case crates of {
+      (:) row [] -> return row;
+      _ -> O.fatal (target ++ " build must have exactly one target crate")
+    };
+    O.require (O.absolute directory) (target ++ " publication has no absolute artifact directory");
+    published <- O.executable (directory ++ "/program");
+    let { programHash = J.get (O.base published) files };
+    O.require (eqString published (J.getText "binary" "" publication) &&
+      J.equal (J.str binaryHash) programHash) (target ++ " executable is not the built publication");
+    _ <- verifyTargetBuildFile target published programHash;
+    actualBinary <- canonicalPath binary;
+    _ <- verifyTargetBuildFile target actualBinary programHash;
+    let { metadata = J.get "unit.mlfci" files; object = J.get "unit.mlfco" files };
+    _ <- verifyTargetBuildFile target (J.getText "metadata" "" crate) metadata;
+    _ <- verifyTargetBuildFile target targetInterface metadata;
+    _ <- verifyTargetBuildFile target targetObject object;
+    proofHash <- verifyTargetBuildFile target dependencies (J.get "dependency-files.json" files);
+    proof <- J.read dependencies;
+    _ <- verifyTargetBuildFile target dependencies (J.str proofHash);
+    interfacePath <- canonicalPath targetInterface;
+    loaded <- Artifact.loadInterfaces ((:) interfacePath []);
+    closure <- case loaded of {
+      Left error -> O.fatal ((target ++ " publication closure: ") ++ error);
+      Right interfaces -> return interfaces
+    };
+    let {
+      inputs = S.filter (\((,) path _) -> S.not (eqString path interfacePath)) closure;
+      paths = S.concatMap (\((,) path _) -> (:) path ((:) (Artifact.objectPath path) [])) inputs;
+      builtins = S.filter (\((,) _ iface) -> eqString (Artifact.crateId iface) Artifact.builtinCrateIdentity) inputs
+    };
+    O.require (S.any (\((,) path iface) -> eqString path interfacePath &&
+      eqString (Artifact.crateId iface) identity) closure &&
+      Catalog.keys paths proof) (target ++ " target or dependency proof differs from the published closure");
+    _ <- verifyTargetBuildFile target interfacePath metadata;
+    valid <- B.validDependencyFiles proof;
+    O.require valid (target ++ " checked dependency bytes changed");
+    (,) interface iface <- case builtins of {
+      (:) builtin [] -> return builtin;
+      _ -> O.fatal (target ++ " checked closure must contain exactly one builtin Prelude")
+    };
+    O.require (S.null (Artifact.crateDependencies iface) && eqString (Artifact.crateEntry iface) "")
+      (target ++ " builtin Prelude is not a dependency-free library");
+    let { builtinObject = Artifact.objectPath interface };
+    return (J.object [
+      (,) "format" (J.num 1),
+      (,) "binary" (J.str actualBinary), (,) "binary_sha256" programHash,
+      (,) "interface" (J.str interface), (,) "interface_sha256" (J.get interface proof),
+      (,) "object" (J.str builtinObject), (,) "object_sha256" (J.get builtinObject proof),
+      (,) "build_report_sha256" buildHash
+    ])
+  };
+  coreGraphReceipt :: TestContext -> String -> String -> IO String;
+  coreGraphReceipt c binary binaryHash = do {
+    receipt <- targetBuiltinReceipt c "core-solver" binary binaryHash;
+    directory <- O.temporaryDirectory (output c) (output c ++ "/core-graph-invocation-");
+    let { path = directory ++ "/receipt.json" };
+    S.mapM_ (\name -> O.mkdir (directory ++ "/" ++ name))
+      (O.words "provider/logs provider/consumers provider/provider-1 provider/provider-2 provider/provider-3 witness/logs witness/snake-1 witness/snake-2 witness/snake-3 witness/other");
+    writeFile (directory ++ "/empty.stdin") "";
+    J.write path receipt;
+    return path
+  };
   transports :: TestContext -> IO ();
   transports c =
     do {
@@ -379,7 +517,15 @@ module Tests.CompilerTests where {
                unsetEnv "MLF_TEST_FAMILY_REPORT";
                return []
              };
-      capture c ((:) binary args) log;
+      graphReceipt <-
+        if eqString target "core-solver" &&
+           S.maybe False (S.elem eqString "core/graph-solver") wantedFamilies
+        then do {
+          path <- coreGraphReceipt c binary binaryHash;
+          return (Just path)
+        }
+        else return Nothing;
+      captureWithCoreGraph c ((:) binary args) log 1800 graphReceipt;
       currentBinaryHash <- fileDigest binary;
       O.require (eqString binaryHash currentBinaryHash)
         (target ++ ": test executable changed during validation");
@@ -889,11 +1035,11 @@ module Tests.CompilerTests where {
     };
   matrices :: TestContext -> String -> Bool -> IO ();
   matrices c binary portFixtures =
-    matrixSuite c binary portFixtures (if portFixtures then 25 else 583)
+    matrixSuite c binary portFixtures (if portFixtures then 25 else 593)
       ((:)
          (if portFixtures
           then "25 MLF port fixtures; 0 failures"
-          else "531 shared IO/prelude/backend fixtures; 0 failures")
+          else "541 shared IO/prelude/backend fixtures; 0 failures")
          []);
   matrixSuite :: TestContext -> String -> Bool -> Int -> [] String -> IO ();
   matrixSuite c binary portFixtures expectedRows expectations =
@@ -915,7 +1061,7 @@ module Tests.CompilerTests where {
         unit =
           if portFixtures
           then "port"
-          else if ((expectedRows == 583) || S.isJust selected) then "backends" else ""
+          else if ((expectedRows == 593) || S.isJust selected) then "backends" else ""
       };
       expectedEntries <-
         if eqString unit ""
@@ -1328,6 +1474,17 @@ module Tests.CompilerTests where {
       };
       saved <- J.read (report c);
       identity <- portTargetIdentity builder binary;
+      let {
+        stateTypes = S.elem eqString "StateTypes" names;
+        inference = S.elem eqString "InferenceConformance" names
+      };
+      discoveredBuiltin <-
+        if stateTypes || inference
+        then do {
+          builtin <- targetBuiltinReceipt c "port" binary (J.getText "checker_sha256" "" identity);
+          return (Just builtin)
+        }
+        else return Nothing;
       targets <-
         S.mapM
           (\name ->
@@ -1337,7 +1494,8 @@ module Tests.CompilerTests where {
                    if S.elem eqString name heavy then memoryCollection else baselineCollection
                };
                setEnv "GC_FREE_SPACE_DIVISOR" collection;
-               target <- preparePortTarget c builder binary name;
+               target <- preparePortTarget c builder binary name
+                 (if isDiscoveredPortTarget name then discoveredBuiltin else Nothing);
                ioReturn (J.set "gc_free_space_divisor" (J.str collection) target)
              })
           names;
@@ -1372,17 +1530,21 @@ module Tests.CompilerTests where {
         collections =
           J.Object
             (S.map (\row -> (,) (J.getText "fixture" "" row) (J.get "gc_free_space_divisor" row))
-               targets)
+               targets);
+        preparedReport = J.set "collection_policies" collections
+          (J.set "target_hashes" targetHashes (J.object [
+            (,) "manifest" (J.str manifest), (,) "sha256" (J.str hash),
+            (,) "targets" (J.num (S.length targets)),
+            (,) "build_report" (J.str (B.reportPath builder))
+          ]))
       };
       record c "prepared_port"
-        (J.set "collection_policies" collections
-           (J.set "target_hashes" targetHashes
-              (B.info
-                 ((:) ((,) "manifest" (J.str manifest))
-                    ((:) ((,) "sha256" (J.str hash))
-                       ((:) ((,) "targets" (J.num (S.length targets)))
-                          ((:) ((,) "build_report" (J.str (B.reportPath builder))) [])))))));
-      validatePreparedPortNames c selectedScope
+        (if stateTypes then J.set "preparation_route" (J.str TS.portStateTypesMode) preparedReport
+         else if inference then J.set "preparation_route" (J.str TS.portInferenceMode) preparedReport
+         else preparedReport);
+      validatePreparedPortNames c selectedScope;
+      setEnv "MLF_TEST_PORT_REQUIRE_STATE_TYPES_SPLIT" "1";
+      setEnv "MLF_TEST_PORT_REQUIRE_INFERENCE_DISCOVERED" "1"
     };
   portTargetIdentity :: B.Builder -> String -> IO J.Json;
   portTargetIdentity builder binary =
@@ -1395,16 +1557,27 @@ module Tests.CompilerTests where {
                  ((:) ((,) "manager" (J.get "manager" (B.tools builder)))
                     ((:) ((,) "checker_sha256" (J.str checkerHash)) [])))))
     };
-  preparePortTarget :: TestContext -> B.Builder -> String -> String -> IO J.Json;
+  preparePortTarget :: TestContext -> B.Builder -> String -> String -> Maybe J.Json -> IO J.Json;
   -- Match PortSuite.prepareFixture's source entry and ordered include roots.
   -- Discovery and the preparation child must resolve relative imports from the
   -- same working directory, including the loader's final implicit '.' root.
-  preparePortTarget c builder binary name =
+  preparePortTarget c builder binary name discoveredBuiltin =
     do {
       working <- canonicalPath ".";
       O.require (eqString working (root c))
         "port source discovery must run from the preparation working directory";
       identity <- portTargetIdentity builder binary;
+      case discoveredBuiltin of {
+        Nothing -> do {
+          O.require (S.not (isDiscoveredPortTarget name)) (name ++ " lacks checked Port builtin authority");
+          prepareDirectPortTarget c builder binary name identity
+        };
+        Just builtin -> prepareDiscoveredPortTarget c builder binary name identity builtin
+      }
+    };
+  prepareDirectPortTarget :: TestContext -> B.Builder -> String -> String -> J.Json -> IO J.Json;
+  prepareDirectPortTarget c builder binary name identity =
+    do {
       inputs <-
         TS.sourceInputs (TS.portRoots (B.graph builder)) ("bootstrap/tests/" ++ (name ++ ".emlf"));
       collection <- getEnv "GC_FREE_SPACE_DIVISOR";
@@ -1452,6 +1625,241 @@ module Tests.CompilerTests where {
                     ((:) ((,) "target_sha256" (J.str hash))
                        ((:) ((,) "checks_sha256" (J.str checksHash)) []))))))
     };
+  portTextDigest :: String -> IO String;
+  portTextDigest text = do {
+    bytes <- byteArrayFromString text;
+    byteArrayDigest bytes
+  };
+  isDiscoveredPortTarget :: String -> Bool;
+  isDiscoveredPortTarget name = eqString name "StateTypes" || eqString name "InferenceConformance";
+  discoveredPortMode :: String -> String;
+  discoveredPortMode name = if eqString name "StateTypes" then TS.portStateTypesMode else TS.portInferenceMode;
+  discoveredSealDigests =
+    O.words "source_inputs_sha256 builtin_interface_sha256 builtin_object_sha256 checker_sha256 interface_sha256 object_sha256 queries_sha256 ordered_proof_sha256 target_sha256 checks_sha256 discovered_sha256";
+  readDiscoveredPortSeal :: String -> String -> IO (Maybe J.Json);
+  readDiscoveredPortSeal name target = do {
+    let {
+      digests = discoveredSealDigests;
+      keys = S.append (O.words "format fixture preparation_mode crate_identity") digests
+    };
+    (,) message bytes <- readByteFileOrError (target ++ ".preparation.json") 65536;
+    if S.not (eqString message "") then return Nothing else do {
+      decoded <- Wire.strictUtf8 65536 bytes;
+      return (case decoded of {
+        Left _ -> Nothing;
+        Right text -> case J.parse text of {
+          Left _ -> Nothing;
+          Right seal ->
+            if Catalog.keys keys seal &&
+               J.equal (J.get "format" seal) (J.num 1) &&
+               eqString (J.getText "fixture" "" seal) name &&
+               eqString (J.getText "preparation_mode" "" seal) (discoveredPortMode name) &&
+               Catalog.nonemptyString (J.get "crate_identity" seal) &&
+               S.all (\key -> B.validDigest (J.get key seal)) digests
+            then Just seal else Nothing
+        }
+      })
+    }
+  };
+  discoveredTargetProducts :: String -> [] ((,) String String);
+  discoveredTargetProducts target = [
+    (,) "target_sha256" target, (,) "checks_sha256" (target ++ ".checks.json"),
+    (,) "discovered_sha256" (target ++ ".discovered.json")
+  ];
+  validDiscoveredPortTarget :: String -> J.Json -> String -> IO Bool;
+  validDiscoveredPortTarget name expected target = do {
+    entries <- O.entries (O.parent target);
+    let { products = O.words "unit.xmlf unit.xmlf.checks.json unit.xmlf.discovered.json unit.xmlf.preparation.json" };
+    if S.not (Catalog.sameSet entries products || Catalog.sameSet entries ((:) "artifact.json" products))
+    then return False
+    else do {
+      loaded <- readDiscoveredPortSeal name target;
+      case loaded of {
+        Nothing -> return False;
+        Just seal ->
+          if S.not (S.all (\((,) key value) -> J.equal (J.get key seal) value) (J.items expected))
+          then return False
+          else do {
+            matches <- S.mapM (\((,) key path) -> do {
+              present <- fileExists path;
+              if S.not present then return False else do {
+                hash <- fileDigest path;
+                return (eqString hash (J.getText key "" seal))
+              }
+            }) (discoveredTargetProducts target);
+            if S.not (S.and matches) then return False else do {
+              checks <- J.read (target ++ ".checks.json");
+              return (V.validPortTargetChecks name (J.getText "target_sha256" "" seal) checks)
+            }
+          }
+      }
+    }
+  };
+  prepareDiscoveredPortTarget :: TestContext -> B.Builder -> String -> String -> J.Json -> J.Json -> IO J.Json;
+  prepareDiscoveredPortTarget c builder binary name identity builtin = do {
+    O.require (isDiscoveredPortTarget name) "unexpected discovered Port fixture";
+    let {
+      graph = B.graph builder;
+      interface = J.getText "interface" "" builtin;
+      object = J.getText "object" "" builtin;
+      state = eqString name "StateTypes";
+      mode = discoveredPortMode name;
+      source = if state then TS.portStateTypesSource else TS.portInferenceSource;
+      crateIdentity = if state then TS.portStateTypesIdentity graph else TS.portInferenceIdentity graph
+    };
+    canonicalObject <- canonicalPath object;
+    O.require (eqString object canonicalObject && eqString object (Artifact.objectPath interface) &&
+      J.equal (J.get "binary_sha256" builtin) (J.get "checker_sha256" identity))
+      (name ++ " checked builtin or checker identity changed");
+    _ <- verifyTargetBuildFile name interface (J.get "interface_sha256" builtin);
+    _ <- verifyTargetBuildFile name object (J.get "object_sha256" builtin);
+    inputs <- if state then TS.portStateTypesInputs graph else TS.portInferenceInputs graph;
+    O.require (eqString (J.getText "cwd" "" inputs) (root c) &&
+      eqString (J.getText "entry" "" inputs) source)
+      (name ++ " discovered source differs from the preparation root");
+    sourceHash <- portTextDigest (J.render inputs ++ "\n");
+    collection <- getEnv "GC_FREE_SPACE_DIVISOR";
+    let {
+      header = J.object [
+        (,) "format" (J.num 1), (,) "fixture" (J.str name),
+        (,) "preparation_mode" (J.str mode), (,) "crate_identity" (J.str crateIdentity),
+        (,) "source_inputs_sha256" (J.str sourceHash),
+        (,) "builtin_interface_sha256" (J.get "interface_sha256" builtin),
+        (,) "builtin_object_sha256" (J.get "object_sha256" builtin),
+        (,) "checker_sha256" (J.get "checker_sha256" identity)
+      ];
+      key = J.set "gc_free_space_divisor" (J.str collection)
+        (J.set "source_inputs" inputs
+          (J.set "preparation" header
+            (J.set "builtin_interface" (J.str interface) (J.set "builtin_object" (J.str object) identity))))
+    };
+    artifact <- B.cachedChecked builder ("checked port target " ++ name) key
+      (\directory -> validDiscoveredPortTarget name header (directory ++ "/unit.xmlf"))
+      (runDiscoveredPortPreparation c builder binary name builtin inputs header);
+    let { target = artifact ++ "/unit.xmlf" };
+    sealed <- readDiscoveredPortSeal name target;
+    seal <- case sealed of {
+      Nothing -> O.fatal (name ++ " preparation seal disappeared after publication");
+      Just value -> return value
+    };
+    sealHash <- fileDigest (target ++ ".preparation.json");
+    return (J.object [
+      (,) "fixture" (J.str name), (,) "source_inputs" inputs,
+      (,) "target" (J.str target), (,) "target_sha256" (J.get "target_sha256" seal),
+      (,) "checks_sha256" (J.get "checks_sha256" seal),
+      (,) "preparation_mode" (J.str mode), (,) "preparation_sha256" (J.str sealHash),
+      (,) "discovered_sha256" (J.get "discovered_sha256" seal)
+    ])
+  };
+  runDiscoveredPortPreparation ::
+    TestContext -> B.Builder -> String -> String -> J.Json -> J.Json -> J.Json -> String -> IO ();
+  runDiscoveredPortPreparation c builder binary name builtin inputs header work = do {
+    let {
+      state = eqString name "StateTypes";
+      stem = if state then "/state-types-split-" else "/inference-discovered-";
+      option = if state then "--prepare-statetypes-split" else "--prepare-inferenceconformance-discovered"
+    };
+    fresh <- O.temporaryDirectory (B.directory builder) (B.directory builder ++ stem);
+    attempt <- canonicalPath fresh;
+    targetDirectory <- canonicalPath work;
+    let {
+      scratch = attempt ++ "/scratch";
+      source = attempt ++ "/source-inputs.json";
+      config = attempt ++ "/config.json";
+      input = attempt ++ "/empty.stdin";
+      stdout = attempt ++ "/coordinator.stdout";
+      target = targetDirectory ++ "/unit.xmlf";
+      interface = J.getText "interface" "" builtin
+    };
+    O.mkdir scratch;
+    writeFile input "";
+    J.write source inputs;
+    _ <- verifyTargetBuildFile name source (J.get "source_inputs_sha256" header);
+    J.write config (J.set "target" (J.str target)
+      (J.set "scratch" (J.str scratch)
+        (J.set "source_inputs" (J.str source) (J.set "builtin_interface" (J.str interface) header))));
+    configHash <- fileDigest config;
+    let { args = [binary, option, config, configHash] };
+    _ <- B.capture builder (root c) args input stdout;
+    build <- J.read (B.reportPath builder);
+    let { command = S.last (J.values (J.get "commands" build)); stderr = J.getText "stderr" "" command };
+    O.require (J.equal (J.get "argv" command) (J.stringArray args) &&
+      eqString (J.getText "cwd" "" command) (root c) &&
+      eqString (J.getText "stdout" "" command) stdout &&
+      J.equal (J.get "exit_code" command) (J.num 0))
+      (name ++ " discovered Port capture receipt differs");
+    success <- portTextDigest ("CHECKED " ++ name ++ "\n");
+    produced <- portTextDigest ("PRODUCED " ++ name ++ "\n");
+    empty <- portTextDigest "";
+    let {
+      streams = [
+        (,) stdout success, (,) stderr empty,
+        (,) (scratch ++ "/producer.stdout") produced, (,) (scratch ++ "/producer.stderr") empty,
+        (,) (scratch ++ "/consumer.stdout") success, (,) (scratch ++ "/consumer.stderr") empty
+      ];
+      directory = scratch ++ "/producer/";
+      checked = [
+        (,) "interface_sha256" (directory ++ "unit.mlfci"),
+        (,) "object_sha256" (directory ++ "unit.mlfco"),
+        (,) "queries_sha256" (directory ++ "unit.queries"),
+        (,) "ordered_proof_sha256" (directory ++ "ordered-proof.json")
+      ]
+    };
+    S.mapM_ (\((,) path expected) -> verifyTargetBuildFile name path (J.str expected)) streams;
+    valid <- validDiscoveredPortTarget name header target;
+    O.require valid (name ++ " discovered preparation did not publish a valid target and sidecars");
+    sealed <- readDiscoveredPortSeal name target;
+    seal <- case sealed of {
+      Nothing -> O.fatal (name ++ " preparation seal disappeared before cache publication");
+      Just value -> return value
+    };
+    S.mapM_ (\((,) key path) -> verifyTargetBuildFile name path (J.get key seal)) checked;
+    _ <- verifyTargetBuildFile name config (J.str configHash);
+    _ <- verifyTargetBuildFile name source (J.get "source_inputs_sha256" header);
+    _ <- verifyTargetBuildFile name interface (J.get "builtin_interface_sha256" header);
+    _ <- verifyTargetBuildFile name (J.getText "object" "" builtin) (J.get "builtin_object_sha256" header);
+    sealHash <- fileDigest (target ++ ".preparation.json");
+    let {
+      evidence = J.object
+        (S.append (S.map (\((,) path hash) -> (,) path (J.str hash)) streams)
+          (S.append (S.map (\((,) key path) -> (,) path (J.get key seal)) checked)
+            [(,) config (J.str configHash), (,) source (J.get "source_inputs_sha256" header)]))
+    };
+    B.record builder (if state then "state_types_split" else "inference_discovered") (J.object [
+      (,) "mode" (J.str (discoveredPortMode name)), (,) "attempt" (J.str attempt),
+      (,) "build_report_sha256" (J.get "build_report_sha256" builtin),
+      (,) "preparation_sha256" (J.str sealHash), (,) "files" evidence
+    ])
+  };
+  validateDiscoveredPortRow :: J.Json -> J.Json -> String -> String -> IO ();
+  validateDiscoveredPortRow manifest row targetHash checksHash = do {
+    let {
+      fixture = J.getText "fixture" "" row;
+      marked = S.any (\key -> J.has key row) (O.words "preparation_mode preparation_sha256 discovered_sha256")
+    };
+    if S.not (isDiscoveredPortTarget fixture)
+    then O.require (S.not marked) "direct Port target unexpectedly has split preparation evidence"
+    else do {
+      O.require (eqString (J.getText "preparation_mode" "" row) (discoveredPortMode fixture))
+        (fixture ++ " lacks required discovered preparation");
+      let { target = J.getText "target" "" row };
+      sealHash <- verifyTargetBuildFile fixture (target ++ ".preparation.json") (J.get "preparation_sha256" row);
+      sealed <- readDiscoveredPortSeal fixture target;
+      seal <- case sealed of {
+        Nothing -> O.fatal ("invalid prepared seal: " ++ fixture);
+        Just value -> return value
+      };
+      _ <- verifyTargetBuildFile fixture (target ++ ".preparation.json") (J.str sealHash);
+      sourceHash <- portTextDigest (J.render (J.get "source_inputs" row) ++ "\n");
+      _ <- verifyTargetBuildFile fixture (target ++ ".discovered.json") (J.get "discovered_sha256" row);
+      O.require (eqString (J.getText "target_sha256" "" seal) targetHash &&
+        eqString (J.getText "checks_sha256" "" seal) checksHash &&
+        eqString (J.getText "source_inputs_sha256" "" seal) sourceHash &&
+        J.equal (J.get "checker_sha256" seal) (J.get "checker_sha256" manifest) &&
+        J.equal (J.get "discovered_sha256" seal) (J.get "discovered_sha256" row))
+        (fixture ++ " preparation provenance changed between layouts")
+    }
+  };
   validatePreparedPort :: TestContext -> IO ();
   validatePreparedPort c = validatePreparedPortNames c Nothing;
   validatePreparedPortNames :: TestContext -> Maybe ([] String) -> IO ();
@@ -1496,7 +1904,8 @@ module Tests.CompilerTests where {
                (eqString hash (J.getText "target_sha256" "" row) &&
                 (eqString checksHash (J.getText "checks_sha256" "" row) &&
                  V.validPortTargetChecks (J.getText "fixture" "" row) hash checks))
-               "prepared port target/check receipt changed between layouts"
+               "prepared port target/check receipt changed between layouts";
+             validateDiscoveredPortRow manifest row hash checksHash
            })
         targets
     };
