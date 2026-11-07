@@ -7,12 +7,17 @@ Cold, separate caches only: this driver does not manufacture or seed artifacts.
 from __future__ import annotations
 import argparse
 import importlib.util
+import math
 import json
 import os
 from pathlib import Path
 import re
+import resource
+import threading
 import shlex
 import signal
+import stat
+import types
 import time
 import shutil
 import subprocess
@@ -20,11 +25,15 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGETS = ('emlf', 'mlfpkg')
-PLAN_NAMES = {'root', 'tests', 'testing-tools', 'async', 'tests-shared', 'async-fixtures'}
+PLAN_ROOTS = {'root': '.', 'tests': 'tests', 'testing-tools': 'testing/tools',
+              'async': 'libraries/mlf-async', 'tests-shared': 'tests/shared', 'async-fixtures': 'tests/async-package'}
+PLAN_NAMES = set(PLAN_ROOTS)
 DIGEST = re.compile(r'[0-9a-f]{64}\Z')
 spec = importlib.util.spec_from_file_location('direct_auth', ROOT / 'tools/shared/test_direct.py')
 direct = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(direct)
+# Harness-local helpers supply only hashing. Producer authentication below loads
+# its original source-root verifier chain, never this relocated module.
 sha = direct.sha
 
 
@@ -56,61 +65,215 @@ def below(path, parent):
     return path
 
 
-def authenticate_gate(path, digest, producer_digest):
-    gate = read(verified(path, digest))
-    require(gate.get('status') == 'passed' and gate.get('producer_receipt_sha256') == producer_digest,
-            'foundational gate is not passed for this producer')
-    expected = {'mlf-foundation/0.3.0/library', 'mlf-async/0.3.0/library',
-                'mlf-language-core/0.3.0/library', 'mlf-frontend/0.3.0/library'}
-    require(expected <= set(gate.get('results', {})), 'incomplete foundational gate')
-    require(sum(gate['results'][name]['module_count'] for name in expected) == 31,
-            'unexpected foundational module inventory')
-    require(all(v.get('reused_groups') == 0 for v in gate['results'].values()), 'foundational gate is not cold')
-    for section in ('inputs', 'artifacts'):
-        require(bool(gate.get(section)), 'missing gate ' + section)
-        for name, value in gate[section].items():
-            verified(name, value)
-    commands = gate.get('commands', [])
-    require(len(commands) == len(gate['results']) and
-            {c.get('crate') for c in commands} == set(gate['results']),
-            'gate commands do not match crate results')
-    require(all(
-        c.get('status') == 'passed' and c.get('resource', {}).get('complete') is True
-        for c in commands), 'failed foundational command')
-    return gate
+def allocated_tree_bytes(root, *, allocated):
+    """Conservative tree accounting, tolerating only disappearing descendants."""
+    seen = set(); total = 0
+    require(root.is_dir(), 'resource root disappeared')
+    def error(exc):
+        if not isinstance(exc, FileNotFoundError):
+            raise exc
+    for directory, directories, files in os.walk(root, followlinks=False, onerror=error):
+        for path in [Path(directory), *(Path(directory) / name for name in files + directories)]:
+            try:
+                info = path.lstat()
+            except FileNotFoundError:
+                continue
+            identity = (info.st_dev, info.st_ino)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            if allocated:
+                total += info.st_blocks * 512
+            elif stat.S_ISREG(info.st_mode):
+                total += info.st_size
+    require(root.is_dir(), 'resource root disappeared')
+    return total
+
+
+class DriverBudget:
+    """Guard Python orchestration as well as its native descendant commands."""
+    def __init__(self, output, workspace, args):
+        self.output, self.workspace, self.args = output, workspace, args
+        self.started = time.monotonic()
+        self.stop_event = threading.Event()
+        self.mutex = threading.Lock()
+        self.failure = None
+        self.samples = 0
+        self.last = None
+        self.peaks = {'process_tree_rss_bytes': 0, 'output_bytes': 0, 'workspace_allocated_bytes': 0}
+        self.tracked = {}
+        self.old_as = resource.getrlimit(resource.RLIMIT_AS)
+        cap = args.address_space_mib * 1024**2
+        self.as_limit = min([cap, *[x for x in self.old_as if x != resource.RLIM_INFINITY]])
+        resource.setrlimit(resource.RLIMIT_AS, (self.as_limit, self.old_as[1]))
+        self.thread = None
+
+    def rss(self):
+        table = {}
+        for path in Path('/proc').glob('[0-9]*/stat'):
+            try:
+                fields = path.read_text().rsplit(') ', 1)[1].split()
+                table[int(path.parent.name)] = (int(fields[1]), fields[19], fields[0],
+                    int((path.parent / 'statm').read_text().split()[1]) * os.sysconf('SC_PAGE_SIZE'))
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+        owned = {os.getpid()} | {pid for pid, start in self.tracked.items() if pid in table and table[pid][1] == start}
+        while True:
+            children = {pid for pid, entry in table.items() if entry[0] in owned} - owned
+            if not children:
+                break
+            owned.update(children)
+        for pid in owned:
+            if pid in table:
+                self.tracked[pid] = table[pid][1]
+        return sum(table[pid][3] for pid in owned if pid in table and table[pid][2] != 'Z')
+
+    def check(self):
+        with self.mutex:
+            if self.failure:
+                raise RuntimeError(self.failure)
+            try:
+                available = next(int(line.split()[1])*1024 for line in Path('/proc/meminfo').read_text().splitlines()
+                                 if line.startswith('MemAvailable:'))
+                sample = {'seconds': time.monotonic() - self.started,
+                          'process_tree_rss_bytes': self.rss(), 'host_available_bytes': available,
+                          'disk_free_bytes': shutil.disk_usage(self.output).free,
+                          'output_bytes': allocated_tree_bytes(self.output, allocated=False),
+                          'workspace_allocated_bytes': allocated_tree_bytes(self.workspace, allocated=True)}
+                self.samples += 1; self.last = sample
+                for key in self.peaks:
+                    self.peaks[key] = max(self.peaks[key], sample[key])
+                require(sample['seconds'] < self.args.window_seconds, 'driver whole-window limit')
+                require(sample['process_tree_rss_bytes'] <= self.args.rss_mib*1024**2, 'driver process-tree RSS limit')
+                require(available >= 3*1024**3, 'driver host memory floor')
+                require(sample['disk_free_bytes'] >= self.args.disk_free_mib*1024**2, 'driver disk free floor')
+                require(sample['output_bytes'] <= self.args.max_output_mib*1024**2, 'driver cumulative output limit')
+                require(sample['workspace_allocated_bytes'] <= (self.args.workspace_limit_mib-self.args.checkpoint_reserve_mib)*1024**2,
+                        'driver workspace allocated-byte limit')
+            except BaseException as error:
+                self.failure = type(error).__name__ + ': ' + str(error)
+                raise
+
+    def start(self):
+        self.check()
+        def monitor():
+            while not self.stop_event.wait(.2):
+                try:
+                    self.check()
+                except BaseException:
+                    os.kill(os.getpid(), signal.SIGTERM)
+                    return
+        self.thread = threading.Thread(target=monitor, name='bootstrap-driver-budget', daemon=True)
+        self.thread.start()
+
+    def summary(self):
+        return {'scope': 'whole driver and observed descendants', 'samples': self.samples,
+                'last_sample': self.last, 'peaks': dict(self.peaks), 'failure': self.failure,
+                'driver_address_space_bytes': self.as_limit,
+                'checkpoint_reserve_mib': self.args.checkpoint_reserve_mib}
+
+    def close(self):
+        self.stop_event.set()
+        if self.thread is not None:
+            self.thread.join(timeout=10)
+            require(not self.thread.is_alive(), 'driver resource monitor did not stop')
+        resource.setrlimit(resource.RLIMIT_AS, self.old_as)
+
+
+PRODUCER_AUTH_HELPERS = ('test_direct.py', 'verify_builtin_prelude.py', 'builtin_prelude_identity.py',
+                         'verify_prepared_libraries.py', 'native_install.py', 'pool_generated_strings.py')
+
+
+def producer_authentication_inputs(source_root):
+    return {str(regular(source_root / 'tools/shared' / name)): sha(source_root / 'tools/shared' / name)
+            for name in PRODUCER_AUTH_HELPERS}
+
+
+def authenticate_producer(receipt, pair, source_root, helper_inputs):
+    """Execute the original source-root verifier bytes, never relocated helpers or .pyc.
+
+    The reviewed source helpers import only Python standard-library modules. Local
+    verifier dependencies are explicitly compiled by path, without sys.modules
+    registration, and their original __file__ identities remain intact.
+    """
+    require(producer_authentication_inputs(source_root) == helper_inputs, 'producer verifier closure changed')
+    path = source_root / 'tools/shared/test_direct.py'
+    module = types.ModuleType('location_bound_producer_auth')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    producer = module.authenticate_build(receipt, pair, source_root)
+    require(producer_authentication_inputs(source_root) == helper_inputs, 'producer verifier closure changed during authentication')
+    return producer
+
+
+def output_tree(output, *, hashes=False, exclude=()):
+    """Reject every writable alias/special node, including untracked future sidecars."""
+    require(output.is_absolute() and output.resolve(strict=True) == output, 'output root alias')
+    result = {}
+    def inspect(path):
+        info = path.lstat()
+        require(not stat.S_ISLNK(info.st_mode), 'output symlink: ' + str(path))
+        if stat.S_ISDIR(info.st_mode):
+            kind = 'directory'
+        else:
+            require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1,
+                    'output special file or hardlink: ' + str(path))
+            kind = 'file'
+        name = path.relative_to(output).as_posix()
+        if name not in exclude:
+            result[name] = {'kind': kind, **({'sha256': sha(path)} if hashes and kind == 'file' else {})}
+    inspect(output)
+    def error(exc):
+        raise exc
+    for directory, directories, files in os.walk(output, followlinks=False, onerror=error):
+        for name in directories + files:
+            inspect(Path(directory) / name)
+    return result
+
+
+def write_new_json(path, value):
+    # O_EXCL refuses existing files, symlinks, hardlinks and abandoned sidecars.
+    with path.open('x') as stream:
+        json.dump(value, stream, indent=2)
+        stream.write('\n')
+
+
+def foundational_inventory(root):
+    """Bind the required cold gate to actual manifests, names and source bytes."""
+    result = {}
+    for name in ('foundation', 'async', 'language-core', 'frontend'):
+        manifest = regular(root / 'libraries' / ('mlf-' + name) / 'mlf-package.json')
+        data = read(manifest)
+        require(data.get('name') == 'mlf-' + name and data.get('version') == '0.3.0',
+                'unexpected foundational package identity')
+        modules = {}
+        for module, relative in data['library']['modules'].items():
+            source = regular(below(manifest.parent / relative, root).resolve(strict=True))
+            modules[module] = {'path': str(source), 'sha256': sha(source)}
+        require(bool(modules), 'empty foundational manifest')
+        result[data['name'] + '/' + data['version'] + '/library'] = {
+            'manifest': {'path': str(manifest), 'sha256': sha(manifest)}, 'modules': modules}
+    return result
+
+
+def prerequisites_verifier():
+    path = regular(ROOT / 'tools/shared/collect_ghc_native_prerequisites.py')
+    module = types.ModuleType('bootstrap_prerequisite_verifier')
+    module.__file__ = str(path)
+    exec(compile(path.read_bytes(), str(path), 'exec'), module.__dict__)
+    return module
+
+
+def authenticate_gate(path, digest, producer_digest, root=ROOT):
+    return prerequisites_verifier().authenticate_gate(path, digest, producer_digest, root)
 
 
 def authenticate_plans(folder, producer_digest, root=ROOT):
-    receipt = read(folder / 'receipt.json')
-    require(receipt.get('complete') is True and receipt.get('producer_sha256') == producer_digest,
-            'locked plans have a different/incomplete producer')
-    rows = receipt.get('roots', [])
-    require(len(rows) == 6 and {r['name'] for r in rows} == PLAN_NAMES, 'six locked roots required')
-    tracked = {str(regular(folder / 'receipt.json')): sha(folder / 'receipt.json')}
-    for row in rows:
-        manifest = below(verified(row['manifest'], row['manifest_sha256']), root)
-        lock = manifest.parent / 'mlf.lock'
-        verified(lock, row['after_lock'])
-        plan = verified(folder / (row['name'] + '-plan.json'), row['plan_sha256'])
-        for path in (manifest, lock, plan):
-            tracked[str(path)] = sha(path)
-        for phase in ('lock', 'plan'):
-            command = row[phase]
-            require(command.get('exit') == 0, 'failed locked plan command')
-            bounded_path = Path(command['receipt'])
-            bounded = read(regular(bounded_path))
-            require(bounded.get('complete') is True and bounded.get('exit_code') == 0,
-                    'failed lock/plan bounded receipt')
-            tracked[str(bounded_path)] = sha(bounded_path)
-        for package in read(plan)['packages']:
-            directory = below((manifest.parent / package['path']).resolve(), root)
-            package_file = verified(directory / 'mlf-package.json', package['manifest'])
-            tracked[str(package_file)] = sha(package_file)
-            for relative, digest in package['sources'].items():
-                source = below(directory / relative, directory)
-                verified(source, digest)
-                tracked[str(source)] = digest
-    return tracked
+    return prerequisites_verifier().authenticate_plans(folder, producer_digest, root)
+
+
+def verify_prerequisites(**arguments):
+    return prerequisites_verifier().verify_prerequisites(**arguments)
 
 
 def stamp(cache, row):
@@ -505,11 +668,13 @@ def interrupted(signum, frame):
     raise InterruptedError('bootstrap driver interrupted by signal ' + str(signum))
 
 
-def managed_run(argv, cwd, env):
+def managed_run(argv, cwd, env, teardown=None):
     # The watchdog owns independently sessioned native descendants. Give its
     # TERM handler time to reap them; retain PID/start-time identities as backup.
     proc = subprocess.Popen(argv, cwd=cwd, env=env, start_new_session=True)
     tracked = {}
+    if teardown is None:
+        teardown = {}
     def descendants():
         table = {}
         for path in Path('/proc').glob('[0-9]*/stat'):
@@ -530,18 +695,35 @@ def managed_run(argv, cwd, env):
         while proc.poll() is None:
             descendants()
             time.sleep(.2)
+        remaining = descendants()
+        require(not remaining, 'watchdog exited with live owned descendants')
+        teardown.update(drained=True, remaining=[], initial=[], seconds=0)
         return proc.returncode
     except BaseException:
-        descendants()
-        if proc.poll() is None: proc.send_signal(signal.SIGTERM)
+        began = time.monotonic()
+        initial = descendants()
+        teardown.update(drained=False, initial=[{'pid': pid, 'start_time': row[1]} for pid, row in sorted(initial.items())])
+        if proc.poll() is None:
+            proc.send_signal(signal.SIGTERM)
+        else:
+            for pid in initial:
+                try: os.kill(pid, signal.SIGTERM)
+                except ProcessLookupError: pass
         deadline = time.monotonic() + 15
         while proc.poll() is None and time.monotonic() < deadline:
             descendants(); time.sleep(.1)
-        remaining = descendants()
-        for pid in remaining:
+        for pid in descendants():
             try: os.kill(pid, signal.SIGKILL)
             except ProcessLookupError: pass
-        proc.wait()
+        try: proc.wait(timeout=2)
+        except subprocess.TimeoutExpired: pass
+        deadline = time.monotonic() + 3
+        remaining = descendants()
+        while remaining and time.monotonic() < deadline:
+            time.sleep(.05); remaining = descendants()
+        teardown.update(drained=not remaining, remaining=[{'pid': pid, 'start_time': row[1]} for pid, row in sorted(remaining.items())],
+                        seconds=time.monotonic()-began)
+        require(not remaining, 'driver teardown left live owned descendants: ' + json.dumps(teardown))
         raise
 
 
@@ -553,12 +735,115 @@ def clear_pointers(output):
 def publish_pointers(output, compiler, manager):
     try:
         for name, path in [('compiler.path', compiler), ('manager.path', manager)]:
-            (output / (name + '.pending')).write_text(str(path) + '\n')
+            with (output / (name + '.pending')).open('x') as stream:
+                stream.write(str(path) + '\n')
         for name in ('compiler.path', 'manager.path'):
             (output / (name + '.pending')).replace(output / name)
     except BaseException:
         clear_pointers(output)
         raise
+
+
+ROUTE = 'authenticated-GHC-pair/native-A/native-B'
+BOUNDARIES = {'authenticated-dry-run': (), 'runner-preflight-complete': (), 'native-A-complete': ('A',)}
+
+
+def isolated_environment(output, clang, pkg, gc, loader_dirs):
+    env = {'PATH': str(clang.parent) + ':' + str(pkg.parent) + ':/usr/bin:/bin',
+           'HOME': str(output / 'home'), 'TMPDIR': str(output / 'tmp'),
+           'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8',
+           'CC': str(clang), 'MLF_CLANG': str(clang), 'MLF_GC_PREFIX': str(gc),
+           'GHC_ENVIRONMENT': '-', 'GC_INITIAL_HEAP_SIZE': '16777216', 'GC_FREE_SPACE_DIVISOR': '8'}
+    if loader_dirs:
+        env['LD_LIBRARY_PATH'] = ':'.join(map(str, loader_dirs))
+    return env
+
+
+def loader_inventory(directories):
+    """Only explicit canonical library directories, never ambient loader variables."""
+    files, bindings = {}, {}
+    for directory in directories:
+        require(directory.is_absolute() and directory.resolve(strict=True) == directory and directory.is_dir(),
+                'canonical loader directory required')
+        for path in sorted(directory.rglob('*')):
+            if path.is_file():
+                actual = regular(path.resolve(strict=True))
+                files[str(actual)] = sha(actual)
+                bindings[str(path)] = str(actual)
+            else:
+                require(path.is_dir() and not path.is_symlink(), 'invalid loader directory member')
+    return {'files': files, 'bindings': bindings}
+
+
+def authenticate_commands(receipt, output):
+    """A saved success summary is not a replacement for its original command evidence."""
+    labels = set()
+    for entry in receipt.get('commands', []):
+        label = entry.get('label')
+        require(isinstance(label, str) and re.fullmatch(r'[A-Za-z0-9_-]+', label) and label not in labels, 'duplicate/missing command label')
+        labels.add(label)
+        directory = output / 'commands' / label
+        require(entry.get('exit_code') == 0 and entry.get('bounded_receipt') == str(directory / 'bounded-receipt.json'),
+                'unfinished or misplaced prior command')
+        bounded = read(verified(directory / 'bounded-receipt.json', entry['bounded_sha256']))
+        verified(directory / 'build.log', entry['log_sha256'])
+        require(bounded.get('complete') is True and bounded.get('exit_code') == 0
+                and bounded.get('final_owned_descendants') == []
+                and entry.get('driver_teardown', {}).get('drained') is True
+                and entry['driver_teardown'].get('remaining') == []
+                and bounded.get('reason') is None and bounded.get('command') == [receipt['contract']['nice'], '-n', '19', *entry['argv']],
+                'prior bounded command differs or failed')
+        require(entry.get('environment') == {**receipt['environment'], **entry.get('stage_environment', {})},
+                'prior command environment differs')
+
+
+def authenticate_resume(path, digest, output, contract, environment):
+    output_tree(output)
+    receipt = read(verified(path, digest))
+    boundary = receipt.get('boundary_checkpoint', {})
+    checkpoint_path = below(Path(boundary.get('path', '')), output / 'checkpoints')
+    verified(checkpoint_path, boundary.get('sha256', ''))
+    expected_inventory = output_tree(output, hashes=True, exclude=('receipt.json', 'driver.lock', str(checkpoint_path.relative_to(output))))
+    require(receipt.get('output_inventory') == expected_inventory, 'resume output inventory differs')
+    require(receipt.get('format') == 2 and receipt.get('route') == ROUTE
+            and receipt.get('output') == str(output) and receipt.get('contract') == contract,
+            'resume route, output or source/input contract differs')
+    phase = receipt.get('phase')
+    require(phase in BOUNDARIES and receipt.get('status') == 'paused'
+            and receipt.get('complete') is False and receipt.get('fixed_point_qualified') is False
+            and not receipt.get('error'), 'resume requires an authenticated natural boundary, not partial/final output')
+    require(set(receipt.get('stages', {})) == set(BOUNDARIES[phase]), 'resume stage sequence differs')
+    require(receipt.get('boundary_complete') is True and receipt.get('stage_complete') ==
+            {'runner': phase != 'authenticated-dry-run', 'A': phase == 'native-A-complete', 'B': False},
+            'resume stage completion markers differ')
+    require(receipt.get('environment') == environment, 'resume environment differs')
+    for original, resolved in receipt.get('path_bindings', {}).items():
+        require(str(Path(original).resolve(strict=True)) == resolved, 'resume input symlink changed')
+    for filename, expected in receipt.get('inputs', {}).items():
+        verified(filename, expected)
+    authenticate_commands(receipt, output)
+    for name in ('compiler.path', 'manager.path', 'compiler.path.pending', 'manager.path.pending'):
+        require(not (output / name).exists(), 'unqualified resume contains published pointers')
+    if phase != 'authenticated-dry-run':
+        runner = receipt.get('runner', {})
+        require(runner.get('path') == str(output / 'tools/mlf-build-runner'), 'resume runner location differs')
+        verified(runner['path'], runner['sha256'])
+    next_stage = 'B' if phase == 'native-A-complete' else 'A'
+    for name in (('A', 'B') if next_stage == 'A' else ('B',)):
+        require(not (output / ('stage-' + name)).exists() and not (output / ('cache-' + name)).exists(),
+                'partial or preseeded next stage/cache exists')
+    return receipt
+
+
+def retain_boundary(output, receipt, phase):
+    receipt.update(phase=phase, status='paused', complete=False, fixed_point_qualified=False, boundary_complete=True)
+    receipt['stage_complete'] = {'runner': phase != 'authenticated-dry-run', 'A': phase == 'native-A-complete', 'B': False}
+    destination = output / 'checkpoints' / (phase + '.json')
+    destination.parent.mkdir(exist_ok=True)
+    # Exact boundary inventories reject even unreferenced added files on resume.
+    receipt['output_inventory'] = output_tree(output, hashes=True, exclude=('receipt.json', 'driver.lock'))
+    write_new_json(destination, receipt)
+    receipt['boundary_checkpoint'] = {'path': str(destination), 'sha256': sha(destination)}
 
 
 def main():
@@ -571,52 +856,118 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--execute', action='store_true', help='explicitly execute reviewed native stages (default dry-run)')
     mode.add_argument('--prepare-runner', action='store_true', help='authenticate and build only the small C scheduling helper; no native compiler stages')
-    parser.add_argument('--checkpoint', help='exact clean reviewed Git HEAD required for execution')
+    parser.add_argument('--checkpoint', help='exact clean production-source Git HEAD required for execution')
+    parser.add_argument('--source-root', type=Path, default=ROOT, help='original location-bound producer source checkout')
+    parser.add_argument('--driver-checkpoint', help='exact clean driver Git HEAD, required when source-root differs')
+    parser.add_argument('--stop-after', choices=('runner', 'A', 'B'), default='A', help='natural boundary; B requires explicit selection')
+    parser.add_argument('--resume-sha256', help='out-of-band SHA256 of this output directory receipt.json')
+    parser.add_argument('--loader-dir', type=Path, action='append', default=[], help='explicit reviewed native library directory (repeatable)')
+    parser.add_argument('--window-seconds', type=int, help='total invocation wall budget, including all probes and actions')
+    parser.add_argument('--max-output-mib', type=int, help='cumulative output namespace cap, including previous stages')
+    parser.add_argument('--workspace-root', type=Path, help='whole shared workspace to monitor')
+    parser.add_argument('--workspace-limit-mib', type=int, default=16384)
+    parser.add_argument('--checkpoint-reserve-mib', type=int, default=512)
+    parser.add_argument('--disk-free-mib', type=int, default=8192)
     parser.add_argument('--release-note', help='required auditable human release reference with --execute')
     parser.add_argument('--seconds', type=int, default=21600)
     parser.add_argument('--rss-mib', type=int, default=3072)
     parser.add_argument('--address-space-mib', type=int, default=4096)
     args = parser.parse_args()
     signal.signal(signal.SIGTERM, interrupted)
-    require(not args.execute or (bool(args.release_note) and bool(re.fullmatch(r'[0-9a-f]{40}', args.checkpoint or ''))),
-            '--execute requires explicit release-note and exact reviewed checkpoint')
+    active = args.execute or args.prepare_runner
+    require(not active or sys.platform == 'linux', 'this driver is Linux-only; Darwin qualification is separate')
+    source_root = args.source_root.resolve(strict=True)
+    driver_checkpoint = args.driver_checkpoint or (args.checkpoint if source_root == ROOT else None)
+    require(not active or (bool(args.release_note) and bool(re.fullmatch(r'[0-9a-f]{40}', args.checkpoint or ''))
+            and bool(re.fullmatch(r'[0-9a-f]{40}', driver_checkpoint or ''))),
+            'execution requires explicit release-note and exact reviewed source/driver checkpoints')
+    require(not active or (args.window_seconds and args.max_output_mib and args.workspace_root),
+            'execution requires explicit whole-window, cumulative output and workspace limits')
+    require(not args.prepare_runner or args.stop_after == 'A', '--prepare-runner cannot combine with --stop-after')
+    stop_after = 'runner' if args.prepare_runner else args.stop_after
+    require(args.disk_free_mib >= 8192 and args.checkpoint_reserve_mib >= 512
+            and args.workspace_limit_mib > args.checkpoint_reserve_mib, 'minimum disk/checkpoint reserve required')
+    require(not active or min(args.window_seconds, args.max_output_mib) > 0, 'positive window/output caps required')
+    started = time.monotonic()
     require(min(args.seconds, args.rss_mib, args.address_space_mib) > 0, 'positive resource caps required')
     out = args.output.absolute()
-    require(not out.is_symlink() and not ROOT.is_relative_to(out.resolve()) and
-            (not out.exists() or not any(out.iterdir())), 'new empty nonancestor output directory required')
-    out.mkdir(parents=True, exist_ok=True)
-    receipt = {'format': 1, 'route': 'authenticated-GHC-pair/native-A/native-B', 'complete': False,
-               'fixed_point_qualified': False, 'mode': 'execute' if args.execute else ('runner-preflight' if args.prepare_runner else 'dry-run'),
+    require(out.resolve() == out and not ROOT.is_relative_to(out) and not source_root.is_relative_to(out),
+            'canonical nonancestor output required')
+    if args.resume_sha256:
+        require(out.is_dir(), 'resume requires existing output directory')
+    else:
+        require(not out.exists() or not any(out.iterdir()), 'new empty output directory required')
+        out.mkdir(parents=True, exist_ok=True)
+    receipt = {'format': 2, 'route': ROUTE, 'output': str(out), 'complete': False,
+               'fixed_point_qualified': False, 'status': 'running', 'boundary_complete': False,
+               'stage_complete': {'runner': False, 'A': False, 'B': False}, 'native_stages_started': False,
+               'mode': 'execute' if args.execute else ('runner-preflight' if args.prepare_runner else 'dry-run'),
                'release_note': args.release_note, 'commands': [], 'stages': {}, 'phase': 'preflight'}
-    def save():
+    admitted = not args.resume_sha256
+    budget = None
+    def save(*, failed=False):
+        if budget is not None:
+            if not failed:
+                budget.check()
+            receipt['driver_resource'] = budget.summary()
+        output_tree(out)
         temporary = out / 'receipt.json.tmp'
-        temporary.write_text(json.dumps(receipt, indent=2) + '\n')
+        write_new_json(temporary, receipt)
         temporary.replace(out / 'receipt.json')
-    save()
+        if budget is not None and not failed:
+            budget.check()
+    previous_alarm = None
+    lock_path = out / 'driver.lock'
+    output_tree(out)
+    lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     try:
+        with os.fdopen(lock_fd, 'w') as stream:
+            stream.write(str(os.getpid()) + '\n')
+        if admitted:
+            save()
+        if active:
+            require(signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0), 'existing alarm conflicts with whole-window guard')
+            previous_alarm = signal.signal(signal.SIGALRM, interrupted)
+            signal.setitimer(signal.ITIMER_REAL, args.window_seconds)
+            workspace = args.workspace_root.resolve(strict=True)
+            require(out.is_relative_to(workspace), 'output must be inside monitored workspace')
+            budget = DriverBudget(out, workspace, args)
+            budget.start()
         git = Path('/usr/bin/git').resolve(strict=True)
         git_environment = {'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent', 'LANG': 'C',
                            'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'}
         def checkpoint():
-            return source_checkpoint(ROOT, git, git_environment, args.checkpoint, args.execute)
-        receipt['source_checkpoint'] = checkpoint()
+            source = source_checkpoint(source_root, git, git_environment, args.checkpoint, active)
+            driver = source_checkpoint(ROOT, git, git_environment, driver_checkpoint, active)
+            if active:
+                require(time.monotonic() - started < args.window_seconds, 'whole invocation wall-time limit')
+            return {'source': source, 'driver': driver}
+        checkpoints = checkpoint()
+        receipt['checkpoints'] = checkpoints
         producer_path = verified(args.producer_receipt, args.producer_sha256)
         pair = producer_path.parent / 'bin'
-        direct.authenticate_build(producer_path, pair, ROOT)
-        gate = authenticate_gate(args.frontend_receipt, args.frontend_sha256, args.producer_sha256)
-        verified(args.plans_dir.resolve() / 'receipt.json', args.plans_sha256)
-        inputs = authenticate_plans(args.plans_dir.resolve(), args.producer_sha256)
-        inputs.update(gate['inputs']); inputs.update(gate['artifacts'])
-        runtime_inputs = {str(p.resolve()): sha(p) for p in (ROOT / 'runtime').iterdir()
+        auth_inputs = producer_authentication_inputs(source_root)
+        authenticate_producer(producer_path, pair, source_root, auth_inputs)
+        inputs = verify_prerequisites(
+            gate_receipt=args.frontend_receipt.resolve(), gate_sha256=args.frontend_sha256,
+            plans_dir=args.plans_dir.resolve(), plans_sha256=args.plans_sha256,
+            producer_receipt=producer_path, producer_sha256=args.producer_sha256,
+            source_root=source_root, source_checkpoint=checkpoints['source']['head'],
+            driver_root=ROOT, driver_checkpoint=checkpoints['driver']['head'])['inputs']
+        inputs.update(auth_inputs)
+        runtime_inputs = {str(p.resolve()): sha(p) for p in (source_root / 'runtime').iterdir()
                           if p.suffix in ('.c', '.h') and p.is_file()}
         inputs.update(runtime_inputs)
         clang = args.clang.resolve(strict=True)
         gc = args.gc_prefix.resolve(strict=True)
         pkg = Path(shutil.which('pkg-config')).resolve(strict=True)
         bindings = {}
+        nice = Path(shutil.which('nice')).resolve(strict=True)
+        python = Path(sys.executable).resolve(strict=True)
         for p in [producer_path, args.frontend_receipt.resolve(), Path(__file__).resolve(),
                   ROOT / 'tools/shared/test_direct.py', ROOT / 'tools/shared/resource_watchdog.py',
-                  clang, pkg, git, Path(sys.executable).resolve(), Path(shutil.which('nice')).resolve(), gc / 'lib/libgc.a', *sorted((gc / 'include').rglob('*.h'))]:
+                  ROOT / 'tools/shared/collect_ghc_native_prerequisites.py',
+                  clang, pkg, git, python, nice, gc / 'lib/libgc.a', *sorted((gc / 'include').rglob('*.h'))]:
             resolved = p.resolve(strict=True)
             inputs[str(regular(resolved))] = sha(resolved)
             bindings[str(p)] = str(resolved)
@@ -625,110 +976,184 @@ def main():
         receipt['producer_receipt_sha256'] = args.producer_sha256
         receipt['frontend_receipt_sha256'] = args.frontend_sha256
         receipt['plans_receipt_sha256'] = args.plans_sha256
-        # No ambient build overrides or loader injection. Pin tool resolution explicitly.
-        env = {'PATH': str(clang.parent) + ':' + str(pkg.parent) + ':/usr/bin:/bin',
-               'HOME': os.environ.get('HOME', '/tmp'), 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8',
-               'CC': str(clang), 'MLF_CLANG': str(clang), 'MLF_GC_PREFIX': str(gc),
-               'GHC_ENVIRONMENT': '-', 'GC_INITIAL_HEAP_SIZE': '16777216', 'GC_FREE_SPACE_DIVISOR': '8'}
-        receipt['environment'] = env.copy()
+        # Deliberately ignore ambient HOME, TMPDIR, LD_*, compiler/manager/cache overrides.
+        loaders = loader_inventory(args.loader_dir)
+        inputs.update(loaders['files']); bindings.update(loaders['bindings'])
+        env = isolated_environment(out, clang, pkg, gc, args.loader_dir)
+        contract = {'source_root': str(source_root), 'driver_root': str(ROOT), 'checkpoints': checkpoints,
+                    'producer_receipt': str(producer_path), 'producer_sha256': args.producer_sha256,
+                    'frontend_receipt': str(args.frontend_receipt.resolve()), 'frontend_sha256': args.frontend_sha256,
+                    'plans_dir': str(args.plans_dir.resolve()), 'plans_sha256': args.plans_sha256,
+                    'clang': str(clang), 'pkg_config': str(pkg), 'gc_prefix': str(gc), 'nice': str(nice), 'python': str(python),
+                    'producer_authentication_inputs': auth_inputs,
+                    'loader_dirs': list(map(str, args.loader_dir)), 'loader_inventory': loaders,
+                    'action_seconds': args.seconds}
+        if args.resume_sha256:
+            saved = authenticate_resume(out / 'receipt.json', args.resume_sha256, out, contract, env)
+            boundary = saved['boundary_checkpoint']
+            checkpoint_value = read(verified(boundary['path'], boundary['sha256']))
+            require({k: v for k, v in checkpoint_value.items() if k not in ('boundary_checkpoint', 'driver_resource')} ==
+                    {k: v for k, v in saved.items() if k not in ('boundary_checkpoint', 'driver_resource')},
+                    'immutable boundary checkpoint differs')
+            # Preserve all former input pins; do not replace them with today's hashes.
+            require(all(saved['inputs'].get(k) == v for k, v in inputs.items()), 'resume initial inputs differ')
+            inputs = saved['inputs']; bindings = saved['path_bindings']; receipt = saved
+            receipt.setdefault('resumptions', []).append({'receipt_sha256': args.resume_sha256,
+                                                         'boundary_checkpoint': boundary})
+        else:
+            receipt['contract'] = contract
+            receipt['environment'] = env.copy()
+        receipt['inputs'] = inputs
+        receipt['path_bindings'] = bindings
+        resume_phase = receipt['phase'] if args.resume_sha256 else None
+        require(not (resume_phase == 'native-A-complete' and stop_after != 'B'), 'after A resume must explicitly select B')
+        require(not (resume_phase == 'runner-preflight-complete' and stop_after == 'runner'), 'runner boundary already complete; select A or B')
+        for name in ('home', 'tmp'):
+            directory = out / name
+            require(not directory.is_symlink(), 'private environment directory is a symlink')
+            directory.mkdir(mode=0o700, exist_ok=True)
+        if active:
+            workspace = args.workspace_root.resolve(strict=True)
+            require(out.is_relative_to(workspace), 'output must be inside monitored workspace')
+            receipt.setdefault('windows', []).append({
+                'stop_after': stop_after, 'window_seconds': args.window_seconds,
+                'max_output_mib': args.max_output_mib, 'workspace_root': str(workspace),
+                'workspace_limit_mib': args.workspace_limit_mib, 'checkpoint_reserve_mib': args.checkpoint_reserve_mib,
+                'rss_mib': args.rss_mib, 'address_space_mib': args.address_space_mib,
+                'disk_free_mib': args.disk_free_mib, 'release_note': args.release_note})
+        require(not args.resume_sha256 or active, 'dry-run does not resume prior work')
+        admitted = True
+        receipt.update(status='running', boundary_complete=False, mode='execute' if args.execute else 'runner-preflight')
+        save()
         def check_inputs():
-            checkpoint()
+            if budget is not None:
+                budget.check()
+            output_tree(out)
+            require(checkpoint() == checkpoints, 'source/driver checkpoint changed')
+            require(loader_inventory(args.loader_dir) == loaders, 'loader directory closure changed')
             for original, resolved in bindings.items():
                 require(str(Path(original).resolve(strict=True)) == resolved, 'input symlink changed: ' + original)
             for name, digest in inputs.items():
                 verified(name, digest)
-            direct.authenticate_build(producer_path, producer_path.parent / 'bin', ROOT)
+            authenticate_producer(producer_path, producer_path.parent / 'bin', source_root, auth_inputs)
+            if budget is not None:
+                budget.check()
         helper = out / 'tools/mlf-build-runner'
         commands = []
         for name, selected in [('A', pair), ('B', out / 'stage-A/bin')]:
-            commands.append(stage_command(ROOT, selected, out / ('stage-' + name), out / ('cache-' + name), clang, gc, args.seconds, pkg))
+            commands.append(stage_command(source_root, selected, out / ('stage-' + name), out / ('cache-' + name), clang, gc, args.seconds, pkg))
         receipt['planned_stage_commands'] = commands
         if not args.execute and not args.prepare_runner:
             check_inputs()
-            receipt.update(phase='authenticated-dry-run', preflight_passed=True)
+            require(not args.resume_sha256, 'dry-run does not resume prior work')
+            receipt.update(preflight_passed=True)
+            retain_boundary(out, receipt, 'authenticated-dry-run')
             save()
             print('Authenticated dry-run only: ' + str(out / 'receipt.json'))
             return
         def run(argv, label, timeout=None):
             check_inputs()
             logdir = out / 'commands' / label
-            wrapper = [sys.executable, str(ROOT / 'tools/shared/resource_watchdog.py'),
-                       '--seconds', str(timeout or args.seconds), '--rss-mib', str(args.rss_mib),
-                       '--address-space-mib', str(args.address_space_mib), '--disk-free-mib', '4096',
-                       str(logdir), 'nice', '-n', '19', *map(str, argv)]
-            entry = {'argv': list(map(str, argv)), 'watchdog_argv': wrapper, 'environment': env.copy()}
+            require(not logdir.exists(), 'command output already exists: ' + label)
+            remaining = math.floor(args.window_seconds - (time.monotonic() - started))
+            require(remaining > 0, 'whole invocation wall-time limit')
+            wrapper = [str(python), str(ROOT / 'tools/shared/resource_watchdog.py'),
+                       '--seconds', str(min(timeout or args.seconds, remaining)), '--rss-mib', str(args.rss_mib),
+                       '--address-space-mib', str(args.address_space_mib), '--disk-free-mib', str(args.disk_free_mib),
+                       '--output-root', str(out), '--max-output-mib', str(args.max_output_mib),
+                       '--workspace-root', str(workspace), '--workspace-limit-mib',
+                       str(args.workspace_limit_mib - args.checkpoint_reserve_mib),
+                       str(logdir), str(nice), '-n', '19', *map(str, argv)]
+            entry = {'label': label, 'argv': list(map(str, argv)), 'watchdog_argv': wrapper, 'environment': env.copy(),
+                     'stage_environment': ({'MLF_BUILD_RUNNER': env['MLF_BUILD_RUNNER']} if 'MLF_BUILD_RUNNER' in env else {})}
             receipt['commands'].append(entry); save()
-            result = managed_run(wrapper, cwd=ROOT, env=env)
+            entry['driver_teardown'] = {}
+            result = managed_run(wrapper, cwd=source_root, env=env, teardown=entry['driver_teardown'])
             bounded = read(logdir / 'bounded-receipt.json')
             entry.update(exit_code=result, bounded_receipt=str(logdir / 'bounded-receipt.json'),
                          bounded_sha256=sha(logdir / 'bounded-receipt.json'), log_sha256=sha(logdir / 'build.log'))
             save()
-            require(result == 0 and bounded.get('complete') is True, 'bounded command failed: ' + label)
+            require(result == 0 and bounded.get('complete') is True and bounded.get('exit_code') == 0
+                    and bounded.get('reason') is None and bounded.get('final_owned_descendants') == []
+                    and entry['driver_teardown'].get('drained') is True
+                    and entry['driver_teardown'].get('remaining') == [], 'bounded command failed: ' + label)
             check_inputs()
             return (logdir / 'build.log').read_text()
-        helper.parent.mkdir()
-        receipt['phase'] = 'native-toolchain-preflight'; save()
-        ldd = Path(shutil.which('ldd')).resolve(strict=True)
-        inputs[str(ldd)] = sha(ldd)
-        for number, tool in enumerate((clang, pkg, Path(sys.executable).resolve())):
-            listing = run([ldd, tool], 'native-loader-' + str(number), 30)
-            for line in listing.splitlines():
-                match = re.search(r'(?:=>\s+|^\s*)(/[^\s]+)', line)
-                if match:
-                    original = Path(match.group(1)); resolved = original.resolve(strict=True)
+        if resume_phase not in ('runner-preflight-complete', 'native-A-complete'):
+            helper.parent.mkdir()
+            receipt['phase'] = 'native-toolchain-preflight'; save()
+            ldd = Path(shutil.which('ldd')).resolve(strict=True)
+            inputs[str(ldd)] = sha(ldd)
+            for number, tool in enumerate((clang, pkg, Path(sys.executable).resolve())):
+                listing = run([ldd, tool], 'native-loader-' + str(number), 30)
+                for line in listing.splitlines():
+                    match = re.search(r'(?:=>\s+|^\s*)(/[^\s]+)', line)
+                    if match:
+                        original = Path(match.group(1)); resolved = original.resolve(strict=True)
+                        inputs[str(regular(resolved))] = sha(resolved)
+                        bindings[str(original)] = str(resolved)
+            gmp_flags = run([pkg, '--cflags', '--libs', 'gmp'], 'gmp-flags', 30).strip().split()
+            gmp_dir = Path(run([pkg, '--variable=libdir', 'gmp'], 'gmp-libdir', 30).strip())
+            gmp_library = gmp_dir / 'libgmp.so'
+            inputs[str(regular(gmp_library.resolve(strict=True)))] = sha(gmp_library)
+            bindings[str(gmp_library)] = str(gmp_library.resolve(strict=True))
+            receipt['native_gmp_flags'] = gmp_flags
+            def pin_native(path):
+                resolved = path.resolve(strict=True)
+                inputs[str(regular(resolved))] = sha(resolved)
+                bindings[str(path)] = str(resolved)
+            trace = run([clang, '-###', '-O2', source_root / 'runtime/mlf_build_runner.c',
+                         gc / 'lib/libgc.a', *gmp_flags, '-lm', '-lpthread', '-ldl',
+                         '-o', out / 'tools/not-built-link-probe'], 'clang-link-selection', 30)
+            subtools = pin_clang_trace(trace, pin_native)
+            receipt['clang_selected_tools'] = [str(p.resolve()) for p in subtools]
+            for number, tool in enumerate(dict.fromkeys(subtools)):
+                listing = run([ldd, tool], 'selected-tool-loader-' + str(number), 30)
+                for line in listing.splitlines():
+                    match = re.search(r'(?:=>\s+|^\s*)(/[^\s]+)', line)
+                    if match: pin_native(Path(match.group(1)))
+
+            def header_dependencies(source, name, include_flags):
+                dependency = out / 'tools' / (name + '.d')
+                run([clang, '-M', '-std=c11', *include_flags, '-MF', dependency, source], name + '-dependencies', 60)
+                text = dependency.read_text().replace('\\\n', ' ')
+                require(': ' in text, 'missing header dependency inventory')
+                for filename in text.split(': ', 1)[1].split():
+                    original = Path(filename)
+                    if not original.is_absolute():
+                        original = source_root / original
+                    resolved = original.resolve(strict=True)
                     inputs[str(regular(resolved))] = sha(resolved)
                     bindings[str(original)] = str(resolved)
-        gmp_flags = run([pkg, '--cflags', '--libs', 'gmp'], 'gmp-flags', 30).strip().split()
-        gmp_dir = Path(run([pkg, '--variable=libdir', 'gmp'], 'gmp-libdir', 30).strip())
-        gmp_library = gmp_dir / 'libgmp.so'
-        inputs[str(regular(gmp_library.resolve(strict=True)))] = sha(gmp_library)
-        bindings[str(gmp_library)] = str(gmp_library.resolve(strict=True))
-        receipt['native_gmp_flags'] = gmp_flags
-        def pin_native(path):
-            resolved = path.resolve(strict=True)
-            inputs[str(regular(resolved))] = sha(resolved)
-            bindings[str(path)] = str(resolved)
-        trace = run([clang, '-###', '-O2', ROOT / 'runtime/mlf_build_runner.c',
-                     gc / 'lib/libgc.a', *gmp_flags, '-lm', '-lpthread', '-ldl',
-                     '-o', out / 'tools/not-built-link-probe'], 'clang-link-selection', 30)
-        subtools = pin_clang_trace(trace, pin_native)
-        receipt['clang_selected_tools'] = [str(p.resolve()) for p in subtools]
-        for number, tool in enumerate(dict.fromkeys(subtools)):
-            listing = run([ldd, tool], 'selected-tool-loader-' + str(number), 30)
-            for line in listing.splitlines():
-                match = re.search(r'(?:=>\s+|^\s*)(/[^\s]+)', line)
-                if match: pin_native(Path(match.group(1)))
-
-        def header_dependencies(source, name, include_flags):
-            dependency = out / 'tools' / (name + '.d')
-            run([clang, '-M', '-std=c11', *include_flags, '-MF', dependency, source], name + '-dependencies', 60)
-            text = dependency.read_text().replace('\\\n', ' ')
-            require(': ' in text, 'missing header dependency inventory')
-            for filename in text.split(': ', 1)[1].split():
-                original = Path(filename)
-                if not original.is_absolute():
-                    original = ROOT / original
-                resolved = original.resolve(strict=True)
-                inputs[str(regular(resolved))] = sha(resolved)
-                bindings[str(original)] = str(resolved)
-            inputs[str(dependency)] = sha(dependency)
-        header_dependencies(ROOT / 'runtime/mlf_build_runner.c', 'runner', [])
-        header_dependencies(ROOT / 'runtime/mlf_runtime.c', 'runtime',
-                            ['-I' + str(gc / 'include')] + [x for x in gmp_flags if x.startswith(('-I', '-D'))])
-        receipt['phase'] = 'runner-preflight'; save()
-        run([clang, '-O2', '-std=c11', '-Wall', '-Wextra', '-Werror',
-             ROOT / 'runtime/mlf_build_runner.c', '-o', helper], 'build-runner', 120)
-        require(run([helper, '--protocol-version'], 'runner-protocol', 30).strip() == '1', 'runner protocol mismatch')
-        inputs[str(helper)] = sha(helper)
-        receipt['runner'] = {'path': str(helper), 'sha256': sha(helper)}
-        if args.prepare_runner:
+                inputs[str(dependency)] = sha(dependency)
+            header_dependencies(source_root / 'runtime/mlf_build_runner.c', 'runner', [])
+            header_dependencies(source_root / 'runtime/mlf_runtime.c', 'runtime',
+                                ['-I' + str(gc / 'include')] + [x for x in gmp_flags if x.startswith(('-I', '-D'))])
+            receipt['phase'] = 'runner-preflight'; save()
+            run([clang, '-O2', '-std=c11', '-Wall', '-Wextra', '-Werror',
+                 source_root / 'runtime/mlf_build_runner.c', '-o', helper], 'build-runner', 120)
+            require(run([helper, '--protocol-version'], 'runner-protocol', 30).strip() == '1', 'runner protocol mismatch')
+            inputs[str(helper)] = sha(helper)
+            receipt['runner'] = {'path': str(helper), 'sha256': sha(helper)}
             check_inputs()
-            receipt.update(phase='runner-preflight-complete', preflight_passed=True, native_stages_started=False)
+            receipt.update(preflight_passed=True, native_stages_started=False)
+            retain_boundary(out, receipt, 'runner-preflight-complete')
             save()
-            print('Runner preflight only: ' + str(out / 'receipt.json'))
+        if stop_after == 'runner':
+            print('Runner boundary only: ' + str(out / 'receipt.json'))
             return
         for index, name in enumerate(('A', 'B')):
-            receipt['phase'] = 'native-' + name; save()
+            if name in receipt['stages']:
+                require(name == 'A' and resume_phase == 'native-A-complete', 'unexpected prior native stage')
+                previous = verify_stage(out / 'stage-A', out / 'cache-A', pair, helper, clang, runtime_inputs,
+                                        read(args.plans_dir / 'root-plan.json')['packages'],
+                                        read(source_root / 'mlf-package.json')['executables'], pkg,
+                                        read(args.plans_dir / 'root-plan.json')['crates'], source_root)
+                require(previous == receipt['stages']['A'], 'revalidated stage A differs')
+                continue
+            require(not (out / ('stage-' + name)).exists() and not (out / ('cache-' + name)).exists(),
+                    'native stage must start cold in a new namespace')
+            receipt.update(phase='native-' + name, native_stages_started=True, boundary_complete=False); save()
             selected = pair if name == 'A' else out / 'stage-A/bin'
             selected_helper = helper if name == 'A' else selected / 'mlf-build-runner'
             env['MLF_BUILD_RUNNER'] = str(selected_helper)
@@ -736,8 +1161,8 @@ def main():
             stage = verify_stage(out / ('stage-' + name), out / ('cache-' + name), selected,
                                  selected_helper, clang, runtime_inputs,
                                  read(args.plans_dir / 'root-plan.json')['packages'],
-                                 read(ROOT / 'mlf-package.json')['executables'], pkg,
-                                 read(args.plans_dir / 'root-plan.json')['crates'], ROOT)
+                                 read(source_root / 'mlf-package.json')['executables'], pkg,
+                                 read(args.plans_dir / 'root-plan.json')['crates'], source_root)
             receipt['stages'][name] = stage
             inputs.update(stage['evidence'])
             bindings.update(stage['dependency_path_bindings'])
@@ -746,18 +1171,39 @@ def main():
                 require(run([binary, '--implementation-identity'], name + '-' + target + '-identity', 30).strip()
                         == 'MLF/shared-haskell-v1 native-MLF', 'wrong native identity')
                 inputs[str(binary)] = sha(binary)
+            check_inputs()
+            receipt['stage_complete'][name] = True
+            if name == 'A':
+                retain_boundary(out, receipt, 'native-A-complete')
+                save()
+                if stop_after == 'A':
+                    print('Native A boundary only; fixed point NOT qualified: ' + str(out / 'receipt.json'))
+                    return
+                receipt.update(status='running')
             save()
         receipt['comparisons'] = compare_stages(receipt['stages']['A'], receipt['stages']['B'])
         check_inputs()
         publish_pointers(out, out / 'stage-B/bin/emlf', out / 'stage-B/bin/mlfpkg')
-        receipt.update(phase='fixed-point-complete', complete=True, fixed_point_qualified=True,
+        receipt.update(phase='fixed-point-complete', status='passed', boundary_complete=True, complete=True, fixed_point_qualified=True,
                        capability_scope='identity only; language/backend/async qualification is separate')
         save()
     except BaseException as error:
+        if not admitted:
+            raise  # A rejected resume must not overwrite the original receipt or evidence.
         clear_pointers(out)
-        receipt.update(complete=False, fixed_point_qualified=False, error=type(error).__name__ + ': ' + str(error))
-        save()
+        receipt.update(status='failed', boundary_complete=False, complete=False, fixed_point_qualified=False, error=type(error).__name__ + ': ' + str(error))
+        save(failed=True)
         raise
+    finally:
+        try:
+            if budget is not None:
+                budget.close()
+                print('Driver resource observations: ' + json.dumps(budget.summary(), sort_keys=True))
+            lock_path.unlink()
+        finally:
+            if previous_alarm is not None:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, previous_alarm)
 
 
 if __name__ == '__main__':

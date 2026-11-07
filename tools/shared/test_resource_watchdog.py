@@ -135,5 +135,78 @@ temporary.write_bytes(b'x'*(2*1024*1024)); temporary.replace(root/'query.mlfq')
         self.assertEqual((out/'query.mlfq').stat().st_size, 2*1024*1024)
 
 
+class CumulativeControls(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.out = self.root / 'run'; self.out.mkdir()
+
+    def run_control(self, script, output_limit=1, workspace_limit=8):
+        logdir = self.out / 'commands' / 'control'
+        argv = [sys.executable, str(DRIVER), '--seconds', '10', '--address-space-mib', '128',
+                '--rss-mib', '128', '--disk-free-mib', '1', '--output-root', str(self.out),
+                '--max-output-mib', str(output_limit), '--workspace-root', str(self.root),
+                '--workspace-limit-mib', str(workspace_limit), str(logdir), sys.executable, '-c', script,
+                str(self.out), str(self.root)]
+        result = subprocess.run(argv, capture_output=True, timeout=20)
+        return result, json.loads((logdir / 'bounded-receipt.json').read_text())
+
+    def test_previous_stage_bytes_count_before_new_command(self):
+        (self.out / 'previous-stage').write_bytes(b'x' * (2*1024*1024))
+        result, receipt = self.run_control("raise RuntimeError('must not launch')")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('process_group', receipt)
+        self.assertEqual(receipt['reason'], 'RuntimeError: output growth limit before start')
+
+    def test_nested_cache_growth_counted_even_outside_command_logs(self):
+        result, receipt = self.run_control("import pathlib,sys; p=pathlib.Path(sys.argv[1])/'cache-A';p.mkdir();(p/'artifact').write_bytes(b'x'*(2*1024*1024))")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(receipt['reason'], 'RuntimeError: output growth limit')
+        self.assertGreater(receipt['samples'][-1]['output_bytes'], 1024*1024)
+
+    def test_other_workspace_output_counts_toward_global_cap(self):
+        result, receipt = self.run_control("import pathlib,sys;(pathlib.Path(sys.argv[2])/'other-work').write_bytes(b'x'*(2*1024*1024))", workspace_limit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(receipt['reason'], 'RuntimeError: workspace allocated-byte limit')
+
+    def test_failed_nested_python_descendant_is_drained_and_recorded(self):
+        script = """import pathlib,subprocess,sys,time
+root=pathlib.Path(sys.argv[1])
+child=subprocess.Popen([sys.executable,'-c', 'import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);time.sleep(30)'],start_new_session=True)
+(root/'child.pid').write_text(str(child.pid))
+time.sleep(.4)
+(root/'oversize').write_bytes(b'x'*(2*1024*1024))
+time.sleep(30)
+"""
+        result, receipt = self.run_control(script)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(receipt['complete'])
+        self.assertTrue(receipt['teardown']['drained'])
+        self.assertEqual(receipt['teardown']['remaining'], [])
+        child = int((self.out/'child.pid').read_text())
+        self.assertIn(child, {row['pid'] for row in receipt['teardown']['initial']})
+        status = Path('/proc')/str(child)/'stat'
+        self.assertTrue(not status.exists() or status.read_text().rsplit(') ',1)[1].startswith('Z'))
+
+    def test_existing_workspace_over_cap_never_starts(self):
+        (self.root / 'retained').write_bytes(b'x'*(2*1024*1024))
+        result, receipt = self.run_control("raise RuntimeError('must not launch')", workspace_limit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('process_group', receipt)
+        self.assertEqual(receipt['reason'], 'RuntimeError: workspace allocated-byte limit before start')
+
+    def test_hardlinked_retained_bytes_count_once_and_symlink_not_followed(self):
+        node = next(n for n in TREE.body if isinstance(n, ast.FunctionDef) and n.name == 'allocated_bytes')
+        namespace = {'os': os, 'Path': Path}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), str(DRIVER), 'exec'), namespace)
+        path = self.root / 'original'; path.write_bytes(b'x'*8192)
+        before = namespace['allocated_bytes'](self.root)
+        os.link(path, self.root / 'hard-link')
+        self.assertEqual(namespace['allocated_bytes'](self.root), before)
+        (self.root / 'link').symlink_to('/usr/bin')
+        self.assertLess(namespace['allocated_bytes'](self.root), before + 8192)
+
+
 if __name__ == '__main__':
     unittest.main()
