@@ -955,6 +955,8 @@ main = do
       need "actual release asset SHA pin" (actual == (expected == "valid"))
       putStrLn "PASS distribution-asset-pin"
     ["formal-check",prefix,expected] -> formalCheck prefix expected
+    ["formal-bundle-check",directory] -> formalBundleCheck directory
+    ["open-interface-controls",directory] -> openInterfaceControls directory
     ["typed-bounds",directory] -> typedBounds directory
     ["wire-corpus",manifest] -> wireCorpus manifest
     ["raw-io",directory] -> rawIO directory
@@ -1067,6 +1069,59 @@ formalCheck prefix expected = do
       putStrLn "PASS formal-object-version-reject"
     _ -> error "actual formal artifact reader disagrees with fixed expectation"
 
+
+formalBundleCheck directory = do
+  let root = B.literal directory
+  manifest <- Release.readManifest root
+  interfaces <- Release.bundleInterfaces root manifest
+  objects <- Release.readObjects root manifest interfaces
+  _ <- expect "portable bundle full checked linking" (CrateArtifact.linkCheckedObjects objects (Release.libraryIdentity manifest))
+  Release.verifyBundle root manifest
+  putStrLn "PASS formal-accept"
+
+openInterfaceControls directory = do
+  let empty name deps = CrateArtifact.CrateInterface name deps [] [] [] [] [] [] [] [] "" "empty" []
+      dependency iface = (CrateArtifact.crateId iface,"/portable/" P.++ CrateArtifact.crateId iface,CrateArtifact.semanticFingerprint iface)
+      withDeps deps (CrateArtifact.CrateInterface name _ modules exports imports datatypes classes instances layouts bindings entry fingerprint protection) =
+        CrateArtifact.CrateInterface name deps modules exports imports datatypes classes instances layouts bindings entry fingerprint protection
+      refusal label message result = case result of
+        T.Left actual -> need label (actual == message)
+        T.Right _ -> error ("accepted " ++ label)
+      leaf = empty "leaf" []
+      middle = empty "middle" [dependency leaf]
+      root = empty "root" [dependency middle]
+      unrelated = empty "unrelated" [("unavailable","/not-read","not-read")]
+      known = CrateArtifact.openInterfaceDependencies
+  reached <- expect "transitive supplied metadata" (known [unrelated,root,leaf,middle] root)
+  need "only transitive dependencies are retained in order" (map CrateArtifact.crateId reached == ["leaf","middle"])
+  refusal "duplicate supplied identity" "duplicate crate supplied crate identity" (known [root,middle,leaf,leaf] root)
+  refusal "missing transitive dependency" "missing crate metadata: leaf" (known [root,middle] root)
+  let staleMiddle = withDeps [("leaf","/portable/leaf","wrong-semantic")] middle
+      staleRoot = withDeps [dependency staleMiddle] root
+  refusal "stale transitive semantic dependency" "stale crate dependency interface: middle requires a different leaf; recompile middle"
+    (known [staleRoot,staleMiddle,leaf] staleRoot)
+  let cycleA = empty "cycle-a" [("cycle-b","/portable/b","irrelevant")]
+      cycleB = empty "cycle-b" [("cycle-a","/portable/a","irrelevant")]
+  refusal "indirect metadata cycle" "cyclic crate dependencies: cycle-b -> cycle-a -> cycle-b" (known [cycleA,cycleB] cycleA)
+  let prefix = B.literal (directory ++ "/seed")
+      path = prefix P.++ ".mlfco"
+  iface <- CrateArtifact.readInterface (prefix P.++ ".mlfci") >>= expect "actual supplied root"
+  builtin <- CrateArtifact.readInterface (B.literal (directory ++ "/builtin.mlfci")) >>= expect "actual supplied builtin"
+  accepted <- CrateArtifact.readObjectWithInterfaces [unrelated,iface,builtin] path iface >>= expect "actual open object with unrelated supplied sibling"
+  need "supplied reader retains exact expected root" (CrateArtifact.encodeInterface (CrateArtifact.objectInterface accepted) == CrateArtifact.encodeInterface iface)
+  CrateArtifact.readObjectWithInterfaces [iface] path iface >>= refusal "actual missing supplied dependency"
+    (path P.++ ": missing crate metadata: " P.++ CrateArtifact.crateId builtin)
+  CrateArtifact.readObjectWithInterfaces [iface,builtin,builtin] path iface >>= refusal "actual duplicate supplied identity"
+    (path P.++ ": duplicate crate supplied crate identity")
+  let relocated = withDeps [(CrateArtifact.crateId builtin,"/never-read/relocated.mlfci",CrateArtifact.semanticFingerprint builtin)] iface
+  CrateArtifact.readObjectWithInterfaces [relocated,builtin] path iface >>= refusal "same-ID altered supplied root path"
+    (path P.++ ": open crate supplied root metadata mismatch")
+  relocatedObject <- CrateArtifact.readObjectWithInterfaces [unrelated,relocated,builtin] path relocated >>= expect "actual path-independent open admission"
+  need "explicit relocated root retained" (CrateArtifact.encodeInterface (CrateArtifact.objectInterface relocatedObject) == CrateArtifact.encodeInterface relocated)
+  builtinObject <- CrateArtifact.readObject (B.literal (directory ++ "/builtin.mlfco")) builtin >>= expect "actual supplied builtin object"
+  _ <- expect "relocated supplied closure complete checked linking" (CrateArtifact.linkCheckedObjects [builtinObject,relocatedObject] (CrateArtifact.crateId relocated))
+  putStrLn "PASS open-interface-context-closure-and-portable-paths"
+
 distributionSeed directory = do
   exists <- doesPathExist directory; need "fresh distribution seed" (not exists); createDirectory directory
   let sourcePath=directory ++ "/BinaryPackage.hs"
@@ -1092,8 +1147,17 @@ distributionSeed directory = do
   need "builtin leaf has no dependencies or entry"
     (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:13" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
   need "release fixture exact identity/module" (CrateArtifact.crateId iface == "binary-package/1/library" && CrateArtifact.crateModules iface == ["BinaryPackage"])
-  writeFile (directory ++ "/legacy.mlfci") (B.unpack (CrateArtifact.encodeInterface iface))
-  writeFile (directory ++ "/legacy.mlfco") (B.unpack (CrateArtifact.encodeObject object))
+  -- Open-object debug encoding is not a legacy artifact. Use the existing
+  -- compatibility projection and its matching recomputed interface together.
+  let legacyObject = CrateArtifact.legacyObject object
+      legacyInterface = CrateArtifact.objectInterface legacyObject
+  legacyFields <- expect "explicit legacy object framing" (U.unpack (CrateArtifact.encodeObject legacyObject))
+  need "explicit legacy projection emits complete MLFCO-2" (case legacyFields of "MLFCO-2":_:_:_:[] -> True; _ -> False)
+  openLinked <- expect "complete open fixture linking" (CrateArtifact.linkObjects [builtinObject,object] (CrateArtifact.crateId iface))
+  legacyLinked <- expect "complete projected legacy fixture linking" (CrateArtifact.linkObjects [builtinObject,legacyObject] (CrateArtifact.crateId legacyInterface))
+  need "explicit legacy projection preserves complete checked linked term" (Pretty.prettyTerm openLinked == Pretty.prettyTerm legacyLinked)
+  writeFile (directory ++ "/legacy.mlfci") (B.unpack (CrateArtifact.encodeInterface legacyInterface))
+  writeFile (directory ++ "/legacy.mlfco") (B.unpack (CrateArtifact.encodeObject legacyObject))
   -- Keep the original Session pair for the formal/public-pair oracles. Real
   -- Release.publish separately writes the complete binary portable closure.
   executable <- getExecutablePath
@@ -1107,7 +1171,7 @@ distributionSeed directory = do
   legacyMetadata <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfci"))
   legacyBody <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfco"))
   let legacyPath = Release.virtualPath (Release.pairKey legacyMetadata legacyBody)
-  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:13",legacyPath)] object)
+  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:13",legacyPath)] legacyObject)
   need "legacy closure exact relocated dependency"
     (CrateArtifact.crateDependencies (CrateArtifact.objectInterface portableLegacy) ==
       [("mlf:builtin-shared-haskell-v1:13",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])

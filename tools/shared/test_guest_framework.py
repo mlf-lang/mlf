@@ -53,6 +53,7 @@ NEGATIVE_DIAGNOSTIC = 'Resolution: no instance or given constraint for MLF.Primi
 FOUNDATION_MODULES = {
     "Bootstrap.Fresh": "Bootstrap/Fresh.hs",
     "Bootstrap.Host": "Bootstrap/Host.hs",
+    "Bootstrap.IndexVec": "Bootstrap/IndexVec.hs",
     "Bootstrap.IntMap": "Bootstrap/IntMap.hs",
     "Bootstrap.IntRank": "Bootstrap/IntRank.hs",
     "Bootstrap.IntSet": "Bootstrap/IntSet.hs",

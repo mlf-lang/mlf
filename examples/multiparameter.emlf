@@ -15,4 +15,4 @@ instance Convert a b => Convert (Box a) (Box b) where {
 };
 
 -- The result annotation determines the second class parameter.
-convert (Box (Box 42)) : Box (Box Bool)
+convert (Box (Box 42)) :: Box (Box Bool)

@@ -2,6 +2,7 @@ module Main where
 import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.Map as M
+import qualified Bootstrap.Set as Set
 import qualified Bootstrap.IntMap as IM
 import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.Graph as G
@@ -12,13 +13,14 @@ import qualified Bootstrap.Elaborate as E
 import qualified Bootstrap.Parser as P
 import qualified Bootstrap.Module as Modules
 import qualified Bootstrap.Prelude as Prelude
+import qualified Bootstrap.Standalone as Standalone
 import qualified Bootstrap.Classes as Classes
 import qualified Bootstrap.X.Check as Check
 import qualified Bootstrap.X.Syntax as X
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.X.Pretty as Pretty
 
-assert condition message = if condition then Right Unit else Left message
+assert condition message = if condition then Right () else Left message
 sameGraph a b = G.nextId a == G.nextId b && IM.eqIntMap G.equalNode (G.nodes a) (G.nodes b) && IM.eqIntMap eqInt (G.links a) (G.links b)
 sameIndexes a b = IM.eqIntMap IS.eqIntSet (S.structuralParents a) (S.structuralParents b) && IM.eqIntMap IS.eqIntSet (S.bindingChildren a) (S.bindingChildren b) && S.equalScopes (S.scopeIndex a) (S.scopeIndex b)
 
@@ -33,16 +35,24 @@ legacySolve constraints = do
   G.validateGraph normalized
   Right normalized
 
+lowerProgram imports program = do
+  canonical <- Classes.canonicalSourceProgram imports program
+  Classes.lowerClassesWithImports imports canonical
+
 lower sources file source = do
   root <- P.parseModule file source
   if Compiler.standalone root then do
     original <- P.standaloneProgram root
-    case Prelude.withPrelude ImplicitPrelude original of
-      Pair imports program -> Classes.lowerClassesWithImports imports program
+    normalized <- Standalone.normalize ImplicitPrelude original
+    case normalized of
+      Just ((,,) imports program _) -> lowerProgram imports program
+      Nothing -> case Prelude.withPrelude ImplicitPrelude original of
+        (,) imports program -> lowerProgram imports program
   else do
     modules <- Modules.loadModuleMap sources root
-    LinkedModule program names valueScopes instanceScopes <- Modules.linkModules ImplicitPrelude modules
-    Classes.lowerClassesWithScopes valueScopes instanceScopes program
+    (,) (LinkedModule program names _ instanceScopes) valueScopes <- Modules.linkModulesInScopes ImplicitPrelude modules
+    canonical <- Classes.canonicalSourceProgram Set.empty program
+    Classes.lowerClassesInScopes valueScopes instanceScopes canonical
 
 checkCounters constraints = case constraints of
   Constraints (Graph nodes aliases fresh) typed equations instances ->
@@ -51,7 +61,7 @@ checkCounters constraints = case constraints of
       Right solver -> Left "checked solver reuse skipped initial freshness validation"
 
 checkFixture sources file source = do
-  Pair program names <- lower sources file source
+  (,) program names <- lower sources file source
   case program of
     SClassProgram _ _ _ _ -> Left "class lowering did not finish"
     SProgram declarations expression -> do
@@ -91,15 +101,15 @@ run label modules source = case checkFixture (M.fromList compareString modules) 
   Right ignored -> putStrLn (label ++ ": checked solver reuse agrees")
 
 expectFinishFailure message solver = case S.finishNormalized solver of
-  Left actual -> if eqString actual message then ioReturn Unit else panic ("wrong finish failure: " ++ actual)
+  Left actual -> if eqString actual message then ioReturn () else panic ("wrong finish failure: " ++ actual)
   Right _ -> panic "normalization bypassed final graph/index validation"
 
 checkFinishFailures =
   let graph = Graph (G.nodesFromDistinctAscList
-        (Cons (Pair 0 (Node (GGen 1) Nothing Flexible))
-        (Cons (Pair 1 (Node (GArr 2 3) (Just 0) Flexible))
-        (Cons (Pair 2 (Node GBot (Just 1) Flexible))
-        (Cons (Pair 3 (Node GBot (Just 1) Rigid)) Nil))))) IM.empty 4 in
+        ((:) ((,) 0 (Node (GGen 1) Nothing Flexible))
+        ((:) ((,) 1 (Node (GArr 2 3) (Just 0) Flexible))
+        ((:) ((,) 2 (Node GBot (Just 1) Flexible))
+        ((:) ((,) 3 (Node GBot (Just 1) Rigid)) []))))) IM.empty 4 in
   case S.prepare graph of
     Left message -> panic message
     Right solver -> case solver of
@@ -108,7 +118,7 @@ checkFinishFailures =
         expectFinishFailure mismatch (Solver original (IM.delete 2 parents) descendants (ScopeIndex intervals jumps))
         expectFinishFailure mismatch (Solver original parents (IM.delete 1 descendants) (ScopeIndex intervals jumps))
         expectFinishFailure mismatch (Solver original parents descendants (ScopeIndex IM.empty jumps))
-        expectFinishFailure mismatch (Solver original parents descendants (ScopeIndex intervals Nil))
+        expectFinishFailure mismatch (Solver original parents descendants (ScopeIndex intervals []))
         -- This binding cycle would make normalize diverge if it ran before
         -- the complete graph check. A rigid Gen must also remain rejected.
         expectFinishFailure "graph must have one binding root" (S.withGraph (G.setNode 0 (Node (GGen 1) (Just 1) Flexible) original) solver)
@@ -117,13 +127,13 @@ checkFinishFailures =
 
 main = do
   checkFinishFailures
-  run "annotation" Nil "identity : forall unused a. a -> a; identity x = x; main = identity True"
-  run "nested-data" Nil "data Maybe a = Nothing | Just a; data Box a = Box a; unbox (Box (Just x)) = x; unbox _ = 0; main = unbox (Box (Just 4))"
-  run "recursive-signature" Nil "data List a = Nil | Cons a (List a); foldl : forall a b. (b -> a -> b) -> b -> List a -> b; foldl f z Nil = z; foldl f z (Cons x xs) = foldl f (f z x) xs; main = foldl (\\z x -> z + x) 0 (Cons 1 Nil)"
-  run "multiparam-class" Nil "class Convert a b where { convert : a -> b }; instance Convert Int String where { convert = showInt }; main = (convert 42 :: String)"
-  run "superclass" Nil "class Inspect a where { inspect : a -> Bool }; class Inspect b => Two a b where { two : a -> b -> Bool }; let f : forall a b. Two a b => a -> b -> Bool = \\x y -> inspect y in 42"
-  run "do-io" Nil "main = do { x <- return 41; printInt (x + 1) }"
+  run "annotation" [] "identity : forall unused a. a -> a; identity x = x; main = identity True"
+  run "nested-data" [] "data Maybe a = Nothing | Just a; data Box a = Box a; unbox (Box (Just x)) = x; unbox _ = 0; main = unbox (Box (Just 4))"
+  run "recursive-signature" [] "data List a = Nil | Cons a (List a); foldl : forall a b. (b -> a -> b) -> b -> List a -> b; foldl f z Nil = z; foldl f z (Cons x xs) = foldl f (f z x) xs; main = foldl (\\z x -> z + x) 0 (Cons 1 Nil)"
+  run "multiparam-class" [] "class Convert a b where { convert : a -> b }; instance Convert Int String where { convert = showInt }; main = (convert 42 :: String)"
+  run "superclass" [] "class Inspect a where { inspect : a -> Bool }; class Inspect b => Two a b where { two : a -> b -> Bool }; let f : forall a b. Two a b => a -> b -> Bool = \\x y -> inspect y in 42"
+  run "do-io" [] "main = do { x <- return 41; printInt (x + 1) }"
   run "module-reexport"
-    (Cons (Pair "A" (Pair "A.emlf" "module A (ident) where\nident x = x"))
-      (Cons (Pair "B" (Pair "B.emlf" "module B (module A) where\nimport A")) Nil))
+    ((:) ((,) "A" ((,) "A.emlf" "module A (ident) where\nident x = x"))
+      ((:) ((,) "B" ((,) "B.emlf" "module B (module A) where\nimport A")) []))
     "module Main where\nimport B\nmain = ident True"

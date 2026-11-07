@@ -14,18 +14,23 @@ sameExpr : String -> String -> String -> (,) String (IO ())
 sameExpr label guarded ordinary = (,) ("guards parser: " ++ label) (do
   actual <- H.right (parseExpr "<guards expression>" guarded)
   expected <- H.right (parseExpr "<ordinary conditional>" ordinary)
-  H.assert (H.eq actual expected) ("guard lowering changed AST: " ++ H.show actual))
+  H.assert (H.eq (H.layoutExpr actual) (H.layoutExpr expected)) ("guard lowering changed AST: " ++ H.show actual))
 
 sameProgram : String -> String -> String -> (,) String (IO ())
 sameProgram label guarded ordinary = (,) ("guards program: " ++ label) (do
   actual <- H.right (parseProgram "<guards program>" guarded)
   expected <- H.right (parseProgram "<ordinary program>" ordinary)
-  H.assert (H.eq actual expected) ("guard lowering changed program: " ++ H.show actual))
+  H.assert (H.eq (H.layoutProgram actual) (H.layoutProgram expected)) ("guard lowering changed program: " ++ H.show actual))
 
 programAST : String -> String -> SExpr -> (,) String (IO ())
 programAST label source expected = (,) ("guards parser: " ++ label) (do
   actual <- H.right (parseProgram "<guards annotation boundary>" source)
-  H.assert (H.eq actual (SProgram [] expected)) (H.show actual))
+  H.assert (H.eq (H.layoutProgram actual) (SProgram [] expected)) (H.show actual))
+
+-- The source parser starts in package main, module Main. Physical positions
+-- are normalized by the comparison; labels and owners remain explicit.
+sourceReference : String -> SExpr
+sourceReference name = SCallSite name (SourceSpan "main" "Main" "" 0 0 0 0) (SVar name)
 
 conditional : SExpr -> SExpr -> SExpr -> SExpr
 conditional condition yes no = SApp (SApp (SApp (SPrimitive PIfThenElse) condition) yes) no
@@ -50,7 +55,7 @@ bool : XType
 bool = XCon "Bool" []
 
 ioUnit : XType
-ioUnit = XCon "IO" ((:) (XCon "Unit" []) [])
+ioUnit = XCon "IO" ((:) (XCon "()" []) [])
 
 guardTests : [] ((,) String (IO ()))
 guardTests = S.append parserTests (S.append checkingTests (S.append rejectionTests
@@ -73,12 +78,12 @@ parserTests = (:)
   (sameProgram "ordinary if identifier compatibility" "otherwise = false; otherwiseValue = true; main = if otherwise then 0 else if otherwiseValue then 42 else 1;" "otherwise = false; otherwiseValue = true; main = if otherwise then 0 else if otherwiseValue then 42 else 1;") ((:)
   (programAST "legacy annotation in RHS before bar" "f x | true = x :: Int | otherwise = 0; f 42"
     (SLet "f" (SLam "x" Nothing (conditional (SBoolLit true)
-      (SAnn (SVar "x") (SAnnotation [] (SCon "Int" []))) (SIntLit 0)))
-      (SApp (SVar "f") (SIntLit 42)))) ((:)
+      (SAnn (sourceReference "x") (SAnnotation [] (SCon "Int" []))) (SIntLit 0)))
+      (SApp (sourceReference "f") (SIntLit 42)))) ((:)
   (programAST "legacy annotation in condition before equals" "g flag | flag :: Bool = 1 | otherwise = 0; g true"
     (SLet "g" (SLam "flag" Nothing (conditional
-      (SAnn (SVar "flag") (SAnnotation [] (SCon "Bool" []))) (SIntLit 1) (SIntLit 0)))
-      (SApp (SVar "g") (SBoolLit true)))) ((:)
+      (SAnn (sourceReference "flag") (SAnnotation [] (SCon "Bool" []))) (SIntLit 1) (SIntLit 0)))
+      (SApp (sourceReference "g") (SBoolLit true)))) ((:)
   ((,) "guards parser: diagnostics keep original line and column" (case parseExpr "guards-position.emlf" "if {\n  | true -> 1;\n  | otherwise -> )\n}" of
     Left err -> H.assert (H.contains "guards-position.emlf:3:18:" err) err
     Right parsed -> H.fail (H.show parsed)))
@@ -160,7 +165,7 @@ guardPrograms = (:)
     "  let offset = 1" ((:)
     "  let choose x | x > 0 = x + offset | otherwise = offset" ((:)
     "  printInt (choose 41)" ((:)
-    "  let rec" ((:)
+    "  let" ((:)
     "    sum : Int -> Int" ((:)
     "    sum n" ((:)
     "      | n == 0 = 0" ((:)

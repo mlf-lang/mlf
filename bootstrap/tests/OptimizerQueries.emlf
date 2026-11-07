@@ -5,8 +5,8 @@ import qualified Bootstrap.Std as L
 import qualified Bootstrap.LLVM.Optimize as O
 import qualified Bootstrap.X.Syntax as X
 
-assert : Bool -> String -> IO Unit
-assert good message = if good then ioReturn Unit else do
+assert : Bool -> String -> IO ()
+assert good message = if good then ioReturn () else do
   putErr ("optimizer queries: " ++ message ++ "\n")
   exitWith 1
 
@@ -20,7 +20,7 @@ lets expression = case expression of
   XEAbs n b -> lets b
   XEApp f a -> lets f + lets a
   XELet n a b -> 1 + lets a + lets b
-  XELetRec ds b -> L.length ds + L.sum (L.map (\entry -> case entry of Pair n a -> lets a) ds) + lets b
+  XELetRec ds b -> L.length ds + L.sum (L.map (\entry -> case entry of (,) n a -> lets a) ds) + lets b
   XECase a branches -> lets a + L.sum (L.map (\branch -> case branch of XErasedAlternative p b -> lets b) branches)
   _ -> 0
 
@@ -44,15 +44,15 @@ main = do
   let loop = name 101
   let argument = name 102
   let rhs = XEAbs argument (pair (XEVar f) (XEApp (XEVar loop) (XEVar argument)))
-  let captured = XELet f (function 25) (XELetRec (Cons (Pair loop rhs) Nil) (pair (XEVar f) (XEVar loop)))
+  let captured = XELet f (function 25) (XELetRec ((:) ((,) loop rhs) []) (pair (XEVar f) (XEVar loop)))
   assert (lets (O.optimize captured) == 2) "captured recursive uses remain shared"
   let patterned = XELet n (function 25) (XECase (XEVar (name 1))
-        (Cons (XErasedAlternative (XConstructorPattern "Keep" (Cons (Just n) Nil)) (XEVar n)) Nil))
+        ((:) (XErasedAlternative (XConstructorPattern "Keep" ((:) (Just n) [])) (XEVar n)) []))
   assert (lets (O.optimize patterned) == 0) "pattern binders keep their own identity"
   let tooLarge = L.foldr (\i b -> XEAbs (name i) b) (panic "size query traversed past its budget") (L.range 1 25)
   assert (O.remainingSize 24 tooLarge < 0) "size query stops at its bound"
   let twice = XEApp (XEApp (XEVar n) (XEVar n)) (panic "occurrence query traversed past its limit")
   assert (O.occurrences 2 n twice == 2) "occurrence query stops at its limit"
   assert (O.occurrences 2 n (XEAbs n (panic "occurrence query entered a shadowed lambda")) == 0) "shadowed lambda skips its body"
-  assert (O.occurrences 2 n (XELetRec (Cons (Pair n (panic "occurrence query entered a shadowed recursive RHS")) Nil) (panic "occurrence query entered a shadowed recursive body")) == 0) "shadowed recursion skips its group"
+  assert (O.occurrences 2 n (XELetRec ((:) ((,) n (panic "occurrence query entered a shadowed recursive RHS")) []) (panic "occurrence query entered a shadowed recursive body")) == 0) "shadowed recursion skips its group"
   putStrLn "optimizer queries: 22 checks passed"

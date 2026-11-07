@@ -1,0 +1,467 @@
+{
+  "format": "declid-step18-catalog-inventory-preflight-v1",
+  "source_base": "af2a1106752829b4f78bd33a68ca4c981d55f3d0",
+  "scope": "Historical completed Catalog maintenance proofs only; unit recovery and final exact-source root-eight remain separate.",
+  "adopted_sources": {
+    "docs/llvm-backend.txt": "40273165ee6ecbb729ccc68fbc56f672d1744c0ceaa8b686db44cf600f76456e",
+    "tests/Tests/Catalog.hs": "c2acbcc2d6497b50199236a8bde33a7d69906f3a523c86377b8aeb56c7ab7982",
+    "tests/Tests/TestCatalog.emlf": "708cd0e9ad0ad82bcc672ea1a00398c48123af61f6f9fcffb3c036be0ba819fb",
+    "tools/release/package.sh": "ce18c4d644a07853f3e3d61b2dfc1e440148e507e41e6f1ef415b36cd705d0eb"
+  },
+  "patch_sha256": "8b0d30c409cc2c9c2a2bff25aa4ec2937ee3e2b2064d76d58ffad2a9c718b259",
+  "handoff_receipt_sha256": "ae736cca895cf2970cd50d9fb344e179bcc499f4957aa740f1144f8bd416b223",
+  "inventory": {
+    "fixtures": [
+      531,
+      541
+    ],
+    "ordered_families": 50,
+    "rows": [
+      583,
+      593
+    ],
+    "ten_added_runtime_labels_existed_in_original_source": true
+  },
+  "native_catalog": {
+    "negative_controls": [
+      {
+        "exit": 1,
+        "name": "row-less"
+      },
+      {
+        "exit": 1,
+        "name": "row-more"
+      },
+      {
+        "exit": 1,
+        "name": "fixture-more-consistent-labels"
+      },
+      {
+        "exit": 1,
+        "name": "fixture-less-consistent-labels"
+      },
+      {
+        "exit": 1,
+        "name": "duplicate-label-counts-preserved"
+      }
+    ],
+    "original_guard_reproduced_exit": 1,
+    "positive": {
+      "exit": 0,
+      "name": "repaired-native-after",
+      "returned_families": 50
+    },
+    "producer": "B normal raw compiler and legal private B dependencies; no C cache; no native C/final D qualification"
+  },
+  "contracts": {
+    "commands": [
+      {
+        "exit": 0,
+        "name": "normal-adapters77"
+      },
+      {
+        "exit": 0,
+        "name": "normal-transition6"
+      },
+      {
+        "exit": 0,
+        "name": "optimized-adapters77"
+      },
+      {
+        "exit": 0,
+        "name": "optimized-transition6"
+      }
+    ],
+    "historical_physical_checkout_replay": [
+      "graph10",
+      "builtin10",
+      "writer8"
+    ],
+    "optimized_mode_propagated": true,
+    "original_C_Contract_logic_except_manifest_pin": true,
+    "original_C_transition6_source_unchanged": true,
+    "source_changes": []
+  },
+  "release": {
+    "complete_original_tools_release_check": true,
+    "exit": 0,
+    "image": "sha256:47c2642f3aebbc12d18800fee078a2030f58da9ff12b63f0122eb97991258f6b",
+    "network": "none",
+    "platform": "linux/amd64",
+    "seconds": 718.7092369999737,
+    "source_changes": []
+  },
+  "evidence_status": "Locally hashed completed maintenance proof bundle; archive keys are proposed paths on the separate evidence branch, publication pending.",
+  "evidence": [
+    {
+      "archive_key": "catalog-inventory-diagnostic/README.md",
+      "sha256": "803c492ab2172c5a3928d0b84c588e131dcba479e9c7fbbef35d07b6e4086017",
+      "bytes": 553
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/SHA256SUMS",
+      "sha256": "c3a23239bda46253513520001c10eae2ed87cd3a348b24e806b76c7828e55dc9",
+      "bytes": 8074
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/contracts-receipt.json",
+      "sha256": "ded1402cf0eeb927e3043ffa33c39c49b2bd60d886e32e55f7bbbc8c2aa6e056",
+      "bytes": 3230
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/contracts-source-pins.json",
+      "sha256": "34e873f04b2fc1e2461cddfe6376559d2c5c64313c91d16c5b9d1907ed868d0e",
+      "bytes": 493829
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/linux-release-check.stderr",
+      "sha256": "8440164ea1d1ca096d979868c376dd6ee30beac5b1ac22e55bb0d16d6589d68b",
+      "bytes": 31381
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/linux-release-check.stdout",
+      "sha256": "d909f1d4db1ff3c106c5837b96a85c95cb20db9c99262ecf160733312a2c37f1",
+      "bytes": 21058
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/mlf-package.json.lock.after",
+      "sha256": "89a3c6856baf774de6a3115174bb2fa4ad32c4a535144b9ac694adafd9acc405",
+      "bytes": 14064
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/mlf-package.json.lock.before",
+      "sha256": "b2bb5c9134327e66e78dda7a5f42be6bf25c35c4a864e83ec6511916b69e92c5",
+      "bytes": 16060
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/normal-adapters77.stderr",
+      "sha256": "d726cab2067abcc655fc506037928e59200384bd05133bf48d24d3a61e8d7cef",
+      "bytes": 176
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/normal-adapters77.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/normal-transition6.stderr",
+      "sha256": "b5fe08f70a7b71a9076d2b3e2f7e7fb55e187506188b69bab223787b1807fdac",
+      "bytes": 429
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/normal-transition6.stdout",
+      "sha256": "50d13317b205b2d4be84634cb9be93158f6670724c3f1c849372f4370e89538f",
+      "bytes": 104
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/optimized-adapters77.stderr",
+      "sha256": "713011963b7ad865a1c20f81669ba3076ee404bb87e8a219f4d3378819dfe208",
+      "bytes": 176
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/optimized-adapters77.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/optimized-transition6.stderr",
+      "sha256": "a2fbc1ba236f0bde4e7bbbefc407800e7934666c60b469e6735352fba7609b6f",
+      "bytes": 429
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/optimized-transition6.stdout",
+      "sha256": "50d13317b205b2d4be84634cb9be93158f6670724c3f1c849372f4370e89538f",
+      "bytes": 104
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/prepared-source.patch",
+      "sha256": "12483983f8def38249fc8662744abea6d4d3ea0e000eb11b91794cec74315c73",
+      "bytes": 89437
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/release-receipt.json",
+      "sha256": "cba0af2df15f91707cbabcc49affbf5f5d069a7745660413997f5734334e74b8",
+      "bytes": 1807
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/release-source-pins.json",
+      "sha256": "34e873f04b2fc1e2461cddfe6376559d2c5c64313c91d16c5b9d1907ed868d0e",
+      "bytes": 493829
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/setup.json",
+      "sha256": "eedef0bee33b47ca10d8d2b30c2860dc0ca4f716dd4ddafce8aca5adf38eee5b",
+      "bytes": 4085
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/tests-mlf-package.json.lock.after",
+      "sha256": "72a7d4ac4e4cbe971a1484ff55b079084a36a08b210bf8acfa6abfedbeca36f3",
+      "bytes": 24098
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-release/tests-mlf-package.json.lock.before",
+      "sha256": "26448d4a97e8da204864161625cd00b573bf1ca28cbbe6a633bdc9b7d8984669",
+      "bytes": 27241
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-source.json",
+      "sha256": "7dc03a49e9621cdf713be28bf24b9ef6121bd5d00917c1aca305d3d15757c30a",
+      "bytes": 490
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/adopted-source.patch",
+      "sha256": "8b0d30c409cc2c9c2a2bff25aa4ec2937ee3e2b2064d76d58ffad2a9c718b259",
+      "bytes": 4443
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/build-driver.py",
+      "sha256": "d60f6d4404031268198d89c17e0b4fe152bf55203f1e9992ac1380774dc1484d",
+      "bytes": 2005
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/duplicate-label-counts-preserved/stderr",
+      "sha256": "c5b1db0d1952d9331d10ce87d874ca448be4c2598bea0140298be4bba7a92103",
+      "bytes": 40
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/duplicate-label-counts-preserved/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/duplicate-label-counts-preserved/tests/golden/unit-inventory.json",
+      "sha256": "d27179ef3161c1db9d8d55fd1fdef1d0716e1e6bcbefb2719fd1456aca258df2",
+      "bytes": 84298
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/duplicate-label-counts-preserved/tests/test-catalog.json",
+      "sha256": "6657a5c221e4281fa6ba9751fa15fd00f5534a71da3b7d6c774eb9285fd42ebf",
+      "bytes": 144983
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/fixture-less-consistent-labels/stderr",
+      "sha256": "81dc7e0bce22a491a603281220dbd199a41ec6d7b2c6a4923b8213f3e10bf579",
+      "bytes": 41
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/fixture-less-consistent-labels/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/fixture-less-consistent-labels/tests/golden/unit-inventory.json",
+      "sha256": "d27179ef3161c1db9d8d55fd1fdef1d0716e1e6bcbefb2719fd1456aca258df2",
+      "bytes": 84298
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/fixture-less-consistent-labels/tests/test-catalog.json",
+      "sha256": "04dd6de94e16e7df049d64b638147342b26a38161da5b8ed686b3593b95e01ac",
+      "bytes": 144901
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/fixture-more-consistent-labels/stderr",
+      "sha256": "81dc7e0bce22a491a603281220dbd199a41ec6d7b2c6a4923b8213f3e10bf579",
+      "bytes": 41
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/fixture-more-consistent-labels/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/fixture-more-consistent-labels/tests/golden/unit-inventory.json",
+      "sha256": "d27179ef3161c1db9d8d55fd1fdef1d0716e1e6bcbefb2719fd1456aca258df2",
+      "bytes": 84298
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/fixture-more-consistent-labels/tests/test-catalog.json",
+      "sha256": "93ce9fa53a82ec75803043cf6fa08027c0526dba4c918b6b861c37172098a89f",
+      "bytes": 144984
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/original-native-before/stderr",
+      "sha256": "81dc7e0bce22a491a603281220dbd199a41ec6d7b2c6a4923b8213f3e10bf579",
+      "bytes": 41
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/original-native-before/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/original-native-before/tests/golden/unit-inventory.json",
+      "sha256": "d27179ef3161c1db9d8d55fd1fdef1d0716e1e6bcbefb2719fd1456aca258df2",
+      "bytes": 84298
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/original-native-before/tests/test-catalog.json",
+      "sha256": "94ec0d9aa4a09c0591abba6cedac7074b634d13ede2f2d35eaa9dcf2ed6b6c95",
+      "bytes": 144954
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/receipt.json",
+      "sha256": "9fd5feb91e6f8c3b3f3df0d8f9f911bd27d8da1168fcb7d2d10fe94f345ec15d",
+      "bytes": 5361
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/repaired-native-after/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/repaired-native-after/stdout",
+      "sha256": "cf0e387d9b4a92edb10b223daa393f629bf24b5d67a5791599225786e84a2f0a",
+      "bytes": 52497
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/repaired-native-after/tests/golden/unit-inventory.json",
+      "sha256": "d27179ef3161c1db9d8d55fd1fdef1d0716e1e6bcbefb2719fd1456aca258df2",
+      "bytes": 84298
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/repaired-native-after/tests/test-catalog.json",
+      "sha256": "94ec0d9aa4a09c0591abba6cedac7074b634d13ede2f2d35eaa9dcf2ed6b6c95",
+      "bytes": 144954
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/row-less/stderr",
+      "sha256": "81dc7e0bce22a491a603281220dbd199a41ec6d7b2c6a4923b8213f3e10bf579",
+      "bytes": 41
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/row-less/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/row-less/tests/golden/unit-inventory.json",
+      "sha256": "d27179ef3161c1db9d8d55fd1fdef1d0716e1e6bcbefb2719fd1456aca258df2",
+      "bytes": 84298
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/row-less/tests/test-catalog.json",
+      "sha256": "1e9854854191895931303d9f73110664d1d03fa04a6de4f7119dd9cb73374ed3",
+      "bytes": 144954
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/row-more/stderr",
+      "sha256": "81dc7e0bce22a491a603281220dbd199a41ec6d7b2c6a4923b8213f3e10bf579",
+      "bytes": 41
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/row-more/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/row-more/tests/golden/unit-inventory.json",
+      "sha256": "d27179ef3161c1db9d8d55fd1fdef1d0716e1e6bcbefb2719fd1456aca258df2",
+      "bytes": 84298
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/catalog-controls/row-more/tests/test-catalog.json",
+      "sha256": "e08c87c90a995b20c86d1a141e3f57dae93776fe90d1e59ae40b035634380edf",
+      "bytes": 144954
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/build-receipt.json",
+      "sha256": "f5a5d5c12311a0ff9ab80900ba30b71ac9752d6768ac59b28bf950052eabd5c9",
+      "bytes": 4007
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/crate.spec",
+      "sha256": "1b028fc932863fd531c0dc6ca0b43dae6a65deba7b0aa18e5a4e952f42dc25c8",
+      "bytes": 2007
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/setup.json",
+      "sha256": "36a4981d4c5b542198870fa1059355a85c218792c03b358b78444a34761e0c69",
+      "bytes": 5910
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/MLF/Entry/CompilerTests.hs",
+      "sha256": "45d7fdabe9d3ed340442f4154a7e953ff7df7279b788570d7e976b1d22c41695",
+      "bytes": 518
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/Tests/Catalog.hs",
+      "sha256": "c2acbcc2d6497b50199236a8bde33a7d69906f3a523c86377b8aeb56c7ab7982",
+      "bytes": 27898
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/Tests/CompilerTests.hs",
+      "sha256": "dce70e32645f51e36f276e31f390457538d0a89d23f01cd29352ac99d630e525",
+      "bytes": 101139
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/Tests/CorePartitions.hs",
+      "sha256": "b020a93ed6d93bf92766016f06ad6eb59f89b7c3b288b934b3568c28cc14284b",
+      "bytes": 4233
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/Tests/Coverage.hs",
+      "sha256": "38ac76ab4abe5d17a53f6c8e66dd52bf8b3b718920ccab99f25909680516e7ff",
+      "bytes": 17356
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/Tests/Selection.hs",
+      "sha256": "8a53a01a1af9b5c5d18eccb0dc7ab370f4a829dda73f09ebd3c420f7cb8967fd",
+      "bytes": 8100
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/Tests/TestDrivers.hs",
+      "sha256": "00689b5924b1b03d4dbedf228fad2a8735439a9df902870916fd538a11f2b511",
+      "bytes": 8850
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/Tests/TestSources.hs",
+      "sha256": "f68293bcdd472babf62ff3ef201325af451079186290ea91efe1c0cb30d7893f",
+      "bytes": 2303
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/driver/sources/tests/shared/Tests/BuildReceipts.hs",
+      "sha256": "05a0d967492413b3fa68055202c7821c08355ede167ea264be1ad992b6d9b1c0",
+      "bytes": 836
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/handoff-receipt.json",
+      "sha256": "ae736cca895cf2970cd50d9fb344e179bcc499f4957aa740f1144f8bd416b223",
+      "bytes": 3490
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/inventory-delta.json",
+      "sha256": "56b028e4eb8684ea1051f86cfc40219ee00c4706c7a3882c0f0ef0d75487c699",
+      "bytes": 6537
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/prepare-adopted-release.py",
+      "sha256": "ffef258466a39b56f579a83cced3d64df2ec0f621cc5409722b1f788cc03b69e",
+      "bytes": 5465
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/release-predicate/receipt.json",
+      "sha256": "f4e6d580f8f0ba84502face8831511118d4c65e36dc1a77240b2ac371bebbc51",
+      "bytes": 2369
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/release-predicate/test-unit-evidence.json",
+      "sha256": "bee55fd8c6d772fae1319b2ef597ea71529fdcfeb23e3eb44219e473cbbf3ae7",
+      "bytes": 189
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/release-predicate/test-unit-evidence.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/release-predicate/test-unit-evidence.stdout",
+      "sha256": "d74e904d1e0071a285d43fecd24cdea791cfc6fd8e3184de56756d704ec16f6c",
+      "bytes": 1026
+    },
+    {
+      "archive_key": "catalog-inventory-diagnostic/run-adopted-verification.py",
+      "sha256": "4576440a23efb34e94d91ef52520365123d1d4bce27aa4cbbb4a3c036673c695",
+      "bytes": 3127
+    }
+  ]
+}

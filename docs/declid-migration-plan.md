@@ -5,7 +5,7 @@
 | 集成分支 | `codex/issue-37-declid-migration` |
 | 分支起点 | `726cd256aa90d3e8cf596842fbb29515c1bc5249`，创建时 [PR #43](https://github.com/mlf-lang/mlf/pull/43) 的远端头 |
 | 合回目标 | `mlf-lang/mlf:codex/issue-37-indexvec`，即 #43 的 head。#43 自身继续沿用 #29 基线并以 `main` 为目标 |
-| 当前进度 | 已建集成分支。本计划中的实施项、验证和回合并均待接手 |
+| 当前进度 | 00–18 已按编号提交，07 分为两笔。[提交、分项验证及剩余名字查找审计](../benchmarks/results/2026-11-05-declid/README.md)。最终安装、配对样本和回合并记录随子 PR 交付 |
 
 目标是让同一个顶层值、方法或生成绑定从解析到查询一直使用同一个声明槽。在接口、缓存、独立链接会话和原生布局之间显式转换身份。基线已经实现 `Global (Index Declaration)`、按表达式建 SCC 和按 ID 捕获实例 helper，也已实现 `finish-receipt-1`。其中 tag 427 绑定组名、最终片段 SHA 和按名字排序的导出契约摘要，有序读取及其版本由代际索引绑定。以这个版本建立对照，历史诊断结果作为研究参考。[现有 ID 设计](indexvec.md) · [查询与收尾契约](crate-query-graph.md)
 

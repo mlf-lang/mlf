@@ -1002,13 +1002,16 @@ module Bootstrap.SourceInference where {
   };
   prepareResolvedSourcePlan bindings = sourcePlanWith (ResolvedInput bindings);
   prepareResolvedSourcePlanWithImports conventions bindings = sourcePlanUsing conventions (ResolvedInput bindings);
+  prepareResolvedSourcePlanWithImportsOrdered order conventions bindings =
+    sourcePlanUsingOrdered (Just order) conventions (ResolvedInput bindings);
   sourcePlanWith = sourcePlanUsing M.empty;
-  sourcePlanUsing conventions input externals datatypes classes instances closedInstances valueScopes instanceScopes = do {
+  sourcePlanUsing = sourcePlanUsingOrdered Nothing;
+  sourcePlanUsingOrdered order conventions input externals datatypes classes instances closedInstances valueScopes instanceScopes = do {
     body <- case input of {
       NamedInput members -> Surface.bindValues members (SConstructor "()");
       ResolvedInput bindings -> Surface.bindIndexed bindings (SConstructor "()")
     };
-    prepared <- Classes.withClassScopesAndImports conventions externals (map fst closedInstances)
+    prepared <- Classes.withClassScopesAndImportsUsing order conventions externals (map fst closedInstances)
       valueScopes instanceScopes
       (SClassProgram datatypes classes (map snd closedInstances) body)
       (\inventory -> Fresh (\count used -> Right ((,,) ((,,) inventory count used) count used)));
@@ -1024,6 +1027,13 @@ module Bootstrap.SourceInference where {
             Just generation -> indexedPlanWith bindings generation supports
               (\i -> map snd (Classes.inventoryCandidateIds inventory i))
           }
+        }
+      };
+      case order of {
+        Nothing -> Right ();
+        Just _ -> case graph of {
+          Just (IndexedPlan _ _ _ _ _) -> Right ();
+          _ -> Left "ordered evidence cannot enter a named or lowered fallback"
         }
       };
       Right ((,) (mapOptional (\g -> SourcePlan inventory g count used externals legacy instances M.empty) graph) legacy)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Retained finite regressions across the explicitly reviewed Int64/Patricia ABI."""
 from pathlib import Path
-import argparse, json, shutil, types, struct, zlib
+import argparse, hashlib, json, shutil, types, struct, zlib
 from legacy_controls import prepare
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
@@ -83,7 +83,11 @@ def main():
                     historical=collection_source.replace(b'IntMapTree Node',b'Map Int Node')
                     previous=V.restore_previous_owner(historical).replace(b'Map Int Node',b'IntMapTree Node')
                     if rank_view:previous=A.with_rank_view(previous)
-                    H.require(H.sha(source/V.CONSTRAINT)==V.CONSTRAINT_SHA,'unchanged generated constraint owner')
+                    constraint = (source/V.CONSTRAINT).read_bytes()
+                    prior = binary.restore_path(constraint, V.CONSTRAINT)
+                    H.require(hashlib.sha256(prior).hexdigest()==V.CONSTRAINT_SHA,'exact historical generated constraint owner')
+                    record['validation_constraint']={'live_sha256':hashlib.sha256(constraint).hexdigest(),
+                        'projected_historical_sha256':V.CONSTRAINT_SHA}
                     for name,data in [('V1FrozenSession',previous),('V1SessionUnderTest',raw)]:
                         old_header=(A.LIVE_SESSION_HEADER.encode() if name=='V1SessionUnderTest' else
                                     b'module Bootstrap.CrateSession (compileSpecFile) where {')

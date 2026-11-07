@@ -532,6 +532,24 @@ module Bootstrap.LLVM.Build where {
       nullary <- result ("icmp eq i64 " ++ (low ++ ", 4"));
       choose "i64" nullary (result ("lshr i64 " ++ (bits ++ ", 3"))) (loadAt "i64" value 8)
     };
+  -- Strict operands have already been evaluated by primitiveApplication.
+  -- The immediate encoding preserves unsigned order; retain the original
+  -- primitive action for boxed Int64 values and every noninteger operand.
+  unsignedIntegerCompare :: String -> String -> Build String -> Build String;
+  unsignedIntegerCompare a b slow =
+    do {
+      x <- result ("ptrtoint ptr " ++ (a ++ " to i64"));
+      y <- result ("ptrtoint ptr " ++ (b ++ " to i64"));
+      both <- result ("and i64 " ++ (x ++ (", " ++ y)));
+      low <- result ("and i64 " ++ (both ++ ", 1"));
+      small <- result ("icmp ne i64 " ++ (low ++ ", 0"));
+      choose "ptr" small
+        (do {
+           test <- result ("icmp ult i64 " ++ (x ++ (", " ++ y)));
+           result ("select i1 " ++
+             (test ++ (", ptr " ++ (immediate 6 ++ (", ptr " ++ immediate 2)))))
+         }) slow
+    };
   integerOperation :: Primitive -> String -> String -> Build String;
   integerOperation p a b =
     do {

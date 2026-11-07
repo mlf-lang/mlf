@@ -1,0 +1,136 @@
+module Tests.CoreSolverNative where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+import qualified Package.Json as J
+import qualified Package.OS as O
+import qualified Test.NativeProcess as Process
+import qualified Tests.CoreProviderWorkers as Provider
+import qualified Tests.CoreRunner as Runner
+import qualified Tests.CoreSolver as Core
+import qualified Tests.CoreWitnessWorkers as Witness
+import qualified Tests.Helpers as H
+
+data Admission = Admission String String Provider.PreludeFiles
+
+receiptEnv : String
+receiptEnv = "MLF_TEST_CORE_GRAPH_RECEIPT"
+
+readAdmission : String -> IO Admission
+readAdmission path = do
+ canonical <- canonicalPath path
+ H.assert (O.absolute path && eqString path canonical) "invalid CoreSolver build receipt path"
+ receipt <- J.read path
+ H.assert (J.equal (J.get "format" receipt) (J.num 1)) "unsupported CoreSolver build receipt"
+ executable <- getExecutablePath
+ binary <- canonicalPath executable
+ expected <- canonicalPath (J.getText "binary" "" receipt)
+ H.assert (O.absolute binary && eqString binary expected) "CoreSolver executable differs from its build receipt"
+ binaryHash <- fileDigest binary
+ H.assert (eqString binaryHash (J.getText "binary_sha256" "" receipt)) "CoreSolver executable hash changed"
+ let interface = J.getText "interface" "" receipt
+ let object = J.getText "object" "" receipt
+ H.assert (O.absolute interface && O.absolute object) "CoreSolver builtin paths are missing"
+ interfaceHash <- fileDigest interface
+ objectHash <- fileDigest object
+ H.assert (eqString interfaceHash (J.getText "interface_sha256" "" receipt) &&
+           eqString objectHash (J.getText "object_sha256" "" receipt)) "CoreSolver checked Prelude images changed"
+ let identity = "checked-builtin-images-v1:" ++ interfaceHash ++ ":" ++ objectHash
+ return (Admission (O.parent path) binary (Provider.PreludeFiles identity interface object))
+
+providerRoot : String -> String
+providerRoot work = work ++ "/provider"
+
+witnessRoot : String -> String
+witnessRoot work = work ++ "/witness"
+
+admissionWork : Admission -> String
+admissionWork (Admission work _ _) = work
+
+admissionFiles : Admission -> Provider.PreludeFiles
+admissionFiles (Admission _ _ files) = files
+
+job : Admission -> String -> String -> [] String -> Process.SuiteJob
+job (Admission work binary _) directory name args =
+ let prefix = directory ++ "/logs/" ++ name in
+ Process.SuiteJob name binary args (work ++ "/empty.stdin") (prefix ++ ".stdout") (prefix ++ ".stderr")
+
+runJobs : [] Process.SuiteJob -> IO ()
+runJobs jobs = do
+ result <- Process.runSuitePhase jobs
+ H.right result
+
+providerCase : Admission -> IO ()
+providerCase admission = do
+ let output = providerRoot (admissionWork admission)
+ runJobs ((:) (job admission output "consumers" ((:) "--core-graph-proof-consumers" [])) [])
+ ranges <- Provider.providerRanges output
+ runJobs (S.map (\((,,) name lo hi) -> job admission output name
+  ((:) "--core-graph-proof-range" ((:) name ((:) (showInt lo) ((:) (showInt hi) []))))) ranges)
+ Provider.verify output
+
+witnessLanes : [] String
+witnessLanes = O.words "snake-1 snake-2 snake-3 other"
+
+witnessCase : Admission -> IO ()
+witnessCase admission = do
+ let output = witnessRoot (admissionWork admission)
+ runJobs (S.map (\name -> job admission output name
+  ((:) "--core-graph-proof-witness" ((:) name []))) witnessLanes)
+ Witness.verify output
+
+firstLabel : String
+firstLabel = "component solver matches every full-graph inference step"
+
+secondLabel : String
+secondLabel = "component witnesses preserve separate frontier solving and identities"
+
+replaceCases : Admission -> [] ((,) String (IO ())) -> IO ([] ((,) String (IO ())))
+replaceCases admission cases = case cases of
+ (:) ((,) first _) ((:) ((,) second _) rest) -> do
+  H.assert (eqString first firstLabel && eqString second secondLabel && S.length cases == 8 &&
+            S.not (S.any (\((,) name _) -> eqString name firstLabel || eqString name secondLabel) rest))
+   "CoreSolver GraphSolver case order changed"
+  return ((:) ((,) first (providerCase admission)) ((:) ((,) second (witnessCase admission)) rest))
+ _ -> H.fail "CoreSolver GraphSolver cases are missing"
+
+replaceFamily : Admission -> ((,) String ([] ((,) String (IO ())))) -> IO ((,) String ([] ((,) String (IO ()))))
+replaceFamily admission ((,) name cases) =
+ if eqString name "core/graph-solver" then do
+  replacement <- replaceCases admission cases
+  return ((,) name replacement)
+ else return ((,) name cases)
+
+runAuthorized : Admission -> [] String -> IO ()
+runAuthorized admission args = case args of
+ (:) "--core-graph-proof-consumers" [] ->
+  Provider.consumers (admissionFiles admission) (providerRoot (admissionWork admission) ++ "/consumers")
+ (:) "--core-graph-proof-range" ((:) name ((:) lo ((:) hi []))) -> do
+  let output = providerRoot (admissionWork admission)
+  ranges <- Provider.providerRanges output
+  let requested = S.filter (\((,,) candidate first last) ->
+   eqString name candidate && eqString lo (showInt first) && eqString hi (showInt last)) ranges
+  case requested of
+   (:) ((,,) _ first last) [] -> Provider.providerRange (admissionFiles admission) first last (output ++ "/" ++ name)
+   _ -> H.fail "CoreSolver worker range differs from the authorized provider input"
+ (:) "--core-graph-proof-witness" ((:) name []) -> do
+  H.assert (S.elem eqString name witnessLanes) "unknown CoreSolver witness lane"
+  Witness.worker name (witnessRoot (admissionWork admission) ++ "/" ++ name)
+ (:) flag _ -> if O.starts "--core-graph-proof-" flag then H.fail "invalid CoreSolver worker arguments"
+  else runSuite admission
+ [] -> runSuite admission
+
+runSuite : Admission -> IO ()
+runSuite admission = do
+ let families = Core.families
+ H.assert (S.length (S.filter (\((,) name _) -> eqString name "core/graph-solver") families) == 1)
+  "CoreSolver GraphSolver family is missing or duplicated"
+ prepared <- S.forM families (replaceFamily admission)
+ Runner.main "core-solver" false 34 prepared
+
+main : IO ()
+main = do
+ path <- getEnv receiptEnv
+ if eqString path "" then Runner.main "core-solver" false 34 Core.families else do
+  admission <- readAdmission path
+  args <- O.allArguments
+  runAuthorized admission args
