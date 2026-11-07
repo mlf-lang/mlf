@@ -1,0 +1,29 @@
+--- a/libraries/mlf-crates/Bootstrap/CrateGraph.hs
++++ b/libraries/mlf-crates/Bootstrap/CrateGraph.hs
+@@ -65,6 +65,17 @@
+     [W.VText (Q.list (compose Q.encodeMember Q.canonicalMember) (Source.groupOriginal prepared)),
+      W.VText (Q.list (compose Q.encodeMember Q.canonicalMember) (Source.groupMembers prepared)),
+      A.toList A.toText (Q.sourceGroupMetadataUsing candidateMetadata prepared)];
++  diagnosticPreparedFailure names prepared error =
++    "Prepared input SCC " ++ Separate.pack names ++ ": " ++ error ++
++    "; original UTF-8 bytes=" ++ diagnosticPreparedBytes (Source.groupOriginal prepared) ++
++    "; members UTF-8 bytes=" ++ diagnosticPreparedBytes (Source.groupMembers prepared) ++
++    "; metadata field UTF-8 bytes=" ++ Separate.pack
++      (map diagnosticTextBytes (Q.sourceGroupMetadataUsing candidateMetadata prepared));
++  diagnosticPreparedBytes members = diagnosticTextBytes
++    (Q.list (compose Q.encodeMember Q.canonicalMember) members);
++  diagnosticTextBytes text = case W.utf8Size 268435456 text of {
++    Left e -> e; Right count -> showInt count
++  };
+   scopeInventory prepared = case Source.groupAuthority prepared of {
+     Nothing -> W.VNode 422 [];
+     Just (Source.RootAuthority _ _ _ candidates protected) -> W.VNode 422
+@@ -146,7 +157,7 @@
+               rawKey = G.key "InferScc" identity };
+             graphStarted <- G.clock statistics;
+             source <- input (G.key "Prepared" identity) (preparedValue prepared) session;
+-            case source of { Left e -> ioReturn (Left e); Right ((,) sourceNode first) -> do {
++            case source of { Left e -> ioReturn (Left (diagnosticPreparedFailure names prepared e)); Right ((,) sourceNode first) -> do {
+               scopeInput <- input (G.key "ScopeInventory" identity) (scopeInventory prepared) first;
+               case scopeInput of { Left e -> ioReturn (Left e); Right ((,) scopeLeaf second) ->
+                 case do {

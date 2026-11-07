@@ -287,6 +287,25 @@ module Bootstrap.CrateQuery where {
     scopes = M.fromList compareCandidateScopes (zip candidates (range 0 (length candidates - 1)));
     table = keyList inlineScopeKey candidates
   } in renderKey scopes (KeyFields (snoc fields table));
+  -- Prepared graph inputs retain the framing tree instead of flattening an
+  -- entire SCC into a single bounded binary symbol. Scope references preserve
+  -- the exact ordered candidate list through an authenticated local table.
+  -- These tags belong only to query inputs, never to checked object readers.
+  sourceKeyValue :: Map ([] ((,) EvidenceRole String)) Int -> SourceKey -> W.Value;
+  sourceKeyValue scopes key = case key of {
+    KeyText text -> W.VText text;
+    KeyFields fields -> W.VNode 427 (map (sourceKeyValue scopes) fields);
+    KeyScope candidates -> case M.lookup compareCandidateScopes candidates scopes of {
+      Nothing -> panic "query input scope missing from its own inventory";
+      Just index -> W.VNode 428 [W.VInt index]
+    }
+  };
+  pooledSourceValue :: [] SourceKey -> W.Value;
+  pooledSourceValue fields = let {
+    candidates = S.toList (keyScopes (KeyFields fields) S.empty);
+    scopes = M.fromList compareCandidateScopes (zip candidates (range 0 (length candidates - 1)))
+  } in W.VNode 429 [sourceKeyValue scopes (KeyFields fields),
+    sourceKeyValue M.empty (keyList inlineScopeKey candidates)];
   encodeField :: Field -> String;
   encodeField field =
     case field of {

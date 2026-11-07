@@ -80,7 +80,7 @@ record_inputs() {
 record_inputs "$work/inputs.json"
 compiler_hash=$(sha256 "$compiler")
 cc_hash=$(sha256 "$cc")
-printf 'IO Unit\n' > "$work/io-unit.type"
+printf 'IO ()\n' > "$work/io-unit.type"
 success capability "$compiler" --run --expr 'do { reply <- processSupervisor "MLF-PROCESS-1\0version\0"; printInt (stringCodeAt reply 2) }'
 test "$(cat "$work/capability.stdout")" = 49 || fail 'real stage-2 host bridge required'
 read -r -a cflags <<< "$(pkg-config --cflags gmp)"
@@ -105,7 +105,7 @@ for source in "$fixtures"/runtime/*.emlf; do
   name=$(basename "$source" .emlf)
   success "$name.compile" "$compiler" -i "$fixtures" "$source"
   success "$name.check" "$compiler" --check "$work/$name.compile.stdout"
-  cmp "$work/io-unit.type" "$work/$name.check.stdout" || fail "$name is not IO Unit"
+  cmp "$work/io-unit.type" "$work/$name.check.stdout" || fail "$name is not IO ()"
   success "$name.interpreter" "$compiler" -i "$fixtures" --run "$source"
   success "$name.target-interpreter" "$compiler" --run-xmlf "$work/$name.compile.stdout"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.interpreter.stdout" || fail "$name source interpreter differs"

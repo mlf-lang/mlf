@@ -61,10 +61,10 @@ module Bootstrap.CrateGraph where {
     }) wanted;
   candidateMetadata protected ((,,) role name _) = Q.node "candidate"
     [Q.encodeRole role,name,Q.boolean (elem eqString name protected)];
-  preparedValue prepared = W.VNode 421
-    [W.VText (Q.list (compose Q.encodeMember Q.canonicalMember) (Source.groupOriginal prepared)),
-     W.VText (Q.list (compose Q.encodeMember Q.canonicalMember) (Source.groupMembers prepared)),
-     A.toList A.toText (Q.sourceGroupMetadataUsing candidateMetadata prepared)];
+  preparedValue prepared = W.VNode 421 [Q.pooledSourceValue
+    [Q.keyList (compose (Q.memberKey Q.KeyScope) Q.canonicalMember) (Source.groupOriginal prepared),
+     Q.keyList (compose (Q.memberKey Q.KeyScope) Q.canonicalMember) (Source.groupMembers prepared),
+     Q.keyList Q.KeyText (Q.sourceGroupMetadataUsing candidateMetadata prepared)]];
   scopeInventory prepared = case Source.groupAuthority prepared of {
     Nothing -> W.VNode 422 [];
     Just (Source.RootAuthority _ _ _ candidates protected) -> W.VNode 422
@@ -119,7 +119,7 @@ module Bootstrap.CrateGraph where {
         graphStarted <- G.clock statistics;
         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
         started <- G.begin (cacheDir ++ "/query-graph-v1")
-          (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1",flavor]);
+          (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1","prepared-source-tree-1",flavor]);
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           initial <- recordInitialBindings (M.toList contracts) session;
           case initial of { Left e -> ioReturn (Left e); Right first -> do {

@@ -30,6 +30,8 @@ for entry in r['shared_inputs'].values():
 command = next(c['argv'] for c in r['commands'] if '-o' in c['argv'] and
                c['argv'][c['argv'].index('-o') + 1].endswith('/bin/emlf')).copy()
 main = root / 'tools/performance/crate-query-graph/SourceChecks.hs'
+fixture_inputs = {str(path): sha(path) for path in
+                  (main, main.with_name('PreparedInputChecks.hs'))}
 command = [str(main) if v.endswith('/host/ghc/app/emlf/Main.hs') else v for v in command]
 command[command.index('-o') + 1] = str(out / 'source-checks')
 # Put Main in a fresh directory without changing the qualified producer.
@@ -49,12 +51,15 @@ if not a.resume_build:
 command[command.index('-odir') + 1] = str(objects)
 command[command.index('-hidir') + 1] = str(objects)
 command.insert(command.index('-odir'), '-i' + old_objects)
+command.insert(command.index('-odir'), '-i' + str(main.parent))
 with (out / 'build.log').open('w') as log:
     subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True)
 with (out / 'checks.log').open('w') as log:
     subprocess.run([out / 'source-checks', out / 'cache', *([a.interface.resolve()] if a.interface else [])], cwd=root,
                    stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
+for path, digest in fixture_inputs.items():
+    assert sha(path) == digest, 'control source changed: ' + path
 (out / 'receipt.json').write_text(json.dumps(dict(complete=True,
-    producer_receipt_sha256=sha(a.receipt), fixture_sha256=sha(main),
+    producer_receipt_sha256=sha(a.receipt), fixture_sha256=sha(main), fixture_inputs=fixture_inputs,
     command=command, binary_sha256=sha(out / 'source-checks')), indent=2) + '\n')
 print((out / 'checks.log').read_text(), end='')

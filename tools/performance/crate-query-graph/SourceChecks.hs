@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Prelude
+import qualified PreparedInputChecks
 import Control.Monad (unless, foldM)
 import System.Environment (getArgs)
 import System.Directory (createDirectoryIfMissing, doesFileExist)
@@ -272,9 +273,11 @@ sessionTransactionChecks root = do
  putStrLn "PASS actual Session same-process failure/retry, lock release, whole-crate publication and retained generation"
 
 main = do
+ PreparedInputChecks.main
  arguments <- getArgs
  let directory=head arguments
  createDirectoryIfMissing True directory
+ PreparedInputChecks.migrationChecks directory
  graphChecks directory
  sourceChecks directory
  sourceChanges directory

@@ -55,6 +55,8 @@ tools/release/test-shared-bootstrap-orchestration.sh
 tools/release/test-direct-source-smoke.sh
 bash tools/release/test-timed-async-bootstrap.sh
 python3 tools/release/test-async-change-scope.py
+python3 -B tools/shared/test_async_sources.py
+python3 -O -B tools/shared/test_async_sources.py
 python3 tools/testing/test_manifest_snapshot.py
 python3 tools/testing/check_manifest_snapshot.py
 python3 tools/testing/test_history_refs.py

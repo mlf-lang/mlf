@@ -123,7 +123,7 @@ success fixture "$clang" -O2 -std=c11 -Wall -Wextra -Werror "$fixtures/fixture.c
 success runtime "$clang" -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c "$root/runtime/mlf_runtime.c" -o "$work/runtime.o"
 success compile "$compiler" "${include_args[@]}" "$fixtures/Main.emlf"
 success check "$compiler" --check "$work/compile.stdout"
-cmp "$fixtures/io-unit.type" "$work/check.stdout" || fail 'checked target does not have type IO Unit'
+cmp "$fixtures/io-unit.type" "$work/check.stdout" || fail 'checked target does not have type IO ()'
 success emit "$compiler" --xmlf-to-llvm-io-gc "$work/compile.stdout"
 grep -F 'mlf_require_async_completion_v2_abi' "$work/emit.stdout" >/dev/null || fail 'native target lacks the current async primitive capability guard'
 success link "$clang" -O2 -Wno-override-module -x ir "$work/emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/suite.native"
@@ -145,7 +145,7 @@ cmp "$work/interpreter.stdout" "$work/llvm.stdout" || fail 'backend observations
 # cleanup and native fail() cleanup are independent paths, so execute both.
 success panic.compile "$compiler" "${include_args[@]}" "$fixtures/Panic.emlf"
 success panic.check "$compiler" --check "$work/panic.compile.stdout"
-cmp "$fixtures/io-unit.type" "$work/panic.check.stdout" || fail 'panic target does not have type IO Unit'
+cmp "$fixtures/io-unit.type" "$work/panic.check.stdout" || fail 'panic target does not have type IO ()'
 success panic.emit "$compiler" --xmlf-to-llvm-io-gc "$work/panic.compile.stdout"
 success panic.link "$clang" -O2 -Wno-override-module -x ir "$work/panic.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/panic.native"
 for backend in interpreter llvm; do
