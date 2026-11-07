@@ -37,3 +37,11 @@ The module deliberately is NOT wired into source_migration_adapter.py. Full succ
 ## Later provisional implementation
 
 The Linux-only `tools/performance/artifact-binary/prepared_input_contract.py` now implements full fixed-parent materialization, reversible raw-byte deltas, ancestor projection/provenance composition and physical unchanged CI-suite replay. See PREPARED-INPUT-PROVISIONAL.md for precise scope and finalization prerequisites. Earlier “unimplemented” statements above describe the initial recovery stage, not this later code. The live selector and all historical files are still unchanged. Tests generate temporary metadata only; no final producer evidence or seal is present.
+
+## Subsequent candidate source selection
+
+A separate portable candidate source contract is now selected locally, documented in tools/performance/artifact-binary/PREPARED-SOURCE-CANDIDATE.md. The earlier Linux experiment remains unselected. Exact source/manifest/code pins and three byte deltas are present for the current candidate, with only two lock source-owner updates. This supersedes the earlier status that no candidate selector exists, but does not finalize producer evidence, native acceptance or history seals.
+
+## Candidate reader portability blocker
+
+The whole-path reader race was corrected with retained directory descriptors and no-follow relative opens. Platforms lacking those capabilities, notably ordinary Python Windows, now intentionally reject candidate live admission. Thus the earlier description of a portable candidate layer is superseded: Linux source controls do not establish Windows/macOS integration or final merge readiness.

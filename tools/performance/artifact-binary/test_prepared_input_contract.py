@@ -187,6 +187,7 @@ class PreparedSuccessorTests(unittest.TestCase):
         for name in set(b.parent['frozen_history'])|set(b.maintenance_parent['files']):
             write(target,'tools/performance/'+name,(self.source/'tools/performance'/name).read_bytes())
         for name in b.ci_metadata_paths:write(target,str(BUNDLE/name),(HERE/name).read_bytes())
+        write(target,str(BUNDLE/'source_migration_adapter.py'),(HERE/'ci-integration-test-loader.py').read_bytes())
         # The unchanged suite pins all its transitive historical executables.
         for file in HERE.glob('*.py'):
             if file.name.startswith('test_') or file.name.endswith('-test-loader.py'):

@@ -1,0 +1,30 @@
+{
+  "base_head": "5b96787c9247504e5494f2664bf30126cf240e8d",
+  "base_tree": "31417fe654a9b6543480c2bd500c31d43819f6ab",
+  "deltas": {
+    "libraries/mlf-crates/Bootstrap/CrateGraph.hs": {
+      "file": "prepared-source-candidate-deltas/0.json",
+      "new": "27bcc346fb979e45fd4f0702105dda93e7e975080a23a5daf02585869d98da65",
+      "old": "cbb7cbada11d4730348e5b63ada4da6cf7935d50c420609bd57be5fc24ed77a7",
+      "sha256": "6c056b39966a7734827b7bd4583f64d76c108de2c71ce04591c20afa852bdf9f"
+    },
+    "libraries/mlf-crates/Bootstrap/CrateQuery.hs": {
+      "file": "prepared-source-candidate-deltas/1.json",
+      "new": "8ce2ab4ac86b3fccd525419a458412cbad495cfe69bd540e198411cb5ba1cd79",
+      "old": "fcb773fe34201e4e230f60698c87233675e20a03bdf4f68eb62fa4a368c55210",
+      "sha256": "50896e981b78030558f4bd5023e6833df67609c26ec6cd75dc1554c3b2cb5c55"
+    },
+    "mlf.lock": {
+      "file": "prepared-source-candidate-deltas/2.json",
+      "new": "e526c31b229b07cfa19bbf06cf5782ebc1a0e2b67b852920fdec383e11d63c23",
+      "old": "0323366b84ac8a85adcd5511f04ac296fbeaa3a77de707a217be62d1dd5b1f5b",
+      "sha256": "3a65981625de11c67e5c030d4c86180c98f49f2da254d5b9e6792002e129c3bb"
+    }
+  },
+  "format": "prepared-source-candidate-source-v1",
+  "inventory_sha256": "e8bb2b2284f354602c93738a7c1af99cb603f4104ab76d84d882d43378776d87",
+  "parent_value_sha256": "8dc771f8f71e402cf758793b6f6460be74b3cbe227ee0e586a3d587d65c15e5b",
+  "provisional": true,
+  "registry_sha256": "97930cfb741a2f13b882697523277bbe738c55946f4d4a9c6c63e86590dfaa06",
+  "scope": "Candidate exact source identity only; no compilation, native, fixed-point or merge qualification."
+}

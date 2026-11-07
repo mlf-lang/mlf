@@ -30,3 +30,7 @@ Repeat with python3 -O -B. These tests invoke only Python and read-only Git blob
 ## Independent review corrections
 
 The historical CI class itself does not project a direct open-release provenance callback to the open-release value. The new layer fixes its own direct callback by selecting the already-authenticated historical open-release proxy; no historical implementation or evidence predicate was changed. Coverage claims are limited to the five explicitly tested record callbacks and the existing projection APIs, not arbitrary inherited private methods. The unchanged historical suite remains the physical baseline.
+
+## Separate candidate integration
+
+A subsequent live source-only layer is now in prepared_source_contract.py; see PREPARED-SOURCE-CANDIDATE.md. This original Linux experiment remains unselected. Its physical predecessor test now installs the saved original CI selector so the historical fixture remains exact after the separate live selector switch.

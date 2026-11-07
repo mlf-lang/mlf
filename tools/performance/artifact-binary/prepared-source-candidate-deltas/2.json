@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 15858,
+  "new_sha256": "e526c31b229b07cfa19bbf06cf5782ebc1a0e2b67b852920fdec383e11d63c23",
+  "old_bytes": 15858,
+  "old_sha256": "0323366b84ac8a85adcd5511f04ac296fbeaa3a77de707a217be62d1dd5b1f5b",
+  "path": "mlf.lock",
+  "splices": [
+    {
+      "new": "MjdiY2MzNDZmYjk3OWU0NWZkNGYwNzAyMTA1ZGRhOTNlN2U5NzUwODBhMjNhNWRhZjAyNTg1ODY5ZDk4ZGE2NSIsCiAgICAgICAgIkJvb3RzdHJhcC9DcmF0ZVF1ZXJ5LmhzIjogIjhjZTJhYjRhYzg2YjNmY2NkNTI1NDE5YTQ1ODQxMmNiYWQ0OTVjZmU2OWJkNTQwZTE5ODQxMWNiNWJhMWNkNzk=",
+      "new_at": 8310,
+      "old": "Y2JiN2NiYWRhMTFkNDczMDM0OGU1YjYzYWRhNGRhNmNmNzkzNWQ1MGM0MjA2MDliZDU3YmU1ZmMyNGVkNzdhNyIsCiAgICAgICAgIkJvb3RzdHJhcC9DcmF0ZVF1ZXJ5LmhzIjogImZjYjc3M2ZlMzQyMDFlNGUyMzBmNjA2OThjODcyMzM2NzVlMjBhMDNiZGY0ZjY4ZWI2MmZhNGEzNjhjNTUyMTA=",
+      "old_at": 8310
+    }
+  ]
+}

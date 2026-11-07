@@ -21,17 +21,22 @@ mkdir -p .mlf-build
 work=$(mktemp -d "$PWD/.mlf-build/benchmark-provenance.XXXXXX")
 case "$work" in "$PWD"/.mlf-build/benchmark-provenance.*) ;; *) exit 1 ;; esac
 trap 'rm -rf -- "$work"' EXIT
+# macOS commonly supplies a /var -> /private/var temporary path. Keep strict
+# no-link readers and historical tests unchanged: all descendants receive an
+# already-created private physical directory owned by this wrapper invocation.
+mkdir -m 700 -- "$work/python-tmp"
+TMPDIR=$(cd -- "$work/python-tmp" && pwd -P)
+export TMPDIR
 jq -r '.pinned_sha256 | to_entries[] | "\(.value)  \(.key)"' "$manifest" > "$work/SHA256SUMS"
 sha256 -c "$work/SHA256SUMS" >/dev/null
 python3 -B tools/release/check_benchmark_transition.py
 python3 -B tools/release/test_benchmark_transition.py
 python3 -B tools/performance/artifact-binary/test_query_graph_migration.py
 python3 -B -O tools/performance/artifact-binary/test_query_graph_migration.py
-# Current CI-integration controls replay the unchanged query-index,
-# package-roots, open-release, builtin and writer physical predecessors.
-# Default CI intentionally uses the complete five-level physical replay.
-python3 -B tools/performance/artifact-binary/test_ci_integration_migration.py
-python3 -B -O tools/performance/artifact-binary/test_ci_integration_migration.py
+# Candidate source controls replay the unchanged CI-integration suite and all
+# five older physical predecessors. This checks source provenance, not native qualification.
+python3 -B tools/performance/artifact-binary/test_prepared_source_contract.py
+python3 -B -O tools/performance/artifact-binary/test_prepared_source_contract.py
 python3 -B tools/performance/crate-prelude/test_contract.py
 python3 -B -O tools/performance/crate-prelude/test_contract.py
 jq -r '.workloads[].provenance[] | select(.original_source != .build_source) | [.original_source,.build_source] | @tsv' "$manifest" > "$work/adaptations.tsv"
