@@ -39,7 +39,9 @@ silently converted into these receipts.
   plan commands, original command/log evidence, unchanged before/after lock hashes,
   and exact manifest/package/source hashes. The validation command is honestly
   recorded as `lock-validation` / `validate-no-change`, not as an executed lock
-  writer. Stale or changed lock bytes stop admission before any compiler call.
+  writer. The collector makes two actual `--offline --locked plan` calls per root
+  and independently reconstructs the manifest/source snapshot to check lock semantics.
+  Stale or changed lock bytes stop admission before any compiler call.
 - The foundational gate includes foundation, async, language-core and frontend.
   Its `inventory` must exactly equal `foundational_inventory(source_root)`: each
   crate's manifest path/hash and module-name-to-source-path/hash map. Counts are
@@ -51,6 +53,21 @@ silently converted into these receipts.
   original bounded commands, dependencies, complete artifact inventories, admission
   bindings and the final seal. Old summary-only receipts are rejected. The compiler
   calls are real cold `--compile-crate` operations, not native A/B qualification.
+- The collector pins the same six original-source authentication helpers as the
+  bootstrap driver, including `native_install.py` and `pool_generated_strings.py`,
+  and checks that closure before and after producer authentication.
+- Collection has its own whole-process deadline, address-space limit, sampled
+  process-tree RSS, host/disk floors and cumulative output/workspace budget. These
+  cover Python validation, final seal writing and read-back, not just compiler or
+  manager subprocesses. `driver-resources-final.json` binds observations after the
+  seal to its exact bytes; a later failure always disqualifies that seal. Final
+  observations are also printed to the caller's retained log. The workspace flag
+  is a usable cap of at most 15872 MiB, preserving 512 MiB beneath the 16-GiB ceiling.
+- The collector loads only the pinned same-checkout supervisor bytes by an exact
+  canonical path, with no named-module registration, bytecode lookup or search-path
+  mutation. Every command retains `supervisor.json` with observed PID/start-time
+  identities and drain outcome. If a watchdog exits abnormally or times out, the
+  parent also drains its tracked descendants; an undrained tree cannot pass.
 
 ## Natural boundaries and truthful completion
 
@@ -177,5 +194,49 @@ based on measured A output. No native command was executed to validate this slic
 `python3 -B tools/shared/test_bootstrap_ghc_native.py` and its `-O` variant test
 stage/receipt/path/artifact rejection and mock orchestration. Watchdog controls
 run only small Python/file/process tests. These are harness controls, not native
-bootstrap evidence. The production shared manifest and module inventory are
-unchanged by this slice, so no source-contract transition is claimed or needed.
+bootstrap evidence. This work uses separate driver and production-source roots and
+does not mutate production contracts. The five source-root lock paths were independently checked
+as absent from the current 196/108 canonical metadata inventories. That lock-only
+finding does not establish membership of these driver/helper files. Before merging
+the driver work into a production-source checkout, inspect the exact canonical
+metadata members and run the normal source-contract gates. Apply the ordinary
+append-only transition wherever those checks require it; unchanged production
+modules alone do not prove that every contract is unaffected. Dual-root operation
+is not a source-contract exemption.
+
+## Failure-evidence signal lifecycle
+
+The invocation delivers its first cancellation signal as an exception. During
+failure cleanup, deferred or repeated SIGTERM/SIGALRM notifications cannot
+interrupt JSON failure publication. Cleanup cancels only its owned timer, stops
+and joins its sampling monitor before writing failure evidence, and keeps the
+address-space limit until final close. A monitor-stop error is retained separately;
+it never converts the original failure into success. This is cleanup of a failed
+invocation, not an extension of the permitted successful-work budget.
+
+The bootstrap driver also stops sampling and performs final synchronous resource
+checks and receipt publication inside its exception boundary on every successful
+exit. A late monitor failure revokes completion and both qualified pointers rather
+than escaping through a success return. Prior signal handlers are restored.
+These guarantees do not claim protection from SIGKILL, power loss or filesystem
+I/O failure. Mock signal regressions are not native bootstrap qualification.
+
+## WIP source preservation update
+
+The independent WIP branch now retains the five refreshed package locks and these
+driver fixes for authentication-helper closure, resource supervision, failure
+signals and exact manifest declaration order. The five-lock update was statically
+validated against the full six-root source inventory; it is not manager-run evidence.
+The earlier stale-lock discussion describes the original checkpoint.
+
+The retained root-plan fixture is byte-for-byte data from a failed collector
+attempt, not successful collection. Its public provenance omits only the private
+original absolute path and adds a publication note; all original hash and failure
+fields remain unchanged. Driver Python source and test bytes match the recovered
+checkpoint. Historical test results are not a new test run on this WIP commit.
+This publication passed static Python syntax checks, 20 synthetic target-order
+controls and the public provenance-to-raw-plan integrity check. The three full
+retained-plan source readbacks were not rerun because the original complete
+source checkout was unavailable.
+Current producer authentication, full collector success, native runner/A/B, source
+contracts and all qualification gates remain pending.

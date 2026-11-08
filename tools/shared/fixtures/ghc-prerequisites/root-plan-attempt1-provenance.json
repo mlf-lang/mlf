@@ -1,0 +1,17 @@
+{
+  "kind": "Exact copied raw plan from the failed first collector attempt; not a successful collector receipt",
+  "sha256": "d19c0a071882b9f90b7635840e5c9cdc3b93b71cce8f2f4aa3ddeb425a689008",
+  "source_head": "34ca9124cd00179fe52d99acfaa2a0f8f474c820",
+  "source_tree": "0ea092196a059579f6145337e420198c9d8c268f",
+  "root_manifest_sha256": "f5f51c2b2954516c86ead23f7a6054d5d317285b47b0982dabcc0269d56bd52f",
+  "producer_receipt_sha256": "b278f1473bceed74c13985ece68aab654b361f80e52aaf19ec9276b1d757f6e0",
+  "original_collector_sha256": "f271102fe9d56181f0b809c6968483dba206747ddc447d516280d87302bbe508",
+  "overall_attempt_exit": 1,
+  "overall_attempt_complete": false,
+  "literal_failure": "ValueError: plan target inventory mismatch",
+  "raw_plan_call_exit": 0,
+  "plan_call_elapsed_seconds": 16.895905100000164,
+  "whole_failed_attempt_elapsed_seconds": 62.35443555500024,
+  "scope": "Full readback test requires explicit source root; no snapshot/producer relocation or successful retry is claimed.",
+  "publication_note": "Public fixture provenance omits the private original absolute path. Raw plan bytes and all other original provenance fields are unchanged. This is not a successful collector receipt."
+}

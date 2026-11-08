@@ -418,7 +418,7 @@ class MainControls(unittest.TestCase):
                        'producer-sha256','frontend-sha256','plans-sha256']:
             args += ['--'+option, str(self.root/'unused')]
         args += ['--execute']
-        with mock.patch('sys.argv', args), mock.patch.object(b.direct, 'authenticate_build') as authenticate:
+        with mock.patch('sys.argv', args), mock.patch.object(b, 'authenticate_producer') as authenticate:
             with self.assertRaises(ValueError): b.main()
             authenticate.assert_not_called()
         self.assertFalse((self.root/'unused').exists())
@@ -685,6 +685,109 @@ class ResumptionControls(unittest.TestCase):
         self.assertFalse(receipt['complete']); self.assertFalse(receipt['fixed_point_qualified'])
         self.assertEqual(self.executed, [])
         self.assertIn('RSS limit', receipt['driver_resource']['failure'])
+
+    def test_signal_handlers_are_restored_after_success(self):
+        before = {name: signal.getsignal(name) for name in (signal.SIGTERM, signal.SIGALRM)}
+        self.invoke()
+        self.assertEqual({name: signal.getsignal(name) for name in before}, before)
+
+    def test_failed_receipt_survives_deferred_signals(self):
+        before = {name: signal.getsignal(name) for name in (signal.SIGTERM, signal.SIGALRM)}
+        original_boundary = b.retain_boundary
+        original_write = b.write_new_json
+        budgets = []
+        original_init = b.DriverBudget.__init__
+        def initialize(budget, *args):
+            original_init(budget, *args)
+            budgets.append(budget)
+        def oversize(output, receipt, phase):
+            original_boundary(output, receipt, phase)
+            (output / 'injected-final-growth').write_bytes(b'x' * (2 * 1024**2))
+        def interrupt_failed_write(path, value):
+            if path.name == 'receipt.json.tmp' and value.get('status') == 'failed':
+                self.assertTrue(budgets[0].stop_event.is_set())
+                self.assertFalse(budgets[0].thread.is_alive())
+                self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0.0, 0.0))
+                with path.open('x') as stream:
+                    os.kill(os.getpid(), signal.SIGTERM)
+                    os.kill(os.getpid(), signal.SIGALRM)
+                    stream.write(json.dumps(value) + '\n')
+                return
+            original_write(path, value)
+        with mock.patch.object(b.DriverBudget, '__init__', initialize), \
+                mock.patch.object(b, 'retain_boundary', side_effect=oversize), \
+                mock.patch.object(b, 'write_new_json', side_effect=interrupt_failed_write):
+            with self.assertRaises((ValueError, RuntimeError, InterruptedError)):
+                self.invoke(extra=('--max-output-mib', '1'))
+        receipt = b.read(self.out / 'receipt.json')
+        self.assertEqual(receipt['status'], 'failed')
+        self.assertFalse(receipt['complete']); self.assertFalse(receipt['fixed_point_qualified'])
+        self.assertFalse((self.out / 'compiler.path').exists())
+        self.assertFalse((self.out / 'manager.path').exists())
+        self.assertEqual({name: signal.getsignal(name) for name in before}, before)
+
+    def reject_late_monitor_failure(self, final_stage):
+        if final_stage == 'B':
+            self.invoke('A')
+        resume = b.sha(self.out / 'receipt.json') if final_stage == 'B' else None
+        original_stop = b.DriverBudget.stop_monitor
+        injected = []
+        def late_failure(budget):
+            original_stop(budget)
+            if not injected:
+                injected.append(True)
+                budget.failure = 'controlled late monitor failure at stop'
+        with mock.patch.object(b.DriverBudget, 'stop_monitor', late_failure):
+            with self.assertRaisesRegex(RuntimeError, 'controlled late monitor failure'):
+                self.invoke(final_stage, resume)
+        receipt = b.read(self.out / 'receipt.json')
+        self.assertTrue(injected)
+        self.assertEqual(receipt['status'], 'failed')
+        self.assertFalse(receipt['complete']); self.assertFalse(receipt['fixed_point_qualified'])
+        self.assertFalse(receipt['boundary_complete'])
+        self.assertFalse((self.out / 'compiler.path').exists())
+        self.assertFalse((self.out / 'manager.path').exists())
+
+    def test_late_monitor_failure_cannot_escape_runner_boundary(self):
+        self.reject_late_monitor_failure('runner')
+
+    def test_late_monitor_failure_revokes_qualified_pointers(self):
+        self.reject_late_monitor_failure('B')
+
+    def reject_post_stop_save_growth(self, final_stage):
+        if final_stage == 'B':
+            self.invoke('A')
+        resume = b.sha(self.out / 'receipt.json') if final_stage == 'B' else None
+        budgets = []
+        original_init = b.DriverBudget.__init__
+        original_write = b.write_new_json
+        injected = []
+        def initialize(budget, *args):
+            original_init(budget, *args)
+            budgets.append(budget)
+        def grow_after_last_save(path, value):
+            original_write(path, value)
+            if (path.name == 'receipt.json.tmp' and budgets and budgets[0].stop_event.is_set()
+                    and value.get('status') in ('paused', 'passed') and not injected):
+                injected.append(True)
+                (self.out / 'extra-post-stop-save-bytes').write_bytes(b'x' * (1024**2 + 1))
+        with mock.patch.object(b.DriverBudget, '__init__', initialize), \
+                mock.patch.object(b, 'write_new_json', side_effect=grow_after_last_save):
+            with self.assertRaisesRegex(ValueError, 'driver cumulative output limit'):
+                self.invoke(final_stage, resume, ('--max-output-mib', '1'))
+        self.assertTrue(injected, 'must inject after the monitor has stopped')
+        receipt = b.read(self.out / 'receipt.json')
+        self.assertEqual(receipt['status'], 'failed')
+        self.assertFalse(receipt['complete']); self.assertFalse(receipt['fixed_point_qualified'])
+        self.assertFalse((self.out / 'compiler.path').exists())
+        self.assertFalse((self.out / 'manager.path').exists())
+        self.assertIn('output limit', receipt['driver_resource']['failure'])
+
+    def test_final_post_stop_runner_save_growth_is_checked(self):
+        self.reject_post_stop_save_growth('runner')
+
+    def test_final_post_stop_qualified_save_growth_revokes_pointers(self):
+        self.reject_post_stop_save_growth('B')
 
     def test_driver_address_space_soft_limit_is_restored(self):
         import resource

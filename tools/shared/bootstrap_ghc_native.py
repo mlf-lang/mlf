@@ -6,7 +6,7 @@ Cold, separate caches only: this driver does not manufacture or seed artifacts.
 """
 from __future__ import annotations
 import argparse
-import importlib.util
+import hashlib
 import math
 import json
 import os
@@ -29,12 +29,12 @@ PLAN_ROOTS = {'root': '.', 'tests': 'tests', 'testing-tools': 'testing/tools',
               'async': 'libraries/mlf-async', 'tests-shared': 'tests/shared', 'async-fixtures': 'tests/async-package'}
 PLAN_NAMES = set(PLAN_ROOTS)
 DIGEST = re.compile(r'[0-9a-f]{64}\Z')
-spec = importlib.util.spec_from_file_location('direct_auth', ROOT / 'tools/shared/test_direct.py')
-direct = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(direct)
-# Harness-local helpers supply only hashing. Producer authentication below loads
-# its original source-root verifier chain, never this relocated module.
-sha = direct.sha
+def sha(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def require(ok, message):
@@ -161,7 +161,9 @@ class DriverBudget:
                 try:
                     self.check()
                 except BaseException:
-                    os.kill(os.getpid(), signal.SIGTERM)
+                    # Main-thread failure finalization may already own shutdown.
+                    if not self.stop_event.is_set():
+                        os.kill(os.getpid(), signal.SIGTERM)
                     return
         self.thread = threading.Thread(target=monitor, name='bootstrap-driver-budget', daemon=True)
         self.thread.start()
@@ -172,11 +174,14 @@ class DriverBudget:
                 'driver_address_space_bytes': self.as_limit,
                 'checkpoint_reserve_mib': self.args.checkpoint_reserve_mib}
 
-    def close(self):
+    def stop_monitor(self):
         self.stop_event.set()
         if self.thread is not None:
             self.thread.join(timeout=10)
             require(not self.thread.is_alive(), 'driver resource monitor did not stop')
+
+    def close(self):
+        self.stop_monitor()
         resource.setrlimit(resource.RLIMIT_AS, self.old_as)
 
 
@@ -668,10 +673,12 @@ def interrupted(signum, frame):
     raise InterruptedError('bootstrap driver interrupted by signal ' + str(signum))
 
 
-def managed_run(argv, cwd, env, teardown=None):
+def managed_run(argv, cwd, env, teardown=None, *, stdout=None, timeout=None):
     # The watchdog owns independently sessioned native descendants. Give its
     # TERM handler time to reap them; retain PID/start-time identities as backup.
-    proc = subprocess.Popen(argv, cwd=cwd, env=env, start_new_session=True)
+    proc = subprocess.Popen(argv, cwd=cwd, env=env, start_new_session=True, stdout=stdout,
+                            stderr=subprocess.STDOUT if stdout is not None else None)
+    deadline = time.monotonic() + timeout if timeout is not None else None
     tracked = {}
     if teardown is None:
         teardown = {}
@@ -694,6 +701,8 @@ def managed_run(argv, cwd, env, teardown=None):
     try:
         while proc.poll() is None:
             descendants()
+            if deadline is not None and time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(argv, timeout)
             time.sleep(.2)
         remaining = descendants()
         require(not remaining, 'watchdog exited with live owned descendants')
@@ -873,7 +882,6 @@ def main():
     parser.add_argument('--rss-mib', type=int, default=3072)
     parser.add_argument('--address-space-mib', type=int, default=4096)
     args = parser.parse_args()
-    signal.signal(signal.SIGTERM, interrupted)
     active = args.execute or args.prepare_runner
     require(not active or sys.platform == 'linux', 'this driver is Linux-only; Darwin qualification is separate')
     source_root = args.source_root.resolve(strict=True)
@@ -905,6 +913,14 @@ def main():
                'release_note': args.release_note, 'commands': [], 'stages': {}, 'phase': 'preflight'}
     admitted = not args.resume_sha256
     budget = None
+    failure_finalizing = False
+    interruption_delivered = False
+    def lifecycle_interrupted(signum, frame):
+        nonlocal interruption_delivered
+        if failure_finalizing or interruption_delivered:
+            return
+        interruption_delivered = True
+        interrupted(signum, frame)
     def save(*, failed=False):
         if budget is not None:
             if not failed:
@@ -917,9 +933,20 @@ def main():
         if budget is not None and not failed:
             budget.check()
     previous_alarm = None
+    def finish_success():
+        # Close the sampling race inside the exception boundary, before a
+        # paused/qualified result can escape. Keep AS and the timer until the
+        # final synchronous receipt checks have covered all publication writes.
+        if budget is not None:
+            budget.stop_monitor()
+            budget.check()
+            save()
+        if previous_alarm is not None:
+            signal.setitimer(signal.ITIMER_REAL, 0)
     lock_path = out / 'driver.lock'
     output_tree(out)
     lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    previous_term = signal.signal(signal.SIGTERM, lifecycle_interrupted)
     try:
         with os.fdopen(lock_fd, 'w') as stream:
             stream.write(str(os.getpid()) + '\n')
@@ -927,7 +954,7 @@ def main():
             save()
         if active:
             require(signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0), 'existing alarm conflicts with whole-window guard')
-            previous_alarm = signal.signal(signal.SIGALRM, interrupted)
+            previous_alarm = signal.signal(signal.SIGALRM, lifecycle_interrupted)
             signal.setitimer(signal.ITIMER_REAL, args.window_seconds)
             workspace = args.workspace_root.resolve(strict=True)
             require(out.is_relative_to(workspace), 'output must be inside monitored workspace')
@@ -1050,6 +1077,7 @@ def main():
             retain_boundary(out, receipt, 'authenticated-dry-run')
             save()
             print('Authenticated dry-run only: ' + str(out / 'receipt.json'))
+            finish_success()
             return
         def run(argv, label, timeout=None):
             check_inputs()
@@ -1141,6 +1169,7 @@ def main():
             save()
         if stop_after == 'runner':
             print('Runner boundary only: ' + str(out / 'receipt.json'))
+            finish_success()
             return
         for index, name in enumerate(('A', 'B')):
             if name in receipt['stages']:
@@ -1178,6 +1207,7 @@ def main():
                 save()
                 if stop_after == 'A':
                     print('Native A boundary only; fixed point NOT qualified: ' + str(out / 'receipt.json'))
+                    finish_success()
                     return
                 receipt.update(status='running')
             save()
@@ -1187,7 +1217,16 @@ def main():
         receipt.update(phase='fixed-point-complete', status='passed', boundary_complete=True, complete=True, fixed_point_qualified=True,
                        capability_scope='identity only; language/backend/async qualification is separate')
         save()
+        finish_success()
     except BaseException as error:
+        failure_finalizing = True
+        if previous_alarm is not None:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+        if budget is not None:
+            try:
+                budget.stop_monitor()
+            except BaseException as cleanup_error:
+                receipt['monitor_stop_error'] = type(cleanup_error).__name__ + ': ' + str(cleanup_error)
         if not admitted:
             raise  # A rejected resume must not overwrite the original receipt or evidence.
         clear_pointers(out)
@@ -1204,6 +1243,7 @@ def main():
             if previous_alarm is not None:
                 signal.setitimer(signal.ITIMER_REAL, 0)
                 signal.signal(signal.SIGALRM, previous_alarm)
+            signal.signal(signal.SIGTERM, previous_term)
 
 
 if __name__ == '__main__':
