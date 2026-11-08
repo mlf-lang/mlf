@@ -17,6 +17,67 @@ b = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(b)
 
 
+class GitSourceCheckpointControls(unittest.TestCase):
+    """Mock Git checkpoint controls, not source or native qualification."""
+    root = Path('/source-fixture')
+    git = Path('/tool-fixture/git')
+    head = 'a' * 40
+
+    def invoke(self, outputs, *, executing=True, env=None):
+        environment = {'LANG': 'C'} if env is None else env
+        with mock.patch.object(b.subprocess, 'check_output', side_effect=outputs) as query, \
+                mock.patch.object(b, 'sha', return_value='c' * 64):
+            result = b.source_checkpoint(self.root, self.git, environment, self.head, executing)
+        return result, query.call_args_list
+
+    def test_exact_execution_keeps_all_queries_with_serial_git_settings(self):
+        result, calls = self.invoke([str(self.root), self.head, ''])
+        prefix = [str(self.git), '-c', 'core.preloadIndex=false', '-c', 'index.threads=1']
+        self.assertEqual(calls, [
+            mock.call(prefix + ['rev-parse', '--show-toplevel'], cwd=self.root, env={'LANG': 'C'}, text=True),
+            mock.call(prefix + ['rev-parse', 'HEAD'], cwd=self.root, env={'LANG': 'C'}, text=True),
+            mock.call(prefix + ['status', '--porcelain', '--untracked-files=normal'], cwd=self.root, env={'LANG': 'C'}, text=True),
+        ])
+        self.assertEqual(result, {'head': self.head, 'dirty': False, 'expected': self.head,
+                                  'git': str(self.git), 'git_sha256': 'c' * 64})
+
+    def test_wrong_root_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'Git checkout mismatch'):
+            self.invoke(['/other-root'])
+
+    def test_wrong_execution_head_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'exact clean reviewed source checkpoint'):
+            self.invoke([str(self.root), 'b' * 40, ''])
+
+    def test_dirty_execution_is_rejected(self):
+        for dirty in (' M source.hs', '?? extra.hs'):
+            with self.subTest(dirty=dirty), self.assertRaisesRegex(ValueError, 'exact clean reviewed source checkpoint'):
+                self.invoke([str(self.root), self.head, dirty])
+
+    def test_dry_run_retains_original_dirty_reporting(self):
+        result, _ = self.invoke([str(self.root), 'b' * 40, ' M source.hs'], executing=False)
+        self.assertEqual(result['head'], 'b' * 40)
+        self.assertTrue(result['dirty'])
+        self.assertEqual(result['expected'], self.head)
+
+    def test_nonwhitelisted_git_environment_still_removed(self):
+        env = {'LANG': 'C', 'GIT_DIR': '/other', 'GIT_WORK_TREE': '/other',
+               'GIT_CONFIG_COUNT': '1', 'GIT_CONFIG_KEY_0': 'core.preloadIndex',
+               'GIT_CONFIG_VALUE_0': 'true', 'GIT_CONFIG_NOSYSTEM': '1',
+               'GIT_CONFIG_GLOBAL': '/dev/null'}
+        _, calls = self.invoke([str(self.root), self.head, ''], env=env)
+        for call in calls:
+            self.assertEqual(call.kwargs['env'], {'LANG': 'C', 'GIT_CONFIG_NOSYSTEM': '1',
+                                                  'GIT_CONFIG_GLOBAL': '/dev/null'})
+
+    def test_errors_propagate_at_each_query(self):
+        for index in range(3):
+            for error in (subprocess.CalledProcessError(128, [str(self.git)]),
+                          subprocess.TimeoutExpired([str(self.git)], 1), OSError('fixture failure')):
+                with self.subTest(index=index, kind=type(error).__name__), self.assertRaises(type(error)):
+                    self.invoke([str(self.root), self.head, ''][:index] + [error])
+
+
 class GateControls(unittest.TestCase):
     def setUp(self):
         # Port the original gate rejection controls to the strict new schema.

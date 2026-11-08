@@ -660,7 +660,8 @@ def pin_clang_trace(trace, pin):
 def source_checkpoint(root, git, env, expected, executing):
     env = {k: v for k, v in env.items() if not k.startswith('GIT_') or k in ('GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL')}
     def query(*arguments):
-        return subprocess.check_output([str(git), *arguments], cwd=root, env=env, text=True).strip()
+        return subprocess.check_output([str(git), '-c', 'core.preloadIndex=false', '-c', 'index.threads=1',
+                                        *arguments], cwd=root, env=env, text=True).strip()
     require(Path(query('rev-parse', '--show-toplevel')).resolve() == root.resolve(), 'Git checkout mismatch')
     head = query('rev-parse', 'HEAD')
     dirty = query('status', '--porcelain', '--untracked-files=normal')
