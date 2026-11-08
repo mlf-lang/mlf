@@ -715,6 +715,51 @@ class PrerequisiteControls(unittest.TestCase):
         self.assert_first_signal_cancels_and_failure_is_parseable('monitor')
 
 
+class GitCheckpointControls(unittest.TestCase):
+    """Mock Git argv and fail-closed checks, not repository qualification."""
+    def invoke(self, outputs):
+        root = Path('/source-fixture')
+        git = Path('/tool-fixture/git')
+        env = {'LANG': 'C'}
+        with mock.patch.object(p.subprocess, 'check_output', side_effect=outputs) as query:
+            p.checkpoint(root, 'a' * 40, git, env)
+        prefix = [str(git), '-c', 'core.preloadIndex=false', '-c', 'index.threads=1']
+        self.assertEqual(query.call_args_list, [
+            mock.call(prefix + ['rev-parse', '--show-toplevel'], cwd=root, env=env, text=True, timeout=15),
+            mock.call(prefix + ['rev-parse', 'HEAD'], cwd=root, env=env, text=True, timeout=15),
+            mock.call(prefix + ['status', '--porcelain', '--untracked-files=normal'], cwd=root, env=env, text=True, timeout=15),
+        ])
+
+    def test_exact_clean_identity_uses_serial_git_settings(self):
+        self.invoke(['/source-fixture\n', 'a' * 40 + '\n', ''])
+
+    def test_wrong_source_root_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'checkpoint is not exact and clean'):
+            self.invoke(['/other-source\n'])
+
+    def test_wrong_head_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'checkpoint is not exact and clean'):
+            self.invoke(['/source-fixture\n', 'b' * 40 + '\n'])
+
+    def test_tracked_modification_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'checkpoint is not exact and clean'):
+            self.invoke(['/source-fixture\n', 'a' * 40 + '\n', ' M source.hs\n'])
+
+    def test_untracked_file_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'checkpoint is not exact and clean'):
+            self.invoke(['/source-fixture\n', 'a' * 40 + '\n', '?? extra.hs\n'])
+
+    def test_git_error_is_not_treated_as_clean(self):
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.invoke([subprocess.CalledProcessError(128, ['/tool-fixture/git'])])
+
+    def test_invalid_commit_rejected_before_git(self):
+        with mock.patch.object(p.subprocess, 'check_output') as query:
+            with self.assertRaisesRegex(ValueError, 'exact reviewed checkpoint required'):
+                p.checkpoint(Path('/source-fixture'), 'not-a-commit', Path('/tool-fixture/git'), {})
+            query.assert_not_called()
+
+
 class PlanInventoryControls(unittest.TestCase):
     """Synthetic source/plan data with deliberately nonalphabetical declarations."""
     def setUp(self):

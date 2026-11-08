@@ -537,7 +537,8 @@ def authenticate_gate(path, digest, producer_digest, root=ROOT):
 def checkpoint(root, expected, git, env):
     require(COMMIT.fullmatch(expected or ''), 'exact reviewed checkpoint required')
     def query(*args):
-        return subprocess.check_output([str(git), *args], cwd=root, env=env, text=True, timeout=15).strip()
+        return subprocess.check_output([str(git), '-c', 'core.preloadIndex=false', '-c', 'index.threads=1',
+                                        *args], cwd=root, env=env, text=True, timeout=15).strip()
     require(query('rev-parse', '--show-toplevel') == str(root) and query('rev-parse', 'HEAD') == expected
             and not query('status', '--porcelain', '--untracked-files=normal'), 'source/driver checkpoint is not exact and clean')
 
