@@ -60,6 +60,8 @@ class PrerequisiteControls(unittest.TestCase):
         }
         for name in p.FOUNDATIONS:
             dependencies = {} if name == 'mlf-foundation' else {'mlf-foundation': {'path': '../mlf-foundation'}}
+            if name == 'mlf-frontend':
+                dependencies['mlf-language-core'] = {'path': '../mlf-language-core'}
             self.package('libraries/' + name, name, synthetic[name], dependencies)
         for label, relative in p.PLAN_ROOTS.items():
             if label == 'async':
@@ -149,8 +151,13 @@ class PrerequisiteControls(unittest.TestCase):
             crate = p.read(directory / 'cold-start.json')['crate']
             self.write(directory / 'unit.mlfci', 'MOCK metadata')
             self.write(directory / 'unit.mlfco', 'MOCK object')
-            self.write(directory / 'builtin/unit.mlfci', 'MOCK builtin metadata')
-            self.write(directory / 'builtin/unit.mlfco', 'MOCK builtin object')
+            # Mirror the reviewed four-crate inheritance layout, not CI encoding.
+            # Only foundation installs; dependency consumers leave the fallback
+            # builtin destination empty. These bytes are synthetic, not evidence.
+            if crate == 'mlf-foundation/0.3.0/library':
+                self.write(directory / 'builtin/unit.mlfci', 'MOCK builtin metadata')
+                self.write(directory / 'builtin/unit.mlfco', 'MOCK builtin object')
+                self.write(directory / 'builtin/unit.lock', '')
             self.write(directory / 'queries/query-fixture', 'MOCK cache')
             report = {'format': 1, 'crate': crate, 'semantic_fingerprint': 'fixture-semantic',
                       'inferred_groups': 1, 'reused_groups': 0,
@@ -202,6 +209,162 @@ class PrerequisiteControls(unittest.TestCase):
         self.assertFalse((self.output / 'failure.json').exists())
         self.assertEqual(len(self.plans['roots']), 6)
         self.assertEqual(len(self.gate['commands']), 4)
+
+    def test_mock_four_crate_inheritance_layout(self):
+        self.check()
+        owner = self.output / 'crates/mlf-foundation/builtin'
+        self.assertEqual({f.name for f in owner.iterdir()}, {'unit.mlfci', 'unit.mlfco', 'unit.lock'})
+        for name in ('mlf-async', 'mlf-language-core', 'mlf-frontend'):
+            self.assertEqual(list((self.output / 'crates' / name / 'builtin').iterdir()), [])
+        frontend = self.root / 'libraries/mlf-frontend/mlf-package.json'
+        self.assertEqual(p.read(frontend)['dependencies'], {
+            'mlf-foundation': {'path': '../mlf-foundation'},
+            'mlf-language-core': {'path': '../mlf-language-core'}})
+        for dep in ('mlf-foundation', 'mlf-language-core'):
+            self.assertIn(str(self.output / 'crates' / dep / 'unit.mlfci'),
+                          (self.output / 'crates/mlf-frontend/crate.spec').read_text())
+
+    def test_missing_owner_files_even_with_rebound_inventory(self):
+        for name in ('unit.mlfci', 'unit.mlfco', 'unit.lock'):
+            with self.subTest(name=name):
+                path = self.output / 'crates/mlf-foundation/builtin' / name
+                raw, digest = path.read_bytes(), self.gate['artifacts'].pop(str(path))
+                path.unlink()
+                self.reject()
+                path.write_bytes(raw); self.gate['artifacts'][str(path)] = digest
+
+    def test_empty_owner_pair_even_with_rebound_hashes(self):
+        for name in ('unit.mlfci', 'unit.mlfco'):
+            with self.subTest(name=name):
+                path = self.output / 'crates/mlf-foundation/builtin' / name
+                raw = path.read_text()
+                self.update_artifact(path, ''); self.reject()
+                self.update_artifact(path, raw)
+
+    def test_owner_files_reject_hardlinks_and_symlinks(self):
+        for name in ('unit.mlfci', 'unit.mlfco', 'unit.lock'):
+            path = self.output / 'crates/mlf-foundation/builtin' / name
+            for kind in ('hardlink', 'symlink', 'dangling'):
+                with self.subTest(name=name, kind=kind):
+                    alias = self.base / 'alias'
+                    raw = path.read_bytes()
+                    if kind == 'hardlink':
+                        os.link(path, alias)
+                    else:
+                        path.rename(alias)
+                        path.symlink_to(alias if kind == 'symlink' else self.base / 'missing')
+                    self.reject()
+                    if kind != 'hardlink':
+                        path.unlink(); path.write_bytes(raw)
+                    alias.unlink()
+
+    def test_builtin_directories_reject_symlink_ancestors(self):
+        for name in p.FOUNDATIONS:
+            with self.subTest(name=name):
+                path = self.output / 'crates' / name / 'builtin'
+                target = self.base / 'moved-builtin'
+                path.rename(target); path.symlink_to(target, target_is_directory=True)
+                self.reject()
+                path.unlink(); target.rename(path)
+
+    def test_builtin_directories_are_required_even_for_consumers(self):
+        for name in ('mlf-async', 'mlf-language-core', 'mlf-frontend'):
+            with self.subTest(name=name):
+                path = self.output / 'crates' / name / 'builtin'
+                path.rmdir(); self.reject(); path.mkdir()
+
+    def test_nonowner_local_contents_rejected_even_if_inventory_rebound(self):
+        for name in ('mlf-async', 'mlf-language-core', 'mlf-frontend'):
+            for leaf in ('unit.mlfci', 'unit.mlfco', 'unit.lock', 'unexpected', 'directory', 'dangling'):
+                with self.subTest(name=name, leaf=leaf):
+                    path = self.output / 'crates' / name / 'builtin' / leaf
+                    if leaf == 'directory':
+                        path.mkdir()
+                    elif leaf == 'dangling':
+                        path.symlink_to(self.base / 'missing')
+                    else:
+                        self.update_artifact(path, 'MOCK unexpected local builtin')
+                    self.reject()
+                    path.rmdir() if leaf == 'directory' else path.unlink()
+                    self.gate['artifacts'].pop(str(path), None)
+
+    def test_owner_extra_contents_rejected_even_if_inventory_rebound(self):
+        for leaf in ('unexpected', 'directory'):
+            with self.subTest(leaf=leaf):
+                path = self.output / 'crates/mlf-foundation/builtin' / leaf
+                if leaf == 'directory':
+                    path.mkdir()
+                else:
+                    self.update_artifact(path, 'MOCK unexpected owner file')
+                self.reject()
+                path.rmdir() if leaf == 'directory' else path.unlink()
+                self.gate['artifacts'].pop(str(path), None)
+
+    def test_owner_artifact_bytes_and_full_hash_inventory_required(self):
+        for name in ('unit.mlfci', 'unit.mlfco', 'unit.lock'):
+            path = self.output / 'crates/mlf-foundation/builtin' / name
+            with self.subTest(name=name, mutation='bytes'):
+                raw = path.read_bytes(); path.write_bytes(raw + b'tampered external reference')
+                self.reject(); path.write_bytes(raw)
+            with self.subTest(name=name, mutation='map omission'):
+                digest = self.gate['artifacts'].pop(str(path))
+                self.reject(); self.gate['artifacts'][str(path)] = digest
+
+    def test_frozen_foundational_dependency_closure_required(self):
+        changes = [
+            ('mlf-foundation', {'mlf-frontend': {'path': '../mlf-frontend'}}),
+            ('mlf-async', {}),
+            ('mlf-language-core', {'mlf-async': {'path': '../mlf-async'}}),
+            ('mlf-frontend', {'mlf-foundation': {'path': '../mlf-foundation'}}),
+            ('mlf-frontend', {'mlf-foundation': {'path': '../mlf-foundation'},
+                              'mlf-language-core': {'path': '../mlf-language-core'},
+                              'unknown': {'path': '../unknown'}}),
+            ('mlf-async', {'mlf-foundation': {'path': '../old-foundation'}}),
+        ]
+        for name, dependencies in changes:
+            with self.subTest(name=name, dependencies=dependencies):
+                path = self.root / 'libraries' / name / 'mlf-package.json'
+                original = p.read(path); changed = dict(original, dependencies=dependencies)
+                self.write(path, changed)
+                with self.assertRaisesRegex(ValueError, 'unreviewed foundational dependency graph'):
+                    p.foundational_inventory(self.root)
+                self.reject()
+                self.write(path, original)
+
+    def test_rebound_specs_cannot_change_dependency_or_builtin_paths(self):
+        path = self.output / 'crates/mlf-frontend/crate.spec'
+        original = path.read_text()
+        dependency = str(self.output / 'crates/mlf-language-core/unit.mlfci')
+        builtin = str(self.output / 'crates/mlf-frontend/builtin/unit')
+        for old, replacement in ((p.pack([dependency]), ''),
+                                 (dependency, str(self.base / 'old-run/unit.mlfci')),
+                                 (builtin, str(self.base / 'external-builtin/unit'))):
+            with self.subTest(replacement=replacement):
+                changed = original.replace(old, replacement)
+                self.assertNotEqual(changed, original)
+                self.update_artifact(path, changed)
+                self.gate['inputs'][str(path)] = p.sha(path)
+                self.reject()
+        self.update_artifact(path, original); self.gate['inputs'][str(path)] = p.sha(path)
+
+    def test_builtin_layout_failure_is_retained_without_success_seals(self):
+        self.next_output('failed-builtin-layout')
+        def command(wrapper, **kwargs):
+            result = self.command(wrapper, **kwargs)
+            if '--compile-crate' in wrapper:
+                spec_path = Path(wrapper[wrapper.index('--compile-crate') + 1])
+                if spec_path.parent.name == 'mlf-async':
+                    self.write(spec_path.parent / 'builtin/unexpected', 'MOCK local content')
+            return result
+        with mock.patch.object(p, 'checkpoint'), mock.patch.object(p, 'authenticate_producer'), \
+                mock.patch.object(p, 'load_supervisor', side_effect=self.mock_supervisor), \
+                mock.patch.object(p, 'managed_run', side_effect=command), redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(ValueError, 'unexpected builtin directory contents'):
+                p.collect(self.binding, self.output)
+        self.assertTrue((self.output / 'gate.json').exists())
+        self.assertFalse(p.read(self.output / 'failure.json')['complete'])
+        self.assertFalse((self.output / 'complete.json').exists())
+        self.assertFalse((self.output / 'driver-resources-final.json').exists())
 
     def test_output_not_overwritten(self):
         with self.assertRaises(FileExistsError):

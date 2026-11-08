@@ -31,6 +31,12 @@ PLAN_ROOTS = {'root': '.', 'tests': 'tests', 'testing-tools': 'testing/tools',
               'async': 'libraries/mlf-async', 'tests-shared': 'tests/shared',
               'async-fixtures': 'tests/async-package'}
 FOUNDATIONS = ('mlf-foundation', 'mlf-async', 'mlf-language-core', 'mlf-frontend')
+FOUNDATIONAL_DEPENDENCIES = {
+    'mlf-foundation': (),
+    'mlf-async': ('mlf-foundation',),
+    'mlf-language-core': ('mlf-foundation',),
+    'mlf-frontend': ('mlf-foundation', 'mlf-language-core'),
+}
 DIGEST = re.compile(r'[0-9a-f]{64}\Z')
 COMMIT = re.compile(r'[0-9a-f]{40}\Z')
 MIB = 1024 ** 2
@@ -127,6 +133,9 @@ def foundational_inventory(root):
         data = read(manifest)
         require(data.get('format') == 1 and data.get('name') == name and data.get('version') == '0.3.0',
                 'unexpected foundational package identity')
+        require(data.get('dependencies', {}) == {
+                    dep: {'path': '../' + dep} for dep in FOUNDATIONAL_DEPENDENCIES[name]},
+                'unreviewed foundational dependency graph: ' + name)
         inventory = module_inventory(manifest)
         require(inventory and not modules.intersection(inventory), 'empty or duplicate module inventory')
         require(not paths.intersection(v['path'] for v in inventory.values()), 'duplicate source inventory')
@@ -483,6 +492,12 @@ def authenticate_gate(path, digest, producer_digest, root=ROOT):
     require(gate.get('producer_receipt_sha256') == producer_digest, 'wrong gate producer')
     inventory = foundational_inventory(root)
     require(gate.get('inventory') == inventory, 'foundational manifest/source inventory differs')
+    # The frozen manifest DAG has exactly one dependency-free crate. The reviewed
+    # withPreludeUsing/loadGraph source installs there and lets all consumers
+    # inherit Prelude + MLF.Primitive through their loaded dependency closure.
+    # This is a source/command/retained-bytes contract, not independent CI-field
+    # decoding or a guarantee against self-consistent receipt repackaging.
+    builtin_owner, = [name for name in FOUNDATIONS if not FOUNDATIONAL_DEPENDENCIES[name]]
     results, commands = gate.get('results', {}), gate.get('commands', [])
     require(set(results) == set(inventory) and len(commands) == len(inventory)
             and {c['crate'] for c in commands} == set(inventory), 'exact four cold crates required')
@@ -523,9 +538,14 @@ def authenticate_gate(path, digest, producer_digest, root=ROOT):
         for suffix in ('mlfci', 'mlfco', 'queries'):
             artifact = regular(directory / ('unit.' + suffix))
             require(artifact.stat().st_size > 0 and tracked.get(str(artifact)) == sha(artifact), 'missing crate output')
-        for suffix in ('mlfci', 'mlfco'):
-            artifact = regular(directory / 'builtin' / ('unit.' + suffix))
-            require(artifact.stat().st_size > 0 and tracked.get(str(artifact)) == sha(artifact), 'missing cold builtin output')
+        builtin = canonical_dir(directory / 'builtin')
+        expected_builtin = {'unit.mlfci', 'unit.mlfco', 'unit.lock'} if directory.name == builtin_owner else set()
+        require({entry.name for entry in builtin.iterdir()} == expected_builtin,
+                'unexpected builtin directory contents: ' + str(builtin))
+        for name in expected_builtin:
+            artifact = regular(builtin / name)
+            require((name == 'unit.lock' or artifact.stat().st_size > 0)
+                    and gate['artifacts'].get(str(artifact)) == sha(artifact), 'missing cold builtin output')
         # Retain every query-cache and emitted artifact byte, not merely a summary.
         for artifact in directory.rglob('*'):
             if artifact.is_file():
