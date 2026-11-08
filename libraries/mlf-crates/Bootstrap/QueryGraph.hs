@@ -219,30 +219,33 @@ module Bootstrap.QueryGraph where {
   requireKey table identity = case M.lookup compareString identity table of {
     Nothing -> Left "unknown snapshot identity"; Just value -> Right value
   };
+  -- Pass the shared rank tables through one function boundary so native
+  -- address callbacks reuse them. Keep parsing and inventory validation in
+  -- the entry point to avoid expanding extra helper types in the crate object.
   encodeIndex config nodes = do {
-    let { rows = M.elems nodes };
-    addresses <- traverseEither (compose parseAddress nodeKey) rows;
+    addresses <- traverseEither (compose parseAddress nodeKey) (M.elems nodes);
     let { select pred = map addressId (filter (compose pred addressTag) addresses);
       evidence = uniqueNames (select (\tag -> tag == evidenceTag));
       types = uniqueNames (select (\tag -> tag == datatypeTag || tag == inputDatatypeTag)) };
     requests <- traverseEither evidenceParts evidence;
     let { groups = uniqueNames (append (select isGroup) (map (\((,,) g _ _) -> g) requests)) };
     members <- traverseEither membersOf groups;
-    let { declarations = uniqueNames (append (select (\tag -> tag == bindingTag || tag == inputBindingTag))
-              (concat members));
-      declIds = ranks declarations; groupIds = ranks groups; requestIds = ranks evidence; typeIds = ranks types;
-      encodeAddress (Address tag name) = do {
-        index <- requireKey (if isGroup tag then groupIds else if tag == evidenceTag then requestIds
-          else if tag == datatypeTag || tag == inputDatatypeTag then typeIds else declIds) name;
-        Right (if tag == bindingTag then W.VInt index else W.VNode tag [W.VInt index])
-      };
-      encodeGroup names = mapEither (A.toList W.VInt) (traverseEither (requireKey declIds) names);
-      encodeEvidence ((,,) group site goal) = mapEither
-        (\i -> W.VNode 414 [W.VInt i,W.VInt site,W.VText goal]) (requireKey groupIds group)
-    };
+    let { declarations = uniqueNames (append (select (\tag -> tag == bindingTag || tag == inputBindingTag)) (concat members));
+      declIds = ranks declarations; groupIds = ranks groups; requestIds = ranks evidence; typeIds = ranks types };
     ensure (not (elem eqString "" declarations) && not (elem eqString "" types)) "empty snapshot identity";
     ensure (not (eqString config "")) "empty query graph configuration";
     traverseEither (checkIdentityBudget identityBudget) [declarations,groups,evidence,types,M.keys nodes];
+    encodeIndexRows config nodes addresses ((,) ((,,,) declarations types members requests) ((,,,) declIds groupIds requestIds typeIds))
+  };
+  encodeIndexRows config nodes addresses
+    ((,) ((,,,) declarations types members requests) ((,,,) declIds groupIds requestIds typeIds)) = do {
+    let { encodeAddress (Address tag name) = do {
+      index <- requireKey (if isGroup tag then groupIds else if tag == evidenceTag then requestIds
+        else if tag == datatypeTag || tag == inputDatatypeTag then typeIds else declIds) name;
+      Right (if tag == bindingTag then W.VInt index else W.VNode tag [W.VInt index]) };
+      encodeGroup names = mapEither (A.toList W.VInt) (traverseEither (requireKey declIds) names);
+      encodeEvidence ((,,) group site goal) = mapEither
+        (\i -> W.VNode 414 [W.VInt i,W.VInt site,W.VText goal]) (requireKey groupIds group) };
     encodedGroups <- traverseEither encodeGroup members;
     encodedEvidence <- traverseEither encodeEvidence requests;
     keys <- traverseEither encodeAddress addresses;
@@ -250,10 +253,8 @@ module Bootstrap.QueryGraph where {
       encodeRow ((,) descriptor (QueryNode _ digest edges payload)) = do {
         ensure (validDigest digest payload) "invalid query graph digest";
         reads <- traverseEither (compose (requireKey byKey) fst) edges;
-        Right (W.VNode 413 [descriptor,W.VText digest,W.VNode 1 reads,A.toMaybe A.toText payload])
-      }
-    };
-    entries <- traverseEither encodeRow (zip keys rows);
+        Right (W.VNode 413 [descriptor,W.VText digest,W.VNode 1 reads,A.toMaybe A.toText payload]) } };
+    entries <- traverseEither encodeRow (zip keys (M.elems nodes));
     Right (W.VNode 412 [W.VText "MLF-CRATE-QUERY-GRAPH-2",W.VText config,A.toList W.VText declarations,
       W.VNode 1 encodedGroups,W.VNode 1 encodedEvidence,A.toList W.VText types,W.VNode 1 entries])
   };

@@ -25,8 +25,9 @@ module Bootstrap.CrateGraph where {
   import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Surface as Surface;
 
+  data ScopeCache = ScopeCache ([] String) String ([] ((,) String String)) String ByteArray;
   data State = State G.Session Source.CheckedContracts
-    (Map String Open.Environment) ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray);
+    (Map String Open.Environment) ([] ((,,) String Open.Fragment ([] (V.Index Declaration)))) Int Int ([] Q.GroupResult) (Maybe IntArray) (Maybe ScopeCache);
   bindingKey scope i = G.key "Binding" (Source.declStable scope i);
   requireBindings scope ids = requireNodes (map (bindingKey scope) ids);
   -- In-memory SCC queries use the full ordered member list. Packing its
@@ -81,13 +82,45 @@ module Bootstrap.CrateGraph where {
   } in W.VNode 421 [W.VText "prepared-declarations-1", A.toList A.toText (Q.referenceDefinitions table),
     W.VText (Q.list member (Source.groupOriginal prepared)), W.VText (Q.list member (Source.groupMembers prepared)),
     A.toList A.toText (Q.sourceGroupMetadataWith token candidate prepared)];
-  scopeInventory prepared = case Source.groupAuthority prepared of {
-    Nothing -> W.VNode 422 [];
-    Just (Source.RootAuthority _ _ _ candidates protected) -> W.VNode 422
-      (map (\candidate -> W.VText (candidateMetadata protected candidate)) candidates)
+  scopeMetadata prepared = case Source.groupAuthority prepared of {
+    Nothing -> [];
+    Just (Source.RootAuthority _ _ _ candidates protected) -> map (candidateMetadata protected) candidates
   };
-  scopeValue prepared dependencies = W.VNode 423
-    [scopeInventory prepared,A.toList (A.toPair A.toText A.toText) (map G.edge dependencies)];
+  scopeInventoryValue metadata = W.VNode 422 (map W.VText metadata);
+  scopeInventory prepared = scopeInventoryValue (scopeMetadata prepared);
+  scopeValueFrom metadata edges = W.VNode 423
+    [scopeInventoryValue metadata,A.toList (A.toPair A.toText A.toText) edges];
+  scopeValue prepared dependencies = scopeValueFrom (scopeMetadata prepared) (map G.edge dependencies);
+  -- Only the immediately preceding successful encoding is retained. Equality
+  -- checks the complete ordered metadata and edges, never a digest alone.
+  scopeInventoryDigest metadata cached = case cached of {
+    Just (ScopeCache previous digest _ _ _) -> if eqList eqString metadata previous then Just digest else Nothing;
+    Nothing -> Nothing
+  };
+  scopeEncoding metadata edges cached = case cached of {
+    Just (ScopeCache previous _ reads digest bytes) ->
+      if eqList eqString metadata previous && eqList (eqPair eqString eqString) edges reads
+      then Just ((,) digest bytes) else Nothing;
+    Nothing -> Nothing
+  };
+  scopeInventoryInput wanted metadata cached session = do {
+    encoded <- case scopeInventoryDigest metadata cached of {
+      Just digest -> ioReturn (Right digest);
+      Nothing -> G.hashValue (scopeInventoryValue metadata)
+    };
+    ioReturn (mapEither (\digest -> (,) digest
+      (G.recordDigest (G.inputKey wanted) [] Nothing digest Nothing session)) encoded)
+  };
+  recordScope wanted leaf metadata inventoryDigest dependencies cached session = do {
+    let { edges = map G.edge dependencies };
+    encoded <- case scopeEncoding metadata edges cached of {
+      Just value -> ioReturn (Right value);
+      Nothing -> G.encodeHashed (scopeValueFrom metadata edges)
+    };
+    ioReturn (mapEither (\((,) digest bytes) -> (,)
+      (ScopeCache metadata inventoryDigest edges digest bytes)
+      (G.recordDigest wanted ((:) (G.edge leaf) edges) (Just digest) digest (Just bytes) session)) encoded)
+  };
   rawValue references group fragment = W.VNode 425
     [A.toList (A.toPair A.toText A.toText) references,Open.encodeBody "raw" group fragment];
   compile verify crateId compilerHash cacheDir imports protected originalPlan =
@@ -166,7 +199,7 @@ module Bootstrap.CrateGraph where {
             case loaded of { Left e -> ioReturn (Left e); Right ready -> do {
               G.elapsed statistics 0 graphStarted;
               runGroups verify (eqString auditSetting "1") crateId inventory groups
-                (State ready contracts M.empty [] 0 0 [] statistics)
+                (State ready contracts M.empty [] 0 0 [] statistics Nothing)
             } }
           } }
         } }
@@ -174,7 +207,7 @@ module Bootstrap.CrateGraph where {
   runGroups verify audit crateId inventory groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
-      State session contracts contexts objects inferred reused reports statistics ->
+      State session contracts contexts objects inferred reused reports statistics scopeCache ->
         let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in
         case bindEither (prepare contracts) (Source.slotPrepared contracts owners) of {
           Left e -> ioReturn (Left e);
@@ -186,8 +219,9 @@ module Bootstrap.CrateGraph where {
             graphStarted <- G.clock statistics;
             source <- input (groupKey PreparedQuery slots) (preparedValue slots prepared) session;
             case source of { Left e -> ioReturn (Left e); Right ((,) sourceNode first) -> do {
-              scopeInput <- input (groupKey ScopeInventoryQuery slots) (scopeInventory prepared) first;
-              case scopeInput of { Left e -> ioReturn (Left e); Right ((,) scopeLeaf second) ->
+              let { metadata = scopeMetadata prepared };
+              scopeInput <- scopeInventoryInput (groupKey ScopeInventoryQuery slots) metadata scopeCache first;
+              case scopeInput of { Left e -> ioReturn (Left e); Right ((,) inventoryDigest ((,) scopeLeaf second)) ->
                 case do {
                   candidateNodes <- requireBindings scope (Source.candidateIds slots) second;
                   bindingNodes <- requireBindings scope (Source.parameterIds slots) second;
@@ -196,10 +230,9 @@ module Bootstrap.CrateGraph where {
                 } of {
                   Left e -> ioReturn (Left e);
                   Right ((,,) candidateNodes bindingNodes dataNodes) -> do {
-                    scoped <- G.record (groupKey ScopeQuery slots)
-                      ((:) (G.edge scopeLeaf) (map G.edge candidateNodes)) True
-                      (scopeValue prepared candidateNodes) second;
-                    case scoped of { Left e -> ioReturn (Left e); Right ((,) scopeNode third) -> do {
+                    scoped <- recordScope (groupKey ScopeQuery slots) scopeLeaf metadata inventoryDigest
+                      candidateNodes scopeCache second;
+                    case scoped of { Left e -> ioReturn (Left e); Right ((,) nextScopeCache ((,) scopeNode third)) -> do {
                       let { dataIdentity = Separate.pack (map G.nodeHash dataNodes);
                         environment = case M.lookup compareString dataIdentity contexts of {
                           Just env -> Right env; Nothing -> Open.environment declarations } };
@@ -290,7 +323,7 @@ module Bootstrap.CrateGraph where {
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)
                                         ((:) (Q.GroupResult group names hit
                                           (Separate.fingerprint (Q.list Q.encodeSourceContract (map (\((,) i c) -> (,) (Source.declName scope i) c) (sortedDelta slots delta))))
-                                          (G.nodeHash rawNode)) reports) statistics)
+                                          (G.nodeHash rawNode)) reports) statistics (Just nextScopeCache))
                                   } }
                                 }
                                 }
@@ -344,12 +377,12 @@ module Bootstrap.CrateGraph where {
       ioReturn (mapEither (\((,) finish next) -> foldlStrict (binding (G.edge finish)) next entries) recorded)
     } }
   };
-  checkedResult (State session contracts _ objects inferred reused reports _) =
+  checkedResult (State session contracts _ objects inferred reused reports _ _) =
     (,,,) (reverse objects) (Q.QueryReport inferred reused (reverse reports)) contracts session;
   result state = case checkedResult state of { (,,,) fragments report contracts session ->
     (,,,) (map (\((,,) n f _) -> (,) n f) fragments) report (Source.checkedNamed contracts) session
   };
-  statistics (State _ _ _ _ _ _ _ stats) = stats;
+  statistics (State _ _ _ _ _ _ _ stats _) = stats;
   data EvidenceQuery = EvidenceQuery Source.GroupSlots Int XType;
   evidenceKey (EvidenceQuery slots site goal) = G.key "Evidence"
     (Separate.pack [groupIdentity slots,showInt site,Pretty.prettyType (Separate.normalType goal)]);

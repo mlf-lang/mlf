@@ -1,0 +1,39 @@
+{
+  "status": "work-in-progress",
+  "qualification": false,
+  "production_commit": "3c7c2b7a4774f403f93bb77ac38d5cb143ce7743",
+  "baseline_commit": "1ce9f25eecf8283cd818ba79ea5d751ab05d0df4",
+  "production_source_sha256": "d2b72319d24f16a1d0fba89ecf9d0ca01399d41cca00f1ee848342b9ad3fe757",
+  "completed": [
+    "Bundle verified and all 22 evidence file hashes matched.",
+    "Independent input reader passed: 2510 rows, 15092 ordered reads, 1434 payload references.",
+    "Static exact-port review passed; one added Rows helper with unchanged checks and tuple field order.",
+    "GHC-hosted exact-source reference/candidate replay matched complete snapshot bytes and logical tables/rows.",
+    "Twelve fixed rejection/precedence checks passed in both source arms.",
+    "Independent synthetic generation passed both encoders: all descriptor kinds, Unicode, 12 nodes, 10 reads, 2 repeated reads.",
+    "Ordinary offline manager lock and locked plan passed; only QueryGraph source hash changed semantically.",
+    "Repository shared-source inventory and dependency boundaries passed for 140 modules.",
+    "Original native Linux seed bundle passed scripts/bootstrap-shared.sh --verify-seed-only; no bootstrap ran.",
+    "Final fresh replay passed with before/after source, independent-reader, Python and tool hashes: both fixtures, both encoders and 12 fixed negative controls per fixture. Watchdog exit 0, no descendants, 27.812 seconds, peak process-tree RSS 665600000 bytes."
+  ],
+  "pending": [
+    "Current-source native bootstrap/stage-1 production and a normal locked emlf build.",
+    "Production schema-7 mlf-crates object must fit unchanged 67108864 expanded-work limit.",
+    "Native thin-probe result and 4/256-group, Bitstream, IntSet real CLI byte/performance comparisons.",
+    "Original full step-18 controls: cold/warm self, root locked build/test, CoreSolver 1800s, Port, Foundation RSS, compatibility/ABI/cache/failure controls.",
+    "Latest integration ancestry and a250ec33 Prelude check, final-source revalidation, authorized publication/review/merge."
+  ],
+  "remote_observations": {
+    "pr43_head": "0812ca846b91ad55abc433d7fa352d18f315cadf",
+    "pr43_state": "open draft, not mergeable against main",
+    "declid_migration_head": "3d6c472b403f6aebd1960a4c1b7fb84b33af4261"
+  },
+  "limits": [
+    "GHC semantic controls are not native qualification or a native performance claim.",
+    "Initial partial probe receipt is retained; final-probe.json closes missing independent-reader/Python pins in a new-directory replay.",
+    "Host timer includes candidate-only lazy node conversion; no timing speedup is claimed.",
+    "No remote branches, PRs, releases, tags or assets have been changed."
+  ],
+  "final_probe_sha256": "fd40ee2d4a9240273db55342353d919ed68d8753af66e78dacdea22aeef6da4c",
+  "final_probe_watchdog_sha256": "8f2ec381187f5f28e8932bcd87380a2704a0afae6ebfce793e5b9cad2a078e64"
+}

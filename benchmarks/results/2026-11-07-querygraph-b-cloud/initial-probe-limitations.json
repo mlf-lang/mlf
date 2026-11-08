@@ -1,0 +1,11 @@
+{
+  "complete": true,
+  "qualification": false,
+  "receipt": "ghc-probe-v1/results.json",
+  "receipt_sha256": "e1eea33072ad6f196c0c4e39ebf3a16d004ba25844556d4a57de5347c33b4af4",
+  "limitations": [
+    "The first replay did not pin the independent Python reader modules or Python interpreter. Those files were read for this replay but are not covered by its before/after inventory.",
+    "GHC timing includes lazy candidate node conversion; no performance conclusion is claimed.",
+    "The updated runner adds missing provenance pins and explicitly labels this timing limitation; it requires a fresh rerun."
+  ]
+}

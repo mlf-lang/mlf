@@ -1,0 +1,22 @@
+{
+  "watchdog.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-work/.mlf-build/querygraph-b/producer-guard/bounded-receipt.json",
+    "bytes": 203896,
+    "sha256": "9fe9e11ef48e1acd5659f2ebd8c04a5e2ee0f3ad3fe45342b0d6f7eb855a937f"
+  },
+  "build-receipt.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-work/.mlf-build/querygraph-b/producer-guard/producer/receipt.json",
+    "bytes": 1186264,
+    "sha256": "ae1289a61d448cfe532c556ce09f087246a0e236ec19ac1fe94011d073dcd20b"
+  },
+  "builtin-verification.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-work/.mlf-build/querygraph-b/producer-guard/producer/builtin-verification/receipt.json",
+    "bytes": 28366,
+    "sha256": "97bb96db926be4745e77bd0215618e65f64e321694acecc0fddae8fd9b18ba7b"
+  },
+  "authenticated-summary.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-work/.mlf-build/querygraph-b/producer-guard/authenticated-summary.json",
+    "bytes": 702,
+    "sha256": "1b9b13e93010ea49d2f6f943dacea723149f30179ad8418b127563d22d40a85c"
+  }
+}

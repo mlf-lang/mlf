@@ -1,0 +1,16 @@
+{
+  "complete": true,
+  "qualification": "ordinary exact-source GHC producer only; not native qualification",
+  "source_commit": "5bd186de3486c5dadd59f86a5453d30d9d801dd5",
+  "receipt_sha256": "ae1289a61d448cfe532c556ce09f087246a0e236ec19ac1fe94011d073dcd20b",
+  "receipt_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-work/.mlf-build/querygraph-b/producer-guard/producer/receipt.json",
+  "authenticate_build": true,
+  "guard_complete": true,
+  "elapsed_seconds": 234.88096473899895,
+  "peak_group_rss": 1066844160,
+  "producer_host": "GHC",
+  "implementation_identity": "MLF/shared-haskell-v1 GHC",
+  "module_count": 140,
+  "optimization": "2",
+  "window_elapsed_seconds": 645.7938942909241
+}

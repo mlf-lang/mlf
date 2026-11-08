@@ -1,0 +1,133 @@
+{
+  "evidence_hashes_verified": [
+    {
+      "file": "B-diagnostic-source.hs",
+      "sha256": "de7130c3926d004db11941bf1e0651de2a6e20b835aa48d7a2159629b5090d70",
+      "bytes": 34208
+    },
+    {
+      "file": "B-diagnostic-driver.hs",
+      "sha256": "ac9372bddfa1cd92505718b414fb473500e65659114c8154f03d331527039dd6",
+      "bytes": 4399
+    },
+    {
+      "file": "B-diagnostic-source-plan.json",
+      "sha256": "b7854886395205779d58df3f0030b59ca7fd6dfef664389032609f945f142de6",
+      "bytes": 1350
+    },
+    {
+      "file": "B-diagnostic-runtime.json",
+      "sha256": "99af351dcea79445d51d8e0b185332764928eeffc8a2d615402b8ba9bd65d789",
+      "bytes": 4552
+    },
+    {
+      "file": "B-diagnostic-build.json",
+      "sha256": "75dfc217f43795c96d81c11cb632155b31e93d9b0a61970ffd01f08940b66922",
+      "bytes": 5407
+    },
+    {
+      "file": "full-tuple-production-failure.json",
+      "sha256": "bcf6e3aaa74b376ea6bc97e9958c0f8ca57bf08167212c83412a4edfaa425881",
+      "bytes": 2379
+    },
+    {
+      "file": "full-tuple-production-stderr.txt",
+      "sha256": "00c54fdd4623df5e0b6c5fc2ed2c5f82e5e2ccd2dca7dca873ba6312acff5862",
+      "bytes": 752
+    },
+    {
+      "file": "full-tuple-source.hs",
+      "sha256": "16e82bc18374445358baeca83ba444f6ff1ab930c3e04d92b434bec5788f8a20",
+      "bytes": 32722
+    },
+    {
+      "file": "single-address-object-budget.json",
+      "sha256": "17a587cb1df7bf09493918457faf37f64697e62f53f361d532256668d76c9197",
+      "bytes": 718
+    },
+    {
+      "file": "scope-native-compiler.json",
+      "sha256": "23711b6042b6cd72a1631d9b175187c04eef82fb3926edb3df87f96934d5c042",
+      "bytes": 2251
+    },
+    {
+      "file": "scope-cli-summary.json",
+      "sha256": "4413aac5ebaf65112aaeed77f8feb6e33d236a5248df1be20389a77b9ae36fee",
+      "bytes": 1995
+    },
+    {
+      "file": "intset-snapshot-runtime.json",
+      "sha256": "30a047decc9b4523bb30015ec2e4ca4102643ca182da22725f5c85ecc57f7ea7",
+      "bytes": 2145
+    },
+    {
+      "file": "cold-worker-profile-regions.json",
+      "sha256": "76cbd507f5719e630d526588deb79c0289bbc0c975f5f7bf2830116feaa10bbd",
+      "bytes": 70495
+    },
+    {
+      "file": "cold-worker-replay-README.md",
+      "sha256": "892b680454d602c0c81afbd5640ff5c908fd858c1581ccad09ad699f499d2e77",
+      "bytes": 4525
+    },
+    {
+      "file": "core-r3-terminal.json",
+      "sha256": "d6f346cec21ec76742a6eaaef8db57c18b2b6f079e31c08fd43f4000264448c4",
+      "bytes": 2148
+    },
+    {
+      "file": "port-r3-terminal.json",
+      "sha256": "5f91bab48c7184fa1308b77ba9fe08622e0a789de13c4ed9a98f1cffa318eb76",
+      "bytes": 1932
+    },
+    {
+      "file": "r3-remote-source-audit.json",
+      "sha256": "173d90669a97b8b54e73a11f73fe65007e5c778588cb277828cda4e774f3f8bc",
+      "bytes": 3033
+    },
+    {
+      "file": "original-migration-plan.md",
+      "sha256": "8a27befe8318860390c50045a191b2f9799691a711d8036b584e1ede5cf21610",
+      "bytes": 18696
+    },
+    {
+      "file": "generation.mlfqg",
+      "sha256": "4392c473a36821393e23f9fdcc212d5f10c3587b9eed7141dba978a4615c8230",
+      "bytes": 384302
+    },
+    {
+      "file": "config.txt",
+      "sha256": "972acc95f35d48ca8eb5640cf0604d18bcb9d18fecaeb6924dc9d95e677842a8",
+      "bytes": 168
+    },
+    {
+      "file": "foundation-review-README.md",
+      "sha256": "aa0198e8e5db8d22b01844b02f753161bb3249f2094fda285f89a5473747bd64",
+      "bytes": 3945
+    },
+    {
+      "file": "seed-options-REVIEW.md",
+      "sha256": "576746d917529230719cca389716de0fd3a350ac90706c15c48c75e42d4b85d2",
+      "bytes": 4437
+    }
+  ],
+  "snapshot": {
+    "schema": 6,
+    "physical_bytes": 384302,
+    "symbols": 2156,
+    "symbol_utf8_bytes": 300736,
+    "nodes": 9858,
+    "edges": 31497,
+    "roots": 1,
+    "depth": 6,
+    "root_expanded_work": 513842,
+    "shared_node_references": 21640
+  },
+  "rows": 2510,
+  "declarations": 788,
+  "groups": 168,
+  "evidence": 20,
+  "datatypes": 122,
+  "payloads": 1434,
+  "ordered_reads": 15092
+}

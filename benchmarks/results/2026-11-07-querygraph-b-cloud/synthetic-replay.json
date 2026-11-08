@@ -1,0 +1,30 @@
+{
+  "complete": true,
+  "qualification": false,
+  "scope": "additional fixed independent synthetic fixture, old validated probe binary; no rebuilt producer",
+  "binary_sha256": "2ffb7e52ced9cfe9a0226889e2285178ce000313339fe3aa8b0d64a45241f2dc",
+  "input_sha256": "9d41fd6b8af5aa58a4710ffa6540e25bb69b11d2c201c3bc15be9be8632e71e5",
+  "nodes": 12,
+  "ordered_reads": 10,
+  "duplicate_reads": 2,
+  "cases": [
+    {
+      "mode": "reference",
+      "exit": 0,
+      "stdout": "PREP_MS 6\nTIMED_MS 1\nOK reference 12 9d41fd6b8af5aa58a4710ffa6540e25bb69b11d2c201c3bc15be9be8632e71e5\n",
+      "output_sha256": "9d41fd6b8af5aa58a4710ffa6540e25bb69b11d2c201c3bc15be9be8632e71e5"
+    },
+    {
+      "mode": "candidate",
+      "exit": 0,
+      "stdout": "PREP_MS 5\nTIMED_MS 1\nOK candidate 12 9d41fd6b8af5aa58a4710ffa6540e25bb69b11d2c201c3bc15be9be8632e71e5\n",
+      "output_sha256": "9d41fd6b8af5aa58a4710ffa6540e25bb69b11d2c201c3bc15be9be8632e71e5"
+    },
+    {
+      "mode": "controls",
+      "exit": 0,
+      "stdout": "PREP_MS 5\nTIMED_MS 6\nOK controls 12 9d41fd6b8af5aa58a4710ffa6540e25bb69b11d2c201c3bc15be9be8632e71e5\n",
+      "output_sha256": "9d41fd6b8af5aa58a4710ffa6540e25bb69b11d2c201c3bc15be9be8632e71e5"
+    }
+  ]
+}

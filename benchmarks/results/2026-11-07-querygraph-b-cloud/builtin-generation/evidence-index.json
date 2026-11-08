@@ -1,0 +1,48 @@
+{
+  "ordinary-o0-watchdog.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/bounded-receipt.json",
+    "bytes": 131727,
+    "sha256": "69beb51b2a5385d2ab2c59ddd4be6e2058e1471566410cc1c3c13c3627bd1d51"
+  },
+  "ordinary-o0-build.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/shared-ghc/receipt.json",
+    "bytes": 1173998,
+    "sha256": "484d86fee35d4daaab2c5d0f0b5030dd1a173a5b47e96ea1387e152a1e1d98e4"
+  },
+  "original-stale-verification.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/shared-ghc/builtin-verification/receipt.json",
+    "bytes": 29030,
+    "sha256": "1ee9e1e1cde9cc88a19a81ebff93bb8df3e2f3d210659af19bacde8804b4cc47"
+  },
+  "original-stale.stdout": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/shared-ghc/builtin-verification/check-candidate.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "original-stale.stderr": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/shared-ghc/builtin-verification/check-candidate.stderr",
+    "bytes": 48,
+    "sha256": "8cf0a9cc3518aee07852f29b97a216bfe18fefe058c62e4710b35a8a809e700c"
+  },
+  "generation-watchdog.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/builtin-generation-guard/bounded-receipt.json",
+    "bytes": 75075,
+    "sha256": "2aee739dc098e01d2e18c4bea8df60dd925cb2905951a5d39475f250002f36ad"
+  },
+  "generation-receipt.json": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/builtin-generation-guard/results/receipt.json",
+    "bytes": 538347,
+    "sha256": "9b2886fd4334c427011c5d9901d224ca96d9b6a0c44e557a012b0b2355dc06da"
+  },
+  "generation.stderr": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/builtin-generation-guard/results/fresh-literal.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "generated_literal": {
+    "original_path": "/workspace/scratch/3f83e2ebe290/declid-issue37-generator-source-ec41739d/.mlf-build/builtin-generation-guard/results/fresh-literal.stdout",
+    "candidate_path": "bootstrap/MLF/BuiltinPreludeData.hs",
+    "bytes": 2220407,
+    "sha256": "d2512a3daf981164c3ae49f3e17473942803092d08a95c325da416afd2a8d89c"
+  }
+}
