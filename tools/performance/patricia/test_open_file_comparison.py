@@ -431,8 +431,11 @@ class RootPackageComparatorControls(ComparatorControls):
 
     def test_original_frozen_summed_work_limit_is_unchanged(self):
         from unittest import mock
-        import artifact_binary_reference as R
+        R = C._reference
         real = C.read_document
+        self.assertIs(real, R.read_document)
+        self.assertEqual(hashlib.sha256(C.Path(R.__file__).read_bytes()).hexdigest(),
+                         C.ORACLE_PINS['artifact_binary_reference.py'])
         calls = []
         def observed(raw, schema, *args, **kwargs):
             calls.append((schema, args, kwargs))
