@@ -236,5 +236,37 @@ class CurrentAsyncAbiGuard(unittest.TestCase):
             self.assertNotIn('mlf_require_async_completion_v2_abi', text)
 
 
+class MixedCompletionIntegerPayload(unittest.TestCase):
+    def setUp(self):
+        root = HERE.parents[1] / 'tests/fixtures/async-completion/runtime'
+        self.source = (root / 'mixed-values.emlf').read_text()
+        self.expected = (root / 'mixed-values.expected').read_bytes()
+
+    def test_explicit_integer_payload_keeps_int_statuses(self):
+        self.assertIn('printPayload : Integer -> IO ()', self.source)
+        self.assertIn('printPayload value = putStrLn (showInteger value)', self.source)
+        self.assertIn('asyncSubscribeCompletion integers printPayload', self.source)
+        self.assertEqual(self.source.count('asyncReadCompletion integers printPayload'), 2)
+        self.assertIn('ioBind (asyncResolveCompletion integers (readInteger "123456789012345678901234567890")) printInt', self.source)
+        self.assertIn('ioBind (asyncResolveCompletion integers (intToInteger 0)) printInt', self.source)
+        self.assertIn('ioBind (asyncResolveCompletion integers (panic "duplicate payload forced")) printInt', self.source)
+        self.assertNotIn('integers printInt', self.source)
+        self.assertIn('asyncReadCompletion strings putStrLn (putStrLn "closed")', self.source)
+
+    def test_literal_observation_is_not_replaced_by_wrapped_int(self):
+        original = (b'1\n0\n0\n0\n2\n123456789012345678901234567890\n0\ntyped string\n0\n1\n'
+                    b'123456789012345678901234567890\n123456789012345678901234567890\n'
+                    b'0\ntyped string\n0\n6\n3\nclosed\n')
+        self.assertEqual(self.expected, original)
+        payload = b'123456789012345678901234567890'
+        wrapped = ((int(payload) + 2**63) % 2**64) - 2**63
+        self.assertEqual(wrapped, -4362896299872285998)
+        for wrong in (str(wrapped).encode(), b'42', b'0'):
+            with self.subTest(wrong=wrong):
+                self.assertNotEqual(self.expected, self.expected.replace(payload, wrong))
+        self.assertNotEqual(self.expected, self.expected.rstrip(b'\n'))
+        self.assertNotEqual(self.expected, self.expected + b'diagnostic\n')
+
+
 if __name__ == '__main__':
     unittest.main()
