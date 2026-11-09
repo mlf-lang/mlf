@@ -14,6 +14,8 @@
  * objects must use their frozen old runtime, not silently cross this boundary. */
 void mlf_require_haskell_boundary_v4_abi(void);
 void mlf_require_byte_file_v2_abi(void);
+void mlf_require_freeze_st_array_abi(void);
+void mlf_require_st_to_io_abi(void);
 
 typedef struct MlfValue MlfValue;
 typedef struct MlfEnv MlfEnv;
@@ -43,6 +45,7 @@ MlfValue *mlf_thunk_new(MlfCode code, uint64_t count);
 MlfValue *mlf_thunk(MlfCode code, MlfEnv *env);
 MlfValue *mlf_closure(MlfCode code, MlfEnv *env);
 MlfValue *mlf_native_io(MlfCode code, MlfEnv *env);
+MlfValue *mlf_native_io_value(MlfCode code, MlfEnv *env);
 MlfValue *mlf_peek(MlfValue *value);
 _Noreturn void mlf_bounds_failure(void);
 MlfValue *mlf_application(MlfValue *function, MlfValue *argument);
@@ -94,6 +97,7 @@ MlfValue *mlf_st_new_array(MlfValue *size, MlfValue *initial);
 MlfValue *mlf_st_read_array(MlfValue *array, MlfValue *index);
 MlfValue *mlf_st_write_array(MlfValue *array, MlfValue *index, MlfValue *entry);
 MlfValue *mlf_st_length_array(MlfValue *array);
+MlfValue *mlf_st_freeze_array(MlfValue *array);
 MlfValue *mlf_prim1(int64_t primitive, MlfValue *a);
 MlfValue *mlf_prim2(int64_t primitive, MlfValue *a, MlfValue *b);
 MlfValue *mlf_prim3(int64_t primitive, MlfValue *a, MlfValue *b, MlfValue *c);

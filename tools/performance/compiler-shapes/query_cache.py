@@ -8,6 +8,7 @@ import sys
 
 SHARED = Path(__file__).resolve().parents[2] / 'shared'
 sys.path.insert(0, str(SHARED))
+from query_generation import Generation, cache_directory
 from artifact_binary_reference import read_document  # noqa: E402
 from test_query_index import read_index  # noqa: E402
 
@@ -47,9 +48,9 @@ def snapshot(query, report, destination):
     JSON wrapping also keeps these inputs in the CI receipts-only upload.
     Result bytes are already hashed by the ordinary complete file inventory.
     """
-    graph = query / GRAPH
-    if not graph.is_dir():
+    if not any((query / g / 'CURRENT').is_file() for g in (GRAPH, 'query-graph-v2')):
         return
+    graph = cache_directory(query)
     files = {}
     for path in sorted(graph.rglob('*')):
         if path.is_file() and (path.name == 'CURRENT' or path.suffix == '.mlfqg'):
@@ -97,7 +98,8 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
                 record['bytes'] >= 0 and valid_hash(record.get('sha256')),
                 'finite integral query inventory bytes and SHA')
     require(not any(p.endswith('.mlfq') for p in inventory), 'mixed legacy and graph query storage')
-    current = GRAPH + 'CURRENT'
+    graph = 'query-graph-v2/' if 'query-graph-v2/CURRENT' in inventory else GRAPH
+    current = graph + 'CURRENT'
     generations = [p for p in inventory if p.endswith('.mlfqg')]
     results = [p for p in inventory if p.endswith('.mlfqr')]
     require(current in inventory and len(generations) == 1 and results,
@@ -106,8 +108,8 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
     for path in generations + results:
         suffix = '.mlfqg' if path in generations else '.mlfqr'
         directory = 'generations/' if suffix == '.mlfqg' else 'results/'
-        name = path.removeprefix(GRAPH + directory).removesuffix(suffix)
-        require(path == GRAPH + directory + name + suffix and valid_hash(name),
+        name = path.removeprefix(graph + directory).removesuffix(suffix)
+        require(path == graph + directory + name + suffix and valid_hash(name),
                 'content-addressed query graph path')
         require(inventory[path]['bytes'] > 0 and inventory[path]['sha256'] == name,
                 'content-addressed query graph SHA')
@@ -125,68 +127,23 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
                 'retained query graph bytes match inventory')
         raw[path] = value
     generation = text(document(raw[current]))
-    require(valid_hash(generation) and generations == [GRAPH + 'generations/' + generation + '.mlfqg'],
+    require(valid_hash(generation) and generations == [graph + 'generations/' + generation + '.mlfqg'],
             'CURRENT selects retained generation')
-    index = document(raw[generations[0]])
-    indexed = index[0] == 'node' and index[1] == 412
-    if indexed:
-        format_value, configuration, _, _ = node(index, 412, 4)
-        require(text(format_value) == 'MLF-CRATE-QUERY-GRAPH-2' and text(configuration),
-                'query graph index format/configuration')
-    else:
-        format_value, configuration, entries = node(index, 411, 3)
-        require(text(format_value) == 'MLF-CRATE-QUERY-GRAPH-1' and text(configuration),
-                'query graph index format/configuration')
-    config = unpack(text(configuration))
+    wire = Generation(raw[generations[0]], expected_hash=generation)
+    expected_directory = 1 if wire.dictionary_format else wire.version
+    require(graph == 'query-graph-v' + str(expected_directory) + '/', 'generation directory version')
+    config = unpack(text(wire.config))
     require(len(config) == 5 and config[0] == crate and config[1] == compiler_sha and
-            valid_hash(compiler_sha) and config[2] and config[3] == 'open-fragment-checker-1' and
+            valid_hash(compiler_sha) and config[2] and config[3] in
+            ('open-fragment-checker-1', 'open-fragment-checker-1/finish-receipt-1') and
             config[4] in ('source', 'lowered'), 'query graph crate/compiler configuration')
-    if indexed:
-        # The independent oracle validates dictionary/ID canonicality, ordered
-        # reads, closure, longest path and referenced-work bounds before
-        # materializing the same logical rows used by the legacy checks below.
-        nodes, _ = read_index(raw[generations[0]], text(configuration), expected=generation)
-        for sha, _, payload in nodes.values():
-            if payload is not None:
-                require(valid_hash(payload) and payload == sha, 'query graph payload matches result hash')
-                require(GRAPH + 'results/' + payload + '.mlfqr' in inventory,
-                        'query graph missing retained payload')
-    else:
-        nodes = {}
-        for entry in node(entries, 1):
-            key_value, hash_value, reads_value, payload_value = node(entry, 410, 4)
-            key, sha = text(key_value), text(hash_value)
-            require(key not in nodes and valid_hash(sha), 'unique query graph keys and valid hashes')
-            reads = [tuple(text(x) for x in node(edge, 2, 2)) for edge in node(reads_value, 1)]
-            require(all(valid_hash(h) for _, h in reads), 'query graph dependency hash')
-            require(payload_value[0] == 'node' and payload_value[1] in (4, 5), 'query graph payload Maybe')
-            payload_children = node(payload_value, payload_value[1], 0 if payload_value[1] == 4 else 1)
-            payload = text(payload_children[0]) if payload_children else None
-            if payload is not None:
-                require(valid_hash(payload) and payload == sha, 'query graph payload matches result hash')
-                require(GRAPH + 'results/' + payload + '.mlfqr' in inventory,
-                        'query graph missing retained payload')
-            nodes[key] = (sha, reads, payload)
-    for _, reads, _ in nodes.values():
-        for key, sha in reads:
-            require(key in nodes and nodes[key][0] == sha, 'query graph missing/stale dependency')
-    # Iterative DFS avoids trusting Python's recursion limit or expanding sharing.
-    done = set()
-    for root in nodes:
-        visiting = set()
-        stack = [(root, False, 0)]
-        while stack:
-            key, complete, depth = stack.pop()
-            if key in done:
-                continue
-            if complete:
-                visiting.remove(key)
-                done.add(key)
-                continue
-            require(key not in visiting and depth < 4096, 'cyclic/deep query graph')
-            visiting.add(key)
-            stack.append((key, True, depth))
-            stack.extend((k, False, depth + 1) for k, _ in reversed(nodes[key][1]))
+    nodes = {}
+    for key, row in wire.nodes.items():
+        payload = row['payload']
+        if payload is not None:
+            require(graph + 'results/' + payload + '.mlfqr' in inventory,
+                    'query graph missing retained payload')
+        nodes[key] = (row['sha'], row['reads'], payload)
     report_text = evidence.get('query_report_json')
     require(isinstance(report_text, str), 'actual query report text missing')
     def unique_pairs(pairs):

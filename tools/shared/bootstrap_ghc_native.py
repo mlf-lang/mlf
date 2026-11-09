@@ -63,8 +63,11 @@ def authenticate_gate(path, digest, producer_digest):
     expected = {'mlf-foundation/0.3.0/library', 'mlf-async/0.3.0/library',
                 'mlf-language-core/0.3.0/library', 'mlf-frontend/0.3.0/library'}
     require(expected <= set(gate.get('results', {})), 'incomplete foundational gate')
-    require(sum(gate['results'][name]['module_count'] for name in expected) == 31,
-            'unexpected foundational module inventory')
+    for crate in expected:
+        package = crate.split('/')[0]
+        modules = read(ROOT / 'libraries' / package / 'mlf-package.json')['library']['modules']
+        require(gate['results'][crate]['module_count'] == len(modules),
+                'unexpected foundational module inventory: ' + package)
     require(all(v.get('reused_groups') == 0 for v in gate['results'].values()), 'foundational gate is not cold')
     for section in ('inputs', 'artifacts'):
         require(bool(gate.get(section)), 'missing gate ' + section)

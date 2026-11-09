@@ -160,9 +160,15 @@ in the complete `packages` campaign. All six full campaigns and the native
 macOS builds remain separate requirements; no skipped macOS job is used as a
 passing pre-merge prerequisite.
 
-## Automatic complete qualification on main
+## Optional complete qualification (automatic invocation paused)
 
-Every push to `main` invokes `native-qualification.yml` with `build_packages=false`.
+Automatic invocation of `native-qualification.yml` is paused at the user's
+request while DeclId integration precedes compiler-speed work. This pauses the
+whole optional qualification layer, not only its self-host A/B stage. Ordinary
+PR/push correctness checks, timed smoke and compatibility/bootstrap remain.
+Explicit manual `CI` dispatch with `full_validation=true` or `self_host=true`
+(and without `windows_runtime_only`) retains the complete graph with
+`build_packages=false`. No automatic restoration or A/B run is scheduled.
 It runs independently of the narrower PR gate, using read-only repository and
 Actions permissions. Pull requests and merge queue groups keep the six checks
 above, including the policy-aware async-language gate (always bootstrapped for

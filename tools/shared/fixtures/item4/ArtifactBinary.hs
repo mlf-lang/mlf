@@ -18,6 +18,9 @@ import qualified Bootstrap.CrateQuery as Q
 import qualified Bootstrap.InferenceUnit as InferenceUnit
 import qualified Bootstrap.SourceInference as Source
 import qualified Bootstrap.X.Pretty as Pretty
+import qualified Bootstrap.X.Syntax as X
+import qualified Bootstrap.Data as D
+import qualified Bootstrap.OpenFragment as Open
 import qualified Bootstrap.CrateSession as Session
 import qualified Bootstrap.CrateArtifact as CrateArtifact
 import qualified Package.Distribution as Distribution
@@ -430,7 +433,9 @@ constructorTests = sequence [
   checkCase "PUnsignedLtInt" A.toPrimitive A.fromPrimitive T.PUnsignedLtInt (W.VNode 32 [W.VInt 128]),
   checkCase "PReadByteFileOrError" A.toPrimitive A.fromPrimitive T.PReadByteFileOrError (W.VNode 32 [W.VInt 129]),
   checkCase "PWriteByteFileOrError" A.toPrimitive A.fromPrimitive T.PWriteByteFileOrError (W.VNode 32 [W.VInt 130]),
-  checkCase "PByteArrayDigest" A.toPrimitive A.fromPrimitive T.PByteArrayDigest (W.VNode 32 [W.VInt 131])
+  checkCase "PByteArrayDigest" A.toPrimitive A.fromPrimitive T.PByteArrayDigest (W.VNode 32 [W.VInt 131]),
+  checkCase "PFreezeSTArray" A.toPrimitive A.fromPrimitive T.PFreezeSTArray (W.VNode 32 [W.VInt 132]),
+  checkCase "PSTToIO" A.toPrimitive A.fromPrimitive T.PSTToIO (W.VNode 32 [W.VInt 133])
   ]
 
 graphChecks = [
@@ -698,7 +703,9 @@ graphChecks = [
   \g root -> checkGraph "PUnsignedLtInt" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 128]),
   \g root -> checkGraph "PReadByteFileOrError" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 129]),
   \g root -> checkGraph "PWriteByteFileOrError" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 130]),
-  \g root -> checkGraph "PByteArrayDigest" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 131])
+  \g root -> checkGraph "PByteArrayDigest" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 131]),
+  \g root -> checkGraph "PFreezeSTArray" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 132]),
+  \g root -> checkGraph "PSTToIO" A.toPrimitive A.fromGraphPrimitive g root (W.VNode 32 [W.VInt 133])
   ]
 
 checkGraph label encode decode graph root expected = do
@@ -738,7 +745,7 @@ semanticEdges directory = do
     need "IEEE exact signed bits; not numeric equality" (P.doubleToBits value == bits && same (A.toDouble value) (W.VBits bits))
     term <- expect "IEEE term decode" (A.fromXTerm (W.VNode 78 [W.VBits bits]))
     case term of T.XDoubleTerm d -> need "IEEE term exact" (P.doubleToBits d == bits); _ -> error "IEEE wrong constructor"
-  forM_ [-1,132,2147483647] $ \code -> do
+  forM_ [-1,134,2147483647] $ \code -> do
     let value=W.VNode 32 [W.VInt code]
     reject "unknown primitive ABI code" (A.fromPrimitive value)
     bytes <- W.encode W.defaultLimits 7 [value] >>= expect "unknown primitive is valid wire"
@@ -954,7 +961,10 @@ main = do
       need "actual release asset SHA pin" (actual == (expected == "valid"))
       putStrLn "PASS distribution-asset-pin"
     ["formal-check",prefix,expected] -> formalCheck prefix expected
+    ["formal-bundle-check",directory] -> formalBundleCheck directory
+    ["open-interface-controls",directory] -> openInterfaceControls directory
     ["formal-error",prefix,message] -> formalError prefix message
+    ["audit-stamp",prefix] -> auditStamp prefix
     ["formal-bundle",directory,digest] -> formalBundle directory digest
     ["typed-bounds",directory] -> typedBounds directory
     ["root-bounds"] -> rbSelfTests >> putStrLn "PASS root-bounds"
@@ -1069,6 +1079,58 @@ formalCheck prefix expected = do
       putStrLn "PASS formal-object-version-reject"
     _ -> error "actual formal artifact reader disagrees with fixed expectation"
 
+
+formalBundleCheck directory = do
+  let root = B.literal directory
+  manifest <- Release.readManifest root
+  interfaces <- Release.bundleInterfaces root manifest
+  objects <- Release.readObjects root manifest interfaces
+  _ <- expect "portable bundle full checked linking" (CrateArtifact.linkCheckedObjects objects (Release.libraryIdentity manifest))
+  Release.verifyBundle root manifest
+  putStrLn "PASS formal-accept"
+
+openInterfaceControls directory = do
+  let empty name deps = CrateArtifact.CrateInterface name deps [] [] [] [] [] [] [] [] "" "empty" []
+      dependency iface = (CrateArtifact.crateId iface,"/portable/" P.++ CrateArtifact.crateId iface,CrateArtifact.semanticFingerprint iface)
+      withDeps deps (CrateArtifact.CrateInterface name _ modules exports imports datatypes classes instances layouts bindings entry fingerprint protection) =
+        CrateArtifact.CrateInterface name deps modules exports imports datatypes classes instances layouts bindings entry fingerprint protection
+      refusal label message result = case result of
+        T.Left actual -> need label (actual == message)
+        T.Right _ -> error ("accepted " ++ label)
+      leaf = empty "leaf" []
+      middle = empty "middle" [dependency leaf]
+      root = empty "root" [dependency middle]
+      unrelated = empty "unrelated" [("unavailable","/not-read","not-read")]
+      known = CrateArtifact.openInterfaceDependencies
+  reached <- expect "transitive supplied metadata" (known [unrelated,root,leaf,middle] root)
+  need "only transitive dependencies are retained in order" (map CrateArtifact.crateId reached == ["leaf","middle"])
+  refusal "duplicate supplied identity" "duplicate crate supplied crate identity" (known [root,middle,leaf,leaf] root)
+  refusal "missing transitive dependency" "missing crate metadata: leaf" (known [root,middle] root)
+  let staleMiddle = withDeps [("leaf","/portable/leaf","wrong-semantic")] middle
+      staleRoot = withDeps [dependency staleMiddle] root
+  refusal "stale transitive semantic dependency" "stale crate dependency interface: middle requires a different leaf; recompile middle"
+    (known [staleRoot,staleMiddle,leaf] staleRoot)
+  let cycleA = empty "cycle-a" [("cycle-b","/portable/b","irrelevant")]
+      cycleB = empty "cycle-b" [("cycle-a","/portable/a","irrelevant")]
+  refusal "indirect metadata cycle" "cyclic crate dependencies: cycle-a -> cycle-b -> cycle-a" (known [cycleA,cycleB] cycleA)
+  let prefix = B.literal (directory ++ "/seed")
+      path = prefix P.++ ".mlfco"
+  iface <- CrateArtifact.readInterface (prefix P.++ ".mlfci") >>= expect "actual supplied root"
+  builtin <- CrateArtifact.readInterface (B.literal (directory ++ "/builtin.mlfci")) >>= expect "actual supplied builtin"
+  accepted <- CrateArtifact.readObjectWithInterfaces [unrelated,iface,builtin] path iface >>= expect "actual open object with unrelated supplied sibling"
+  need "supplied reader retains exact expected root" (CrateArtifact.encodeInterface (CrateArtifact.objectInterface accepted) == CrateArtifact.encodeInterface iface)
+  CrateArtifact.readObjectWithInterfaces [iface] path iface >>= refusal "actual missing supplied dependency"
+    (path P.++ ": missing crate metadata: " P.++ CrateArtifact.crateId builtin)
+  CrateArtifact.readObjectWithInterfaces [iface,builtin,builtin] path iface >>= refusal "actual duplicate supplied identity"
+    (path P.++ ": duplicate crate supplied crate identity")
+  let relocated = withDeps [(CrateArtifact.crateId builtin,"/never-read/relocated.mlfci",CrateArtifact.semanticFingerprint builtin)] iface
+  CrateArtifact.readObjectWithInterfaces [relocated,builtin] path iface >>= refusal "same-ID altered supplied root path"
+    (path P.++ ": open crate supplied root metadata mismatch")
+  relocatedObject <- CrateArtifact.readObjectWithInterfaces [unrelated,relocated,builtin] path relocated >>= expect "actual path-independent open admission"
+  need "explicit relocated root retained" (CrateArtifact.encodeInterface (CrateArtifact.objectInterface relocatedObject) == CrateArtifact.encodeInterface relocated)
+  builtinObject <- CrateArtifact.readObject (B.literal (directory ++ "/builtin.mlfco")) builtin >>= expect "actual supplied builtin object"
+  _ <- expect "relocated supplied closure complete checked linking" (CrateArtifact.linkCheckedObjects [builtinObject,relocatedObject] (CrateArtifact.crateId relocated))
+  putStrLn "PASS open-interface-context-closure-and-portable-paths"
 -- Portable objects are admitted with the exact authenticated bundle context.
 -- Never fabricate their virtual dependency paths or turn open objects closed.
 formalBundle directory digest = do
@@ -1108,10 +1170,10 @@ distributionSeed directory = do
     (CrateArtifact.encodeInterface builtinIface == CrateArtifact.encodeInterface (CrateArtifact.objectInterface canonicalBuiltin) &&
      CrateArtifact.encodeObject builtinObject == CrateArtifact.encodeObject canonicalBuiltin)
   need "release fixture exact builtin dependency and no entry"
-    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:11",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
+    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:13",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
      CrateArtifact.crateEntry iface == "")
   need "builtin leaf has no dependencies or entry"
-    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:11" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
+    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:13" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
   need "release fixture exact identity/module" (CrateArtifact.crateId iface == "binary-package/1/library" && CrateArtifact.crateModules iface == ["BinaryPackage"])
   need "actual Session keeps the open primary" (CrateArtifact.openMarked object)
   -- The explicit companion adds old-format coverage. The original Session
@@ -1155,10 +1217,10 @@ distributionSeed directory = do
   legacyMetadata <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfci"))
   legacyBody <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfco"))
   let legacyPath = Release.virtualPath (Release.pairKey legacyMetadata legacyBody)
-  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:11",legacyPath)] closed)
+  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:13",legacyPath)] closed)
   need "legacy closure exact relocated dependency"
     (CrateArtifact.crateDependencies (CrateArtifact.objectInterface portableLegacy) ==
-      [("mlf:builtin-shared-haskell-v1:11",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
+      [("mlf:builtin-shared-haskell-v1:13",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
   writeFile (directory ++ "/release-legacy-root.mlfci") (B.unpack (CrateArtifact.encodeInterface (CrateArtifact.objectInterface portableLegacy)))
   writeFile (directory ++ "/release-legacy-root.mlfco") (B.unpack (CrateArtifact.encodeObject portableLegacy))
   putStrLn "PASS actual-binary-library-and-legacy-formal"
@@ -1461,7 +1523,7 @@ releaseBuiltinBranches directory = do
       ownership label identity modules expected = case CrateArtifact.validateBuiltinOwnership (replaceIdentityModules identity modules builtin) of
         T.Left message -> need label (message == expected)
         T.Right _ -> error ("accepted ownership regression: " ++ label)
-  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:11")
+  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:13")
   need "builtin localPrefix uses canonical compiler cache"
     (Release.localPrefix "/cache" compiler (row current) == ("/cache/.queries/builtin-prelude/" P.++ compiler P.++ "/unit"))
   need "ordinary localPrefix keeps release key cache"
@@ -1471,6 +1533,7 @@ releaseBuiltinBranches directory = do
   Release.verifyPrelude root
   ownership "obsolete prelude owner" "mlf:builtin-prelude:1" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
   ownership "stale shared ABI owner" "mlf:builtin-shared-haskell-v1:10" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
+  ownership "preceding shared ABI owner" "mlf:builtin-shared-haskell-v1:12" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
   ownership "ordinary forged owner" "other/library" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
   ownership "missing primitive ownership" current ["Prelude"] "builtin crate must own exactly Prelude and MLF.Primitive"
   ownership "extra builtin module" current ["Extra","MLF.Primitive","Prelude"] "builtin crate must own exactly Prelude and MLF.Primitive"
@@ -1491,7 +1554,7 @@ releaseForgedCurrent directory = do
   let forged = CrateArtifact.makeObject (CrateArtifact.objectInterface canonical) fragments
       iface = CrateArtifact.objectInterface forged
   need "forged control retains exact current identity and ownership"
-    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:11" &&
+    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:13" &&
      CrateArtifact.crateModules iface == CrateArtifact.crateModules (CrateArtifact.objectInterface canonical))
   _ <- expect "forged control passes complete ordinary typed linking" (CrateArtifact.linkCheckedObjects [forged] (CrateArtifact.crateId iface))
   need "forged control is genuinely noncanonical" (CrateArtifact.encodeObject forged /= CrateArtifact.encodeObject canonical)
@@ -1943,3 +2006,32 @@ rbCompareGraph name original bounded = case (original,bounded) of
       (W.resourceExpandedWork sa == W.resourceExpandedWork sb &&
        W.resourceBytes sa == W.resourceBytes sb)
   _ -> error (name ++ ": bounded-root decoder changed ordinary admission")
+
+-- Fixture-only semantic forgery. Public canonicalization helpers and an exact
+-- original-stamp check bind this copied serialization expression to its input.
+auditStamp prefix = do
+  iface <- CrateArtifact.readInterface (B.literal (prefix ++ ".mlfci")) >>= expect "audit seed interface"
+  object <- CrateArtifact.readObject (B.literal (prefix ++ ".mlfco")) iface >>= expect "audit seed object"
+  fragment <- case object of
+    CrateArtifact.OpenCrateObject _ package -> case Open.packageFragments package of
+      [(_, value)] -> pure value
+      _ -> error "audit seed requires exactly one fragment"
+    _ -> error "audit seed requires an open object"
+  declarations <- mapM (expect "canonical audit declaration" . A.fromDataDecl . Open.declarationValue)
+    (Open.declarations (Open.context fragment))
+  let parameters = Open.parameters fragment
+      owned = Open.bindings fragment
+      stamp term = U.fingerprint (U.pack
+        [U.pack (map D.prettyDeclaration declarations),
+         U.pack (map (\(n,ty) -> U.pack [P.showInt (X.nameId n), X.nameHint n, Pretty.prettyType (U.normalType ty)]) parameters),
+         Pretty.prettyTerm term,
+         U.pack (map (\(n,ty) -> U.pack [X.nameHint n, Pretty.prettyType (U.normalType ty)]) owned)])
+  need "fixture stamp matches original checked receipt" (stamp (Open.body fragment) == Open.fingerprint fragment)
+  binder <- case owned of
+    [(n,ty)] -> do
+      need "audit seed owner is Int" (Pretty.prettyType (U.normalType ty) == "Int")
+      need "audit owner is not a parameter" (all (\(p,_) -> X.nameId p /= X.nameId n) parameters)
+      pure n
+    _ -> error "audit seed requires one Int owner"
+  let forged = T.XLet binder (T.XBoolTerm True) (T.XConstructor "()" [])
+  putStrLn (B.unpack (stamp forged))

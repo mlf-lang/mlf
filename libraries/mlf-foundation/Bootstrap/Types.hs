@@ -4,11 +4,14 @@
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.Types where {
   import MLF.Primitive;
-  -- Shared data representations. This module is deliberately dependency-free.
+  import qualified Bootstrap.IndexVec as V;
+  -- Shared data representations. Term slots belong to one resolver session.
 
 
 
 
+  -- Resolver, Core and native layout use this domain for top-level value slots.
+  data Declaration = Declaration;
   data Maybe a = Nothing | Just a;
   data Either e a = Left e | Right a;
   data Map k v = MapEmpty | MapNode Int k v (Map k v) (Map k v);
@@ -164,7 +167,9 @@ module Bootstrap.Types where {
     PUnsignedLtInt |
     PReadByteFileOrError |
     PWriteByteFileOrError |
-    PByteArrayDigest;
+    PByteArrayDigest |
+    PFreezeSTArray |
+    PSTToIO;
   data SType =
     STVar String |
     SBottom |
@@ -177,7 +182,11 @@ module Bootstrap.Types where {
   data SAnnotation = SAnnotation ([] String) SType;
   data RecursiveMode = InferRecursive | CheckRecursive SAnnotation;
   data SourceSpan = SourceSpan String String String Int Int Int Int;
+  data TermRef = LexicalRef String | DeclRef (V.Index Declaration) String;
   data SExpr =
+    SGlobal (V.Index Declaration) String |
+    SDeclScope ([] (V.Index Declaration)) SExpr |
+    SWantedRefs String ([] ((,) EvidenceRole TermRef)) |
     SVar String |
     SConstructor String |
     SLam String (Maybe SAnnotation) SExpr |
@@ -209,6 +218,7 @@ module Bootstrap.Types where {
     SIntPattern Int |
     SStringPattern String |
     SOverloadedStringPattern SourceString String String |
+    SIndexedStringPattern SourceString TermRef TermRef |
     SBoolPattern Bool |
     SAsPattern String SPattern |
     SLazyPattern SPattern;
@@ -341,6 +351,9 @@ module Bootstrap.Types where {
   data EvidenceBinding = EvidenceBinding EvidenceRole XName Int Bool | DeclaredEvidenceBinding EvidenceRole XName XType;
   data Constraints = Constraints Graph Typed ([] ((,) Int Int)) ([] SolveStep);
   data Core =
+    CGlobal (V.Index Declaration) String |
+    CDeclScope ([] (V.Index Declaration)) Core |
+    CWantedRefs String ([] ((,) EvidenceRole TermRef)) |
     CVar String |
     CLam String Core |
     CApp Core Core |

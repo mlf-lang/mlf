@@ -29,7 +29,12 @@ def main():
     files=[ROOT/x['path'] for x in manifest['modules']]+list((ROOT/'host/ghc').rglob('*.hs'))
     files+=list(HERE.glob('*.hs'))+[ORACLE/'FrozenCrateQuery.hs',ORACLE/'oracle.json',Path(__file__),hp]
     bridge=HERE.parent/'source-key-builtins/FrozenSourceKey.hs'
-    pins={str(f):H.sha(f) for f in [*files,bridge]}
+    adapter=bridge.with_name('frozen_query.py')
+    adapted_dir=out/'historical-oracle'
+    adapted_dir.mkdir()
+    adapted=H.module(adapter,'frozen_query').prepare_frozen_query(ORACLE/'FrozenCrateQuery.hs',adapted_dir,
+        expected_sha256=oracle['frozen_sha256'])
+    pins={str(f):H.sha(f) for f in [*files,bridge,adapter,adapted]}
     limits=dict(address_space_per_process_bytes=6*1024**3,disk_free_floor_bytes=5*1024**3,
         host_available_floor_bytes=3*1024**3,process_tree_rss_bytes=5*1024**3,max_work_bytes=2*1024**3,wall_seconds=600)
     record=dict(complete=False,performance_samples=0,inputs=pins,oracle=oracle,checks=[])
@@ -45,7 +50,7 @@ def main():
                 label='O'+opt;objects=out/(label+'-objects');binary=out/(label+'-binary')
                 argv=[auth['ghc']['path'],'--make','-j1','-O'+opt,'-fpedantic-bottoms','-fno-state-hack',
                     '-Werror=incomplete-patterns','-Werror=incomplete-uni-patterns','-package-env','-',
-                    '-i','-i'+str(HERE),'-i'+str(bridge.parent),'-i'+str(ORACLE),*['-i'+str(ROOT/x) for x in manifest['source_roots']],
+                    '-i','-i'+str(adapted_dir),'-i'+str(HERE),'-i'+str(bridge.parent),'-i'+str(ORACLE),*['-i'+str(ROOT/x) for x in manifest['source_roots']],
                     '-odir',objects,'-hidir',objects,HERE/'Main.hs',a.producer/'host.o',
                     a.producer/'supervisor.o','-o',binary]
                 H.Runner(out,limits).run(argv,ROOT,out/(label+'-build'))

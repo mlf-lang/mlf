@@ -6,6 +6,9 @@ module Package.Scheduler where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
+  import qualified Bootstrap.Dependency as D;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Package.OS as O;
   import qualified Package.Json as J;
   import qualified Package.Manifest as M;
@@ -38,7 +41,7 @@ module Package.Scheduler where {
     let {
       ps = S.map packageFrom (J.values (J.get "packages" value))
     } in
-    M.PackageGraph (M.lookupPackage (J.getText "root" "" value) ps) ps
+    M.buildPackageGraph (J.getText "root" "" value) ps
       (S.map moduleFrom (J.values (J.get "modules" value)));
   request name target publish =
     B.info
@@ -59,25 +62,21 @@ module Package.Scheduler where {
     };
   libraryId p noPrelude =
     ((if noPrelude then "library-no-prelude-" else "library-prelude-") ++ M.packageName p);
-  neededPackages :: M.PackageGraph -> [] String -> [] String -> [] String;
-  neededPackages graph done names =
-    case names of {
-      [] -> done;
-      (:) name rest ->
-        if S.elem eqString name done
-        then neededPackages graph done rest
-        else let {
-               p = M.lookupPackage name (M.packages graph)
-             } in
-             neededPackages graph (S.snoc done name)
-               (S.append (M.keys (J.getObject "dependencies" (M.packageData p))) rest)
-    };
+  neededPackages :: M.PackageGraph -> [] String -> [] M.Package;
+  neededPackages graph names =
+    let {
+      pkgs = M.packageGraph graph;
+      roots = S.map (M.packageId graph) names;
+      reached = IS.fromList (S.map V.toInt (D.finishOrder (D.graphRows pkgs) roots))
+    } in
+    S.map (M.packageAt graph)
+      (S.filter (\i -> IS.member (V.toInt i) reached) (V.indices (D.graphNodes pkgs)));
   libraryJobs graph p target =
     let {
       own = if S.null (M.packageModules p) then [] else (:) (M.packageName p) []
     } in
     let {
-      needed = neededPackages graph [] (S.append (M.targetDependencyNames p target) own)
+      needed = neededPackages graph (S.append (M.targetDependencyNames p target) own)
     } in
     let {
       noPrelude = J.getBool "no-prelude" False target
@@ -88,15 +87,11 @@ module Package.Scheduler where {
            deps =
              S.map (\r -> libraryId r noPrelude)
                (S.filter (\r -> S.not (S.null (M.packageModules r)))
-                  (S.map (\name -> M.lookupPackage name (M.packages graph))
-                     (S.sortBy compareString
-                        (M.keys (J.getObject "dependencies" (M.packageData q))))))
+                  (M.directPackages graph q))
          } in
          J.set "package" (J.str (M.packageName q))
            (J.set "no-prelude" (J.Boolean noPrelude) (job "library" (libraryId q noPrelude) deps)))
-      (S.filter
-         (\q -> (S.elem eqString (M.packageName q) needed && S.not (S.null (M.packageModules q))))
-         (M.packages graph));
+      (S.filter (\q -> S.not (S.null (M.packageModules q))) needed);
   planTarget b jobs selected =
     do {
       let {
@@ -292,7 +287,7 @@ module Package.Scheduler where {
         if MLF.Primitive.eqString matchValueShared2 "library"
         then do {
                let {
-                 q = M.lookupPackage (J.getText "package" "" selected) (M.packages graph)
+                 q = M.packageAt graph (M.packageId graph (J.getText "package" "" selected))
                };
                B.libraryResult b q dependencies (J.getBool "no-prelude" False selected)
              }

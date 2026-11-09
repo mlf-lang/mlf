@@ -337,7 +337,7 @@ module Main where {
     iface <- Crate.readInterface (input ++ ".mlfci") >>= right;
     result <- Crate.readObject (input ++ ".mlfco") iface;
     let { observed = case result of {
-      Left message -> Left message;
+      Left message -> if auditing then panic "audit negative failed ordinary admission" else Left message;
       Right object -> if auditing then case object of {
         Crate.OpenCrateObject _ package ->
           Std.mapLeft (\message -> input ++ ".mlfco: " ++ message)

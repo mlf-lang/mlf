@@ -1,0 +1,1682 @@
+{
+  "plan_sha256": "bef0b81792beb3bc34db1d78221e37e4cc0081ce33728ce16f98544a71c7ae0b",
+  "samples": [
+    {
+      "case": "module_diamond",
+      "round": 0,
+      "state": "fresh",
+      "lane": "before",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790269295711000,
+      "wall_s": 0.381404125,
+      "user_s": 0.297876,
+      "system_s": 0.104964,
+      "peak_rss_bytes": 48545792,
+      "sampled_group_rss_bytes": 48529408,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "49301f585428563c7f48f45579f531e85a4df45eecd9d8aa78c1318dc5a20113",
+        "user_object_sha256": "f3035ebdcb195cd256d1b8446c45c70637df007c388ce9d314f7fcf726a3643c",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/fresh-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "04dce98d3a53f559671d815b680b832f4aab16f4426c61adf7231ac21c18d7b0"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "1f46da462fc1fda314e674666f209ac8ec73c69eb4a22c670cfc169715c9a38f"
+      },
+      "stage_intervals_s": [
+        0.22577195,
+        0.068900868,
+        0.065047896
+      ],
+      "program_sha256": "a417a5a4a4ed42e3b1e0f200604e58ca7a52839849dc6d341b5c3c93f2b75118",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 0,
+      "state": "fresh",
+      "lane": "ghc",
+      "argv": [
+        "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/host/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "-odir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/ghc",
+        "-hidir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/ghc",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/ghc/program"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790270632371000,
+      "wall_s": 0.680079042,
+      "user_s": 0.6700809999999999,
+      "system_s": 0.26193099999999997,
+      "peak_rss_bytes": 288620544,
+      "sampled_group_rss_bytes": 338362368,
+      "program_sha256": "46f0d9d70d671a62e563b2b8bfd56f8acae7ff9812ccf85311f70d850e1851dc",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 0,
+      "state": "fresh",
+      "lane": "after",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790272272409000,
+      "wall_s": 0.347243667,
+      "user_s": 0.300651,
+      "system_s": 0.076263,
+      "peak_rss_bytes": 47693824,
+      "sampled_group_rss_bytes": 47546368,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "da42b196041bc2bf0f167ebf3e7f4d0e67abf3ae4bf318cb23e6e1a3008e1a94",
+        "user_object_sha256": "45d19dc3156875985c210d993d5b234b8c624abdc1018c823d216550a52a4e69",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/fresh-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "04dce98d3a53f559671d815b680b832f4aab16f4426c61adf7231ac21c18d7b0"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "c61a3e3b16f2ca45c4a19d102362a42860494e616079093e812920cfc2a340db"
+      },
+      "stage_intervals_s": [
+        0.233142383,
+        0.039032138,
+        0.052157142
+      ],
+      "program_sha256": "36136d0d504f4ff4df3c77867109cf5a0d1e9fa49dc77087335b12c0c998e16e",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 0,
+      "state": "edited",
+      "lane": "after",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790273317358000,
+      "wall_s": 0.362575125,
+      "user_s": 0.313694,
+      "system_s": 0.071021,
+      "peak_rss_bytes": 47726592,
+      "sampled_group_rss_bytes": 47579136,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "831166481c333613a09061c4006c2de63bfcd4dbdb16f3fcf4c5e0d2ab807f6b",
+        "user_object_sha256": "db4a8ab352c26ed43724970672679f1714b7f40a459d2fe9b5cef4f784abb58c",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/after/edited-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "a36dbb3c4dcbba0c08f574c62589e6e685a3b84da54809f46a565ed60f9d59e2"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "50007337b1ef0f50c9e68bf9703759cbbddf7a8cc22f521ce356baea124896b5"
+      },
+      "stage_intervals_s": [
+        0.245280567,
+        0.034741122,
+        0.052883686
+      ],
+      "program_sha256": "871eccdad95e449a2bec6b3b53c5ff53f400e9fdc635cb93174f57978c71bf5e",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 0,
+      "state": "edited",
+      "lane": "ghc",
+      "argv": [
+        "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/host/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "-odir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/ghc",
+        "-hidir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/ghc",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/ghc/program"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790274575102000,
+      "wall_s": 0.682785875,
+      "user_s": 0.684977,
+      "system_s": 0.260932,
+      "peak_rss_bytes": 289685504,
+      "sampled_group_rss_bytes": 344653824,
+      "program_sha256": "03e4e05d1d010a0bbbb9c15b233a4a950685056151e1d23ff30fd4784a1e1a62",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 0,
+      "state": "edited",
+      "lane": "before",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790276442714000,
+      "wall_s": 0.369648083,
+      "user_s": 0.29419,
+      "system_s": 0.072961,
+      "peak_rss_bytes": 46481408,
+      "sampled_group_rss_bytes": 46333952,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "592daed2aa9df2cdb539ed3fd42c02ffc3e81d8d6e83a1a858676b7b60c54d34",
+        "user_object_sha256": "2ee46b2caed3f12c617114f2d2eb04975b653b7b9d7161d382d0237bb4597346",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/0/before/edited-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "a36dbb3c4dcbba0c08f574c62589e6e685a3b84da54809f46a565ed60f9d59e2"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "3d0e0c44268a6de7ecc7daf375cbe185e7a58c0e00ef7dc4b15f59eccafa8c6e"
+      },
+      "stage_intervals_s": [
+        0.243739493,
+        0.035377708,
+        0.054522525
+      ],
+      "program_sha256": "de5e6ee980db670de8bc66d18b94c358056d0458647404d5b5113f1f75597dfb",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 1,
+      "state": "fresh",
+      "lane": "after",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790277344621000,
+      "wall_s": 0.356749916,
+      "user_s": 0.317302,
+      "system_s": 0.07384299999999999,
+      "peak_rss_bytes": 47693824,
+      "sampled_group_rss_bytes": 47546368,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "da42b196041bc2bf0f167ebf3e7f4d0e67abf3ae4bf318cb23e6e1a3008e1a94",
+        "user_object_sha256": "45d19dc3156875985c210d993d5b234b8c624abdc1018c823d216550a52a4e69",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/fresh-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "04dce98d3a53f559671d815b680b832f4aab16f4426c61adf7231ac21c18d7b0"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "d797ce80947c85d8751df19ee63ec7506d07d89ee5397769188acb4fd97f08cc"
+      },
+      "stage_intervals_s": [
+        0.238438819,
+        0.03684438,
+        0.056618408
+      ],
+      "program_sha256": "36136d0d504f4ff4df3c77867109cf5a0d1e9fa49dc77087335b12c0c998e16e",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 1,
+      "state": "fresh",
+      "lane": "before",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790278009037000,
+      "wall_s": 0.368192667,
+      "user_s": 0.31296999999999997,
+      "system_s": 0.074075,
+      "peak_rss_bytes": 48578560,
+      "sampled_group_rss_bytes": 48431104,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "49301f585428563c7f48f45579f531e85a4df45eecd9d8aa78c1318dc5a20113",
+        "user_object_sha256": "f3035ebdcb195cd256d1b8446c45c70637df007c388ce9d314f7fcf726a3643c",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/fresh-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "04dce98d3a53f559671d815b680b832f4aab16f4426c61adf7231ac21c18d7b0"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "d053b43eb67d9437fdf704ba48b10e8c3fc96a33b2ea9f370c7d6ce344302339"
+      },
+      "stage_intervals_s": [
+        0.240131375,
+        0.035682793,
+        0.058589665
+      ],
+      "program_sha256": "a417a5a4a4ed42e3b1e0f200604e58ca7a52839849dc6d341b5c3c93f2b75118",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 1,
+      "state": "fresh",
+      "lane": "ghc",
+      "argv": [
+        "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/host/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "-odir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/ghc",
+        "-hidir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/ghc",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/ghc/program"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790278784815000,
+      "wall_s": 0.639004166,
+      "user_s": 0.676264,
+      "system_s": 0.23544199999999998,
+      "peak_rss_bytes": 288325632,
+      "sampled_group_rss_bytes": 384794624,
+      "program_sha256": "46f0d9d70d671a62e563b2b8bfd56f8acae7ff9812ccf85311f70d850e1851dc",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 1,
+      "state": "edited",
+      "lane": "ghc",
+      "argv": [
+        "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/host/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "-odir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/ghc",
+        "-hidir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/ghc",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/ghc/program"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790280030804000,
+      "wall_s": 0.657060208,
+      "user_s": 0.682314,
+      "system_s": 0.253563,
+      "peak_rss_bytes": 286556160,
+      "sampled_group_rss_bytes": 387596288,
+      "program_sha256": "03e4e05d1d010a0bbbb9c15b233a4a950685056151e1d23ff30fd4784a1e1a62",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 1,
+      "state": "edited",
+      "lane": "before",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790281296414000,
+      "wall_s": 0.342680667,
+      "user_s": 0.30023,
+      "system_s": 0.072392,
+      "peak_rss_bytes": 46481408,
+      "sampled_group_rss_bytes": 46333952,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "592daed2aa9df2cdb539ed3fd42c02ffc3e81d8d6e83a1a858676b7b60c54d34",
+        "user_object_sha256": "2ee46b2caed3f12c617114f2d2eb04975b653b7b9d7161d382d0237bb4597346",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/before/edited-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "a36dbb3c4dcbba0c08f574c62589e6e685a3b84da54809f46a565ed60f9d59e2"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "a322f313b589fb32d4e6da27ddcf7cdfe00afa41c019491ef48631555afac2af"
+      },
+      "stage_intervals_s": [
+        0.22683504,
+        0.033928078,
+        0.05486811
+      ],
+      "program_sha256": "de5e6ee980db670de8bc66d18b94c358056d0458647404d5b5113f1f75597dfb",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 1,
+      "state": "edited",
+      "lane": "after",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790282284004000,
+      "wall_s": 0.359872667,
+      "user_s": 0.307699,
+      "system_s": 0.072486,
+      "peak_rss_bytes": 47693824,
+      "sampled_group_rss_bytes": 47546368,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "831166481c333613a09061c4006c2de63bfcd4dbdb16f3fcf4c5e0d2ab807f6b",
+        "user_object_sha256": "db4a8ab352c26ed43724970672679f1714b7f40a459d2fe9b5cef4f784abb58c",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/1/after/edited-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "a36dbb3c4dcbba0c08f574c62589e6e685a3b84da54809f46a565ed60f9d59e2"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "68794b401bf770432f508cc3bf331eec95124370490399ad39141224419cb874"
+      },
+      "stage_intervals_s": [
+        0.242648575,
+        0.035198666,
+        0.052122601
+      ],
+      "program_sha256": "871eccdad95e449a2bec6b3b53c5ff53f400e9fdc635cb93174f57978c71bf5e",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 2,
+      "state": "fresh",
+      "lane": "ghc",
+      "argv": [
+        "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/host/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "-odir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/ghc",
+        "-hidir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/ghc",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/ghc/program"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790282950290000,
+      "wall_s": 0.635716958,
+      "user_s": 0.681443,
+      "system_s": 0.238171,
+      "peak_rss_bytes": 288325632,
+      "sampled_group_rss_bytes": 353140736,
+      "program_sha256": "46f0d9d70d671a62e563b2b8bfd56f8acae7ff9812ccf85311f70d850e1851dc",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 2,
+      "state": "fresh",
+      "lane": "before",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790284172279000,
+      "wall_s": 0.354541125,
+      "user_s": 0.312828,
+      "system_s": 0.074359,
+      "peak_rss_bytes": 48611328,
+      "sampled_group_rss_bytes": 48447488,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "49301f585428563c7f48f45579f531e85a4df45eecd9d8aa78c1318dc5a20113",
+        "user_object_sha256": "f3035ebdcb195cd256d1b8446c45c70637df007c388ce9d314f7fcf726a3643c",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/fresh-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "04dce98d3a53f559671d815b680b832f4aab16f4426c61adf7231ac21c18d7b0"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "45dc1974d6b4de3107e2a572bd33bba41dddc7454a4649118c126e393935b65b"
+      },
+      "stage_intervals_s": [
+        0.252366181,
+        0.036122461,
+        0.053828481
+      ],
+      "program_sha256": "a417a5a4a4ed42e3b1e0f200604e58ca7a52839849dc6d341b5c3c93f2b75118",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 2,
+      "state": "fresh",
+      "lane": "after",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790284928395000,
+      "wall_s": 0.362338541,
+      "user_s": 0.317609,
+      "system_s": 0.070064,
+      "peak_rss_bytes": 47710208,
+      "sampled_group_rss_bytes": 47562752,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "da42b196041bc2bf0f167ebf3e7f4d0e67abf3ae4bf318cb23e6e1a3008e1a94",
+        "user_object_sha256": "45d19dc3156875985c210d993d5b234b8c624abdc1018c823d216550a52a4e69",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/fresh-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "04dce98d3a53f559671d815b680b832f4aab16f4426c61adf7231ac21c18d7b0"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "92ad57307ba0e14dc66c10267c0be98838a35b1a9a61eb2ce80bc810d0f744c4"
+      },
+      "stage_intervals_s": [
+        0.242042559,
+        0.035121915,
+        0.054910486
+      ],
+      "program_sha256": "36136d0d504f4ff4df3c77867109cf5a0d1e9fa49dc77087335b12c0c998e16e",
+      "oracle": [
+        [
+          "-1",
+          "3\n"
+        ],
+        [
+          "0",
+          "6\n"
+        ],
+        [
+          "9",
+          "33\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 2,
+      "state": "edited",
+      "lane": "after",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790285678874000,
+      "wall_s": 0.361622958,
+      "user_s": 0.303145,
+      "system_s": 0.07019,
+      "peak_rss_bytes": 47742976,
+      "sampled_group_rss_bytes": 47595520,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "831166481c333613a09061c4006c2de63bfcd4dbdb16f3fcf4c5e0d2ab807f6b",
+        "user_object_sha256": "db4a8ab352c26ed43724970672679f1714b7f40a459d2fe9b5cef4f784abb58c",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/install-final/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/after/edited-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "a36dbb3c4dcbba0c08f574c62589e6e685a3b84da54809f46a565ed60f9d59e2"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "5ef29798795110949472d4977fc7de56bdf2978d2e3636a8c15e939fec177740"
+      },
+      "stage_intervals_s": [
+        0.238861068,
+        0.034658497,
+        0.054131982
+      ],
+      "program_sha256": "871eccdad95e449a2bec6b3b53c5ff53f400e9fdc635cb93174f57978c71bf5e",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 2,
+      "state": "edited",
+      "lane": "before",
+      "argv": [
+        "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/bin/emlf",
+        "-i",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/program",
+        "--build-dir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790286327698000,
+      "wall_s": 0.345032792,
+      "user_s": 0.303401,
+      "system_s": 0.068781,
+      "peak_rss_bytes": 46465024,
+      "sampled_group_rss_bytes": 46317568,
+      "installed": {
+        "stdlib_path": "installed",
+        "native_export_count": 0,
+        "builtin_inline_count": 0,
+        "llvm_sha256": "592daed2aa9df2cdb539ed3fd42c02ffc3e81d8d6e83a1a858676b7b60c54d34",
+        "user_object_sha256": "2ee46b2caed3f12c617114f2d2eb04975b653b7b9d7161d382d0237bb4597346",
+        "commands": [
+          {
+            "command": [
+              "/usr/bin/clang",
+              "-O2",
+              "-Wno-override-module",
+              "-c",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build/program.ll",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build/program.o"
+            ],
+            "exit_code": 0,
+            "phase": "llvm",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build/llvm.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build/llvm.stdout"
+          },
+          {
+            "command": [
+              "/usr/bin/clang",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build/program.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/library.o",
+              "/Users/ares/.codex/worktrees/issue-37-baseline/mlf/.mlf-build/install/native/runtime.o",
+              "/opt/homebrew/Cellar/gmp/6.3.0/lib/libgmp.10.dylib",
+              "/opt/homebrew/Cellar/bdw-gc/8.2.12/lib/libgc.a",
+              "-lm",
+              "-o",
+              "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build/program"
+            ],
+            "exit_code": 0,
+            "phase": "link",
+            "stderr": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build/link.stderr",
+            "stdout": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/before/edited-build/link.stdout"
+          }
+        ],
+        "source_inputs": [
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Shared.hs",
+            "sha256": "a36dbb3c4dcbba0c08f574c62589e6e685a3b84da54809f46a565ed60f9d59e2"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/LeftArm.hs",
+            "sha256": "a4abbbb271a891fa3ac28cf56c3d18b3c2cfd565a5c1b28c2fabd5ba4b69c04c"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/RightArm.hs",
+            "sha256": "572f2eec1d88d060d12f93dccdce5da2b5273a0c525465922cb925aa6277a130"
+          },
+          {
+            "path": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+            "sha256": "6bd19cf415196ffcb48eebcc8d9b698712d55c7342ea97453ac22fd0b4cba947"
+          }
+        ],
+        "receipt_sha256": "603685285a52f810e47a97d327cab402b26fdfea6d9cb5a2d136ec1f18447fba"
+      },
+      "stage_intervals_s": [
+        0.22756719,
+        0.035476042,
+        0.054379316
+      ],
+      "program_sha256": "de5e6ee980db670de8bc66d18b94c358056d0458647404d5b5113f1f75597dfb",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    },
+    {
+      "case": "module_diamond",
+      "round": 2,
+      "state": "edited",
+      "lane": "ghc",
+      "argv": [
+        "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/host/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+        "-odir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/ghc",
+        "-hidir",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/ghc",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond/Main.hs",
+        "-o",
+        "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/legs/module_diamond/2/ghc/program"
+      ],
+      "cwd": "/Users/ares/.codex/worktrees/issue-37-indexvec/mlf/.mlf-build/edited-diamond/sources/module_diamond",
+      "exit": 0,
+      "guard": null,
+      "start_ns": 1793790286980966000,
+      "wall_s": 0.659037584,
+      "user_s": 0.6721429999999999,
+      "system_s": 0.24590199999999998,
+      "peak_rss_bytes": 287604736,
+      "sampled_group_rss_bytes": 365199360,
+      "program_sha256": "03e4e05d1d010a0bbbb9c15b233a4a950685056151e1d23ff30fd4784a1e1a62",
+      "oracle": [
+        [
+          "-1",
+          "6\n"
+        ],
+        [
+          "0",
+          "9\n"
+        ],
+        [
+          "9",
+          "36\n"
+        ]
+      ],
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "summary": [
+    {
+      "case": "module_diamond",
+      "state": "fresh",
+      "medians": {
+        "before": {
+          "wall_s": 0.368192667,
+          "user_s": 0.312828,
+          "system_s": 0.074359,
+          "peak_rss_bytes": 48578560
+        },
+        "after": {
+          "wall_s": 0.356749916,
+          "user_s": 0.317302,
+          "system_s": 0.07384299999999999,
+          "peak_rss_bytes": 47693824
+        },
+        "ghc": {
+          "wall_s": 0.639004166,
+          "user_s": 0.676264,
+          "system_s": 0.238171,
+          "peak_rss_bytes": 288325632
+        }
+      },
+      "after_over_before": 0.9689218389566678,
+      "before_over_ghc": 0.576197600251639,
+      "after_over_ghc": 0.558290438438237
+    },
+    {
+      "case": "module_diamond",
+      "state": "edited",
+      "medians": {
+        "before": {
+          "wall_s": 0.345032792,
+          "user_s": 0.30023,
+          "system_s": 0.072392,
+          "peak_rss_bytes": 46481408
+        },
+        "after": {
+          "wall_s": 0.361622958,
+          "user_s": 0.307699,
+          "system_s": 0.071021,
+          "peak_rss_bytes": 47726592
+        },
+        "ghc": {
+          "wall_s": 0.659037584,
+          "user_s": 0.682314,
+          "system_s": 0.253563,
+          "peak_rss_bytes": 287604736
+        }
+      },
+      "after_over_before": 1.048082867439452,
+      "before_over_ghc": 0.5235403873415511,
+      "after_over_ghc": 0.5487137103852942
+    }
+  ]
+}

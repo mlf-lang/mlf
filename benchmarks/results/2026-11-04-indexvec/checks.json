@@ -1,0 +1,87 @@
+{
+  "compiler_sha256": "3a8922854f37f0a4bfda7642cc9b96b0b44a0b4531a56b1e8e46b7c0303fa8a8",
+  "build_receipt_sha256": "be848f7c8b938c79541f19b68a751d37fc8f21a738abef078025e031a34ab2d6",
+  "target_comparison": {
+    "commands": [
+      "emlf -i CASE_DIR CASE_DIR/Main.hs > OUTPUT.xmlf",
+      "cmp BEFORE.xmlf AFTER.xmlf",
+      "before/emlf --check AFTER.xmlf",
+      "after/emlf --check BEFORE.xmlf"
+    ],
+    "cases": {
+      "dependency_chain": {
+        "bytes": 269499,
+        "sha256": "2d8dcc1d59d0521d12c5041bbdebf92b5ab4b990eb986890da8ff34ff2954c94",
+        "cross_checked": true
+      },
+      "flat_functions": {
+        "bytes": 269940,
+        "sha256": "0153ef55923585c612f6361a074f5d5c42d49db46a20a468de0cbea3e602047e",
+        "cross_checked": true
+      },
+      "recursive_ring": {
+        "bytes": 272181,
+        "sha256": "b4e3b7804851318d5ae51b4931beb3eb4fad0358ae442cd511333617bb9833ce",
+        "cross_checked": true
+      },
+      "module_diamond": {
+        "bytes": 266747,
+        "sha256": "64a4bdddecaa0204fe5a2e782d93ea4a03745c71bd650ddd5e307565a3e838a1",
+        "cross_checked": true
+      },
+      "compiler_unicode": {
+        "bytes": 294072,
+        "sha256": "3533c0a657568521c7f9e83505aa3e00ba00cdc385d5ffe35c1123d02f266729",
+        "cross_checked": true
+      }
+    }
+  },
+  "compiler_regressions": {
+    "frontend": [
+      "shared frontend: qualified recursive inference checks passed",
+      "shared frontend: declaration provenance and declared forall field checks passed",
+      "shared frontend: recursive inference checks passed",
+      "shared frontend: parser and namespace checks passed"
+    ],
+    "native-first": [
+      "shared frontend: first native semantics checks passed"
+    ],
+    "native-second": [
+      "shared frontend: checks passed"
+    ]
+  },
+  "graph_controls": {
+    "ordered_scc_comparisons": 1032,
+    "suite_stdout": "Passed ordered graph, package scheduling, typed index, region, interpreter and LLVM controls.",
+    "before_manager": "8c4556416023ac727e3fb2294070358a3dae8d9e",
+    "worker_roundtrip": true,
+    "malformed_import_duplicate_module_and_dependency_cycle_diagnostics_match_before": true,
+    "raw_freeze_bounds": {
+      "host_and_llvm": [
+        "snapshot-empty",
+        "snapshot-negative"
+      ],
+      "interpreter": [
+        "snapshot-empty"
+      ],
+      "expected": "array index out of bounds"
+    }
+  },
+  "packages": {
+    "locked_root_plan_sha256": "c75ef5916ccfdc028d80d5aa83258601301841dc322816b4a652e84bd315e678",
+    "example_build_report_sha256": "5e682f07e8a3bac0c51c31745772b9432e62076e8c157c2dcc9bcc2b27fdcc72",
+    "example_binary_sha256": "b8eaf2411d193ac9e9714939dfdc40d775c0f73473889b3d11dc68df38723208",
+    "example_stdout": "Hello, local packages!\n"
+  },
+  "artifact_binary": {
+    "constructors": "PASS constructors 266",
+    "independent_wire_corpus_sha256": "2334439d06211a649607672cb31b2f30a1d232cc9b55ee9f691222e5fb352a04",
+    "native_fixture_modules": 50,
+    "modular_controls": 21
+  },
+  "bootstrap_driver_unit_tests": {
+    "platform": "Linux aarch64",
+    "tests": 46,
+    "output_sha256": "8a4d7c5f45bb2d5d0ee6167b0aa431aa0f534aa0d3d94127bfcbc790bbf12f44"
+  }
+}

@@ -3,6 +3,7 @@
 from pathlib import Path
 import importlib.util
 import subprocess
+import sys
 import tempfile
 import types
 import unittest
@@ -110,14 +111,20 @@ class HostContract(unittest.TestCase):
     def test_later_host_delta_corruption_is_rejected(self):
         # The complete physical source was admitted above. Relocate only the
         # subsequently read host proof to exercise its independent byte gate.
-        row = self.binary.frozen_value['deltas'][OWNER]
-        original = (self.binary.directory / row['file']).read_bytes()
+        # Reconciliation -> DeclId -> authenticated builtin-regeneration stage.
+        # Corrupt the exact historical owner while exercising the complete live
+        # forward/reverse bridge, rather than discarding the mutation oracle.
+        historical = self.binary.previous.previous
+        self.assertEqual(historical.manifest_sha256,
+                         'fb8335e198e463d3a25b336f124d56dac141c6ad2063df531c09ade8e7411559')
+        row = historical.frozen_value['deltas'][OWNER]
+        original = (historical.directory / row['file']).read_bytes()
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
             path = temp / row['file']
             path.parent.mkdir(parents=True)
             path.write_bytes(original)
-            with patch.object(self.binary._frozen, 'directory', temp):
+            with patch.object(historical._frozen, 'directory', temp):
                 self.assertEqual(self.binary.restore_path(self.current, OWNER), self.compact)
                 self.assertEqual(self.binary.advance_path(self.compact, OWNER), self.current)
                 for altered in [original + b'\n', original.replace(OWNER.encode(), b'other.hs')]:
@@ -132,7 +139,9 @@ class HostContract(unittest.TestCase):
         # A current host alone must never authenticate an obsolete or mixed tree.
         sources = {path: (ROOT / path).read_bytes()
                    for path in self.binary.value['current_files']}
-        self.assertEqual(len(sources), 196)
+        self.assertEqual(len(sources), 198)
+        self.assertIn('libraries/mlf-foundation/Bootstrap/IndexVec.hs', sources)
+        self.assertIn('libraries/mlf-frontend/Bootstrap/Resolved.hs', sources)
         self.assertLessEqual(sum(map(len, sources.values())), 16 * 1024**2)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

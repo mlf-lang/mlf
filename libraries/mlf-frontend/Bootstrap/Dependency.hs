@@ -8,12 +8,21 @@ module Bootstrap.Dependency where {
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.Resolved as R;
+  import qualified Bootstrap.IntSet as IS;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.ST as ST;
   import qualified Bootstrap.Desugar as Desugar;
   -- Edges point from a declaration to the declarations it needs. Namespace
   -- imports and type observations deliberately do not become value SCC edges.
-  data Observation = Observation ([] String) ([] String) ([] String) ([] String);
+  data Observation = Observation ([] TermRef) ([] String) ([] String) ([] String);
   lexicalValueName name = if stringLength name >= 11 && eqString (stringSlice name 0 11) "$MLF.Infix." then stringSlice name 11 (stringLength name - 11) else name;
-  valueNames (Observation values _ _ _) = values;
+  valueRefs (Observation values _ _ _) = values;
+  valueNames observation = map termRefName (valueRefs observation);
+  expressionNamedReads expression = mapMaybe (\ref -> case ref of {
+    LexicalRef n -> Just n; DeclRef _ _ -> Nothing
+  }) (valueRefs (observeExpression expression));
   typeNames (Observation _ types _ _) = types;
   constructorNames (Observation _ _ constructors _) = constructors;
   classNames (Observation _ _ _ classes) = classes;
@@ -23,10 +32,23 @@ module Bootstrap.Dependency where {
   mergeMany observations = foldlStrict merge emptyObservation observations;
   canonical names = S.toList (S.fromList compareString names);
   normalize (Observation a b c d) =
-    Observation (canonical a) (canonical b) (canonical c) (canonical d);
+    Observation (S.toList (S.fromList compareRead a)) (canonical b) (canonical c) (canonical d);
+  compareRead a b = case compareString (termRefName a) (termRefName b) of {
+    0 -> case (,) a b of {
+      (,) (LexicalRef _) (LexicalRef _) -> 0; (,) (LexicalRef _) _ -> 0 - 1;
+      (,) _ (LexicalRef _) -> 1; (,) (DeclRef i _) (DeclRef j _) -> compareInt (V.toInt i) (V.toInt j)
+    };
+    order -> order
+  };
   without values bound = filter (\n -> not (S.member compareString n bound)) values;
   bindObservation bound (Observation values types constructors classes) =
-    Observation (without values bound) types constructors classes;
+    Observation (filter (\ref -> case ref of {
+      LexicalRef n -> not (S.member compareString n bound); DeclRef _ _ -> True
+    }) values) types constructors classes;
+  bindDeclObservation slots (Observation values types constructors classes) =
+    let { bound = IS.fromList (map V.toInt slots) } in Observation (filter (\ref -> case ref of {
+      LexicalRef _ -> True; DeclRef i _ -> not (IS.member (V.toInt i) bound)
+    }) values) types constructors classes;
   observeType :: SType -> Observation;
   observeType ty =
     case ty of {
@@ -60,7 +82,8 @@ module Bootstrap.Dependency where {
       SAsPattern _ inner -> observePattern inner;
       SLazyPattern inner -> observePattern inner;
       SOverloadedStringPattern _ equality conversion ->
-        Observation ((:) (lexicalValueName equality) ((:) (lexicalValueName conversion) [])) [] [] [];
+        Observation [LexicalRef (lexicalValueName equality),LexicalRef (lexicalValueName conversion)] [] [] [];
+      SIndexedStringPattern _ equality conversion -> Observation [equality,conversion] [] [] [];
       SConstructorPattern n _ -> Observation [] [] ((:) n []) [];
       SNestedPattern n ps ->
         merge (Observation [] [] ((:) n []) []) (mergeMany (map observePattern ps));
@@ -68,31 +91,48 @@ module Bootstrap.Dependency where {
       _ -> emptyObservation
     };
   observeExpression :: SExpr -> Observation;
-  observeExpression expression =
+  observeExpression = observeExpressionWith True;
+  observeExpressionWith includeCandidates = observeSyntax includeCandidates False;
+  -- Prepared input serialization includes declaration markers and their
+  -- enclosed occurrences. Dependency selection uses only free references.
+  querySyntaxRefs expression = valueRefs (observeSyntax True True expression);
+  observeSyntax includeCandidates inventory expression =
+    let { child = observeSyntax includeCandidates inventory } in
     case expression of {
-      SSourceDefinition body -> observeExpression body;
-      SCallSite _ _ body -> observeExpression body;
+      SSourceDefinition body -> child body;
+      SCallSite _ _ body -> child body;
       SSharedBind pattern action body binding failure ->
         merge (observePattern pattern)
-          (merge (bindObservation (S.fromList compareString (Desugar.patternVariables pattern)) (observeExpression body))
-            (mergeMany (map observeExpression ((:) action ((:) binding ((:) failure []))))));
-      SVar n -> Observation ((:) (lexicalValueName n) []) [] [] [];
+          (merge (bindObservation (S.fromList compareString (Desugar.patternVariables pattern)) (child body))
+            (mergeMany (map child ((:) action ((:) binding ((:) failure []))))));
+      SGlobal i n -> Observation [DeclRef i n] [] [] [];
+      SDeclScope ids group -> let {
+        bound result = if inventory then result else bindDeclObservation ids result;
+        owners names result = if inventory then merge (Observation (zipWith DeclRef ids names) [] [] []) result else result
+      } in case group of {
+        SLam name annotation body -> owners [name] (merge (observeOptional annotation) (bound (child body)));
+        SLet name rhs body -> owners [name] (merge (child rhs) (bound (child body)));
+        SLetRec defs body -> owners (map (\((,,) name _ _) -> name) defs) (bound (merge (child body)
+          (mergeMany (map (\((,,) _ mode rhs) -> merge (observeRecursiveMode mode) (child rhs)) defs))));
+        _ -> child group
+      };
+      SVar n -> Observation [LexicalRef (lexicalValueName n)] [] [] [];
       SConstructor n -> Observation [] [] ((:) n []) [];
       SLam n a b ->
-        merge (observeOptional a) (bindObservation (S.singleton n) (observeExpression b));
-      SApp a b -> merge (observeExpression a) (observeExpression b);
+        merge (observeOptional a) (bindObservation (S.singleton n) (child b));
+      SApp a b -> merge (child a) (child b);
       SLet n a b ->
-        merge (observeExpression a) (bindObservation (S.singleton n) (observeExpression b));
-      SAnn a t -> merge (observeExpression a) (observeAnnotation t);
-      SSignature a t -> merge (observeExpression a) (observeAnnotation t);
+        merge (child a) (bindObservation (S.singleton n) (child b));
+      SAnn a t -> merge (child a) (observeAnnotation t);
+      SSignature a t -> merge (child a) (observeAnnotation t);
       SCase a branches ->
-        merge (observeExpression a)
+        merge (child a)
           (mergeMany
              (map
                 (\(SAlternative p b) ->
                    merge (observePattern p)
                      (bindObservation (S.fromList compareString (Desugar.patternVariables p))
-                        (observeExpression b)))
+                        (child b)))
                 branches));
       SEquations rows ->
         mergeMany
@@ -101,20 +141,27 @@ module Bootstrap.Dependency where {
                 merge (mergeMany (map observePattern ps))
                   (bindObservation
                      (S.fromList compareString (concatMap Desugar.patternVariables ps))
-                     (observeExpression b)))
+                     (child b)))
              rows);
-      SDo _ _ -> observeExpression (Desugar.desugarDo expression);
+      SDo _ _ -> child (Desugar.desugarDo expression);
       SLetRec declarations body ->
         bindObservation (S.fromList compareString (map (\((,,) n _ _) -> n) declarations))
-          (merge (observeExpression body)
+          (merge (child body)
              (mergeMany
-                (map (\((,,) _ mode b) -> merge (observeRecursiveMode mode) (observeExpression b))
+                (map (\((,,) _ mode b) -> merge (observeRecursiveMode mode) (child b))
                    declarations)));
       SWanted dictionary candidates ->
-        Observation (map snd candidates) ((:) dictionary []) [] [];
-      SChecked ty b -> merge (observeType ty) (observeExpression b);
+        Observation (if includeCandidates then map (compose LexicalRef snd) candidates else []) ((:) dictionary []) [] [];
+      SWantedRefs dictionary candidates -> Observation (if includeCandidates then map snd candidates else []) [dictionary] [] [];
+      SChecked ty b -> merge (observeType ty) (child b);
       _ -> emptyObservation
     };
+  -- Typed reads survive a same-spelled local binder. Collect every RHS and
+  -- pattern operation, without treating a scope's owner IDs as references.
+  expressionGlobalIds :: SExpr -> [] (V.Index Declaration);
+  expressionGlobalIds expression = mapMaybe (\ref -> case ref of {
+    LexicalRef _ -> Nothing; DeclRef i _ -> Just i
+  }) (valueRefs (observeExpression expression));
   observeDeclaration ((,,) _ annotation body) =
     normalize (merge (observeOptional annotation) (observeExpression body));
   declarationObservations values =
@@ -161,80 +208,359 @@ module Bootstrap.Dependency where {
       (merge (observePredicate (SPredicate name head))
          (merge (mergeMany (map observePredicate context))
             (mergeMany (map (\((,) _ expression) -> observeExpression expression) methods))));
-  data Visit = Enter String | Leave String;
-  -- Kosaraju with indexed adjacency maps and explicit work lists. Each vertex
-  -- and edge is visited a constant number of times; map/set work is logarithmic.
-  -- Sorting roots, edges and component members makes source ordering irrelevant.
-  adjacency :: [] ((,) String ([] String)) -> Map String ([] String);
-  adjacency entries =
+  -- Names are resolved once at the graph boundary. Both the row table and
+  -- each edge row are dense immutable vectors. IDs live only in this graph.
+  data EdgeSlot = EdgeSlot;
+  data Rows d = Rows (V.IndexVec d (V.IndexVec EdgeSlot (V.Index d)));
+  data NamedGraph d a = NamedGraph (Map String (V.Index d)) (V.IndexVec d a) (Rows d);
+  buildGraph :: forall d a. (a -> String) -> (a -> [] String) ->
+                (String -> Maybe (V.Index d)) -> [] a -> NamedGraph d a;
+  buildGraph name dependencies missing values =
     let {
-      names = S.fromList compareString (map fst entries)
-    } in
-    M.fromList compareString
-      (map
-         (\((,) n deps) -> (,) n (canonical (filter (\d -> S.member compareString d names) deps)))
-         entries);
-  transpose :: Map String ([] String) -> Map String ([] String);
-  transpose graph =
-    M.map canonical
-      (foldlStrict
-         (\acc entry ->
-            foldlStrict
-              (\state dependency ->
-                 M.insertWith compareString append dependency ((:) (fst entry) []) state)
-              acc
-              (snd entry))
-         (M.map (\_ -> []) graph)
-         (M.toList graph));
-  finish :: Map String ([] String) ->
-            Set String -> [] Visit -> [] String -> (,) (Set String) ([] String);
-  finish graph seen pending ordered =
-    case pending of {
-      [] -> (,) seen ordered;
-      (:) (Leave n) rest -> finish graph seen rest ((:) n ordered);
-      (:) (Enter n) rest ->
-        if S.member compareString n seen
-        then finish graph seen rest ordered
-        else let {
-               dependencies = M.findWithDefault compareString [] n graph
-             } in
-             finish graph (S.insert compareString n seen)
-               (foldr (\d next -> (:) (Enter d) next) ((:) (Leave n) rest) dependencies)
-               ordered
-    };
-  collect :: Map String ([] String) ->
-             Set String -> [] String -> [] String -> (,) (Set String) ([] String);
-  collect graph seen pending members =
-    case pending of {
-      [] -> (,) seen (sortBy compareString members);
-      (:) n rest ->
-        if S.member compareString n seen
-        then collect graph seen rest members
-        else collect graph (S.insert compareString n seen)
-               (append (M.findWithDefault compareString [] n graph) rest)
-               ((:) n members)
-    };
-  collectGroups :: Map String ([] String) ->
-                   Set String -> [] String -> [] ([] String) -> [] ([] String);
-  collectGroups graph seen ordered groups =
-    case ordered of {
-      [] -> groups;
-      (:) n rest ->
-        if S.member compareString n seen
-        then collectGroups graph seen rest groups
-        else case collect graph seen ((:) n []) [] of {
-               (,) next members -> collectGroups graph next rest ((:) members groups)
-             }
-    };
+      nodes = V.fromList values;
+      names = M.fromList compareString (zipWith (\node i -> (,) (name node) i) values (V.indices nodes));
+      resolve key = case M.lookup compareString key names of {
+        Just i -> Just i;
+        Nothing -> missing key
+      };
+      rows = V.fromList (map (\node -> V.fromList (mapMaybe resolve (dependencies node))) values)
+    } in NamedGraph names nodes (Rows rows);
+  graphNodes :: forall d a. NamedGraph d a -> V.IndexVec d a;
+  graphNodes (NamedGraph _ nodes _) = nodes;
+  graphRows :: forall d a. NamedGraph d a -> Rows d;
+  graphRows (NamedGraph _ _ rows) = rows;
+  graphId :: forall d a. NamedGraph d a -> String -> Maybe (V.Index d);
+  graphId (NamedGraph names _ _) name = M.lookup compareString name names;
+  neighbors :: forall d. Rows d -> V.Index d -> [] (V.Index d);
+  neighbors (Rows rows) i = V.toList (V.at rows i);
+
+  -- Roots and rows have a specified order. The explicit stack avoids native
+  -- call-stack growth on deep import chains. Leave prepends to finish order.
+  data Visit d = Enter (V.Index d) | Leave (V.Index d);
+  finish :: forall s d. Rows d -> V.Builder s d Bool -> [] (Visit d) -> [] (V.Index d) ->
+                        ST s ([] (V.Index d));
+  finish rows seen pending ordered = case pending of {
+    [] -> stReturn ordered;
+    (:) (Leave i) rest -> finish rows seen rest ((:) i ordered);
+    (:) (Enter i) rest -> stBind (V.get seen i) (\marked ->
+      if marked then finish rows seen rest ordered
+      else stBind (V.set seen i True) (\_ ->
+        finish rows seen (foldr (\j next -> (:) (Enter j) next) ((:) (Leave i) rest)
+                            (neighbors rows i)) ordered))
+  };
+  finishOrder :: forall d. Rows d -> [] (V.Index d) -> [] (V.Index d);
+  finishOrder (Rows rows) roots = runST (stBind (V.filled (V.count rows) False) (\seen ->
+    finish (Rows rows) seen (map Enter roots) []));
+
+  -- Path-based SCCs (Gabow). A positive mark is an open DFS preorder,
+  -- zero is unseen, and -1 is closed. Boundaries are candidate SCC roots.
+  -- An edge to an open vertex merges all boundaries discovered after it.
+  -- Closing a surviving root emits exactly one component, in finish order.
+  data ModuleVertex = ModuleVertex;
+  componentsById :: forall d. Rows d -> [] (V.Index d) -> [] ([] (V.Index d));
+  componentsById (Rows rows) roots = runST (stBind (V.filled (V.count rows) 0) (\marks ->
+    scanComponents rows marks 1 (map Enter roots) [] [] []));
+  scanComponents :: forall s d. V.IndexVec d (V.IndexVec EdgeSlot (V.Index d)) ->
+    V.Builder s d Int -> Int -> [] (Visit d) -> [] (V.Index d) -> [] ((,) (V.Index d) Int) ->
+    [] ([] (V.Index d)) -> ST s ([] ([] (V.Index d)));
+  scanComponents rows marks serial pending open boundaries groups = case pending of {
+    [] -> stReturn (reverse groups);
+    (:) (Enter i) rest -> stBind (V.get marks i) (\mark ->
+      if mark == 0 then stBind (V.set marks i serial) (\_ ->
+        let { next = serial + 1;
+              tasks = foldr (\j more -> (:) (Enter j) more) ((:) (Leave i) rest)
+                (V.toList (V.at rows i)) } in
+        seq next (scanComponents rows marks next tasks ((:) i open) ((:) ((,) i serial) boundaries) groups))
+      else scanComponents rows marks serial rest open
+        (if mark < 0 then boundaries else dropWhile (\entry -> snd entry > mark) boundaries) groups);
+    (:) (Leave i) rest -> case boundaries of {
+      (:) ((,) root _) older -> if V.toInt root == V.toInt i
+        then stBind (closeComponent marks root open []) (\((,) members remaining) ->
+          scanComponents rows marks serial rest remaining older ((:) members groups))
+        else scanComponents rows marks serial rest open boundaries groups;
+      [] -> panic "missing SCC boundary"
+    }
+  };
+  closeComponent :: forall s d. V.Builder s d Int -> V.Index d -> [] (V.Index d) ->
+    [] (V.Index d) -> ST s ((,) ([] (V.Index d)) ([] (V.Index d)));
+  closeComponent marks root open members = case open of {
+    [] -> panic "missing open SCC root";
+    (:) i rest -> stBind (V.set marks i (0 - 1)) (\_ ->
+      if V.toInt i == V.toInt root then stReturn ((,) ((:) i members) rest)
+      else closeComponent marks root rest ((:) i members))
+  };
+  -- SCCs close dependency-first. All members of a component share one
+  -- immutable reach set. Internal edges still point to empty slots until
+  -- the entire component is published; external successors are complete.
+  reachTable :: forall d. Rows d -> V.IndexVec d IntSet;
+  reachTable rows@(Rows table) = runST (stBind (V.filled (V.count table) IS.empty) (\closed ->
+    stBind (ST.map_ (closeReach rows closed) (componentsById rows (V.indices table))) (\_ ->
+      V.freeze closed)));
+  closeReach :: forall s d. Rows d -> V.Builder s d IntSet -> [] (V.Index d) -> ST s ();
+  closeReach rows closed group =
+    let { addEdge reached j = stBind (V.get closed j) (\child ->
+            let { next = IS.union reached child } in seq next (stReturn next));
+          addMember reached i = ST.fold addEdge (IS.insert (V.toInt i) reached) (neighbors rows i)
+    } in stBind (ST.fold addMember IS.empty group) (\reached ->
+      ST.map_ (\i -> V.set closed i reached) group);
+  -- Repeated keys select the last entry. Roots, outgoing rows and group
+  -- members are lexical, independently of source declaration order.
+  nameGraph :: forall d. [] ((,) String ([] String)) -> NamedGraph d ((,) String ([] String));
+  nameGraph entries =
+    let { values = M.toList (M.fromList compareString entries);
+      nodes = V.fromList values;
+      names = M.fromDistinctAscList (zipWith (\entry i -> (,) (fst entry) i) values (V.indices nodes));
+      row entry = V.fromList (map V.fromInt (IS.toAscList (foldlStrict (\seen name ->
+        case M.lookup compareString name names of {
+          Nothing -> seen; Just j -> IS.insert (V.toInt j) seen
+        }) IS.empty (snd entry))))
+    } in NamedGraph names nodes (Rows (V.fromList (map row values)));
+  declarationGraph :: [] ((,) String ([] String)) -> NamedGraph Declaration ((,) String ([] String));
+  declarationGraph = nameGraph;
+  moduleGraph :: [] ((,) String ([] String)) -> NamedGraph ModuleVertex ((,) String ([] String));
+  moduleGraph = nameGraph;
   components :: [] ((,) String ([] String)) -> [] ([] String);
-  components entries =
+  components entries = case entries of {
+    [] -> [];
+    [(,) name _] -> [[name]];
+    _ -> groupNames (declarationGraph entries)
+  };
+  groupNames :: forall d. NamedGraph d ((,) String ([] String)) -> [] ([] String);
+  groupNames graph =
     let {
-      graph = adjacency entries
-    } in
+      nodes = graphNodes graph;
+      rows = graphRows graph;
+      groups = componentsById rows (V.indices nodes)
+    } in map (\group -> sortBy compareString (map (\i -> fst (V.at nodes i)) group)) groups;
+  -- Semantic declaration IDs belong to one resolution. Source occurrences
+  -- already carry them. Later class-support bindings extend the same domain.
+  data DeclOrder = DeclOrder;
+  -- Each slot owns its canonical spelling and stable definition key. A
+  -- resolved entity can share its *printed* name with an inactive import.
+  -- Only the stable keys cross a resolution or link-session boundary.
+  data Symbols = Symbols (V.IndexVec Declaration String) ([] (V.Index Declaration)) (IntMap (Maybe String))
+                         (V.IndexVec Declaration ((,) String String));
+  symbolNodes (Symbols nodes _ _ _) = nodes;
+  symbolName symbols = V.at (symbolNodes symbols);
+  symbolKey (Symbols _ _ _ labels) i = fst (V.at labels i);
+  symbolDisplay (Symbols _ _ _ labels) i = snd (V.at labels i);
+  symbolKeyIndex table = M.fromList compareString
+    (map (\i -> (,) (symbolKey table i) i) (V.indices (symbolNodes table)));
+  checkedDeclId :: Symbols -> Int -> Either String (V.Index Declaration);
+  checkedDeclId table number =
+    if number >= 0 && number < V.count (symbolNodes table) then Right (V.fromInt number)
+    else Left "declaration slot out of bounds";
+  compareSlots nodes i j = compareString (V.at nodes i) (V.at nodes j);
+  symbolsWithLabels entries =
+    let { nodes = V.fromList (map (\((,,,) name _ _ _) -> name) entries); indices = V.indices nodes;
+          methods = mapMaybe (\((,) ((,,,) _ _ _ method) i) -> if method then Just ((,) (V.toInt i) Nothing) else Nothing)
+                      (zip entries indices);
+          labels = V.fromList (map (\((,,,) _ key display _) -> (,) key display) entries)
+    } in Symbols nodes (sortBy (compareSlots nodes) indices) (IM.fromList methods) labels;
+  symbolsWithKeys entries = symbolsWithLabels (map (\((,,) name key method) -> (,,,) name key name method) entries);
+  withMethodOwners (Symbols nodes order methods keys) owners =
+    Symbols nodes order (foldlStrict (\table ((,) i owner) -> IM.insert (V.toInt i) (Just owner) table) methods owners) keys;
+  methodOwner (Symbols _ _ methods _) i = case IM.lookup (V.toInt i) methods of {
+    Just owner -> owner; Nothing -> Nothing
+  };
+  methodKeyCompare = comparePair compareString compareString;
+  -- Named adapters and standalone link sessions already have stable names.
+  symbols entries = symbolsWithKeys (map (\((,) n m) -> (,,) n n m) entries);
+  -- Generated names are qualified by their owner at the lowering boundary.
+  -- The returned slots belong to the new snapshot, in the caller's order.
+  appendSymbols original@(Symbols nodes order methods keys) names = case names of {
+    [] -> (,) original [];
+    _ -> let { allNodes = V.fromList (append (V.toList nodes) names);
+               allKeys = V.fromList (append (V.toList keys) (map (\name -> (,) name name) names));
+               extra = map V.fromInt (range (V.count nodes) (V.count allNodes - 1));
+               cmp = compareSlots allNodes
+         } in (,) (Symbols allNodes (mergeBy cmp order (sortBy cmp extra)) methods allKeys) extra
+  };
+  extendSymbols table names = fst (appendSymbols table names);
+  -- Visibility belongs to the defining declaration. Only active definitions
+  -- enter the adapter used by the named surface/class lowering boundary.
+  data ClassContext = ClassContext GeneratedTable Bool (V.Index Declaration -> Maybe ((,) ([] String) Bool));
+  data ValueScopes a = NamedScopes (Map String a) |
+    IndexedScopes Bool (Maybe ClassContext) Symbols (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe a));
+  indexedScopes symbols entries = let {
+    names = M.fromList compareString (map (\((,) i _) -> (,) (symbolName symbols i) i) entries);
+    table = runST (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
+      stBind (ST.map_ (\((,) i a) -> V.set rows i (Just a)) entries) (\_ -> V.freeze rows)))
+  } in IndexedScopes True Nothing symbols names table;
+  mapScopes f scopes = case scopes of {
+    NamedScopes named -> NamedScopes (M.map f named);
+    IndexedScopes top tableId symbols names table -> IndexedScopes top tableId symbols names
+      (V.fromList (map (mapOptional f) (V.toList table)))
+  };
+  namedScopes scopes = case scopes of {
+    NamedScopes named -> named;
+    IndexedScopes _ _ _ names table -> M.map (\i -> case V.at table i of {
+      Just a -> a; Nothing -> panic "inactive declaration scope"
+    }) names
+  };
+  lookupScope name scopes = case scopes of {
+    NamedScopes named -> M.lookup compareString name named;
+    IndexedScopes _ _ _ names table -> case M.lookup compareString name names of {
+      Nothing -> Nothing; Just i -> V.at table i
+    }
+  };
+  scopeAt scopes i = case scopes of {
+    IndexedScopes _ _ _ _ table -> V.at table i;
+    NamedScopes _ -> panic "named visibility has no declaration IDs"
+  };
+  scopeContext scopes = case scopes of {
+    NamedScopes _ -> Nothing; IndexedScopes _ context _ _ _ -> context
+  };
+  scopeGeneration scopes = mapOptional (\(ClassContext table _ _) -> table) (scopeContext scopes);
+  scopeContract scopes i = case scopeContext scopes of {
+    Nothing -> Nothing; Just (ClassContext _ _ read) -> read i
+  };
+  withScopeContext context scopes = case scopes of {
+    NamedScopes _ -> scopes;
+    IndexedScopes top _ symbols names rows -> IndexedScopes top context symbols names rows
+  };
+  nestedScopes scopes = case scopes of {
+    IndexedScopes _ generated symbols names table -> IndexedScopes False generated symbols names table;
+    NamedScopes _ -> scopes
+  };
+  bindingScope scopes name copied fallback = case scopes of {
+    IndexedScopes False _ _ _ _ -> if copied then fromMaybe fallback (lookupScope name scopes) else fallback;
+    _ -> fromMaybe fallback (lookupScope name scopes)
+  };
+  lookupSourceScope scopes i = case scopes of {
+    NamedScopes _ -> Nothing;
+    IndexedScopes _ _ _ _ rows -> if V.toInt i < 0 || V.toInt i >= V.count rows then Nothing else V.at rows i
+  };
+  scopeForBinder scopes ref copied fallback = case ref of {
+    DeclRef i name -> case scopes of {
+      NamedScopes _ -> bindingScope scopes name copied fallback;
+      IndexedScopes _ _ _ _ _ -> fromMaybe fallback (lookupSourceScope scopes i)
+    };
+    LexicalRef name -> bindingScope scopes name copied fallback
+  };
+  data Bound = Bound (V.Index Declaration) (Maybe SAnnotation) (R.Expr Declaration);
+  boundId (Bound i _ _) = i;
+  boundValue symbols (Bound i annotation rhs) = let { name = symbolName symbols } in
+    (,,) (name i) annotation (R.namedExpr name rhs);
+  data BoundValues = BoundValues Symbols ([] Bound);
+  boundValues (BoundValues symbols rows) = map (boundValue symbols) rows;
+  boundTable (BoundValues symbols bindings) = runST
+    (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\slots ->
+      stBind (ST.map_ (\b -> V.set slots (boundId b) (Just b)) bindings) (\_ -> V.freeze slots)));
+  appendBoundWithId (BoundValues old rows) name rhs =
+    case appendSymbols old [name] of {
+      (,) table [i] -> (,) i (BoundValues table (append rows [Bound i Nothing rhs]));
+      _ -> panic "missing appended declaration slot"
+    };
+  appendBound values name rhs = snd (appendBoundWithId values name rhs);
+  -- Class generation owns the slots of its local outputs. Interface-only
+  -- selectors and dictionaries join the same table as imported bindings.
+  data GeneratedTable = GeneratedTable Symbols ([] (V.Index Declaration))
+    (Map String (V.Index Declaration)) (Map String (V.Index Declaration)) (V.IndexVec Declaration (Maybe ((,) (V.Index Declaration) ([] String))));
+  generatedSymbols (GeneratedTable symbols _ _ _ _) = symbols;
+  generatedSlots (GeneratedTable _ slots _ _ _) = slots;
+  generatedNameId (GeneratedTable _ _ names _ _) name = M.lookup compareString name names;
+  generatedImportId (GeneratedTable _ _ _ imports _) name = M.lookup compareString name imports;
+  selectorEntry (GeneratedTable _ _ _ _ selectors) i = V.at selectors i;
+  selectorId table i = mapOptional fst (selectorEntry table i);
+  generatedTable base sources supportNames imports methods = let {
+    entries = mapMaybe (\((,) name binding) -> case snd binding of {
+      (:) owner _ -> Just ((,) ((,) owner name) binding); [] -> Nothing
+    }) (M.toList methods)
+  } in generatedTableFor base sources supportNames imports methods (M.fromList methodKeyCompare entries);
+  generatedTableFor base sources supportNames imports methods ownedMethods =
     let {
-      ordered = snd (finish graph S.empty (map Enter (M.keys graph)) [])
-    } in
-    collectGroups (transpose graph) S.empty ordered [];
+      nodes = symbolNodes base; start = V.count nodes;
+      byId i = (,) (symbolName base i) i;
+      active = M.fromList compareString (map byId sources);
+      owners = IS.fromList (map V.toInt sources);
+      inactive = filter (\i -> not (IS.member (V.toInt i) owners)) (V.indices nodes);
+      available = symbolKeyIndex base;
+      missing = filter (\n -> not (M.member compareString n available)) imports;
+      symbols = extendSymbols base (append supportNames missing);
+      support = map V.fromInt (range start (start + length supportNames - 1));
+      extra = map V.fromInt (range (start + length supportNames) (V.count (symbolNodes symbols) - 1));
+      assigned ids = M.fromList compareString (map (\i -> (,) (symbolName symbols i) i) ids);
+      keys = M.union compareString (assigned extra) available;
+      external = M.fromList compareString (map (\key -> (,) key (M.get compareString key keys)) imports);
+      names = M.union compareString active (M.union compareString (assigned support)
+        (M.union compareString keys (M.fromList compareString (map byId inactive))));
+      choose i = case (case methodOwner base i of {
+        Nothing -> M.lookup compareString (symbolName base i) methods;
+        Just owner -> M.lookup methodKeyCompare ((,) owner (symbolName base i)) ownedMethods
+      }) of {
+        Nothing -> Nothing;
+        Just ((,) name classes) -> mapOptional (\j -> (,) j classes) (M.lookup compareString name names)
+      };
+      selectors = case base of { Symbols _ _ methodIds _ -> runST
+        (stBind (V.filled (V.count (symbolNodes symbols)) Nothing) (\rows ->
+          stBind (ST.map_ (\n -> let { i = V.fromInt n } in V.set rows i (choose i))
+            (IM.keys methodIds)) (\_ -> V.freeze rows))) }
+    } in GeneratedTable symbols support names external selectors;
+  scopeOwnerId scopes name = case scopes of {
+    IndexedScopes _ _ _ names _ -> M.lookup compareString name names;
+    NamedScopes _ -> Nothing
+  };
+  -- Only later-generated syntax arrives by spelling. Source edges use the
+  -- Global leaf of the resolved expression directly.
+  namedRank :: V.IndexVec Declaration String -> V.IndexVec DeclOrder (V.Index Declaration) ->
+    String -> Maybe (V.Index DeclOrder);
+  namedRank nodes order name =
+    let { search lo hi = if lo >= hi then Nothing else
+            let { mid = lo + quotInt (hi - lo) 2; rank = V.fromInt mid;
+                  cmp = compareString name (V.at nodes (V.at order rank)) } in
+            if cmp < 0 then search lo mid else if cmp > 0 then search (mid + 1) hi else Just rank
+    } in search 0 (V.count order);
+  uniqueSlots nodes ordered = case ordered of {
+    (:) i rest@((:) j _) -> compareSlots nodes i j /= 0 && uniqueSlots nodes rest;
+    _ -> True
+  };
+  -- Keep the resolver's IDs even when a later selector sorts before a source
+  -- declaration. Dense lexical ranks order DFS roots, siblings and members.
+  resolvedGroups :: BoundValues -> [] ((,) String ([] String)) -> Map String ((,) String ([] String)) ->
+    Map String ([] String) -> Either String ((,) Symbols ([] ([] ((,) (V.Index Declaration) Bool))));
+  resolvedGroups bindings generated methods scopes = resolvedGroupsInScopes bindings generated methods (NamedScopes scopes);
+  resolvedGroupsInScopes bindings@(BoundValues base bound) generated methods scopes =
+    let { generation = generatedTable base (map boundId bound) (map fst generated) [] methods;
+          targets i = mapMaybe (generatedNameId generation) (fromMaybe []
+            (case scopes of {
+              NamedScopes values -> M.lookup compareString (symbolName base i) values;
+              IndexedScopes _ _ _ _ _ -> scopeAt scopes i
+            }))
+    } in resolvedGroupsWith bindings generation generated targets;
+  resolvedGroupsWith (BoundValues base bound) generation generated targets = do {
+    let { symbols = generatedSymbols generation; nodes = symbolNodes symbols;
+          generatedIds = generatedSlots generation;
+          present = append (map boundId bound) generatedIds;
+          active = IS.fromList (map V.toInt present);
+          presentId i = IS.member (V.toInt i) active;
+          duplicate = if null generated then "duplicate value declaration" else "duplicate source/support binding";
+          orderedIds = case symbols of { Symbols _ indices _ _ -> filter presentId indices }
+    };
+    let { valid i = V.toInt i >= 0 && V.toInt i < V.count (symbolNodes base);
+          referencesInRange (Bound i _ rhs) = valid i && all valid (R.references rhs) };
+    ensure (all referencesInRange bound) "declaration slot out of bounds";
+    ensure (IS.size active == length present && uniqueSlots nodes orderedIds) duplicate;
+    let { order = V.fromList orderedIds;
+          direct = runST (stBind (V.filled (V.count nodes) Nothing) (\slots ->
+            stBind (ST.map_ (\r -> V.set slots (V.at order r) (Just r)) (V.indices order)) (\_ -> V.freeze slots)));
+          rank i = V.at direct i;
+          sourceRank i = rank (fromMaybe i (selectorId generation i));
+          edgeRow targets = V.fromList (map (\r -> V.at order (V.fromInt r))
+            (IS.toAscList (IS.fromList (map V.toInt targets))));
+          sourceRow (Bound i _ rhs) = (,) i (edgeRow (append (mapMaybe sourceRank (R.references rhs))
+            (mapMaybe rank (targets i))));
+          generatedRow i entry = (,) i (edgeRow (mapMaybe rank (mapMaybe (generatedNameId generation) (snd entry))));
+          rows = runST (stBind (V.filled (V.count nodes) (V.fromList [])) (\slots ->
+            stBind (ST.map_ (\((,) i row) -> V.set slots i row)
+              (append (map sourceRow bound) (zipWith generatedRow generatedIds generated))) (\_ ->
+                stBind (V.freeze slots) (\table -> stReturn (Rows table)))));
+          member i = (,) i (any (\j -> V.toInt i == V.toInt j) (neighbors rows i));
+          ordered group = map member (sortBy (\i j -> compareString (V.at nodes i) (V.at nodes j)) group)
+    };
+    Right ((,) symbols (map ordered (componentsById rows (V.toList order))))
+  };
+  groupSpellings ((,) symbols groups) = map (map (compose (V.at (symbolNodes symbols)) fst)) groups;
   declarationGroups :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
                        Either String ([] ([] String));
   declarationGroups values =

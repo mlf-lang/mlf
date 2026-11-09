@@ -80,9 +80,9 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
   compileLinked :: PreludeMode -> [] SourceModule -> Either CompileError Compilation;
   compileLinked mode modules =
     do {
-      boundValueShared1 <- atPhase ModuleResolution (Modules.linkModules mode modules);
+      boundValueShared1 <- atPhase ModuleResolution (Modules.linkModulesInScopes mode modules);
       case boundValueShared1 of {
-        LinkedModule program names valueScopes instanceScopes ->
+        (,) (LinkedModule program names _ instanceScopes) valueScopes ->
           do {
             let {
               display = Modules.displayNames names
@@ -92,7 +92,7 @@ module Bootstrap.Compiler (Compilation, inferredType, compiledTerm, checkedTerm,
               Right value -> Right value
             };
             lowered <-
-              case Classes.lowerClassesWithScopes valueScopes instanceScopes canonical of {
+              case Classes.lowerClassesInScopes valueScopes instanceScopes canonical of {
                 Left err -> Left (CompileError Inference (display err));
                 Right lowered -> Right lowered
               };

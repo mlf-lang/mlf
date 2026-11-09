@@ -16,6 +16,8 @@ sys.path.insert(0, str(ROOT / 'tools/shared'))
 from artifact_binary_reference import read_document, tree_document, Invalid, require
 from test_query_index import read_index
 from artifact_binary_typed import value_node as node, text, list_values as items, unpack
+from query_generation import Generation, cache_directory
+from finish_receipts import check_receipts, forge_generation
 
 
 def sha(data): return hashlib.sha256(data).hexdigest()
@@ -104,13 +106,14 @@ def reject_index(raw, configuration, reason):
 
 
 def graph(cache):
-    directory = cache / 'query-graph-v1'
+    directory = cache_directory(cache)
     current = text(read(directory / 'CURRENT', 6))
     raw = (directory / 'generations' / (current + '.mlfqg')).read_bytes()
-    _, _, result = index_data(raw, expected=current)
+    generation = Generation(raw, expected_hash=current)
+    result = generation.nodes
     for entry in result.values():
         payload = entry['payload']
-        if payload is not None:
+        if payload:
             raw = (directory / 'results' / (payload + '.mlfqr')).read_bytes()
             require(sha(raw) == payload == entry['sha'], 'query payload SHA256')
             require(tree_document(read_document(raw, 6).values(), schema=6) == raw,
@@ -201,9 +204,12 @@ def main():
             inc = compile(f'{version}-incremental')
             report = json.loads(inc.with_suffix('.queries').read_text())
             current, nodes = graph(cache)
+            receipts = check_receipts(inc, cache, nodes)
+            if name == 'scope-order' and version == 1:
+                assert receipts['rewritten'] > 0, 'expected a final evidence adapter'
             if name == 'recursive-dictionary':
-                idx = cache / 'query-graph-v1/generations' / (current + '.mlfqg')
-                _, configuration, _ = index_data(idx.read_bytes(), expected=current)
+                idx = cache_directory(cache) / 'generations' / (current + '.mlfqg')
+                configuration = text(Generation(idx.read_bytes()).config)
                 assert unpack(configuration)[-1] == 'source', 'pure dictionary recursion should retain the source plan'
             before = {str(p.relative_to(cache)): (sha(p.read_bytes()), p.stat().st_mtime_ns)
                       for p in cache.rglob('*') if p.is_file() and p.name != '.lock'}
@@ -243,7 +249,7 @@ def main():
         # A corrupt/missing result is repaired; final output remains exact.
         current, nodes = graph(cache)
         payload = next(n['payload'] for k, n in nodes.items() if unpack(k)[0] == 'InferScc')
-        damaged = cache / 'query-graph-v1/results' / (payload + '.mlfqr')
+        damaged = cache_directory(cache) / 'results' / (payload + '.mlfqr')
         damaged.write_bytes(b'corrupt checked record')
         repaired = compile('repaired')
         assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 1
@@ -255,7 +261,7 @@ def main():
         assert outputs(missing) == outputs(inc)
         graph(cache)
         # Failed source/output/publication cannot advance the generation pointer.
-        pointer = cache / 'query-graph-v1/CURRENT'; old = pointer.read_bytes()
+        pointer = cache_directory(cache) / 'CURRENT'; old = pointer.read_bytes()
         source.write_text(source_text(versions[-1] + '\ninvalid = missingDefinition\n'))
         compile('source-failure', success=False)
         assert pointer.read_bytes() == old
@@ -273,7 +279,7 @@ def main():
             assert 'query publication interrupted' in (folder / ('failed-' + point + '.stderr')).read_text(), 'failure did not reach publication'
             assert pointer.read_bytes() == old
             graph(cache)
-            staged = set((cache / 'query-graph-v1/staging').glob('*.mlfqr'))
+            staged = set((cache_directory(cache) / 'staging').glob('*.mlfqr'))
             if point == 'after-result-staging':
                 assert staged, 'failpoint did not reach staged results'
                 staged_before_move = staged
@@ -290,21 +296,30 @@ def main():
         objectfile.write_bytes(saved)
         # Broken, checksum-correct references reject the whole generation.
         valid_generation, valid_nodes = graph(cache)
-        index = cache / 'query-graph-v1/generations' / (valid_generation + '.mlfqg')
-        version, configuration, valid_nodes = index_data(index.read_bytes(), expected=valid_generation)
-        absent = frame(['Binding', 'absent-definition'])
-        require(absent not in valid_nodes, 'dangling fixture key already exists')
-        damaged_nodes = {key: dict(entry, reads=list(entry['reads']))
-                         for key, entry in valid_nodes.items()}
+        index = cache_directory(cache) / 'generations' / (valid_generation + '.mlfqg')
+        wire = Generation(index.read_bytes())
+        damaged_entries = []
         changed = False
-        for entry in damaged_nodes.values():
-            if not changed and entry['reads']:
-                _, expected = entry['reads'][0]
-                entry['reads'][0] = (absent, expected)
+        for value in wire.rows:
+            k, h, reads, location = node(value, 410, 4)
+            if not changed and items(reads):
+                edges = list(items(reads))
+                _, expected = pair(edges[0])
+                edges[0] = ('node', 2, (('text', frame(['Binding','absent-definition'])), expected))
+                value = ('node', 410, (k,h,('node',1,tuple(edges)),location))
                 changed = True
-        assert changed
-        bad_bytes = index_bytes(configuration, damaged_nodes, version=version)
-        reject_index(bad_bytes, configuration, 'closure' if version == 1 else 'missing dependency')
+            damaged_entries.append(value)
+        require(changed and len(damaged_entries) == len(wire.rows),
+                'dangling fixture preserves all original rows')
+        bad_bytes = wire.encode_rows(damaged_entries)
+        try:
+            Generation(bad_bytes, configuration=text(wire.config))
+        except Invalid as error:
+            expected_error = ('missing dependency' if wire.dictionary_format else
+                              'missing/stale dependency' if wire.version == 1 else 'dangling query read')
+            require(str(error) == expected_error, 'dangling fixture exact semantic rejection')
+        else:
+            raise Invalid('dangling fixture was admitted')
         bad_hash = sha(bad_bytes)
         (index.parent / (bad_hash + '.mlfqg')).write_bytes(bad_bytes)
         pointer.write_bytes(tree_document([('text',bad_hash)],schema=6))
@@ -317,8 +332,8 @@ def main():
             # graph closure. This is an audit-policy test, not corruption: the
             # normal reader/ICH must not silently become a second typechecker.
             generation, nodes = graph(cache)
-            index = cache / 'query-graph-v1/generations' / (generation + '.mlfqg')
-            version, configuration, nodes = index_data(index.read_bytes(), expected=generation)
+            index = cache_directory(cache) / 'generations' / (generation + '.mlfqg')
+            wire = Generation(index.read_bytes())
             def replace_literal(value, changed):
                 if value[0] != 'node': return value
                 if value[1] == 77 and not changed[0]:
@@ -327,20 +342,25 @@ def main():
                 return ('node',value[1],tuple(replace_literal(v,changed) for v in value[2]))
             for key, entry in nodes.items():
                 if unpack(key)[0] != 'InferScc': continue
-                path = cache / 'query-graph-v1/results' / (entry['payload']+'.mlfqr')
+                path = cache_directory(cache) / 'results' / (entry['payload']+'.mlfqr')
                 changed = [False]
                 forged = replace_literal(read(path, 6), changed)
                 if changed[0]: break
             assert changed[0]
             raw = tree_document([forged],schema=6); forged_hash = sha(raw)
             (path.parent/(forged_hash+'.mlfqr')).write_bytes(raw)
-            new_nodes = replace_result(nodes, key, forged_hash)
-            encoded = index_bytes(configuration, new_nodes, version=version)
-            # This attack must pass structural/closure admission in the same
-            # version as the actual producer before exercising the audit policy.
-            parsed_version, parsed_configuration, parsed_nodes = index_data(encoded)
-            require((parsed_version, parsed_configuration, parsed_nodes) ==
-                    (version, configuration, new_nodes), 'trusted fixture changed logical graph')
+            new_entries = []
+            for value in wire.rows:
+                k,h,edges,location = node(value,410,4)
+                new_edges = tuple(('node',2,(dep,('text',forged_hash) if text(dep)==key else digest))
+                                  for dep,digest in map(pair,items(edges)))
+                if text(k)==key:
+                    h=('text',forged_hash); location=('node',5,(('text',forged_hash),))
+                new_entries.append(('node',410,(k,h,('node',1,new_edges),location)))
+            encoded = wire.encode_rows(new_entries)
+            checked = Generation(encoded, configuration=text(wire.config))
+            require(checked.nodes == replace_result(wire.nodes, key, forged_hash),
+                    'trusted fixture changed logical graph')
             forged_generation = sha(encoded)
             (index.parent/(forged_generation+'.mlfqg')).write_bytes(encoded)
             pointer.write_bytes(tree_document([('text',forged_generation)],schema=6))
@@ -356,16 +376,34 @@ def main():
         # stable evidence can be recomputed without invalidating raw inference.
         _, nodes = graph(cache)
         damaged_kinds = []
-        for kind in ('Binding', 'Datatype', 'Evidence'):
+        for kind in ('Binding', 'Datatype', 'Evidence', 'FinishScc'):
             matches = [n['payload'] for k,n in nodes.items() if unpack(k)[0] == kind and n['payload']]
             if not matches: continue
-            (cache / 'query-graph-v1/results' / (matches[0] + '.mlfqr')).unlink()
+            (cache_directory(cache) / 'results' / (matches[0] + '.mlfqr')).unlink()
             repaired = compile('repair-shared-' + kind)
             assert outputs(repaired) == outputs(inc)
             assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 0
             graph(cache); damaged_kinds.append(kind)
         record.setdefault('shared_repair', {})[name] = damaged_kinds
         if name == 'body':
+            generation, nodes = graph(cache)
+            target = next(n for k,n in nodes.items() if unpack(k)[0] == 'FinishScc')
+            path = cache_directory(cache) / 'results' / (target['payload'] + '.mlfqr')
+            path.write_bytes(b'damaged finish receipt')
+            repaired = compile('damaged-finish')
+            assert sha(path.read_bytes()) == target['sha'] and outputs(repaired) == outputs(inc)
+            assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 0
+            modes = ('swapped', 'stale', 'reordered', 'wrong-address', 'finish-as-raw', 'previous-format')
+            for mode in modes:
+                forged = forge_generation(cache, generation, mode)
+                if mode != 'wrong-address':
+                    assert graph(cache)[0] == forged  # Valid checksums and dependency closure.
+                repaired = compile('repair-finish-' + mode)
+                assert graph(cache)[0] == generation and outputs(repaired) == outputs(inc)
+                report = json.loads(repaired.with_suffix('.queries').read_text())
+                expected = len(report['groups']) if mode in ('wrong-address', 'previous-format') else int(mode == 'finish-as-raw')
+                assert report['inferred_groups'] == expected
+            record['finish_receipt_recovery'] = ['damaged', 'missing', *modes]
             cache.rename(folder / 'before-concurrent-writers')
             with ThreadPoolExecutor(max_workers=2) as pool:
                 writes = list(pool.map(compile, ['writer-a', 'writer-b']))

@@ -83,7 +83,14 @@ pureTests = do
   again <- right "canonical reencode value" (Q.encodeIndexV2 "config" wire)
   bytes2 <- W.encode W.defaultLimits 6 [again] >>= right "canonical reencode bytes"
   Storage.sameBytes bytes bytes2 >>= need "canonical v2 bytes"
-  right "legacy index reader" (decode (Q.encodeIndex "config" decoded)) >>= same "legacy compatibility" decoded
+  -- Dictionary v2 retains independent locations; legacy admission requires
+  -- each present payload to equal its result digest.
+  let legacyNodes = M.fromList P.compareString
+        [("leaf",Q.QueryNode "leaf" hashA [] T.Nothing),
+         ("root",Q.QueryNode "root" hashB [("leaf",hashA),("leaf",hashA)] (T.Just hashB))]
+  right "legacy index reader" (decode (Q.encodeLegacyIndex "config" legacyNodes)) >>= same "legacy compatibility" legacyNodes
+  decodeReject "legacy mismatched payload" "invalid query graph digest"
+    (Q.encodeLegacyIndex "config" decoded)
   empty <- right "empty v2 writer" (Q.encodeIndexV2 "config" M.empty)
   right "empty v2 reader" (decode empty) >>= (need "empty nodes" . M.null)
   let first = Q.QueryNode "first" hashA [] T.Nothing
@@ -141,7 +148,7 @@ pureTests = do
   two <- right "two roots plan" (W.planGraph W.defaultLimits [base,base])
   reject "two index roots" "root count" (Q.decodeIndex "config" two)
   let oldLeaf = legacyNode "leaf" hashA [] none
-      oldRoot = legacyNode "root" hashB [("leaf",hashA)] (just (W.VText hashA))
+      oldRoot = legacyNode "root" hashB [("leaf",hashA)] (just (W.VText hashB))
   decodeReject "legacy duplicate" "duplicate" (legacy [oldLeaf,oldLeaf,oldRoot])
   decodeReject "legacy bad hash" "digest" (legacy [legacyNode "leaf" "wrong" [] none])
   decodeReject "legacy missing" "unpublished" (legacy [oldRoot])
@@ -153,11 +160,10 @@ pureTests = do
   forM_ [False,True] $ \dependencyFirst -> do
     accepted <- right "4096-node writer" (Q.encodeIndexV2 "config" (chain 4096 dependencyFirst))
     right "4096-node reader" (decode accepted) >>= (need "4096 retained" . (==4096) . M.size)
-    if dependencyFirst
-      then right "legacy historical done-first depth compatibility"
-        (decode (Q.encodeIndex "config" (chain 4097 True))) >> pure ()
-      else decodeReject "legacy original forward depth limit" "cyclic/deep"
-        (Q.encodeIndex "config" (chain 4097 False))
+    -- DeclId's memoized suffix heights enforce the same boundary in both
+    -- lexical orders; the old done-first loophole must not be preserved.
+    decodeReject "legacy depth limit in both key orders" "cyclic/deep"
+      (Q.encodeLegacyIndex "config" (chain 4097 dependencyFirst))
     reject "4097-node writer rejects all key orders" "cyclic/deep"
       (Q.encodeIndexV2 "config" (chain 4097 dependencyFirst))
     let allNodes = M.elems (chain 4097 dependencyFirst)
@@ -174,7 +180,7 @@ pureTests = do
   let numeric = [Q.IndexNode 2 0 [] T.Nothing,
                  Q.IndexNode 3 1 [(2,0),(2,0)] (T.Just 0)]
   sizes <- mapM (right "row projected work" . Q.indexNodeWork 67108864 dictionary) numeric
-  inlineWork <- right "independent inline codec work" (work (Q.encodeIndex "config" decoded))
+  inlineWork <- right "independent inline codec work" (work (Q.encodeLegacyIndex "config" decoded))
   need "exact projected row work" (sizes == [73,280])
   need "exact projected total work" (inlineWork == sum sizes + 4 + 23 + 6)
   right "exact row/total budgets" (Q.validateIndexWork 280 inlineWork "config" dictionary numeric)
@@ -217,7 +223,7 @@ pureTests = do
   compactWork <- right "compact exact work" (work exact64)
   need "64 Mi row represented below 64 Ki work" (compactWork < 65536)
   reject "legacy whole-index actual 64 Mi remains" "work limit"
-    (W.plan W.defaultLimits [Q.encodeIndex "config" (repeated 1979)])
+    (W.plan W.defaultLimits [Q.encodeLegacyIndex "config" (repeated 1979)])
   boundaryGraph <- right "codec exact smaller budget"
     (W.planGraph (withWork compactWork W.defaultLimits) [exact64])
   right "codec exact smaller budget reader" (Q.decodeIndex "config" boundaryGraph) >> pure ()
@@ -281,18 +287,19 @@ publicationTests root = do
       current = txt (root ++ "/CURRENT")
   let legacyPath = txt (root ++ "/legacy")
   Q.begin legacyPath "config" >>= right "create legacy cache" >> pure ()
-  (legacyHash,legacyBytes) <- Q.encodeHashed (Q.encodeIndex "config" M.empty) >>= right "legacy generation bytes"
+  (legacyHash,legacyBytes) <- Q.encodeHashed (Q.encodeLegacyIndex "config" M.empty) >>= right "legacy generation bytes"
   Storage.writeRawAtomic (txt (root ++ "/legacy/generations/" ++ B.unpack legacyHash ++ ".mlfqg"))
     legacyBytes >>= right "legacy generation write"
   Storage.writeAtomic 6 (txt (root ++ "/legacy/CURRENT")) [W.VText legacyHash] >>= right "legacy pointer write"
   oldSession <- Q.begin legacyPath "config" >>= right "legacy begin reader"
-  let Q.Session _ _ oldHash _ _ _ = oldSession
-  need "legacy generation retained" (oldHash == legacyHash)
+  let Q.Session _ _ oldHash oldNodes _ _ = oldSession
+  need "legacy rows admitted but noncanonical address cannot be reused"
+    (oldHash == "" && M.size oldNodes == 0)
   Q.publish oldSession >>= right "legacy migrates to v2" >>= need "legacy migration switches"
   session <- Q.begin path "config" >>= right "begin empty"
-  (leaf,s1) <- Q.record (Q.key "Input" "leaf") [] True (W.VText "leaf payload") session
+  (leaf,s1) <- Q.record (Q.key "Input" (Q.key "Binding" "leaf")) [] True (W.VText "leaf payload") session
     >>= right "record input"
-  (node,s2) <- Q.record (Q.key "Compute" "root") [Q.edge leaf,Q.edge leaf] True
+  (node,s2) <- Q.record (Q.key "Binding" "root") [Q.edge leaf,Q.edge leaf] True
     (W.VText "root payload") s1 >>= right "record root"
   Q.publish s2 >>= right "cold publication" >>= need "cold switches CURRENT"
   baseline <- P.fileDigest current
@@ -318,7 +325,7 @@ publicationTests root = do
   Q.publish warm >>= right "warm publication" >>= (need "warm unchanged" . not)
   P.fileDigest current >>= (need "warm CURRENT preserved" . (== baseline))
   forM_ ["before-results","after-result-staging","after-result-batch","before-index","before-current"] $ \point -> do
-    (_,next) <- Q.record (Q.key "Compute" (txt point)) [] True (W.VText (txt point)) warm
+    (_,next) <- Q.record (Q.key "Binding" (txt point)) [] True (W.VText (txt point)) warm
       >>= right ("record " ++ point)
     setEnv "MLF_QUERY_FAILPOINT" point
     result <- Q.publish next

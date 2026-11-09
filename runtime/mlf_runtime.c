@@ -132,6 +132,8 @@ static void gc_free(void *memory) {
 /* Canonical source constructor tags and Char/typed-IOError primitives 95..102 and managed stack/context 103..106. */
 void mlf_require_haskell_boundary_v4_abi(void) {}
 void mlf_require_byte_file_v2_abi(void) {}
+void mlf_require_freeze_st_array_abi(void) {}
+void mlf_require_st_to_io_abi(void) {}
 
 typedef enum {
     HOLE, BUSY, INDIRECT, THUNK, APPLICATION, CLOSURE,
@@ -142,7 +144,7 @@ typedef enum {
     SMALL_INT_TABLE, ST_ACTION, ST_ARRAY, CONSTRUCTOR_WIDE,
     ASYNC_SCOPE, COMPLETION, ASYNC_SUBSCRIPTION, ASYNC_ACTION,
     IO_ERROR_VALUE, IO_CATCH_FRAME, IO_ASYNC_FINISH_FRAME,
-    CALL_STACK, IO_HANDLER_FRAME, BIG_INTEGER
+    CALL_STACK, IO_HANDLER_FRAME, BIG_INTEGER, NATIVE_IO_VALUE
 } Tag;
 
 /* These numbers are shared with primitiveCode in MLF.LLVM. */
@@ -171,7 +173,7 @@ typedef enum {
     EMPTY_CALL_STACK, PUSH_CALL_STACK, PRETTY_CALL_STACK, IO_ERROR_WITH_STACK,
     CONCAT_STRING_LIST,
     OR_INT, XOR_INT, SHIFT_LINT, SHIFT_RINT, UNSIGNED_SHIFT_RINT, COUNT_LEADING_ZEROS_INT, COUNT_TRAILING_ZEROS_INT, POP_COUNT_INT, INT_TO_INTEGER, INTEGER_TO_INT, ADD_INTEGER, SUB_INTEGER, MUL_INTEGER, QUOT_INTEGER, REM_INTEGER, EQ_INTEGER, LT_INTEGER, SHOW_INTEGER, READ_INTEGER, INTEGER_TO_DOUBLE, UNSIGNED_LT_INT,
-    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST,
+    READ_BYTE_FILE_OR_ERROR, WRITE_BYTE_FILE_OR_ERROR, BYTE_ARRAY_DIGEST, FREEZE_ST_ARRAY, ST_TO_IO,
     PRIMITIVE_COUNT
 } Primitive;
 
@@ -417,7 +419,7 @@ static MlfValue *value(Tag tag) {
      * the unused trailing union word; keeping the prefix saves a GC size class. */
     switch (tag) {
     case HOLE: case BUSY: case INDIRECT: case THUNK: case APPLICATION:
-    case CLOSURE: case INTEGER: case BIG_INTEGER: case DOUBLE: case PRIMITIVE: case NATIVE_IO:
+    case CLOSURE: case INTEGER: case BIG_INTEGER: case DOUBLE: case PRIMITIVE: case NATIVE_IO: case NATIVE_IO_VALUE:
     case CONSTRUCTOR_1: case INT_ARRAY: case DOUBLE_ARRAY: case BYTE_ARRAY:
     case INT_TABLE: case SMALL_INT_TABLE: case ST_ARRAY:
     case ASYNC_SCOPE: case COMPLETION: case ASYNC_SUBSCRIPTION: case ASYNC_ACTION:
@@ -483,6 +485,7 @@ MlfValue *mlf_thunk_new(MlfCode code, uint64_t count) {
 MlfValue *mlf_thunk(MlfCode code, MlfEnv *env) { return code_value(THUNK, code, env); }
 MlfValue *mlf_closure(MlfCode code, MlfEnv *env) { return code_value(CLOSURE, code, env); }
 MlfValue *mlf_native_io(MlfCode code, MlfEnv *env) { return code_value(NATIVE_IO, code, env); }
+MlfValue *mlf_native_io_value(MlfCode code, MlfEnv *env) { return code_value(NATIVE_IO_VALUE, code, env); }
 MlfValue *mlf_hole(void) { return value(HOLE); }
 
 void mlf_fill(MlfValue *hole, MlfValue *entry) {
@@ -1401,14 +1404,14 @@ static MlfValue *primitive_result(Primitive p, MlfValue *a, MlfValue *b, MlfValu
     case ASYNC_SCOPE_NEW: case ASYNC_RESOLVE_COMPLETION: case ASYNC_SUBSCRIBE_COMPLETION:
     case ASYNC_ENQUEUE: case ASYNC_WAIT: return async_action(p,2,a,b,NULL);
     case ASYNC_NEW_COMPLETION: case ASYNC_READ_COMPLETION: case ASYNC_DELAY: return async_action(p,3,a,b,c);
-    case ST_RETURN: case LENGTH_ST_ARRAY: return st_action(p,1,a,NULL,NULL);
+    case ST_RETURN: case LENGTH_ST_ARRAY: case FREEZE_ST_ARRAY: return st_action(p,1,a,NULL,NULL);
     case ST_BIND: case NEW_ST_ARRAY: case READ_ST_ARRAY: return st_action(p,2,a,b,NULL);
     case WRITE_ST_ARRAY: return st_action(p,3,a,b,c);
     /* Codegen.evaluate promises canonical WHNF for a saturated pure result.
      * The executor itself preserves the laziness of values passed to binds. */
     case RUN_ST: return force(run_st(a));
     case IO_ERROR: case CATCH_IO_ERROR: case IO_ERROR_WITH_STACK:
-    case IO_RETURN: case IO_BIND: case PUT_STR: case PUT_STR_LN: case GET_LINE: case PRINT_INT:
+    case IO_RETURN: case IO_BIND: case ST_TO_IO: case PUT_STR: case PUT_STR_LN: case GET_LINE: case PRINT_INT:
     case NEW_INT_ARRAY: case READ_INT_ARRAY: case LENGTH_INT_ARRAY:
     case NEW_DOUBLE_ARRAY: case READ_DOUBLE_ARRAY: case LENGTH_DOUBLE_ARRAY:
     case NEW_BYTE_ARRAY: case READ_BYTE_ARRAY: case LENGTH_BYTE_ARRAY: case BYTE_ARRAY_FROM_STRING:
@@ -1518,7 +1521,7 @@ static MlfValue *primitive(Primitive p, MlfEnv *arguments) {
         1,2,3,1,2,1,1,1,2,1,1,2,1,1,0,1,1,1,0,0,
         1,2,1,2,2,3,1,
         1,2,1,2,1,1,1,1,1,1, 2,1,3,2,3,2,1,1,1,2,3,2, 1,1,1,1,1,1,2,1, 0,2,1,2, 1,
-        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1
+        2,2,2,2,2,1,1,1,1,1,2,2,2,2,2,2,2,1,1,1,2,2,2,1,1,1
     };
     _Static_assert(sizeof(arities) / sizeof(arities[0]) == PRIMITIVE_COUNT,
                    "primitive arity inventory mismatch");
@@ -1635,7 +1638,7 @@ MlfValue *mlf_prim1(int64_t p, MlfValue *a) {
     case PANIC: case READ_FILE: case FILE_EXISTS: case CANONICAL_PATH: case GET_ARG: case PUT_ERR: case EXIT_WITH:
     case GET_ENV: case UNSET_ENV: case LIST_DIRECTORY: case DIRECTORY_EXISTS: case FILE_DIGEST: case ACQUIRE_FILE_LOCK: case RELEASE_FILE_LOCK: case PROCESS_SUPERVISOR:
     case ASYNC_SCOPE_CLOSE: case ASYNC_SUBSCRIPTION_STATUS: case ASYNC_CANCEL_SUBSCRIPTION: case ASYNC_STEP:
-    case ST_RETURN: case RUN_ST: case LENGTH_ST_ARRAY:
+    case ST_RETURN: case RUN_ST: case LENGTH_ST_ARRAY: case FREEZE_ST_ARRAY: case ST_TO_IO:
         return primitive_result((Primitive)p,a,NULL,NULL);
     default: fail("unary primitive arity mismatch");
     }
@@ -2078,6 +2081,18 @@ MlfValue *mlf_st_length_array(MlfValue *array) {
     return small((int64_t)expect(array,ST_ARRAY)->as.int_array.length);
 }
 
+static MlfValue *snapshot_lookup(MlfEnv *cells, MlfValue *index) {
+    return cells->slots[array_index(index, cells->count)];
+}
+
+MlfValue *mlf_st_freeze_array(MlfValue *array) {
+    array = expect(array, ST_ARRAY);
+    size_t count = array->as.int_array.length;
+    MlfEnv *cells = mlf_env_new(count);
+    memcpy(cells->slots, array->as.int_array.cells, count * sizeof(MlfValue *));
+    return mlf_closure(snapshot_lookup, cells);
+}
+
 /* ST has no process-global current action or mutable store: each call owns
  * its continuation stack, while boxed arrays keep ordinary heap reachability.
  * Do not explicitly collect here. Pure generated frames do not register every
@@ -2105,6 +2120,9 @@ static MlfValue *run_st(MlfValue *root) {
             break;
         case WRITE_ST_ARRAY:
             result = mlf_st_write_array(mlf_env_get(arguments,0),mlf_env_get(arguments,1),mlf_env_get(arguments,2));
+            break;
+        case FREEZE_ST_ARRAY:
+            result = mlf_st_freeze_array(mlf_env_get(arguments,0));
             break;
         case LENGTH_ST_ARRAY:
             result = mlf_st_length_array(mlf_env_get(arguments,0));
@@ -2386,6 +2404,9 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             current = operation->as.closure.code(operation->as.closure.env,NULL);
             continue;
         }
+        else if (!immediate(operation) && operation->tag == NATIVE_IO_VALUE) {
+            result = operation->as.closure.code(operation->as.closure.env,NULL);
+        }
         else if (!immediate(operation) && operation->tag == PUT_BYTES_ACTION) {
             result = mlf_put_bytes(operation->as.array_write.array,operation->as.array_write.index,
                                    operation->as.array_write.entry);
@@ -2432,6 +2453,7 @@ int32_t mlf_run(MlfValue *root, int64_t is_io) {
             current = operation->as.action.first;
             continue;
         case IO_RETURN: result = operation->as.action.first; break;
+        case ST_TO_IO: result = run_st(operation->as.action.first); break;
         case GET_LINE: result = read_line(); break;
         case BYTE_ARRAY_DIGEST: result = byte_array_digest(operation->as.action.first); break;
         case READ_BYTE_FILE_OR_ERROR:

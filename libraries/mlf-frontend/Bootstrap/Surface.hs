@@ -9,6 +9,9 @@ module Bootstrap.Surface where {
   import Bootstrap.Fresh;
   import qualified Bootstrap.Desugar as Desugar;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Resolved as R;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Set as Set;
   import qualified Bootstrap.Data as D;
@@ -66,6 +69,7 @@ module Bootstrap.Surface where {
       SAsPattern _ inner -> patternReferences inner;
       SLazyPattern inner -> patternReferences inner;
       SOverloadedStringPattern _ equality conversion -> (:) equality ((:) conversion []);
+      SIndexedStringPattern _ eq from -> [termRefName eq,termRefName from];
       SNestedPattern _ patterns -> concatMap patternReferences patterns;
       _ -> []
     };
@@ -83,6 +87,9 @@ module Bootstrap.Surface where {
           (append (without (freeNamesRaw body) (patternVariables pattern))
             (concatMap freeNamesRaw ((:) action ((:) binding ((:) failure [])))));
       SVar n -> (:) (Dependency.lexicalValueName n) [];
+      SGlobal _ n -> [n];
+      SDeclScope _ b -> freeNamesRaw b;
+      SWantedRefs _ candidates -> map (compose termRefName snd) candidates;
       SLam n _ b -> without (freeNamesRaw b) ((:) n []);
       SApp a b -> append (freeNamesRaw a) (freeNamesRaw b);
       SLet n a b -> append (freeNamesRaw a) (without (freeNamesRaw b) ((:) n []));
@@ -144,6 +151,76 @@ module Bootstrap.Surface where {
       Left error -> Left error;
       Right groups -> wrapGroups values (Dependency.declarationEdges values) groups body
     };
+  -- Independently lowered source and generated rows may introduce or remove
+  -- dependencies. Only references to IDs in this group can close its SCC.
+  indexedMemberGroups entries = mapEither (map (map fst)) (indexedMemberComponents entries);
+  indexedMemberComponents entries = let {
+    ordered = V.fromList (sortBy (\a b -> compareString (valueName (snd a)) (valueName (snd b))) entries);
+    ids = map fst entries;
+    ranks = M.fromList compareInt (map (\rank -> (,) (V.toInt (fst (V.at ordered rank))) rank) (V.indices ordered));
+    row member = V.fromList (map V.fromInt (IS.toAscList (IS.fromList (mapMaybe
+      (\ref -> mapOptional V.toInt (M.lookup compareInt (V.toInt ref) ranks))
+      (Dependency.expressionGlobalIds (valueBody (snd member)))))));
+    rows = Dependency.Rows (V.fromList (map row (V.toList ordered)));
+    describe rank = (,) (fst (V.at ordered rank))
+      (any (\child -> V.toInt child == V.toInt rank) (Dependency.neighbors rows rank));
+    groups = Dependency.componentsById rows (V.indices ordered)
+  } in do {
+    ensure (M.size ranks == length ids && Set.size (Set.fromList compareString (map (compose valueName snd) entries))
+      == length ids) "duplicate value declaration";
+    Right (map (\ranks -> map describe (sortBy (\a b -> compareInt (V.toInt a) (V.toInt b)) ranks)) groups)
+  };
+  bindIndexedMembers entries body = do {
+    groups <- indexedMemberComponents entries;
+    let { values = M.fromList compareInt (map (\((,) i row) -> (,) (V.toInt i) row) entries);
+          wrap continuation group = let { ids = map fst group } in
+            mapEither (SDeclScope ids) (wrapValueGroup (map (\i -> M.get compareInt (V.toInt i) values) ids)
+              (length group > 1 || any snd group) continuation)
+    };
+    foldM wrap body (reverse groups)
+  };
+  bindResolvedExpr values@(Dependency.BoundValues symbols _) body =
+    bindResolved values (R.namedExpr (Dependency.symbolName symbols) body);
+  bindResolved = bindResolvedWith Dependency.boundValue (\_ expression -> expression);
+  bindIndexedExpr values@(Dependency.BoundValues symbols _) body =
+    bindIndexed values (R.indexedExpr (Dependency.symbolName symbols) body);
+  indexedValue symbols (Dependency.Bound i annotation rhs) =
+    (,,) (Dependency.symbolName symbols i) annotation (R.indexedExpr (Dependency.symbolName symbols) rhs);
+  bindIndexed = bindResolvedWith indexedValue SDeclScope;
+  bindResolvedWith project scoped values@(Dependency.BoundValues symbols bindings) body = case bindings of {
+    [] -> Right body;
+    (:) _ _ -> do {
+      (,) _ groups <- Dependency.resolvedGroups values [] M.empty M.empty;
+      let { table = Dependency.boundTable values;
+            member ((,) i _) = case V.at table i of {
+              Just binding -> project symbols binding; Nothing -> panic "unbound declaration ID"
+            };
+            wrap continuation group = mapEither (scoped (map fst group))
+              (wrapValueGroup (map member group) (length group > 1 || any snd group) continuation)
+      } in foldM wrap body (reverse groups)
+    }
+  };
+  -- Instance methods copy only source helpers reachable from their resolved
+  -- bodies. Imported IDs stay outside this table even if a local prints alike.
+  data HelperScope = HelperScope Dependency.Symbols (V.IndexVec Declaration (Maybe Dependency.Bound));
+  helperScope values@(Dependency.BoundValues symbols _) = HelperScope symbols (Dependency.boundTable values);
+  helperBindings table seen pending result = case pending of {
+    [] -> result;
+    (:) i rest -> if IS.member (V.toInt i) seen then helperBindings table seen rest result
+      else let { next = IS.insert (V.toInt i) seen } in case V.at table i of {
+        Nothing -> helperBindings table next rest result;
+        Just (Dependency.Bound j annotation rhs) -> helperBindings table next (append (R.references rhs) rest)
+          ((:) (Dependency.Bound j annotation (R.SourceDefinition rhs)) result)
+      }
+  };
+  closeResolvedInstance = closeInstanceWith bindResolvedExpr;
+  closeIndexedInstance = closeInstanceWith bindIndexedExpr;
+  closeInstanceWith bind (HelperScope symbols table) (R.Instance vars context klass head methods) = do {
+    closed <- mapM (\((,) i rhs) ->
+      let { needed = helperBindings table IS.empty (R.references rhs) [] } in
+      mapEither ((,) (Dependency.symbolName symbols i)) (bind (Dependency.BoundValues symbols needed) rhs)) methods;
+    Right (SInstanceDecl vars context klass head closed)
+  };
   wrapGroups :: [] ((,,) String (Maybe SAnnotation) SExpr) ->
                 [] ((,) String ([] String)) ->
                 [] ([] String) -> SExpr -> Either String SExpr;
@@ -170,20 +247,15 @@ module Bootstrap.Surface where {
                  any (\n -> elem eqString n (M.findWithDefault compareString [] n dependencies))
                    group)
             } in
-            if cyclic
-            then mapEither (\ds -> SLetRec ds continuation) (recursiveValues local)
-            else case local of {
-                   (:) ((,,) n a e) [] ->
-                     Right
-                       (SLet n
-                          (case a of {
-                             Nothing -> e;
-                             Just t -> SSignature e t
-                           })
-                          continuation);
-                   _ -> Left "invalid declaration group"
-                 }
+            wrapValueGroup local cyclic continuation
         }
+    };
+  wrapValueGroup local cyclic continuation =
+    if cyclic then mapEither (\ds -> SLetRec ds continuation) (recursiveValues local)
+    else case local of {
+      [(,,) n annotation rhs] -> Right (SLet n (case annotation of {
+        Nothing -> rhs; Just t -> SSignature rhs t }) continuation);
+      _ -> Left "invalid declaration group"
     };
   lowerSurface :: SProgram -> Either String SProgram;
   lowerSurface program = do {
@@ -224,6 +296,7 @@ module Bootstrap.Surface where {
   lower :: DataEnv -> SExpr -> Fresh SExpr;
   lower env expression =
     case expression of {
+      SDeclScope ids body -> do { b <- lower env body; freshPure (SDeclScope ids b) };
       SSourceDefinition body -> do { b <- lower env body; freshPure (SSourceDefinition b) };
       SCallSite name location body -> do { b <- lower env body; freshPure (SCallSite name location b) };
       SSharedBind _ _ _ _ _ -> freshFail "internal error: shared do escaped metadata lowering";
@@ -496,6 +569,7 @@ module Bootstrap.Surface where {
                              SIntPattern n -> SIntLit n;
                              _ -> value
                            });
+                    SIndexedStringPattern _ _ _ -> overloadedStringMatrix env column values rows;
                     SOverloadedStringPattern _ _ _ ->
                       overloadedStringMatrix env column values rows;
                     SStringPattern _ ->
@@ -658,8 +732,7 @@ module Bootstrap.Surface where {
     case rows of {
       [] -> freshFail "non-exhaustive patterns";
       (:) (MatchRow patterns body rowIndex) rest ->
-        case index patterns column of {
-          SOverloadedStringPattern text equality conversion -> do {
+        let { compareLiteral text equality conversion = do {
             fallbackResult <- matrix env values rest;
             case fallbackResult of {
               (,) fallback usedRest -> do {
@@ -669,14 +742,16 @@ module Bootstrap.Surface where {
                 case matchedResult of {
                   (,) matched usedMatch ->
                     freshPure ((,)
-                      (choose (SApp (SApp (SVar equality) (index values column))
-                                (SApp (SVar conversion) (sourceStringExpression text)))
+                      (choose (SApp (SApp equality (index values column))
+                                (SApp conversion (sourceStringExpression text)))
                          matched fallback)
                       (append (filter (\i -> i /= (-1)) usedMatch) usedRest))
                 }
               }
             }
-          };
+          } } in case index patterns column of {
+          SOverloadedStringPattern text eq from -> compareLiteral text (SVar eq) (SVar from);
+          SIndexedStringPattern text eq from -> compareLiteral text (referenceExpr eq) (referenceExpr from);
           _ -> freshFail "invalid overloaded string pattern row"
         }
     };
@@ -684,6 +759,7 @@ module Bootstrap.Surface where {
   isOverloadedString p =
     case p of {
       SOverloadedStringPattern _ _ _ -> True;
+      SIndexedStringPattern _ _ _ -> True;
       _ -> False
     };
   eqLiteral :: SPattern -> SPattern -> Bool;
@@ -694,6 +770,10 @@ module Bootstrap.Surface where {
           SIntPattern m -> (n == m);
           _ -> False
         };
+      SIndexedStringPattern n eq from -> case q of {
+        SIndexedStringPattern m eq2 from2 -> eqSourceString n m && eqTermRef eq eq2 && eqTermRef from from2;
+        _ -> False
+      };
       SOverloadedStringPattern n eq from ->
         case q of {
           SOverloadedStringPattern m eq2 from2 ->

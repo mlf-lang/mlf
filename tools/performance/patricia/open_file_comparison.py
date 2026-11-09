@@ -9,34 +9,26 @@ production-boundary control, not independent codec or checker evidence.
 """
 from pathlib import Path
 import hashlib
-import importlib.util
-import sys
 
-# Authenticate the actual modules before executing either oracle's top level.
-# The fallback supports the bounded authoring harness's explicit PYTHONPATH;
-# installed repository layout always puts tools/shared first.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'shared'))
+# The C4 oracle predates the additional DeclId array/ST primitives. Keep its
+# entire reader/schema triple byte-for-byte: this finite corpus uses the old
+# primitive domain. Actual artifacts still pass the current native reader,
+# linker and audit before this independent comparison.
+from frozen_file_oracles import load_oracles, dependency_oracle
+
 ORACLE_PINS = {
     'artifact_binary_reference.py': 'de312e3415eba178b649d30b6fa2b113fc864455de16603a5902af034d036422',
     'artifact_binary_typed.py': 'b703af43e334733c9ccb49f2a4e5a63a615f6bd065c8c464bdd3841ed54e369d',
     'artifact_structure_contract.json': '20f1df71bc2fc1ebe01247dc986b01029b3e8e0c4a89f7dcc8cc517f756cf5a1',
 }
-_oracle_spec = importlib.util.find_spec('artifact_binary_reference')
-if _oracle_spec is None or _oracle_spec.origin is None:
-    raise RuntimeError('independent C4 oracle module is unavailable')
-ORACLE_DIRECTORY = Path(_oracle_spec.origin).resolve().parent
-for _filename, _expected in ORACLE_PINS.items():
-    _oracle_path = ORACLE_DIRECTORY / _filename
-    if hashlib.sha256(_oracle_path.read_bytes()).hexdigest() != _expected:
-        raise RuntimeError('independent C4 oracle pin mismatch: ' + _filename)
-for _module in ('artifact_binary_reference', 'artifact_binary_typed'):
-    _spec = importlib.util.find_spec(_module)
-    if _spec is None or _spec.origin is None or Path(_spec.origin).resolve() != ORACLE_DIRECTORY / (_module + '.py'):
-        raise RuntimeError('independent C4 oracle import path mismatch: ' + _module)
-
-from artifact_binary_reference import Invalid, read_document, tree_document
-from artifact_binary_typed import (value_node as fields, list_values as items,
-    text, validate_type, builtin_datatypes, pack)
+ORACLE_DIRECTORY, _reference, _typed = load_oracles(ORACLE_PINS)
+DEPENDENCY_ORACLE_PATH, _dependency_typed = dependency_oracle(
+    ORACLE_DIRECTORY, _reference, ORACLE_PINS['artifact_binary_typed.py'])
+Invalid, read_document, tree_document = (_reference.Invalid, _reference.read_document,
+                                        _reference.tree_document)
+fields, items, text = _typed.value_node, _typed.list_values, _typed.text
+validate_type, builtin_datatypes, pack = (_typed.validate_type, _typed.builtin_datatypes,
+                                         _typed.pack)
 
 class ComparisonError(ValueError):
     pass
@@ -67,6 +59,28 @@ def decoded(raw, schema, family=None):
     require(tree_document(values, schema) == raw, 'canonical whole binary bytes')
     return values[0]
 
+def dependency_decoded(raw):
+    """Validate whole dependency bytes, including the two added primitive exports."""
+    doc = read_document(raw, 3)
+    require(len(doc.roots) == 1, 'exactly one dependency interface root')
+    _dependency_typed.validate_type(doc, doc.roots[0], 'CrateInterfaceFields')
+    values = doc.values()
+    require(tree_document(values, 3) == raw, 'canonical whole dependency bytes')
+    # Module.builtinEntities declares primitive entities in Prelude, including
+    # exports reexported through MLF.Primitive. Do not treat 132/133 as generic
+    # newly accepted integers or permit an arbitrary renamed primitive export.
+    added = {132: ('Prelude', 'freezeSTArray'), 133: ('Prelude', 'stToIO')}
+    for module, entities in (fields(row, 2, 2) for row in items(fields(values[0], 242, 13)[3])):
+        text(module)
+        for entity in items(entities):
+            owner, spelling, role = fields(entity, 189, 3)
+            if role[1] == 186:
+                primitive, = fields(role, 186, 1)
+                code, = fields(primitive, 32, 1)
+                if code[1] in added:
+                    require((text(owner), text(spelling)) == added[code[1]],
+                            'exact added dependency primitive identity')
+    return values[0]
 
 OPEN_FORMATS = {7: 'MLF-OPEN-CRATE-1/checker-1', 8: 'MLF-OPEN-CRATE-2/checker-1'}
 
@@ -373,16 +387,93 @@ def linked_equal(a, b):
     return {'changed_identity_pairs': changed, 'changed_occurrences': occurrences,
             'all_other_typed_structure_exact': True, 'lexical_binding_correspondence': True}
 
+def select_original_linked(term, fragments, entry):
+    """Independent step-14 closure over fully compared stored fragments.
+
+    Only outer declarations whose exact stable owner is an unreachable fragment
+    are omitted. RHSs and all their lexical binders remain opaque and unchanged.
+    The actual entry identity and complete original outer inventory are checked
+    before the existing binder-aware comparison sees the projected reference.
+    """
+    owners, used, ordered = {}, {}, []
+    for fragment in fragments:
+        fs = fields(fragment, 401, 7)
+        group = text(fs[0])
+        require(group not in used, 'selection duplicate fragment group')
+        ordered.append(group)
+        require(list(items(fs[5])) == spine_names(fs[4]), 'selection complete owned binders')
+        require(list(items(fs[6])) == free_names(fs[4]), 'selection exact lexical used inventory')
+        used[group] = [name(x)[1] for x in items(fs[6])]
+        for value in items(fs[5]):
+            key = name(value)[1]
+            require(key not in owners, 'selection duplicate declaration owner')
+            owners[key] = group
+    require(entry in owners, 'selection entry has no declaration owner')
+    reached, pending = set(), [owners[entry]]
+    while pending:
+        group = pending.pop()
+        if group not in reached:
+            reached.add(group)
+            pending.extend(owners[key] for key in used[group] if key in owners)
+    omitted = {key for key, group in owners.items() if group not in reached}
+    seen, identities, dropped_ids = {}, set(), set()
+
+    def declaration(values):
+        pairs = [name(value) for value in values]
+        require(all(identity not in identities for identity, _ in pairs) and
+                len({identity for identity, _ in pairs}) == len(pairs),
+                'selection unique outer declaration identities')
+        identities.update(identity for identity, _ in pairs)
+        owned = [(identity, key) for identity, key in pairs if key in owners]
+        require(all(key not in seen for _, key in owned), 'selection unique outer declaration owners')
+        seen.update((key, identity) for identity, key in owned)
+        if not owned:
+            return False
+        require(len(owned) == len(pairs) and len({owners[key] for _, key in owned}) == 1,
+                'selection outer group has mixed declaration owners')
+        remove = all(key in omitted for _, key in owned)
+        if remove:
+            dropped_ids.update(identity for identity, _ in owned)
+        return remove
+
+    def outer(value):
+        fs = fields(value)
+        if value[1] == 84:
+            return node(84, fs[0], outer(fs[1]))
+        if value[1] == 75:
+            remove = declaration([fs[0]])
+            rest = outer(fs[2])
+            return rest if remove else node(75, fs[0], fs[1], rest)
+        if value[1] == 76:
+            remove = declaration([fields(row, 3, 3)[0] for row in items(fs[0])])
+            rest = outer(fs[1])
+            return rest if remove else node(76, fs[0], rest)
+        require(value[1] == 70 and name(fs[0]) == (seen.get(entry), entry),
+                'selection terminal variable is the actual declared entry')
+        return value
+
+    selected = outer(term)
+    require(set(seen) == set(owners), 'selection complete original declaration inventory')
+    require(not any(name(value)[0] in dropped_ids for value in free_names(selected)),
+            'selection removed a live lexical reference')
+    return selected, {'entry': entry, 'selected_groups': [g for g in ordered if g in reached],
+                      'omitted_groups': [g for g in ordered if g not in reached],
+                      'omitted_declarations': sorted(omitted),
+                      'original_stored_fragments_complete': True,
+                      'only_unreachable_outer_declarations_omitted': True}
+
+
 def compare_open_file(closed_files, open_files, dependency_interfaces,
-                      audited_open_files, closed_linked_bytes, open_linked_bytes):
+                      audited_open_files, closed_linked_bytes, open_linked_bytes,
+                      entry_selection=False):
     try:
         return _compare(closed_files, open_files, dependency_interfaces,
-                        audited_open_files, closed_linked_bytes, open_linked_bytes)
+                        audited_open_files, closed_linked_bytes, open_linked_bytes, entry_selection)
     except Invalid as error:
         raise ComparisonError(str(error)) from error
 
 def _compare(closed_files, open_files, dependency_interfaces,
-             audited_open_files, closed_linked_bytes, open_linked_bytes):
+             audited_open_files, closed_linked_bytes, open_linked_bytes, entry_selection):
     suffixes = {'.mlfci', '.mlfco'}
     for values in (closed_files, open_files, audited_open_files):
         require(set(values) == suffixes, 'complete exact artifact file inventory')
@@ -398,7 +489,7 @@ def _compare(closed_files, open_files, dependency_interfaces,
     require(text(opened[0]) == OPEN_FORMATS[open_schema], 'wrong open package family')
     compatibility = compatibility_identity()
     require(text(opened[1]) == compatibility, 'wrong checker/compiler compatibility identity')
-    dependencies = [decoded(raw, 3, 'CrateInterfaceFields') for raw in dependency_interfaces]
+    dependencies = [dependency_decoded(raw) for raw in dependency_interfaces]
     depmap = keyed([(text(fields(i, 242, 13)[0]), i) for i in dependencies], 'dependency interface identity')
     rootid = text(of[0])
     require(rootid not in depmap, 'root included in imported interface closure')
@@ -499,6 +590,9 @@ def _compare(closed_files, open_files, dependency_interfaces,
             'native audited rebuild differs from original complete open bytes')
     old_linked = decoded(closed_linked_bytes, 6, 'XTerm')
     new_linked = decoded(open_linked_bytes, 6, 'XTerm')
+    selection = None
+    if entry_selection:
+        old_linked, selection = select_original_linked(old_linked, fragments, text(of[10]))
     linked = linked_equal(old_linked, new_linked)
     return {'comparison': 'explicit-schema-4-to-' + str(open_schema), 'open_wire_schema': open_schema,
             'audit_scope': 'exact same-format pair; not schema7-to-8 migration', 'groups': group_reports,
@@ -506,6 +600,7 @@ def _compare(closed_files, open_files, dependency_interfaces,
             'datatype_reference_count': len(dr), 'compatibility_identity': compatibility,
             'interface_content_exact': True, 'all_original_fragment_bodies_exact': True,
             'audited_rebuild_original_bytes_equal': True, 'linked': linked,
+            'entry_selection': selection,
             'native_validation_required': 'Public read/link of both originals, old checksums and Open.audit with returned fragments.'}
 
 def make_native_negatives(closed_files, open_files):
@@ -557,7 +652,7 @@ def make_native_negatives(closed_files, open_files):
         {'name': 'receipt-sha-recomputed', 'closed_files': dict(closed_files),
          'open_files': receipt, 'expected_helper_exit': 1,
          'expected_compare_rejection': False,
-         'required_error_fragment': 'open fragment audit mismatch'},
+         'required_error_fragment': 'open crate fragment fingerprint mismatch'},
         {'name': 'used-inventory-sha-recomputed', 'closed_files': dict(closed_files),
          'open_files': used, 'expected_helper_exit': 0,
          'expected_compare_rejection': True, 'required_error_fragment': None},

@@ -27,7 +27,7 @@ class GateControls(unittest.TestCase):
         self.gate = {'status': 'passed', 'producer_receipt_sha256': 'producer',
                      'inputs': {str(evidence): b.sha(evidence)},
                      'artifacts': {str(evidence): b.sha(evidence)}, 'results': {}, 'commands': []}
-        for name, count in [('foundation', 12), ('async', 5), ('language-core', 4), ('frontend', 10)]:
+        for name, count in [('foundation', 15), ('async', 5), ('language-core', 4), ('frontend', 10)]:
             self.add_crate(name, count)
 
     def add_crate(self, name, count):
@@ -46,6 +46,12 @@ class GateControls(unittest.TestCase):
     def test_combined(self):
         self.add_crate('inference', 6)
         self.check()
+
+    def test_misassigned_module_counts(self):
+        self.gate['results']['mlf-foundation/0.3.0/library']['module_count'] -= 1
+        self.gate['results']['mlf-frontend/0.3.0/library']['module_count'] += 1
+        with self.assertRaisesRegex(ValueError, 'module inventory'):
+            self.check()
 
     def test_missing_required(self):
         del self.gate['results']['mlf-frontend/0.3.0/library']

@@ -166,7 +166,7 @@ def native_negative_controls(H, output, folder, viewer, source, closed_files, op
                     case['closed_files'], case['open_files'],
                     [p.read_bytes() for p in dependencies], raw_files(views / 'audited-open'),
                     (views / 'crate.xterm-v6.bin').read_bytes(),
-                    (views / 'session.xterm-v6.bin').read_bytes())
+                    (views / 'session.xterm-v6.bin').read_bytes(), entry_selection=True)
             except Comparison.ComparisonError as error:
                 H.require('used-name inventory' in str(error),
                           'independent used-name rejection is the intended failure')
@@ -224,12 +224,19 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
         path = Comparison.ORACLE_DIRECTORY / name
         H.require(H.sha(path) == digest, 'fixed independent oracle: ' + name)
         inputs[str(path)] = digest
-    for path in [Path(__file__), HERE / 'open_file_comparison.py', fixture_path]:
+    inputs[str(Comparison.DEPENDENCY_ORACLE_PATH)] = H.sha(Comparison.DEPENDENCY_ORACLE_PATH)
+    for path in [Path(__file__), HERE / 'open_file_comparison.py',
+                 HERE / 'frozen_file_oracles.py', fixture_path]:
         inputs[str(path)] = H.sha(path)
     rows = {'complete': False, 'scope': 'explicit closed/open boundary; complete content and '
             'linked structures; exact same-format fresh/fresh, warm and audited bytes',
             'file_cases': [], 'commands': []}
     record['routes']['session'] = rows
+    rows['independent_dependency_schema_extension'] = {
+        'source_sha256': Comparison.ORACLE_PINS['artifact_binary_typed.py'],
+        'adapted_sha256': H.sha(Comparison.DEPENDENCY_ORACLE_PATH),
+        'scope': 'only dependency-interface primitive declarations 132/133 with exact Prelude owner and names; unchanged 0..131 reader for own artifacts and linked terms',
+        'exact_source_inverse_verified': True}
     save()
 
     def run(label, argv, cwd, expected_exit=0):
@@ -362,7 +369,7 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
                 raw_files(closed_prefix), cold_files,
                 [path.read_bytes() for path in dependency_paths], audited,
                 (views / 'crate.xterm-v6.bin').read_bytes(),
-                (views / 'session.xterm-v6.bin').read_bytes())
+                (views / 'session.xterm-v6.bin').read_bytes(), entry_selection=True)
             H.require(row['comparison']['open_wire_schema'] == 8,
                       'current Session C4 writer emits schema8')
             H.require(row['comparison']['fragment_count'] == fragments,

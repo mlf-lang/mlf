@@ -25,15 +25,14 @@ jq -r '.pinned_sha256 | to_entries[] | "\(.value)  \(.key)"' "$manifest" > "$wor
 sha256 -c "$work/SHA256SUMS" >/dev/null
 python3 -B tools/release/check_benchmark_transition.py
 python3 -B tools/release/test_benchmark_transition.py
-python3 -B tools/performance/artifact-binary/test_query_graph_migration.py
-python3 -B -O tools/performance/artifact-binary/test_query_graph_migration.py
-# Current CI-integration controls replay the unchanged query-index,
-# package-roots, open-release, builtin and writer physical predecessors.
-# Default CI intentionally uses the complete five-level physical replay.
-python3 -B tools/performance/artifact-binary/test_ci_integration_migration.py
-python3 -B -O tools/performance/artifact-binary/test_ci_integration_migration.py
-python3 -B tools/performance/crate-prelude/test_contract.py
-python3 -B -O tools/performance/crate-prelude/test_contract.py
+# Authenticate current reconciliation bytes separately from unchanged historical
+# suites. Sequential physical replays preserve each original source contract.
+python3 -B tools/performance/artifact-binary/test_pr43_reconciliation.py
+python3 -O -B tools/performance/artifact-binary/test_pr43_reconciliation.py
+python3 -B tools/performance/artifact-binary/replay_reconciliation_predecessors.py declid
+python3 -O -B tools/performance/artifact-binary/replay_reconciliation_predecessors.py declid
+python3 -B tools/performance/artifact-binary/replay_reconciliation_predecessors.py main
+python3 -O -B tools/performance/artifact-binary/replay_reconciliation_predecessors.py main
 jq -r '.workloads[].provenance[] | select(.original_source != .build_source) | [.original_source,.build_source] | @tsv' "$manifest" > "$work/adaptations.tsv"
 
 count=0

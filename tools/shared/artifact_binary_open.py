@@ -300,6 +300,30 @@ def typed_value(value, family):
     validate_type(document, document.roots[0], family)
 
 
+def checked_stamp_syntax(value):
+    """Canonical rolling-residue syntax only, NOT a content fingerprint check.
+
+    Separate.fingerprint starts at (0, 1), reduces nonnegative Unicode scalar
+    recurrences modulo these primes, then renders both with showInt.
+    """
+    parts = value.split('-')
+    require(len(parts) == 2 and all(1 <= len(p) <= 10 and p.isascii() and
+            p.isdecimal() and (p == '0' or not p.startswith('0')) for p in parts),
+            'malformed open fragment stamp')
+    residues = tuple(map(int, parts))
+    require(residues[0] < 2147483647 and residues[1] < 2147483629,
+            'malformed open fragment stamp')
+    return residues
+
+
+def different_content_stamp(value):
+    first, second = checked_stamp_syntax(value)
+    changed = str((first + 1) % 2147483647) + '-' + str(second)
+    require(changed != value, 'distinct content-stamp mutation')
+    checked_stamp_syntax(changed)
+    return changed
+
+
 def inspect_pair(pair, dependency_interfaces):
     """Inspect an original open pair and its exact complete dependency closure."""
     try:
@@ -378,6 +402,7 @@ def _inspect_pair(pair, dependency_interfaces):
         require(group and group not in groups, 'duplicate or empty fragment group')
         groups.add(group)
         require(bool(text(receipt)), 'empty checked receipt')
+        checked_stamp_syntax(text(receipt))
         typed_value(body, 'XTerm')
         for value in (*items(parameters), *items(owned), *items(used)):
             typed_value(value, 'XName')
@@ -633,6 +658,21 @@ def repinned(pair, body):
     return tree_document([node(242, *values)], 3), body
 
 
+def content_stamp_mutation(pair):
+    """Valid syntax, wrong content binding: only actual readers certify rejection."""
+    schema, _, original = open_document(pair[1])
+    opened = list(original)
+    fragments = list(items(opened[5]))
+    require(bool(fragments), 'nonempty content-stamp mutation')
+    fragment = list(fields(fragments[0], 401, 7))
+    fragment[1] = string(different_content_stamp(text(fragment[1])))
+    fragments[0] = node(401, *fragment)
+    opened[5] = sequence(fragments)
+    label = ('schema7-' if schema == 7 else '') + 'wrong-open-fragment-content-stamp'
+    return (label, repinned(pair, open_bytes(schema, opened)),
+            'open crate fragment fingerprint mismatch')
+
+
 def mutation_cases(pair):
     """Authored invalid variants. Expected public errors do not come from execution."""
     schema, document, original = open_document(pair[1])
@@ -667,6 +707,16 @@ def mutation_cases(pair):
     rows[0] = node(2, key, string('0' * 64))
     cases.append(('wrong-open-reference', repinned(pair, change(3, sequence(rows))),
                   'open crate dependency changed: ' + text(key)))
+    # Recompute the object SHA and CRC so admission reaches the saved ICH,
+    # rather than rejecting an unrelated outer integrity field first.
+    fragments = list(items(opened[5]))
+    require(bool(fragments), 'nonempty fragment fingerprint mutation')
+    fragment = list(fields(fragments[0], 401, 7))
+    fragment[1] = string(text(fragment[1]) + '-forged')
+    fragments[0] = node(401, *fragment)
+    cases.append(('wrong-open-fragment-stamp',
+                  repinned(pair, change(5, sequence(fragments))),
+                  'open crate fragment fingerprint mismatch'))
     if schema == 8:
         roots = list(document.values())
         header = list(fields(roots[0], 432, 6))
@@ -819,6 +869,11 @@ def independent_controls(pair, closed_pair, dependency_interfaces, audited_pair,
     """Run exact parser negatives against the real seed, without a target-derived oracle."""
     good = compare_companion(closed_pair, pair, dependency_interfaces, audited_pair,
                              legacy_pair, legacy_rebuilt_pair)
+    # Structural admission deliberately cannot authenticate the term's pretty
+    # serialization fingerprint. Require the semantic forgery to remain readable
+    # and report it separately; integration runs all three production readers.
+    content_label, content_pair, _ = content_stamp_mutation(pair)
+    inspect_pair(content_pair, dependency_interfaces)
     rejected = []
     for label, damaged, expected in closed_fingerprint_mutations(closed_pair, legacy_pair):
         try:
@@ -894,15 +949,24 @@ def independent_controls(pair, closed_pair, dependency_interfaces, audited_pair,
         rejected.append('changed-audit-bytes')
     else:
         raise OpenPairError('changed audit output accepted')
-    return {'positive': good, 'negative_cases': rejected}
+    return {'positive': good, 'negative_cases': rejected,
+            'structure_accepted_content_stamp_not_authenticated': [content_label]}
 
-def audit_mutation_cases(pair):
-    """A changed receipt must fail the actual checker audit, not just a byte hash."""
+def audit_mutation_cases(pair, saved_stamp):
+    """Structurally valid Int-owner/Bool-body forgery for explicit checker audit."""
     schema, document, original = open_document(pair[1])
     opened = list(original)
     fragments = list(items(opened[5]))
+    require(len(fragments) == 1, 'audit seed requires one fragment')
     first = list(fields(fragments[0], 401, 7))
-    first[1] = string('deliberately-wrong-checked-receipt')
+    owned = list(items(first[5]))
+    require(len(owned) == 1, 'audit seed requires one owner')
+    require(name(owned[0])[0] not in {name(p)[0] for p in items(first[3])},
+            'audit owner is not a parameter')
+    first[1] = string(saved_stamp)
+    first[4] = node(75, owned[0], node(79, node(7)),
+                    node(82, string('()'), sequence([])))
+    first[6] = sequence([])
     fragments[0] = node(401, *first)
     opened[5] = sequence(fragments)
     changed = repinned(pair, open_bytes(schema, opened))

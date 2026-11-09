@@ -225,7 +225,9 @@ module Bootstrap.BuiltinPreludeLiteral where {
     PUnsignedLtInt -> "PUnsignedLtInt";
     PReadByteFileOrError -> "PReadByteFileOrError";
     PWriteByteFileOrError -> "PWriteByteFileOrError";
-    PByteArrayDigest -> "PByteArrayDigest"
+    PByteArrayDigest -> "PByteArrayDigest";
+    PFreezeSTArray -> "PFreezeSTArray";
+    PSTToIO -> "PSTToIO"
   };
   sourceType :: SType -> String;
   sourceType value = case value of {
@@ -255,6 +257,9 @@ module Bootstrap.BuiltinPreludeLiteral where {
   };
   sourceExpression :: SExpr -> String;
   sourceExpression value = case value of {
+    SGlobal _ n -> sourceExpression (SVar n);
+    SDeclScope _ b -> sourceExpression b;
+    SWantedRefs n xs -> sourceExpression (SWanted n (L.namedCandidates xs));
     SVar n -> application "SVar" [string n];
     SConstructor n -> application "SConstructor" [string n];
     SLam n signature body -> application "SLam" [string n, maybe annotation signature, sourceExpression body];
@@ -292,6 +297,7 @@ module Bootstrap.BuiltinPreludeLiteral where {
     SAnnotatedPattern n signature -> application "SAnnotatedPattern" [string n, annotation signature];
     SIntPattern n -> application "SIntPattern" [integer n];
     SStringPattern text -> application "SStringPattern" [string text];
+    SIndexedStringPattern text eq from -> sourcePattern (SOverloadedStringPattern text (L.termRefName eq) (L.termRefName from));
     SOverloadedStringPattern literal conversion equality -> application "SOverloadedStringPattern"
       [sourceString literal, string conversion, string equality];
     SBoolPattern b -> application "SBoolPattern" [boolean b];

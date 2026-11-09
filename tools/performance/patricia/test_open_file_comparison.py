@@ -95,6 +95,76 @@ class ComparatorControls(unittest.TestCase):
             C.compare_open_file(**data)
         if message:
             self.assertIn(message, str(error.exception))
+    def test_frozen_oracle_bytes_and_reject_added_primitive_codes(self):
+        for name, digest in C.ORACLE_PINS.items():
+            raw = (C.ORACLE_DIRECTORY / name).read_bytes()
+            self.assertEqual(hashlib.sha256(raw).hexdigest(), digest)
+        self.assertEqual(C._typed.SCHEMAS['Primitive'], {32: ('PrimitiveCode',)})
+        for code in (132, 133):
+            raw = C.tree_document([N(81, N(32, I(code)), L([]))], 6)
+            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                C.decoded(raw, 6, 'XTerm')
+            data = copy.deepcopy(self.data)
+            data['closed_linked_bytes'] = raw
+            data['open_linked_bytes'] = raw
+            with self.assertRaisesRegex(C.ComparisonError, 'closed primitive ABI'):
+                C.compare_open_file(**data)
+        allowed = C.tree_document([N(81, N(32, I(131)), L([]))], 6)
+        C.decoded(allowed, 6, 'XTerm')
+
+    def test_dependency_only_primitive_extension_is_exact(self):
+        def dependency(code, owner='Prelude', spelling='freezeSTArray'):
+            fs = list(C.fields(iface('metadata'), 242, 13))
+            entity = N(189, S(owner), S(spelling), N(186, N(32, I(code))))
+            fs[3] = L([N(2, S('MLF.Primitive'), L([entity]))])
+            return C.tree_document([N(242, *fs)], 3)
+        for code, spelling in ((132, 'freezeSTArray'), (133, 'stToIO')):
+            raw = dependency(code, spelling=spelling)
+            C.dependency_decoded(raw)
+            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                C.decoded(raw, 3, 'CrateInterfaceFields')
+            for wrong in (dependency(code, spelling='other'),
+                          dependency(code, owner='Other', spelling=spelling)):
+                with self.assertRaisesRegex(C.ComparisonError, 'added dependency primitive identity'):
+                    C.dependency_decoded(wrong)
+        for code in (-1, 134, 2147483647):
+            with self.assertRaisesRegex(C.Invalid, 'closed primitive ABI'):
+                C.dependency_decoded(dependency(code))
+        original = (C.ORACLE_DIRECTORY / 'artifact_binary_typed.py').read_bytes()
+        adapted = C.DEPENDENCY_ORACLE_PATH.read_bytes()
+        self.assertEqual(adapted.replace(b'0 <= node.data <= 133', b'0 <= node.data <= 131'), original)
+
+    def test_oracle_mutation_rejected_before_execution(self):
+        import frozen_file_oracles as F
+        for name, digest in C.ORACLE_PINS.items():
+            raw = (C.ORACLE_DIRECTORY / name).read_bytes()
+            self.assertEqual(F.verify(raw, digest, name), raw)
+            with self.assertRaisesRegex(ValueError, 'fixed C4 oracle identity'):
+                F.verify(raw + b'\n', digest, name)
+
+    def test_oracle_load_isolates_preexisting_checkout_modules(self):
+        import frozen_file_oracles as F
+        import sys
+        import types
+        from unittest import mock
+        names = ('artifact_binary_reference', 'artifact_binary_typed')
+        impostors = {name: types.ModuleType(name) for name in names}
+        with mock.patch.dict(sys.modules, impostors):
+            directory, reference, typed = F.load_oracles(C.ORACLE_PINS)
+            self.assertTrue(directory.is_dir())
+            self.assertIs(typed.read_document, reference.read_document)
+            for name in names:
+                self.assertIs(sys.modules[name], impostors[name])
+            self.assertIsNot(reference, impostors[names[0]])
+            self.assertIsNot(typed, impostors[names[1]])
+
+    def test_oracle_predecessor_tree_drift_rejected(self):
+        import frozen_file_oracles as F
+        from unittest import mock
+        with mock.patch.object(F.subprocess, 'check_output', return_value='0' * 40):
+            with self.assertRaisesRegex(ValueError, 'predecessor tree'):
+                F.load_oracles(C.ORACLE_PINS)
+
     def test_positive_complete_private_body_and_linked_alpha(self):
         result = C.compare_open_file(**self.data)
         self.assertEqual(result['fragment_count'], 2)
@@ -115,6 +185,61 @@ class ComparatorControls(unittest.TestCase):
         b = N(46,v(0),N(40,v(8)),N(40,v(0)))
         self.assertTrue(C.type_alpha(a,b))
         self.assertFalse(C.type_alpha(a,N(46,v(0),N(40,v(0)),N(40,v(0)))))
+    def test_entry_selection_omits_only_unreachable_stored_group(self):
+        data = copy.deepcopy(self.data)
+        data['open_linked_bytes'] = C.tree_document([
+            N(84, L([]), N(75, X(111, 'main'), N(77, I(7)), N(70, X(111, 'main'))))], 6)
+        result = C.compare_open_file(**data, entry_selection=True)
+        self.assertEqual(result['entry_selection']['selected_groups'], ['g-main'])
+        self.assertEqual(result['entry_selection']['omitted_groups'], ['g-unused'])
+        self.assertEqual(result['entry_selection']['omitted_declarations'], ['unused'])
+        self.assertTrue(result['all_original_fragment_bodies_exact'])
+        # Keeping the unreachable binding or dropping the required entry both fail.
+        with self.assertRaises(C.ComparisonError):
+            C.compare_open_file(**self.data, entry_selection=True)
+        data['open_linked_bytes'] = C.tree_document([N(84, L([]), N(70, X(111, 'main')))], 6)
+        with self.assertRaises(C.ComparisonError):
+            C.compare_open_file(**data, entry_selection=True)
+
+    def test_selection_live_dependency_and_swapped_owner_rejected(self):
+        own, imported, other = X(1, 'main'), X(3, 'unused'), X(2, 'unused')
+        main = N(401, S('g-main'), S('receipt'), L([]), L([imported]),
+                 N(75, own, N(70, imported), UNIT), L([own]), L([imported]))
+        dependency = N(401, S('g-unused'), S('receipt'), L([]), L([]),
+                       N(75, other, N(77, I(7)), UNIT), L([other]), L([]))
+        linked = N(75, X(102, 'unused'), N(77, I(7)),
+                   N(75, X(101, 'main'), N(70, X(102, 'unused')), N(70, X(101, 'main'))))
+        selected, report = C.select_original_linked(linked, [main, dependency], 'main')
+        self.assertEqual(selected, linked)
+        self.assertEqual(report['omitted_groups'], [])
+        dropped = N(75, X(101, 'main'), N(70, X(102, 'unused')), N(70, X(101, 'main')))
+        with self.assertRaises(C.ComparisonError):
+            C.linked_equal(selected, dropped)
+        fs = list(C.fields(dependency, 401, 7));fs[5] = L([own])
+        with self.assertRaisesRegex(C.ComparisonError, 'owned binders'):
+            C.select_original_linked(linked, [main, N(401, *fs)], 'main')
+        fs = list(C.fields(main, 401, 7));fs[6] = L([])
+        with self.assertRaisesRegex(C.ComparisonError, 'lexical used inventory'):
+            C.select_original_linked(linked, [N(401, *fs), dependency], 'main')
+
+    def test_selection_preserves_local_shadowing_and_rhs_structure(self):
+        own, other, local = X(1, 'main'), X(2, 'unused'), X(3, 'unused')
+        rhs = N(75, local, N(77, I(7)), N(70, local))
+        main = N(401, S('g-main'), S('receipt'), L([]), L([]),
+                 N(75, own, rhs, UNIT), L([own]), L([]))
+        unused = N(401, S('g-unused'), S('receipt'), L([]), L([]),
+                   N(75, other, N(77, I(9)), UNIT), L([other]), L([]))
+        linked = N(75, X(101, 'main'), rhs,
+                   N(75, X(102, 'unused'), N(77, I(9)), N(70, X(101, 'main'))))
+        selected, report = C.select_original_linked(linked, [main, unused], 'main')
+        self.assertEqual(selected, N(75, X(101, 'main'), rhs, N(70, X(101, 'main'))))
+        self.assertEqual(report['omitted_groups'], ['g-unused'])
+        wrong = N(75, X(101, 'main'), N(77, I(7)), N(70, X(101, 'main')))
+        with self.assertRaises(C.ComparisonError):
+            C.linked_equal(selected, wrong)
+        with self.assertRaisesRegex(C.ComparisonError, 'actual declared entry'):
+            C.select_original_linked(linked, [main, unused], 'unused')
+
     def test_wrong_binary_family(self):
         data = copy.deepcopy(self.data)
         schema, root = fixture_package(data['open_files']['.mlfco'])
@@ -175,6 +300,7 @@ class ComparatorControls(unittest.TestCase):
         data=copy.deepcopy(self.data);data['open_files']=negative['open_files']
         self.rejects(data,'audited rebuild')
         self.assertEqual(negative['expected_helper_exit'],1)
+        self.assertEqual(negative['required_error_fragment'], 'open crate fragment fingerprint mismatch')
     def test_used_inventory_with_recomputed_sha_and_matching_audit(self):
         negative=C.make_native_negatives(self.data['closed_files'],self.data['open_files'])[1]
         data=copy.deepcopy(self.data);data['open_files']=negative['open_files']
@@ -305,8 +431,11 @@ class RootPackageComparatorControls(ComparatorControls):
 
     def test_original_frozen_summed_work_limit_is_unchanged(self):
         from unittest import mock
-        import artifact_binary_reference as R
+        R = C._reference
         real = C.read_document
+        self.assertIs(real, R.read_document)
+        self.assertEqual(hashlib.sha256(C.Path(R.__file__).read_bytes()).hexdigest(),
+                         C.ORACLE_PINS['artifact_binary_reference.py'])
         calls = []
         def observed(raw, schema, *args, **kwargs):
             calls.append((schema, args, kwargs))

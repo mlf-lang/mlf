@@ -109,7 +109,8 @@ class ScheduleTests(unittest.TestCase):
         _, chosen, _, _ = bench.resolve('default', ['local_functions'], [512])
         self.assertEqual(chosen, ['local_functions'])
 
-    def test_unmeasured_endpoint_is_rejected(self):
+    def test_installed_endpoint_is_separate_from_crate_runner(self):
+        self.assertIn('emlf-source-v1', bench.registry()['paired_endpoints'])
         with self.assertRaises(SystemExit):
             bench.measured_endpoint('emlf-source-v1')
 
@@ -444,10 +445,26 @@ class GraphCacheTests(unittest.TestCase):
             self.check(inventory, evidence)
 
     def test_rejects_payload_hash_different_from_node_hash(self):
+        valid_inventory, valid_evidence = self.fixture()
+        self.check(valid_inventory, valid_evidence)
+        report = json.loads(valid_evidence['query_report_json'])['groups'][0]
         def mutate(nodes):
-            nodes[-1]['payload'] = nodes[1]['hash']
+            target = nodes[-1]
+            self.assertEqual(target['key'], analyze.Q.pack(['InferScc', analyze.Q.pack(sorted(report['members']))]))
+            self.assertEqual(target['hash'], report['query_key'])
+            self.assertEqual(target['payload'], target['hash'])
+            before = dict(target)
+            target['payload'] = nodes[1]['hash']
+            self.assertNotEqual(target['payload'], target['hash'])
+            self.assertEqual({k: v for k, v in target.items() if k != 'payload'},
+                             {k: v for k, v in before.items() if k != 'payload'})
         inventory, evidence = self.fixture(mutate_nodes=mutate)
-        with self.assertRaisesRegex(ValueError, 'payload matches result hash'):
+        self.assertEqual(evidence['query_report_json'], valid_evidence['query_report_json'])
+        # Legacy admission enforces this before the report. Dictionary v2
+        # reaches the exact InferScc/raw-payload cross-check with valid identity.
+        reason = self.index_error('query graph payload matches result hash',
+                                  'exact InferScc identity and raw payload SHA')
+        with self.assertRaisesRegex(ValueError, '^' + reason + '$'):
             self.check(inventory, evidence)
 
     def test_rejects_extra_generation(self):

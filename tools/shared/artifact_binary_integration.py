@@ -66,8 +66,12 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
 
     seed=output/'distribution-seed'
     require(invoke('distribution-seed','distribution-seed',seed)==b'PASS actual-binary-library-and-legacy-formal\n','real Session binary library producer')
+    require(invoke('open-interface-controls','open-interface-controls',seed)==b'PASS open-interface-context-closure-and-portable-paths\n',
+            'actual supplied-interface closure and portable-path admission controls')
     binary_pair=((seed/'seed.mlfci').read_bytes(),(seed/'seed.mlfco').read_bytes())
     legacy_pair=((seed/'legacy.mlfci').read_bytes(),(seed/'legacy.mlfco').read_bytes())
+    original_builtin_pair=((seed/'builtin.mlfci').read_bytes(),(seed/'builtin.mlfco').read_bytes())
+    typed.inspect_crate_pair(*original_builtin_pair,4)
     closed_pair=((seed/'closed.mlfci').read_bytes(),(seed/'closed.mlfco').read_bytes())
     dependency_interfaces=[(seed/'builtin.mlfci').read_bytes()]
     opened.inspect_pair(binary_pair,dependency_interfaces)
@@ -125,13 +129,26 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         bad=output/('formal-corrupt-'+str(schema));bad.mkdir()
         for extension,data in zip(('.mlfci','.mlfco'),closed_pair):(bad/('unit'+extension)).write_bytes(data)
         damaged=bytearray((bad/('unit'+suffix)).read_bytes());damaged[8:12]=(2).to_bytes(4,'little')
-        (bad/('unit'+suffix)).write_bytes(ref.repair_crc(damaged))
+        damaged=ref.repair_crc(damaged)
+        (bad/('unit'+suffix)).write_bytes(damaged)
+        if schema == 7:
+            # Open admission authenticates the paired object SHA before parsing.
+            # Rebind it so this control reaches the actual version check.
+            fields=list(typed.value_node(typed.inspect_artifact(binary_pair[0],3).values()[0],242,13))
+            fields[11]=typed.s(sha(damaged))
+            (bad/'unit.mlfci').write_bytes(ref.tree_document([typed.n(242,*fields)],schema=3))
         family='interface' if schema==3 else 'object'
         require(invoke('formal-corrupt-'+str(schema),'formal-check',bad/'unit','reject-'+family+'-version')==('PASS formal-'+family+'-version-reject\n').encode(),'formal exact binary-version diagnostic; no legacy fallback')
     open_negatives=[]
     resource_cases, resource_witnesses = opened.resource_mutation_cases(
         binary_pair, dependency_interfaces)
-    for label,pair,diagnostic in [*opened.mutation_cases(binary_pair), *resource_cases]:
+    content_stamp_cases = [opened.content_stamp_mutation(pair)
+                           for pair in (binary_pair, schema7_pair)]
+    for _, damaged, _ in content_stamp_cases:
+        # Must reach content binding, not fail an independent syntax/shape check.
+        opened.inspect_pair(damaged, dependency_interfaces)
+    for label,pair,diagnostic in [*opened.mutation_cases(binary_pair), *resource_cases,
+                                  *content_stamp_cases]:
         bad=output/label;bad.mkdir();prefix=bad/'unit'
         for suffix,data in zip(('.mlfci','.mlfco'),pair):prefix.with_suffix(suffix).write_bytes(data)
         require(invoke('formal-'+label,'formal-error',prefix,diagnostic)==b'PASS formal-open-reject\n',
@@ -145,7 +162,10 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
                                'resource_witness':resource_witnesses.get(label)})
     record['open_public_negatives']=open_negatives
     audit_negatives=[]
-    for label,pair,diagnostic in opened.audit_mutation_cases(binary_pair):
+    audit_stamp=invoke('audit-stamp', 'audit-stamp', seed/'seed').decode('utf-8').strip()
+    require(audit_stamp and all(part.isdecimal() for part in audit_stamp.split('-'))
+            and len(audit_stamp.split('-')) == 2, 'fixture structural stamp format')
+    for label,pair,diagnostic in opened.audit_mutation_cases(binary_pair, audit_stamp):
         bad=output/label;bad.mkdir();prefix=bad/'unit'
         for suffix,data in zip(('.mlfci','.mlfco'),pair):prefix.with_suffix(suffix).write_bytes(data)
         # The independent parser does not manufacture checker evidence. A
@@ -159,7 +179,7 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
     record['open_audit_negatives']=audit_negatives
 
     distro=output/'distribution';distro.mkdir();distribution=[]
-    builtin_id='mlf:builtin-shared-haskell-v1:11';root_id='binary-package/1/library'
+    builtin_id='mlf:builtin-shared-haskell-v1:13';root_id='binary-package/1/library'
     identities=(builtin_id,root_id)
     def pair_at(prefix):return tuple(prefix.with_suffix(suffix).read_bytes() for suffix in ('.mlfci','.mlfco'))
     def interface_summary(pair,dependencies=()):
@@ -178,6 +198,9 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
         require(not body.startswith(ref.MAGIC),'legacy pair must have two text artifacts')
         fields=typed.unpack(metadata.decode('utf-8','strict'))
         require(len(fields)==14 and fields[0]=='MLFCI-5','exact legacy interface framing')
+        object_fields=typed.unpack(body.decode('utf-8','strict'))
+        require(len(object_fields)==4 and object_fields[0]=='MLFCO-2' and object_fields[1]==fields[1],
+                'exact complete projected legacy object framing/identity')
         dependencies=[tuple(typed.unpack(row)) for row in typed.unpack(fields[2])]
         require(all(len(row)==3 for row in dependencies),'legacy dependency triples')
         return {'identity':fields[1],'dependencies':dependencies,'modules':typed.unpack(fields[3]),'entry':fields[10]}
@@ -189,7 +212,6 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
             original_dependencies[0][1]==str((seed/'builtin.mlfci').resolve()) and original_dependencies[0][2],
             'original real Session root exact builtin edge')
     semantic=original_dependencies[0][2]
-    original_builtin_pair=pair_at(seed/'builtin')
     original_builtin_summary=interface_summary(original_builtin_pair)
     require(original_builtin_summary['identity']==builtin_id and original_builtin_summary['dependencies']==[] and
             original_builtin_summary['entry']=='' and 'Prelude' in original_builtin_summary['modules'] and

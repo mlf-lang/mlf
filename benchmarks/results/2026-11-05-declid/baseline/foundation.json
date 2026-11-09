@@ -1,0 +1,155 @@
+{
+  "source_commit": "726cd256aa90d3e8cf596842fbb29515c1bc5249",
+  "corpus_commit": "c5928b5be73cd78d194405e734aa012415570e1a",
+  "host": "MLF/shared-haskell-v1 GHC",
+  "ghc": {
+    "path": "/Users/ares/.ghcup/ghc/9.14.1/bin/ghc-9.14.1",
+    "sha256": "39fd1ee0cf7eb5739a595d5c238a95a7a062942397cc6d2a16425d6eeb18283e",
+    "version": "9.14.1"
+  },
+  "optimization": "2",
+  "install_receipt_sha256": "b77ea31af5c07fbbbda43e7591d11226e2020fcf2f279a612db599528ba10321",
+  "programs": {
+    "emlf": {
+      "path": "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/emlf",
+      "sha256": "86dcabe8df31cf67ae62192314fb2709524482e0a0b26556cde0920467889b16"
+    },
+    "mlfpkg": {
+      "path": "/Users/ares/.codex/worktrees/declid-task-00-evidence/install/bin/mlfpkg",
+      "sha256": "fa7a9a16673dff822c17452a044338743ba76d85bc082d08885775e3ace82ef2"
+    }
+  },
+  "locked_plan_sha256": "de5fba60eef7607afe1dbc2b6b6e5dc5af20f466e436936cd73cc2bb02685cfc",
+  "sources": {
+    "Fresh.hs": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
+    "Host.hs": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+    "IntMap.hs": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+    "IntRank.hs": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
+    "IntSet.hs": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+    "IntTree.hs": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
+    "Map.hs": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+    "Regex.hs": "016cda4d5a9cd2ed0161976ab4150d74c1b2843cb6a5a046aef72eccc1945b0d",
+    "ST.hs": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
+    "Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+    "Std.hs": "d8ac87643ba3c81b1a87a46f59386f4a8f27eaad3515100b5374737f9747ca17",
+    "Types.hs": "9eb67b3a3e7f3591f051a8627bb466209a3be39436d58f48db8efc89f936fbac",
+    "Unicode.hs": "fb8a1f8a0147d416d3b5bfd637d53121e584de6f8856d2c380ec360d2df47adf",
+    "Version.hs": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+  },
+  "states": {
+    "cold": {
+      "counts": [
+        504,
+        0
+      ],
+      "resources": {
+        "wall_s": 19.865972542,
+        "cpu_s": 19.698524,
+        "rss_bytes": 155697152
+      },
+      "version_source_sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+      "cache_bytes": 7908903,
+      "products_sha256": {
+        ".mlfci": "51ea388579135cc086d386c16761fad4e13471a4277c9577d0d23dc83d791381",
+        ".mlfco": "57dbaf5f655a2655ce96868808842a974daf0ea76b41079ff54565c7eb64390a",
+        ".queries": "ce5bf34891b605f77ec972ab33ae5ce595397d8399f350d61a93a53bbc8b9f95"
+      },
+      "generation_sha256": "64314c43d8f0164da19b764a9392db31b6ab2ba9f1aac902037bdd7a2ce480d7",
+      "rows_sha256": "ada637ba396b0405db3c958f4e346df9d05b7a85570b8d2e4f0ad933ebf826e2",
+      "rows": 3403,
+      "ordered_reads": 19277,
+      "index": {
+        "schema": 6,
+        "physical_bytes": 1168976,
+        "symbols": 5474,
+        "symbol_utf8_bytes": 1046369,
+        "nodes": 15783,
+        "edges": 43877,
+        "roots": 1,
+        "depth": 6,
+        "root_expanded_work": 7491045,
+        "shared_node_references": 28095
+      },
+      "finish_receipts": {
+        "retained": 496,
+        "rewritten": 8
+      }
+    },
+    "warm": {
+      "counts": [
+        0,
+        504
+      ],
+      "resources": {
+        "wall_s": 3.425698041,
+        "cpu_s": 3.363368,
+        "rss_bytes": 141574144
+      },
+      "version_source_sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+      "cache_bytes": 7908903,
+      "products_sha256": {
+        ".mlfci": "51ea388579135cc086d386c16761fad4e13471a4277c9577d0d23dc83d791381",
+        ".mlfco": "57dbaf5f655a2655ce96868808842a974daf0ea76b41079ff54565c7eb64390a",
+        ".queries": "25499cf5b30aded00b4c21932103564764c8968e25d5576eaa36e2e1dd991de6"
+      },
+      "generation_sha256": "64314c43d8f0164da19b764a9392db31b6ab2ba9f1aac902037bdd7a2ce480d7",
+      "rows_sha256": "ada637ba396b0405db3c958f4e346df9d05b7a85570b8d2e4f0ad933ebf826e2",
+      "rows": 3403,
+      "ordered_reads": 19277,
+      "index": {
+        "schema": 6,
+        "physical_bytes": 1168976,
+        "symbols": 5474,
+        "symbol_utf8_bytes": 1046369,
+        "nodes": 15783,
+        "edges": 43877,
+        "roots": 1,
+        "depth": 6,
+        "root_expanded_work": 7491045,
+        "shared_node_references": 28095
+      },
+      "finish_receipts": {
+        "retained": 496,
+        "rewritten": 8
+      }
+    },
+    "edit": {
+      "counts": [
+        1,
+        503
+      ],
+      "resources": {
+        "wall_s": 3.641083125,
+        "cpu_s": 3.5953899999999996,
+        "rss_bytes": 142671872
+      },
+      "version_source_sha256": "5612d2bb47c615928ae4a20e284fe9a5ba76650ed03169e2a9e6cf78346b5d1e",
+      "cache_bytes": 9108870,
+      "products_sha256": {
+        ".mlfci": "cf85bf9482d88f238b39e23712cc3afc6fbd8c60597ced4fbab1a22c8a62911a",
+        ".mlfco": "f5873a08cd9f5af99c9f5e5c53958fbb42ca7f016924571ed9061b88bfece13f",
+        ".queries": "ca1070c3a406c98125bd91c1e60cb2ee8ae9010f7453f23a7bfa1fc2b94d8c5c"
+      },
+      "generation_sha256": "e611393e5f1c3165f62cad99e3b55f85b856979b0171f93f32546d1582bfca10",
+      "rows_sha256": "b091badc62e4bbbc697a6ff6e43922c2e6ad0bcd5f3a4bea82764e95f0b77702",
+      "rows": 3403,
+      "ordered_reads": 19277,
+      "index": {
+        "schema": 6,
+        "physical_bytes": 1168976,
+        "symbols": 5474,
+        "symbol_utf8_bytes": 1046369,
+        "nodes": 15783,
+        "edges": 43877,
+        "roots": 1,
+        "depth": 6,
+        "root_expanded_work": 7491045,
+        "shared_node_references": 28095
+      },
+      "finish_receipts": {
+        "retained": 496,
+        "rewritten": 8
+      }
+    }
+  }
+}

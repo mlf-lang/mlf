@@ -141,7 +141,9 @@ module Bootstrap.Primitive where {
       PUnsignedLtInt -> 128;
       PReadByteFileOrError -> 129;
       PWriteByteFileOrError -> 130;
-      PByteArrayDigest -> 131
+      PByteArrayDigest -> 131;
+      PFreezeSTArray -> 132;
+      PSTToIO -> 133
     };
   primitiveName :: Primitive -> String;
   primitiveName p =
@@ -277,7 +279,9 @@ module Bootstrap.Primitive where {
       PUnsignedLtInt -> "unsignedLtInt";
       PReadByteFileOrError -> "readByteFileOrError";
       PWriteByteFileOrError -> "writeByteFileOrError";
-      PByteArrayDigest -> "byteArrayDigest"
+      PByteArrayDigest -> "byteArrayDigest";
+      PFreezeSTArray -> "freezeSTArray";
+      PSTToIO -> "stToIO"
     };
   legacyPrimitives :: [] Primitive;
   legacyPrimitives =
@@ -447,7 +451,7 @@ module Bootstrap.Primitive where {
                                                                                                                                                                                                                                                                                                 []))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
   allPrimitives :: [] Primitive;
   allPrimitives = S.append legacyPrimitives
-    [PTextToChars, PTextFromChars, PCharCode, PCharFromCode, PUserError, PIOError, PCatchIOError, PIOErrorString, PEmptyCallStack, PPushCallStack, PPrettyCallStack, PIOErrorWithStack, PConcatStringList, POrInt, PXorInt, PShiftLInt, PShiftRInt, PUnsignedShiftRInt, PCountLeadingZerosInt, PCountTrailingZerosInt, PPopCountInt, PIntToInteger, PIntegerToInt, PAddInteger, PSubInteger, PMulInteger, PQuotInteger, PRemInteger, PEqInteger, PLtInteger, PShowInteger, PReadInteger, PIntegerToDouble, PUnsignedLtInt, PReadByteFileOrError, PWriteByteFileOrError, PByteArrayDigest];
+    [PTextToChars, PTextFromChars, PCharCode, PCharFromCode, PUserError, PIOError, PCatchIOError, PIOErrorString, PEmptyCallStack, PPushCallStack, PPrettyCallStack, PIOErrorWithStack, PConcatStringList, POrInt, PXorInt, PShiftLInt, PShiftRInt, PUnsignedShiftRInt, PCountLeadingZerosInt, PCountTrailingZerosInt, PPopCountInt, PIntToInteger, PIntegerToInt, PAddInteger, PSubInteger, PMulInteger, PQuotInteger, PRemInteger, PEqInteger, PLtInteger, PShowInteger, PReadInteger, PIntegerToDouble, PUnsignedLtInt, PReadByteFileOrError, PWriteByteFileOrError, PByteArrayDigest, PFreezeSTArray, PSTToIO];
   lookupTargetPrimitive :: String -> Maybe Primitive;
   lookupTargetPrimitive name = S.find (\p -> eqString (primitiveName p) name) allPrimitives;
   lookupPrimitive :: String -> Maybe Primitive;
@@ -667,6 +671,14 @@ module Bootstrap.Primitive where {
                    ((:) (Parameter "s")
                       ((:) (Applied "STArray" ((:) (Parameter "s") ((:) (Parameter "a") [])))
                          [])))));
+      PSTToIO ->
+        (,) [(,) "a" Star]
+          (Function (Applied "ST" [Applied "IOWorld" [], Parameter "a"])
+            (Applied "IO" [Parameter "a"]));
+      PFreezeSTArray ->
+        (,) [(,) "s" Star, (,) "a" Star]
+          (Function (Applied "STArray" [Parameter "s", Parameter "a"])
+            (Applied "ST" [Parameter "s", Function (Applied "Int" []) (Parameter "a")]));
       PReadSTArray ->
         (,) ((:) ((,) "s" Star) ((:) ((,) "a" Star) []))
           (Function (Applied "STArray" ((:) (Parameter "s") ((:) (Parameter "a") [])))
@@ -942,7 +954,9 @@ module Bootstrap.Primitive where {
       PUnsignedLtInt -> 2;
       PReadByteFileOrError -> 2;
       PWriteByteFileOrError -> 2;
-      PByteArrayDigest -> 1
+      PByteArrayDigest -> 1;
+      PFreezeSTArray -> 1;
+      PSTToIO -> 1
     };
   fieldArity :: Field -> Int;
   fieldArity field =

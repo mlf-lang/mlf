@@ -9,11 +9,12 @@ module Bootstrap.PreparedLibraries
    metadataHash, objectHash, libraryObject, compileLoaded, checkedTerm,
    sourceType, reused, nameMap, NativeRoot, nativeCheckedWrapper, nativeSignatures,
    nativeSourceType, nativeInferredType, nativeDeclarations, nativeBuiltinCount, compileNativeRoot, compileNativeRootUsing,
-   nativeLibrary, nativeLibraryDeclarations, nativeExportSignatures) where {
+   nativeLibrary, nativeLibraryDeclarations, nativeExportSignatures, nativeInstalledIds, nativeLayoutIds, nativeSelectedIds) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Lexer as Lexer;
@@ -163,6 +164,11 @@ module Bootstrap.PreparedLibraries
         (Artifact.definitionName identity entity) (fst state)) (snd state)
     }
   } in Modules.Names (fst (foldl allocate ((,) M.empty 0) (S.toList entities)));
+  mixedKey raw entity = case M.lookup compareString (Modules.owner entity) (owners raw) of {
+    Just identity -> Artifact.definitionName identity entity;
+    Nothing -> Modules.termIdentity entity
+  };
+  resolvePreparedPlan raw = Modules.resolvePlanWithKey (mixedNames raw) (mixedKey raw);
   collision raw sources = let { protected = rawProtected raw; selected = map sourceName (librarySources raw) } in
     any (\source -> not (elem eqString (Modules.moduleIdentity source) selected) &&
       any (\name -> S.member compareString name protected &&
@@ -192,7 +198,7 @@ module Bootstrap.PreparedLibraries
         -- cannot bypass ordinary namespace checking before artifact admission.
         Core.atPhase ModuleResolution resolution;
         if collision raw sources then fallback else
-          case bindEither planned (Modules.resolveCratePlan (mixedNames raw)) of {
+          case bindEither planned (resolvePreparedPlan raw) of {
             Left _ -> fallback;
             Right prepared -> case validatePrepared raw prepared of {
               Left _ -> fallback;
@@ -242,13 +248,15 @@ module Bootstrap.PreparedLibraries
       (Artifact.sourceMetadata [] (concatMap Artifact.crateClasses (interfaces raw)) []))
       "prepared library source class mismatch"
   };
-  instanceRows raw resolution values = let {
+  instanceRows raw resolution bindings = let {
+    closeLocal = Surface.closeIndexedInstance (Surface.helperScope bindings);
+    rows = Modules.resolvedInstanceRows resolution;
     ownership = owners raw;
     imported = M.fromList compareString (concatMap Artifact.crateInstances (interfaces raw));
     protected = S.union compareString (rawProtected raw)
       (S.fromList compareString (concatMap (compose Modules.sourceUsed Modules.resolvedSource)
         (Modules.resolvedCrateModules resolution)))
-  } in traverseEither (\((,) index ((,) owner instanceValue)) ->
+  } in traverseEither (\((,) index ((,) owner inst)) -> let { instanceValue = Modules.instanceValue resolution inst } in
     case M.lookup compareString owner ownership of {
       Just identity -> let { name = Artifact.instanceName identity owner instanceValue } in
         case M.lookup compareString name imported of {
@@ -260,22 +268,39 @@ module Bootstrap.PreparedLibraries
           }
         };
       Nothing -> do {
-        closed <- Separate.closeInstance values instanceValue;
+        closed <- closeLocal inst;
         let { name = fst (Modules.chooseName protected ("preparedUserInstance" ++ showInt index ++ "_") 0) };
         Right ((,) name closed)
       }
-    }) (zip (range 0 (length (Modules.resolvedCrateInstances resolution) - 1))
-      (Modules.resolvedCrateInstances resolution));
+    }) (zip (range 0 (length rows - 1)) rows);
   -- This value authenticates the freshly checked user wrapper only. Installed
   -- native code identity and file pins are enforced by the compiler consumer.
   -- Raw library metadata does not manufacture a checked library implementation.
-  data NativeRoot = NativeRoot Checked.CheckedTerm (Map String XType) String XType ([] DataDecl) Int;
-  nativeCheckedWrapper (NativeRoot value _ _ _ _ _) = value;
-  nativeSignatures (NativeRoot _ value _ _ _ _) = value;
-  nativeSourceType (NativeRoot _ _ value _ _ _) = value;
-  nativeInferredType (NativeRoot _ _ _ value _ _) = value;
-  nativeDeclarations (NativeRoot _ _ _ _ value _) = value;
-  nativeBuiltinCount (NativeRoot _ _ _ _ _ value) = value;
+  data NativeRoot = NativeRoot Checked.CheckedTerm (Map String XType) String XType ([] DataDecl) Int Parameters.Signatures;
+  nativeCheckedWrapper (NativeRoot value _ _ _ _ _ _) = value;
+  nativeSignatures (NativeRoot _ value _ _ _ _ _) = value;
+  nativeSourceType (NativeRoot _ _ value _ _ _ _) = value;
+  nativeInferredType (NativeRoot _ _ _ value _ _ _) = value;
+  nativeDeclarations (NativeRoot _ _ _ _ value _ _) = value;
+  nativeBuiltinCount (NativeRoot _ _ _ _ _ value _) = value;
+  -- The checked wrapper and ABI layout must interpret the same consumer IDs.
+  nativeLayoutIds :: NativeRoot -> [] ((,) (V.Index Declaration) ((,) String XType));
+  nativeLayoutIds (NativeRoot _ _ _ _ _ _ inventory) =
+    zipWith (\((,) d _) signature -> (,) d signature)
+      (Parameters.entries inventory) (Parameters.namedEntries inventory);
+  nativeSelectedIds :: NativeRoot -> [] (V.Index Declaration);
+  nativeSelectedIds compiled = let { selected = nativeSignatures compiled } in
+    map fst (filter (\((,) _ ((,) key _)) -> M.member compareString key selected) (nativeLayoutIds compiled));
+  -- Installed objects have independent declaration numbering. Their published
+  -- ABI order is by stable key, even if the declarations arrive in another order.
+  nativeInstalledIds :: RawLibrary -> Either String ([] ((,) (V.Index Declaration) ((,) String XType)));
+  nativeInstalledIds raw = do {
+    let { entries = concatMap Artifact.crateBindings (interfaces raw);
+          numbered = zipWith (\d ((,) key ty) -> (,) key ((,) d ((,) key ty)))
+            (map V.fromInt (range 0 (length entries - 1))) entries };
+    Artifact.uniqueNames "native export" (map fst entries);
+    Right (map snd (M.toList (M.fromList compareString numbered)))
+  };
   nativeLibraryDeclarationsV1 raw = foldEither Separate.mergeDeclaration []
     (concatMap Artifact.crateLoweredData (interfaces raw));
   nativeExportSignatures raw = M.toList (M.fromList compareString
@@ -356,7 +381,7 @@ module Bootstrap.PreparedLibraries
       Core.atPhase Verification (ensure (not (collision raw sources)) "installed native library source identity collision");
       completed <- Core.atPhase Verification (completeNativeSources parseSource raw loaded);
       prepared <- Core.atPhase ModuleResolution
-        (Modules.resolveCrateWithAllocator mode M.empty (mixedNames raw) completed);
+        (bindEither (Modules.prepareCrateResolution mode M.empty completed) (resolvePreparedPlan raw));
       Core.atPhase Verification (validatePrepared raw prepared);
       Core.atPhase Verification (nativeHeaders raw);
       compileNativeResolvedRoot raw prepared
@@ -381,6 +406,12 @@ module Bootstrap.PreparedLibraries
     };
     _ -> Left "native library requires one canonical builtin implementation"
   };
+  -- Class lowering owns every support/selector slot used in the completed
+  -- wrapper. Its table also maps the imported contracts into this resolution.
+  wrapperImports lowered signatures = case snd lowered of {
+    Just table -> Parameters.fromGenerated table signatures;
+    Nothing -> Left "prepared library lowering lost its declaration table"
+  };
   compileNativeResolvedRootV1 raw resolution = do {
     let { display = Modules.displayNames (Modules.resolvedCrateDisplayNames resolution);
           sourcePhase phase result = Core.atPhase phase (mapLeft display result);
@@ -388,36 +419,32 @@ module Bootstrap.PreparedLibraries
           ownership = owners raw;
           own = filter (\entry -> not (M.member compareString
             (Modules.moduleIdentity (Modules.resolvedSource entry)) ownership)) resolved;
-          values = concatMap (compose Modules.renamedValues Modules.resolvedContents) own;
-          entryModule = last resolved;
-          source = Modules.resolvedSource entryModule };
-    entry <- sourcePhase ModuleResolution (case Modules.renamedBody (Modules.resolvedContents entryModule) of {
-      Just expression -> Right expression;
-      Nothing -> if any (\value -> eqString (Modules.valueName value) "main") (Modules.sourceValues source)
-        then mapEither SVar (Modules.resolvedName (Modules.resolvedCrateNames resolution)
-          (Modules.Entity (Modules.moduleIdentity source) "main" Modules.Value))
-        else Modules.resolveExpr (Modules.resolvedCrateNames resolution) (Modules.resolvedScope entryModule) (SVar "main")
-    });
-    body <- sourcePhase ModuleResolution (Surface.bindValues values entry);
+          bindings = Modules.boundIn resolution own;
+          entryModule = last resolved };
+    entry <- sourcePhase ModuleResolution (Modules.entryExpr resolution entryModule);
+    body <- sourcePhase ModuleResolution (Surface.bindIndexedExpr bindings entry);
     parts <- sourcePhase Inference (canonicalParts resolution);
-    instances <- sourcePhase Inference (instanceRows raw resolution values);
+    instances <- sourcePhase Inference (instanceRows raw resolution bindings);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
           dictionaries = M.fromList compareString
             (map (\klass -> (,) ("Dict_" ++ Modules.className klass) (Modules.className klass)) (snd parts));
           sourceValues = S.fromList compareString (concatMap
-            (\entry -> map (\((,,) name _ _) -> name) (Modules.renamedValues (Modules.resolvedContents entry)))
+            (compose Modules.renamedValueNames Modules.resolvedContents)
             (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
           externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
-    full <- sourcePhase Inference (Classes.lowerSeparateClassesWithScopes externals (map fst instances)
-      (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
+    let { conventions = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
+            then Separate.importClasses dictionaries ty else []) signatures };
+    full <- sourcePhase Inference (Classes.lowerSeparateClassesAndSlotsWithImports conventions externals (map fst instances)
+      (Modules.resolvedValueScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
-    selected <- sourcePhase Verification (Parameters.select signatures full);
-    let { lowered = fst selected; selectedSignatures = snd selected;
+    imports <- sourcePhase Verification (wrapperImports full signatures);
+    selected <- sourcePhase Verification (Parameters.select imports (fst full));
+    let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected);
           diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
             (Modules.resolvedCrateDisplayNames resolution)) };
     compiled <- mapLeft (\(CompileError phase message) -> CompileError phase (diagnostic message))
-      (Imported.finishCompilation selectedSignatures lowered);
+      (Imported.finishSelected (snd selected) lowered);
     let { wrapper = Imported.checkedWrapper compiled;
           declarations = case Checked.term wrapper of { XWithData ds _ -> ds; _ -> [] } };
     Core.atPhase Verification (do {
@@ -449,7 +476,7 @@ module Bootstrap.PreparedLibraries
       })
     };
     Right (NativeRoot (fst local) (snd local) (display (Imported.sourceType compiled))
-      (Imported.inferredType compiled) declarations (length (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures))))
+      (Imported.inferredType compiled) declarations (length (filter (\key -> S.member compareString key builtinKeys) (M.keys usedSignatures))) imports)
   };
   compilePreparedV1 raw admitted resolution = do {
     let { linked = libraryState admitted;
@@ -459,36 +486,32 @@ module Bootstrap.PreparedLibraries
           ownership = owners raw;
           own = filter (\entry -> not (M.member compareString
             (Modules.moduleIdentity (Modules.resolvedSource entry)) ownership)) resolved;
-          values = concatMap (compose Modules.renamedValues Modules.resolvedContents) own;
-          entryModule = last resolved;
-          source = Modules.resolvedSource entryModule };
-    entry <- sourcePhase ModuleResolution (case Modules.renamedBody (Modules.resolvedContents entryModule) of {
-      Just expression -> Right expression;
-      Nothing -> if any (\value -> eqString (Modules.valueName value) "main") (Modules.sourceValues source)
-        then mapEither SVar (Modules.resolvedName (Modules.resolvedCrateNames resolution)
-          (Modules.Entity (Modules.moduleIdentity source) "main" Modules.Value))
-        else Modules.resolveExpr (Modules.resolvedCrateNames resolution) (Modules.resolvedScope entryModule) (SVar "main")
-    });
-    body <- sourcePhase ModuleResolution (Surface.bindValues values entry);
+          bindings = Modules.boundIn resolution own;
+          entryModule = last resolved };
+    entry <- sourcePhase ModuleResolution (Modules.entryExpr resolution entryModule);
+    body <- sourcePhase ModuleResolution (Surface.bindIndexedExpr bindings entry);
     parts <- sourcePhase Inference (canonicalParts resolution);
-    instances <- sourcePhase Inference (instanceRows raw resolution values);
+    instances <- sourcePhase Inference (instanceRows raw resolution bindings);
     let { signatures = M.fromList compareString (concatMap Artifact.crateBindings (interfaces raw));
           dictionaries = M.fromList compareString
             (map (\klass -> (,) ("Dict_" ++ Modules.className klass) (Modules.className klass)) (snd parts));
           sourceValues = S.fromList compareString (concatMap
-            (\entry -> map (\((,,) name _ _) -> name) (Modules.renamedValues (Modules.resolvedContents entry)))
+            (compose Modules.renamedValueNames Modules.resolvedContents)
             (filter (\r -> M.member compareString (Modules.moduleIdentity (Modules.resolvedSource r)) ownership) resolved));
           externals = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
             then Separate.sourceScheme dictionaries ty else Separate.sourceSchemeIn M.empty False ty) signatures };
-    full <- sourcePhase Inference (Classes.lowerSeparateClassesWithScopes externals (map fst instances)
-      (Modules.resolvedCrateValueScopes resolution) (Modules.resolvedCrateInstanceScopes resolution)
+    let { conventions = M.mapWithKey (\name ty -> if S.member compareString name sourceValues
+            then Separate.importClasses dictionaries ty else []) signatures };
+    full <- sourcePhase Inference (Classes.lowerSeparateClassesAndSlotsWithImports conventions externals (map fst instances)
+      (Modules.resolvedValueScopesIn resolution own) (Modules.resolvedCrateInstanceScopes resolution)
       (SClassProgram (fst parts) (snd parts) (map snd instances) body));
-    selected <- sourcePhase Verification (Parameters.select signatures full);
-    let { lowered = fst selected; selectedSignatures = snd selected;
+    imports <- sourcePhase Verification (wrapperImports full signatures);
+    selected <- sourcePhase Verification (Parameters.select imports (fst full));
+    let { lowered = fst selected; selectedSignatures = Parameters.project (snd selected);
           diagnostic = Modules.displayNames (M.union compareString (M.map display (snd lowered))
             (Modules.resolvedCrateDisplayNames resolution)) };
     compiled <- mapLeft (\(CompileError phase message) -> CompileError phase (diagnostic message))
-      (Imported.finishCompilation selectedSignatures lowered);
+      (Imported.finishSelected (snd selected) lowered);
     let { fresh = snd (Separate.freshObject (Artifact.fragmentSerial linked)
             (Checked.term (Imported.checkedWrapper compiled)));
           rootData = case fresh of { XWithData declarations _ -> declarations; _ -> [] } };

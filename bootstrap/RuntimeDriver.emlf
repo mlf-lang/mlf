@@ -3,11 +3,11 @@ import Bootstrap.Types
 import qualified Bootstrap.Runtime as R
 import qualified Bootstrap.X.Parser as X
 
-arguments : Int -> Int -> IO (List String)
-arguments i count = if i >= count then ioReturn Nil else do
+arguments : Int -> Int -> IO ([] String)
+arguments i count = if i >= count then ioReturn [] else do
   value <- getArg i
   rest <- arguments (i + 1) count
-  return (Cons value rest)
+  return ((:) value rest)
 
 die message = do
   putErr (message ++ "\n")
@@ -30,8 +30,8 @@ main = do
     file <- getArg 1
     rest <- arguments 2 count
     let args = case rest of
-          Cons first tail -> if eqString first "--" then tail else rest
-          Nil -> Nil
+          (:) first tail -> if eqString first "--" then tail else rest
+          [] -> []
     if eqString mode "--run-xmlf" then run true file args
     else if eqString mode "--run-program-xmlf" then run false file args
     else die "unknown runtime driver command"

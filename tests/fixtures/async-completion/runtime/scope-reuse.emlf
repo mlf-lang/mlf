@@ -1,5 +1,5 @@
-cycleScopes : Int -> IO Unit
-cycleScopes n = if n <= 0 then ioReturn Unit else do
+cycleScopes : Int -> IO ()
+cycleScopes n = if n <= 0 then ioReturn () else do
   scope <- asyncScopeNew 0 1
   ticket <- asyncDelay scope 4294967295 (panic "stale timer fired")
   asyncScopeClose scope

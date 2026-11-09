@@ -22,6 +22,26 @@ def pack(values):
     return ''.join(str(len(x))+':'+x for x in values)
 
 
+def prepare_host_package(ghc, source, producer, deps, run):
+    pkg=ghc.with_name('ghc-pkg');deps.mkdir()
+    objects=deps/'objects';objects.mkdir();db=deps/'package-db'
+    packages=['base','array','bytestring','text','containers','directory']
+    flags=['-package-env','-','-clear-package-db','-global-package-db','-no-user-package-db','-hide-all-packages']
+    for name in packages:flags+=['-package',name]
+    run('build-host-package',[ghc,'--make','-j1','-no-link','-O2','-this-unit-id','mlf-shape-primitives-0.1',
+        *flags,'-i','-i'+str(source/'host/ghc'),'-odir',objects,'-hidir',objects,source/'host/ghc/MLF/Primitive.hs'])
+    run('archive-host-package',['/usr/bin/ar','rcs',deps/'libHSmlf-shape-primitives-0.1.a',
+        *sorted(objects.rglob('*.o')),producer/'host.o',producer/'supervisor.o'])
+    run('init-package-db',[pkg,'init',db])
+    ids=[subprocess.check_output([pkg,'--global','field',name,'id','--simple-output'],text=True).strip() for name in packages]
+    conf=deps/'package.conf'
+    conf.write_text('name: mlf-shape-primitives\nversion: 0.1\nid: mlf-shape-primitives-0.1\nkey: mlf-shape-primitives-0.1\n'
+        'exposed: True\nexposed-modules: MLF.Primitive\nhidden-modules: MLF.Host.Base MLF.Host.IO MLF.Host.Async\n'
+        +'import-dirs: '+str(objects)+'\nlibrary-dirs: '+str(deps)+'\nhs-libraries: HSmlf-shape-primitives-0.1\ndepends: '+' '.join(ids)+'\n')
+    run('register-package',[pkg,'--package-db',db,'register',conf])
+    return db
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--producer',type=Path,required=True)
@@ -45,25 +65,12 @@ def main():
     limits={'address_space_per_process_bytes':6*1024**3,'disk_free_floor_bytes':5*1024**3,
             'host_available_floor_bytes':3*1024**3,'max_work_bytes':2*1024**3,
             'process_tree_rss_bytes':5*1024**3,'wall_seconds':600}
-    ghc=Path(a.ghc).resolve() if a.ghc else Path(auth['ghc']['path']);pkg=ghc.with_name('ghc-pkg');deps=out/'dependencies';deps.mkdir()
-    objects=deps/'objects';objects.mkdir();db=deps/'package-db'
-    packages=['base','array','bytestring','text','containers','directory']
-    flags=['-package-env','-','-clear-package-db','-global-package-db','-no-user-package-db','-hide-all-packages']
-    for name in packages:flags+=['-package',name]
+    ghc=Path(a.ghc).resolve() if a.ghc else Path(auth['ghc']['path'])
     def run(name,argv):return H.Runner(out,limits).run(argv,ROOT,out/name)
     builtin_record={}
     with H.SerialLock(ROOT/'.mlf-build'):
-        run('build-host-package',[ghc,'--make','-j1','-no-link','-O2','-this-unit-id','mlf-shape-primitives-0.1',
-            *flags,'-i','-i'+str(source/'host/ghc'),'-odir',objects,'-hidir',objects,source/'host/ghc/MLF/Primitive.hs'])
-        run('archive-host-package',['/usr/bin/ar','rcs',deps/'libHSmlf-shape-primitives-0.1.a',
-            *sorted(objects.rglob('*.o')),producer/'host.o',producer/'supervisor.o'])
-        run('init-package-db',[pkg,'init',db])
-        ids=[subprocess.check_output([pkg,'--global','field',name,'id','--simple-output'],text=True).strip() for name in packages]
-        conf=deps/'package.conf'
-        conf.write_text('name: mlf-shape-primitives\nversion: 0.1\nid: mlf-shape-primitives-0.1\nkey: mlf-shape-primitives-0.1\n'
-            'exposed: True\nexposed-modules: MLF.Primitive\nhidden-modules: MLF.Host.Base MLF.Host.IO MLF.Host.Async\n'
-            +'import-dirs: '+str(objects)+'\nlibrary-dirs: '+str(deps)+'\nhs-libraries: HSmlf-shape-primitives-0.1\ndepends: '+' '.join(ids)+'\n')
-        run('register-package',[pkg,'--package-db',db,'register',conf])
+        deps=out/'dependencies'
+        db=prepare_host_package(ghc,source,producer,deps,run)
         cflags=shlex.split(subprocess.check_output(['pkg-config','--cflags','bdw-gc','gmp'],text=True))
         libs=shlex.split(subprocess.check_output(['pkg-config','--libs','bdw-gc','gmp'],text=True))
         clang=Path(a.clang).resolve();runtime=deps/'runtime.o'

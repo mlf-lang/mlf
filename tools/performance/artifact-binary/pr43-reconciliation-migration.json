@@ -1,0 +1,49 @@
+{
+  "additions": {},
+  "changes": {
+    "bootstrap/MLF/BuiltinPreludeData.hs": [
+      "91b2dee48f06af0432c7d2e81372d3a51d223c0e91ff22eab6e132559b4e3211",
+      "af45b8f1846c57c167cc203a37b31dfa077edd3dbdb43d16fcf1c58335149c87"
+    ],
+    "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs": [
+      "93713ba56536cc32eea5e5474548381509238e8016f42e46f8a3c8356b4b85d6",
+      "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23"
+    ],
+    "libraries/mlf-crates/Bootstrap/Bitstream.hs": [
+      "4fd3a4f6f163bc0164977a242b3fc7aabc746f44c7e4e564c9a764b92df0ab1c",
+      "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+    ],
+    "libraries/mlf-crates/Bootstrap/Crate.hs": [
+      "278c4d02ea78af21fc27bbd13283cd75429ca3fa54055637f068b678758a9427",
+      "169a65e03680313755c0bcfe25b462cc96c9b260e077891771785a43a3d7c063"
+    ],
+    "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": [
+      "d8d14ea5ed7f231aa5d6a2ea48c118d01a57cabbee8a796f6cc0749b3c4c1f0f",
+      "da416111adcfafa18eb473ae611379fc1ef521c84d1dab3d2d5a4dc3eb51c6f0"
+    ],
+    "libraries/mlf-crates/Bootstrap/OpenFragment.hs": [
+      "e4d4ee6441c887fddb0ebc07546cb785c9281a40fa02103d51c509c40ba7e853",
+      "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b"
+    ],
+    "libraries/mlf-crates/Bootstrap/QueryGraph.hs": [
+      "3280476968d34ab9a71f91e003008fe6b3bc9b28dcf805d1fc948d8c6b2b593c",
+      "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+    ],
+    "libraries/mlf-package-core/Package/Release.hs": [
+      "c948c574e757238df2d75fb68f5e03b15635e9dcd589feda61a91d7a4219fc60",
+      "0b23919bb1f3047a222fd8efec0da951d5b1f6e2a3d1bb69d093a9db0ccb9a4e"
+    ],
+    "mlf.lock": [
+      "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
+      "ebce6286ef3254a5c9d40b4b056b62d1382b289aa15765c6ed1c43a40bb7cb72"
+    ]
+  },
+  "format": "pr43-reconciliation-source-migration-v1",
+  "maintenance": {
+    "patricia/test_adapters.py": [
+      "fe299bd576901e008a1a7473abab98377f66785c4ec239a50f7c139b553e834f",
+      "507ef12af81d40d645cc7bcd6994d472cf050a3a2d75cd613df6b2c27e4647cd"
+    ]
+  },
+  "predecessor": "4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160"
+}

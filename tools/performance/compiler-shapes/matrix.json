@@ -48,9 +48,9 @@
       "cache_boundary": "each leg gets a private, empty query cache directory that is inventoried and deleted after correctness checks; no target objects, .hi/.o files, LLVM or executables are reused between legs"
     }
   },
-  "unmeasured_endpoints": {
+  "paired_endpoints": {
     "emlf-source-v1": {
-      "status": "declared, not measured in this revision",
+      "status": "separate installed driver",
       "summary": "Installed default emlf SOURCE -o OUTPUT driver with its native standard library. Different internal work from crate-bootstrap-v1 and therefore a separate cohort dimension.",
       "requires": "a qualified native installation (tools/shared/build.py without --bootstrap-only) plus its own preparation step",
       "rule": "cohorts of this endpoint must never be pooled, compared or relabelled against crate-bootstrap-v1 cohorts"

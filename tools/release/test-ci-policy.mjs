@@ -37,7 +37,8 @@ assert.match(qualify,/MLF_TEST_BUILD_JOBS: '1'/);
 assert.equal((qualify.match(/build-jobs: '1'/g) || []).length, 7, 'All qualification consumers remain serial');
 assert.equal((qualify.match(/\.mlf-build\/prerequisites\/compiler-tests\/build-report.json/g) || []).length, 2, 'Both producers preserve authentic campaign-runner reports');
 assert.match(ci,/push:\n    branches: \[main\]/);
-assert.match(ci,/if: \(github.event_name == 'push'.*inputs.full_validation.*inputs.self_host/);
+assert.match(ci,/if: github.event_name == 'workflow_dispatch' && \(inputs.full_validation \|\| inputs.self_host\) && !inputs.windows_runtime_only/);
+assert.doesNotMatch(ci,/if: \(github.event_name == 'push'.*inputs.full_validation.*inputs.self_host/);
 assert.match(ci,/uses: \.\/\.github\/workflows\/native-qualification.yml\n    with:\n      source: \$\{\{ github.sha \}\}\n      build_packages: false/);
 assert.match(ci,/needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]/);
 assert.match(ci,/length == 6 and all/);
@@ -153,8 +154,8 @@ assert.match(ci,/pull_request:\n    types: \[opened, synchronize, reopened, labe
 assert.match(fs.readFileSync('tools/release/async-change-scope.py','utf8'), /OPT_IN_LABEL = "ci:async-parity"/);
 assert.match(asyncJob,/id: scope\n        run: python3 tools\/release\/async-change-scope.py/);
 assert.match(asyncJob,/\.mlf-build\/async-change-scope\/decision.json/);
-assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 5);
-for (const name of ['Native bootstrap and parity dependencies', 'Fetch verified native seed', 'Bootstrap released seed through frozen bridge to shared native tools', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
+assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 6);
+for (const name of ['GHC-origin bootstrap and native parity dependencies', 'Install pinned GHC 9.14.1 for ordinary async parity', 'Test GHC async preparation controls', 'Build and authenticate GHC-origin async tools', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
   assert.ok(asyncJob.includes(`- name: ${name}\n        if: steps.scope.outputs.required != 'false'\n`));
 }
 // Only a positive false output skips the expensive steps; unknown/missing
@@ -167,7 +168,8 @@ assert.equal(Function('steps', `return (${selectionExpression});`)({scope:{outpu
 for (const name of ['build-runner', 'async-runtime', 'windows-runtime', 'native']) {
   assert.doesNotMatch(ciJob(name), /steps\.scope|async-change-scope/, `${name} must stay unconditional`);
 }
-for (const command of ['scripts/bootstrap-async.sh','tests/fixtures/async-completion/check.sh','tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh']) {
+assert.doesNotMatch(asyncJob,/scripts\/bootstrap-async\.sh/);
+for (const command of ['tools/shared/prepare_async_ghc.py','tests/fixtures/async-completion/check.sh','tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh']) {
   assert.ok(ciJob('async-language').includes(command), `Missing ${command}`);
 }
 assert.doesNotMatch(ci,/contents: write|continue-on-error/);

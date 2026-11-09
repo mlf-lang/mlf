@@ -10,7 +10,7 @@ polymorphic-result	ACCEPT	forall a69. a69 -> a69
 impredicative-array-functions	ACCEPT	Pair Int Bool
 nested-independent	ACCEPT	Int
 reuse-independent-allocation	ACCEPT	Int
-pure-io-description-result	ACCEPT	IO Unit
+pure-io-description-result	ACCEPT	IO ()
 unused-poisoned-cell	ACCEPT	Int
 snapshot	ACCEPT	Int
 repeated-read-action	ACCEPT	Int

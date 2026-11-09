@@ -69,11 +69,11 @@ class GateControls(unittest.TestCase):
                     'Set', 'Std', 'Types', 'Unicode', 'Version'}
         self.assertEqual(gate.FOUNDATION_MODULES,
                          {'Bootstrap.'+name: 'Bootstrap/'+name+'.hs'
-                          for name in original | {'IntTree', 'IntRank'}})
+                          for name in original | {'IntTree', 'IntRank', 'IndexVec'}})
         foundation = gate.ROOT/'libraries/mlf-foundation/mlf-package.json'
         framework = gate.ROOT/'testing/mlf-package.json'
         self.assertEqual(len(gate.manifest_inputs(foundation,'mlf-foundation',
-                         gate.FOUNDATION_MODULES,{})[1]),14)
+                         gate.FOUNDATION_MODULES,{})[1]),15)
         modules = gate.manifest_inputs(framework,'mlf-test',gate.FRAMEWORK_MODULES,
                                       {'mlf-foundation':'../libraries/mlf-foundation'})[1]
         self.assertEqual(len(modules),14)

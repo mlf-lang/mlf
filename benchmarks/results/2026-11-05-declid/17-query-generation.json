@@ -1,0 +1,112 @@
+{
+  "step": 17,
+  "source_base": "6b914085e2bca0bf3285e35dfaf283d7ca0b934c",
+  "source_sha256": {
+    "libraries/mlf-crates/Bootstrap/CrateGraph.hs": "4f146c335dadaf4166c3b4d67f72672f9b78f1f5d22d3ea016360b378b346228",
+    "libraries/mlf-crates/Bootstrap/QueryGraph.hs": "77cfed1cac8cb6a9473e254c83e00ce9288c2a3e74d1e8b3dc1418112dcb22c9",
+    "bootstrap/MLF/BuiltinPreludeData.hs": "6cd53defb79f875f0f92626908a324969fdd619ed61811bc13792be6b59e1cab",
+    "mlf.lock": "1f5a4dff56c39449adc93d8b189a326f88d73e0ac5d16abcdb8a32ed1ee7d696"
+  },
+  "compiler": {
+    "host": "MLF/shared-haskell-v1 GHC",
+    "sha256": "7cd9d9650de3284c58fa2c6f9537bd84281a375f3fe5a062f6e5804ba129f9ac",
+    "build": "GHC 9.14.1 -O2 development relink using authenticated fixed-baseline host objects and the source hashes above."
+  },
+  "query_verification": {
+    "command": "python3 -B tools/performance/crate-query-graph/verify.py \"$COMPILER\" \"$OUT/query\"",
+    "complete": true,
+    "cases": [
+      "body",
+      "type",
+      "protection",
+      "datatype",
+      "constructor-owner",
+      "scc",
+      "scope",
+      "scope-order",
+      "recursive-dictionary"
+    ],
+    "source_versions": 20,
+    "finish_recovery": [
+      "damaged",
+      "missing",
+      "swapped",
+      "stale",
+      "reordered",
+      "wrong-address",
+      "finish-as-raw",
+      "previous-format"
+    ],
+    "serialized_writers": true,
+    "partial_batch_preserves_previous_generation": true,
+    "ich_semantic_audit_separated": true
+  },
+  "host_controls": {
+    "Graphs.hs": "1,032 SCC and reach comparisons and query controls, including v1 admission, slot drift, all descriptor kinds, ordered reads, duplicates, dangling edges and DAG height in both lexical directions.",
+    "SourceChecks.hs": "21 controls passed, including source and lowered SCCs, independent source and runtime oracles, whole-crate retry, cross-executable object loading and prepared legacy literal.",
+    "shared_syntax_name_resolution": 137
+  },
+  "representation_only": {
+    "baseline_sha256": "ee292a85bc8a967581da9c22284c3e61aa942661ba02515853697c2ba8ec7f02",
+    "candidate_sha256": "7cef4caf37ac7fa94081957100b15cd9ad7fb88ddc498e382a42a3a43b4c9820",
+    "reencoded_sha256": "ee292a85bc8a967581da9c22284c3e61aa942661ba02515853697c2ba8ec7f02",
+    "rows": 184,
+    "ordered_reads": 256,
+    ".mlfci": "4b1aaf931b59c074a83df95a4fc7437521e6a2204a29302a3d655c39ad7ac1e3",
+    ".mlfco": "ccaf793f0d24d45c52bde1823fec27bf413666e8239410065cabcc83808bfa86",
+    ".queries": "1aa90b00821d175b429008e0f3161f284ec0c3b9aea6795a6a7712b3ca3272e6"
+  },
+  "self_build": {
+    "manifest": "libraries/mlf-crates/mlf-package.json",
+    "command": "\"$MANAGER\" --offline --manifest libraries/mlf-crates/mlf-package.json --build-dir \"$OUT/self-build\" --cache-dir \"$OUT/empty-cache\" --compiler \"$COMPILER\" --runtime \"$PWD/runtime/mlf_runtime.c\" --jobs 1 --timeout 21600 build",
+    "manager_sha256": "072c5ee521b412a0444a35012ac3903ce3628106324b6261bab8b1557b444b90",
+    "completed_packages": 7,
+    "all_tasks_complete": true,
+    "cold_inferred_reused": [
+      1748,
+      0
+    ],
+    "warm_inferred_reused": [
+      0,
+      1748
+    ],
+    "products": {
+      "mlfci": {
+        "sha256": "a3d070af3a28bc05d903bebb1548667340e1e639708869e1a43fcc85c94289b2",
+        "bytes": 834054
+      },
+      "mlfco": {
+        "sha256": "2f30245c0b370f3f4925ea4c7d7adefc79f4406d66724ad9017fb49cdcff0504",
+        "bytes": 5868068
+      },
+      "queries": {
+        "sha256": "6e66e7f7184b1870c2bffe0b099fb786adc5f0d038024b8d72ab967489d552da",
+        "bytes": 2447172
+      }
+    },
+    "warm_products_equal": [
+      "mlfci",
+      "mlfco"
+    ],
+    "retained_current_after_warm": "e97ac09b7b94278b8d2a2ab1a749405831e3a7a19d80f5268ba3f07a637ad224",
+    "generation": {
+      "sha256": "e97ac09b7b94278b8d2a2ab1a749405831e3a7a19d80f5268ba3f07a637ad224",
+      "rows": 20765,
+      "reads": 410543,
+      "bytes": 3081855,
+      "schema": 6,
+      "physical_bytes": 3081855,
+      "symbols": 15146,
+      "symbol_utf8_bytes": 2032622,
+      "nodes": 80770,
+      "edges": 381517,
+      "roots": 1,
+      "depth": 6,
+      "root_expanded_work": 5637929,
+      "shared_node_references": 300748
+    },
+    "binary_expanded_work_limit": 67108864,
+    "warm_query_command": "\"$COMPILER\" --compile-crate \"$SAVED_MLF_CRATES_SPEC\" -o \"$OUT/warm\"",
+    "second_package_build": "same command, same cache, exited 0"
+  }
+}

@@ -18,7 +18,7 @@ main = do
     asyncDelay scope 0 (putStrLn "nested timer");
     ioBind (asyncStep scope) printInt;
     asyncEnqueue scope (putStrLn "nested ready");
-    ioReturn Unit })
+    ioReturn () })
   ioBind (asyncStep scope) printInt
   ioBind (asyncStep scope) printInt
   ioBind (asyncStep scope) printInt

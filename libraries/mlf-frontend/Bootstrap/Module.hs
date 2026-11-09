@@ -18,6 +18,8 @@ module Bootstrap.Module where {
   import qualified Bootstrap.Unicode as U;
   import qualified Bootstrap.Lexer as Lexer;
   import qualified Bootstrap.Dependency as Dependency;
+  import qualified Bootstrap.Resolved as R;
+  import qualified Bootstrap.IndexVec as V;
   sourcePath (SourceModule path _ _ _ _ _ _ _ _ _) = path;
   sourceModuleName (SourceModule _ name _ _ _ _ _ _ _ _) = name;
   sourceExports (SourceModule _ _ exports _ _ _ _ _ _ _) = exports;
@@ -320,30 +322,47 @@ module Bootstrap.Module where {
   data Entity = Entity String String Role;
   data Interface = Interface (Map ((,) ModuleSpace String) (Set Entity));
   data Names = Names (Map Entity String);
-  data Renamed =
-    Renamed ([] DataDecl) ([] SClassDecl) ([] SInstanceDecl) ([]
-                                                                    ((,,) String
-                                                                     (Maybe SAnnotation)
-                                                                     SExpr)) (Maybe SExpr);
+  data Renamed = Renamed Dependency.Symbols ([] DataDecl) ([] (R.Class Declaration))
+    ([] (R.Instance Declaration)) ([] Dependency.Bound) (Maybe (R.Expr Declaration));
   data Resolved = Resolved SourceModule Interface Renamed;
-  -- Namespace resolution retains declaration identities and defining scopes. It
-  -- neither binds declaration groups nor invokes inference; consumers choose
-  -- declaration SCCs and artifact boundaries after this stage.
-  data ResolvedCrate =
-    ResolvedCrate Names (Map String String) ([] Resolved) ([] ((,) String SInstanceDecl)) (Map
-                                                                                                String
-                                                                                                IntSet) ([]
-                                                                                                         IntSet) (Map
-                                                                                                                  String
-                                                                                                                  (Set
-                                                                                                                   String));
-  resolvedCrateNames (ResolvedCrate names _ _ _ _ _ _) = names;
-  resolvedCrateDisplayNames (ResolvedCrate _ names _ _ _ _ _) = names;
-  resolvedCrateModules (ResolvedCrate _ _ modules _ _ _ _) = modules;
-  resolvedCrateInstances (ResolvedCrate _ _ _ instances _ _ _) = instances;
-  resolvedCrateValueScopes (ResolvedCrate _ _ _ _ scopes _ _) = scopes;
-  resolvedCrateInstanceScopes (ResolvedCrate _ _ _ _ _ scopes _) = scopes;
-  resolvedCrateReach (ResolvedCrate _ _ _ _ _ _ reach) = reach;
+  data ResolvedCrate = ResolvedCrate Bindings ([] Resolved) (Map String IntSet) (Map String (Set String));
+  resolvedCrateBindings (ResolvedCrate bindings _ _ _) = bindings;
+  resolvedCrateNames crate = bindingNames (resolvedCrateBindings crate);
+  displayEntity entity = if eqString (owner entity) "Prelude" then spelling entity else label entity;
+  -- Named consumers (including type and dictionary errors) format their
+  -- messages at this boundary. Both the emitted spelling and stable key may
+  -- appear in serialized/query diagnostics. An identified term has its own
+  -- display label independent of either spelling.
+  resolvedCrateDisplayNames crate = case resolvedCrateBindings crate of { Bindings symbols table -> let {
+    entries ((,) entity binding) = case binding of {
+      OtherName name -> [(,) name (displayEntity entity)];
+      TermSlot i -> let { display = Dependency.symbolDisplay symbols i; key = Dependency.symbolKey symbols i;
+        name = Dependency.symbolName symbols i
+      } in if eqString key name then [(,) name display] else [(,) name display,(,) key display]
+    };
+    local = M.fromList compareString (concatMap (\r ->
+        map (\b -> let { i = Dependency.boundId b } in
+          (,) (Dependency.symbolName symbols i) (Dependency.symbolDisplay symbols i))
+          (renamedBindings (resolvedContents r))) (resolvedCrateModules crate))
+  } in M.union compareString local (M.fromList compareString (concatMap entries (M.toList table))) };
+  resolvedCrateModules (ResolvedCrate _ modules _ _) = modules;
+  resolvedInstanceRows crate = concatMap (\entry ->
+    map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst) (resolvedInstances (resolvedContents entry)))
+    (resolvedCrateModules crate);
+  instanceValue crate = R.namedInstance (Dependency.symbolName (bindingSymbols (resolvedCrateBindings crate)));
+  resolvedCrateInstances crate = map (\((,) owner inst) -> (,) owner (instanceValue crate inst)) (resolvedInstanceRows crate);
+  resolvedScopeRows modules scopeOf = concatMap (\entry ->
+    let { scope = scopeOf (moduleIdentity (resolvedSource entry)) } in
+    map (\binding -> (,) (Dependency.boundId binding) scope) (renamedBindings (resolvedContents entry))) modules;
+  resolvedValueScopesIn (ResolvedCrate bindings _ masks _) modules =
+    Dependency.indexedScopes (bindingSymbols bindings) (resolvedScopeRows modules (\name -> M.get compareString name masks));
+  resolvedCrateValueScopes crate = resolvedValueScopesIn crate (resolvedCrateModules crate);
+  resolvedCrateInstanceScopes (ResolvedCrate _ modules masks _) = concatMap (\entry ->
+    map (\_ -> M.get compareString (moduleIdentity (resolvedSource entry)) masks)
+      (resolvedInstances (resolvedContents entry))) modules;
+  resolvedCrateReach (ResolvedCrate _ _ _ reach) = reach;
+  boundIn crate modules = Dependency.BoundValues (bindingSymbols (resolvedCrateBindings crate))
+    (concatMap (compose renamedBindings resolvedContents) modules);
   owner (Entity name _ _) = name;
   spelling (Entity _ name _) = name;
   role (Entity _ _ category) = category;
@@ -454,7 +473,7 @@ module Bootstrap.Module where {
       Right env
     };
   primitiveTypeNames :: [] String;
-  primitiveTypeNames = (:) "Char" ((:) "IOError" legacyPrimitiveTypeNames);
+  primitiveTypeNames = append ((:) "Char" ((:) "IOError" legacyPrimitiveTypeNames)) ["IOWorld"];
   legacyPrimitiveTypeNames :: [] String;
   legacyPrimitiveTypeNames =
     ["AsyncScope", "Completion", "AsyncSubscription", "ST", "STArray",
@@ -1003,20 +1022,31 @@ module Bootstrap.Module where {
              } in
              (,) (M.insert compareEntity entity (fst chosen) entries) (snd chosen)
     };
-  freshNames modules entities =
+  -- Preserve the standalone names assigned with the original 132-entry ABI.
+  -- Appended primitives still receive collision-checked names, after every
+  -- entity that was present in an older compilation of the same source.
+  allocateEntities :: Set String -> Set Entity -> Names;
+  allocateEntities used entities =
     let {
-      used = Set.fromList compareString (concatMap sourceUsed modules)
-    } in
-    Names (fst (foldl (allocateName used) ((,) M.empty 0) (Set.toList entities)));
+      appended entity = case role entity of {
+        Primitive p -> P.primitiveCode p >= 132;
+        BuiltinType -> eqString (spelling entity) "IOWorld";
+        _ -> False
+      }
+    } in case partition appended (Set.toList entities) of {
+      (,) extra established -> Names (fst (foldl (allocateName used) ((,) M.empty 0)
+                                         (append established extra)))
+    };
+  freshNames modules entities =
+    allocateEntities (Set.fromList compareString (concatMap sourceUsed modules)) entities;
   -- Resolve the genuine facade alone, without subjecting standalone abstract
   -- nominal annotations to module lookup. The caller supplies every user name.
-  standaloneBuiltinScope :: [] String -> Either String ((,,) Names Interface Renamed);
+  standaloneBuiltinScope :: [] String -> Either String ((,,) Bindings Interface Renamed);
   standaloneBuiltinScope userNames = do {
     declared <- locals primitiveSource;
     let { env = union declared (interface sharedPrimitiveEntities) };
     let { used = Set.fromList compareString (append userNames (sourceUsed primitiveSource)) };
-    let { names = Names (fst (foldl (allocateName used) ((,) M.empty 0)
-                              (Set.toList (visible env)))) };
+    let { names = resolveNames (allocateEntities used (visible env)) };
     renamed <- renameModule names env env primitiveSource;
     Right ((,,) names env renamed)
   };
@@ -1025,7 +1055,7 @@ module Bootstrap.Module where {
       Nothing -> Left ("missing module identity: " ++ label entity);
       Just name -> Right name
     };
-  resolveType :: Names -> Interface -> SType -> Either String SType;
+  resolveType :: Bindings -> Interface -> SType -> Either String SType;
   resolveType names env ty =
     case ty of {
       SArrow a b ->
@@ -1043,7 +1073,7 @@ module Bootstrap.Module where {
                    entity <- lookupEntity Types constructor env;
                    if (isRole Class entity || isRole ManagedConstraint entity)
                    then Left ("class used as a type constructor: " ++ constructor)
-                   else resolvedName names entity
+                   else bindingSpelling names entity
                  };
           arguments' <- mapM (resolveType names env) arguments;
           Right (SCon name arguments')
@@ -1068,7 +1098,7 @@ module Bootstrap.Module where {
         };
       _ -> Right ty
     };
-  resolvePredicate :: Names -> Interface -> SPredicate -> Either String SPredicate;
+  resolvePredicate :: Bindings -> Interface -> SPredicate -> Either String SPredicate;
   resolvePredicate names env predicate =
     case predicate of {
       SPredicate name arguments ->
@@ -1077,7 +1107,7 @@ module Bootstrap.Module where {
           unless (isRole Class entity || isRole ManagedConstraint entity) (Left ("not a class: " ++ name));
           when (isRole ManagedConstraint entity && not (null arguments))
             (Left "HasCallStack does not take type arguments");
-          name' <- resolvedName names entity;
+          name' <- bindingSpelling names entity;
           arguments' <- mapM (resolveType names env) arguments;
           Right (SPredicate name' arguments')
         }
@@ -1099,319 +1129,191 @@ module Bootstrap.Module where {
           Right (Just value')
         }
     };
-  resolveRecursiveMode :: Names -> Interface -> RecursiveMode -> Either String RecursiveMode;
+  resolveRecursiveMode :: Bindings -> Interface -> RecursiveMode -> Either String RecursiveMode;
   resolveRecursiveMode names env mode =
     case mode of {
       InferRecursive -> Right InferRecursive;
       CheckRecursive annotation ->
         mapEither CheckRecursive (resolveAnnotation names env annotation)
     };
-  resolveVariable names entity =
-    case role entity of {
-      Primitive p -> Right (SPrimitive p);
-      Value -> if eqString (owner entity) "MLF.Primitive" && eqString (spelling entity) "callStack"
-               then Right (SVar "$MLF.Stack.callStack")
-               else mapEither SVar (resolvedName names entity);
-      Method _ -> mapEither SVar (resolvedName names entity);
-      _ -> Left ("not a function or value: " ++ label entity)
+  -- Names is the name-based allocator/ABI interface. Only Bindings is retained
+  -- by resolution. A term entity owns a slot; its spelling lives in Symbols.
+  data BindingName = TermSlot (V.Index Declaration) | OtherName String;
+  data Bindings = Bindings Dependency.Symbols (Map Entity BindingName);
+  -- Standalone source has no crate ABI. Use the defining module, spelling
+  -- and method owner regardless of allocation order or display spelling.
+  termIdentity entity = let { field n = showInt (stringLength n) ++ (":" ++ n);
+    member = case role entity of { Method klass -> "m" ++ field klass; _ -> "v" }
+  } in member ++ (field (owner entity) ++ field (spelling entity));
+  resolveNames = resolveNamesWithKey termIdentity;
+  resolveNamesWithKey stable (Names allocated) = let {
+    isTerm entry = case role (fst entry) of { Value -> True; Method _ -> True; _ -> False };
+    parts = partition isTerm (M.toList allocated); terms = fst parts;
+    base = Dependency.symbolsWithLabels (map (\((,) e n) -> (,,,) n (stable e) (displayEntity e) (case role e of { Method _ -> True; _ -> False })) terms);
+    methodOwner ((,) ((,) entity _) i) = case role entity of {
+      Method className -> let { klass = Entity (owner entity) className Class } in
+        Just ((,) i (M.findWithDefault compareEntity (stable klass) klass allocated));
+      _ -> Nothing
     };
-  resolveConstructor names entity =
-    case role entity of {
-      Constructor _ -> mapEither SConstructor (resolvedName names entity);
-      Boolean b -> Right (SBoolLit b);
-      _ -> Left ("not a data constructor: " ++ label entity)
+    symbols = Dependency.withMethodOwners base (mapMaybe methodOwner (zip terms (V.indices (Dependency.symbolNodes base))));
+    slots = M.fromDistinctAscList (zipWith (\entry i -> (,) (fst entry) (TermSlot i)) terms
+      (V.indices (Dependency.symbolNodes symbols)));
+    others = M.fromDistinctAscList (map (\((,) e n) -> (,) e (OtherName n)) (snd parts))
+  } in Bindings symbols (M.union compareEntity slots others);
+  bindingSymbols (Bindings symbols _) = symbols;
+  bindingText symbols binding = case binding of {
+    TermSlot i -> Dependency.symbolName symbols i; OtherName name -> name
+  };
+  canonicalEntries (Bindings symbols table) = M.map (bindingText symbols) table;
+  bindingNames bindings = Names (canonicalEntries bindings);
+  lookupBinding (Bindings _ table) entity = case M.lookup compareEntity entity table of {
+    Nothing -> Left ("missing module identity: " ++ label entity); Just binding -> Right binding
+  };
+  bindingSpelling bindings entity = mapEither (bindingText (bindingSymbols bindings)) (lookupBinding bindings entity);
+  termId bindings entity = do {
+    binding <- lookupBinding bindings entity;
+    case binding of { TermSlot i -> Right i; OtherName _ -> Left ("not a declaration: " ++ label entity) }
+  };
+  variable bindings entity = case role entity of {
+    Primitive p -> Right (R.Prim p);
+    Value -> if eqString (owner entity) "MLF.Primitive" && eqString (spelling entity) "callStack"
+             then Right R.CallStack else mapEither R.Global (termId bindings entity);
+    Method _ -> mapEither R.Global (termId bindings entity);
+    _ -> Left ("not a function or value: " ++ label entity)
+  };
+  constructor bindings entity = case role entity of {
+    Constructor _ -> mapEither R.Constructor (bindingSpelling bindings entity);
+    Boolean b -> Right (R.BoolLit b);
+    _ -> Left ("not a data constructor: " ++ label entity)
+  };
+  namedTerm bindings = R.namedExpr (Dependency.symbolName (bindingSymbols bindings));
+  resolveVariable names entity = mapEither (namedTerm names) (variable names entity);
+  resolveConstructor names entity = mapEither (namedTerm names) (constructor names entity);
+  resolvePattern bindings env pattern = let { child = resolvePattern bindings env } in case pattern of {
+    SAsPattern name inner -> mapEither (R.AsPattern name) (child inner);
+    SLazyPattern inner -> mapEither R.LazyPattern (child inner);
+    SIndexedStringPattern _ _ _ -> Left "resolved pattern cannot enter source name resolution";
+    SOverloadedStringPattern text _ _ -> do {
+      eq <- termId bindings (Entity "MLF.Primitive" "==" (Method "Eq"));
+      from <- termId bindings (Entity "MLF.Primitive" "fromString" (Method "IsString"));
+      Right (R.OverloadedStringPattern text eq from)
     };
-  resolvePattern :: Names -> Interface -> SPattern -> Either String SPattern;
-  resolvePattern names env pattern =
-    case pattern of {
-      SAsPattern name inner -> mapEither (SAsPattern name) (resolvePattern names env inner);
-      SLazyPattern inner -> mapEither SLazyPattern (resolvePattern names env inner);
-      SOverloadedStringPattern text _ _ -> do {
-        equality <- resolvedName names (Entity "MLF.Primitive" "==" (Method "Eq"));
-        conversion <- resolvedName names (Entity "MLF.Primitive" "fromString" (Method "IsString"));
-        Right (SOverloadedStringPattern text equality conversion)
-      };
-      SConstructorPattern name fields ->
-        if D.sourceBuiltinConstructor name then Right pattern
-        else resolveOrdinaryPattern names env pattern;
-      SNestedPattern name patterns ->
-        if D.sourceBuiltinConstructor name
-        then mapEither (SNestedPattern name) (mapM (resolvePattern names env) patterns)
-        else resolveOrdinaryPattern names env pattern;
-      _ -> resolveOrdinaryPattern names env pattern
-    };
-  resolveOrdinaryPattern :: Names -> Interface -> SPattern -> Either String SPattern;
-  resolveOrdinaryPattern names env pattern =
-    let {
-      matchValueShared1 = pattern
-    } in
-    case matchValueShared1 of {
-      SConstructorPattern constructor fields -> do {
-        entity <- lookupEntity Terms constructor env;
+    SConstructorPattern name fields ->
+      if D.sourceBuiltinConstructor name then Right (R.ConstructorPattern name fields) else do {
+        entity <- lookupEntity Terms name env;
         case role entity of {
-          Constructor _ -> mapEither (\name -> SConstructorPattern name fields) (resolvedName names entity);
-          Boolean b -> if null fields then Right (SBoolPattern b)
-                       else Left ("not a constructor pattern: " ++ constructor);
-          _ -> Left ("not a constructor pattern: " ++ constructor)
+          Constructor _ -> mapEither (\n -> R.ConstructorPattern n fields) (bindingSpelling bindings entity);
+          Boolean b -> if null fields then Right (R.BoolPattern b) else Left ("not a constructor pattern: " ++ name);
+          _ -> Left ("not a constructor pattern: " ++ name)
         }
       };
-      SNestedPattern matchValueShared4 matchValueShared5 ->
-        let {
-          constructor = matchValueShared4
-        } in
-        let {
-          patterns = matchValueShared5
-        } in
-        do {
-          entity <- lookupEntity Terms constructor env;
-          case role entity of {
-            Constructor _ ->
-              do {
-                name <- resolvedName names entity;
-                patterns' <- mapM (resolvePattern names env) patterns;
-                Right (SNestedPattern name patterns')
-              };
-            _ -> Left ("not a constructor pattern: " ++ constructor)
-          }
-        };
-      SAnnotatedPattern matchValueShared6 matchValueShared7 ->
-        let {
-          variable = matchValueShared6
-        } in
-        let {
-          annotation = matchValueShared7
-        } in
-        do {
-          annotation' <- resolveAnnotation names env annotation;
-          Right (SAnnotatedPattern variable annotation')
-        };
-      _ -> Right pattern
+    SNestedPattern name patterns -> do {
+      n <- if D.sourceBuiltinConstructor name then Right name else do {
+        entity <- lookupEntity Terms name env;
+        case role entity of { Constructor _ -> bindingSpelling bindings entity; _ -> Left ("not a constructor pattern: " ++ name) }
+      };
+      mapEither (R.NestedPattern n) (mapM child patterns)
     };
-  resolveExpr names env expression =
-    resolveBound names env Set.empty (Desugar.desugarDo expression);
+    SAnnotatedPattern n ty -> mapEither (R.AnnotatedPattern n) (resolveAnnotation bindings env ty);
+    SDefaultPattern n -> Right (R.DefaultPattern n);
+    SIntPattern n -> Right (R.IntPattern n); SStringPattern s -> Right (R.StringPattern s);
+    SBoolPattern b -> Right (R.BoolPattern b)
+  };
+  resolveExpr bindings env expression = resolveBound bindings env Set.empty (Desugar.desugarDo expression);
+  entryExpr crate entry = let {
+    source = resolvedSource entry; bindings = resolvedCrateBindings crate
+  } in case resolvedBody (resolvedContents entry) of {
+    Just body -> Right body;
+    Nothing -> if any (\value -> eqString (valueName value) "main") (sourceValues source)
+      then mapEither R.Global (termId bindings (Entity (moduleIdentity source) "main" Value))
+      else resolveExpr bindings (resolvedScope entry) (SVar "main")
+  };
   managedAnnotation :: SExpr -> Bool;
   managedAnnotation expression = case expression of {
     SAnn _ (SAnnotation _ ty) -> managedAnnotationType ty;
     _ -> False
   };
-  managedAnnotationType :: SType -> Bool;
+  managedResolved :: R.Expr Declaration -> Bool;
+  managedResolved expression = case expression of {
+    R.Ann _ (SAnnotation _ ty) -> managedAnnotationType ty;
+    _ -> False
+  };
   managedAnnotationType ty = case ty of {
     SForall _ _ _ body -> managedAnnotationType body;
     SQualified predicates body -> any (\(SPredicate name _) -> eqString name "MLFHasCallStack") predicates || managedAnnotationType body;
     _ -> False
   };
-  resolveBound :: Names -> Interface -> Set String -> SExpr -> Either String SExpr;
-  resolveBound names env bound expression =
-    let {
-      matchValueShared8 = expression
-    } in
-    case matchValueShared8 of {
-      SSourceDefinition body -> mapEither SSourceDefinition (resolveBound names env bound body);
-      SCallSite display location body -> do {
-        resolved <- resolveBound names env bound body;
-        Right (if eqString display "an expression type signature" && not (managedAnnotation resolved)
-          then resolved else SCallSite display location resolved)
-      };
-      SSharedBind pattern action continuation binding failure -> do {
-        pattern' <- resolvePattern names env pattern;
-        action' <- resolveBound names env bound action;
-        continuation' <- resolveBound names env
-          (Set.union compareString bound (Set.fromList compareString (Surface.patternVariables pattern))) continuation;
-        binding' <- resolveBound names env bound binding;
-        failure' <- resolveBound names env bound failure;
-        Right (SSharedBind pattern' action' continuation' binding' failure')
-      };
-      SVar matchValueShared9 ->
-        let {
-          name = matchValueShared9
-        } in
-        if eqString name "$MLF.Stack.callStack"
-        then Right (SVar "$MLF.Stack.callStack")
-        else if Lexer.textStartsAt name 0 "$MLF.Primitive."
-        then let { method = stringSlice name 15 (stringLength name - 15) } in
-             resolveVariable names (Entity "MLF.Primitive" method (Method (Prelude.standardMethodClass method)))
-        else if Lexer.textStartsAt name 0 "$MLF.Infix." then do {
-          let { operator = stringSlice name 11 (stringLength name - 11) };
-          when (Set.member compareString operator bound) (Left "shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form");
-          entity <- lookupEntity Terms operator env;
-          unless (eqString (owner entity) "MLF.Primitive") (Left "shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form");
-          resolveVariable names entity
-        }
-        else if Set.member compareString name bound
-             then Right expression
-             else do {
-                    entity <- lookupEntity Terms name env;
-                    resolveVariable names entity
-                  };
-      SConstructor matchValueShared10 ->
-        if D.sourceBuiltinConstructor matchValueShared10
-        then Right expression
-        else let {
-               name = matchValueShared10
-             } in
-             do {
-               entity <- lookupEntity Terms name env;
-               resolveConstructor names entity
-             };
-      SLam matchValueShared11 matchValueShared12 matchValueShared13 ->
-        let {
-          variable = matchValueShared11
-        } in
-        let {
-          annotation = matchValueShared12
-        } in
-        let {
-          body = matchValueShared13
-        } in
-        do {
-          annotation' <- resolveOptionalAnnotation names env annotation;
-          body' <- resolveBound names env (Set.insert compareString variable bound) body;
-          Right (SLam variable annotation' body')
-        };
-      SApp matchValueShared14 matchValueShared15 ->
-        let {
-          a = matchValueShared14
-        } in
-        let {
-          b = matchValueShared15
-        } in
-        do {
-          a' <- resolveBound names env bound a;
-          b' <- resolveBound names env bound b;
-          Right (SApp a' b')
-        };
-      SLet matchValueShared16 matchValueShared17 matchValueShared18 ->
-        let {
-          variable = matchValueShared16
-        } in
-        let {
-          a = matchValueShared17
-        } in
-        let {
-          b = matchValueShared18
-        } in
-        do {
-          a' <- resolveBound names env bound a;
-          b' <- resolveBound names env (Set.insert compareString variable bound) b;
-          Right (SLet variable a' b')
-        };
-      SSignature a annotation ->
-        do {
-          a' <- resolveBound names env bound a;
-          annotation' <- resolveAnnotation names env annotation;
-          Right (SSignature a' annotation')
-        };
-      SAnn matchValueShared19 matchValueShared20 ->
-        let {
-          a = matchValueShared19
-        } in
-        let {
-          annotation = matchValueShared20
-        } in
-        do {
-          a' <- resolveBound names env bound a;
-          annotation' <- resolveAnnotation names env annotation;
-          Right (SAnn a' annotation')
-        };
-      SLetRec matchValueShared21 matchValueShared22 ->
-        let {
-          definitions = matchValueShared21
-        } in
-        let {
-          body = matchValueShared22
-        } in
-        do {
-          let {
-            local =
-              Set.union compareString bound
-                (Set.fromList compareString
-                   (map
-                      (\definition ->
-                         case definition of {
-                           (,,) variable _ _ -> variable
-                         })
-                      definitions))
-          };
-          definitions' <-
-            mapM
-              (\definition ->
-                 case definition of {
-                   (,,) variable mode value ->
-                     do {
-                       mode' <- resolveRecursiveMode names env mode;
-                       value' <- resolveBound names env local value;
-                       Right ((,,) variable mode' value')
-                     }
-                 })
-              definitions;
-          body' <- resolveBound names env local body;
-          Right (SLetRec definitions' body')
-        };
-      SCase matchValueShared23 matchValueShared24 ->
-        let {
-          a = matchValueShared23
-        } in
-        let {
-          alternatives = matchValueShared24
-        } in
-        do {
-          a' <- resolveBound names env bound a;
-          alternatives' <-
-            mapM
-              (\alternative ->
-                 case alternative of {
-                   SAlternative pattern body ->
-                     do {
-                       pattern' <- resolvePattern names env pattern;
-                       body' <-
-                         resolveBound names env
-                           (Set.union compareString bound
-                              (Set.fromList compareString (Surface.patternVariables pattern)))
-                           body;
-                       Right (SAlternative pattern' body')
-                     }
-                 })
-              alternatives;
-          Right (SCase a' alternatives')
-        };
-      SEquations matchValueShared25 ->
-        let {
-          equations = matchValueShared25
-        } in
-        do {
-          equations' <-
-            mapM
-              (\equation ->
-                 case equation of {
-                   (,) patterns body ->
-                     do {
-                       patterns' <- mapM (resolvePattern names env) patterns;
-                       body' <-
-                         resolveBound names env
-                           (Set.union compareString bound
-                              (Set.fromList compareString
-                                 (concatMap Surface.patternVariables patterns)))
-                           body;
-                       Right ((,) patterns' body')
-                     }
-                 })
-              equations;
-          Right (SEquations equations')
-        };
-      SDo matchValueShared26 matchValueShared27 ->
-        resolveBound names env bound (Desugar.desugarDo expression);
-      SChecked matchValueShared28 matchValueShared29 ->
-        Left "checked source forms are reserved for dictionary translation";
-      SWanted matchValueShared30 matchValueShared31 ->
-        Left "dictionary holes are reserved for dictionary translation";
-      _ -> Right expression
+  resolveBound :: Bindings -> Interface -> Set String -> SExpr -> Either String (R.Expr Declaration);
+  resolveBound bindings env bound expression = let {
+    walk = resolveBound bindings env; child = walk bound; pat = resolvePattern bindings env;
+    under ps = Set.union compareString bound (Set.fromList compareString (concatMap Surface.patternVariables ps))
+  } in case expression of {
+    SVar name ->
+      if eqString name "$MLF.Stack.callStack" then Right R.CallStack
+      else if Lexer.textStartsAt name 0 "$MLF.Primitive."
+      then let { method = stringSlice name 15 (stringLength name - 15) } in
+        variable bindings (Entity "MLF.Primitive" method (Method (Prelude.standardMethodClass method)))
+      else if Lexer.textStartsAt name 0 "$MLF.Infix." then do {
+        let { op = stringSlice name 11 (stringLength name - 11);
+              invalid = "shared infix use requires a canonical MLF.Primitive binding; use the symbolic binding in prefix form" };
+        when (Set.member compareString op bound) (Left invalid);
+        entity <- lookupEntity Terms op env;
+        unless (eqString (owner entity) "MLF.Primitive") (Left invalid);
+        variable bindings entity
+      } else if Set.member compareString name bound then Right (R.Local name)
+      else bindEither (lookupEntity Terms name env) (variable bindings);
+    SConstructor name -> if D.sourceBuiltinConstructor name then Right (R.Constructor name)
+      else bindEither (lookupEntity Terms name env) (constructor bindings);
+    SIntLit n -> Right (R.IntLit n); SDoubleLit n -> Right (R.DoubleLit n);
+    SStringLit s -> Right (R.StringLit s); SBoolLit b -> Right (R.BoolLit b); SPrimitive p -> Right (R.Prim p);
+    SLam n a b -> do {
+      ty <- resolveOptionalAnnotation bindings env a;
+      mapEither (R.Lam n ty) (walk (Set.insert compareString n bound) b)
     };
+    SApp a b -> do { f <- child a; mapEither (R.App f) (child b) };
+    SLet n a b -> do { v <- child a; mapEither (R.Let n v) (walk (Set.insert compareString n bound) b) };
+    SAnn a t -> do { v <- child a; mapEither (R.Ann v) (resolveAnnotation bindings env t) };
+    SSignature a t -> do { v <- child a; mapEither (R.Signature v) (resolveAnnotation bindings env t) };
+    SLetRec defs b -> let {
+      local = Set.union compareString bound (Set.fromList compareString (map (\((,,) n _ _) -> n) defs))
+    } in do {
+      ds <- mapM (\((,,) n mode value) -> do {
+        m <- resolveRecursiveMode bindings env mode;
+        mapEither ((,,) n m) (walk local value)
+      }) defs;
+      mapEither (R.LetRec ds) (walk local b)
+    };
+    SCase a arms -> do {
+      scrut <- child a;
+      mapEither (R.Case scrut) (mapM (\(SAlternative p b) -> do {
+        q <- pat p; mapEither ((,) q) (walk (under [p]) b)
+      }) arms)
+    };
+    SEquations rows -> mapEither R.Equations (mapM (\((,) ps b) -> do {
+      qs <- mapM pat ps; mapEither ((,) qs) (walk (under ps) b)
+    }) rows);
+    SSharedBind p a b bind fail -> do {
+      q <- pat p; x <- child a; y <- walk (under [p]) b; z <- child bind; f <- child fail;
+      Right (R.SharedBind q x y z f)
+    };
+    SSourceDefinition b -> mapEither R.SourceDefinition (child b);
+    SCallSite display loc b -> do {
+      v <- child b; Right (if eqString display "an expression type signature" && not (managedResolved v)
+        then v else R.CallSite display loc v)
+    };
+    SDo _ _ -> child (Desugar.desugarDo expression);
+    SChecked _ _ -> Left "checked source forms are reserved for dictionary translation";
+    SGlobal _ _ -> Left "resolved global cannot enter source name resolution";
+    SDeclScope _ _ -> Left "resolved binder cannot enter source name resolution";
+    SWantedRefs _ _ -> Left "dictionary holes are reserved for dictionary translation";
+    SWanted _ _ -> Left "dictionary holes are reserved for dictionary translation"
+  };
   ownName names local namespace name =
     do {
       entity <- lookupEntity namespace name local;
-      resolvedName names entity
+      bindingSpelling names entity
     };
-  resolveField :: Names -> Interface -> Field -> Either String Field;
+  resolveField :: Bindings -> Interface -> Field -> Either String Field;
   resolveField names env field =
     case field of {
       Parameter _ -> Right field;
@@ -1467,12 +1369,13 @@ module Bootstrap.Module where {
         mapM
           (\method ->
              do {
-               name' <- ownName names local Terms (fst method);
+               entity <- lookupEntity Terms (fst method) local;
+               name' <- termId names entity;
                ty <- resolveType names env (snd method);
                Right ((,) name' ty)
              })
           (classMethods klass);
-      Right (SClassDecl name (classParameters klass) supers methods)
+      Right (R.Class name (classParameters klass) supers methods)
     };
   renameInstance shared names env inst =
     do {
@@ -1485,46 +1388,42 @@ module Bootstrap.Module where {
           (\method ->
              do {
                name <-
-                 resolvedName names (Entity (owner klass) (fst method) (Method (spelling klass)));
+                 termId names (Entity (owner klass) (fst method) (Method (spelling klass)));
                body <- resolveExpr names env (snd method);
                Right ((,) name body)
              })
           originals;
       context <- mapM (resolvePredicate names env) (instanceContext inst);
-      name <- resolvedName names klass;
+      name <- bindingSpelling names klass;
       head <- mapM (resolveType names env) (instanceHead inst);
-      Right (SInstanceDecl (instanceVariables inst) context name head methods)
+      Right (R.Instance (instanceVariables inst) context name head methods)
     };
-  renameModule names local env source =
-    do {
-      ds <- mapM (renameDatatype names local env) (sourceDatatypes source);
-      cs <- mapM (renameClass names local env) (sourceClasses source);
-      instances <- mapM (renameInstance (Lexer.isSharedSyntax (sourceSyntax source)) names env) (sourceInstances source);
-      values <-
-        mapM
-          (\value ->
-             case value of {
-               (,,) original annotation expression ->
-                 do {
-                   name <- ownName names local Terms original;
-                   annotation' <- resolveOptionalAnnotation names env annotation;
-                   expression' <- resolveExpr names env expression;
-                   Right ((,,) name annotation' expression')
-                 }
-             })
-          (sourceValues source);
-      body <-
-        case sourceBody source of {
-          Nothing -> Right Nothing;
-          Just expression -> mapEither Just (resolveExpr names env expression)
-        };
-      Right (Renamed ds cs instances values body)
+  renameModule names local env source = do {
+    ds <- mapM (renameDatatype names local env) (sourceDatatypes source);
+    cs <- mapM (renameClass names local env) (sourceClasses source);
+    instances <- mapM (renameInstance (Lexer.isSharedSyntax (sourceSyntax source)) names env) (sourceInstances source);
+    values <- mapM (\((,,) original annotation expression) -> do {
+      entity <- lookupEntity Terms original local;
+      i <- termId names entity;
+      a <- resolveOptionalAnnotation names env annotation;
+      mapEither (Dependency.Bound i a) (resolveExpr names env expression)
+    }) (sourceValues source);
+    body <- case sourceBody source of {
+      Nothing -> Right Nothing; Just expression -> mapEither Just (resolveExpr names env expression)
     };
-  renamedDatatypes (Renamed ds _ _ _ _) = ds;
-  renamedClasses (Renamed _ cs _ _ _) = cs;
-  renamedInstances (Renamed _ _ instances _ _) = instances;
-  renamedValues (Renamed _ _ _ values _) = values;
-  renamedBody (Renamed _ _ _ _ body) = body;
+    Right (Renamed (bindingSymbols names) ds cs instances values body)
+  };
+  renamedSymbols (Renamed symbols _ _ _ _ _) = symbols;
+  renamedDatatypes (Renamed _ ds _ _ _ _) = ds;
+  resolvedClasses (Renamed _ _ cs _ _ _) = cs;
+  resolvedInstances (Renamed _ _ _ instances _ _) = instances;
+  renamedBindings (Renamed _ _ _ _ bindings _) = bindings;
+  resolvedBody (Renamed _ _ _ _ _ body) = body;
+  renamedClasses r = map (R.namedClass (Dependency.symbolName (renamedSymbols r))) (resolvedClasses r);
+  renamedInstances r = map (R.namedInstance (Dependency.symbolName (renamedSymbols r))) (resolvedInstances r);
+  renamedValueNames r = map (compose (Dependency.symbolName (renamedSymbols r)) Dependency.boundId) (renamedBindings r);
+  renamedValues r = map (Dependency.boundValue (renamedSymbols r)) (renamedBindings r);
+  renamedBody r = mapOptional (R.namedExpr (Dependency.symbolName (renamedSymbols r))) (resolvedBody r);
   resolvedSource (Resolved source _ _) = source;
   resolvedScope (Resolved _ env _) = env;
   resolvedContents (Resolved _ _ content) = content;
@@ -1562,23 +1461,22 @@ module Bootstrap.Module where {
           (renameModule names local env source);
       Right (Resolved source env renamed)
     };
-  settleReach :: Map String (Set String) -> Map String (Set String) -> Map String (Set String);
-  settleReach direct current =
+  -- External-only modules are leaf vertices. Publish only owners from the
+  -- input table, using the existing name sets required by crate interfaces.
+  moduleReach :: Map String (Set String) -> Map String (Set String);
+  moduleReach direct =
     let {
-      next =
-        M.mapWithKey
-          (\name dependencies ->
-             Set.insert compareString name
-               (Set.unions compareString
-                  ((:) dependencies
-                     (map
-                        (\dependency ->
-                           M.findWithDefault compareString (Set.singleton dependency) dependency
-                             current)
-                        (Set.toList dependencies)))))
-          direct
-    } in
-    if M.eqMap eqString (Set.eqSet eqString) current next then next else settleReach direct next;
+      entries = M.toList (M.map Set.toList direct);
+      leaves = concatMap (\entry -> map (\name -> (,) name []) (snd entry)) entries;
+      graph = Dependency.moduleGraph (append leaves entries);
+      nodes = Dependency.graphNodes graph;
+      closed = Dependency.reachTable (Dependency.graphRows graph);
+      reach name = case Dependency.graphId graph name of {
+        Nothing -> panic "missing module reach owner";
+        Just i -> Set.fromDistinctAscList
+          (map (\j -> fst (V.at nodes (V.fromInt j))) (IS.toAscList (V.at closed i)))
+      }
+    } in M.mapWithKey (\name _ -> reach name) direct;
   crateReach mode modules =
     let {
       direct =
@@ -1589,7 +1487,7 @@ module Bootstrap.Module where {
                   (Set.fromList compareString (append (if Lexer.isSharedSyntax (sourceSyntax source) then (:) "MLF.Primitive" [] else []) (map importedModule (importsFor mode source)))))
              modules)
     } in
-    settleReach direct direct;
+    moduleReach direct;
   candidateScope reach instances ownerName =
     let {
       reachable = M.findWithDefault compareString Set.empty ownerName reach
@@ -1608,12 +1506,16 @@ module Bootstrap.Module where {
                   Map String Interface ->
                   (Entity -> String) -> [] SourceModule -> Either String ResolvedCrate;
   resolveCrate mode external mangle supplied =
-    resolveCrateWithAllocator mode external
-      (\_ entities ->
-         Names
-           (M.fromList compareEntity
-              (map (\entity -> (,) entity (mangle entity)) (Set.toList entities))))
-      supplied;
+    resolveWithTermKey mode external mangle termIdentity supplied;
+  -- The artifact producer supplies the defining crate/module/role encoding.
+  -- Source-only clients can choose colliding display names independently.
+  resolveCrateDefinitions mode external definition supplied =
+    resolveWithTermKey mode external definition definition supplied;
+  resolveWithTermKey mode external mangle stable supplied = do {
+    plan <- prepareCrateResolution mode external supplied;
+    resolvePlanWithKey (\_ entities -> Names (M.fromList compareEntity
+      (map (\entity -> (,) entity (mangle entity)) (Set.toList entities)))) stable plan
+  };
   data CrateResolution = CrateResolution PreludeMode ([] SourceModule)
     (Map String Interface) (Map String Interface) (Set Entity);
   resolveCrateWithAllocator :: PreludeMode ->
@@ -1737,66 +1639,26 @@ module Bootstrap.Module where {
            };
            Right (CrateResolution mode modules localMap exports allEntities)
          };
-  resolveCratePlan allocate (CrateResolution mode modules localMap exports allEntities) = do {
-           let {
-             names = allocate modules allEntities
-           };
-           let {
-             entries =
-               case names of {
-                 Names entries -> entries
-               }
-           };
-           let {
-             publicNames =
-               M.fromList compareString
-                 (map
-                    (\entry ->
-                       (,) (snd entry)
-                         (if eqString (owner (fst entry)) "Prelude"
-                          then spelling (fst entry)
-                          else label (fst entry)))
-                    (M.toList entries))
-           };
-           resolved <- mapM (resolveOneWith mode names localMap exports) modules;
-           let {
-             instances =
-               concatMap
-                 (\entry ->
-                    map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst)
-                      (renamedInstances (resolvedContents entry)))
-                 resolved
-           };
-           let {
-             reach = crateReach mode modules
-           };
-           let {
-             candidates = candidateScope reach instances
-           };
-           let {
-             scopes =
-               M.fromList compareString
-                 (concatMap
-                    (\entry ->
-                       map
-                         (\value ->
-                            (,) (valueName value)
-                              (candidates (moduleIdentity (resolvedSource entry))))
-                         (renamedValues (resolvedContents entry)))
-                    resolved)
-           };
-           Right
-             (ResolvedCrate names publicNames resolved instances scopes
-                (map (\inst -> candidates (fst inst)) instances)
-                reach)
+  resolveCratePlan allocate = resolvePlanWithKey allocate termIdentity;
+  resolvePlanWithKey allocate stable (CrateResolution mode modules localMap exports allEntities) = do {
+           let { bindings = resolveNamesWithKey stable (allocate modules allEntities);
+                 symbols = bindingSymbols bindings };
+           ensure (M.size (Dependency.symbolKeyIndex symbols) == V.count (Dependency.symbolNodes symbols))
+             "duplicate stable declaration identity";
+           resolved <- mapM (resolveOneWith mode bindings localMap exports) modules;
+           let { instances = concatMap (\entry -> map (\inst -> (,) (moduleIdentity (resolvedSource entry)) inst)
+                    (resolvedInstances (resolvedContents entry))) resolved;
+                 reach = crateReach mode modules;
+                 scopes = M.fromList compareString (map (\source -> let { name = moduleIdentity source } in
+                   (,) name (candidateScope reach instances name)) modules) };
+           Right (ResolvedCrate bindings resolved scopes reach)
          };
   linkModules :: PreludeMode -> [] SourceModule -> Either String LinkedModule;
-  linkModules mode supplied =
+  linkModules mode supplied = mapEither fst (linkModulesUsing Surface.bindResolvedExpr Surface.closeResolvedInstance mode supplied);
+  linkModulesInScopes = linkModulesUsing Surface.bindIndexedExpr Surface.closeIndexedInstance;
+  linkModulesUsing bind close mode supplied =
     do {
       crate <- resolveCrateWithAllocator mode M.empty freshNames supplied;
-      let {
-        names = resolvedCrateNames crate
-      };
       let {
         publicNames = resolvedCrateDisplayNames crate
       };
@@ -1804,7 +1666,7 @@ module Bootstrap.Module where {
         resolved = resolvedCrateModules crate
       };
       let {
-        instances = resolvedCrateInstances crate
+        instances = resolvedInstanceRows crate
       };
       let {
         scopes = resolvedCrateValueScopes crate
@@ -1815,35 +1677,21 @@ module Bootstrap.Module where {
       let {
         cs = concatMap (\entry -> renamedClasses (resolvedContents entry)) resolved
       };
-      let {
-        values = concatMap (\entry -> renamedValues (resolvedContents entry)) resolved
-      };
+      let { bindings = boundIn crate resolved };
       let {
         entryModule = last resolved
       };
-      let {
-        source = resolvedSource entryModule
-      };
-      entry <-
-        case renamedBody (resolvedContents entryModule) of {
-          Just expression -> Right expression;
-          Nothing ->
-            if any (\value -> eqString (valueName value) "main") (sourceValues source)
-            then mapEither SVar (resolvedName names (Entity (moduleIdentity source) "main" Value))
-            else resolveExpr names (resolvedScope entryModule) (SVar "main")
-        };
-      body <- bindValues publicNames values entry;
-      let {
-        valueMap = M.fromList compareString (map (\value -> (,) (valueName value) value) values)
-      };
-      instances' <- mapM (\inst -> closeInstance publicNames values valueMap (snd inst)) instances;
+      entry <- entryExpr crate entryModule;
+      body <- mapLeft (displayNames publicNames) (bind bindings entry);
+      instances' <- mapLeft (displayNames publicNames) (mapM
+        (compose (close (Surface.helperScope bindings)) snd) instances);
       let {
         program =
           if (null cs && null instances')
           then SProgram ds body
           else SClassProgram ds cs instances' body
       };
-      Right (LinkedModule program publicNames scopes (resolvedCrateInstanceScopes crate))
+      Right ((,) (LinkedModule program publicNames (Dependency.namedScopes scopes) (resolvedCrateInstanceScopes crate)) scopes)
     };
   wordChar c = (U.isAlphaNum c || ((c == 95) || (c == 39)));
   wordEnd :: String -> Int -> Int;
@@ -1875,9 +1723,9 @@ module Bootstrap.Module where {
   validateSharedModuleCycles sources =
     let {
       groups =
-        Dependency.components
+        Dependency.groupNames (Dependency.moduleGraph
           (map (\source -> (,) (moduleIdentity source) (map importedModule (sourceImports source)))
-             sources)
+             sources))
     } in
     mapM_
       (\group ->

@@ -106,6 +106,9 @@ sourceChecks root = do
  (old,_,oldContracts)<-Old.compileSourceGroups "source-oracle" oldCache [] M.empty plan >>= expect "old source oracle"
  (cold,coldReport,contracts)<-CG.compileSourceGroups False "source-oracle" newCache [] M.empty plan >>= expect "new cold source query"
  assert "cold groups" (Old.inferredCount coldReport==fromIntegral (length cold) && Old.reusedCount coldReport==0)
+ case cold of
+  (group,fragment):_ -> finishHashChecks group fragment
+  [] -> error "missing finish hash fixture"
  assert "contracts match legacy source oracle" (contractView contracts==contractView oldContracts)
  oldOpen<-mapM (\o->expect "legacy receipt" (U.objectChecked o) >>= expect "open legacy receipt" . O.fromChecked) old
  assert "same source group inventory" (length oldOpen==length cold)
@@ -163,15 +166,32 @@ sourceChanges root = do
    if label=="body" && version==1 then assert "source body edit one inferred"(Old.inferredCount report==1) else pure ()
    putStrLn("PASS source change "++label++" "++show version)) (zip [0::Int ..] versions)) cases
 
+finishHashChecks group fragment = do
+ let refs = [("a","version-a"),("b","version-b")]
+     content rs = G.hashValue (CG.rawValue rs group fragment) >>= expect "canonical fragment content"
+ raw <- content refs
+ let previous = G.QueryNode "raw" raw [] (T.Just raw)
+     finalHash mode body node rs =
+       CG.finishContentHash mode group body fragment node refs rs
+ kept <- finalHash False SI.KeepRawBody previous refs >>= expect "retained raw content"
+ checked <- finalHash True SI.KeepRawBody previous refs >>= expect "verified retained content"
+ adapted <- finalHash False (SI.AdaptedBody fragment) previous refs >>= expect "identical adapted content"
+ assert "equal final values keep one SHA through either recipe" (raw == kept && raw == checked && raw == adapted)
+ reordered <- finalHash False SI.KeepRawBody previous (reverse refs) >>= expect "changed environment"
+ expected <- content (reverse refs)
+ assert "ordered environment is part of the final fragment" (reordered == expected && reordered /= raw)
+ mismatch <- finalHash True SI.KeepRawBody (G.QueryNode "raw" "incorrect" [] T.Nothing) refs
+ assert "ICH verifies the retained fragment" (case mismatch of T.Left _ -> True; _ -> False)
+
 graphChecks root = do
  let path=B.literal (root++"/graph-controls"); config="compiler-a/builtin-a/checker-1"
  s<-G.begin path config >>= expect "start graph"
- (input,s1)<-G.record (G.inputKey "source") [] False (W.VText "old body") s >>= expect "input"
+ (input,s1)<-G.record (G.inputKey (G.key "Prepared" (U.pack ["f"]))) [] False (W.VText "old body") s >>= expect "input"
  (binding,s2)<-G.record (G.key "Binding" "f") [G.edge input] True (W.VText "Int -> Int / unprotected") s1 >>= expect "binding"
- (caller,s3)<-G.record (G.key "InferScc" "g") [G.edge binding] True (W.VText "caller body") s2 >>= expect "caller"
+ (caller,s3)<-G.record (G.key "InferScc" (U.pack ["g"])) [G.edge binding] True (W.VText "caller body") s2 >>= expect "caller"
  _<-G.publish s3 >>= expect "publish controls"
  next<-G.begin path config >>= expect "reopen controls"
- (changed,next1)<-G.record (G.inputKey "source") [] False (W.VText "new body") next >>= expect "changed input"
+ (changed,next1)<-G.record (G.inputKey (G.key "Prepared" (U.pack ["f"]))) [] False (W.VText "new body") next >>= expect "changed input"
  assert "changed source invalidates binding" (case fst(G.validate (G.nodeKey binding) next1) of T.Nothing->True;_->False)
  (equal,next2)<-G.record (G.nodeKey binding) [G.edge changed] True (W.VText "Int -> Int / unprotected") next1 >>= expect "equal recomputed contract"
  assert "red/green result equality" (G.nodeHash binding==G.nodeHash equal)
@@ -237,7 +257,7 @@ loweredChecks root = do
 sessionTransactionChecks root = do
  let folder=root++"/session-transaction"
      source=folder++"/Tx.hs"; spec=folder++"/crate.spec"; cache=folder++"/cache"
-     pointer=cache++"/query-graph-v1/CURRENT"
+     pointer=cache++"/query-graph-v2/CURRENT"
      header="-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule Tx where { import MLF.Primitive; "
      program value rhs=header++"ok :: Int; ok = "++value++"; bad :: Int; bad = "++rhs++" }\n"
      compile label=Session.compileSpecFile (B.literal spec) (B.literal(folder++"/"++label))

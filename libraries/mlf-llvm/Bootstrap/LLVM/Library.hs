@@ -3,12 +3,15 @@
              KindSignatures, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, OverloadedStrings #-}
 module Bootstrap.LLVM.Library
-  (ExportLayout, prepareLayout, prepareLayoutWithTypeNames, identity, exports, declarations, constructorTags,
+  (ExportLayout, prepareLayout, prepareLayoutWithTypeNames, prepareLayoutIds, withTypeNames, emitRootIds, identity, exports, declarations, constructorTags,
    reservedTypeNames, libraryTypeNames, rootConstructorTags, libraryTerm, emitLibrary, emitRoot) where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import Bootstrap.Std;
   import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.IndexVec as V;
+  import qualified Bootstrap.IntMap as IM;
+  import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Set as S;
   import qualified Bootstrap.Data as D;
   import qualified Bootstrap.X.Checked as Checked;
@@ -22,11 +25,17 @@ module Bootstrap.LLVM.Library
   -- bind these compiler-owned fields to its independently verified installed
   -- object/runtime identities before linking. No raw native object is a
   -- CheckedTerm, and no alleged result type is accepted by emitRoot.
-  data ExportLayout = ExportLayout String ([] ((,,) String String XType)) ([] DataDecl) (Maybe (Set String));
+  -- A root and its fixed library share an ABI order but may allocate different
+  -- declaration slots. The numeric ABI slot is used only at the LLVM boundary.
+  data AbiSlot = AbiSlot;
+  data ExportRows = ExportRows (V.IndexVec AbiSlot ((,) (V.Index Declaration) ((,,) String String XType)))
+    (Map String (V.Index Declaration)) (IntMap (V.Index AbiSlot));
+  data ExportLayout = ExportLayout String ExportRows ([] DataDecl) (Maybe (Set String));
+  exportRows (ExportLayout _ rows _ _) = rows;
   identity :: ExportLayout -> String;
   identity (ExportLayout value _ _ _) = value;
   exports :: ExportLayout -> [] ((,,) String String XType);
-  exports (ExportLayout _ value _ _) = value;
+  exports (ExportLayout _ (ExportRows rows _ _) _ _) = map snd (V.toList rows);
   declarations :: ExportLayout -> [] DataDecl;
   declarations (ExportLayout _ _ value _) = value;
   digest :: String -> Bool;
@@ -38,30 +47,43 @@ module Bootstrap.LLVM.Library
   exportHint :: (,,) String String XType -> String;
   exportHint ((,,) _ hint _) = hint;
   prepareLayout :: String -> [] ((,,) String String XType) -> [] DataDecl -> Either String ExportLayout;
-  prepareLayout input entries ds = do {
+  prepareLayout input entries ds = prepareLayoutIds input
+    (zip (map V.fromInt (range 0 (length entries - 1))) entries) ds;
+  prepareLayoutIds :: String -> [] ((,) (V.Index Declaration) ((,,) String String XType)) ->
+    [] DataDecl -> Either String ExportLayout;
+  prepareLayoutIds input indexed ds = do {
+    let { entries = map snd indexed; rows = V.fromList indexed;
+          byKey = M.fromList compareString (map (\((,) d entry) -> (,) (exportKey entry) d) indexed);
+          byDecl = IM.fromList (map (\slot -> (,) (V.toInt (fst (V.at rows slot))) slot) (V.indices rows)) };
     ensure (digest input) "native library requires a SHA256 installation identity";
-    ensure (length entries == length (nubBy eqString (map exportKey entries))) "native library duplicate export key";
-    ensure (length entries == length (nubBy eqString (map exportHint entries))) "native library ambiguous export hint";
+    ensure (length entries == M.size byKey) "native library duplicate export key";
+    ensure (length entries == S.size (S.fromList compareString (map exportHint entries))) "native library ambiguous export hint";
     ensure (all (\entry -> not (eqString (exportKey entry) "") && not (eqString (exportHint entry) "")) entries)
       "native library empty export identity";
+    ensure (all (\r -> V.toInt (fst r) >= 0) indexed && IM.size byDecl == length entries)
+      "native library duplicate or invalid declaration slot";
     context <- D.validateDeclarations ds;
     traverseEither (\((,,) _ _ ty) -> do {
       ensure (S.null (T.freeVars ty)) "native library export contract is not closed";
       kind <- T.kindOf context M.empty ty;
       ensure (eqKind kind Star) "native library export contract does not have kind *"
     }) entries;
-    Right (ExportLayout input entries ds Nothing)
+    Right (ExportLayout input (ExportRows rows byKey byDecl) ds Nothing)
   };
   -- This is sealed schema data, not a proof manufactured by the caller.
   -- emitLibrary checks its exact census against the actual checked code; the
   -- consumer authenticates the corresponding compiled installation registry.
   prepareLayoutWithTypeNames :: String -> [] ((,,) String String XType) -> [] DataDecl -> [] String -> Either String ExportLayout;
   prepareLayoutWithTypeNames input entries ds names = do {
-    prepareLayout input entries ds;
+    base <- prepareLayout input entries ds;
+    withTypeNames base names
+  };
+  withTypeNames :: ExportLayout -> [] String -> Either String ExportLayout;
+  withTypeNames (ExportLayout input rows ds _) names = do {
     let { known = S.fromList compareString names };
     ensure (eqList eqString names (S.toList known) && all (\name -> not (eqString name "")) names)
       "native library type-name census is not canonical";
-    Right (ExportLayout input entries ds (Just known))
+    Right (ExportLayout input rows ds (Just known))
   };
   reservedTypeNames :: ExportLayout -> [] String;
   reservedTypeNames (ExportLayout _ _ _ known) = case known of { Nothing -> []; Just names -> S.toList names };
@@ -98,8 +120,11 @@ module Bootstrap.LLVM.Library
     }
   };
   exportEntries :: ExportLayout -> [] ((,,) Int XName XType);
-  exportEntries layout = zipWith (\slot ((,,) _ hint ty) -> (,,) slot (XName slot hint) ty)
-    (range 0 (length (exports layout) - 1)) (exports layout);
+  exportEntries layout = case exportRows layout of {
+    ExportRows rows _ _ -> map (\slot -> case snd (V.at rows slot) of {
+      (,,) _ hint ty -> (,,) (V.toInt slot) (XName (V.toInt slot) hint) ty
+    }) (V.indices rows)
+  };
   envelope :: ExportLayout -> Product;
   envelope layout = case buildProduct (exportEntries layout) of {
     Product body ty paths ->
@@ -191,7 +216,7 @@ module Bootstrap.LLVM.Library
   header = ["; Generated from checked xMLF and an authenticated fixed native library boundary.",
     "source_filename = \"emlf-fixed-native\"", ""];
   abi :: [] String;
-  abi = ["declare void @mlf_require_haskell_boundary_v4_abi()", "declare void @mlf_require_byte_file_v2_abi()"];
+  abi = ["declare void @mlf_require_haskell_boundary_v4_abi()", "declare void @mlf_require_byte_file_v2_abi()\ndeclare void @mlf_require_freeze_st_array_abi()\ndeclare void @mlf_require_st_to_io_abi()"];
   chunks :: [] String -> [] String;
   chunks = map (\line -> line ++ "\n");
   emitLibrary :: ExportLayout -> Checked.LinkedSpine -> Either String ([] String);
@@ -230,32 +255,34 @@ module Bootstrap.LLVM.Library
   };
   rootConstructorTags :: ExportLayout -> [] DataDecl -> Either String (Map String ((,) Int Int));
   rootConstructorTags layout ds = mapEither contextTags (rootContext layout ds);
-  rootParameters :: Map String ((,) Int ((,) String XType)) -> [] String -> XTerm -> XType ->
-                    Either String ((,) ([] Int) XType);
-  rootParameters available keys term ty = case keys of {
+  rootParameters inventory@(ExportRows rows _ byDecl) selected term ty = case selected of {
     [] -> Right ((,) [] ty);
-    (:) key rest -> case M.lookup compareString key available of {
+    (:) d rest -> case IM.lookup (V.toInt d) byDecl of {
       Nothing -> Left "native root requested an uninstalled export";
-      Just ((,) slot ((,) hint expected)) -> case (,) term ty of {
+      Just slot -> case snd (V.at rows slot) of { (,,) _ hint expected -> case (,) term ty of {
         (,) (XAbs name actual body) (XArrow parameter result) -> do {
           ensure (eqString (X.nameHint name) hint && T.alphaEq expected actual && T.alphaEq expected parameter)
             "native root import wrapper does not match installed contract";
-          next <- rootParameters available rest body result;
-          Right ((,) ((:) slot (fst next)) (snd next))
+          next <- rootParameters inventory rest body result;
+          Right ((,) ((:) (V.toInt slot) (fst next)) (snd next))
         };
         _ -> Left "native root lost its checked import arrow"
-      }
+      } }
     }
   };
   emitRoot :: ExportLayout -> [] String -> Checked.CheckedTerm -> Either String ([] String);
-  emitRoot layout selected checked = do {
-    ensure (length selected == length (nubBy eqString selected)) "native root duplicate import key";
+  emitRoot layout keys checked = case exportRows layout of { ExportRows _ byKey _ -> do {
+    ids <- traverseEither (\key -> case M.lookup compareString key byKey of {
+      Nothing -> Left "native root requested an uninstalled export"; Just d -> Right d
+    }) keys;
+    emitRootIds layout ids checked
+  } };
+  emitRootIds :: ExportLayout -> [] (V.Index Declaration) -> Checked.CheckedTerm -> Either String ([] String);
+  emitRootIds layout selected checked = do {
+    ensure (length selected == IS.size (IS.fromList (map V.toInt selected))) "native root duplicate import key";
     let { parts = case Checked.term checked of { XWithData ds body -> (,) ds body; body -> (,) [] body } };
     ds <- rootContext layout (fst parts);
-    let { available = M.fromList compareString
-      (zipWith (\slot ((,,) key hint ty) -> (,) key ((,) slot ((,) hint ty)))
-        (range 0 (length (exports layout) - 1)) (exports layout)) };
-    imports <- rootParameters available selected (snd parts) (Checked.typeOf checked);
+    imports <- rootParameters (exportRows layout) selected (snd parts) (Checked.typeOf checked);
     generated <- generate (drop (length (declarations layout)) ds) ds checked;
     Right (chunks (concat [header, snd generated, rootAdapter layout (fst generated) (fst imports) (LLVM.ioType (snd imports))]))
   };
@@ -271,7 +298,7 @@ module Bootstrap.LLVM.Library
       "cycle:", "  call void @llvm.trap()", "  unreachable", "start:",
       "  store i32 1, ptr @" ++ prefix ++ "_state",
       "  call void @mlf_require_haskell_boundary_v4_abi()",
-      "  call void @mlf_require_byte_file_v2_abi()",
+      "  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()",
       "  %root = call ptr " ++ entry ++ "(ptr null, ptr null)",
       "  store ptr %root, ptr @" ++ prefix ++ "_root, align 8"]
       (append (concatMap (slotCode prefix count) paths)
@@ -298,7 +325,7 @@ module Bootstrap.LLVM.Library
     concat [abi,
       ["declare ptr @" ++ prefix ++ "_get(i64)", "define ptr @mlf_entry() {", "entry:",
        "  call void @mlf_require_haskell_boundary_v4_abi()",
-      "  call void @mlf_require_byte_file_v2_abi()",
+      "  call void @mlf_require_byte_file_v2_abi()\n  call void @mlf_require_freeze_st_array_abi()\n  call void @mlf_require_st_to_io_abi()",
        "  %wrapper = call ptr " ++ entry ++ "(ptr null, ptr null)"],
       concat (zipWith (\index slot ->
         ["  %import" ++ showInt index ++ " = call ptr @" ++ prefix ++ "_get(i64 " ++ showInt slot ++ ")",

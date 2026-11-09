@@ -6,6 +6,8 @@ module Package.Manifest where {
   import MLF.Primitive;
   import Bootstrap.Types;
   import qualified Bootstrap.Std as S;
+  import qualified Bootstrap.Dependency as D;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Parser as P;
   import qualified Bootstrap.Lexer as Lexer;
   import qualified Package.OS as O;
@@ -14,7 +16,10 @@ module Package.Manifest where {
   import qualified Package.Distribution as Distribution;
   data Package = Package String J.Json ([] Module);
   data Module = Module String String String ([] String);
-  data PackageGraph = PackageGraph Package ([] Package) ([] Module);
+  data PackageNode = PackageNode;
+  data ModuleNode = ModuleNode;
+  data PackageGraph = PackageGraph (V.Index PackageNode) (D.NamedGraph PackageNode Package)
+                        (D.NamedGraph ModuleNode Module) ([] (V.Index ModuleNode));
   packageRoot (Package path _ _) = O.parent path;
   packagePath (Package path _ _) = path;
   packageData (Package _ value _) = value;
@@ -27,16 +32,26 @@ module Package.Manifest where {
   moduleSource (Module _ _ source _) = source;
   moduleOwner (Module _ owner _ _) = owner;
   moduleImports (Module _ _ _ imports) = imports;
-  rootPackage (PackageGraph p _ _) = p;
-  packages (PackageGraph _ ps _) = ps;
-  modules (PackageGraph _ _ ms) = ms;
   keys value = S.map S.fst (J.items value);
-  lookupModule name ms =
-    S.fromMaybe (panic ("missing module " ++ name))
-      (S.find (\m -> eqString (moduleName m) name) ms);
-  lookupPackage name ps =
-    S.fromMaybe (panic ("missing package " ++ name))
-      (S.find (\p -> eqString (packageName p) name) ps);
+  requireId :: forall d a. String -> D.NamedGraph d a -> String -> V.Index d;
+  requireId label graph name = S.fromMaybe (panic (label ++ name)) (D.graphId graph name);
+  buildPackageGraph root ps ms =
+    let {
+      pkgs = D.buildGraph packageName
+               (\p -> S.sortBy compareString (keys (J.getObject "dependencies" (packageData p))))
+               (\name -> panic ("missing package " ++ name)) ps;
+      mods = D.buildGraph moduleName moduleImports (\name -> panic ("missing module " ++ name)) ms;
+      roots = S.map (requireId "missing module " mods) (S.sortBy compareString (S.map moduleName ms));
+      order = S.reverse (D.finishOrder (D.graphRows mods) roots)
+    } in PackageGraph (requireId "missing package " pkgs root) pkgs mods order;
+  packageGraph (PackageGraph _ pkgs _ _) = pkgs;
+  rootPackage (PackageGraph root pkgs _ _) = V.at (D.graphNodes pkgs) root;
+  packages graph = V.toList (D.graphNodes (packageGraph graph));
+  modules (PackageGraph _ _ mods order) = S.map (V.at (D.graphNodes mods)) order;
+  packageId graph = requireId "missing package " (packageGraph graph);
+  packageAt graph = V.at (D.graphNodes (packageGraph graph));
+  directPackages graph p =
+    S.map (packageAt graph) (D.neighbors (D.graphRows (packageGraph graph)) (packageId graph (packageName p)));
   lower n = ((n >= 97) && (n <= 122));
   upper n = ((n >= 65) && (n <= 90));
   digit n = ((n >= 48) && (n <= 57));
@@ -379,22 +394,18 @@ module Package.Manifest where {
        then J.getStrings "dependencies" target
        else keys (J.getObject "dependencies" (packageData p)));
   targetDependencies graph p target =
-    S.map (\name -> lookupPackage name (packages graph)) (targetDependencyNames p target);
-  visibleWith ps p dependencies =
-    S.concat
-      ((:) (S.map moduleName (packageModules p))
-         (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps))) dependencies));
-  visible ps p =
-    S.concat
-      ((:) (S.map moduleName (packageModules p))
-         (S.map (\name -> S.map moduleName (packageModules (lookupPackage name ps)))
-            (keys (J.getObject "dependencies" (packageData p)))));
-  checkImports ps p local =
+    if J.has "dependencies" target
+    then S.map (\name -> packageAt graph (packageId graph name)) (targetDependencyNames p target)
+    else directPackages graph p;
+  visibleModules p direct =
+    S.concatMap (\q -> S.map moduleName (packageModules q)) ((:) p direct);
+  checkImports graph p local =
+    let { visible = S.append (visibleModules p (directPackages graph p)) (S.map moduleName local) } in
     S.mapM_
       (\m ->
          S.mapM_
            (\name ->
-              O.require (S.elem eqString name (S.append (visible ps p) (S.map moduleName local)))
+              O.require (S.elem eqString name visible)
                 (packageName p ++
                  (":" ++
                   (moduleName m ++
@@ -402,32 +413,6 @@ module Package.Manifest where {
                     (name ++ " is not declared in this package or a direct dependency"))))))
            (moduleImports m))
       local;
-  moduleClosure ms names = discoverMany ms [] [] names;
-  discoverMany :: [] Module -> [] String -> [] Module -> [] String -> IO ([] Module);
-  discoverMany ms trail done names =
-    case names of {
-      [] -> ioReturn done;
-      (:) name rest ->
-        do {
-          next <- discoverModule ms trail done name;
-          discoverMany ms trail next rest
-        }
-    };
-  discoverModule :: [] Module -> [] String -> [] Module -> String -> IO ([] Module);
-  -- Imports discover namespaces, not separately compiled module prerequisites.
-  -- The package DAG above owns compilation-cycle rejection.
-  discoverModule ms trail done name =
-    do {
-      if (S.elem eqString name trail || S.any (\m -> eqString (moduleName m) name) done)
-      then ioReturn done
-      else do {
-             let {
-               m = lookupModule name ms
-             };
-             next <- discoverMany ms (S.snoc trail name) done (moduleImports m);
-             ioReturn (S.snoc next m)
-           }
-    };
   targetCrateModules graph p target =
     do {
       local <- readModules (packageRoot p) (packageName p) (J.getObject "modules" target);
@@ -445,7 +430,7 @@ module Package.Manifest where {
         "entry/private module conflicts with a library module";
       let {
         visible =
-          S.append (visibleWith (packages graph) p (targetDependencyNames p target))
+          S.append (visibleModules p (targetDependencies graph p target))
             (S.map moduleName private)
       };
       S.mapM_
@@ -481,11 +466,10 @@ module Package.Manifest where {
       };
       O.require (S.length (S.nubBy eqString (S.map moduleName ms)) == S.length ms)
         "module is provided by multiple packages";
-      S.mapM_ (\q -> checkImports ps q (packageModules q)) ps;
-      sorted <- moduleClosure ms (S.sortBy compareString (S.map moduleName ms));
       let {
-        graph = PackageGraph p ps sorted
+        graph = buildPackageGraph (packageName p) ps ms
       };
+      S.mapM_ (\q -> checkImports graph q (packageModules q)) ps;
       S.mapM_
         (\q ->
            S.mapM_
@@ -505,8 +489,7 @@ module Package.Manifest where {
   libraryDependencies graph p =
     S.map (\q -> crateIdentity q "library")
       (S.filter (\q -> S.not (S.null (packageModules q)))
-         (S.map (\name -> lookupPackage name (packages graph))
-            (S.sortBy compareString (keys (J.getObject "dependencies" (packageData p))))));
+         (directPackages graph p));
   targetLibraryDependencies graph p target =
     S.map (\q -> crateIdentity q "library")
       (S.filter (\q -> S.not (S.null (packageModules q))) (targetDependencies graph p target));

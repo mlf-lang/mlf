@@ -70,7 +70,7 @@ record_inputs() {
     jq --arg path "${file#"$root"/}" --arg hash "$(sha256 "$file")" '. + {($path):$hash}' "$destination" > "$destination.tmp"
     mv "$destination.tmp" "$destination"
   done < <({ find "$fixtures" "$root/runtime" -type f; printf '%s\n' \
-    "$root/tests/native/completion_cell_tests.c" "$root/tests/native/async_completion_primitives.c" \
+    "$root/tools/release/check_async_abi.py" "$root/tests/native/completion_cell_tests.c" "$root/tests/native/async_completion_primitives.c" \
     "$root/libraries/mlf-foundation/Bootstrap/Types.hs" \
     "$root/libraries/mlf-language-core/Bootstrap/Data.hs" "$root/libraries/mlf-language-core/Bootstrap/Primitive.hs" \
     "$root/libraries/mlf-frontend/Bootstrap/Module.hs" \
@@ -80,7 +80,7 @@ record_inputs() {
 record_inputs "$work/inputs.json"
 compiler_hash=$(sha256 "$compiler")
 cc_hash=$(sha256 "$cc")
-printf 'IO Unit\n' > "$work/io-unit.type"
+printf 'IO ()\n' > "$work/io-unit.type"
 success capability "$compiler" --run --expr 'do { reply <- processSupervisor "MLF-PROCESS-1\0version\0"; printInt (stringCodeAt reply 2) }'
 test "$(cat "$work/capability.stdout")" = 49 || fail 'real stage-2 host bridge required'
 read -r -a cflags <<< "$(pkg-config --cflags gmp)"
@@ -105,13 +105,13 @@ for source in "$fixtures"/runtime/*.emlf; do
   name=$(basename "$source" .emlf)
   success "$name.compile" "$compiler" -i "$fixtures" "$source"
   success "$name.check" "$compiler" --check "$work/$name.compile.stdout"
-  cmp "$work/io-unit.type" "$work/$name.check.stdout" || fail "$name is not IO Unit"
+  cmp "$work/io-unit.type" "$work/$name.check.stdout" || fail "$name is not IO ()"
   success "$name.interpreter" "$compiler" -i "$fixtures" --run "$source"
   success "$name.target-interpreter" "$compiler" --run-xmlf "$work/$name.compile.stdout"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.interpreter.stdout" || fail "$name source interpreter differs"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.target-interpreter.stdout" || fail "$name target interpreter differs"
   success "$name.emit" "$compiler" --xmlf-to-llvm-io-gc "$work/$name.compile.stdout"
-  grep -F 'mlf_require_async_completion_v2_abi' "$work/$name.emit.stdout" >/dev/null || fail "$name lacks current ABI guard"
+  python3 -B "$root/tools/release/check_async_abi.py" "$work/$name.emit.stdout" >/dev/null || fail "$name lacks current ABI guard"
   success "$name.link" "$cc" -O2 -Wno-override-module -x ir "$work/$name.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/$name.native"
   success "$name.native" "$work/$name.native"
   cmp "$fixtures/runtime/$name.expected" "$work/$name.native.stdout" || fail "$name native differs"

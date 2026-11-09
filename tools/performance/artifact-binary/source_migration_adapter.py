@@ -1,17 +1,12 @@
-"""Reviewed ci-integration source loader; graph135 and frozen132 evidence are unchanged.
-
-Install beside source_contract.py and the future frozen metadata bundle at
- tools/performance/artifact-binary/. The historical source chain is unchanged.
-This loader performs no IO until explicitly called. Both live pins are explicit.
-"""
+"""Load the pinned PR43 reconciliation source transition for current qualification and historical projections."""
 from pathlib import Path
 import hashlib
 import types
 import os
 import stat
 
-FINAL_MANIFEST_SHA256 = '8335183e3341de4e023362330e4e1eaa153110d20b7f101172e7f1ff8c219a8c'
-CONTRACT_SOURCE_SHA256 = '97c6887065e459d655256f6d94807c88bcc4760f78ee842abd641d9df9bba868'
+FINAL_MANIFEST_SHA256 = 'f0379aba40e33ae97d57381658ad1f7d12756831af9ea604dd3ab063ff107bf4'
+CONTRACT_SOURCE_SHA256 = '6f8554cb379bab4747faa52c9ca7b80a1894128cb255316afecbc89b01343562'
 
 
 def read_implementation(path):
@@ -37,16 +32,19 @@ def read_implementation(path):
 
 
 def live_contract(history_root, source_root=None):
-    if FINAL_MANIFEST_SHA256 is None:
-        raise ValueError('binary source migration is not frozen; live135 admission is unavailable')
     directory = Path(__file__).resolve().parent
-    path = directory / 'ci_integration_contract.py'
+    path = directory / 'reconciliation_contract.py'
     raw = read_implementation(path)
     if hashlib.sha256(raw).hexdigest() != CONTRACT_SOURCE_SHA256:
-        raise ValueError('fixed ci-integration source contract implementation SHA')
-    module = types.ModuleType('fixed_binary_source_contract')
+        raise ValueError('fixed PR43 reconciliation source contract implementation SHA')
+    import sys
+    name = '_mlf_pr43_contract_' + CONTRACT_SOURCE_SHA256
+    if name in sys.modules:
+        return sys.modules[name].Contract(directory, FINAL_MANIFEST_SHA256, history_root, source_root=source_root)
+    module = types.ModuleType(name)
     module.__file__ = str(path)
     # Execute only this separately author-pinned maintenance implementation;
     # never a candidate Haskell module or timestamp-selected .pyc.
     exec(compile(raw, str(path), 'exec'), module.__dict__)
+    sys.modules[name] = module
     return module.Contract(directory, FINAL_MANIFEST_SHA256, history_root, source_root=source_root)
