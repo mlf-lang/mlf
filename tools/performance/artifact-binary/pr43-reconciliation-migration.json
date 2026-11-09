@@ -39,6 +39,11 @@
     ]
   },
   "format": "pr43-reconciliation-source-migration-v1",
-  "maintenance": {},
+  "maintenance": {
+    "patricia/test_adapters.py": [
+      "fe299bd576901e008a1a7473abab98377f66785c4ec239a50f7c139b553e834f",
+      "507ef12af81d40d645cc7bcd6994d472cf050a3a2d75cd613df6b2c27e4647cd"
+    ]
+  },
   "predecessor": "4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160"
 }

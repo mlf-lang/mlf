@@ -306,5 +306,16 @@ class PRSmokeIntegerContract(unittest.TestCase):
         self.assertIn('cmp "$fixtures/$name.stdout" "$work/$name.llvm.stdout"', gate)
 
 
+class TaskTripleContract(unittest.TestCase):
+    def test_retained_heterogeneous_result_uses_current_tuple_constructor(self):
+        import hashlib
+        source = (HERE.parents[1] / 'tests/async-task/Main.emlf').read_text()
+        self.assertEqual(source.count('(,,)'), 2)
+        self.assertIn('T.pure ((,,) (f n) s again)', source)
+        self.assertIn('case result of (,,) n s again ->', source)
+        self.assertEqual(hashlib.sha256(source.replace('(,,)', 'Triple').encode()).hexdigest(),
+                         '08aa5c242c62fc169c9a0348412f1a19cf98adf6fee7ca2fdb70d4a988c88794')
+
+
 if __name__ == '__main__':
     unittest.main()

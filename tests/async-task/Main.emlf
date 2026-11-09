@@ -34,8 +34,8 @@ mixed = do
    T.bind (T.await number) (\n ->
    T.bind (T.await text) (\s ->
    T.bind (T.await function) (\f ->
-   T.bind (T.await number) (\again -> T.pure (Triple (f n) s again)))))))))
- case result of Triple n s again -> assert (n == 42 && eqString s "typed" && again == 41) "heterogeneous retained results"
+   T.bind (T.await number) (\again -> T.pure ((,,) (f n) s again)))))))))
+ case result of (,,) n s again -> assert (n == 42 && eqString s "typed" && again == 41) "heterogeneous retained results"
  putStrLn "PASS mixed-values-functions-repeat-await"
 
 queuedCancel = do

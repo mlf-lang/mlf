@@ -1744,6 +1744,9 @@ class BinarySourceBoundaryTests(unittest.TestCase):
 
     def test_reviewed_source_repairs_project_all_declared_owners(self):
         binary = migration.binary_contract()
+        # These repairs belong to the authenticated DeclId predecessor, not
+        # the later PR43 reconciliation delta. Keep both boundaries explicit.
+        repairs = binary.previous
         names = ('Bootstrap.Layout', 'Package.Benchmark', 'Package.Verification', 'Tests.CompilerTests')
         for module in names:
             path = binary.value['module_paths'][module]
@@ -1752,10 +1755,12 @@ class BinarySourceBoundaryTests(unittest.TestCase):
                 # Both endpoints are authenticated independently: exact new
                 # bytes from the live source manifest and exact old Git bytes,
                 # followed by every existing binary/numeric/API inverse.
-                self.assertEqual(hashlib.sha256(live).hexdigest(), binary.changes[path][1])
-                previous = (binary.archived / path).read_bytes()
-                self.assertEqual(hashlib.sha256(previous).hexdigest(), binary.changes[path][0])
-                historical = binary.previous.restore_path(previous, path)
+                self.assertNotIn(path, binary.changes)
+                self.assertEqual(binary.value['current_files'][path], repairs.changes[path][1])
+                self.assertEqual(hashlib.sha256(live).hexdigest(), repairs.changes[path][1])
+                previous = (repairs.archived / path).read_bytes()
+                self.assertEqual(hashlib.sha256(previous).hexdigest(), repairs.changes[path][0])
+                historical = repairs.previous.restore_path(previous, path)
                 self.assertEqual(prebinary_read_bytes(ROOT / path), historical)
                 self.assertEqual(binary.project_owner(live, module), historical)
                 self.assertEqual(binary.advance_path(historical, path), live)
