@@ -83,7 +83,14 @@ pureTests = do
   again <- right "canonical reencode value" (Q.encodeIndexV2 "config" wire)
   bytes2 <- W.encode W.defaultLimits 6 [again] >>= right "canonical reencode bytes"
   Storage.sameBytes bytes bytes2 >>= need "canonical v2 bytes"
-  right "legacy index reader" (decode (Q.encodeLegacyIndex "config" decoded)) >>= same "legacy compatibility" decoded
+  -- Dictionary v2 retains independent locations; legacy admission requires
+  -- each present payload to equal its result digest.
+  let legacyNodes = M.fromList P.compareString
+        [("leaf",Q.QueryNode "leaf" hashA [] T.Nothing),
+         ("root",Q.QueryNode "root" hashB [("leaf",hashA),("leaf",hashA)] (T.Just hashB))]
+  right "legacy index reader" (decode (Q.encodeLegacyIndex "config" legacyNodes)) >>= same "legacy compatibility" legacyNodes
+  decodeReject "legacy mismatched payload" "invalid query graph digest"
+    (Q.encodeLegacyIndex "config" decoded)
   empty <- right "empty v2 writer" (Q.encodeIndexV2 "config" M.empty)
   right "empty v2 reader" (decode empty) >>= (need "empty nodes" . M.null)
   let first = Q.QueryNode "first" hashA [] T.Nothing
@@ -141,7 +148,7 @@ pureTests = do
   two <- right "two roots plan" (W.planGraph W.defaultLimits [base,base])
   reject "two index roots" "root count" (Q.decodeIndex "config" two)
   let oldLeaf = legacyNode "leaf" hashA [] none
-      oldRoot = legacyNode "root" hashB [("leaf",hashA)] (just (W.VText hashA))
+      oldRoot = legacyNode "root" hashB [("leaf",hashA)] (just (W.VText hashB))
   decodeReject "legacy duplicate" "duplicate" (legacy [oldLeaf,oldLeaf,oldRoot])
   decodeReject "legacy bad hash" "digest" (legacy [legacyNode "leaf" "wrong" [] none])
   decodeReject "legacy missing" "unpublished" (legacy [oldRoot])
