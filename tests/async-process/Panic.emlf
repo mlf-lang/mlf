@@ -2,18 +2,18 @@ module Main where
 import Bootstrap.Types
 import Async.Process
 
-fail : forall a. String -> IO a
-fail message = do { putErr (message ++ "\n"); exitWith 1 }
+processTestFailure : forall a. String -> IO a
+processTestFailure message = do { putErr (message ++ "\n"); exitWith 1 }
 right : forall a. Either AsyncError a -> IO a
-right result = case result of { Right value -> ioReturn value; Left error -> fail (errorMessage error) }
+right result = case result of { Right value -> ioReturn value; Left error -> processTestFailure (errorMessage error) }
 ready : ProcessScope -> ProcessHandle -> String -> IO ()
 ready scope handle path = do
  found <- fileExists path
  if found then ioReturn () else do
   result <- awaitWithin scope handle (ForMilliseconds 10)
   case result of
-   Left error -> if errorCode error == 10 then ready scope handle path else fail (errorMessage error)
-   Right _ -> fail "panic child exited before readiness"
+   Left error -> if errorCode error == 10 then ready scope handle path else processTestFailure (errorMessage error)
+   Right _ -> processTestFailure "panic child exited before readiness"
 main = do
  helper <- getEnv "MLF_ASYNC_FIXTURE"
  work <- getEnv "MLF_ASYNC_WORK"

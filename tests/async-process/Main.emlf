@@ -3,12 +3,12 @@ import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import Async.Process
 
-fail : forall a. String -> IO a
-fail message = do { putErr ("ASYNC TEST FAILURE: " ++ message ++ "\n"); exitWith 1 }
+processTestFailure : forall a. String -> IO a
+processTestFailure message = do { putErr ("ASYNC TEST FAILURE: " ++ message ++ "\n"); exitWith 1 }
 assert : Bool -> String -> IO ()
-assert condition message = if condition then ioReturn () else fail message
+assert condition message = if condition then ioReturn () else processTestFailure message
 right : forall a. Either AsyncError a -> IO a
-right result = case result of { Right value -> ioReturn value; Left error -> fail (showInt (errorCode error) ++ ": " ++ errorMessage error) }
+right result = case result of { Right value -> ioReturn value; Left error -> processTestFailure (showInt (errorCode error) ++ ": " ++ errorMessage error) }
 errorIs : forall a. Int -> Either AsyncError a -> Bool
 errorIs code result = case result of { Left error -> errorCode error == code; Right _ -> false }
 exited : Int -> ProcessOutcome -> Bool
@@ -96,7 +96,7 @@ events helper work = do
    Right (ProcessEvent delivered outcome) -> do
     repeated <- await scope delivered
     assert (exited 7 outcome && exited 7 repeated) "wait event payload"
-   Left error -> fail (errorMessage error)
+   Left error -> processTestFailure (errorMessage error)
   second <- poll scope
   assert (case second of { Right Nothing -> true; _ -> false }) "completion delivered twice"
   repeated <- await scope handle

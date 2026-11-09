@@ -277,5 +277,34 @@ class CompletionKindRejection(unittest.TestCase):
         self.assertIn("wrong-kind) expected='(kind|arity)' ;;", gate)
 
 
+class ProcessFailureHelperNames(unittest.TestCase):
+    def test_local_failure_helpers_do_not_shadow_primitive_fail(self):
+        import hashlib
+        root = HERE.parents[1]
+        originals = {'Main': '19ba4322c1b1fcc5cf56da077f021aca995714310d0a18c55ed0fe0a5f9f898b', 'Panic': '8818d7ba77bbb85fb712bb44f16b8dba2232d55613bd9e7b14883d078e3c3106'}
+        for name, digest in originals.items():
+            source = (root / ('tests/async-process/' + name + '.emlf')).read_text()
+            self.assertIn('processTestFailure : forall a. String -> IO a', source)
+            self.assertIn('processTestFailure message =', source)
+            self.assertEqual(hashlib.sha256(source.replace('processTestFailure', 'fail').encode()).hexdigest(), digest)
+
+
+class PRSmokeIntegerContract(unittest.TestCase):
+    def test_arbitrary_precision_fixture_keeps_its_literal_oracle(self):
+        import hashlib
+        root = HERE.parents[1]
+        source = (root / 'tests/pr-smoke/unbounded-integers.emlf').read_text()
+        self.assertIn('putStrLn (showInteger (addInteger (readInteger "999999999999999999999999999999") (intToInteger 1)))', source)
+        self.assertIn('printInt (-42)', source)
+        self.assertIn('printInt (subInt (-4611686018427387904) 1)', source)
+        self.assertEqual(hashlib.sha256((root / 'tests/pr-smoke/unbounded-integers.stdout').read_bytes()).hexdigest(),
+                         'a47d6f54ab321162b9e8931a3cf06561195a5db7efecd704e4c98e104ee790d8')
+        self.assertEqual((root / 'tests/pr-smoke/io-unit.type').read_bytes(), b'IO ()\n')
+        gate = (root / 'tools/release/pr-smoke-cli.sh').read_text()
+        self.assertIn('cmp "$fixtures/io-unit.type" "$work/$name.check.stdout"', gate)
+        self.assertIn('cmp "$fixtures/$name.stdout" "$work/$name.interpreter.stdout"', gate)
+        self.assertIn('cmp "$fixtures/$name.stdout" "$work/$name.llvm.stdout"', gate)
+
+
 if __name__ == '__main__':
     unittest.main()
