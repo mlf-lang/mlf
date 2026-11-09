@@ -196,5 +196,45 @@ class CanonicalAsyncUnitOracles(unittest.TestCase):
                       (negative / 'function-confusion.emlf').read_text())
 
 
+class CurrentAsyncAbiGuard(unittest.TestCase):
+    def setUp(self):
+        path = HERE.parents[1] / 'tools/release/check_async_abi.py'
+        spec = importlib.util.spec_from_file_location('check_async_abi', path)
+        self.abi = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.abi)
+        self.declarations = [b'declare void @' + name + b'()' for name in self.abi.GUARDS]
+        self.calls = [b'  call void @' + name + b'()' for name in self.abi.GUARDS]
+        self.valid = b'\n'.join(self.declarations + [b'define ptr @mlf_entry() {'] +
+                                 self.calls + [b'  ret ptr null', b'}', b''])
+
+    def test_exact_current_contract(self):
+        self.abi.check(self.valid)
+
+    def test_each_declaration_and_entry_call_is_required(self):
+        for line in self.declarations + self.calls:
+            for replacement in (b'', b'; ' + line, line + b' ; mention only'):
+                with self.subTest(line=line, replacement=replacement), self.assertRaises(ValueError):
+                    self.abi.check(self.valid.replace(line, replacement))
+        for altered in (
+            self.valid.replace(b'haskell_boundary_v4', b'async_completion_v2'),
+            self.valid.replace(b'define ptr @mlf_entry()', b'define ptr @unrelated()'),
+            self.valid.replace(self.calls[0], b'  %root = call ptr @evaluate()\n' + self.calls[0]),
+            self.valid + self.declarations[0] + b'\n',
+            b'\n'.join(self.declarations + self.calls),
+        ):
+            with self.subTest(altered=altered), self.assertRaises(ValueError):
+                self.abi.check(altered)
+
+    def test_all_three_gates_bind_and_use_the_helper(self):
+        root = HERE.parents[1]
+        for name in ('tests/fixtures/async-completion/check.sh',
+                     'tools/release/test-async-process.sh', 'tools/release/test-async-task.sh'):
+            text = (root / name).read_text()
+            self.assertIn('python3 -B "$root/tools/release/check_async_abi.py"', text)
+            inputs = text.split('record_inputs()', 1)[1].split('record_inputs ', 1)[0]
+            self.assertIn('"$root/tools/release/check_async_abi.py"', inputs)
+            self.assertNotIn('mlf_require_async_completion_v2_abi', text)
+
+
 if __name__ == '__main__':
     unittest.main()

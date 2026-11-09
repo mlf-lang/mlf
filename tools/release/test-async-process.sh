@@ -78,7 +78,7 @@ include_args=(-i "$root/libraries/mlf-foundation" -i "$root/libraries/mlf-async"
 record_inputs() {
   local destination=$1 file
   printf '{}\n' > "$destination"
-  for file in "$fixtures"/* "$root/tools/release/test-async-process.sh" \
+  for file in "$fixtures"/* "$root/tools/release/test-async-process.sh" "$root/tools/release/check_async_abi.py" \
     "$root/libraries/mlf-foundation/Bootstrap/Types.hs" "$root/libraries/mlf-foundation/Bootstrap/Std.hs" \
     "$root/libraries/mlf-async/Async/Process.hs" "$root/libraries/mlf-async/Async/Process/Internal.hs" \
     "$root"/runtime/*; do
@@ -125,7 +125,7 @@ success compile "$compiler" "${include_args[@]}" "$fixtures/Main.emlf"
 success check "$compiler" --check "$work/compile.stdout"
 cmp "$fixtures/io-unit.type" "$work/check.stdout" || fail 'checked target does not have type IO Unit'
 success emit "$compiler" --xmlf-to-llvm-io-gc "$work/compile.stdout"
-grep -F 'mlf_require_async_completion_v2_abi' "$work/emit.stdout" >/dev/null || fail 'native target lacks the current async primitive capability guard'
+python3 -B "$root/tools/release/check_async_abi.py" "$work/emit.stdout" >/dev/null || fail 'native target lacks the current async primitive capability guard'
 success link "$clang" -O2 -Wno-override-module -x ir "$work/emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/suite.native"
 export MLF_ASYNC_FIXTURE="$work/fixture"
 for backend in interpreter llvm; do

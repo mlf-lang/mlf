@@ -5,8 +5,9 @@ import hashlib
 import json
 
 from query_generation import Generation, cache_directory
-from artifact_binary_reference import read_document, tree_document
+from artifact_binary_reference import read_document, tree_document, require
 from artifact_binary_typed import list_values, text, unpack, value_node
+from artifact_binary_open import open_document, OPEN_FORMATS
 
 
 def n(tag, *fields):
@@ -29,12 +30,28 @@ def binder_name(binder):
     return value_node(binder, 31, 2)[1]
 
 
+def package_fragments(raw):
+    """Read committed schema dispatch, preserving each complete final record."""
+    # Reuse the independent schema8 aggregate/per-root budget and canonical
+    # framing checks already used by the binary-artifact correctness suite.
+    schema, _, package = open_document(raw)
+    fmt, compiler, association, bindings, declarations, finals = package
+    require(text(fmt) == OPEN_FORMATS[schema], "open package format")
+    finals = list_values(finals)
+    objects = {}
+    for final in finals:
+        fields = value_node(final, 401, 7)
+        name = text(fields[0])
+        require(name not in objects, "duplicate open package fragment")
+        objects[name] = fields
+    return objects
+
+
 def check_receipts(prefix, cache, nodes):
     """Rebuild the fragment commitment from the emitted object and actual dependency versions."""
     results = cache_directory(cache) / "results"
     groups = json.loads(prefix.with_suffix(".queries").read_text())["groups"]
-    package = value_node(read(prefix.with_suffix(".mlfco"), 7), 430, 6)
-    objects = {text(f[2][0]): value_node(f, 401, 7) for f in list_values(package[-1])}
+    objects = package_fragments(prefix.with_suffix(".mlfco").read_bytes())
     interface = value_node(read(prefix.with_suffix(".mlfci"), 3), 242, 13)
     types = {text(name): ty for name, ty in (value_node(b, 2, 2) for b in list_values(interface[9]))}
     retained = rewritten = 0

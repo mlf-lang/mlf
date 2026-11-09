@@ -57,7 +57,7 @@ success() { local label=$1; run "$@" || fail "$label failed"; test ! -s "$work/$
 record_inputs() {
  local destination=$1 file
  printf '{}\n' > "$destination"
- for file in "$fixtures"/* "$root/tools/release/test-async-task.sh" "$root/tests/async-process/fixture.c" \
+ for file in "$fixtures"/* "$root/tools/release/test-async-task.sh" "$root/tools/release/check_async_abi.py" "$root/tests/async-process/fixture.c" \
   "$root/libraries/mlf-foundation/Bootstrap/Types.hs" "$root/libraries/mlf-foundation/Bootstrap/Std.hs" \
   "$root/libraries/mlf-async/Async/Task/Core.hs" "$root/libraries/mlf-async/Async/Task.hs" "$root/libraries/mlf-async/Async/Task/Internal.hs" \
   "$root/libraries/mlf-async/Async/Process.hs" "$root/libraries/mlf-async/Async/Process/Internal.hs" \
@@ -118,7 +118,7 @@ for suite in main processes wait-graph guards; do
  success "$suite.check" "$compiler" --check "$work/$suite.compile.stdout"
  cmp "$fixtures/$type_oracle" "$work/$suite.check.stdout" || fail "$suite target type"
  success "$suite.emit" "$compiler" --xmlf-to-llvm-io-gc "$work/$suite.compile.stdout"
- grep -F 'mlf_require_async_completion_v2_abi' "$work/$suite.emit.stdout" >/dev/null || fail "$suite lacks async ABI guard"
+ python3 -B "$root/tools/release/check_async_abi.py" "$work/$suite.emit.stdout" >/dev/null || fail "$suite lacks async ABI guard"
  success "$suite.link" "$clang" -O2 -Wno-override-module -x ir "$work/$suite.emit.stdout" -x none "$work/runtime.o" "${libs[@]}" -o "$work/$suite.native"
  for backend in interpreter llvm; do
   mkdir "$work/$suite.$backend"
