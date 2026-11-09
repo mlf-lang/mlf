@@ -1,0 +1,116 @@
+{
+  "format": "integrated-fingerprint-fusion-independent-controls-v1",
+  "entry": "Tests.main",
+  "candidate_output_used_for_expectations": false,
+  "source_files": {
+    "Oracle.hs": "af71fa1817dabd45c7cfab98c1043dd18eca396bfa57c23181d0bf22e035cfee",
+    "Tests.hs": "e7352052eb25fa2855ac5741577e328d461d481a21aea203bcb230f53f784f6a",
+    "Probe.hs": "a715135903662d82e16431be6796c60789ae6a87fb178757083124f4e92fe271"
+  },
+  "oracle": {
+    "optimization": "O0 via file pragma",
+    "arithmetic": "Literal original unbounded Integer mul/add/rem with locally defined left-to-right strict2/pseq; original zero-divisor text via public HostError constructor",
+    "candidate_arithmetic_calls": false,
+    "original_rule_parameters": [
+      [
+        65599,
+        2147483647
+      ],
+      [
+        131,
+        2147483629
+      ]
+    ],
+    "nonmatching_parameters": [
+      [
+        65598,
+        2147483647
+      ],
+      [
+        65599,
+        2147483646
+      ]
+    ],
+    "private_candidate_helpers_imported": false
+  },
+  "probe_routes": [
+    "stepA",
+    "namedA",
+    "stepB",
+    "namedB",
+    "unmatchedMultiplier",
+    "unmatchedModulus"
+  ],
+  "finite_values": {
+    "boundary_states": 27,
+    "boundary_codes": 25,
+    "boundary_pairs": 675,
+    "boundary_route_comparisons": 4050,
+    "deterministic_pairs": 2500,
+    "deterministic_route_comparisons": 15000,
+    "state_modes": 10,
+    "code_modes": 10,
+    "generator_seed": 1729,
+    "generator_formula": "(1103515245*x+12345) rem 2147483648",
+    "candidate_generates_inputs": false
+  },
+  "streams": {
+    "streams": 5,
+    "initial_states": 9,
+    "routes": 6,
+    "stream_runs": 270,
+    "comparison": "every prefix, not just final checksum",
+    "categories": [
+      "ASCII",
+      "Unicode scalar integer codes",
+      "host surrogate Char codes (not text)",
+      "noncanonical/huge signed integer codes",
+      "512 deterministic codepoints"
+    ],
+    "char_boundaries": 8,
+    "char_checks_per_boundary": 2,
+    "text_validation_claim": false
+  },
+  "demand": {
+    "candidate_routes": 6,
+    "literal_oracle_routes": 6,
+    "exact_HostError_priority_probes": 60,
+    "partial_application_functions": 18,
+    "partial_application_whnf_checks": 18,
+    "partial_application_application_error_checks": 18,
+    "ordinary_nonzero_signed_division_cases": 224,
+    "ordinary_zero_and_panic_order_probes": 40,
+    "ordinary_operations": [
+      "remInt",
+      "(%)",
+      "quotInt",
+      "(/)"
+    ]
+  },
+  "timeouts": {
+    "expected_timeout_microseconds": 250000,
+    "expected_HostError_deadline_microseconds": 2000000,
+    "caught_exception_type": "MLF.Host.Base.HostError only",
+    "unexpected_exceptions": "propagate and fail; never treated as divergence",
+    "expected_timeouts": 36,
+    "expected_panic_not_timeout": 12,
+    "minimum_expected_timeout_wait_seconds": 9,
+    "groups": [
+      "TIMEOUT fingerprint 12 state-divergence before code-panic observations",
+      "TIMEOUT fingerprint 12 state-panic wins before code-divergence observations",
+      "TIMEOUT fingerprint 12 canonical-state code-divergence observations",
+      "TIMEOUT fingerprint 12 noncanonical-state code-divergence observations"
+    ],
+    "observation_limit": "bounded operational observation, not a theorem of universal divergence/equivalence"
+  },
+  "required_parent_qualification": [
+    "Authenticate the current complete O2 producer before and after all controls.",
+    "Compile exact Oracle.hs and Tests.hs with their O0 pragmas, exact Probe and current production host modules separately at O0 and O2.",
+    "Compare literal expected stdout, empty stderr, successful exit and exact public-probe rule firing counts (zero O0, two of each rule O2), with Core lint enabled.",
+    "Recompile only current unchanged Bootstrap.Separate with authenticated O2 objects in a fresh copy; require both literal rules to fire and Core lint to pass.",
+    "Finite controls and rule firings are correctness/mechanism evidence, not compiler performance acceptance."
+  ],
+  "expected_stdout": "PASS fingerprint 675 boundary pairs x 6 public Probe routes\nPASS fingerprint 2500 deterministic pairs x 6 public Probe routes\nPASS fingerprint signed rem and literal cross-rule nonmatching constants\nPASS fingerprint 270 checksum streams every prefix and host Char code boundaries\nPASS fingerprint 60 exact HostError priority and noncanonical fallback probes\nPASS fingerprint 18 partial applications lazy until second operand\nPASS fingerprint 224 ordinary signed divisions and 40 exact zero-divisor demand probes\nPASS TIMEOUT fingerprint 12 state-divergence before code-panic observations\nPASS TIMEOUT fingerprint 12 state-panic wins before code-divergence observations\nPASS TIMEOUT fingerprint 12 canonical-state code-divergence observations\nPASS TIMEOUT fingerprint 12 noncanonical-state code-divergence observations\nPASS fingerprint finite independent controls complete; no universal equivalence or speed claim\n",
+  "expected_stderr": "",
+  "expectation_origin": "Frozen independent pre-integration control authoring; never generated from candidate output. Execution status belongs to each run receipt."
+}

@@ -1,0 +1,2 @@
+module RejectedLambda where
+refutable = \(Cons "b" rest) -> 2

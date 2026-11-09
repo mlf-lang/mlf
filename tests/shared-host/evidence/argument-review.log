@@ -1,0 +1,12 @@
+C.UTF-8 invalid
+argument-probe 0 b'Left (HostError "invalid Unicode scalar")\n' b''
+native 1 b'' b'Runtime: IO error: invalid UTF-8 input\n'
+C.UTF-8 valid Unicode
+argument-probe 0 b'Right 1\n' b''
+native 0 b'4\n' b''
+C invalid
+argument-probe 0 b'Left (HostError "invalid Unicode scalar")\n' b''
+native 1 b'' b'Runtime: IO error: invalid UTF-8 input\n'
+C valid Unicode
+argument-probe 0 b'Left (HostError "invalid Unicode scalar")\n' b''
+native 0 b'4\n' b''

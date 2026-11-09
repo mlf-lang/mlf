@@ -1,0 +1,745 @@
+checkGraph label encode decode graph root expected = do
+  restored <- expect (label ++ " graph decode") (decode graph root)
+  need (label ++ " graph typed semantics") (same (encode restored) expected)
+  let malformed = [W.VBits 0,W.VNode 2147483647 []] ++ case expected of
+        W.VNode tag children -> [W.VNode tag (children ++ [W.VInt 0])] ++ case children of
+          [] -> []
+          _:rest -> [W.VNode tag rest,W.VNode tag (W.VNode 2147483647 []:rest)]
+        _ -> []
+  badBytes <- W.encode W.defaultLimits 7 malformed >>= expect "malformed typed shapes are valid wire"
+  badGraph <- W.decodeGraph W.defaultLimits 7 badBytes >>= expect "malformed typed graph wire"
+  forM_ (W.graphRoots badGraph) (\index -> reject (label ++ " Graph shape rejection") (decode badGraph index))
+
+graphConstructorTests bytes = do
+  graph <- W.decodeGraph W.defaultLimits 7 bytes >>= expect "whole constructor graph"
+  need "all constructor graph roots" (length (W.graphRoots graph) == length graphChecks)
+  zipWithM_ (\check root -> check graph root) graphChecks (W.graphRoots graph)
+  reject "negative graph index" (W.lookupGraphNode graph (-1))
+  reject "out-of-range graph index" (W.lookupGraphNode graph 2147483647)
+
+-- Hand-authored semantic edges beyond the generated closed-shape inventory.
+scalarRoots = map W.VInt [-9223372036854775808,-65536,-129,-128,-1,0,1,63,64,127,128,65535,9223372036854775807]
+  ++ map W.VBits [0,-9223372036854775808,1,4503599627370495,4503599627370496,4607182418800017408,9218868437227405311,9218868437227405312,-4503599627370496,9221120237041090561,9218868437227405313,-2251799813685247]
+  ++ map (W.VText . B.literal) ["","\NUL","ASCII","α😀","\x7f\x80\x7ff\x800\xd7ff\xe000\xffff\x10000\x10ffff","a\NULb"]
+sharedLeaf = W.VNode 31 [W.VInt (-7),W.VText "same hint\NUL😀"]
+sharedRoots = [W.VNode 70 [sharedLeaf],W.VNode 72 [sharedLeaf,sharedLeaf],W.VNode 72 [sharedLeaf,sharedLeaf],W.VText "same hint\NUL😀"]
+
+semanticEdges directory = do
+  forM_ [-9223372036854775808,-1,0,1,9223372036854775807] $ \x -> do
+    restored <- expect "Int64 boundary" (A.fromInt (A.toInt x)); need "Int64 exact" (restored == x)
+    let name = T.XName x "full hint\NULα😀"
+    decoded <- expect "full name" (A.fromXName (A.toXName name))
+    case decoded of T.XName identity hint -> need "name identity and hint exact" (identity == x && hint == "full hint\NULα😀")
+  forM_ [0,-9223372036854775808,1,4503599627370495,4503599627370496,9218868437227405311,9218868437227405312,-4503599627370496,9221120237041090561,9218868437227405313,-2251799813685247] $ \bits -> do
+    value <- expect "IEEE decode" (A.fromDouble (W.VBits bits))
+    need "IEEE exact signed bits; not numeric equality" (P.doubleToBits value == bits && same (A.toDouble value) (W.VBits bits))
+    term <- expect "IEEE term decode" (A.fromXTerm (W.VNode 78 [W.VBits bits]))
+    case term of T.XDoubleTerm d -> need "IEEE term exact" (P.doubleToBits d == bits); _ -> error "IEEE wrong constructor"
+  forM_ [-1,132,2147483647] $ \code -> do
+    let value=W.VNode 32 [W.VInt code]
+    reject "unknown primitive ABI code" (A.fromPrimitive value)
+    bytes <- W.encode W.defaultLimits 7 [value] >>= expect "unknown primitive is valid wire"
+    graph <- W.decodeGraph W.defaultLimits 7 bytes >>= expect "unknown primitive graph"
+    case W.graphRoots graph of
+      [root] -> reject "unknown primitive Graph ABI code" (A.fromGraphPrimitive graph root)
+      _ -> error "unknown primitive root inventory"
+  reject "primitive wrong scalar" (A.fromPrimitive (W.VNode 32 [W.VBits 0]))
+  need "empty Maybe" (same (A.toMaybe A.toInt T.Nothing) (W.VNode 4 []))
+  need "present Maybe" (same (A.toMaybe A.toInt (T.Just 42)) (W.VNode 5 [W.VInt 42]))
+  need "list order and duplicates" (same (A.toList A.toInt [2,1,2]) (W.VNode 1 [W.VInt 2,W.VInt 1,W.VInt 2]))
+  _ <- checkCase "raw UnitObject" A.toRawUnitObject A.fromRawUnitObject (sampleRawUnitObject 31) (expectRawUnitObject 31)
+  raw <- expect "raw unit decoder" (A.fromRawUnitObject (expectRawUnitObject 31))
+  case raw of U.UnitObject _ _ -> pure (); U.CheckedUnitObject _ _ -> error "deserialized checked evidence"
+  iface <- expect "interface old semantic roundtrip" (A.fromUnitInterface (A.toUnitInterface (sampleUnitInterface 31)))
+  need "old interface meaning retained" (U.encodeInterface iface == U.encodeInterface (sampleUnitInterface 31))
+  let original = sampleInterfaceInstance 45
+  metadata <- expect "interface metadata" (A.fromInterfaceInstance (A.toInterfaceInstance original))
+  need "interface body stripping matches existing contract" (same (A.toSInstanceDecl metadata) (A.toSInstanceDecl (U.stripInstance original)))
+  full <- expect "full source instance" (A.fromSInstanceDecl (A.toSInstanceDecl original))
+  need "full source method bodies survive" (same (A.toSInstanceDecl full) (A.toSInstanceDecl original))
+  reject "fullsource tag not interface metadata" (A.fromInterfaceInstance (A.toSInstanceDecl original))
+  reject "interface metadata tag not fullsource" (A.fromSInstanceDecl (A.toInterfaceInstance original))
+  forM_ [False,True] $ \legacy -> do
+    let value = A.CrateObjectFields legacy (sampleCrateInterfaceFields 9) [sampleRawUnitObject 1,sampleRawUnitObject 2]
+    restored <- expect "legacy/modern crate flag" (A.fromCrateObjectFields (A.toCrateObjectFields value))
+    case restored of A.CrateObjectFields actual _ _ -> need "crate variant exact" (actual == legacy)
+  let ds = [sampleDataDecl 1,sampleDataDecl 2,sampleDataDecl 1]
+  context <- expect "data context" (A.fromDataContext (A.toDataContext ds))
+  need "context order and duplicates" (same (A.toDataContext context) (W.VNode 244 [W.VNode 1 (map A.toDataDecl ds)]))
+  contextBytes <- W.encode W.defaultLimits 1 [A.toDataContext ds] >>= expect "DataContext schema1 encode"
+  contextGraph <- W.decodeGraph W.defaultLimits 1 contextBytes >>= expect "DataContext schema1 Graph"
+  case W.graphRoots contextGraph of
+    [root] -> do
+      restored <- expect "Graph DataContext typed adapter" (A.fromGraphDataContext contextGraph root)
+      need "Graph DataContext order and duplicates" (same (A.toDataContext restored) (A.toDataContext ds))
+    _ -> error "DataContext one-root family contract"
+
+  -- Invalid Unicode is never normalized to replacement characters.
+  forM_ [0xd800,0xdfff] $ \point -> do
+    result <- try (evaluate (B.literal [toEnum point])) :: IO (Either B.HostError P.String)
+    case result of
+      Left (B.HostError message) -> need "surrogate rejected at existing scalar constructor" (message == "invalid Unicode scalar")
+      Right _ -> error "surrogate scalar constructed"
+  wireCheck (directory ++ "/scalars.bin") scalarRoots
+  scalarBytes <- readBounded (directory ++ "/scalars.bin")
+  scalarGraph <- W.decodeGraph W.defaultLimits 7 scalarBytes >>= expect "scalar Graph fixture"
+  need "all scalar Graph roots retained" (length (W.graphRoots scalarGraph) == length scalarRoots)
+  zipWithM_ (\root value -> case value of
+    W.VInt number -> do
+      actual <- expect "Graph Int64 boundary" (A.fromGraphInt scalarGraph root)
+      need "Graph exact Int64" (actual == number)
+    W.VBits bits -> do
+      actual <- expect "Graph IEEE boundary" (A.fromGraphDouble scalarGraph root)
+      need "Graph exact IEEE bits" (P.doubleToBits actual == bits)
+    W.VText text -> do
+      actual <- expect "Graph Unicode boundary" (A.fromGraphText scalarGraph root)
+      need "Graph exact scalar text" (actual == text)
+    _ -> error "unexpected scalar fixture constructor") (W.graphRoots scalarGraph) scalarRoots
+  wireCheck (directory ++ "/sharing.bin") sharedRoots
+
+readBounded path = do
+  (diagnostic,bytes) <- P.readByteFileOrError (B.literal path) (256*1024*1024)
+  need ("fixture input " ++ path ++ ": " ++ B.unpack diagnostic) (diagnostic == "")
+  pure bytes
+splitTabs line = case break (=='\t') line of (a,[]) -> [a]; (a,_:b) -> a:splitTabs b
+wireCorpus manifest = do
+  bytes <- P.newByteArray 5 0
+  let value = B.literal "Aé"; W.Read parse = W.getUtf8 3
+  end <- W.putText bytes 3 value 0
+  need "unaligned UTF-8 write extent" (end == 27)
+  result <- parse (W.Cursor bytes 3 end) >>= expect "unaligned UTF-8 read"
+  case result of
+    (text,W.Cursor _ next _) -> need "unaligned UTF-8 roundtrip" (text == value && next == end)
+  -- A poisoned suffix makes backward scanning observable without large
+  -- allocations. The first invalid scalar must fail before touching it.
+  prefixBytes <- fromBytes [128,32,255]
+  let W.Read readSymbols = W.getSymbols W.defaultLimits 1
+  rejected <- readSymbols (W.Cursor prefixBytes 0 (4098 * 8))
+  case rejected of
+    T.Left msg -> need "invalid prefix short circuits symbol allocation" (msg == "invalid binary UTF-8 leading byte")
+    T.Right _ -> error "invalid symbol prefix admitted"
+  input <- readFile manifest
+  forM_ (lines input) $ \line -> case splitTabs line of
+    [name,path,expected,schema,b,s,one,total,n,e,d,w] -> do
+      bytes <- readBounded path
+      result <- W.decode (W.Limits (read b) (read s) (read one) (read total) (read n) (read e) (read d) (read w)) (read schema) bytes
+      case (expected,result) of
+        ("accept",T.Right values) -> do
+          -- Positive corpus inputs are canonical: encoder must produce exactly
+          -- these independently authored bytes under the same limits.
+          again <- W.encode (W.Limits (read b) (read s) (read one) (read total) (read n) (read e) (read d) (read w)) (read schema) values >>= expect (name ++ " reencode")
+          a <- byteList bytes; b2 <- byteList again; need (name ++ " canonical exact bytes") (a == b2)
+        ("reject",T.Left _) -> pure ()
+        _ -> error ("wire outcome disagrees with fixed oracle: " ++ name)
+      graphResult <- W.decodeGraph (W.Limits (read b) (read s) (read one) (read total) (read n) (read e) (read d) (read w)) (read schema) bytes
+      case (expected,graphResult,result) of
+        ("accept",T.Right graph,T.Right values) -> do
+          need (name ++ " graph root inventory") (length (W.graphRoots graph) == length values)
+          zipWithM_ (sameGraphValue graph) (W.graphRoots graph) values
+        ("reject",T.Left _,T.Left _) -> pure ()
+        _ -> error ("graph decoder outcome disagrees with fixed oracle: " ++ name)
+      let hints = [B.literal (replicate 1100 'A')]
+      hinted <- W.decodeGraphWithText hints (W.Limits (read b) (read s) (read one) (read total) (read n) (read e) (read d) (read w)) (read schema) bytes
+      case (result,hinted) of
+        (T.Right values,T.Right graph) -> do
+          need (name ++ " hinted graph roots") (length values == length (W.graphRoots graph))
+          zipWithM_ (sameGraphValue graph) (W.graphRoots graph) values
+        (T.Left ordinary,T.Left withHint) -> need (name ++ " hinted rejection") (ordinary == withHint)
+        _ -> error ("hint changed wire admission: " ++ name)
+      putStrLn ("PASS " ++ name)
+    _ -> error "bad corpus manifest shape"
+
+sameGraphValue graph index value = do
+  node <- expect "graph child lookup" (W.lookupGraphNode graph index)
+  case (node,value) of
+    (W.GInt a,W.VInt b) -> need "graph int bits" (a == b)
+    (W.GBits a,W.VBits b) -> need "graph raw bits" (a == b)
+    (W.GText a,W.VText b) -> need "graph text scalar bytes" (a == b)
+    (W.GNode a xs,W.VNode b ys) -> do
+      need "graph node tag/arity" (a == b && length xs == length ys)
+      zipWithM_ (sameGraphValue graph) xs ys
+    _ -> error "graph node kind disagrees with Value decode"
+
+
+rawIO directory = do
+  -- Constructing a byte action must not force its array before execution.
+  _ <- evaluate (P.byteArrayDigest (error "forced digest array while constructing action"))
+  _ <- evaluate (P.writeByteFileOrError "unused" (error "forced file array while constructing action"))
+  exists <- doesPathExist directory; need "fresh raw fixture directory" (not exists); createDirectory directory
+  empty <- fromBytes []
+  bytes <- fromBytes [0..255]
+  let p x = B.literal (directory ++ "/" ++ x)
+      readOK label path limit expected = do
+        (diagnostic,array) <- P.readByteFileOrError path limit
+        actual <- byteList array
+        need label (diagnostic == "" && actual == expected)
+      readBad label path limit expected = do
+        (diagnostic,array) <- P.readByteFileOrError path limit
+        actual <- byteList array
+        need label (diagnostic == expected && null actual)
+  saveBytes (directory ++ "/empty.bin") empty
+  saveBytes (directory ++ "/allbytes.bin") bytes
+  readOK "empty with zero limit" (p "empty.bin") 0 []
+  readOK "all raw byte values exact boundary" (p "allbytes.bin") 256 [0..255]
+  readOK "raw exact larger limit" (p "allbytes.bin") 257 [0..255]
+  readBad "nonempty zero cap" (p "allbytes.bin") 0 "byte file exceeds limit"
+  readBad "discard partial read" (p "allbytes.bin") 255 "byte file exceeds limit"
+  readBad "missing path diagnostic" (p "missing.bin") 256 "IO error: byte file read failed"
+  readBad "negative limit" (p "allbytes.bin") (-1) "invalid byte file limit"
+  readBad "overflow-prone limit" (p "allbytes.bin") 9223372036854775807 "invalid byte file limit"
+  readBad "path NUL has priority" (p "allbytes.bin\NULsuffix") (-1) "file path contains NUL"
+  diagnostic <- P.writeByteFileOrError (p "nul-created.bin\NULsuffix") bytes
+  need "write NUL diagnostic" (diagnostic == "file path contains NUL")
+  nulExists <- doesPathExist (directory ++ "/nul-created.bin"); need "NUL path not truncated/opened" (not nulExists)
+  noParent <- P.writeByteFileOrError (p "missing-parent/file") bytes
+  need "missing parent write ordinary failure" (noParent == "IO error: byte file write failed")
+  directoryFailure <- P.writeByteFileOrError (B.literal directory) bytes
+  need "directory write ordinary failure" (directoryFailure == "IO error: byte file write failed")
+  digestEmpty <- P.byteArrayDigest empty
+  digestAll <- P.byteArrayDigest bytes
+  P.writeByteArray bytes 0 255
+  changed <- P.byteArrayDigest bytes
+  saveBytes (directory ++ "/changed.bin") bytes
+  writeFile (directory ++ "/digests.tsv") ("empty.bin\t" ++ B.unpack digestEmpty ++ "\nallbytes.bin\t" ++ B.unpack digestAll ++ "\nchanged.bin\t" ++ B.unpack changed ++ "\n")
+  forM_ [1,55,56,63,64,65,127,128,129,4095,4096,4097] $ \size -> do
+    boundary <- fromBytes [i `mod` 256 | i <- [0..size-1]]
+    let leaf="sha-" ++ show size ++ ".bin"
+    saveBytes (directory ++ "/" ++ leaf) boundary
+    fingerprint <- P.byteArrayDigest boundary
+    appendFile (directory ++ "/digests.tsv") (leaf ++ "\t" ++ B.unpack fingerprint ++ "\n")
+  need "digest changes with mutable byte snapshot" (digestAll /= changed)
+  -- Snapshot digest must not depend on the current contents of the source path.
+  saveBytes (directory ++ "/allbytes.bin") empty
+  retained <- P.byteArrayDigest bytes
+  need "byte digest is array snapshot not reopened path" (retained == changed)
+  saveBytes (directory ++ "/allbytes.bin") =<< fromBytes [0..255]
+  putStrLn "PASS raw-byte-io-and-digest"
+
+partialWrite sink = do
+  bytes <- P.newByteArray 8192 255
+  diagnostic <- P.writeByteFileOrError (B.literal sink) bytes
+  need "short write or close failure must not report success" (diagnostic == "IO error: byte file write failed")
+  putStrLn "PASS raw-write-failure"
+
+main = do
+  args <- getArgs
+  case args of
+    ["constructors",directory] -> do
+      exists <- doesPathExist directory; need "fresh constructor directory" (not exists); createDirectory directory
+      roots <- constructorTests
+      wireCheck (directory ++ "/constructors.bin") roots
+      readBounded (directory ++ "/constructors.bin") >>= graphConstructorTests
+      semanticEdges directory
+      putStrLn ("PASS constructors " ++ show (length roots))
+    ["source-admission",directory] -> sourceAdmissionTests directory
+    ["admission"] -> admissionTests
+    ["base64",directory] -> base64Tests directory
+    ["lowered-query",directory,resultFile,value] -> loweredQuery directory resultFile (read value)
+    ["lowered-legacy",path,version] -> loweredLegacy path version
+    ["distribution-seed",directory] -> distributionSeed directory
+    ["release-builtin-branches",directory] -> releaseBuiltinBranches directory
+    ["release-forged-current",directory] -> releaseForgedCurrent directory
+    ["release-materialize",directory,digest,cache,compiler] ->
+      Release.materializePinned (B.literal directory) (B.literal digest) (B.literal cache) (B.literal compiler) True >>= putStrLn . B.unpack
+    ["distribution-pack",directory,asset] -> Distribution.pack (B.literal directory) (B.literal asset) >>= putStrLn . B.unpack . Json.render
+    ["distribution-unpack",asset,destination,expectedSHA] -> Distribution.unpack (B.literal asset) (B.literal destination) (B.literal expectedSHA) >>= putStrLn . B.unpack . Json.render
+    ["distribution-asset",path,expectedSHA,expected] -> do
+      actual <- Distribution.validAsset (B.literal path) (B.literal expectedSHA)
+      need "actual release asset SHA pin" (actual == (expected == "valid"))
+      putStrLn "PASS distribution-asset-pin"
+    ["formal-check",prefix,expected] -> formalCheck prefix expected
+    ["typed-bounds",directory] -> typedBounds directory
+    ["wire-corpus",manifest] -> wireCorpus manifest
+    ["raw-io",directory] -> rawIO directory
+    ["partial-write",sink] -> partialWrite sink
+    _ -> error "expected constructors DIR | wire-corpus MANIFEST | raw-io DIR | partial-write FAILURE-SINK"
+
+-- Finite stress cases cover the *typed* graph boundary, not just wire parsing.
+-- They intentionally do not imply the old semantic fingerprinting pass is O(DAG).
+typedBounds directory = do
+  exists <- doesPathExist directory; need "fresh typed bounds directory" (not exists); createDirectory directory
+  let wide = W.VNode 1 [W.VText (B.literal ("field-" ++ show i)) | i <- [0..4095 :: Int]]
+      chain 0 = W.VNode 10 []
+      chain depth = W.VNode 11 [W.VNode 10 [],chain (depth-1)]
+      bomb 0 = W.VNode 10 []
+      bomb depth = let child=bomb (depth-1) in W.VNode 11 [child,child]
+      graphFrom limits value = do
+        bytes <- W.encode limits 7 [value] >>= expect "typed stress encode"
+        graph <- W.decodeGraph limits 7 bytes >>= expect "typed stress graph decode"
+        root <- case W.graphRoots graph of [r] -> pure r; _ -> error "typed stress roots"
+        pure (bytes,graph,root)
+  (wideBytes,wideGraph,wideRoot) <- graphFrom W.defaultLimits wide
+  strings <- expect "wide typed list" (A.fromGraphTextList wideGraph wideRoot)
+  need "wide list exact length/order" (map B.unpack strings == ["field-" ++ show i | i <- [0..4095 :: Int]])
+  saveBytes (directory ++ "/wide.bin") wideBytes
+  let deep=chain (2048 :: Int)
+  (deepBytes,deepGraph,deepRoot) <- graphFrom W.defaultLimits deep
+  kind <- expect "deep typed Kind" (A.fromGraphKind deepGraph deepRoot)
+  let depth T.Star = 0 :: Int
+      depth (T.KArrow T.Star rest) = 1 + depth rest
+      depth _ = error "deep Kind shape changed"
+  need "deep typed chain survives" (depth kind == 2048)
+  direct <- expect "deep Value adapter explicit stack" (A.fromKind deep)
+  need "deep Value adapter result" (depth direct == 2048)
+  saveBytes (directory ++ "/deep.bin") deepBytes
+  let limits=W.Limits 1048576 16 1024 4096 64 128 64 524287
+      tooSmall=W.Limits 1048576 16 1024 4096 64 128 64 524286
+      exponential=bomb (18 :: Int)
+  (bombBytes,bombGraph,bombRoot) <- graphFrom limits exponential
+  W.decodeGraph tooSmall 7 bombBytes >>= reject "typed graph exponential work preflight"
+  W.decode tooSmall 7 bombBytes >>= reject "Value decode same exponential work preflight"
+  shared <- expect "typed graph bounded KArrow DAG" (A.fromGraphKind bombGraph bombRoot)
+  let sharing 0 T.Star = pure ()
+      sharing remaining (T.KArrow a b) = do
+        a' <- evaluate a; b' <- evaluate b
+        left <- makeStableName a'; right <- makeStableName b'
+        need "Graph decoder retains raw syntax child identity" (eqStableName left right)
+        sharing (remaining-1) a'
+      sharing _ _ = error "typed shared Kind shape changed"
+  sharing (18 :: Int) shared
+  saveBytes (directory ++ "/exponential.bin") bombBytes
+  let rawValue=W.VNode 241 [expectUnitInterface 1, W.VNode 77 [W.VInt 1]]
+  (_,rawGraph,rawRoot) <- graphFrom W.defaultLimits rawValue
+  raw <- expect "typed graph raw unit" (A.fromGraphRawUnitObject rawGraph rawRoot)
+  case raw of U.UnitObject _ _ -> pure (); U.CheckedUnitObject _ _ -> error "Graph reused/deserialized proof evidence"
+  putStrLn "PASS typed-wide-deep-shared-raw"
+
+base64Tests directory = do
+  exists <- doesPathExist directory; need "fresh base64 directory" (not exists); createDirectory directory
+  forM_ [("",""),("f","Zg=="),("fo","Zm8="),("foo","Zm9v"),("foob","Zm9vYg=="),("fooba","Zm9vYmE="),("foobar","Zm9vYmFy")] $ \(source,expected) -> do
+    bytes <- P.byteArrayFromString (B.literal source)
+    encoded <- Storage.encodeBase64 bytes >>= expect "RFC4648 base64 encode"
+    need "fixed RFC4648 golden" (encoded == B.literal expected)
+    decoded <- Storage.decodeBase64 (B.literal expected) >>= expect "RFC4648 base64 decode"
+    original <- byteList bytes; actual <- byteList decoded; need "base64 byte roundtrip" (original == actual)
+  forM_ ["Z","Zg","Zg=","Zg===","Zh==","Zm9=","Zg==AAAA","Z=g=","====","____","Zg==\n","αααα","AA A"] $ \bad ->
+    Storage.decodeBase64 (B.literal bad) >>= reject "noncanonical release base64"
+  bytes <- fromBytes [0..255]
+  encoded <- Storage.encodeBase64 bytes >>= expect "all-byte base64"
+  writeFile (directory ++ "/allbytes.base64") (B.unpack encoded)
+  decoded <- Storage.decodeBase64 encoded >>= expect "all-byte decode"
+  actual <- byteList decoded; need "all-byte base64 exact" (actual == [0..255])
+  putStrLn "PASS canonical-base64"
+
+loweredQuery directory resultFile value = do
+  let members=[("first",T.Nothing,T.SIntLit value),("second",T.Nothing,T.SIntLit 99)]
+  (objects,report) <- Q.compileGroups "binary-lowered" (B.literal directory) [] [] members >>= expect "actual lowered QUERY4 driver"
+  writeFile resultFile (B.unpack (U.pack (map U.encodeObject objects)))
+  putStrLn (B.unpack (Q.reportJSON "binary-lowered" "test" report))
+
+loweredLegacy path version = do
+  bytes <- readBounded path
+  graph <- W.decodeGraph W.defaultLimits 2 bytes >>= expect "real inline binary query"
+  root <- case W.graphRoots graph of [r] -> pure r; _ -> error "inline query roots"
+  node <- expect "inline query root" (W.lookupGraphNode graph root)
+  (key,object) <- case node of
+    W.GNode 300 [keyNode,objectNode] -> do
+      key <- expect "inline full exact key" (A.fromGraphText graph keyNode)
+      object <- expect "inline complete raw unit" (A.fromGraphRawUnitObject graph objectNode)
+      pure (key,object)
+    _ -> error "lowered driver did not write binary inline root300"
+  let text=if version == "1" then U.pack ["MLF-QUERY-CACHE-1",key,U.encodeInterface (U.objectInterface object),U.encodeObject object]
+           else Q.encodeCached key object
+  parts <- expect "legacy query framing" (U.unpack text)
+  need "exact intended old lowered query format" (case parts of tag:_ -> tag == (if version == "1" then "MLF-QUERY-CACHE-1" else "MLF-QUERY-CACHE-2"); _ -> False)
+  writeFile path (B.unpack text)
+  putStrLn ("PASS lowered-install-CACHE" ++ version)
+
+formalCheck prefix expected = do
+  result <- CrateArtifact.readInterface (B.literal (prefix ++ ".mlfci"))
+  combined <- case result of
+    T.Left message -> pure (T.Left message)
+    T.Right iface -> CrateArtifact.readObject (B.literal (prefix ++ ".mlfco")) iface
+  case (expected,combined) of
+    ("accept",T.Right _) -> putStrLn "PASS formal-accept"
+    ("reject-interface-version",T.Left message) -> do
+      need "recognized interface magic uses exact binary version refusal" (message == B.literal (prefix ++ ".mlfci: unsupported binary format version"))
+      putStrLn "PASS formal-interface-version-reject"
+    ("reject-object-version",T.Left message) -> do
+      need "recognized object magic uses exact binary version refusal" (message == B.literal (prefix ++ ".mlfco: unsupported binary format version"))
+      putStrLn "PASS formal-object-version-reject"
+    _ -> error "actual formal artifact reader disagrees with fixed expectation"
+
+distributionSeed directory = do
+  exists <- doesPathExist directory; need "fresh distribution seed" (not exists); createDirectory directory
+  let sourcePath=directory ++ "/BinaryPackage.hs"
+      specPath=directory ++ "/seed.spec"
+      prefix=directory ++ "/seed"
+      source="-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule BinaryPackage where { import MLF.Primitive; value :: Int; value = 41 }\n"
+      spec=U.pack ["MLF-CRATE-1","binary-package/1/library","","true",U.pack [U.pack ["BinaryPackage",B.literal sourcePath]],U.pack [],B.literal (directory ++ "/cache"),B.literal (directory ++ "/builtin")]
+  writeFile sourcePath source
+  writeFile specPath (B.unpack spec)
+  Session.compileSpecFile (B.literal specPath) (B.literal prefix) >>= expect "real library Session producer"
+  iface <- CrateArtifact.readInterface (B.literal (prefix ++ ".mlfci")) >>= expect "new complete binary interface reader"
+  object <- CrateArtifact.readObject (B.literal (prefix ++ ".mlfco")) iface >>= expect "new complete binary object reader"
+  builtinPath <- P.canonicalPath (B.literal (directory ++ "/builtin.mlfci"))
+  builtinIface <- CrateArtifact.readInterface builtinPath >>= expect "actual Session builtin interface"
+  builtinObject <- CrateArtifact.readObject (CrateArtifact.objectPath builtinPath) builtinIface >>= expect "actual Session builtin object"
+  canonicalBuiltin <- expect "canonical builtin fixture" CrateArtifact.builtinPrelude
+  need "Session dependency is exact canonical builtin pair"
+    (CrateArtifact.encodeInterface builtinIface == CrateArtifact.encodeInterface (CrateArtifact.objectInterface canonicalBuiltin) &&
+     CrateArtifact.encodeObject builtinObject == CrateArtifact.encodeObject canonicalBuiltin)
+  need "release fixture exact builtin dependency and no entry"
+    (CrateArtifact.crateDependencies iface == [("mlf:builtin-shared-haskell-v1:11",builtinPath,CrateArtifact.semanticFingerprint builtinIface)] &&
+     CrateArtifact.crateEntry iface == "")
+  need "builtin leaf has no dependencies or entry"
+    (CrateArtifact.crateId builtinIface == "mlf:builtin-shared-haskell-v1:11" && null (CrateArtifact.crateDependencies builtinIface) && CrateArtifact.crateEntry builtinIface == "")
+  need "release fixture exact identity/module" (CrateArtifact.crateId iface == "binary-package/1/library" && CrateArtifact.crateModules iface == ["BinaryPackage"])
+  writeFile (directory ++ "/legacy.mlfci") (B.unpack (CrateArtifact.encodeInterface iface))
+  writeFile (directory ++ "/legacy.mlfco") (B.unpack (CrateArtifact.encodeObject object))
+  -- Keep the original Session pair for the formal/public-pair oracles. Real
+  -- Release.publish separately writes the complete binary portable closure.
+  executable <- getExecutablePath
+  compiler <- P.fileDigest (B.literal executable)
+  Release.publish (B.literal (prefix ++ ".mlfci")) compiler True "binary-package" "1" (B.literal (directory ++ "/release-binary"))
+  -- Legacy bytes have different digest keys. Encode the canonical leaf first,
+  -- then relocate the unchanged root through the production relocation helper.
+  let legacyBuiltinPrefix = directory ++ "/release-legacy-builtin"
+  writeFile (legacyBuiltinPrefix ++ ".mlfci") (B.unpack (CrateArtifact.encodeInterface builtinIface))
+  writeFile (legacyBuiltinPrefix ++ ".mlfco") (B.unpack (CrateArtifact.encodeObject builtinObject))
+  legacyMetadata <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfci"))
+  legacyBody <- P.fileDigest (B.literal (legacyBuiltinPrefix ++ ".mlfco"))
+  let legacyPath = Release.virtualPath (Release.pairKey legacyMetadata legacyBody)
+  portableLegacy <- expect "legacy root relocation" (Release.relocateObject [("mlf:builtin-shared-haskell-v1:11",legacyPath)] object)
+  need "legacy closure exact relocated dependency"
+    (CrateArtifact.crateDependencies (CrateArtifact.objectInterface portableLegacy) ==
+      [("mlf:builtin-shared-haskell-v1:11",legacyPath,CrateArtifact.semanticFingerprint builtinIface)])
+  writeFile (directory ++ "/release-legacy-root.mlfci") (B.unpack (CrateArtifact.encodeInterface (CrateArtifact.objectInterface portableLegacy)))
+  writeFile (directory ++ "/release-legacy-root.mlfco") (B.unpack (CrateArtifact.encodeObject portableLegacy))
+  putStrLn "PASS actual-binary-library-and-legacy-formal"
+
+-- Raw structural fidelity is intentionally broader than production parser
+-- admission. These negatives invoke the actual production checker with a
+-- correct outer term fingerprint; they cannot pass via an unrelated hash error.
+admissionTests = do
+  let bad label reason tasks = case Storage.admit tasks of
+        T.Left message -> need label (message == "binary artifact syntax admission: " P.++ B.literal reason)
+        T.Right _ -> error ("production syntax accepted " ++ label)
+  bad "class empty parameters" "invalid class name or empty parameters" [Storage.AdmitClasses [T.SClassDecl "Eq" [] [] []]]
+  bad "class illegal name" "invalid class name or empty parameters" [Storage.AdmitClasses [T.SClassDecl "bad name" [("a",T.Star)] [] []]]
+  bad "instance empty head" "invalid instance class or empty head" [Storage.AdmitInstances [("opaque ID",T.SInstanceDecl [] [] "Eq" [] [])]]
+  bad "instance illegal class name" "invalid instance class or empty head" [Storage.AdmitInstances [("opaque ID",T.SInstanceDecl [] [] "bad name" [T.SCon "Int" []] [])]]
+  bad "field quantified binder" "invalid quantified field binder" [Storage.AdmitField True (T.Quantified "Upper" T.Star (T.Parameter "Upper"))]
+  bad "field variable binder" "invalid field parameter" [Storage.AdmitField True (T.Parameter "Upper")]
+  bad "negative term name ID" "invalid term identity or hint" [Storage.AdmitName (T.XName (-1) "x")]
+  bad "illegal term hint" "invalid term identity or hint" [Storage.AdmitName (T.XName 0 "bad space")]
+  bad "min type variable ID" "type identity outside legacy decimal domain" [Storage.AdmitVariable (T.XTyVar (-9223372036854775808))]
+  bad "class method name" "invalid class method name" [Storage.AdmitMethods [("bad space",T.SCon "Int" [])]]
+  bad "instance method name" "invalid instance method name" [Storage.AdmitMethodNames [("bad space",T.SIntLit 0)]]
+  bad "predicate empty arguments" "invalid predicate class or empty arguments" [Storage.AdmitPredicates [T.SPredicate "Eq" []]]
+  bad "surface binder" "invalid surface type binder" [Storage.AdmitSurface (T.SForall T.Flexible "Upper" T.SBottom (T.STVar "Upper"))]
+  forM_ ["True.T","False.T","M.True.T","M.False.T"] $ \name -> do
+    bad "reserved boolean cannot be a qualified prefix" "invalid surface type constructor" [Storage.AdmitSurface (T.SCon name [])]
+    bad "reserved boolean cannot prefix metadata field type" "invalid field constructor" [Storage.AdmitField True (T.Applied name [])]
+  bad "metadata colon surface type" "invalid surface type constructor" [Storage.AdmitSurface (T.SCon ":" [])]
+  bad "metadata colon field type" "invalid field constructor" [Storage.AdmitField True (T.Applied ":" [])]
+  forM_ ["M.True","M.False","True","False"] $ \name -> do
+    _ <- expect "boolean spelling is allowed as the terminal metadata component" (Storage.admit [Storage.AdmitSurface (T.SCon name []),Storage.AdmitField True (T.Applied name [])])
+    pure ()
+  _ <- expect "xMLF field profile retains legal builtin colon" (Storage.admit [Storage.AdmitField False (T.Applied ":" [])])
+
+  let box=T.DataDeclK "Box" [("a",T.Star)] [T.ConstructorDecl "Box" [T.Parameter "a"]]
+      application=T.Application (T.Applied "Box" []) (T.Applied "Int" [])
+  _ <- expect "all-Star DataDeclK is a legal representation" (Storage.admit [Storage.AdmitData True [box]])
+  _ <- expect "Application is a legal field representation" (Storage.admit [Storage.AdmitField True application])
+  _ <- expect "ordinary class/instance syntax" (Storage.admit [
+    Storage.AdmitClasses [T.SClassDecl "Eq" [("a",T.Star)] [] [("eq",T.SArrow (T.STVar "a") (T.STVar "a"))]],
+    Storage.AdmitInstances [("opaque ID",T.SInstanceDecl [] [] "Eq" [T.SCon "Int" []] [("eq",T.SIntLit 0)])],
+    Storage.AdmitVariable (T.XTyVar (-9223372036854775807)),Storage.AdmitName (T.XName 9223372036854775807 "x"),
+    Storage.AdmitPredicates [T.SPredicate "HasCallStack" []]])
+  -- The raw codec must not normalize away the representational differences.
+  restoredBox <- expect "raw all-Star DataDeclK" (A.fromDataDecl (A.toDataDecl box))
+  need "raw DataDeclK tag retained" (case restoredBox of T.DataDeclK _ _ _ -> True; _ -> False)
+  restoredField <- expect "raw Application" (A.fromField (A.toField application))
+  need "raw Application tag retained" (case restoredField of T.Application _ _ -> True; _ -> False)
+  let checkBadUnit term reason = do
+        let iface=U.UnitInterface "AdmissionProbe" [] [] [] [] [] [] (U.fingerprint (Pretty.prettyTerm term))
+            object=U.UnitObject iface term
+        bytes <- W.encode W.defaultLimits 7 [A.toRawUnitObject object] >>= expect "invalid-admission raw syntax encodes"
+        graph <- W.decodeGraph W.defaultLimits 7 bytes >>= expect "invalid-admission wire graph decodes"
+        root <- case W.graphRoots graph of [r] -> pure r; _ -> error "admission raw root"
+        raw <- expect "invalid-admission typed raw syntax decodes" (A.fromGraphRawUnitObject graph root)
+        case Storage.checkUnit raw of
+          T.Left message -> need "actual checkUnit correct admission boundary, not outer checksum" (message == "binary artifact syntax admission: " P.++ B.literal reason)
+          T.Right _ -> error "production admitted malformed raw term syntax"
+  checkBadUnit (T.XVarTerm (T.XName (-1) "x")) "invalid term identity or hint"
+  checkBadUnit (T.XVarTerm (T.XName 0 "bad space")) "invalid term identity or hint"
+  checkBadUnit (T.XTypeAbs (T.XTyVar (-9223372036854775808)) T.XBot (T.XIntTerm 0)) "type identity outside legacy decimal domain"
+  let goodTerm=T.XIntTerm 41
+      goodIface=U.UnitInterface "AdmissionProbe" [] [] [] [] [] [] (U.fingerprint (Pretty.prettyTerm goodTerm))
+  accepted <- expect "production checker still admits valid raw syntax" (Storage.checkUnit (U.UnitObject goodIface goodTerm))
+  case accepted of U.CheckedUnitObject _ _ -> pure (); U.UnitObject _ _ -> error "production failed to establish checked evidence"
+  putStrLn "PASS production-admission-distinct-from-raw-codec"
+
+
+-- R2 regression: keep the source key and actual schema301 empty
+-- context/int-only raw body fixed. Only the caller's expected datatype list
+-- changes. A body that does not mention Other must not bypass key/context
+-- binding, including after a genuine invocation-local memo was established.
+-- Compare the localized proof edit to the full canonical graph traversal.
+-- Pretty output intentionally forgets XThen association; compare formal nodes.
+sourceNormalizationControls = do
+  let var = T.XTyVar 3
+      chain n = foldl T.XThen T.XRefl (replicate n T.XRefl)
+      term phi = T.XTypeApp (T.XIntTerm 0) phi
+      x = T.XName 4 "x"
+      ty = T.XCon "Int" []
+      trees = [term (T.XOuter var (T.XInner (chain n))) | n <- [0..48]]
+        ++ [ T.XAbs x ty (term (chain 7))
+           , T.XApp (term (chain 8)) (term (chain 8))
+           , T.XWithData [] (T.XLet x (term (chain 5)) (term (chain 6)))
+           , T.XLetRec [(x,ty,term (chain 9))] (term (chain 3))
+           , T.XCase (term (chain 6)) ty [T.XAlternative (T.XDefaultPattern T.Nothing) (term (chain 4))]
+           ]
+  forM_ trees $ \input -> do
+    graph <- expect "complete reference syntax graph" (W.planGraph W.defaultLimits [A.toXTerm input])
+    [root] <- pure (W.graphRoots graph)
+    full <- expect "whole-graph normalization"
+      (Source.finalSyntaxRun graph [Source.FinalVisit root (Source.FinalTerm input)] []
+        (Source.FinalSyntaxState T.MapEmpty T.MapEmpty 0 0 0))
+    original <- expect "reference term" (Source.finalSyntaxTerm full)
+    edit <- expect "localized normalization" (Source.editProofs input)
+    let candidate = case edit of T.Nothing -> input; T.Just changed -> changed
+    a <- W.encode W.defaultLimits 2 [A.toXTerm original] >>= expect "normalized reference shape"
+    b <- W.encode W.defaultLimits 2 [A.toXTerm candidate] >>= expect "normalized candidate shape"
+    same <- Storage.sameBytes a b; need "localized normalization changed exact syntax" same
+  let near = foldr (\_ inside -> W.VNode 8 [inside]) (W.VInt 0) [1..255::Int]
+  case (Source.smallFinalValue near, Source.smallFinalValue (W.VNode 8 [near]),
+        Source.smallFinalValue (W.VNode (-1) []), Source.smallFinalValue (W.VNode 58 [W.VNode 58 []])) of
+    (T.Just False,T.Nothing,T.Nothing,T.Just True) -> pure ()
+    _ -> error "small-source geometry did not respect depth/tag/nested boundaries"
+  case Source.smallFinalValue (W.VText (B.literal (replicate 262145 'a'))) of
+    T.Nothing -> pure (); _ -> error "small-source geometry failed to cap text work"
+
+sourceAdmissionTests directory = do
+  sourceNormalizationControls
+  exists <- doesPathExist directory; need "fresh source-admission directory" (not exists); createDirectory directory
+  bracket (P.acquireFileLock (B.literal (directory ++ "/.lock"))) P.releaseFileLock $ \_ -> do
+    object <- expect "actual int-only empty-context raw inference" (InferenceUnit.compileLoweredGroup "RawGroup" [] [] [("value",T.Nothing,T.SIntLit 41)])
+    let encoded=Q.encodeSourceDatatypes []
+        key=U.pack ["MLF-SOURCE-CRATE-QUERY-7","binary-source-admission","compiler","member","bindings",encoded,"source-group","contracts","scope"]
+        path=directory ++ "/record.mlfq"
+        other=[T.DataDecl "Other" [] [T.ConstructorDecl "Other" []]]
+        mismatch="cached source query datatype context mismatch"
+        missing="source query context cache miss"
+        invalid="invalid source query context reference"
+        readCurrent previous declarations = Q.readSourceCacheFileWithWindow previous (B.literal directory) key "RawGroup" [] declarations ["value"] (B.literal path)
+        rejected label expected (next,reused,result) = do
+          need (label ++ " structural miss clears memo") (null next && not reused)
+          case result of
+            T.Left message -> need (label ++ " exact error precedence") (message == expected)
+            T.Right _ -> error ("accepted " ++ label)
+        accepted label expectedReuse (next,reused,result) = do
+          raw <- expect label result
+          need (label ++ " actual verified memo") (not (null next) && reused == expectedReuse)
+          need (label ++ " exact complete object") (U.encodeObject raw == U.encodeObject object && U.encodeInterface (U.objectInterface raw) == U.encodeInterface (U.objectInterface object))
+          pure next
+    Q.writeLegacySourceCached T.Nothing (B.literal directory) (B.literal path) key object >>= expect "actual schema301 publication"
+    originalSha <- P.byteArrayFromString key >>= P.byteArrayDigest
+    let readExactWithAudit strict = Q.readLocalSourceFile strict [] (B.literal directory)
+          key originalSha encoded "RawGroup" [] [] ["value"] (B.literal path)
+    readExactWithAudit True >>= rejected "full audit upgrades the old exact-key record"
+      "legacy source record has no result fingerprint"
+
+    -- Fixed complete inputs guarantee both sample arms on every executable and
+    -- checkout path. Damage only the ICH, with a valid canonical CRC and body.
+    forM_ [("0","f6af59bc522f44fbb7a149eb635a732a674008f58115d49889207325aef2f6eb",False),
+           ("61","07b64870cd2a03ed8e27d6174b0195fd0d7370e0775b69ca8e79c452e3753b22",True)] $
+      \(crate,expected,sampled) -> do
+        let full = U.pack ["MLF-SOURCE-CRATE-QUERY-7",crate,"compiler","member","bindings",
+                           encoded,"source-group","contracts","scope"]
+            target = B.literal (directory ++ "/audit-" ++ B.unpack crate ++ ".mlfq")
+        sha <- P.byteArrayFromString full >>= P.byteArrayDigest
+        need "independent full-input SHA selects expected sample arm" (sha == expected && Q.sampledSourceInput sha == sampled)
+        Q.writeSourceCached T.Nothing (B.literal directory) target full object >>= expect "write fingerprint record"
+        rawBytes <- Storage.readRaw target >>= expect "actual fingerprint record bytes"
+        roots <- W.decode W.defaultLimits 2 rawBytes >>= expect "actual fingerprint record"
+        let loadInput digest strict = Q.readLocalSourceFile strict [] (B.literal directory)
+              full digest encoded "RawGroup" [] [] ["value"] target
+            tryAudit = loadInput sha
+            other = B.literal (replicate 64 '0')
+            address = W.VText sha
+        raw <- byteList rawBytes
+        case splitAt 76 raw of
+          (before,crc:after) -> fromBytes (before ++ (P.xorInt crc 1 : after)) >>= \bad ->
+            Storage.writeRaw target bad >>= expect "damage outer CRC"
+          _ -> error "missing CRC in source fixture"
+        -- Wrong address wins even when full decoding would have failed the CRC.
+        forM_ [False,True] $ \strict -> do
+          loadInput other strict >>= rejected "wrong address before CRC" "cached query key mismatch"
+          tryAudit strict >>= rejected "matching address still checks CRC" "binary checksum mismatch"
+        Storage.write 2 target [W.VText "",W.VInt 1] >>= expect "short symbol area"
+        tryAudit False >>= rejected "short address safely misses" "cached query key mismatch"
+        let inline = Q.localPayloadFields T.Nothing object
+        emitted <- Q.encodeLocalRecord sha inline >>= expect "single-plan inline record"
+        slot <- Q.slotResultHash sha inline >>= expect "reference slot hash"
+        expectedBytes <- W.encode W.defaultLimits 2 [address,W.VNode 305 ([address,W.VText slot] ++ inline)]
+          >>= expect "independently encode final slot"
+        same <- Storage.sameBytes emitted expectedBytes
+        need "patched record is the exact canonical encoding" same
+        damagedSlot <- byteList emitted >>= \raw -> case splitAt 76 raw of
+          (prefix,c:rest) -> fromBytes (prefix ++ (P.xorInt c 1 : rest))
+          _ -> error "truncated result slot fixture"
+        Storage.writeRaw target damagedSlot >>= expect "damage slot CRC"
+        loadInput other True >>= rejected "slot address rejects before CRC" "cached query key mismatch"
+        tryAudit True >>= rejected "slot address hit still checks CRC" "binary checksum mismatch"
+        Storage.writeRaw target emitted >>= expect "write inline slot"
+        (_,_,checkedSlot) <- tryAudit True
+        actualSlot <- expect "verified inline slot" checkedSlot
+        need "inline slot retained full raw body" (U.encodeObject actualSlot == U.encodeObject object)
+        forM_ [[W.VText Q.resultSlot],[W.VNode 42 [W.VText Q.resultSlot]]] $ \aliased -> do
+          safe <- Q.encodeLocalRecord sha aliased >>= expect "literal placeholder alias"
+          legacy <- Q.encodeLegacyLocalRecord sha aliased >>= expect "prior checked encoder"
+          equal <- Storage.sameBytes safe legacy
+          need "placeholder alias wrote through a semantic field" equal
+        need "colliding stored digest must use the independent encoder"
+          (Q.slotConflicts sha [W.Symbol Q.resultSlot 64,W.Symbol sha 64])
+        ich <- Q.localResultHash sha inline >>= expect "inline raw ICH"
+        Storage.write 2 target [address,W.VNode 302 ([address,W.VText ich] ++ inline)]
+          >>= expect "two-root inline source record"
+        (_,_,inlineHit) <- tryAudit True
+        checkedInline <- expect "inline checked hit" inlineHit
+        need "inline raw body preserved" (U.encodeObject checkedInline == U.encodeObject object)
+        case roots of
+          [W.VText prefix,payload@(W.VNode 303 [ref,W.VText seen,result,header,body])] | prefix == sha && seen == sha -> do
+            (_,stats) <- expect "single-root resource demand" (W.planMeasured W.defaultLimits [payload])
+            let work = W.resourceExpandedWork stats
+                cap n = case W.defaultLimits of
+                  W.Limits z c t total nodes edges depth _ -> W.Limits z c t total nodes edges depth n
+            W.encode (cap work) 2 [address,payload] >>= reject "address exceeds exact single-root work cap"
+            fallback <- Q.encodeAddressedSource (cap work) address payload >>= expect "preserve prior wire budget"
+            legacy <- W.decode (cap work) 2 fallback >>= expect "budget fallback checked under original cap"
+            need "only the original single-root representation fits" (sameValues legacy [payload])
+            Q.encodeAddressedSource (cap (work-1)) address payload >>= reject "fallback cannot bypass resource cap"
+            let byteCap = case W.defaultLimits of
+                  W.Limits _ c t total nodes edges depth limit ->
+                    let size = W.resourceBytes stats
+                    in W.Limits size c (min size t) (min size total) nodes edges depth limit
+            W.encode byteCap 2 [address,payload] >>= reject "extra root exceeds exact single-root file size"
+            fallbackBytes <- Q.encodeAddressedSource byteCap address payload >>= expect "exact file-size fallback"
+            oldBytes <- W.encode byteCap 2 [payload] >>= expect "original size-limited encoding"
+            sameBytes <- Storage.sameBytes fallbackBytes oldBytes
+            need "file-size fallback preserves exact prior bytes" sameBytes
+            Storage.write 2 target [address,W.VNode 303 [ref,W.VText other,result,header,body]]
+              >>= expect "valid CRC with detached address"
+            tryAudit False >>= rejected "matching prefix cannot authorize another payload"
+              "source query address disagrees with payload"
+            Storage.write 2 target [address,W.VNode 303 [ref,address,W.VText other,header,body]]
+              >>= expect "mutate only result hash, with a correct CRC"
+          _ -> error "expected published addressed source fingerprint"
+        (_,_,ordinary) <- tryAudit False
+        case ordinary of
+          T.Left message -> need "sampled default rejects wrong ICH" (sampled && message == "cached source result fingerprint mismatch")
+          T.Right _ -> need "unsampled default accepts checked value" (not sampled)
+        tryAudit True >>= rejected "full mode always detects wrong ICH" "cached source result fingerprint mismatch"
+    bytes <- readBounded path
+    graph <- W.decodeGraph W.defaultLimits 2 bytes >>= expect "actual binary source record"
+    reference <- case W.graphRoots graph of
+      [root] -> do
+        value <- expect "actual source root" (W.lookupGraphNode graph root)
+        case value of
+          W.GNode 301 [ref,_,_,_] -> expect "actual source context reference" (A.fromGraphText graph ref)
+          _ -> error "source-admission fixture did not publish real schema301"
+      _ -> error "source-admission root inventory"
+    let contextPath=B.unpack (Q.sourceContextPath (B.literal directory) reference)
+    contextBytes <- readBounded contextPath
+    digest <- P.byteArrayDigest contextBytes
+    need "source-admission content address is exact physical binary bytes" (digest == reference)
+    contextGraph <- W.decodeGraph W.defaultLimits 1 contextBytes >>= expect "actual source context schema"
+    declarations <- case W.graphRoots contextGraph of
+      [root] -> expect "actual source typed context" (A.fromGraphDataContext contextGraph root)
+      _ -> error "source context root inventory"
+    need "source-admission actual context is empty" (null declarations)
+    readCurrent [] other >>= rejected "cold unchanged key but wrong expectedDS" mismatch
+    memo <- readCurrent [] [] >>= accepted "establish real empty-context memo" False
+    _ <- readCurrent memo [] >>= accepted "same context genuine memo hit" True
+    readCurrent memo other >>= rejected "warm unchanged key wrong expectedDS with carrier present" mismatch
+    -- A cooperating private fixture owns the actual lock throughout these
+    -- visibility tests. This is not a guarantee for lock-ignoring mutation.
+    bracket (renameFile contextPath (contextPath ++ ".held")) (\_ -> renameFile (contextPath ++ ".held") contextPath) $ \_ -> do
+      readCurrent [] other >>= rejected "cold missing carrier precedes expectedDS mismatch" missing
+      readCurrent memo other >>= rejected "warm structural miss needs actual carrier" missing
+      _ <- readCurrent memo [] >>= accepted "unchanged verified memo is independent of subsequent carrier IO" True
+      pure ()
+    broken <- fromBytes [0,1,2]
+    bracket (saveBytes contextPath broken) (\_ -> saveBytes contextPath contextBytes) $ \_ -> do
+      readCurrent [] other >>= rejected "corrupt carrier digest precedes expectedDS mismatch" invalid
+      readCurrent memo other >>= rejected "warm structural miss validates carrier digest first" invalid
+    readCurrent memo other >>= rejected "restored carrier still rejects wrong expectedDS" mismatch
+    -- Exercise a real old CACHE3 record with its OWN old-text content SHA.
+    -- No binary digest is relabeled as a legacy carrier identity.
+    let oldCarrier=Q.sourceContextContents encoded
+    oldBytes <- P.byteArrayFromString oldCarrier
+    oldReference <- P.byteArrayDigest oldBytes
+    need "legacy and binary physical identities are distinct" (oldReference /= reference)
+    let oldPath=B.unpack (Q.sourceContextPath (B.literal directory) oldReference)
+        oldRecordPath=directory ++ "/legacy.mlfq"
+    compact <- case Q.sourceCacheParts key of T.Just (value,_) -> pure value; T.Nothing -> error "source key projection"
+    let oldRecord=U.pack ["MLF-QUERY-CACHE-3",oldReference,compact,U.encodeContextualObject object]
+    saveBytes oldPath oldBytes
+    writeFile oldRecordPath (B.unpack oldRecord)
+    let readOld = Q.readSourceCacheFileWithWindow [] (B.literal directory) key "RawGroup" [] [] ["value"] (B.literal oldRecordPath)
+    _ <- readOld >>= accepted "actual legacy CACHE3 and its own carrier" False
+    bracket (renameFile oldPath (oldPath ++ ".held")) (\_ -> renameFile (oldPath ++ ".held") oldPath) $ \_ ->
+      readOld >>= rejected "legacy CACHE3 missing carrier exact compatibility diagnostic" missing
+    _ <- readOld >>= accepted "legacy carrier restored" False
+    putStrLn "PASS source-key-context-admission-and-priority"
+
+-- Regression controls for all three canonical builtin authority branches.
+releaseReadPair prefix = do
+  iface <- CrateArtifact.readInterface (B.literal (prefix ++ ".mlfci")) >>= expect "release control checked interface"
+  object <- CrateArtifact.readObject (B.literal (prefix ++ ".mlfco")) iface >>= expect "release control checked object"
+  pure object
+
+releaseBuiltinBranches directory = do
+  binary <- releaseReadPair (directory ++ "/builtin")
+  legacy <- releaseReadPair (directory ++ "/release-legacy-builtin")
+  root <- releaseReadPair (directory ++ "/seed")
+  let current = CrateArtifact.builtinCrateIdentity
+      compiler = B.literal (replicate 64 'c')
+      key = B.literal (replicate 128 'd')
+      row identity = Json.Object [("identity",Json.str identity),("key",Json.str key)]
+      builtin = CrateArtifact.objectInterface binary
+      replaceIdentityModules identity modules iface = case iface of
+        CrateArtifact.CrateInterface _ dependencies _ exports imports datatypes classes instances layouts bindings entry fingerprint protection ->
+          CrateArtifact.CrateInterface identity dependencies modules exports imports datatypes classes instances layouts bindings entry fingerprint protection
+      ownership label identity modules expected = case CrateArtifact.validateBuiltinOwnership (replaceIdentityModules identity modules builtin) of
+        T.Left message -> need label (message == expected)
+        T.Right _ -> error ("accepted ownership regression: " ++ label)
+  need "fixed current builtin authority" (current == "mlf:builtin-shared-haskell-v1:11")
+  need "builtin localPrefix uses canonical compiler cache"
+    (Release.localPrefix "/cache" compiler (row current) == ("/cache/.queries/builtin-prelude/" P.++ compiler P.++ "/unit"))
+  need "ordinary localPrefix keeps release key cache"
+    (Release.localPrefix "/cache" compiler (row "binary-package/1/library") == ("/cache/.releases/" P.++ compiler P.++ "/" P.++ key P.++ "/unit"))
+  Release.verifyPrelude binary
+  Release.verifyPrelude legacy
+  Release.verifyPrelude root
+  ownership "obsolete prelude owner" "mlf:builtin-prelude:1" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
+  ownership "stale shared ABI owner" "mlf:builtin-shared-haskell-v1:10" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
+  ownership "ordinary forged owner" "other/library" ["MLF.Primitive","Prelude"] "stale or forged builtin crate identity"
+  ownership "missing primitive ownership" current ["Prelude"] "builtin crate must own exactly Prelude and MLF.Primitive"
+  ownership "extra builtin module" current ["Extra","MLF.Primitive","Prelude"] "builtin crate must own exactly Prelude and MLF.Primitive"
+  putStrLn "PASS release-canonical-builtin-paths-ownership-binary-legacy"
+
+releaseForgedCurrent directory = do
+  canonical <- releaseReadPair (directory ++ "/builtin")
+  fragments <- case CrateArtifact.objectFragments canonical of
+    [] -> error "canonical builtin must have a typed fragment"
+    first:rest -> do
+      let changedInterface = case U.objectInterface first of
+            U.UnitInterface name dependencies exports datatypes classes instances bindings fingerprint ->
+              U.UnitInterface (name P.++ ".noncanonical-release-control") dependencies exports datatypes classes instances bindings fingerprint
+          -- Terms, types and bindings remain exact. Change only the checked
+          -- fragment inventory label, then recompute its real pooled checksum.
+          changed = U.UnitObject changedInterface (U.objectTerm first)
+      pure (changed:rest)
+  let forged = CrateArtifact.makeObject (CrateArtifact.objectInterface canonical) fragments
+      iface = CrateArtifact.objectInterface forged
+  need "forged control retains exact current identity and ownership"
+    (CrateArtifact.crateId iface == "mlf:builtin-shared-haskell-v1:11" &&
+     CrateArtifact.crateModules iface == CrateArtifact.crateModules (CrateArtifact.objectInterface canonical))
+  _ <- expect "forged control passes complete ordinary typed linking" (CrateArtifact.linkCheckedObjects [forged] (CrateArtifact.crateId iface))
+  need "forged control is genuinely noncanonical" (CrateArtifact.encodeObject forged /= CrateArtifact.encodeObject canonical)
+  putStrLn "PASS release-forged-current-fully-typed"
+  Release.verifyPrelude forged
+  error "accepted noncanonical current builtin"

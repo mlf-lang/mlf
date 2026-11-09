@@ -5,7 +5,7 @@ minimum a b = if a < b then a else b
 
 chunkBytes n = n + (n + 59) / 60
 
-cumulative : DoubleArray -> Int -> Int -> IO Unit
+cumulative : DoubleArray -> Int -> Int -> IO ()
 cumulative probabilities length i =
   if i < length then do
     previous <- readDoubleArray probabilities (i - 1)
@@ -52,7 +52,7 @@ repeatFill source out length count i index column offset =
         repeatFill source out length count (i + 1) next (column + 1) (offset + 1)
   else return 0
 
-repeatChunks : ByteArray -> ByteArray -> Int -> Int -> Int -> IO Unit
+repeatChunks : ByteArray -> ByteArray -> Int -> Int -> Int -> IO ()
 repeatChunks source out length remaining index =
   if remaining == 0 then return ()
   else do
@@ -61,7 +61,7 @@ repeatChunks source out length remaining index =
     putBytes out 0 (chunkBytes count)
     repeatChunks source out length (remaining - count) next
 
-randomFill : ByteArray -> DoubleArray -> IntArray -> DoubleArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> IO Unit
+randomFill : ByteArray -> DoubleArray -> IntArray -> DoubleArray -> ByteArray -> Int -> Int -> Int -> Int -> Int -> IO ()
 randomFill alphabet probabilities seed random out length count i column offset =
   let
     counters = i + (column + offset)
@@ -81,7 +81,7 @@ randomFill alphabet probabilities seed random out length count i column offset =
         randomFill alphabet probabilities seed random out length count (i + 1) (column + 1) (offset + 1)
   else return ()
 
-randomChunks : ByteArray -> DoubleArray -> IntArray -> DoubleArray -> ByteArray -> Int -> Int -> IO Unit
+randomChunks : ByteArray -> DoubleArray -> IntArray -> DoubleArray -> ByteArray -> Int -> Int -> IO ()
 randomChunks alphabet probabilities seed random out length remaining =
   if remaining == 0 then return ()
   else do

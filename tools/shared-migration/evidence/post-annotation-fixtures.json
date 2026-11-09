@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "scope": "final one-time tool regression after literal annotations",
+  "pass_count": 37,
+  "ghc": "9.14.1",
+  "log_sha256": "d83148a7696317eadf889311f2ece2448cebef15537005f70a21b67ac00ba89e",
+  "tool_sources": {
+    "tools/shared-migration/Hierarchy.hs": "e0e5542af2945de57f0ff9bdf1f89f82bce98317df576fe17318a1fc862f7373",
+    "tools/shared-migration/Main.hs": "b4ff70c5bb185f85cb53a4ee37f3d952beb9f418c1e47ede818a562ee3d667fb",
+    "tools/shared-migration/Audit.hs": "9ee950a31c9e21f0544ccc7ee5c2313f9ed9f1bfed5eb9b186901d8cd321394b",
+    "tools/shared-migration/LiteralSignatures.hs": "b7b7959a1d5245ae8f3dd7f08fa51cbf49d12a73765a4bdaa1cbaa372184bf3f",
+    "tools/shared-migration/Migrate.hs": "0d3c13cbd0d9388e5aa3dc468a8034cbc07c5205e70ea7dbc26d2ca9740798f2",
+    "tools/shared-migration/Adjust.hs": "0b2fdba6c2f11c398d022bcd3456f50b6290030b2e32bb579c08214657defa46"
+  }
+}

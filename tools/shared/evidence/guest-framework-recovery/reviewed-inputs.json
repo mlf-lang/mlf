@@ -1,0 +1,14 @@
+{
+  "testing/Test/Evidence.emlf": "7773b2beac9f8b25d22ad0520793cc9042f1316ace052f731a7ac44468e8911d",
+  "testing/Test/Plan.emlf": "f61c6dfe36f9138aa0da5be725ea2cbbf3557ab90b1451e735e2935f450daccb",
+  "testing/Test/Capability.emlf": "be3d1c6e6e871eebe3ff3bbd4e6aa0718bdc52ede8495381f068f96518300719",
+  "mlf.lock": "814889b1592997cf14d3181a309b19740394ea7e91b0700dd13d2577a4a9d2c3",
+  "tools/shared/test_guest_framework.py": "ec1df0084c3b04a09a8bbf3ba346bfcdeb1b1c1d9cbe7d3979d75f56cf1db2e3",
+  "tools/shared/resource_watchdog.py": "865e7fb6564e41727dac9cbc83e247112ca6712cc3d481e342508e5a580adecd",
+  "tools/shared/test_guest_framework_controls.py": "d2498132305d7ccd2ed7ea337e099f05b5823cf2a7457953f66e163a8fd84e25",
+  "tools/testing/check_manifest_snapshot.py": "e45e8b0fbdbfe9b6ff8905f866d683f17cd5414064c42409ad548146d8ba2694",
+  "tools/testing/test_manifest_snapshot.py": "a8dfe4c47f1e04270fc2d10a011ab4e3dc879e3e1397b4954fd2ac21f5cdc2a8",
+  ".github/workflows/ci.yml": "9ff00506834e46c9e816ffd579834ca087f6611f2d61e63881d97df98d4b257a",
+  "tools/release/check.sh": "58000e8ea395aa00ab9b65a2049fae072f6700ae0bb14d1f5bec8758e3bcad8b",
+  "tools/release/test-ci-policy.mjs": "7904108a245c79734a0dbbc2556711a48a5edcc423d9fcc768ced16a8c35c9e3"
+}

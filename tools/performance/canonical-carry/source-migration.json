@@ -1,0 +1,28 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.CrateArtifact": {
+      "new": "88758de08e6ac15b37381b8e78dd5e47d2b50e535794aa3056513fda969fab0a",
+      "old": "56baf52d3f314d450c543392884fb1d44d01081d58a57e89a0fb1fc686c6be0f",
+      "reviewed_change": "validated canonical text carry through pooled crate decoding; public validation and canonical byte boundaries retained"
+    },
+    "Bootstrap.Separate": {
+      "new": "a8af345dbfac5000fb9adcd3fc4c9aa1663c5496667f1026590d0a516a7fcb30",
+      "old": "762419bd4d7e818799f972264c16607cd7f935e436f86419e2aaca6a57786861",
+      "reviewed_change": "validated canonical text carry through pooled crate decoding; public validation and canonical byte boundaries retained"
+    },
+    "MLF.BuiltinPreludeData": {
+      "new": "4f296f9009fad3b75842125f0107e5aefc2591a5fe26b4c53aac4a95aed32236",
+      "old": "c1e1240c275abc0dbd17954d8cbe8f76599344d089edb5648a2117feab8c33ad",
+      "reviewed_change": "ordinary checked builtin regeneration for the two canonical-carry source changes"
+    }
+  },
+  "format": "pooled-canonical-carry-source-migration-v1",
+  "host_sources": {},
+  "implementation_commit": "e123603d00f6f64e20e4d771836e49ddd808320f",
+  "module_count": 128,
+  "parent_manifest_sha256": "da5f482bb5c89e0e88d812eaacaafc4788bafef2cfbe709c924fed0e6179746e",
+  "parent_ref": "69580e21d20a742a235b3ea95aa4c68f20783265",
+  "removed_sources": [],
+  "unchanged_sources": 125
+}

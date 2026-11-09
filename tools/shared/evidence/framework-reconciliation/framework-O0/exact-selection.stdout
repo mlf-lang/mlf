@@ -1,0 +1,3 @@
+{"schema_version":1,"event":"start","total":90,"selected":1,"scope":"partial","ids":["tuple-list/focused/pair-ast"]}
+{"schema_version":1,"event":"case","id":"tuple-list/focused/pair-ast","name":"pair AST","tags":["tuple-list","group:language","level:integration","input:fixed","oracle:fixed-ast","purpose:regression","purpose:conformance"],"status":"passed"}
+{"schema_version":1,"event":"summary","total":90,"selected":1,"scope":"partial","complete":true,"executed":1,"passed":1,"failed":0}

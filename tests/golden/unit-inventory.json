@@ -114,6 +114,7 @@
         "alpha-equivalence tracks shadowing",
         "type quantifiers have lexical scope",
         "xMLF does not identify inert or alias bounds",
+        "recursive exports preserve scoped identities and independent copies",
         "expansion resets scheme flag and binding",
         "all inert nodes normalized",
         "well-domination enforced",
@@ -306,7 +307,7 @@
         "do: optional trailing semicolon",
         "do: nested blocks",
         "do: bind statement sees the outer binding",
-        "do: local let sees the outer binding",
+        "do: distinct do-let binder sees the outer binding",
         "do: local let is generalized",
         "do: local let annotation",
         "do: let-in expression is an action",
@@ -316,7 +317,10 @@
         "do: constructor wildcard field",
         "do: discarded action cannot capture an outer name",
         "do: pattern temporary cannot capture an outer name",
-        "do: uses the lexical bind function",
+        "do: explicit bind remains lexical",
+        "do rejection: lexical bind cannot intercept do",
+        "do rejection: same-name do-let is recursive, not an outer reference",
+        "do: annotated recursive do-let keeps its own binding",
         "do rejection: empty block",
         "do rejection: final statement must be an expression",
         "do rejection: cannot end with a local declaration",
@@ -327,7 +331,7 @@
         "do rejection: later binding is unavailable",
         "do rejection: action type mismatch",
         "do rejection: final action has the right monadic type",
-        "do rejection: refutable pattern requires an explicit case",
+        "do rejection: refutable pattern requires canonical MonadFail",
         "do rejection: pattern binder duplicates",
         "do: parser preserves statement forms",
         "do: lowering preserves binding order and the final action",
@@ -361,21 +365,22 @@
         "surface checking: inline whole-function signature",
         "surface checking: annotated local function",
         "surface checking: do-local function generalizes",
-        "surface checking: do-local function sees outer binding",
+        "surface checking: distinct do-local function sees outer binding",
         "surface checking: conditional returns polymorphic function",
         "surface checking: conditional works in a case scrutinee",
         "surface checking: keyword prefixes remain identifiers",
         "surface checking: instance method parameters",
         "surface checking: qualified function declaration",
         "surface checking: syntax needs no implicit prelude",
-        "surface rejection: recursion needs a signature",
+        "surface checking: same-name do-local function is recursive",
+        "surface checking: unsigned recursion infers bottom",
         "surface checking: forward value references",
         "surface rejection: branch types must agree",
         "surface rejection: condition must be Bool",
         "surface rejection: arithmetic does not overload Double",
         "surface rejection: unary plus requires a number",
         "surface rejection: unary minus requires a number",
-        "surface rejection: comparisons do not overload String",
+        "surface checking: equality supports annotated strings",
         "surface rejection: whole function signature is checked",
         "surface rejection: chained comparisons",
         "surface rejection: mixed chained comparisons",
@@ -415,8 +420,8 @@
         "recursion: unused explicit quantified variables are discharged",
         "equations: parameter can shadow the function name",
         "readability rejection: recursive forall cannot specialize to Int",
-        "readability rejection: mutual recursion needs every signature",
-        "readability rejection: local recursion needs a signature",
+        "recursion: mixed signed and inferred group",
+        "recursion: unsigned local group",
         "readability rejection: recursive existentials are not closed signatures",
         "readability rejection: recursive signature free variable",
         "readability rejection: equation arity",
@@ -509,7 +514,7 @@
         "modules rejection: explicit empty Prelude removes value names",
         "modules rejection: qualified Prelude suppresses implicit Prelude",
         "modules rejection: Prelude cannot be redefined",
-        "modules rejection: primitive constructor cannot be redefined",
+        "modules rejection: ordinary Unit constructor is not builtin unit",
         "modules rejection: primitive type cannot be redefined",
         "modules rejection: unused private definitions still checked",
         "modules rejection: export list cannot name missing value",
@@ -518,7 +523,6 @@
         "modules rejection: instance not visible in another instance",
         "modules rejection: cyclic private constructor remains hidden",
         "modules rejection: cyclic reexports cannot invent a missing identity",
-        "modules rejection: cross-module recursion retains existing signature requirement",
         "modules rejection: downstream orphan cannot leak into an import cycle",
         "modules: original source type names",
         "modules: unit syntax is intrinsic",
@@ -528,6 +532,8 @@
         "modules: unused imports do not cause value ambiguity",
         "modules: legacy compile path preserves checked output",
         "modules: file loader, includes, hierarchy and errors",
+        "modules typing: cross-module recursion infers unsigned cycle",
+        "modules typing: cross-module qualified recursion generalizes shared exports",
         "crate namespaces resolve recursive declarations before inference",
         "crate namespace resolution preserves external ownership and mangling",
         "cyclic export fixed point is invariant under source order",
@@ -600,7 +606,7 @@
         "crate rejects: explicit empty Prelude removes value names",
         "crate rejects: qualified Prelude suppresses implicit Prelude",
         "crate rejects: Prelude cannot be redefined",
-        "crate rejects: primitive constructor cannot be redefined",
+        "crate rejects: ordinary Unit constructor is not builtin unit",
         "crate rejects: primitive type cannot be redefined",
         "crate rejects: unused private definitions still checked",
         "crate rejects: export list cannot name missing value",
@@ -609,8 +615,9 @@
         "crate rejects: instance not visible in another instance",
         "crate rejects: cyclic private constructor remains hidden",
         "crate rejects: cyclic reexports cannot invent a missing identity",
-        "crate rejects: cross-module recursion retains existing signature requirement",
         "crate rejects: downstream orphan cannot leak into an import cycle",
+        "crate typing: cross-module recursion infers unsigned cycle",
+        "crate typing: cross-module qualified recursion generalizes shared exports",
         "crate paths and native cache commands",
         "crate metadata version rejection",
         "crate object binding schemes are independently checked",
@@ -803,6 +810,8 @@
         "test_medians_and_ratios_allow_c_to_lose",
         "test_failure_replaces_stale_success_and_no_measurement_starts",
         "test_invalid_cli_inputs_fail_before_tools",
+        "test_split_runtime_compiles_independent_objects_before_linking",
+        "test_split_runtime_failed_producers_reap_every_child",
         "test_prestarted_link_waits_for_complete_objects_and_reaps_failed_producers",
         "test_streaming_build_overlaps_startup_and_archives_exact_ir",
         "test_blocked_fifo_failure_and_timeout_reap_process_groups",
@@ -1399,6 +1408,171 @@
         }
       },
       "unchanged_expectations": "All existing IDs, independent parity/Algorithm W oracles and metrics are retained. Each of the eight runtime sources adds one Core type/target-roundtrip case and one differential interpreter/LLVM matrix row."
+    },
+    {
+      "name": "ordinary unsigned recursive inference",
+      "basis": "Manually reviewed new graph export test and two old early-signature rejections whose programs are now supported; no oracle answers regenerated.",
+      "added_core_ids": [
+        "recursive exports preserve scoped identities and independent copies"
+      ],
+      "replaced_core_ids": [
+        {
+          "before": "readability rejection: mutual recursion needs every signature",
+          "after": "recursion: mixed signed and inferred group"
+        },
+        {
+          "before": "readability rejection: local recursion needs a signature",
+          "after": "recursion: unsigned local group"
+        }
+      ],
+      "required_execution_counts": {
+        "core": {
+          "before": 739,
+          "after": 740
+        }
+      },
+      "unchanged_expectations": "All other case IDs and metrics, independent target/Algorithm W oracles and backend inventories remain unchanged. No full native campaign is claimed by the focused host validation."
+    },
+    {
+      "name": "qualified ordinary recursive module interfaces",
+      "basis": "Two manually authored type-only executions of the same generalized unsigned A/B source, one direct and one through saved crate interfaces; no target-checking oracle regenerated.",
+      "added_core_ids": [
+        "modules typing: cross-module qualified recursion generalizes shared exports",
+        "crate typing: cross-module qualified recursion generalizes shared exports"
+      ],
+      "required_execution_counts": {
+        "core": {
+          "before": 740,
+          "after": 742
+        },
+        "core_modules_physical": {
+          "before": 299,
+          "after": 301
+        }
+      },
+      "unchanged_expectations": "Both paths enforce prescribed Bool with current/frozen target checking, target serialization and erased equality. All existing source fixtures and metrics remain. No fixture target execution or full native campaign is claimed.",
+      "replaced_core_ids": [
+        {
+          "before": "modules rejection: cross-module recursion retains existing signature requirement",
+          "after": "modules typing: cross-module recursion infers unsigned cycle"
+        },
+        {
+          "before": "crate rejects: cross-module recursion retains existing signature requirement",
+          "after": "crate typing: cross-module recursion infers unsigned cycle"
+        }
+      ],
+      "active_metadata_reconciliation": "The retained phase-1 recursive export graph case is added to CoreRegistry and test-catalog; the two retained Readability acceptance labels replace their obsolete rejection IDs there. Their existing golden entries and source bodies are unchanged.",
+      "runner_count_reconciliation": {
+        "core_solver": {
+          "before": 33,
+          "after": 34,
+          "reason": "The already-retained phase-1 recursive export graph test adds one execution."
+        },
+        "core_modules": {
+          "before": 299,
+          "after": 301,
+          "reason": "The new ModuleTyping adds one direct and one saved-crate-interface check."
+        },
+        "core_aggregate": {
+          "before": 739,
+          "after": 742,
+          "derivation": "34 core-solver + 380 core-language + 27 core-crates + 301 core-modules = 742; the active golden inventory was already 740 before these two added module checks."
+        }
+      }
+    },
+    {
+      "name": "canonical source cutover and recursive scope reconciliation",
+      "basis": "Independently reviewed exact PR22 semantic delta after the ordered 742-leaf ordinary-recursion inventory; no candidate inference results generate expectations.",
+      "replaced_core_ids": [
+        {
+          "family": "core/do-notation",
+          "before": "do: local let sees the outer binding",
+          "after": "do: distinct do-let binder sees the outer binding"
+        },
+        {
+          "family": "core/do-notation",
+          "before": "do: uses the lexical bind function",
+          "after": "do: explicit bind remains lexical"
+        },
+        {
+          "family": "core/do-notation",
+          "before": "do rejection: refutable pattern requires an explicit case",
+          "after": "do rejection: refutable pattern requires canonical MonadFail"
+        },
+        {
+          "family": "core/modules",
+          "before": "modules rejection: primitive constructor cannot be redefined",
+          "after": "modules rejection: ordinary Unit constructor is not builtin unit"
+        },
+        {
+          "family": "core/separate-compilation",
+          "before": "crate rejects: primitive constructor cannot be redefined",
+          "after": "crate rejects: ordinary Unit constructor is not builtin unit"
+        },
+        {
+          "family": "core/surface-syntax",
+          "before": "surface checking: do-local function sees outer binding",
+          "after": "surface checking: distinct do-local function sees outer binding"
+        },
+        {
+          "family": "core/surface-syntax",
+          "before": "surface rejection: comparisons do not overload String",
+          "after": "surface checking: equality supports annotated strings"
+        },
+        {
+          "family": "core/surface-syntax",
+          "before": "surface rejection: recursion needs a signature",
+          "after": "surface checking: unsigned recursion infers bottom"
+        }
+      ],
+      "added_core_ids": [
+        {
+          "family": "core/do-notation",
+          "label": "do rejection: lexical bind cannot intercept do",
+          "before": "do rejection: empty block"
+        },
+        {
+          "family": "core/do-notation",
+          "label": "do rejection: same-name do-let is recursive, not an outer reference",
+          "before": "do rejection: empty block"
+        },
+        {
+          "family": "core/do-notation",
+          "label": "do: annotated recursive do-let keeps its own binding",
+          "before": "do rejection: empty block"
+        },
+        {
+          "family": "core/surface-syntax",
+          "label": "surface checking: same-name do-local function is recursive",
+          "before": "surface checking: unsigned recursion infers bottom"
+        }
+      ],
+      "required_execution_counts": {
+        "core": {
+          "before": 742,
+          "after": 746
+        },
+        "core_language_physical": {
+          "before": 380,
+          "after": 384
+        }
+      },
+      "unchanged_expectations": "The original 739 and recursion 742 inventory histories remain frozen. All unlisted labels retain ownership and order. Same-name recursive function and unsigned divergent-loop positives only check prescribed Int/XBot types and checked targets, never execute; the same-name value binding retains its occurs-check rejection. Canonical Unit, Eq String and MonadFail expectations follow the upstream semantics, with independent target checks retained."
+    },
+    {
+      "name": "optional split runtime build dependency controls",
+      "basis": "Two authored native harness families execute real child processes in ordinary, streaming LLVM and prestarted link modes. Distinct producer output bytes and process rendezvous independently enforce completion and overlap; injected core and supervisor failures check cleanup. No existing expected output or performance limit changes.",
+      "added_harness_ids": [
+        "test_split_runtime_compiles_independent_objects_before_linking",
+        "test_split_runtime_failed_producers_reap_every_child"
+      ],
+      "required_execution_counts": {
+        "harness": {
+          "before": 67,
+          "after": 69
+        }
+      },
+      "unchanged_expectations": "All prior harness cases, metrics and inventories remain; these controls do not claim measured benchmark acceptance."
     }
   ]
 }

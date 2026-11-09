@@ -1,0 +1,19 @@
+{
+  "complete": true,
+  "mode": "direct-GHC-checkout-source",
+  "producer_receipt_sha256": "2eb2041085a79260859c65edf320062efc7e9cce96079eaa3ee7ac8bfc65a0d3",
+  "commit": "f2b21c3b88d97e29a08785aec9d61ff253d6191c",
+  "cases": 5,
+  "accepted": 2,
+  "rejected": 2,
+  "malformed_target": 1,
+  "total_seconds": 8,
+  "gc_free_space_divisor": 2,
+  "seed_sha256": "51ac8c0027fc5c183bf831c3489d23d88be1fbcfb888a35d297cb196fceba3e3",
+  "sources_sha256": "a54b9f81ed77ae16bbf82e38ee5cd219fe15ee65a8f420235ffb1439a28999f7",
+  "log_sha256": "e0e9f91f42aa2ab34a283b50ba8ea70b017ff7428fb2ccf9e8059c49753cfefc",
+  "targets": {
+    "polymorphic_let": "92f19efcbb25c3a48bdc74881a84b4c021eedefb48374cdeac144eacbf2a4c80",
+    "self_application": "e6d6253719ef0bb03f8781e1fb909356e1aa0b6458ac0155a747db4ffa5bbfb8"
+  }
+}

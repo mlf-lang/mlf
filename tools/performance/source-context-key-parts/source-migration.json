@@ -1,0 +1,63 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.CrateQuery": {
+      "new": "f1b55c953d2631458af0ab6e736f7c13fd0303bc1b6be8025c90eb0c4f5215f0",
+      "old": "a1d35da4cb9f5256b3d0d1302aba6c54ce87752d5e1c6f247ae773ab0be9131f",
+      "reviewed_change": "reuse the same validated source-key decomposition and compare canonical compact fields without rebuilding the full context-bearing key"
+    }
+  },
+  "current_lock_sha256": "0c7ef4f26547c1b9c0eb49dc814ac417a4317a1cd803dacd90d9499e626631f4",
+  "current_registry_sha256": "7eae16f2e1df8be084b411e676e524f75d61626687e8fafd9b98acf6b26b70e2",
+  "format": "source-context-key-parts-migration-v1",
+  "frozen_references": {
+    "full-compiler/session-delta.json": "6aeb0fac2965143ec648c30ce2d540060480af1a422b146654d5c9377e605c5d",
+    "full-compiler/source-migration.json": "8a7118c56442506571541c5c20821086e8ce9aff987de058097a81e224e29bb0",
+    "full-compiler/source_contract.py": "68eec55dbeb8eec2a1d983dac1f5f61f03e1c03057c0cf9689c6361e8141a027",
+    "llvm-memory/host-delta.json": "3139c588c098659f16b17e88d20f584af54810c26ecda63aad7c042592feec29",
+    "llvm-memory/source_contract.py": "dafccd15ca69dbce1540b7963403410b9c60e3f83c51659e13b7254c3de7f539",
+    "query-key-scratch/query-delta.json": "0c04d92f7da1eea83192e14fa870de681c4fac962bf79badb80c38ab6f20c411",
+    "query-key-scratch/session-delta.json": "5534f3bfc032fbc51aa71eee39992f67760bb337a6690f9490bea08a5b364e06",
+    "query-key-scratch/source-migration.json": "9ecbc912e288495a1ff7f5652e81b429c5cfafd2dcd2da951c395efdc762a95a",
+    "query-key-scratch/source_contract.py": "a445a69b7c5a8eaae9cfeb794192ea5bfd7201e5a1bc96fb1dd231933f8281ba",
+    "source-context-projection-merge/left-session-delta.json": "73fb0aae3ec2efe06c4c8654e869f77efd07cf96460663b96ee12092de3fb076",
+    "source-context-projection-merge/right-session-delta.json": "c7d673c951ea8ddc9e64f091bfec6c539d6088739f6da9611bdf51bb10bd5396",
+    "source-context-projection-merge/source-migration.json": "be4b1897299a20e7f2cc1ae0ad7dc056da48418920141ca7a9329b14271c6112",
+    "source-context-projection-merge/source_contract.py": "352ae609b851fc57586ccaea7cd77a95a6bb5c85d29ae0b8c7d684962ec1ee2d",
+    "source-context-publication/query-delta.json": "53720f0a1ff588d1eb71356350657dd4fdda5a5ba6c97d06c35f54aebc4b2174",
+    "source-context-publication/source-migration.json": "b5d62c0a13a2306413167e318687573a790585a85d418203747bfd5956b62ca6",
+    "source-context-publication/source_contract.py": "b2abf018b5c3b5017d704a2adcb0f6f05c0501038b8edd9e421bb0f49c252c0c",
+    "source-context-read-reuse/query-delta.json": "022636870b0dd0da2abdfcca3764efb4fb947dc17402b88025434742588f7ee0",
+    "source-context-read-reuse/session-delta.json": "624818cd1064a142066198aed31f49c8ed3c22f9143042fe33b27c7900b3544f",
+    "source-context-read-reuse/source-migration.json": "f53f560ee5f2014ecd7db26c555040a8bf531fa4d6c77bd36d32934d67172c1c",
+    "source-context-read-reuse/source_contract.py": "186714be67b6866b711a38f53d532b4cc68641e91b2103a7aa5ce60234f5a890",
+    "source-query-context/query-delta.json": "d35a696a0dbe00def5c8bf579e88ae4b515b1c2f40f2318408c3dcf8548bc864",
+    "source-query-context/session-delta.json": "6442aa9316137001e8c71cc54c2257f5c3bee388b7dee1f957b52edae99abc5a",
+    "source-query-context/source-migration.json": "5dbb5cbc5fcb047732e1ef48931c88a3dbd73030af4cc853f6a07ed951208a6e",
+    "source-query-context/source_contract.py": "8cacdec2b8f398d357fd01555e5095eeb2f56376beebffcd9f57980a504cec29"
+  },
+  "host_sources": {},
+  "module_count": 128,
+  "owners": {
+    "Bootstrap.CrateQuery": {
+      "delta_sha256": "f12e5cdeaafee31475441bdf5a53d45265a2a273f113780e43339fbc9e1d4568",
+      "edit_count": 2,
+      "file": "query-delta.json",
+      "new": "f1b55c953d2631458af0ab6e736f7c13fd0303bc1b6be8025c90eb0c4f5215f0",
+      "old": "a1d35da4cb9f5256b3d0d1302aba6c54ce87752d5e1c6f247ae773ab0be9131f",
+      "path": "libraries/mlf-crates/Bootstrap/CrateQuery.hs"
+    }
+  },
+  "parent_lock_sha256": "ecb026e4a33eaf149df8a72b67bc6539789fc585be1ff017593c2e84f8064c40",
+  "parent_manifest_sha256": "b5d62c0a13a2306413167e318687573a790585a85d418203747bfd5956b62ca6",
+  "parent_ref": "97fe3dc80237bbd4d58594b043f189c5ba633209",
+  "parent_registry_sha256": "b16a33ddb6530d107d0dbf14f8ffbb18d2753fb89fffc0b6f7f879291ca54bbc",
+  "removed_sources": {},
+  "unchanged_count": 127,
+  "unchanged_owners": {
+    "Bootstrap.CrateSession": {
+      "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+      "sha256": "8adefc9d5346f375dd8568a59400bd498695af270b6fc70bea296c0698b5d190"
+    }
+  }
+}

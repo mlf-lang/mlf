@@ -1,0 +1,7 @@
+Resolution: no instance or given constraint for Monad (Bootstrap.Types.Either String); ambiguous uses need a type annotation
+Traceback (most recent call last):
+  File "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/figure12/run.py", line 3, in <module>
+    subprocess.run(json.loads((Path(__file__).parent/"command.json").read_text()),check=True)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/emlf', '--compile-crate', '/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/figure12/crate.spec', '-o', '/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/integration-modular/figure12/artifact/unit']' returned non-zero exit status 1.

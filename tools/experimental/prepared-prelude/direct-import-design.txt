@@ -1,0 +1,85 @@
+Direct imported-root experiment (opt-in, not production integration)
+=================================================================
+
+Measured selected-prefix filtering removes 28–29 of 76 synthetic imports but
+saves only 4–10% of frontend time. The remaining imports are SChecked signatures
+with panic RHSs: the compiler declares each imported type, generates/skolemizes
+and solves a dummy body/proof, then deletes the body during checked linking.
+Deep Core profiling found solving dominant: the old selected n-body root spent
+about .538 CPU seconds in solve, .051 in generation, and .005 in independent
+checking. Those diagnostic counters are inclusive/lazy-demand measurements,
+not a performance gate. Current direct-import code is in PreparedImportedCore;
+the full and selected synthetic-prefix routes remain independent references.
+
+No current public API avoids this construction. InferenceUnit.compileLoweredGroup
+also makes the panic definitions and later rechecks an XAbs parameter wrapper.
+The useful existing seam is Constraint.declareRecursive and the Binding argument
+of Constraint.build. declareRecursive builds a fresh name and a closed signature
+graph without traversing any RHS. buildRecursive uses Poly for these declarations;
+DeclaredPoly has additional declared-field provenance semantics and is not an
+interchangeable import representation.
+
+Implemented experimental pipeline:
+
+1. Keep complete class/instance lowering, external-scheme translation, local
+   declarations and annotation validation in the original order. Parameter
+   selection may observe the complete lowered inner expression, including
+   SWanted candidate names and every unused RHS, as the current experiment does.
+2. Admit the exact synthetic prefix against checked import contracts. Keep the
+   original outer generalization node, imported declaration GGen nodes, child
+   continuation and continuation-to-root edge. CWanted uses the outermost scope;
+   independent import roots or annotated source lambdas are not substitutes.
+3. Reuse declareRecursive and its Poly environment but omit only the synthetic
+   import RHS subgraphs and their dead proof constraints. Generate and solve
+   the entire user continuation once. No SourcePlan or per-definition inference.
+4. Elaborate the open user result with its import bindings, then place XAbs
+   parameters carrying authenticated target types OUTSIDE the user result's
+   type abstractions. Independently check the resulting closed target wrapper.
+5. Compare the arrow tail after the exact import prefix with the independently
+   inferred user-root scheme. Use a distinct imported-compilation result:
+   ordinary Compilation.inferredType currently means the checked term's type,
+   which would otherwise expose the extra parameter arrows as the user type.
+6. Perform capture-free identity substitution against actual exported binders,
+   preserve ordered data layouts, and retain the existing full final graft
+   checker. No public unchecked CheckedTerm constructor or raw type attachment.
+
+The raw removal helper rejects duplicate parameter identities, ambiguous encoded
+source hints, nested rebinding of a parameter identity, mismatched exported
+types, and exported identities already present in the fresh wrapper. These are
+conservative guards in addition to the trusted adapter's full wrapper check and
+freshObject discipline. Zero imports retain every user-owned term/type binder.
+
+Required controls include zero imports; higher-rank and bounded-forall imports;
+independent polymorphic uses; dictionary-only candidates; local shadowing;
+unused invalid bindings/instances; malformed or mismatched contracts; result
+type abstractions; and exact import ordering. Compare acceptance, principal
+target schemes, error phase/reason, erasure, ordered data layouts and executed
+outputs with the complete synthetic-prefix reference. Fresh numeric identities
+may change; any alpha allowance must be precise.
+
+Separate fixed-library preparation proposal
+------------------------------------------
+
+Keep CheckedTerm's constructor private. A Types-only generated module can hold
+fixed builtin term/type/inventory constants. Checked may expose only a fixed
+zero-argument witness getter, never a raw (term,type) constructor. Generation
+must use the fresh ordinary builtin/checker path, independent of this getter.
+The candidate must independently recheck its embedded data before qualification.
+Source/ABI/dependency/output hashes establish freshness, not correctness.
+
+The production shared build enforces a single static source set and forbids
+overlays. Either add a canonical generated-data source kind to the manifest or
+check in generated literal data and regenerate/verify it before qualification.
+Native and GHC must consume the same canonical syntax/data module. The current
+host-only generated experiment is not a production integration of this scheme.
+
+For imported library roots, initially keep ordinary module loading/resolution
+and select only exact authenticated library module/SCC components before binding
+the remaining user declarations together. Preserve lookup errors, declaration
+order, instance scopes and source-span package/file provenance. Crate preparation
+already supplies owner/reach/scope metadata; its SourcePlan inference route must
+not replace whole-root inference. Semantic interface fingerprints alone exclude
+bodies/private contracts and cannot authenticate reusable source implementations.
+Existing .mlfco objects are checked ASTs, not precompiled native libraries. Native
+library object reuse would additionally require a stable closure/constructor/GC
+ABI and is a separate engineering task.

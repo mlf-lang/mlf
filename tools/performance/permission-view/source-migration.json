@@ -1,0 +1,22 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.Graph": {
+      "new": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+      "old": "c515ef78483563eea91a4d9a26a0ef3165586961f7d3271d4a470816951aa6b4",
+      "reviewed_change": "Reuse dense permission views within one rebind only when all flexible binding parents are equal; retain construction fallback and query order."
+    },
+    "MLF.BuiltinPreludeData": {
+      "new": "c1e1240c275abc0dbd17954d8cbe8f76599344d089edb5648a2117feab8c33ad",
+      "old": "a40b64e7420a93d9dbbb393df479ec68134ea8d432a9c293fe92b939e0a4eff2",
+      "reviewed_change": "Fresh complete canonical regeneration with identity-only byte change for the Graph preparation closure."
+    }
+  },
+  "format": "permission-view-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "10f2da2458cbda85d61787be112fcb09e28d93cf97ebbd7b974eaccac5466f6b",
+  "parent_ref": "01ef8e70741c9f9ac4f27e489d059c96a4b33df5",
+  "removed_sources": {},
+  "unchanged_sources": 126
+}

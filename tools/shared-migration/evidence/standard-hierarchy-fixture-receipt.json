@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "scope": "post-cutover standard Haskell hierarchy focused fixtures",
+  "ghc": "9.14.1",
+  "optimization": "0",
+  "pass_count": 37,
+  "log": "tools/shared-migration/evidence/standard-hierarchy-fixtures.log",
+  "log_sha256": "b940fecbc60f9c8742cf8e6719fe98da95c918acc954a6b5944123237a27f4a0",
+  "inputs": {
+    "tools/shared-migration/tests/Runner.hs": "28d327de9e79db63d72302c798f11d5ea6d3bd90e1fc02dc9ff2fab26c834af2",
+    "tools/shared-migration/tests/support/MLF/Primitive.hs": "9ec33452b130612c22d4692a088fccecd1144c02ac54aebc520a60c2e824317f",
+    "tools/shared-migration/tests/RejectedUnreachable.emlf": "e957eeb08b14249f4782c462fac5ae13830deefa80881aa7e10ab331c6830419",
+    "tools/shared-migration/tests/NegativeDouble.emlf": "2aa531d78274f12c1c0ab635c07c0263861fa8c86a75e5216c61d26f7b7d7220",
+    "tools/shared-migration/tests/RejectedUnsignedRec.emlf": "ff765e8629580482331011183659f2c48900fde6c8ccd1706cc75664928b368a",
+    "tools/shared-migration/tests/RejectedLambda.emlf": "3a27b98436b0417d7db0ff18883429a73fef86f49e90ca8ea9a51cdb41aefa45",
+    "tools/shared-migration/tests/DemandScope.emlf": "60889f4f5ffbe1171c44ea310cfc18e51cf30110c6c96aed7af1440132b299cf",
+    "tools/shared-migration/tests/RejectedOpenRec.emlf": "4afff8dea9ae3d22e7e07c24138c2bb24d3ec1a464f4dc19fdff51f83ddc0d6d",
+    "tools/shared-migration/tests/PrimitiveShadow.emlf": "49f75337c08df3263d44151a1edc03370a609e0e7dce4d9c06576a3dadfa807e",
+    "tools/shared-migration/tests/Comments.emlf": "e6fbc56782cd3736686aba31007ddf8492696668d298895d8dc837a33cd70e34",
+    "tools/shared-migration/tests/legacy/Bootstrap/Std.emlf": "5975437c9ba42c095ce5e5c15423e2dbddf2002aaf614c03b905a4db26559700"
+  }
+}

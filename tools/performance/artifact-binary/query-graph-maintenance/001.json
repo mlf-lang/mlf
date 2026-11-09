@@ -1,0 +1,28 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 115747,
+  "new_sha256": "dd58bad7a75a80d6bc947abda2136ba60fafc078d6a5426d1afa3b42675982f1",
+  "old_bytes": 116086,
+  "old_sha256": "9a6cdbfe2be40a0283bfdf78ae7d24839da69efcb175acec2ebc7f309780c13b",
+  "path": "patricia/test_adapters.py",
+  "splices": [
+    {
+      "new": "NQ==",
+      "new_at": 109268,
+      "old": "Mg==",
+      "old_at": 109268
+    },
+    {
+      "new": "NQ==",
+      "new_at": 109658,
+      "old": "Mg==",
+      "old_at": 109658
+    },
+    {
+      "new": "c2V0KGJpbmFyeS5tZXRhZGF0YV9wYXRocw==",
+      "new_at": 112445,
+      "old": "eydzb3VyY2VfY29udHJhY3QucHknLCAnc291cmNlX21pZ3JhdGlvbl9hZGFwdGVyLnB5JywgJ3BhcmVudC1pbnZlbnRvcnkuanNvbicsCiAgICAgICAgICAgICAgICAgICAgICAgICdtYWludGVuYW5jZS1wYXJlbnRzLmpzb24nLCAnc291cmNlLW1pZ3JhdGlvbi5qc29uJywgJ2J1aWx0aW4tdmVyaWZpY2F0aW9uLXJlY2VpcHQuanNvbid9CiAgICAgICAgYnVuZGxlX25hbWVzLnVwZGF0ZShyb3dbJ2ZpbGUnXSBmb3Igcm93IGluIGJpbmFyeS52YWx1ZVsnZGVsdGFzJ10udmFsdWVzKCkpCiAgICAgICAgYnVuZGxlX25hbWVzLnVwZGF0ZShyb3dbJ2ZpbGUnXSBmb3Igcm93IGluIGJpbmFyeS52YWx1ZVsnbWFpbnRlbmFuY2UnXS52YWx1ZXMoKQ==",
+      "old_at": 112445
+    }
+  ]
+}

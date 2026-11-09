@@ -1,0 +1,23 @@
+{
+  "baseline_commit": "3b56689320f29b45835d26915fb99a4218eec09e",
+  "files": {
+    "tools/performance/crate-optimizations/p1/FrozenSelectorMap.hs": "9b7dce8485229d577862ea78e8be34cd28edd9766809a91de7ddf87dd43102e9",
+    "tools/performance/crate-optimizations/p1/FrozenSelectorSet.hs": "882f4a8beba89fa538b398c99831891628e0b6ae28c5c7f8ce70680f6ef91d19",
+    "tools/performance/crate-optimizations/p1/FrozenSelectors.hs": "62c44c42657f507c35d46fc08b5fc39f99ac23d34cb9cb2cf645fabfc83767d4",
+    "tools/performance/crate-optimizations/p1/SelectorDifferential.hs": "6d2f3b5ec7a803360c295a6ea1178cf9ba06a79bb14cc2d442753433863da603",
+    "tools/performance/crate-optimizations/p2/FrozenFingerprint.hs": "46ccf49aeef6caf9ad440bb315d9e4d1fe4ce65173584a6fdf6c16215b00a3fe",
+    "tools/performance/crate-optimizations/p2/FingerprintDifferential.hs": "3247c7b5efb826c95fd02a9480b332f1913ebed3fd16e50c2b4d1af9450e9fc7",
+    "tools/performance/crate-optimizations/p3/FrozenPrefix.hs": "486ce3801e0d286d0884c46962bcb0311d8a1b889544fbc4bff774613f64a369",
+    "tools/performance/crate-optimizations/p3/FrozenInferenceUnit.hs": "4693d0bc2a733200f9916fc756ab5a2df8736e95a0fdd3e625600725f5578351",
+    "tools/performance/crate-optimizations/p3/QueryV6Bridge.hs": "c72f46932d68b0a3e484883cbfc9ed99c49d8820bd771018905e35d85cadd042",
+    "tools/performance/crate-optimizations/p3/PrefixControls.hs": "576c10e653b0bd47bfce1d3dae4f4ed2355829acc00e30d8b6b1511e99156e61",
+    "tools/performance/map-balance/BaselineMap.hs": "fca037e0cd1719142ff7bc825aa811359d9f84b9030d774713ffa5046d1bf7e7",
+    "tools/performance/map-balance/BalanceControls.hs": "badfdff0f04a5612d8ffc4ba496feb6344ab9c5da5f7a750cb82e8eca586fb80",
+    "tools/performance/fingerprint-fusion/controls/Oracle.hs": "af71fa1817dabd45c7cfab98c1043dd18eca396bfa57c23181d0bf22e035cfee",
+    "tools/performance/fingerprint-fusion/controls/Tests.hs": "e7352052eb25fa2855ac5741577e328d461d481a21aea203bcb230f53f784f6a",
+    "tools/performance/fingerprint-fusion/controls/Probe.hs": "a715135903662d82e16431be6796c60789ae6a87fb178757083124f4e92fe271",
+    "tools/performance/validation-reuse/BoundaryControls.hs": "4fbe283e60e853550f204cab759207894d5b88fb319bffba2b0c825990334626",
+    "tools/performance/a1-private-index/controls/FrozenMap.hs": "0cdeb2b572f38a59e82e5a91d3c47b118b5dc0928292a66849115e1679d18e31",
+    "tools/performance/a1-private-index/current/CurrentBuiltinControls.hs": "eb512024358872e69ce2df3b429a28ef6f12755c0c5d194147ddc36a627c944d"
+  }
+}

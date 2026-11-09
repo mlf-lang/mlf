@@ -9,7 +9,7 @@ rows text = S.mapM (\line -> H.right (J.parse line)) (S.filter (\line -> stringL
 check directory binary name args expected = do
  let out = directory ++ "/" ++ name ++ ".stdout"
  let err = directory ++ "/" ++ name ++ ".stderr"
- code <- O.exec "" (Cons binary args) "" out err 120
+ code <- O.exec "" ((:) binary args) "" out err 120
  H.assert (code == expected) (name ++ ": unexpected exit status " ++ showInt code)
  readFile out
 summary records count failures scope = do
@@ -28,7 +28,7 @@ main work unions = do
   text <- check directory unions "unions" (O.words "--format json") 0
   records <- rows text
   summary records 1 0 "full"
-  H.assert (S.eqList eqString (J.getStrings "ids" (S.head records)) (Cons "int-set/union-sorted-list" Nil)) "migrated case ID changed"
+  H.assert (S.eqList eqString (J.getStrings "ids" (S.head records)) ((:) "int-set/union-sorted-list" [])) "migrated case ID changed"
   let result = S.index records 1
   H.assert (eqString (J.getText "name" "" result) "size-biased set unions agree with independent sorted lists") "migrated case label changed"
   selected <- check directory unions "exact" (O.words "--exact int-set/union-sorted-list --tag oracle --format json") 0
@@ -46,7 +46,7 @@ main work unions = do
   -- Exercise that real directory independently of the campaign runner's cwd.
   current <- canonicalPath "."
   checkout <- fileExists (current ++ "/tests/mlf-package.json")
-  code <- O.exec (if checkout then current ++ "/tests" else current) (Cons self Nil) "" (directory ++ "/package-cwd.stdout") (directory ++ "/package-cwd.stderr") 120
+  code <- O.exec (if checkout then current ++ "/tests" else current) ((:) self []) "" (directory ++ "/package-cwd.stdout") (directory ++ "/package-cwd.stderr") 120
   H.assert (code == 0) "framework failed from the tests package directory"
   packageOutput <- readFile (directory ++ "/package-cwd.stdout")
   H.assert (H.contains "Test catalog classification and selection contracts passed" packageOutput) "package-directory launch omitted catalog contracts"
@@ -63,14 +63,14 @@ main work unions = do
   text <- check directory self "listing" (O.words "--list-probe --list --format json") 0
   records <- rows text
   H.assert (S.length records == 1 && eqString (J.getText "event" "" (S.head records)) "inventory") "listing ran tests or emitted execution results"
-  text <- check directory self "noisy" (S.append (O.words "--noisy-probe --report") (Cons report Nil)) 0
+  text <- check directory self "noisy" (S.append (O.words "--noisy-probe --report") ((:) report [])) 0
   H.assert (H.contains "test action output" text) "noisy action did not execute"
   saved <- readFile report
   records <- rows saved
   summary records 1 0 "full"
   -- Reuse a completed report path and deliberately crash. It must no longer
   -- contain the previous successful summary.
-  code <- O.exec "" (S.append (Cons self (O.words "--list-probe --report")) (Cons report Nil)) "" (directory ++ "/crash.out") (directory ++ "/crash.err") 120
+  code <- O.exec "" (S.append ((:) self (O.words "--list-probe --report")) ((:) report [])) "" (directory ++ "/crash.out") (directory ++ "/crash.err") 120
   H.assert (code /= 0) "panic probe succeeded"
   crashError <- readFile (directory ++ "/crash.err")
   H.assert (H.contains "listing executed an action" crashError) "crash probe failed for an unrelated reason"

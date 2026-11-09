@@ -1,0 +1,22 @@
+{
+  "attempts": [
+    {
+      "path": "O2-producer",
+      "outcome": "stopped130 after discovering force-recomp beyond initial incremental-only permission"
+    },
+    {
+      "path": "O2-producer-full-authorized",
+      "outcome": "failed1: ambiguous local/imported Phase; explicit import hiding repaired"
+    },
+    {
+      "path": "O2-producer-phase-fix",
+      "outcome": "failed1: seven unresolved IsString schemes; concrete original-domain annotations repaired"
+    },
+    {
+      "path": "O2-framework",
+      "outcome": "failed1: test-only Unit qualification; MLF.Primitive import repaired"
+    }
+  ],
+  "all_retained_locally": true,
+  "final_success_receipts_separate": true
+}

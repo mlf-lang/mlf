@@ -1,0 +1,64 @@
+{
+  "suite": "compiler-shapes",
+  "version": 2,
+  "title": "GHC / MLF compiler shape classification benchmark",
+  "purpose": "Compile identical generated shared-Haskell programs with GHC and with GHC-hosted MLF, from fresh targets to native executables. This classifies compiler behaviour by program shape; it is not the C/MLF Benchmarks Game comparison in tools/bench.",
+  "families": {
+    "flat_functions": {"label": "Independent annotated functions", "default": true, "work": "n annotated top-level functions summed in a balanced tree"},
+    "dependency_chain": {"label": "Annotated dependency chain", "default": true, "work": "n annotated functions in a strict chain"},
+    "inferred_chain": {"label": "Inferred dependency chain", "default": true, "work": "the same chain with no signature on the generated functions"},
+    "recursive_ring": {"label": "Mutually recursive ring", "default": true, "work": "n functions in a mutually recursive cycle"},
+    "mono_calls": {"label": "Monomorphic Box calls", "default": true, "work": "n monomorphic constructor pack/unpack calls"},
+    "poly_calls": {"label": "Polymorphic Box calls", "default": true, "work": "the same calls through a rank-1 forall"},
+    "tree_chain": {"label": "Skewed constructor tree", "default": true, "work": "n leaves in a left-deep constructor tree"},
+    "balanced_tree": {"label": "Balanced constructor tree", "default": true, "work": "the same leaves in a balanced constructor tree"},
+    "literal_table": {"label": "Generated literal table", "default": true, "work": "a generated constructor table of n items"},
+    "higher_order_chain": {"label": "Higher-order composition chain", "default": true, "work": "n nested higher-order compositions"},
+    "local_functions": {"label": "Local let-bound functions (optional)", "default": false, "work": "flat functions placed inside one local let; never part of the default matrix"},
+    "baseline": {"label": "Minimal IO baseline", "default": false, "work": "a program that only reads argv and prints it"}
+  },
+  "sizes": [8, 32, 128],
+  "repeats": 3,
+  "seed": 20261031,
+  "matrices": {
+    "default": {
+      "description": "10 families x sizes 8, 32, 128 plus one minimal baseline; 31 cells, 186 timed compilations",
+      "families": ["flat_functions", "dependency_chain", "inferred_chain", "recursive_ring", "mono_calls",
+                   "poly_calls", "tree_chain", "balanced_tree", "literal_table", "higher_order_chain"],
+      "sizes": [8, 32, 128],
+      "baseline": true,
+      "repeats": 3
+    },
+    "smoke": {
+      "description": "Low-cost integrity and coverage check for ordinary PRs: 2 families at size 8 plus baseline; 3 cells, 18 timed compilations",
+      "families": ["flat_functions", "recursive_ring"],
+      "sizes": [8],
+      "baseline": true,
+      "repeats": 3
+    }
+  },
+  "endpoints": {
+    "crate-bootstrap-v1": {
+      "status": "measured",
+      "summary": "GHC-hosted shared-source bootstrap crate producer: --compile-crate (source to checked) then --crate-to-llvm-gc (checked to LLVM), then ordinary Clang -O2. This is NOT the installed emlf SOURCE -o driver.",
+      "producer": "tools/shared/build.py --bootstrap-only --optimization 2",
+      "driver": "PRODUCER/bin/emlf --compile-crate SPEC -o UNIT; PRODUCER/bin/emlf --crate-to-llvm-gc UNIT.mlfci; clang -O2 UNIT.ll",
+      "compiles_user_program_fresh": true,
+      "reused_inputs": ["fixed builtin checked pair (.mlfci/.mlfco)", "prebuilt host MLF.Primitive package", "runtime.o", "GHC and Clang toolchains"],
+      "cache_boundary": "each leg gets a private, empty query cache directory that is inventoried and deleted after correctness checks; no target objects, .hi/.o files, LLVM or executables are reused between legs"
+    }
+  },
+  "unmeasured_endpoints": {
+    "emlf-source-v1": {
+      "status": "declared, not measured in this revision",
+      "summary": "Installed default emlf SOURCE -o OUTPUT driver with its native standard library. Different internal work from crate-bootstrap-v1 and therefore a separate cohort dimension.",
+      "requires": "a qualified native installation (tools/shared/build.py without --bootstrap-only) plus its own preparation step",
+      "rule": "cohorts of this endpoint must never be pooled, compared or relabelled against crate-bootstrap-v1 cohorts"
+    }
+  },
+  "claim_limits": [
+    "Three repetitions per cell describe spread on one machine; they are not a confidence interval.",
+    "A single cohort cannot show that one compiler is faster in general, only the measured wall ratios for these fixtures.",
+    "Different cohorts are separate windows and are never pooled into one median."
+  ]
+}

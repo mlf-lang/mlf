@@ -1,0 +1,1 @@
+test: test [--list] [--filter TEXT] [--exact ID] [--tag TAG] [--group NAME] [--level NAME] [--input NAME] [--oracle NAME] [--purpose NAME] [--category NAME] [--technique NAME] [--format text|json] [--report FILE]

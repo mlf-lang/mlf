@@ -1,0 +1,23 @@
+{
+  "format": "validation-reuse-owner-v1",
+  "base_ref": "76c6eac4f13ca39ae45590281fe4ced8c07512e8",
+  "owner": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+  "old_sha256": "8900a34bf977eaec0d44948be816ca2b5ddb8955170908e7df8fa93967d179df",
+  "new_sha256": "e6ffa2603d73f4df1bc69858487168dd53991a8a6243cb046cb1f00e8fbadc13",
+  "constraint_sha256": "ec4520331a84a51a8e702fe027a7bd59d88d6219c7495779d96eec9acf9e3852",
+  "scope": "One private owner; shared solving continuation reuses immediately successful generation validation. Public raw validation, all remaining admission/final checks, oracle bodies and expected results unchanged.",
+  "edits": [
+    {
+      "old": "      SProgram declarations expression ->\n        do {\n          constraints <- Compiler.atPhase Inference (C.generateProgram program);\n          solved <- Compiler.atPhase Inference (solvePrepared constraints);\n          let {\n            graph = S.solverGraph solved\n          };\n",
+      "new": "      SProgram declarations expression ->\n        do {\n          constraints <- Compiler.atPhase Inference (C.generateProgram program);\n          solved <- Compiler.atPhase Inference (solveGenerated constraints);\n          let {\n            graph = S.solverGraph solved\n          };\n"
+    },
+    {
+      "old": "  prepareGraph :: Graph -> Either String Graph;\n  prepareGraph input =\n    G.bindE (G.validateGraph input)\n      (\\ignored ->\n         if L.any (\\n -> IM.member n (G.links input)) (IM.keys (G.nodes input))\n         then Left \"live graph identities cannot also be aliases\"\n         else if L.any (\\n -> (n >= G.nextId input)) (IM.keys (G.nodes input))\n              then Left \"fresh identity counter overlaps graph nodes\"\n              else if L.any (\\n -> (n >= G.nextId input)) (IM.keys (G.links input))\n                   then Left \"fresh identity counter overlaps graph aliases\"\n                   else Right (G.canonicalize input));\n  openPreparedSession :: forall s. Graph -> ST s (Session s);\n  openPreparedSession canonical =\n    stBind (K.importIndices IM.empty IM.empty)\n",
+      "new": "  prepareGraph :: Graph -> Either String Graph;\n  prepareGraph input =\n    G.bindE (G.validateGraph input)\n      (\\ignored -> prepareValidatedGraph input);\n  -- Both callers have already validated this unchanged graph. Identity, alias\n  -- and index admission still happens before opening a session.\n  prepareValidatedGraph :: Graph -> Either String Graph;\n  prepareValidatedGraph input =\n    if L.any (\\n -> IM.member n (G.links input)) (IM.keys (G.nodes input))\n    then Left \"live graph identities cannot also be aliases\"\n    else if L.any (\\n -> (n >= G.nextId input)) (IM.keys (G.nodes input))\n         then Left \"fresh identity counter overlaps graph nodes\"\n         else if L.any (\\n -> (n >= G.nextId input)) (IM.keys (G.links input))\n              then Left \"fresh identity counter overlaps graph aliases\"\n              else Right (G.canonicalize input);\n  openPreparedSession :: forall s. Graph -> ST s (Session s);\n  openPreparedSession canonical =\n    stBind (K.importIndices IM.empty IM.empty)\n"
+    },
+    {
+      "old": "  audit :: forall s. Session s -> ST s (Either String (Session s));\n  audit state = ST.bindE (finish state) (\\checked -> ST.pureE state);\n  solvePrepared :: Constraints -> Either String Solver;\n  solvePrepared constraints = G.bindE (prepareGraph (C.initialGraph constraints))\n    (\\canonical -> runST\n      (stBind (openPreparedSession canonical)\n        (\\initial -> ST.bindE (solverUnify (C.equalities constraints) initial)\n",
+      "new": "  audit :: forall s. Session s -> ST s (Either String (Session s));\n  audit state = ST.bindE (finish state) (\\checked -> ST.pureE state);\n  solvePrepared :: Constraints -> Either String Solver;\n  solvePrepared constraints =\n    solvePreparedGraph (prepareGraph (C.initialGraph constraints)) constraints;\n  -- This private route is used only immediately after generateProgram succeeds;\n  -- it has already validated exactly initialGraph. Arbitrary constraints retain\n  -- solvePrepared's original validation, and final validation is unchanged.\n  solveGenerated :: Constraints -> Either String Solver;\n  solveGenerated constraints =\n    solvePreparedGraph (prepareValidatedGraph (C.initialGraph constraints)) constraints;\n  solvePreparedGraph :: Either String Graph -> Constraints -> Either String Solver;\n  solvePreparedGraph prepared constraints = G.bindE prepared\n    (\\canonical -> runST\n      (stBind (openPreparedSession canonical)\n        (\\initial -> ST.bindE (solverUnify (C.equalities constraints) initial)\n"
+    }
+  ]
+}

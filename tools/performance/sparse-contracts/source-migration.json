@@ -1,0 +1,37 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.Classes": {
+      "new": "28b098e1a881b25a289f79a33252c7a1842664ea6cdc3633169231aad85cbdbc",
+      "old": "3f685123f17509b53cdb2a28dde74d8b54e7459002f7b19c4eb698abef8273dd",
+      "reviewed_change": "Maintain the owned reservation set while preserving public source lowering and reservation order."
+    },
+    "Bootstrap.CrateQuery": {
+      "new": "06263b9871c593c9f4f7a4f51975b8a38c9f96737f84a632afe5aa7525e50576",
+      "old": "03938b24a01727e6a655c57399fd111d47b0c8befb8b4533d74fc5ad0d9b02a7",
+      "reviewed_change": "Combined sparse selection, ordinal declaration index, maintained contract views, and owned reservation set; public structural paths retained."
+    },
+    "Bootstrap.CrateSession": {
+      "new": "18abedc7f96452392ed3401f1ae607233ec13e2a5ba24bd1c0cba344820c382f",
+      "old": "c97410642e2c86c7bc84436492a284c51291d617e1be0e262716275e5997a23d",
+      "reviewed_change": "Combined sparse selection, ordinal declaration index, maintained contract views, and owned reservation set; public structural paths retained."
+    },
+    "Bootstrap.SourceInference": {
+      "new": "936ec48b2d8535a4211db4ebea027f09ae2c3d8b2615551d41cbd17b779b2fc0",
+      "old": "3cbcf934a1390a578916534cc12e9cb9f424b30faf8f9c7a58d5c6ed3700c75e",
+      "reviewed_change": "Combined sparse selection, ordinal declaration index, maintained contract views, and owned reservation set; public structural paths retained."
+    },
+    "MLF.BuiltinPreludeData": {
+      "new": "a40b64e7420a93d9dbbb393df479ec68134ea8d432a9c293fe92b939e0a4eff2",
+      "old": "1bf3daaa14bb6ba16224e8d4f80cfa3db4ee7aca91a55e51741567c964552039",
+      "reviewed_change": "Canonical builtin regenerated for the reservation candidate source identity."
+    }
+  },
+  "format": "sparse-contracts-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "762b056350c72a204a5edfb4e5a65af7a0d1b4da603226a90f8ebb2b79294071",
+  "parent_ref": "48275901cd7b760cc8dd000ed54898a23a494a87",
+  "removed_sources": [],
+  "unchanged_sources": 123
+}

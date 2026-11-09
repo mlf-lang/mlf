@@ -1,0 +1,213 @@
+{
+  "format": 1,
+  "complete": false,
+  "source_mode": "authenticated direct committed shared source",
+  "commands": [
+    {
+      "name": "process-fixture",
+      "argv": [
+        "/usr/bin/x86_64-linux-gnu-gcc-14",
+        "-O2",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-process/fixture.c",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/process-fixture"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799211.6029296,
+      "timeout_seconds": 180,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.06552675699640531
+    },
+    {
+      "name": "task-fixture",
+      "argv": [
+        "/usr/bin/x86_64-linux-gnu-gcc-14",
+        "-O2",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/fixture.c",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/task-fixture"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799211.6691308,
+      "timeout_seconds": 180,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.06666969299840275
+    },
+    {
+      "name": "async-task",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/async-task"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799211.73642,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/task-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/async-task-work"
+      },
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "46c0e346910ce907d8dd375c464e9c848d87ec6bd82d4c377207623eb41b4fcc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.015501325004152022
+    },
+    {
+      "name": "async-task-processes",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/async-task-processes"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799211.752465,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/task-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/async-task-processes-work"
+      },
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "694f21874604e86236baf637a283b8b9801875591bacd941dd7adaef898f18bf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.18053505998977926
+    },
+    {
+      "name": "async-task-wait-graph",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/async-task-wait-graph"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799211.9336798,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/task-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/async-task-wait-graph-work"
+      },
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "a86f86c034512edb04d9f396ece94bf58f0d4fca2463ca4081654c75f0bbd74f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.004671838003559969
+    },
+    {
+      "name": "async-process",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/async-process"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799211.94024,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/process-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/async-process-work"
+      },
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "f19761b2c72ba1bcd5e7a196912a8f269fb250b5daea1e6ba1b686d6c33c065a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.43308643699856475
+    },
+    {
+      "name": "async-process-panic",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/async-process-panic"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799212.374097,
+      "timeout_seconds": 180,
+      "environment_overrides": {
+        "MLF_ASYNC_FIXTURE": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/process-fixture",
+        "MLF_ASYNC_WORK": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/panic-work"
+      },
+      "state": "passed",
+      "exit_code": 1,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "46e8692f84b5f12e267aeca0c42465ff2261a2f096008abd1a4739170315d110",
+      "seconds": 0.02396616799524054
+    },
+    {
+      "name": "panic-child-reaped",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/process-fixture",
+        "assert-gone",
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/panic-work/panic.pid"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799212.398712,
+      "timeout_seconds": 180,
+      "environment_overrides": {},
+      "state": "passed",
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "seconds": 0.0013031470007263124
+    },
+    {
+      "name": "shared-frontend-frontend",
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/bin/shared-frontend",
+        "--frontend"
+      ],
+      "cwd": "/workspace/scratch/3f83e2ebe290/pr22-recovery",
+      "started": 1792799212.400588,
+      "timeout_seconds": 120,
+      "environment_overrides": {},
+      "state": "failed",
+      "exit_code": 1,
+      "error": "shared-frontend-frontend failed; see /workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/shared-frontend-frontend.stderr",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "6d3774532bae2e8259748e216aa78f4121fb15ebdbfeb9c232b1736c3bd6f99d",
+      "seconds": 1.4814325490006013
+    }
+  ],
+  "inputs": {
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/suite.stdout": "46c0e346910ce907d8dd375c464e9c848d87ec6bd82d4c377207623eb41b4fcc",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/processes.stdout": "694f21874604e86236baf637a283b8b9801875591bacd941dd7adaef898f18bf",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/wait-graph.stdout": "a86f86c034512edb04d9f396ece94bf58f0d4fca2463ca4081654c75f0bbd74f",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-process/suite.stdout": "f19761b2c72ba1bcd5e7a196912a8f269fb250b5daea1e6ba1b686d6c33c065a",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/shared-sources.json": "0fcdcc88f6ba5c1f7b149dc7cee8d6d7025b8ca1e8e61b6888f3362d871324a1",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-process/fixture.c": "94fc65e46734815e80a7908ebfbb1ca3096a5964453427ceba5566ea56ac2829",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tests/async-task/fixture.c": "000b627560be8bcea06d973950c4eec226f6afbff6c1ed3b6927c35f0ad2f898",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/shared/test_direct.py": "67df22b36bda398a389ba7798829d9dac5fc8ddd7ab72c7a814448ae8fa61bee",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/tools/release/test-suite-build-receipts.py": "4bef144548256ca2adafc24c427f73352554c185d8d81f59740baff31021ee3b",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/receipt.json": "17ba398d0dc77a03196ad7ded9dcf068a6dcddb31860d6ef871ad1d7995ef38e",
+    "/usr/bin/x86_64-linux-gnu-gcc-14": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7"
+  },
+  "producer": {
+    "path": "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-ghc-O2/receipt.json",
+    "sha256": "17ba398d0dc77a03196ad7ded9dcf068a6dcddb31860d6ef871ad1d7995ef38e",
+    "host": "GHC",
+    "optimization": "2"
+  },
+  "fixture_compiler": {
+    "path": "/usr/bin/x86_64-linux-gnu-gcc-14",
+    "sha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f"
+  },
+  "orchestrator": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7"
+  },
+  "helpers": {
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/process-fixture": "dc3849d271eb757e4150a514091e356f0de6583678dde9413849eaf5a3c491f8",
+    "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/task-fixture": "985e1b9343fe4bb736eed35a4e38e6d928be0ce58cbc547a1f2bf5d49f0ab412"
+  },
+  "error": {
+    "type": "RuntimeError",
+    "message": "shared-frontend-frontend failed; see /workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-metadata-fix-direct-O2/shared-frontend-frontend.stderr"
+  }
+}

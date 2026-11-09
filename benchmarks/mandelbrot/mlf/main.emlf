@@ -31,7 +31,7 @@ pixels zr0 zi0 tr0 ti0 cr0 zr1 zi1 tr1 ti1 cr1 ci active0 active1 remaining =
       in pixels nextR0 nextI0 (mulDouble nextR0 nextR0) (mulDouble nextI0 nextI0) cr0 nextR1 nextI1 (mulDouble nextR1 nextR1) (mulDouble nextI1 nextI1) cr1 ci live0 live1 (remaining - 1)
   else return 0
 
-pad : ByteArray -> Int -> Int -> IO Unit
+pad : ByteArray -> Int -> Int -> IO ()
 pad out index bits =
   if bits == 0 then return ()
   else do
@@ -39,7 +39,7 @@ pad out index bits =
     writeByteArray out index (byte * 2)
     pad out index (bits - 1)
 
-row : ByteArray -> Int -> Int -> Int -> IO Unit
+row : ByteArray -> Int -> Int -> Int -> IO ()
 row out n y x =
   if x < n then do
     let cr = subDouble (divDouble (mulDouble 2.0 (intToDouble x)) (intToDouble n)) 1.5
@@ -58,7 +58,7 @@ row out n y x =
       row out n y (x + 1)
   else pad out (n / 8) (if n % 8 == 0 then 0 else 8 - n % 8)
 
-rows : ByteArray -> Int -> Int -> IO Unit
+rows : ByteArray -> Int -> Int -> IO ()
 rows out n y =
   if y < n then do
     row out n y 0

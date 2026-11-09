@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c",
+    "3",
+    "python3",
+    ".mlf-build/integration-modular/core/run.py"
+  ],
+  "limits": {
+    "wall_seconds": 900,
+    "address_space_per_process": 3221225472,
+    "process_tree_rss_bytes": 1610612736,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 3221225472,
+    "max_output_bytes": 536870912
+  },
+  "process_group": 7,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 172.13827246299843,
+  "peak_group_rss": 829104128,
+  "raw_receipt_sha256": "79abe298b7a391243e727d77898d549a04d64423e0f3f1d36afa2fe618870f0f",
+  "sample_count": 838,
+  "min_host_available": 8481558528,
+  "min_disk_free": 18300043264,
+  "max_output_bytes": 205647153
+}

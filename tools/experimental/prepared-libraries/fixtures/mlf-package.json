@@ -1,0 +1,15 @@
+{
+  "format": 1,
+  "name": "prepared-library-controls",
+  "version": "0.1.0",
+  "library": {
+    "modules": {
+      "Fixed.API": "Fixed/API.emlf",
+      "Fixed.Class": "Fixed/Class.emlf",
+      "Fixed.Functions": "Fixed/Functions.emlf",
+      "Fixed.Instances": "Fixed/Instances.emlf",
+      "Fixed.Stack": "Fixed/Stack.hs",
+      "Fixed.Types": "Fixed/Types.emlf"
+    }
+  }
+}

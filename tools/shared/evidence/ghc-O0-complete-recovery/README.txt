@@ -1,0 +1,1 @@
+Exact current-source GHC O0 build succeeded: 94 modules, 12 executable links, complete whole-corpus grammar/name resolution, final hash checks. Full direct runtime tests, O2 and native bootstrap are separate pending gates. Source implementation checkpoint: 98d6df3914f888c635181c31c5d27752647d659b.

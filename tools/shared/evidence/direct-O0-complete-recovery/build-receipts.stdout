@@ -1,0 +1,5 @@
+PASS suite-build receipts: first-and-second
+PASS suite-build receipts: reject-null
+PASS suite-build receipts: reject-object
+PASS suite-build receipts: reject-string
+PASS suite-build receipts: reject-prepared-null

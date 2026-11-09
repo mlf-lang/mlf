@@ -100,10 +100,12 @@ class FrameworkRecoveryControls(unittest.TestCase):
 
 
 class PublishedFrameworkRecoveryControls(unittest.TestCase):
-    def test_actual_root_lock_matches_exact_reviewed_repairs(self):
+    def test_pr19_historical_root_lock_matches_exact_reviewed_repairs(self):
         original = subprocess.check_output(
             ['git', '--no-replace-objects', 'show', recovery.FROZEN_FRAMEWORK + ':mlf.lock'], cwd=ROOT)
-        self.assertEqual((ROOT / 'mlf.lock').read_bytes(), recovery.repaired_root_lock(ROOT, original))
+        recovered = subprocess.check_output(
+            ['git', '--no-replace-objects', 'show', recovery.RECOVERED_FRAMEWORK + ':mlf.lock'], cwd=ROOT)
+        self.assertEqual(recovered, recovery.repaired_root_lock(ROOT, original, recovery.RECOVERED_FRAMEWORK))
 
 
 if __name__ == '__main__':

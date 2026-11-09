@@ -7,7 +7,7 @@ import qualified Bootstrap.Std as S
 -- These are admission limits, not a claim of operating-system memory policing.
 data Demand = Demand Int Int Int Int Bool
 data Lease = Lease String Demand
-data Budget = Budget Demand (List Lease)
+data Budget = Budget Demand ([] Lease)
 cpu (Demand value _ _ _ _) = value
 memory (Demand _ value _ _ _) = value
 processes (Demand _ _ value _ _) = value
@@ -19,7 +19,7 @@ valid request = cpu request >= 0 && memory request >= 0 && processes request >= 
 fits request capacity = cpu request <= cpu capacity && memory request <= memory capacity && processes request <= processes capacity && files request <= files capacity
 subtract capacity request = Demand (cpu capacity - cpu request) (memory capacity - memory request) (processes capacity - processes request) (files capacity - files request) (exclusive capacity)
 remaining (Budget capacity leases) = S.foldl (\rest lease -> subtract rest (demand lease)) capacity leases
-create capacity = if valid capacity && cpu capacity > 0 && processes capacity > 0 then Right (Budget capacity Nil) else Left "invalid resource budget"
+create capacity = if valid capacity && cpu capacity > 0 && processes capacity > 0 then Right (Budget capacity []) else Left "invalid resource budget"
 -- A duplicate acquisition is a protocol mistake, not resource contention.
 acquire key request budget = case budget of
  Budget capacity leases ->
@@ -27,7 +27,7 @@ acquire key request budget = case budget of
   if S.not (valid request) then Left "negative resource demand" else
   if S.not (fits request capacity) || (exclusive request && S.not (exclusive capacity)) then Left "resource demand exceeds host budget" else
   if S.any (\lease -> exclusive (demand lease)) leases || (exclusive request && S.not (S.null leases)) || S.not (fits request (remaining budget)) then Right Nothing else
-  Right (Just (Budget capacity (Cons (Lease key request) leases)))
+  Right (Just (Budget capacity ((:) (Lease key request) leases)))
 release key (Budget capacity leases) =
  if S.not (S.any (\lease -> eqString key (identity lease)) leases) then Left "unknown or already released resource lease" else
  Right (Budget capacity (S.filter (\lease -> S.not (eqString key (identity lease))) leases))

@@ -2,5 +2,5 @@ module CoreCratesMain where
 import Bootstrap.Types
 import qualified Tests.CoreCrates as T
 import qualified Tests.CoreRunner as R
-main : IO Unit
+main : IO ()
 main = R.main "core-crates" false 27 T.families

@@ -8,14 +8,14 @@ import qualified Tests.Basic as H
 
 -- Exercise the real driver construction path with small source programs. A
 -- second output directory shares only checked artifacts, never test results.
-main : IO Unit
+main : IO ()
 main = H.withScratch (\scratch -> do
  let directory = scratch ++ "/driver cache's λ"
  O.mkdir directory
  root <- canonicalPath "."
  compiler <- getEnv "MLF_BOOTSTRAP_COMPILER"
  self <- getExecutablePath
- O.run "" (Cons "/bin/cp" (Cons "-R" (Cons (root ++ "/runtime") (Cons (directory ++ "/runtime") Nil))))
+ O.run "" ((:) "/bin/cp" ((:) "-R" ((:) (root ++ "/runtime") ((:) (directory ++ "/runtime") []))))
  O.mkdir (directory ++ "/runtime/sub")
  writeFile (directory ++ "/runtime/sub/cache.h") "/* nested dependency version 1 */\n"
  runtime <- readFile (directory ++ "/runtime/mlf_runtime.c")
@@ -30,7 +30,7 @@ main = H.withScratch (\scratch -> do
  writeFile (directory ++ "/bootstrap/LLVMDriver.emlf") "module LLVMDriver where\nimport DriverCacheShared\nmain = printInt shared\n"
  writeFile (directory ++ "/bootstrap/RuntimeDriver.emlf") "module RuntimeDriver where\nimport DriverCacheShared\nmain = printInt (shared + 10)\n"
  writeFile (directory ++ "/mlf-package.json") "{\"format\":1,\"name\":\"driver-cache-probe\",\"version\":\"0.1.0\",\"dependencies\":{\"driver-cache-dependency\":{\"path\":\"dependency\"}},\"library\":{\"modules\":{\"DriverCacheShared\":\"bootstrap/DriverCacheShared.emlf\"}},\"executables\":{\"llvm\":{\"main\":\"bootstrap/LLVMDriver.emlf\"},\"runtime\":{\"main\":\"bootstrap/RuntimeDriver.emlf\"}}}\n"
- code <- O.exec directory (Cons self (Cons "--driver-cache-case" (Cons compiler Nil))) "" (directory ++ "/case.out") (directory ++ "/case.err") 1800
+ code <- O.exec directory ((:) self ((:) "--driver-cache-case" ((:) compiler []))) "" (directory ++ "/case.out") (directory ++ "/case.err") 1800
  out <- readFile (directory ++ "/case.out")
  err <- readFile (directory ++ "/case.err")
  H.assert (code == 0 && H.contains "PASS checked native driver cache" out) ("driver cache regression failed: " ++ out ++ err)
@@ -46,7 +46,7 @@ build root compiler portOnly = do
  actualManager <- canonicalPath manager
  -- The context carries the real CLI manager. Build.create still records this
  -- executing harness as the owner of its direct build/cache operations.
- ignored <- CT.prepareDrivers (CT.TestContext root directory compiler Nil (root ++ "/shared-cache") actualManager) portOnly
+ ignored <- CT.prepareDrivers (CT.TestContext root directory compiler [] (root ++ "/shared-cache") actualManager) portOnly
  report <- J.read (directory ++ "/verification.json")
  saved <- J.read (J.getText "path" "" (J.get "driver_build" report))
  H.assert (J.getBool "complete" false saved) "driver builder did not finish input verification"
@@ -60,13 +60,13 @@ runDriver root name expected = do
  let stem = root ++ "/run-" ++ name
  binary <- O.executable (root ++ "/current/" ++ name)
  setEnv "MLF_TEST_TRACE" (stem ++ ".trace")
- code <- O.exec root (Cons binary Nil) "" (stem ++ ".out") (stem ++ ".err") 60
+ code <- O.exec root ((:) binary []) "" (stem ++ ".out") (stem ++ ".err") 60
  unsetEnv "MLF_TEST_TRACE"
  out <- readFile (stem ++ ".out")
  err <- readFile (stem ++ ".err")
  H.assert (code == 0 && eqString out expected && eqString err "") ("cached driver output changed: " ++ out ++ err)
 
-run : String -> IO Unit
+run : String -> IO ()
 run compiler = do
  root <- canonicalPath "."
  cold <- build root compiler true

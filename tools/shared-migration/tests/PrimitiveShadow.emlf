@@ -1,0 +1,11 @@
+module PrimitiveShadow where
+shadowStringEquality : Int
+shadowStringEquality = let eqString a b = false in case Cons "b" (panic "tail") of
+  Cons "a" (Cons x xs) -> 1
+  Cons "b" rest -> 2
+  _ -> 3
+shadowIntEquality : Int
+shadowIntEquality = let eqInt a b = false in case Pair 1 "b" of
+  Pair 0 "a" -> 1
+  Pair 1 "b" -> 2
+  _ -> 3

@@ -1,0 +1,19 @@
+{
+  "baseline_ref": "5172c4ade3b3141da2e64593c383892575b36699",
+  "edits": [
+    {
+      "new": "          decoded <- Query.readSourceCached cacheDir key name bindings datatypes names input;\n          ioReturn (do {\n            object <- decoded;\n            Source.validatePreparedRaw prepared object\n          })",
+      "old": "          ioReturn (do {\n            object <- Query.decodeCached key name bindings datatypes names input;\n            Source.validatePreparedRaw prepared object\n          })"
+    },
+    {
+      "new": "                else Query.writeSourceCached encodings cacheDir destination key object;",
+      "old": "                else Query.writeCache destination (case encodings of {\n                  Nothing -> Query.encodeCached key object;\n                  Just (Query.SourceEncodings pool _) -> Query.encodeCachedWithDatatypes pool key object\n                });"
+    }
+  ],
+  "format": "source-query-context-projection-v1",
+  "module": "Bootstrap.CrateSession",
+  "new_sha256": "a5cd0cb1b939c81785c2c8b7fa2499fd63c24cd6730b8a2e3d74ce9559edabbf",
+  "old_sha256": "51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9",
+  "parent_ref": "941b6c03bed05db0a5b3054d6d789e54204e3cea",
+  "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs"
+}

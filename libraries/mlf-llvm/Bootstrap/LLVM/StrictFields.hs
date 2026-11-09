@@ -1,0 +1,209 @@
+-- mlf:syntax shared-haskell-v1
+{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes,
+             KindSignatures, FlexibleContexts, FlexibleInstances,
+             MultiParamTypeClasses, OverloadedStrings #-}
+module Bootstrap.LLVM.StrictFields where {
+  import MLF.Primitive;
+  import Bootstrap.Types;
+  import qualified Bootstrap.Std as L;
+  import qualified Bootstrap.Map as M;
+  import qualified Bootstrap.Set as S;
+  import qualified Bootstrap.Primitive as P;
+  import qualified Bootstrap.X.Syntax as X;
+  import qualified Bootstrap.LLVM.Optimize as O;
+  import qualified Bootstrap.LLVM.Analysis as A;
+  -- Prove stored WHNF pointers without adding evaluation. Keep this traversal
+  -- aligned with LLVM.Codegen: strict workers/lets have canonical pointers;
+  -- callback captures and recursive holes are unknown. Partial or escaping
+  -- constructors invalidate all fields; facts meet across every saturated site.
+  data Work = Evaluate (Set XName) XErased | Suspend (Set XName) XErased;
+  arity :: Map String Int -> String -> Int;
+  arity cs c = M.findWithDefault compareString (0 - 1) c cs;
+  meet :: [] Bool -> [] Bool -> [] Bool;
+  meet xs ys =
+    case xs of {
+      [] -> [];
+      (:) x rest ->
+        case ys of {
+          [] -> [];
+          (:) y tail -> (:) (x && y) (meet rest tail)
+        }
+    };
+  record :: String -> [] Bool -> Map String ([] Bool) -> Map String ([] Bool);
+  record c flags facts = M.insertWith compareString meet c flags facts;
+  falseFields :: Int -> [] Bool;
+  falseFields count = if (count <= 0) then [] else (:) False (falseFields (count - 1));
+  escape :: Map String Int -> String -> Map String ([] Bool) -> Map String ([] Bool);
+  escape cs c facts = record c (falseFields (arity cs c)) facts;
+  atom :: Map String Int -> Map XName A.WorkerFunction -> Set XName -> XErased -> Bool;
+  atom cs fs known expression =
+    case expression of {
+      XEVar n -> (S.member O.compareName n known || M.member O.compareName n fs);
+      XEInt n -> True;
+      XEDouble n -> True;
+      XEBool n -> True;
+      XEString n -> True;
+      XEPrimitive p -> True;
+      XEConstructor c -> True;
+      XEAbs n body -> True;
+      _ ->
+        case O.applications expression of {
+          (,) (XEConstructor c) args -> (L.length args == arity cs c);
+          _ -> False
+        }
+    };
+  caseWork :: Set XName -> XErasedAlternative -> Work;
+  caseWork known (XErasedAlternative pattern body) =
+    case pattern of {
+      XDefaultPattern optional ->
+        Evaluate
+          (case optional of {
+             Nothing -> known;
+             Just n -> S.insert O.compareName n known
+           })
+          body;
+      _ ->
+        Evaluate
+          (S.difference O.compareName known (S.fromList O.compareName (X.patternNames pattern)))
+          body
+    };
+  recursiveWork :: Map XName A.WorkerFunction ->
+                   Set XName -> (,) XName XErased -> [] Work -> [] Work;
+  recursiveWork fs known ((,) n rhs) rest =
+    if M.member O.compareName n fs then rest else (:) (Suspend known rhs) rest;
+  argumentWork :: Set XName -> Set XName -> (,) XName XErased -> Work;
+  argumentWork known strict ((,) n arg) =
+    if S.member O.compareName n strict then Evaluate known arg else Suspend known arg;
+  run :: Bool ->
+         Map String Int ->
+         Map XName A.WorkerFunction ->
+         Map String ([] Bool) -> [] Work -> Map String ([] Bool);
+  run evaluated cs fs facts work =
+    case work of {
+      [] -> facts;
+      (:) (Suspend known expression) rest ->
+        run evaluated cs fs facts
+          ((:) (Evaluate (if atom cs fs known expression then known else S.empty) expression)
+             rest);
+      (:) (Evaluate known expression) rest ->
+        case expression of {
+          XEAbs n body -> run evaluated cs fs facts ((:) (Evaluate S.empty body) rest);
+          XELet n rhs body ->
+            if M.member O.compareName n fs
+            then run evaluated cs fs facts ((:) (Evaluate known body) rest)
+            else if S.member O.compareName n (A.demanded fs body)
+                 then run evaluated cs fs facts
+                        ((:) (Evaluate known rhs)
+                           ((:) (Evaluate (S.insert O.compareName n known) body) rest))
+                 else run evaluated cs fs facts
+                        ((:) (Suspend known rhs)
+                           ((:) (Evaluate (S.delete O.compareName n known) body) rest));
+          XELetRec bindings body ->
+            let {
+              local =
+                S.difference O.compareName known
+                  (S.fromList O.compareName
+                     (L.map
+                        (\entry ->
+                           case entry of {
+                             (,) n rhs -> n
+                           })
+                        bindings))
+            } in
+            run evaluated cs fs facts
+              (L.foldr (recursiveWork fs local) ((:) (Evaluate local body) rest) bindings);
+          XECase scrutinee ((:) (XErasedAlternative (XDefaultPattern optional) body) []) ->
+            let {
+              local =
+                case optional of {
+                  Nothing -> known;
+                  Just n -> S.delete O.compareName n known
+                }
+            } in
+            run evaluated cs fs facts
+              ((:) (Suspend known scrutinee) ((:) (Evaluate local body) rest));
+          XECase scrutinee alternatives ->
+            run evaluated cs fs facts
+              ((:) (Evaluate known scrutinee)
+                 (L.append (L.map (caseWork known) alternatives) rest));
+          XEConstructor c ->
+            run evaluated cs fs
+              (if (arity cs c == 0) then record c [] facts else escape cs c facts)
+              rest;
+          XEApp f a -> application evaluated cs fs known expression facts rest;
+          _ -> run evaluated cs fs facts rest
+        }
+    };
+  application :: Bool ->
+                 Map String Int ->
+                 Map XName A.WorkerFunction ->
+                 Set XName ->
+                 XErased -> Map String ([] Bool) -> [] Work -> Map String ([] Bool);
+  application evaluated cs fs known expression facts rest =
+    case O.applications expression of {
+      (,) (XEConstructor c) args ->
+        if (L.length args == arity cs c)
+        then run evaluated cs fs (record c (L.map (atom cs fs known) args) facts)
+               (L.append (L.map (Suspend known) args) rest)
+        else dynamic evaluated cs fs known expression (escape cs c facts) rest;
+      (,) (XEPrimitive PIfThenElse) ((:) condition ((:) yes ((:) no []))) ->
+        run evaluated cs fs facts
+          ((:) (Evaluate known condition)
+             ((:) (Evaluate known yes) ((:) (Evaluate known no) rest)));
+      (,) (XEPrimitive PSeq) ((:) first ((:) second [])) ->
+        run evaluated cs fs facts
+          ((:) (Evaluate known first)
+             ((:) (Evaluate (if evaluated then afterForce known first else known) second) rest));
+      (,) (XEPrimitive p) args ->
+        if (L.length args == P.primitiveArity p)
+        then run evaluated cs fs facts
+               (L.append
+                  (L.map
+                     (\arg -> if P.primitiveStrict p then Evaluate known arg else Suspend known arg)
+                     args)
+                  rest)
+        else dynamic evaluated cs fs known expression facts rest;
+      (,) (XEVar n) args ->
+        case M.lookup O.compareName n fs of {
+          Just function ->
+            if (L.length args == L.length (A.parameters function))
+            then run evaluated cs fs facts
+                   (L.append
+                      (L.map (argumentWork known (A.strict function))
+                         (L.zip (A.parameters function) args))
+                      rest)
+            else dynamic evaluated cs fs known expression facts rest;
+          Nothing -> dynamic evaluated cs fs known expression facts rest
+        };
+      _ -> dynamic evaluated cs fs known expression facts rest
+    };
+  dynamic :: Bool ->
+             Map String Int ->
+             Map XName A.WorkerFunction ->
+             Set XName -> XErased -> Map String ([] Bool) -> [] Work -> Map String ([] Bool);
+  dynamic evaluated cs fs known expression facts rest =
+    case expression of {
+      XEApp f a -> run evaluated cs fs facts ((:) (Suspend known f) ((:) (Suspend known a) rest));
+      _ -> run evaluated cs fs facts rest
+    };
+  infer :: Map String Int -> Map XName A.WorkerFunction -> XErased -> Map String ([] Bool);
+  infer cs fs expression =
+    run False cs fs M.empty
+      ((:) (Evaluate S.empty expression)
+         (L.map (\f -> Evaluate (A.strict f) (A.functionBody f)) (M.elems fs)));
+  -- Representation proofs only need semantic WHNF, unlike direct field loads,
+  -- which require a canonical pointer. In particular, seq of a recursive hole
+  -- evaluates its target but does not replace the captured hole pointer.
+  afterForce :: Set XName -> XErased -> Set XName;
+  afterForce known expression =
+    case expression of {
+      XEVar n -> S.insert O.compareName n known;
+      _ -> known
+    };
+  inferEvaluated :: Map String Int ->
+                    Map XName A.WorkerFunction -> XErased -> Map String ([] Bool);
+  inferEvaluated cs fs expression =
+    run True cs fs M.empty
+      ((:) (Evaluate S.empty expression)
+         (L.map (\f -> Evaluate (A.strict f) (A.functionBody f)) (M.elems fs)))
+}

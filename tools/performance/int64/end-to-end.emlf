@@ -1,0 +1,24 @@
+square : Int -> Int
+square n = n * n
+
+main = do
+  printInt (9223372036854775807 + 1)
+  printInt (9223372036854775808 - 1)
+  printInt (square 4294967296)
+  printInt (readInt "18446744073709551616")
+  printInt (readInt "-18446744073709551617")
+  printInt (9223372036854775808 % (0 - 1))
+  printInt (shiftLInt 1 63)
+  printInt (shiftRInt (0 - 1) 64)
+  printInt (unsignedShiftRInt (0 - 1) 1)
+  printInt (xorInt 9223372036854775808 9223372036854775807)
+  printInt (countLeadingZerosInt 0)
+  printInt (countTrailingZerosInt 0)
+  printInt (popCountInt (0 - 1))
+  printInt (integerToInt (readInteger "18446744073709551617"))
+  putStrLn (showInteger (mulInteger (readInteger "18446744073709551616") (readInteger "18446744073709551616")))
+  putStrLn (showInteger (intToInteger 9223372036854775808))
+  printInt (doubleToBits (doubleFromBits (0 - 1)))
+  printInt (doubleToBits (subDouble 0.0 0.5))
+  printInt (if unsignedLtInt 0 (0 - 1) then 1 else 0)
+  printInt (if unsignedLtInt (0 - 1) 0 then 1 else 0)

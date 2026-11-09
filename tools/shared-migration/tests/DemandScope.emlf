@@ -1,0 +1,64 @@
+module DemandScope where
+
+data Box a = Box a
+instance Monad Box where
+  return x = Box x
+  bind action next = case action of {Box value -> next value}
+
+poisonCase : List String -> Int
+poisonCase values = case values of
+  Cons "a" (Cons x xs) -> 1
+  Cons "b" rest -> 2
+  _ -> 3
+poisonEquation : List String -> Int
+poisonEquation (Cons "a" (Cons x xs)) = 1
+poisonEquation (Cons "b" rest) = 2
+poisonEquation _ = 3
+poisonLambda : List String -> Int
+poisonLambda = \values -> case values of
+  Cons "a" (Cons x xs) -> 1
+  Cons "b" rest -> 2
+  _ -> 3
+firstRowDemand : List String -> Int
+firstRowDemand values = case values of
+  Cons _ Nil -> 1
+  Cons "b" rest -> 2
+  _ -> 3
+fallbackAlias : List String -> Int
+fallbackAlias values = case values of
+  Cons "a" Nil -> 1
+  whole -> case whole of {Cons tag _ -> if eqString tag "b" then 2 else 3; Nil -> 4}
+nestedOuter : Pair (List String) Int -> Int
+nestedOuter input = case input of
+  Pair (Cons "a" (Cons x xs)) _ -> 1
+  Pair (Cons "b" rest) _ -> 2
+  _ -> 3
+outerCapture : Int
+outerCapture = let x = 41 in let x = x + 1 in x
+functionCapture : Int
+functionCapture = let f n = n + 10 in let f x = f x + 1 in f 1
+repeatedShadows : Int
+repeatedShadows = let x = 1 in let x = x + 1 in let x = x + 1 in x
+sequentialForward : Int
+sequentialForward = let y = 7 in let {x = y; y = 8} in x
+innerBinder : Int
+innerBinder = let x = (\x -> x) 7 in x
+caseBinder : Int
+caseBinder = let x = case Pair 8 9 of {Pair x _ -> x} in x
+doShadow : Int
+doShadow = case (do {let x = 40; let x = x + 2; Box x}) of {Box result -> result}
+doContinuation : Int
+doContinuation = case (do
+  Pair x y <- Box (Pair 20 21)
+  z <- Box 1
+  let answer = x + y + z
+  Box answer) of {Box result -> result}
+doIgnoredPayload : Int
+doIgnoredPayload = case (do {Box (panic "discarded"); Box 42}) of {Box result -> result}
+closedRecursion : Int
+closedRecursion = let rec {countdown : Int -> Int = \x -> if x == 0 then 42 else countdown (x - 1)} in countdown 3
+mutualRecursion : Int
+mutualRecursion = let rec
+  {even : Int -> Bool = \x -> if x == 0 then true else odd (x - 1)
+  ;odd : Int -> Bool = \x -> if x == 0 then false else even (x - 1)}
+  in if even 4 then 42 else 0

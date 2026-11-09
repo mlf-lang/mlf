@@ -1,0 +1,175 @@
+{
+  "complete": false,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c",
+    "3",
+    "python3",
+    ".mlf-build/integration-modular/test/run.py"
+  ],
+  "limits": {
+    "wall_seconds": 900,
+    "address_space_per_process": 3221225472,
+    "process_tree_rss_bytes": 1610612736,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368,
+    "max_output_bytes": 104857600
+  },
+  "samples": [
+    {
+      "seconds": 0.0014670119999209419,
+      "group_rss": 569344,
+      "host_available": 7616765952,
+      "disk_free": 20551815168,
+      "output_bytes": 7319
+    },
+    {
+      "seconds": 0.2028083860022889,
+      "group_rss": 51998720,
+      "host_available": 7576846336,
+      "disk_free": 20551811072,
+      "output_bytes": 7493
+    },
+    {
+      "seconds": 0.40415487700011,
+      "group_rss": 61493248,
+      "host_available": 7568674816,
+      "disk_free": 20551811072,
+      "output_bytes": 7665
+    },
+    {
+      "seconds": 0.6056916439993074,
+      "group_rss": 63791104,
+      "host_available": 7568674816,
+      "disk_free": 20551811072,
+      "output_bytes": 7839
+    },
+    {
+      "seconds": 0.8070297830017807,
+      "group_rss": 64094208,
+      "host_available": 7535755264,
+      "disk_free": 20551811072,
+      "output_bytes": 8013
+    },
+    {
+      "seconds": 1.0083514069992816,
+      "group_rss": 64094208,
+      "host_available": 7539552256,
+      "disk_free": 20551811072,
+      "output_bytes": 8187
+    },
+    {
+      "seconds": 1.2094089269994583,
+      "group_rss": 64094208,
+      "host_available": 7549124608,
+      "disk_free": 20551811072,
+      "output_bytes": 8361
+    },
+    {
+      "seconds": 1.4109003510020557,
+      "group_rss": 64094208,
+      "host_available": 7544897536,
+      "disk_free": 20551811072,
+      "output_bytes": 8535
+    },
+    {
+      "seconds": 1.6120389249990694,
+      "group_rss": 64094208,
+      "host_available": 7544897536,
+      "disk_free": 20551811072,
+      "output_bytes": 8709
+    },
+    {
+      "seconds": 1.8138887839995732,
+      "group_rss": 64094208,
+      "host_available": 7544897536,
+      "disk_free": 20551811072,
+      "output_bytes": 8883
+    },
+    {
+      "seconds": 2.0153557160010678,
+      "group_rss": 64094208,
+      "host_available": 7544762368,
+      "disk_free": 20551811072,
+      "output_bytes": 9057
+    },
+    {
+      "seconds": 2.216594654000801,
+      "group_rss": 64094208,
+      "host_available": 7532388352,
+      "disk_free": 20551811072,
+      "output_bytes": 9230
+    },
+    {
+      "seconds": 2.419257789999392,
+      "group_rss": 64094208,
+      "host_available": 7516045312,
+      "disk_free": 20551811072,
+      "output_bytes": 9403
+    },
+    {
+      "seconds": 2.6203755200003798,
+      "group_rss": 64094208,
+      "host_available": 7515787264,
+      "disk_free": 20551811072,
+      "output_bytes": 9577
+    },
+    {
+      "seconds": 2.8218334129996947,
+      "group_rss": 64094208,
+      "host_available": 7515787264,
+      "disk_free": 20551811072,
+      "output_bytes": 9751
+    },
+    {
+      "seconds": 3.0229568270005984,
+      "group_rss": 64094208,
+      "host_available": 7515602944,
+      "disk_free": 20551811072,
+      "output_bytes": 9925
+    },
+    {
+      "seconds": 3.2246288690002984,
+      "group_rss": 64094208,
+      "host_available": 7515602944,
+      "disk_free": 20551811072,
+      "output_bytes": 10099
+    },
+    {
+      "seconds": 3.4262605090007128,
+      "group_rss": 64094208,
+      "host_available": 7490854912,
+      "disk_free": 20551811072,
+      "output_bytes": 10274
+    },
+    {
+      "seconds": 3.627371303999098,
+      "group_rss": 64094208,
+      "host_available": 7490854912,
+      "disk_free": 20551811072,
+      "output_bytes": 10448
+    },
+    {
+      "seconds": 3.8287796469994646,
+      "group_rss": 64094208,
+      "host_available": 7490854912,
+      "disk_free": 20551811072,
+      "output_bytes": 10623
+    },
+    {
+      "seconds": 4.029941689001134,
+      "group_rss": 64094208,
+      "host_available": 7490830336,
+      "disk_free": 20551811072,
+      "output_bytes": 10797
+    }
+  ],
+  "process_group": 9,
+  "exit_code": 1,
+  "reason": null,
+  "elapsed_seconds": 4.232105988001422,
+  "peak_group_rss": 64094208
+}

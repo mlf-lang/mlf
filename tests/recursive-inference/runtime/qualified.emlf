@@ -1,0 +1,3 @@
+class Inspect a where { inspect : a -> Bool };
+instance Inspect Int where { inspect = \x -> eqInt x 0 };
+let rec { loop x n = if eqInt n 0 then inspect x else loop x (subInt n 1) } in printInt (if loop 0 4 then 42 else 0)

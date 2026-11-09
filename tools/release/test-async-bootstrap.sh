@@ -55,6 +55,9 @@ case "$target" in
     ;;
   emlf)
     test -f "$source/bootstrap/Main.emlf"
+    # Entry imports are visible through direct dependencies only. Inference and
+    # crates depending on frontend do not make frontend imports available here.
+    grep -F '"mlf-frontend": {"path": "libraries/mlf-frontend"}' "$manifest" >/dev/null
     if [ "${build##*/}" = stage1 ]; then
       test "$compiler" = "$TEST_SEED_COMPILER"
       grep -F 'requires the stage-2 compiler' "$source/libraries/mlf-interpreter/Bootstrap/ProcessHost.emlf" >/dev/null

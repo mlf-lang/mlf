@@ -9,7 +9,7 @@ import history_refs as history
 
 ROOT = Path(__file__).resolve().parents[2]
 CALLERS = {
-    'ci': ('metadata',),
+    'ci': ('metadata', 'native'),
     'native-qualification': ('metadata', 'mac-package', 'linux-package'),
     'platform-release': ('metadata',),
     'recover-release': ('metadata', 'macos-package'),
@@ -39,13 +39,14 @@ def require_callers(workflows):
             body = match[1]
             steps = re.findall(r'^      - .*?(?=^      - |\Z)', body, re.M | re.S)
             checkouts = [step for step in steps if step.startswith('      - uses: actions/checkout@')]
-            if not checkouts or len(re.findall(r'^          fetch-depth: 0$', checkouts[0], re.M)) != 1:
+            if not checkouts or len(re.findall(r'^          fetch-depth: 0(?:[ \t]+#[^\n]*)?$', checkouts[0], re.M)) != 1:
                 raise ValueError('consumer requires full source history: ' + job)
             expected = RECOVERY_PREPARE if workflow == 'recover-release' else PREPARE
             matching = [step for step in steps if step.rstrip() == expected.rstrip()]
             if len(matching) != 1:
                 raise ValueError('consumer requires exact unsuppressed preparation: ' + job)
-            command = 'tools/release/check.sh' if job == 'metadata' else 'tools/release/package.sh'
+            command = ('tools/shared/build.py' if workflow == 'ci' and job == 'native' else
+                       'tools/release/check.sh' if job == 'metadata' else 'tools/release/package.sh')
             if command not in body or not (body.index(checkouts[0]) < body.index(expected) < body.index(command)):
                 raise ValueError('history preparation must precede validation: ' + job)
 
@@ -92,12 +93,12 @@ class HistoryWorkflowControls(unittest.TestCase):
         with self.assertRaises(ValueError):
             require_callers(changed)
 
-    def test_incoming_main_and_frozen_inputs_are_independently_pinned(self):
+    def test_pr19_historical_reconciliation_inputs_remain_independently_pinned(self):
         for path in history.RECONCILED_MAIN_PATHS:
             with self.subTest(path=path):
                 frozen = history.historical_bytes('4d732f31982ebe18124511f2ca4cb412770d6bd6', path)
                 digest = hashlib.sha256(frozen).hexdigest()
-                current = (ROOT / path).read_bytes()
+                current = history._git('show', 'afbe7219806881301831d79f43596811eca3279d:' + path)
                 self.assertTrue(history.checked_current(path, current, digest))
                 self.assertFalse(history.checked_current(path, current + b'\n# unauthorized delta\n', digest))
                 with self.assertRaisesRegex(ValueError, 'frozen reconciliation input changed'):

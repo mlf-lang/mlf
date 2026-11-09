@@ -2,6 +2,7 @@
 // make the PR/main/release split and full coverage executable review assertions.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import './test-native-ci-partition.mjs';
 const read = name => fs.readFileSync(`.github/workflows/${name}.yml`,'utf8');
 const ci=read('ci'), qualify=read('native-qualification'), release=read('platform-release');
 const concurrency = release.match(/^concurrency:\n(?:  #.*\n)*  group: \$\{\{ (.*) \}\}\n  cancel-in-progress: \$\{\{ (.*) \}\}$/m);
@@ -41,6 +42,103 @@ assert.match(ci,/uses: \.\/\.github\/workflows\/native-qualification.yml\n    wi
 assert.match(ci,/needs: \[metadata, native, windows-runtime, build-runner, async-runtime, async-language\]/);
 assert.match(ci,/length == 6 and all/);
 const ciJob = name => ci.match(new RegExp(`^  ${name}:\\n[\\s\\S]*?(?=^  [a-z][a-z-]*:\\n|(?![\\s\\S]))`, 'm'))?.[0];
+assert.match(ciJob('metadata'), /fetch-depth: 0/, 'Historical migration audits require full Git history');
+const requireHistoricalCheckouts = workflow => {
+  const jobs = workflow.match(/^  [a-z][a-z-]*:\n[\s\S]*?(?=^  [a-z][a-z-]*:\n|(?![\s\S]))/gm) || [];
+  for (const job of jobs) {
+    if (job.includes('tools/release/check.sh') || job.includes('tools/shared/test_framework_direct.py')) {
+      assert.match(job, /fetch-depth: 0/, 'Historical audits require a full-history checkout in their own job');
+    }
+  }
+};
+for (const workflow of [ci, qualify, release, read('recover-release')]) {
+  requireHistoricalCheckouts(workflow);
+  assert.throws(() => requireHistoricalCheckouts(workflow.replaceAll('fetch-depth: 0', 'fetch-depth: 1')));
+}
+const historyPreparation = 'python3 -B tools/testing/prepare_history_refs.py';
+const requirePreparedHistory = (text, consumer) => {
+  const prepareAt = text.indexOf(historyPreparation);
+  const consumeAt = text.indexOf(consumer);
+  assert.ok(prepareAt >= 0 && consumeAt > prepareAt,
+    'Pinned squash history must be prepared explicitly before historical consumers');
+};
+const releaseChecks = fs.readFileSync('tools/release/check.sh', 'utf8');
+for (const [text, consumer] of [
+  [releaseChecks, 'tools/release/check-benchmark-provenance.sh'],
+  [ciJob('native'), 'name: Install pinned direct-host GHC'],
+]) {
+  requirePreparedHistory(text, consumer);
+  assert.throws(() => requirePreparedHistory(text.replace(historyPreparation, ''), consumer));
+  assert.throws(() => requirePreparedHistory(text.replace(historyPreparation, '') + historyPreparation, consumer));
+}
+assert.match(ciJob('native'), /python3 tools\/shared\/test_framework_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/framework-direct/);
+assert.match(ciJob('native'), /python3 tools\/shared\/test_figure12_direct.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json/);
+assert.match(ciJob('native'), /\.mlf-build\/framework-direct\/\*\.json\*/);
+assert.match(ciJob('native'), /name: Check actual MLF mixed-framework source acceptance\n\s+if: matrix.optimization == '2'\n\s+run: python3 tools\/shared\/test_guest_framework.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/guest-framework-source/);
+assert.match(ciJob('native'), /\.mlf-build\/guest-framework-source\/\*\*\/\*\.json/);
+assert.match(ciJob('native'), /name: Check actual-import guest Graph and Oracle laws\n\s+if: matrix.optimization == '2'\n\s+run: python3 tools\/shared\/test_guest_state_laws.py --build-receipt \.mlf-build\/shared-ghc\/receipt.json --output \.mlf-build\/guest-state-laws/);
+assert.match(ciJob('native'), /\.mlf-build\/guest-state-laws\/\*\*\/\*\.json/);
+assert.match(ciJob('native'), /\.mlf-build\/guest-state-laws\/\*\*\/\*\.log/);
+
+assert.match(ciJob('native'), /\.mlf-build\/figure12-direct\/\*\.json/);
+
+// The integrated source gate is not the separate fixed-ref timing runner.
+const finiteGate = `      - name: Check finite P1-P3, A1 and F1 correctness
+        if: matrix.optimization == '2'
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/crate-optimization-guard python3 -B tools/performance/patricia/run_integrated.py --suite p123 --producer .mlf-build/shared-ghc --output .mlf-build/crate-optimization-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/a1-integrated-guard python3 -B tools/performance/patricia/run_integrated.py --suite graph --producer .mlf-build/shared-ghc --output .mlf-build/a1-integrated-controls
+          python3 -B tools/shared/resource_watchdog.py --seconds 1800 --address-space-mib 6144 --rss-mib 5120 --disk-free-mib 4096 .mlf-build/f1-integrated-guard python3 -B tools/performance/patricia/run_fingerprint.py --producer .mlf-build/shared-ghc --output .mlf-build/f1-integrated-controls
+`;
+const verifyFiniteGate = workflow => {
+  assert.ok(workflow.includes(finiteGate), 'Current-source P1-P3/A1/F1 gate, bounds and failure propagation must remain exact');
+  for (const root of ['crate-optimization', 'a1-integrated', 'f1-integrated']) {
+    assert.ok(workflow.includes(`            .mlf-build/${root}-guard/\n`));
+    for (const suffix of ['json', 'stdout', 'stderr']) {
+      assert.ok(workflow.includes(`            .mlf-build/${root}-controls/**/*.${suffix}\n`));
+    }
+  }
+};
+// C4's full retained graph/transaction controls now run in the explicit ABI
+// adapter's graph suite inside this finite gate. Preserve its evidence too.
+const c4Gate = finiteGate;
+const verifyC4Gate = workflow => {
+  assert.ok(workflow.includes(c4Gate), 'Exact O2 C4 graph gate with unchanged resource bounds');
+  for (const artifact of [
+    '.mlf-build/a1-integrated-guard/',
+    '.mlf-build/a1-integrated-controls/**/*.json',
+    '.mlf-build/a1-integrated-controls/**/stdout',
+    '.mlf-build/a1-integrated-controls/**/stderr',
+    '.mlf-build/a1-integrated-controls/**/*.hs',
+  ]) assert.ok(workflow.includes('            ' + artifact + '\n'), 'C4 failure/evidence preservation: ' + artifact);
+};
+verifyC4Gate(ciJob('native'));
+assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, '')));
+assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace("if: matrix.optimization == '2'", 'if: false'))));
+assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('--rss-mib 5120', '--rss-mib 99999'))));
+assert.throws(() => verifyC4Gate(ciJob('native').replace(c4Gate, c4Gate.replace('set -euo pipefail', 'set +e'))));
+assert.throws(() => verifyC4Gate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/stderr', 'discarded')));
+const verifyNumericEvidence = workflow => {
+  for (const root of ['patricia-*', 'int64-*', 'llp64-*']) {
+    for (const suffix of ['**/*.json', '**/stdout', '**/stderr', '**/*.hs']) {
+      assert.ok(workflow.includes(`            .mlf-build/${root}/${suffix}\n`),
+        `Keep numeric/collection failure evidence: ${root}/${suffix}`);
+    }
+  }
+};
+verifyNumericEvidence(ciJob('native'));
+assert.throws(() => verifyNumericEvidence(ciJob('native').replace('.mlf-build/llp64-*/**/stderr', 'discarded')));
+
+verifyFiniteGate(ciJob('native'));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, '')));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace("if: matrix.optimization == '2'", 'if: false'))));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace(finiteGate, finiteGate.replace('set -euo pipefail', 'set +e'))));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/a1-integrated-controls/**/*.json', 'discarded')));
+assert.throws(() => verifyFiniteGate(ciJob('native').replace('.mlf-build/f1-integrated-controls/**/*.json', 'discarded')));
+assert.match(ciJob('native'), /f1-integrated-controls\/\*\*\/source\/Probe\.dump-\*/);
+assert.match(ciJob('native'), /f1-integrated-controls\/actual-source\/Separate\.dump-\*/);
+
 for (const name of ['build-runner','async-runtime','async-language']) {
   const job = ciJob(name);
   assert.ok(job, `Missing ${name} coverage`);
@@ -56,7 +154,7 @@ assert.match(fs.readFileSync('tools/release/async-change-scope.py','utf8'), /OPT
 assert.match(asyncJob,/id: scope\n        run: python3 tools\/release\/async-change-scope.py/);
 assert.match(asyncJob,/\.mlf-build\/async-change-scope\/decision.json/);
 assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 5);
-for (const name of ['Native bootstrap and parity dependencies', 'Fetch verified native seed', 'Bootstrap the real primitive-aware interpreter and compiler', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
+for (const name of ['Native bootstrap and parity dependencies', 'Fetch verified native seed', 'Bootstrap released seed through frozen bridge to shared native tools', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
   assert.ok(asyncJob.includes(`- name: ${name}\n        if: steps.scope.outputs.required != 'false'\n`));
 }
 // Only a positive false output skips the expensive steps; unknown/missing

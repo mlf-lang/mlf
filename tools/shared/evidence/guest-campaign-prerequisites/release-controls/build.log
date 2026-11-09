@@ -1,0 +1,231 @@
+Benchmark provenance passed: all pinned hashes and 19 exact patch reconstructions.
+PASS macOS dependencies: fresh bottle closure, revision suffix and dirty image tap preservation
+PASS macOS dependencies: repeated setup reuses owned tap and preserves the original once
+PASS macOS dependencies: ignore stale installed receipts and reinstall matching or newer bottles
+PASS macOS dependencies: benchmark closure includes pinned linker and PCRE2
+PASS macOS dependencies: benchmark closure rejects missing PCRE2 bottle
+PASS macOS dependencies: developer machine rejected
+PASS macOS dependencies: self-hosted runner rejected
+PASS macOS dependencies: Linux rejected
+PASS macOS dependencies: Intel rejected
+PASS macOS dependencies: different macOS bottle platform rejected
+PASS macOS dependencies: nonstandard prefix rejected
+PASS macOS dependencies: dirty owned formula checkout rejected
+PASS macOS dependencies: unexpected formula remote rejected
+PASS macOS dependencies: fetch failure stops installation
+PASS macOS dependencies: checkout failure stops installation
+PASS macOS dependencies: wrong checked-out revision rejected
+PASS macOS dependencies: missing fixed bottle rejected
+PASS macOS dependencies: unsafe dependency name rejected
+PASS macOS dependencies: failed install is not reported as complete
+PASS macOS dependencies: wrong active keg rejected
+20 pinned macOS dependency checks passed
+PASS publishing: preparation is local and emits pinned dependency
+PASS publishing: existing output and invalid locator are rejected
+PASS publishing: exact tag is checked and assets precede publication
+PASS publishing: existing cannot publish
+PASS publishing: moved cannot publish
+PASS publishing: upload-failed cannot publish
+PASS publishing: moved-during-upload cannot publish
+PASS publishing: damaged asset is rejected before GitHub access
+8 package publishing checks passed
+PASS smoke receipt: source-smoke wrapper arguments
+PASS smoke receipt: source-smoke runtime profile
+PASS smoke receipt: source-smoke native environment
+PASS smoke receipt: source-smoke direct arguments
+PASS smoke receipt: source-smoke missing seed
+PASS smoke receipt: pr-smoke wrapper arguments
+PASS smoke receipt: pr-smoke runtime profile
+PASS smoke receipt: pr-smoke native environment
+PASS smoke receipt: pr-smoke direct arguments
+PASS smoke receipt: pr-smoke missing seed
+PASS smoke receipt: extended-pr-smoke wrapper arguments
+PASS smoke receipt: extended-pr-smoke runtime profile
+PASS smoke receipt: extended-pr-smoke native environment
+PASS smoke receipt: extended-pr-smoke direct arguments
+PASS smoke receipt: extended-pr-smoke missing seed
+PASS smoke receipt: source wrapper needs no native build dependencies and blocks forbidden tools
+16 smoke receipt checks passed
+PASS seed fetch: macos-arm64 archive selection and four independent pin rejections
+PASS seed fetch: linux-x64 archive selection and four independent pin rejections
+11 seed fetch platform/pin checks passed.
+33 PR aggregate checks passed; all six required jobs must succeed.
+73 complete qualification gate checks passed.
+27 benchmark gate checks passed.
+PR/main/release workflow policy contracts passed.
+test_attempt_logged_before_launch_failure (__main__.CommandEvidence.test_attempt_logged_before_launch_failure) ... ok
+test_success_checks_exact_stdout (__main__.CommandEvidence.test_success_checks_exact_stdout) ... ok
+test_timeout_retains_command_and_partial_streams (__main__.CommandEvidence.test_timeout_retains_command_and_partial_streams) ... ok
+test_actual_compiler_mutation_rejected (__main__.DirectProducerReceipt.test_actual_compiler_mutation_rejected) ... ok
+test_current_source_cannot_relabel_old_binary (__main__.DirectProducerReceipt.test_current_source_cannot_relabel_old_binary) ... ok
+test_incomplete_and_typecheck_receipts_rejected (__main__.DirectProducerReceipt.test_incomplete_and_typecheck_receipts_rejected) ... ok
+test_installed_dependency_mutation_rejected (__main__.DirectProducerReceipt.test_installed_dependency_mutation_rejected) ... ok
+test_missing_actual_resolution_rejected (__main__.DirectProducerReceipt.test_missing_actual_resolution_rejected) ... ok
+test_missing_host_inventory_rejected (__main__.DirectProducerReceipt.test_missing_host_inventory_rejected) ... ok
+test_missing_host_resolution_rejected (__main__.DirectProducerReceipt.test_missing_host_resolution_rejected) ... ok
+test_native_aggregate_is_not_direct_source_proof (__main__.DirectProducerReceipt.test_native_aggregate_is_not_direct_source_proof) ... ok
+test_native_configuration_mutation_rejected (__main__.DirectProducerReceipt.test_native_configuration_mutation_rejected) ... ok
+test_old_or_unrelated_binary_rejected (__main__.DirectProducerReceipt.test_old_or_unrelated_binary_rejected) ... ok
+test_producer_command_failure_rejected (__main__.DirectProducerReceipt.test_producer_command_failure_rejected) ... ok
+test_tool_mutation_rejected (__main__.DirectProducerReceipt.test_tool_mutation_rejected) ... ok
+test_valid_receipt (__main__.DirectProducerReceipt.test_valid_receipt) ... ok
+test_absent_dump_fails_closed (__main__.InferredSchemeEvidence.test_absent_dump_fails_closed) ... ok
+test_actual_monomorphic_scheme_accepted (__main__.InferredSchemeEvidence.test_actual_monomorphic_scheme_accepted) ... ok
+test_explicit_datatype_only_module_accepted (__main__.InferredSchemeEvidence.test_explicit_datatype_only_module_accepted) ... ok
+test_literal_polymorphism_rejected (__main__.InferredSchemeEvidence.test_literal_polymorphism_rejected) ... ok
+test_value_module_needs_schemes (__main__.InferredSchemeEvidence.test_value_module_needs_schemes) ... ok
+test_complete_interface_and_archive_are_bound (__main__.InstalledClosure.test_complete_interface_and_archive_are_bound) ... ok
+test_missing_library_archive_rejected (__main__.InstalledClosure.test_missing_library_archive_rejected) ... ok
+test_missing_library_directory_rejected (__main__.InstalledClosure.test_missing_library_directory_rejected) ... ok
+test_cabal_wrong_main_rejected (__main__.ManifestParity.test_cabal_wrong_main_rejected) ... ok
+test_cabal_wrong_wrapper_rejected (__main__.ManifestParity.test_cabal_wrong_wrapper_rejected) ... ok
+test_closed_corpus_has_matching_103_modules_12_executables (__main__.ManifestParity.test_closed_corpus_has_matching_103_modules_12_executables) ... ok
+test_library_transitive_only_frontend_import_rejected (__main__.ManifestParity.test_library_transitive_only_frontend_import_rejected) ... ok
+test_missing_native_module_rejected (__main__.ManifestParity.test_missing_native_module_rejected) ... ok
+test_missing_rts_argv_flag_rejected (__main__.ManifestParity.test_missing_rts_argv_flag_rejected) ... ok
+test_native_frontend_inference_and_runtime_dependencies_required (__main__.ManifestParity.test_native_frontend_inference_and_runtime_dependencies_required) ... ok
+test_native_wrong_entry_rejected (__main__.ManifestParity.test_native_wrong_entry_rejected) ... ok
+test_native_wrong_module_path_rejected (__main__.ManifestParity.test_native_wrong_module_path_rejected) ... ok
+test_target_duplicate_dependency_rejected (__main__.ManifestParity.test_target_duplicate_dependency_rejected) ... ok
+test_target_empty_selection_does_not_mean_all_dependencies (__main__.ManifestParity.test_target_empty_selection_does_not_mean_all_dependencies) ... ok
+test_target_omitted_selection_defaults_to_all_direct_dependencies (__main__.ManifestParity.test_target_omitted_selection_defaults_to_all_direct_dependencies) ... ok
+test_target_selection_does_not_restrict_own_library_dependencies (__main__.ManifestParity.test_target_selection_does_not_restrict_own_library_dependencies) ... ok
+test_target_transitive_only_frontend_import_rejected (__main__.ManifestParity.test_target_transitive_only_frontend_import_rejected) ... ok
+test_wrapper_wrong_entry_rejected (__main__.ManifestParity.test_wrapper_wrong_entry_rejected) ... ok
+test_failed_preflight_invalidates_previous_success (__main__.ProducerPreflight.test_failed_preflight_invalidates_previous_success) ... ok
+
+----------------------------------------------------------------------
+Ran 40 tests in 1.080s
+
+OK
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 0.708s
+
+OK
+10 recovery existing-tag guards passed.
+ok 1 - exports final-compiler runner and all producer proof files
+ok 2 - authentic candidate verifies
+ok 3 - changed original emlf publication rejected before export
+ok 4 - changed original mlfpkg publication rejected before export
+ok 5 - changed original compiler-tests publication rejected before export
+ok 6 - missing executable dependency proof rejected before export
+ok 7 - changed runner bytes rejected
+ok 8 - stale runner source snapshot rejected
+ok 9 - changed native environment rejected
+ok 10 - wrong source rejected
+ok 11 - wrong platform rejected
+ok 12 - wrong root rejected
+ok 13 - seed-built runner rejected even with matching transport hashes
+ok 14 - failed scheduler rejected despite completed envelope and matching hashes
+ok 15 - changed dependency receipt rejected
+outputs.tar.gz: OK
+manifest.json: OK
+ok 16 - clean consumer imports original binary and build proof
+ok 17 - consumer executes a fresh campaign without rebuilding runner
+17 shared candidate transport checks passed
+All nine unit binaries, one build DAG and exact Core evidence union verified.
+ok 1 - authentic complete fixture checks all nine binaries and exact union
+ok 2 - incomplete envelope is rejected as false
+ok 3 - wrong-implementation envelope is rejected as false
+ok 4 - wrong-group envelope is rejected as false
+ok 5 - partial-unit envelope is rejected as false
+ok 6 - changed shard binary rejected
+ok 7 - changed CLI helper binary rejected
+ok 8 - missing partial family receipt rejected
+ok 9 - invented aggregate binary rejected
+ok 10 - missing physical target rejected
+ok 11 - duplicated build target rejected
+ok 12 - partial shard cannot claim full scope
+ok 13 - changed original invocation report rejected
+ok 14 - different compile tool rejected despite report rehash
+ok 15 - failed-scheduler rejected despite report rehash
+ok 16 - repeated-key rejected despite report rehash
+ok 17 - over-parallel rejected despite report rehash
+ok 18 - consistently rehashed altered inventory is rejected
+18 split unit evidence checks passed
+10 bounded qualification parallelism policy checks passed.
+PASS source smoke diagnostics: success
+PASS source smoke diagnostics: timeout
+PASS source smoke diagnostics: progress
+PASS source smoke diagnostics: telemetry
+4 source smoke diagnostic checks passed
+PASS PR CLI watchdog: initial sleep cancellation
+PASS PR CLI watchdog: grace sleep cancellation
+2 PR CLI watchdog checks passed
+PASS mock/control bootstrap transition: manager replacement, stable retry, isolated bridge, frozen adjacent runner.
+This control test does not qualify MLF compilers, interpreter behavior, or native runtime parity.
+PASS shared bootstrap dispatch preserves directory and arguments
+PASS shared package bootstrap rejects a released seed before emission
+PASS shared package launch with native-MLF identity
+PASS shared package launch with GHC identity
+PASS legacy package launch remains unchanged without shared manifest
+PASS shared bootstrap control: seed isolation, native-only path, both tools, truthful receipt, retry invalidation, source mutation rejection.
+No real compiler, bridge build, native runtime or fixed point is qualified by this test.
+PASS direct smoke control: authenticated source paths/hashes, honest producer, stale or incomplete receipt rejection, native route separation.
+test_cli_receipt_and_output_match_for_skip_opt_in_and_invalid (__main__.Selection.test_cli_receipt_and_output_match_for_skip_opt_in_and_invalid) ... ok
+test_default_pr_is_explicit_nonexecution (__main__.Selection.test_default_pr_is_explicit_nonexecution) ... ok
+test_explicit_opt_in_pr_runs_even_without_source_diff (__main__.Selection.test_explicit_opt_in_pr_runs_even_without_source_diff) ... ok
+test_invalid_commit_identity_fails_closed (__main__.Selection.test_invalid_commit_identity_fails_closed) ... ok
+test_label_addition_and_removal_change_only_execution_policy (__main__.Selection.test_label_addition_and_removal_change_only_execution_policy) ... ok
+test_main_manual_queue_and_unknown_events_keep_coverage (__main__.Selection.test_main_manual_queue_and_unknown_events_keep_coverage) ... ok
+test_missing_invalid_labels_fail_closed (__main__.Selection.test_missing_invalid_labels_fail_closed) ... ok
+test_unrelated_or_similar_labels_do_not_opt_in (__main__.Selection.test_unrelated_or_similar_labels_do_not_opt_in) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.101s
+
+OK
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 0.010s
+
+OK
+{"lock_written": false, "native_plan_verified": false, "packages": 12, "snapshot_sha256": "814889b1592997cf14d3181a309b19740394ea7e91b0700dd13d2577a4a9d2c3", "source_hashes": 97, "static_only": true}
+{
+  "kind": "static-source-preservation",
+  "baseline": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "leaf_ids": 90,
+  "default_implementation": "legacy",
+  "literal_calls_preserved": 72,
+  "oracle_helpers_preserved": 12,
+  "mutation_controls": 14,
+  "shared_semantic_contract": {
+    "tests/Tests/TupleList.hs": "85ee364d92530114332c9b37723141bf008fda960d9f7db4ddfcc6f1d8e6a954",
+    "tests/MLF/Entry/TupleList.hs": "a6de5a49e9cf14dbb9fa9b840ade22fb27c6e06478703b04c9671ac9b84fee4d",
+    "tests/Tests/TupleListLegacy.hs": "35085423a20b13cb04ec4c330ccb246cf9f0d9bf0c6c1e45f3b9aead98ad0790"
+  },
+  "compilation_verified": false,
+  "semantic_execution_verified": false
+}
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.003s
+
+OK
+.....................
+----------------------------------------------------------------------
+Ran 21 tests in 1.121s
+
+OK
+{
+  "kind": "static-core-opt-in-controls",
+  "baseline": "8a3e69b165765931c3ff762379a78db9659b2cd8",
+  "family_count": 35,
+  "legacy_actions": 739,
+  "named_substring_observations": 13,
+  "mutation_controls": 10,
+  "shared_partition_mutation_controls": 3,
+  "shared_partition_sha256": "074ec18485fc1fb79a4186cbf6b9eb9bfe9ad9e8d87c7e9b1ea97699e8590aab",
+  "default_campaign": "legacy",
+  "qualification_eligible": false,
+  "compilation_verified": false,
+  "semantic_execution_verified": false
+}
+{"changed_upstream_owners": 3, "current_sources": [{"current_sha256": "a3cfc33040260bdd3e37623bb2ff50cee0518f0d602cfedae56c65ea80fdc634", "current_validation_verified": false, "differs_from_historical": true, "historical_sha256": "582ccf476e3206f7a502614973373c2d06c8b9f2475c6f0b7d196676f6910c0a", "path": "tools/release/async-change-scope.py", "required_follow_on_validation": "python3 tools/release/test-async-change-scope.py"}, {"current_sha256": "cd043259b9f227c29ddaa4042cafc6c6bc9c7faddbb9265b28593b5b9a3617b9", "current_validation_verified": false, "differs_from_historical": true, "historical_sha256": "e08a320b531d36213fe3465738f943575bc46165d3d2aabbb63bfa9fc9c28724", "path": "tools/release/test-async-change-scope.py", "required_follow_on_validation": "python3 tools/release/test-async-change-scope.py"}, {"current_sha256": "9ff00506834e46c9e816ffd579834ca087f6611f2d61e63881d97df98d4b257a", "current_validation_verified": false, "differs_from_historical": true, "historical_sha256": "b7aa7f562587b7d7fb5905367ec31e559b4ef23bb6af6c42e0e06f6becbfed0c", "path": ".github/workflows/ci.yml", "required_follow_on_validation": "node tools/release/test-ci-policy.mjs"}, {"current_sha256": "58000e8ea395aa00ab9b65a2049fae072f6700ae0bb14d1f5bec8758e3bcad8b", "current_validation_verified": false, "differs_from_historical": true, "historical_sha256": "b6ac38007fe0eba0dcae5b484bb29e71f636d176810874d46cd03a84336ddf13", "path": "tools/release/check.sh", "required_follow_on_validation": "bash -n tools/release/check.sh; run its maintained controls"}, {"current_sha256": "7904108a245c79734a0dbbc2556711a48a5edcc423d9fcc768ced16a8c35c9e3", "current_validation_verified": false, "differs_from_historical": true, "historical_sha256": "b73e4d10c2b91fac1585de989fbc95dc491298d05d19db788bf03a7f4e15fa76", "path": "tools/release/test-ci-policy.mjs", "required_follow_on_validation": "node tools/release/test-ci-policy.mjs"}, {"current_sha256": "14809ad9907f0cd2e2ea63acc12e8d118bdb7290a531ef109a7ced101b6684bf", "current_validation_verified": false, "differs_from_historical": true, "historical_sha256": "a2983ccdd56babedfaf1ad801b963fdeb10a4e0876b28262de1b92932fdfdc7f", "path": "tools/testing/check_reconciliation_inventory.py", "required_follow_on_validation": "python3 tools/testing/test_reconciliation_inventory.py"}, {"current_sha256": "106796a05c3f35504c0e5834929848e9b507d8456b2cb13d3379e17a86b47d3b", "current_validation_verified": false, "differs_from_historical": false, "historical_sha256": "106796a05c3f35504c0e5834929848e9b507d8456b2cb13d3379e17a86b47d3b", "path": "docs/testing-migration-inventory-20261023.json", "required_follow_on_validation": null}, {"current_sha256": "9eda8926f8b878e45063f76063517db78d84f241aea290c4cefd7faf69db90bf", "current_validation_verified": false, "differs_from_historical": false, "historical_sha256": "9eda8926f8b878e45063f76063517db78d84f241aea290c4cefd7faf69db90bf", "path": "docs/testing-inventory-20261023.tsv", "required_follow_on_validation": null}, {"current_sha256": "2f3c2afeba7b8def7bee960f559b3d13a311b22c128102652c920274ce646359", "current_validation_verified": false, "differs_from_historical": false, "historical_sha256": "2f3c2afeba7b8def7bee960f559b3d13a311b22c128102652c920274ce646359", "path": "docs/testing-external-entrypoints-20261023.tsv", "required_follow_on_validation": null}, {"current_sha256": "452daca86b1b67eca438e08f763156b21710c7c06ea02be6703afa18bfae8ee4", "current_validation_verified": false, "differs_from_historical": true, "historical_sha256": "ed3eff43261b8e0cf2e4c7cb604c8190c54557557e3dac66615c84378bacd63c", "path": "tests/testing-migration-ledger.json", "required_follow_on_validation": "python3 tools/testing/migration_inventory.py"}, {"current_sha256": "814889b1592997cf14d3181a309b19740394ea7e91b0700dd13d2577a4a9d2c3", "current_validation_verified": false, "differs_from_historical": true, "historical_sha256": "93cd77fadc6eb420bde07fb0cc2efa68598b9d91018c93bcb2fcd36f132b7679", "path": "mlf.lock", "required_follow_on_validation": "qualified mlfpkg --locked plan; python3 tools/testing/check_manifest_snapshot.py"}, {"current_sha256": "648d84f765fe664bb046746fd6f5a76b6253976ad9abe4e724190a9906b394ea", "current_validation_verified": false, "differs_from_historical": false, "historical_sha256": "648d84f765fe664bb046746fd6f5a76b6253976ad9abe4e724190a9906b394ea", "path": "tests/fixtures/async-gate/counterexample/incorrect-quantifier.emlf", "required_follow_on_validation": null}], "current_validation_verified": false, "historical_snapshot": "4d732f31982ebe18124511f2ca4cb412770d6bd6", "new_local_audits": 1, "new_upstream_paths": 2, "runtime_migration_complete": false, "status": "historical-supplemental-source-inventory-valid", "tracked_entries": 6}
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.324s
+
+OK
+Release metadata and shell syntax passed for 0.3.0.

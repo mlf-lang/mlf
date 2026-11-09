@@ -1,0 +1,45 @@
+test_attempt_logged_before_launch_failure (__main__.CommandEvidence.test_attempt_logged_before_launch_failure) ... ok
+test_success_checks_exact_stdout (__main__.CommandEvidence.test_success_checks_exact_stdout) ... ok
+test_timeout_retains_command_and_partial_streams (__main__.CommandEvidence.test_timeout_retains_command_and_partial_streams) ... ok
+test_actual_compiler_mutation_rejected (__main__.DirectProducerReceipt.test_actual_compiler_mutation_rejected) ... ok
+test_current_source_cannot_relabel_old_binary (__main__.DirectProducerReceipt.test_current_source_cannot_relabel_old_binary) ... ok
+test_incomplete_and_typecheck_receipts_rejected (__main__.DirectProducerReceipt.test_incomplete_and_typecheck_receipts_rejected) ... ok
+test_installed_dependency_mutation_rejected (__main__.DirectProducerReceipt.test_installed_dependency_mutation_rejected) ... ok
+test_missing_actual_resolution_rejected (__main__.DirectProducerReceipt.test_missing_actual_resolution_rejected) ... ok
+test_missing_host_inventory_rejected (__main__.DirectProducerReceipt.test_missing_host_inventory_rejected) ... ok
+test_missing_host_resolution_rejected (__main__.DirectProducerReceipt.test_missing_host_resolution_rejected) ... ok
+test_native_aggregate_is_not_direct_source_proof (__main__.DirectProducerReceipt.test_native_aggregate_is_not_direct_source_proof) ... ok
+test_native_configuration_mutation_rejected (__main__.DirectProducerReceipt.test_native_configuration_mutation_rejected) ... ok
+test_old_or_unrelated_binary_rejected (__main__.DirectProducerReceipt.test_old_or_unrelated_binary_rejected) ... ok
+test_producer_command_failure_rejected (__main__.DirectProducerReceipt.test_producer_command_failure_rejected) ... ok
+test_tool_mutation_rejected (__main__.DirectProducerReceipt.test_tool_mutation_rejected) ... ok
+test_valid_receipt (__main__.DirectProducerReceipt.test_valid_receipt) ... ok
+test_absent_dump_fails_closed (__main__.InferredSchemeEvidence.test_absent_dump_fails_closed) ... ok
+test_actual_monomorphic_scheme_accepted (__main__.InferredSchemeEvidence.test_actual_monomorphic_scheme_accepted) ... ok
+test_explicit_datatype_only_module_accepted (__main__.InferredSchemeEvidence.test_explicit_datatype_only_module_accepted) ... ok
+test_literal_polymorphism_rejected (__main__.InferredSchemeEvidence.test_literal_polymorphism_rejected) ... ok
+test_value_module_needs_schemes (__main__.InferredSchemeEvidence.test_value_module_needs_schemes) ... ok
+test_complete_interface_and_archive_are_bound (__main__.InstalledClosure.test_complete_interface_and_archive_are_bound) ... ok
+test_missing_library_archive_rejected (__main__.InstalledClosure.test_missing_library_archive_rejected) ... ok
+test_missing_library_directory_rejected (__main__.InstalledClosure.test_missing_library_directory_rejected) ... ok
+test_cabal_wrong_main_rejected (__main__.ManifestParity.test_cabal_wrong_main_rejected) ... ok
+test_cabal_wrong_wrapper_rejected (__main__.ManifestParity.test_cabal_wrong_wrapper_rejected) ... ok
+test_closed_corpus_has_matching_94_modules_12_executables (__main__.ManifestParity.test_closed_corpus_has_matching_94_modules_12_executables) ... ok
+test_library_transitive_only_frontend_import_rejected (__main__.ManifestParity.test_library_transitive_only_frontend_import_rejected) ... ok
+test_missing_native_module_rejected (__main__.ManifestParity.test_missing_native_module_rejected) ... ok
+test_missing_rts_argv_flag_rejected (__main__.ManifestParity.test_missing_rts_argv_flag_rejected) ... ok
+test_native_frontend_inference_and_runtime_dependencies_required (__main__.ManifestParity.test_native_frontend_inference_and_runtime_dependencies_required) ... ok
+test_native_wrong_entry_rejected (__main__.ManifestParity.test_native_wrong_entry_rejected) ... ok
+test_native_wrong_module_path_rejected (__main__.ManifestParity.test_native_wrong_module_path_rejected) ... ok
+test_target_duplicate_dependency_rejected (__main__.ManifestParity.test_target_duplicate_dependency_rejected) ... ok
+test_target_empty_selection_does_not_mean_all_dependencies (__main__.ManifestParity.test_target_empty_selection_does_not_mean_all_dependencies) ... ok
+test_target_omitted_selection_defaults_to_all_direct_dependencies (__main__.ManifestParity.test_target_omitted_selection_defaults_to_all_direct_dependencies) ... ok
+test_target_selection_does_not_restrict_own_library_dependencies (__main__.ManifestParity.test_target_selection_does_not_restrict_own_library_dependencies) ... ok
+test_target_transitive_only_frontend_import_rejected (__main__.ManifestParity.test_target_transitive_only_frontend_import_rejected) ... ok
+test_wrapper_wrong_entry_rejected (__main__.ManifestParity.test_wrapper_wrong_entry_rejected) ... ok
+test_failed_preflight_invalidates_previous_success (__main__.ProducerPreflight.test_failed_preflight_invalidates_previous_success) ... ok
+
+----------------------------------------------------------------------
+Ran 40 tests in 1.160s
+
+OK

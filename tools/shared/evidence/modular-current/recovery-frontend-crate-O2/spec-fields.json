@@ -1,0 +1,10 @@
+[
+  "MLF-CRATE-1",
+  "mlf-frontend/0.3.0/library",
+  "",
+  "false",
+  "118:20:Bootstrap.Dependency92:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Dependency.hs112:17:Bootstrap.Desugar89:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Desugar.hs110:16:Bootstrap.Layout88:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Layout.hs108:15:Bootstrap.Lexer87:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Lexer.hs110:16:Bootstrap.Module88:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Module.hs110:16:Bootstrap.Parsec88:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Parsec.hs110:16:Bootstrap.Parser88:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Parser.hs112:17:Bootstrap.Prelude89:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Prelude.hs112:17:Bootstrap.Surface89:/workspace/scratch/3f83e2ebe290/pr22-recovery/libraries/mlf-frontend/Bootstrap/Surface.hs",
+  "118:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/artifact/unit.mlfci108:/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-language-core-crate-O2/artifact/unit.mlfci",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-frontend-crate-O2/queries",
+  "/workspace/scratch/3f83e2ebe290/pr22-recovery/.mlf-build/recovery-foundation-crate-O2-metadata-fix/builtin/unit"
+]

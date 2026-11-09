@@ -3,14 +3,14 @@
 
 data Result = Result Int Int
 
-initialize : IntArray -> Int -> Int -> IO Unit
+initialize : IntArray -> Int -> Int -> IO ()
 initialize perm n i =
   if i == n then return ()
   else do
     writeIntArray perm i (i + 1)
     initialize perm n (i + 1)
 
-copy : IntArray -> IntArray -> Int -> Int -> IO Unit
+copy : IntArray -> IntArray -> Int -> Int -> IO ()
 copy source dest n i =
   if i == n then return ()
   else do
@@ -18,7 +18,7 @@ copy source dest n i =
     writeIntArray dest i x
     copy source dest n (i + 1)
 
-reversePrefix : IntArray -> Int -> Int -> IO Unit
+reversePrefix : IntArray -> Int -> Int -> IO ()
 reversePrefix perm i j =
   if i < j then do
     x <- readIntArray perm i
@@ -36,7 +36,7 @@ countFlips perm flips = do
     reversePrefix perm 0 (first - 1)
     countFlips perm (flips + 1)
 
-rotate : IntArray -> Int -> Int -> Int -> IO Unit
+rotate : IntArray -> Int -> Int -> Int -> IO ()
 rotate perm end first i =
   if i == end then writeIntArray perm end first
   else do

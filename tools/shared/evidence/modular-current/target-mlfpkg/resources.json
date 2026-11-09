@@ -1,0 +1,29 @@
+{
+  "complete": true,
+  "command": [
+    "nice",
+    "-n",
+    "19",
+    "ionice",
+    "-c",
+    "3",
+    "python3",
+    ".mlf-build/integration-modular/target-mlfpkg/run.py"
+  ],
+  "limits": {
+    "wall_seconds": 900,
+    "address_space_per_process": 3221225472,
+    "process_tree_rss_bytes": 1610612736,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 805306368,
+    "max_output_bytes": 104857600
+  },
+  "process_group": 41,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 9.875224594999963,
+  "peak_group_rss": 186286080,
+  "raw_receipt_sha256": "116724395a942066de744ae946943d09f5d43a4818480c1eef47efa4a8b985dc",
+  "min_host_available": 7203422208,
+  "min_disk_free": 20601192448
+}

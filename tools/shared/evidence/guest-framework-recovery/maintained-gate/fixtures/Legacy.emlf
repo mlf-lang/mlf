@@ -1,0 +1,5 @@
+module Legacy where
+import Bootstrap.Types
+import qualified Bootstrap.Std as S
+main : Either String Int
+main = do { x <- Right 1; Right x }

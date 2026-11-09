@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Authenticate only the executed legacy-framework source repairs and lock delta."""
+"""Authenticate PR19 historical repairs, independently of the evolved PR22 framework."""
 import hashlib
 import json
 import subprocess
 
+RECOVERED_FRAMEWORK = 'afbe7219806881301831d79f43596811eca3279d'
 FROZEN_FRAMEWORK = 'e0f11f9c39b40f54f30e0eecbea7cebdf8cf0e74'
 EDITS = {
     'testing/Test/Outcome.emlf': [
@@ -43,13 +44,15 @@ def repair_bytes(path, original):
     return value.encode('utf-8')
 
 
-def verify_repairs(root):
+def verify_repairs(root, revision=None):
     sources = {}
     for path in EDITS:
         original = subprocess.check_output(
             ['git', '--no-replace-objects', 'show', FROZEN_FRAMEWORK + ':' + path], cwd=root)
         expected = repair_bytes(path, original)
-        if (root / path).read_bytes() != expected:
+        actual = ((root / path).read_bytes() if revision is None else subprocess.check_output(
+            ['git', '--no-replace-objects', 'show', revision + ':' + path], cwd=root))
+        if actual != expected:
             raise ValueError('framework source exceeds reviewed repair: ' + path)
         sources[path] = (digest(original), digest(expected))
     return sources
@@ -64,9 +67,9 @@ def strict_object(pairs):
     return value
 
 
-def repaired_root_lock(root, original):
+def repaired_root_lock(root, original, revision=None):
     """Change only hashes of the three repaired modules in the frozen root graph."""
-    repairs = verify_repairs(root)
+    repairs = verify_repairs(root, revision)
     value = json.loads(original, object_pairs_hook=strict_object)
     expected_paths = {path for path in EDITS if path.startswith('testing/Test/')}
     seen = set()

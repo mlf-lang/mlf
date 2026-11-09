@@ -1,0 +1,543 @@
+{
+  "candidate": "S1 Darwin inherited-I/O process spawn",
+  "accepted": true,
+  "baseline_commit": "1d16f351e5727a4d82097d9ca7df9c6d02d273f3",
+  "production_header_sha256": "cc87aa9445c45e7e6fe66b2631a887be870baf3015f9daa6d6705d356ed37477",
+  "ordinary_binaries_sha256": {
+    "A": "be787a8d66f3ba1ea83c438031b635924da60f62a1273b4f75819b22f59b2f69",
+    "B": "bd3b28b7708886f317d74990a2564072c96c51077cc912f57927dd7295faf442"
+  },
+  "toolchain": {
+    "ghc": "9.14.1",
+    "ghc_optimization": "ordinary -O2 -fpedantic-bottoms -fno-state-hack",
+    "native_shape_clang_flags": [
+      "-O2",
+      "-Wno-override-module"
+    ],
+    "compiler_concurrency": 1
+  },
+  "host": {
+    "affinity": "not exposed by macOS",
+    "cpu": "Apple M1 Max",
+    "logical_cpus": 10,
+    "machine": "arm64",
+    "os_cache_flush": false,
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.8 (main, Sep 30 2026, 17:55:09) [Clang 21.0.0 (clang-2100.3.34.2)]",
+    "qualification": "macOS experimental; sampled RSS, no hard address-space limit"
+  },
+  "target": {
+    "source_commit": "d96f67726599fa4e21f236462886106434c8e417",
+    "modules": 15,
+    "fresh_per_leg": 711,
+    "reused_per_leg": 0,
+    "endpoint": "checked MLF/xMLF crate",
+    "raw_bytes_against_independent_reference": true
+  },
+  "confirmation": {
+    "purpose": "confirmation",
+    "plan_sha256": "7e1aff54ffd3a9713285501417f213e53e7559a23aac792a04d4c2f698f0d4fc",
+    "receipt_sha256": "7f55f4f1b2439e8fd8a7baf98e8f9a43e44536b462999e172deaca64504280ac",
+    "runs": 24,
+    "blocks": 6,
+    "cases": [
+      {
+        "case": "compiler",
+        "fresh_per_leg": 711,
+        "medians": {
+          "A": {
+            "wall_seconds": 72.5199094585,
+            "child_user_seconds": 65.4056985,
+            "child_system_seconds": 5.3533035
+          },
+          "B": {
+            "wall_seconds": 67.05160529150001,
+            "child_user_seconds": 65.070764,
+            "child_system_seconds": 1.6168334999999998
+          }
+        },
+        "descriptive_ratio_of_medians": 0.9245958219221266
+      }
+    ],
+    "block_effects": [
+      {
+        "block": 0,
+        "order": "BAAB",
+        "log_ratio": -0.08174191428399828,
+        "gain": 0.07849024348576883
+      },
+      {
+        "block": 1,
+        "order": "BAAB",
+        "log_ratio": -0.0731365176016209,
+        "gain": 0.07052606818787022
+      },
+      {
+        "block": 2,
+        "order": "ABBA",
+        "log_ratio": -0.06737719353259053,
+        "gain": 0.0651574817258107
+      },
+      {
+        "block": 3,
+        "order": "BAAB",
+        "log_ratio": -0.07627271218604265,
+        "gain": 0.07343651305294308
+      },
+      {
+        "block": 4,
+        "order": "ABBA",
+        "log_ratio": -0.056852218516687064,
+        "gain": 0.05526632680560073
+      },
+      {
+        "block": 5,
+        "order": "ABBA",
+        "log_ratio": -0.0826349155356535,
+        "gain": 0.07931278553154886
+      }
+    ],
+    "primary": {
+      "log_ratio": -0.07300257860943216,
+      "ratio": 0.9295984329514149,
+      "gain": 0.07040156704858513,
+      "log_ratio_95ci": [
+        -0.08320262556989991,
+        -0.0628025316489644
+      ],
+      "gain_95ci": [
+        0.060871096383733336,
+        0.07983532056338039
+      ],
+      "block_log_ratio_sd": 0.009719554561229448
+    },
+    "by_order": {
+      "ABBA": 0.06663111007244171,
+      "BAAB": 0.07415679280590148
+    },
+    "meets_frozen_acceptance_rule": true,
+    "qualification": "Nominal block t interval, conditional on fixed binaries, workload and Mac session; six blocks do not establish independence or portability."
+  },
+  "shape_discovery": {
+    "purpose": "discovery",
+    "plan_sha256": "2ca0953e51716ac22dc3229dc94af47616025919555f3efee862f445bab346c2",
+    "receipt_sha256": "2e85928249f213f2a7a27b552017b990b29bee70d90a2e38f3455e2902122059",
+    "runs": 12,
+    "blocks": 3,
+    "cases": [
+      {
+        "case": "flat_functions-512",
+        "fresh_per_leg": 515,
+        "medians": {
+          "A": {
+            "wall_seconds": 7.5814585415,
+            "child_user_seconds": 3.9959045,
+            "child_system_seconds": 2.717678
+          },
+          "B": {
+            "wall_seconds": 4.8361101875,
+            "child_user_seconds": 3.8061179999999997,
+            "child_system_seconds": 0.9073225
+          }
+        },
+        "descriptive_ratio_of_medians": 0.637886517617647,
+        "stage_medians": {
+          "A": {
+            "source-to-checked": {
+              "wall_seconds": 5.944951,
+              "user_seconds": 2.5839995,
+              "system_seconds": 2.518396
+            },
+            "checked-to-llvm": {
+              "wall_seconds": 0.9485834995,
+              "user_seconds": 0.9108615,
+              "system_seconds": 0.02187949999999983
+            },
+            "llvm-to-executable": {
+              "wall_seconds": 0.601677791,
+              "user_seconds": 0.4470495000000001,
+              "system_seconds": 0.15325200000000017
+            }
+          },
+          "B": {
+            "source-to-checked": {
+              "wall_seconds": 3.3467985625,
+              "user_seconds": 2.3823895,
+              "system_seconds": 0.8109184999999999
+            },
+            "checked-to-llvm": {
+              "wall_seconds": 0.963866437,
+              "user_seconds": 0.9232214999999999,
+              "system_seconds": 0.02221850000000003
+            },
+            "llvm-to-executable": {
+              "wall_seconds": 0.4453038535,
+              "user_seconds": 0.4464935000000001,
+              "system_seconds": 0.05112549999999999
+            }
+          }
+        }
+      },
+      {
+        "case": "inferred_chain-512",
+        "fresh_per_leg": 515,
+        "medians": {
+          "A": {
+            "wall_seconds": 8.6816933545,
+            "child_user_seconds": 4.718572,
+            "child_system_seconds": 3.0865080000000003
+          },
+          "B": {
+            "wall_seconds": 5.701234728999999,
+            "child_user_seconds": 4.5441075,
+            "child_system_seconds": 1.003535
+          }
+        },
+        "descriptive_ratio_of_medians": 0.6566961646998125,
+        "stage_medians": {
+          "A": {
+            "source-to-checked": {
+              "wall_seconds": 7.0623590835000005,
+              "user_seconds": 3.1656495,
+              "system_seconds": 2.9943155
+            },
+            "checked-to-llvm": {
+              "wall_seconds": 1.2473546039999999,
+              "user_seconds": 1.20705,
+              "system_seconds": 0.020996000000000237
+            },
+            "llvm-to-executable": {
+              "wall_seconds": 0.289655833,
+              "user_seconds": 0.29001399999999977,
+              "system_seconds": 0.04831949999999985
+            }
+          },
+          "B": {
+            "source-to-checked": {
+              "wall_seconds": 4.0657229585,
+              "user_seconds": 2.9822965,
+              "system_seconds": 0.9151695
+            },
+            "checked-to-llvm": {
+              "wall_seconds": 1.2600464164999998,
+              "user_seconds": 1.2134304999999999,
+              "system_seconds": 0.01911950000000001
+            },
+            "llvm-to-executable": {
+              "wall_seconds": 0.2948710205,
+              "user_seconds": 0.2945730000000002,
+              "system_seconds": 0.04620999999999997
+            }
+          }
+        }
+      },
+      {
+        "case": "local_functions-512",
+        "fresh_per_leg": 3,
+        "medians": {
+          "A": {
+            "wall_seconds": 4.9667911875,
+            "child_user_seconds": 4.7522515,
+            "child_system_seconds": 0.1884805
+          },
+          "B": {
+            "wall_seconds": 4.956976771000001,
+            "child_user_seconds": 4.767086,
+            "child_system_seconds": 0.1864865
+          }
+        },
+        "descriptive_ratio_of_medians": 0.9980239925276707,
+        "stage_medians": {
+          "A": {
+            "source-to-checked": {
+              "wall_seconds": 1.696679396,
+              "user_seconds": 1.5810175,
+              "system_seconds": 0.07161699999999999
+            },
+            "checked-to-llvm": {
+              "wall_seconds": 1.8327261875,
+              "user_seconds": 1.7816415,
+              "system_seconds": 0.028359000000000002
+            },
+            "llvm-to-executable": {
+              "wall_seconds": 1.358981979,
+              "user_seconds": 1.3364139999999998,
+              "system_seconds": 0.0661175
+            }
+          },
+          "B": {
+            "source-to-checked": {
+              "wall_seconds": 1.6594455,
+              "user_seconds": 1.5797590000000001,
+              "system_seconds": 0.0539665
+            },
+            "checked-to-llvm": {
+              "wall_seconds": 1.8536681874999998,
+              "user_seconds": 1.7992745,
+              "system_seconds": 0.032896499999999995
+            },
+            "llvm-to-executable": {
+              "wall_seconds": 1.365081146,
+              "user_seconds": 1.3347969999999998,
+              "system_seconds": 0.076752
+            }
+          }
+        }
+      }
+    ]
+  },
+  "control_receipt_sha256": {
+    "process_controls": "47f6ff04152c496a4d1e2237efd3e9521d7aca4fa56fca0be17faec42d052df8",
+    "inherited_state": "9774a8143cb104e475e656a32e1aa962463e9b726ba213134488f8389452872f",
+    "semantic_gates": "fad647e3d807fecb63bb3098e79248ecb32c6f1907010f3a4b1faf95a63428f7",
+    "shape_discovery": "2e85928249f213f2a7a27b552017b990b29bee70d90a2e38f3455e2902122059",
+    "target_discovery": "162549b95d3dd383aa59a140661d941e460391ee39f99b763e94c391eee3a987",
+    "confirmation": "7f55f4f1b2439e8fd8a7baf98e8f9a43e44536b462999e172deaca64504280ac",
+    "analysis": "eb946c5af46b16afe5811d8160ed2ab3683078c4aa40c7c0438e282e01117066"
+  },
+  "ordinary_object_comparison": {
+    "old_object_count": 131,
+    "new_object_count": 131,
+    "different_objects": [
+      "MLF/Host/Base.o",
+      "MLF/Host/IO.o"
+    ],
+    "all_ghc_objects_identical": false,
+    "text_section_comparison": {
+      "MLF/Host/Base.o": {
+        "equal": true,
+        "sha256": [
+          "a674b5e450744132cc1bee7d8b0deda85eeaecd3652b91f70ec5b52462c8460e",
+          "a674b5e450744132cc1bee7d8b0deda85eeaecd3652b91f70ec5b52462c8460e"
+        ]
+      },
+      "MLF/Host/IO.o": {
+        "equal": true,
+        "sha256": [
+          "ddad8912a3db335aea0a1fe9b5281253c0bd9212027316f853de0cfcc6aa8f6e",
+          "ddad8912a3db335aea0a1fe9b5281253c0bd9212027316f853de0cfcc6aa8f6e"
+        ]
+      }
+    },
+    "qualification": "129 complete GHC objects identical; 2 host objects differ. strings comparison shows build-source paths. Text-section audit is not a proof that every remaining object difference is a source path, and linked layouts can differ."
+  },
+  "timings": [
+    {
+      "block": 0,
+      "position": 0,
+      "side": "B",
+      "started_utc": "2026-10-30T18:57:29Z",
+      "wall_seconds": 72.527399709,
+      "child_user_seconds": 68.605742,
+      "child_system_seconds": 2.047146
+    },
+    {
+      "block": 0,
+      "position": 1,
+      "side": "A",
+      "started_utc": "2026-10-30T18:58:42Z",
+      "wall_seconds": 78.609711583,
+      "child_user_seconds": 68.675225,
+      "child_system_seconds": 6.179508
+    },
+    {
+      "block": 0,
+      "position": 2,
+      "side": "A",
+      "started_utc": "2026-10-30T19:00:01Z",
+      "wall_seconds": 75.798177875,
+      "child_user_seconds": 67.838672,
+      "child_system_seconds": 5.925749
+    },
+    {
+      "block": 0,
+      "position": 3,
+      "side": "B",
+      "started_utc": "2026-10-30T19:01:16Z",
+      "wall_seconds": 69.764219,
+      "child_user_seconds": 67.190863,
+      "child_system_seconds": 1.836433
+    },
+    {
+      "block": 1,
+      "position": 0,
+      "side": "B",
+      "started_utc": "2026-10-30T19:02:29Z",
+      "wall_seconds": 68.837650041,
+      "child_user_seconds": 66.731111,
+      "child_system_seconds": 1.698404
+    },
+    {
+      "block": 1,
+      "position": 1,
+      "side": "A",
+      "started_utc": "2026-10-30T19:03:38Z",
+      "wall_seconds": 73.798624458,
+      "child_user_seconds": 66.654155,
+      "child_system_seconds": 5.708181
+    },
+    {
+      "block": 1,
+      "position": 2,
+      "side": "A",
+      "started_utc": "2026-10-30T19:04:51Z",
+      "wall_seconds": 73.876293417,
+      "child_user_seconds": 66.815107,
+      "child_system_seconds": 5.610292
+    },
+    {
+      "block": 1,
+      "position": 3,
+      "side": "B",
+      "started_utc": "2026-10-30T19:06:05Z",
+      "wall_seconds": 68.422944,
+      "child_user_seconds": 66.387983,
+      "child_system_seconds": 1.660117
+    },
+    {
+      "block": 2,
+      "position": 0,
+      "side": "A",
+      "started_utc": "2026-10-30T19:07:16Z",
+      "wall_seconds": 73.758471083,
+      "child_user_seconds": 66.591033,
+      "child_system_seconds": 5.624201
+    },
+    {
+      "block": 2,
+      "position": 1,
+      "side": "B",
+      "started_utc": "2026-10-30T19:08:30Z",
+      "wall_seconds": 68.781887917,
+      "child_user_seconds": 66.347766,
+      "child_system_seconds": 1.658534
+    },
+    {
+      "block": 2,
+      "position": 2,
+      "side": "B",
+      "started_utc": "2026-10-30T19:09:39Z",
+      "wall_seconds": 66.426238584,
+      "child_user_seconds": 64.727149,
+      "child_system_seconds": 1.42872
+    },
+    {
+      "block": 2,
+      "position": 3,
+      "side": "A",
+      "started_utc": "2026-10-30T19:10:45Z",
+      "wall_seconds": 70.880199959,
+      "child_user_seconds": 64.662498,
+      "child_system_seconds": 4.918695
+    },
+    {
+      "block": 3,
+      "position": 0,
+      "side": "B",
+      "started_utc": "2026-10-30T19:11:59Z",
+      "wall_seconds": 66.399109875,
+      "child_user_seconds": 64.623397,
+      "child_system_seconds": 1.4374069999999999
+    },
+    {
+      "block": 3,
+      "position": 1,
+      "side": "A",
+      "started_utc": "2026-10-30T19:13:05Z",
+      "wall_seconds": 70.865691791,
+      "child_user_seconds": 64.57983,
+      "child_system_seconds": 4.905244
+    },
+    {
+      "block": 3,
+      "position": 2,
+      "side": "A",
+      "started_utc": "2026-10-30T19:14:16Z",
+      "wall_seconds": 72.90733725,
+      "child_user_seconds": 65.583895,
+      "child_system_seconds": 5.381599
+    },
+    {
+      "block": 3,
+      "position": 3,
+      "side": "B",
+      "started_utc": "2026-10-30T19:15:29Z",
+      "wall_seconds": 66.802909,
+      "child_user_seconds": 64.910584,
+      "child_system_seconds": 1.606369
+    },
+    {
+      "block": 4,
+      "position": 0,
+      "side": "A",
+      "started_utc": "2026-10-30T19:16:38Z",
+      "wall_seconds": 71.913757292,
+      "child_user_seconds": 65.227502,
+      "child_system_seconds": 5.325008
+    },
+    {
+      "block": 4,
+      "position": 1,
+      "side": "B",
+      "started_utc": "2026-10-30T19:17:50Z",
+      "wall_seconds": 67.300301583,
+      "child_user_seconds": 65.230944,
+      "child_system_seconds": 1.627298
+    },
+    {
+      "block": 4,
+      "position": 2,
+      "side": "B",
+      "started_utc": "2026-10-30T19:18:58Z",
+      "wall_seconds": 66.638615625,
+      "child_user_seconds": 64.766031,
+      "child_system_seconds": 1.545377
+    },
+    {
+      "block": 4,
+      "position": 3,
+      "side": "A",
+      "started_utc": "2026-10-30T19:20:04Z",
+      "wall_seconds": 69.873453083,
+      "child_user_seconds": 64.087263,
+      "child_system_seconds": 4.516073
+    },
+    {
+      "block": 5,
+      "position": 0,
+      "side": "A",
+      "started_utc": "2026-10-30T19:21:16Z",
+      "wall_seconds": 69.6732535,
+      "child_user_seconds": 63.957514,
+      "child_system_seconds": 4.505488
+    },
+    {
+      "block": 5,
+      "position": 1,
+      "side": "B",
+      "started_utc": "2026-10-30T19:22:26Z",
+      "wall_seconds": 65.243461083,
+      "child_user_seconds": 63.764036,
+      "child_system_seconds": 1.300795
+    },
+    {
+      "block": 5,
+      "position": 2,
+      "side": "B",
+      "started_utc": "2026-10-30T19:23:31Z",
+      "wall_seconds": 65.295642208,
+      "child_user_seconds": 63.786069,
+      "child_system_seconds": 1.314449
+    },
+    {
+      "block": 5,
+      "position": 3,
+      "side": "A",
+      "started_utc": "2026-10-30T19:24:36Z",
+      "wall_seconds": 72.132481667,
+      "child_user_seconds": 64.663642,
+      "child_system_seconds": 4.83592
+    }
+  ],
+  "scope": "Fixed binaries, source and local Mac session. Nominal block t interval, not a global candidate-search guarantee. Discovery and confirmation are never pooled."
+}

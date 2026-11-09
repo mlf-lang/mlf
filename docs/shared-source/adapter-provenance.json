@@ -1,0 +1,611 @@
+{
+  "format": 1,
+  "reference_commit": "767a5b66172ccf3931e0954c38ca47eb8b4e7a28",
+  "primitive_abi": "mlf-primitive-95-v1",
+  "syntax": "shared-haskell-v1",
+  "changes": [
+    "MLF.Primitive facade replaces the generated-prefixed API; primitive IDs0\u201394 unchanged",
+    "Actual Prelude Functor/Applicative/Monad replace the earlier custom class; pure is standard and bind ordinary compatibility value",
+    "Standard IsString instance for opaque String; no RebindableSyntax or source-local literal hooks",
+    "Async completion action arguments forced only when their IO action executes",
+    "IntArray/DoubleArray/ByteArray have distinct abstract newtype identities",
+    "Raw UTF8 argv and file/path operations are locale-independent, preserve NUL contents, and validate native error boundaries",
+    "fileExists follows native regular-file semantics; getContents leaves stdin open",
+    "SafeFFI result ownership remains masked through copy/free; allocation failure frees intermediate wrapper",
+    "panic message has explicit demand barrier and diagnostics render as UTF8 bytes; exit bounds diagnostic matches native",
+    "runProcess cwd is validated before its specification; native setEnv validates name then content explicitly",
+    "Executable links use -rtsopts=ignoreAll so RTS arguments remain application argv",
+    "Target display hints encode non-identifier synthetic names at fresh numeric identity allocation; source hygiene/environment keys unchanged; frontend3/builtin4"
+  ],
+  "reference_files": {
+    "runtime/MLF/Host/Async.hs": "62b9dd5dd32614fbaf48b086710b569ecc618d7a6019ecd19f972cf732c9ebe2",
+    "runtime/MLF/Host/Base.hs": "f6f9180009d266428623ade00130369a3d258478d7c7fe32fbb3363267fd4f78",
+    "runtime/MLF/Host/IO.hs": "cd219c0a45b1cec1ae0c351c03452fcd40c7a7d9be4a50f7c3f3ff2718d02336",
+    "runtime/MLF/Host/Primitives.hs": "332f0c9fefd63c2d5a724933dcacfcd9f3657b47a77b6ac7222f9b8e7b7cb047",
+    "cbits/host.c": "60199c86a29adfe5101ac89900d41a9c7233d83b2f474996e301425592836e7f"
+  },
+  "primitives": [
+    {
+      "id": 0,
+      "name": "ioReturn",
+      "host_module": "MLF.Host.Base",
+      "signature": "a -> IO a"
+    },
+    {
+      "id": 1,
+      "name": "ioBind",
+      "host_module": "MLF.Host.Base",
+      "signature": "IO a -> (a -> IO b) -> IO b"
+    },
+    {
+      "id": 2,
+      "name": "putStr",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO Unit"
+    },
+    {
+      "id": 3,
+      "name": "putStrLn",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO Unit"
+    },
+    {
+      "id": 4,
+      "name": "getLine",
+      "host_module": "MLF.Host.IO",
+      "signature": "IO String"
+    },
+    {
+      "id": 5,
+      "name": "printInt",
+      "host_module": "MLF.Host.IO",
+      "signature": "Int -> IO Unit"
+    },
+    {
+      "id": 6,
+      "name": "concatString",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> String -> String"
+    },
+    {
+      "id": 7,
+      "name": "showInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> String"
+    },
+    {
+      "id": 8,
+      "name": "addInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Int -> Int"
+    },
+    {
+      "id": 9,
+      "name": "subInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Int -> Int"
+    },
+    {
+      "id": 10,
+      "name": "eqInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Int -> Bool"
+    },
+    {
+      "id": 11,
+      "name": "ltInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Int -> Bool"
+    },
+    {
+      "id": 12,
+      "name": "eqString",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> String -> Bool"
+    },
+    {
+      "id": 13,
+      "name": "ifThenElse",
+      "host_module": "MLF.Host.Base",
+      "signature": "Bool -> a -> a -> a"
+    },
+    {
+      "id": 14,
+      "name": "mulInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Int -> Int"
+    },
+    {
+      "id": 15,
+      "name": "quotInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Int -> Int"
+    },
+    {
+      "id": 16,
+      "name": "remInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Int -> Int"
+    },
+    {
+      "id": 17,
+      "name": "readInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> Int"
+    },
+    {
+      "id": 18,
+      "name": "addDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Double -> Double -> Double"
+    },
+    {
+      "id": 19,
+      "name": "subDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Double -> Double -> Double"
+    },
+    {
+      "id": 20,
+      "name": "mulDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Double -> Double -> Double"
+    },
+    {
+      "id": 21,
+      "name": "divDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Double -> Double -> Double"
+    },
+    {
+      "id": 22,
+      "name": "sqrtDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Double -> Double"
+    },
+    {
+      "id": 23,
+      "name": "eqDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Double -> Double -> Bool"
+    },
+    {
+      "id": 24,
+      "name": "ltDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Double -> Double -> Bool"
+    },
+    {
+      "id": 25,
+      "name": "intToDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Double"
+    },
+    {
+      "id": 26,
+      "name": "formatDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Double -> String"
+    },
+    {
+      "id": 27,
+      "name": "newIntArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "Int -> Int -> IO IntArray"
+    },
+    {
+      "id": 28,
+      "name": "readIntArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "IntArray -> Int -> IO Int"
+    },
+    {
+      "id": 29,
+      "name": "writeIntArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "IntArray -> Int -> Int -> IO Unit"
+    },
+    {
+      "id": 30,
+      "name": "lengthIntArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "IntArray -> IO Int"
+    },
+    {
+      "id": 31,
+      "name": "newDoubleArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "Int -> Double -> IO DoubleArray"
+    },
+    {
+      "id": 32,
+      "name": "readDoubleArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "DoubleArray -> Int -> IO Double"
+    },
+    {
+      "id": 33,
+      "name": "writeDoubleArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "DoubleArray -> Int -> Double -> IO Unit"
+    },
+    {
+      "id": 34,
+      "name": "lengthDoubleArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "DoubleArray -> IO Int"
+    },
+    {
+      "id": 35,
+      "name": "newByteArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "Int -> Int -> IO ByteArray"
+    },
+    {
+      "id": 36,
+      "name": "readByteArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "ByteArray -> Int -> IO Int"
+    },
+    {
+      "id": 37,
+      "name": "writeByteArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "ByteArray -> Int -> Int -> IO Unit"
+    },
+    {
+      "id": 38,
+      "name": "lengthByteArray",
+      "host_module": "MLF.Host.IO",
+      "signature": "ByteArray -> IO Int"
+    },
+    {
+      "id": 39,
+      "name": "byteArrayFromString",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO ByteArray"
+    },
+    {
+      "id": 40,
+      "name": "putBytes",
+      "host_module": "MLF.Host.IO",
+      "signature": "ByteArray -> Int -> Int -> IO Unit"
+    },
+    {
+      "id": 41,
+      "name": "getByteLine",
+      "host_module": "MLF.Host.IO",
+      "signature": "IO ByteArray"
+    },
+    {
+      "id": 42,
+      "name": "newIntTable",
+      "host_module": "MLF.Host.IO",
+      "signature": "IO IntTable"
+    },
+    {
+      "id": 43,
+      "name": "readIntTable",
+      "host_module": "MLF.Host.IO",
+      "signature": "IntTable -> Int -> IO Int"
+    },
+    {
+      "id": 44,
+      "name": "writeIntTable",
+      "host_module": "MLF.Host.IO",
+      "signature": "IntTable -> Int -> Int -> IO Unit"
+    },
+    {
+      "id": 45,
+      "name": "andInt",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Int -> Int"
+    },
+    {
+      "id": 46,
+      "name": "stringLength",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> Int"
+    },
+    {
+      "id": 47,
+      "name": "stringCodeAt",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> Int -> Int"
+    },
+    {
+      "id": 48,
+      "name": "stringSlice",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> Int -> Int -> String"
+    },
+    {
+      "id": 49,
+      "name": "stringFromCode",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> String"
+    },
+    {
+      "id": 50,
+      "name": "compareString",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> String -> Int"
+    },
+    {
+      "id": 51,
+      "name": "readDouble",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> Double"
+    },
+    {
+      "id": 52,
+      "name": "doubleToBits",
+      "host_module": "MLF.Host.Base",
+      "signature": "Double -> Int"
+    },
+    {
+      "id": 53,
+      "name": "doubleFromBits",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> Double"
+    },
+    {
+      "id": 54,
+      "name": "seq",
+      "host_module": "MLF.Host.Base",
+      "signature": "a -> b -> b"
+    },
+    {
+      "id": 55,
+      "name": "panic",
+      "host_module": "MLF.Host.Base",
+      "signature": "String -> a"
+    },
+    {
+      "id": 56,
+      "name": "readFile",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO String"
+    },
+    {
+      "id": 57,
+      "name": "writeFile",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> String -> IO Unit"
+    },
+    {
+      "id": 58,
+      "name": "fileExists",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO Bool"
+    },
+    {
+      "id": 59,
+      "name": "canonicalPath",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO String"
+    },
+    {
+      "id": 60,
+      "name": "getArgCount",
+      "host_module": "MLF.Host.IO",
+      "signature": "IO Int"
+    },
+    {
+      "id": 61,
+      "name": "getArg",
+      "host_module": "MLF.Host.IO",
+      "signature": "Int -> IO String"
+    },
+    {
+      "id": 62,
+      "name": "putErr",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO Unit"
+    },
+    {
+      "id": 63,
+      "name": "exitWith",
+      "host_module": "MLF.Host.IO",
+      "signature": "Int -> IO a"
+    },
+    {
+      "id": 64,
+      "name": "getExecutablePath",
+      "host_module": "MLF.Host.IO",
+      "signature": "IO String"
+    },
+    {
+      "id": 65,
+      "name": "getContents",
+      "host_module": "MLF.Host.IO",
+      "signature": "IO String"
+    },
+    {
+      "id": 66,
+      "name": "stReturn",
+      "host_module": "MLF.Host.Base",
+      "signature": "a -> ST s a"
+    },
+    {
+      "id": 67,
+      "name": "stBind",
+      "host_module": "MLF.Host.Base",
+      "signature": "ST s a -> (a -> ST s b) -> ST s b"
+    },
+    {
+      "id": 68,
+      "name": "runST",
+      "host_module": "MLF.Host.Base",
+      "signature": "(forall s. ST s a) -> a"
+    },
+    {
+      "id": 69,
+      "name": "newSTArray",
+      "host_module": "MLF.Host.Base",
+      "signature": "Int -> a -> ST s (STArray s a)"
+    },
+    {
+      "id": 70,
+      "name": "readSTArray",
+      "host_module": "MLF.Host.Base",
+      "signature": "STArray s a -> Int -> ST s a"
+    },
+    {
+      "id": 71,
+      "name": "writeSTArray",
+      "host_module": "MLF.Host.Base",
+      "signature": "STArray s a -> Int -> a -> ST s Unit"
+    },
+    {
+      "id": 72,
+      "name": "lengthSTArray",
+      "host_module": "MLF.Host.Base",
+      "signature": "STArray s a -> ST s Int"
+    },
+    {
+      "id": 73,
+      "name": "getEnv",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO String"
+    },
+    {
+      "id": 74,
+      "name": "setEnv",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> String -> IO Unit"
+    },
+    {
+      "id": 75,
+      "name": "unsetEnv",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO Unit"
+    },
+    {
+      "id": 76,
+      "name": "runProcess",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> String -> IO Int"
+    },
+    {
+      "id": 77,
+      "name": "listDirectory",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO String"
+    },
+    {
+      "id": 78,
+      "name": "directoryExists",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO Bool"
+    },
+    {
+      "id": 79,
+      "name": "fileDigest",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO String"
+    },
+    {
+      "id": 80,
+      "name": "acquireFileLock",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO Int"
+    },
+    {
+      "id": 81,
+      "name": "releaseFileLock",
+      "host_module": "MLF.Host.IO",
+      "signature": "Int -> IO Unit"
+    },
+    {
+      "id": 82,
+      "name": "processSupervisor",
+      "host_module": "MLF.Host.IO",
+      "signature": "String -> IO String"
+    },
+    {
+      "id": 83,
+      "name": "asyncScopeNew",
+      "host_module": "MLF.Host.Async",
+      "signature": "Int -> Int -> IO AsyncScope"
+    },
+    {
+      "id": 84,
+      "name": "asyncScopeClose",
+      "host_module": "MLF.Host.Async",
+      "signature": "AsyncScope -> IO Unit"
+    },
+    {
+      "id": 85,
+      "name": "asyncNewCompletion",
+      "host_module": "MLF.Host.Async",
+      "signature": "AsyncScope -> (Completion a -> IO b) -> IO b -> IO b"
+    },
+    {
+      "id": 86,
+      "name": "asyncResolveCompletion",
+      "host_module": "MLF.Host.Async",
+      "signature": "Completion a -> a -> IO Int"
+    },
+    {
+      "id": 87,
+      "name": "asyncReadCompletion",
+      "host_module": "MLF.Host.Async",
+      "signature": "Completion a -> (a -> IO b) -> IO b -> IO b"
+    },
+    {
+      "id": 88,
+      "name": "asyncSubscribeCompletion",
+      "host_module": "MLF.Host.Async",
+      "signature": "Completion a -> (a -> IO Unit) -> IO AsyncSubscription"
+    },
+    {
+      "id": 89,
+      "name": "asyncSubscriptionStatus",
+      "host_module": "MLF.Host.Async",
+      "signature": "AsyncSubscription -> IO Int"
+    },
+    {
+      "id": 90,
+      "name": "asyncCancelSubscription",
+      "host_module": "MLF.Host.Async",
+      "signature": "AsyncSubscription -> IO Int"
+    },
+    {
+      "id": 91,
+      "name": "asyncStep",
+      "host_module": "MLF.Host.Async",
+      "signature": "AsyncScope -> IO Int"
+    },
+    {
+      "id": 92,
+      "name": "asyncEnqueue",
+      "host_module": "MLF.Host.Async",
+      "signature": "AsyncScope -> IO Unit -> IO AsyncSubscription"
+    },
+    {
+      "id": 93,
+      "name": "asyncDelay",
+      "host_module": "MLF.Host.Async",
+      "signature": "AsyncScope -> Int -> IO Unit -> IO AsyncSubscription"
+    },
+    {
+      "id": 94,
+      "name": "asyncWait",
+      "host_module": "MLF.Host.Async",
+      "signature": "AsyncScope -> Int -> IO Int"
+    }
+  ],
+  "builtin_interface": "mlf-primitive/shared-haskell-v1/4",
+  "current_files": {
+    "host/ghc/MLF/Primitive.hs": "ffe9fd2106149e664e5ca22e1e1eae51cf4b0a1541cee090f1e7bc9185efa031",
+    "host/ghc/MLF/Host/Base.hs": "6d60cb8f2349293f2a797348b202577267df5f69d334cc936df6be455e547a4d",
+    "host/ghc/MLF/Host/IO.hs": "6779594885592e3661f0070c0a1f2244d7563d5e3b19bcb1a0b47c6af934adf8",
+    "host/ghc/MLF/Host/Async.hs": "d576fb9829c9d7eed49c728bc67a05266f74850f5a38bde346783d269013d0c3",
+    "host/ghc/cbits/host.c": "bfcf4b400902afaa89e0d6cbe0de5901a4e1e89c6100d203e50c3099ba7fc694",
+    "runtime/mlf_system.h": "eb1f0f97ece2bd95a60a75e4c7445b5c2cbd2ff75c75545e2ac673f2f3157cff"
+  },
+  "focused_evidence": "tests/shared-host/evidence/latest/receipt.json",
+  "independent_review": "docs/shared-source/independent-runtime-adapter-review.md",
+  "qualification_scope": "Bounded Linux adapter probes only; whole-compiler/native-fixed-point gates separate"
+}

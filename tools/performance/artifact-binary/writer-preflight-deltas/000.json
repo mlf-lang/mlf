@@ -1,0 +1,16 @@
+{
+  "format": "binary-source-byte-splices-v1",
+  "new_bytes": 210098,
+  "new_sha256": "d13d59ed310bb8ef447596437516cfadbbbb025da632b18930e2b4263ac97826",
+  "old_bytes": 209748,
+  "old_sha256": "b6ee095b0bad180db43d84dff1a8a3da211bfd81df43179e426abc5b5f7d5743",
+  "path": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+  "splices": [
+    {
+      "new": "CiAgICBpZiBTdG9yYWdlLmhhc051bCBwcmVmaXggMCB0aGVuIGlvUmV0dXJuIChMZWZ0ICJmaWxlIHBhdGggY29udGFpbnMgTlVMIikgZWxzZSBkbyB7CiAgICAgIGxldCB7IHBhdGggPSBwcmVmaXggKysgIi5tbGZjbyI7IGRlc3RpbmF0aW9uID0gaWYgSG9zdC5hYnNvbHV0ZVBhdGggcGF0aCB0aGVuIHBhdGggZWxzZSAiLi8iICsrIHBhdGggfTsKICAgICAgaXNEaXJlY3RvcnkgPC0gZGlyZWN0b3J5RXhpc3RzIGRlc3RpbmF0aW9uOwogICAgICBpZiBpc0RpcmVjdG9yeSB0aGVuIGlvUmV0dXJuIChMZWZ0ICJhcnRpZmFjdCBkZXN0aW5hdGlvbiBpcyBhIGRpcmVjdG9yeSIpIGVsc2UgY2FzZSBvYmplY3Qgb2YgewogICAgICAgIE9wZW5DcmF0ZU9iamVjdCBpZmFjZSBwYWNrYWdlIC0+IHdyaXRlT3Blbk9iamVjdCBwcmVmaXggaWZhY2UgcGFja2FnZTsKICAgICAgICBfIC0+IHdyaXRlQ2xvc2VkT2JqZWN0RWl0aGVyIHByZWZpeCBvYmplY3QKICAgICAgfQogIA==",
+      "new_at": 197200,
+      "old": "IGNhc2Ugb2JqZWN0IG9mIHsKICAgIE9wZW5DcmF0ZU9iamVjdCBpZmFjZSBwYWNrYWdlIC0+IHdyaXRlT3Blbk9iamVjdCBwcmVmaXggaWZhY2UgcGFja2FnZTsKICAgIF8gLT4gd3JpdGVDbG9zZWRPYmplY3RFaXRoZXIgcHJlZml4IG9iamVjdAo=",
+      "old_at": 197200
+    }
+  ]
+}

@@ -23,6 +23,13 @@ step (Pair solver (Stats graft ground general size largest copied bottom closed)
    result <- S.solverUnify equations expanded
    let count = IS.size component
    Right (Pair result (Stats graft ground (general + 1) (size + count) (L.max largest count) (copied + IM.size copies) (bottom + (if G.isBottom (G.tag (G.nodeAt (S.graph solver) target)) then 1 else 0)) (closed + (if eligible source target solver then 1 else 0))))
+-- Projection is semantic solver work, not an instance metric sample.
+workStep state work = case work of
+ Instantiate edge -> step state edge
+ ProjectCase fields -> case state of
+  Pair solver stats -> do
+   result <- C.evaluateStep solver work
+   Right (Pair result stats)
 eligible source target solver =
  let graph = S.graph solver in
  let t = G.resolve graph target in
@@ -42,6 +49,6 @@ main = do
    constraints <- right (C.generateProgram lowered)
    prepared <- right (S.prepare (C.initialGraph constraints))
    initial <- right (S.solverUnify (C.equalities constraints) prepared)
-   Pair result (Stats graft ground general size largest copied bottom closed) <- right (L.foldM step (Pair initial (Stats 0 0 0 0 0 0 0 0)) (C.instances constraints))
+   Pair result (Stats graft ground general size largest copied bottom closed) <- right (L.foldM workStep (Pair initial (Stats 0 0 0 0 0 0 0 0)) (C.solveSteps constraints))
    _ <- right (S.finishNormalized result)
    putStrLn ("{\"ground_grafts\":" ++ showInt graft ++ ",\"ground_checks\":" ++ showInt ground ++ ",\"general_instantiations\":" ++ showInt general ++ ",\"component_nodes_total\":" ++ showInt size ++ ",\"largest_component\":" ++ showInt largest ++ ",\"copied_nodes_total\":" ++ showInt copied ++ ",\"bottom_targets\":" ++ showInt bottom ++ ",\"closed_graft_targets\":" ++ showInt closed ++ ",\"final_nodes\":" ++ showInt (IM.size (G.nodes (S.graph result))) ++ "}")

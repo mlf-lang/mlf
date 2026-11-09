@@ -1,0 +1,619 @@
+{
+  "complete": true,
+  "baseline_ref": "48275901cd7b760cc8dd000ed54898a23a494a87",
+  "scope": "Fixed exploratory growth curve; one ABBA/BAAB block per cell; 2 samples per implementation; same-session separate GHC reference pass; no CI or asymptotic order claim.",
+  "endpoint": "crate-bootstrap-v1; fresh source to native executable, GHC 9.14.1 O2 hosted MLF; serial ordinary Clang O2; fixed primitive/runtime/builtin dependencies reused",
+  "raw_directory": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-source-context-20261101",
+  "receipts": {
+    "curve/plan.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-source-context-20261101/curve/plan.json",
+      "sha256": "8e1766b6adb89a5aec706aaf03cec1ed6af881563d8532007789006af8e1b54f"
+    },
+    "curve/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-source-context-20261101/curve/receipt.json",
+      "sha256": "9e80d2f247f40cf441847355027c6b836bdeaa49f7f3bd3c19438220e9114e99"
+    },
+    "ghc-reference/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-source-context-20261101/ghc-reference/receipt.json",
+      "sha256": "2d17843d0dcf128d97f6322d1fe53e7b8b4c7b7d97b28ecbe68ebd4413b1e345"
+    },
+    "controls/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-source-context-20261101/controls/receipt.json",
+      "sha256": "456aca02c0d8b0d47f1579ad3dfb38abddcbd9adf07b80454fd5a7bf36a19e50"
+    },
+    "producer/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-source-context-20261101/producer/receipt.json",
+      "sha256": "ce1b5e43b0c94879363d7c6ed0a629ab76e85e43e20a01b5df6b7006f4e8563c"
+    },
+    "builtin-refresh/receipt.json": {
+      "path": "/Users/ares/.codex/worktrees/int64-patricia-20261031/mlf/.mlf-build/owned-source-context-20261101/builtin-refresh/receipt.json",
+      "sha256": "cd55150bfd107ab201045657b47e13502c811f5c5785cb3e092cfddb0b20f8f6"
+    }
+  },
+  "rows": [
+    {
+      "case": "dependency_chain-8",
+      "family": "dependency_chain",
+      "size": 8,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            0.932879875,
+            0.95458025
+          ],
+          "whole_median": 0.9437300625,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.16579975,
+              0.188828417
+            ],
+            "checked-to-llvm": [
+              0.517151416,
+              0.491796042
+            ],
+            "llvm-to-executable": [
+              0.174340459,
+              0.186356542
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.1773140835,
+            "checked-to-llvm": 0.504473729,
+            "llvm-to-executable": 0.1803485005
+          },
+          "fresh": 11
+        },
+        "B": {
+          "whole_seconds": [
+            0.859592042,
+            0.854722458
+          ],
+          "whole_median": 0.85715725,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.164823,
+              0.1589745
+            ],
+            "checked-to-llvm": [
+              0.441904333,
+              0.449389875
+            ],
+            "llvm-to-executable": [
+              0.174909709,
+              0.167955166
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.16189874999999998,
+            "checked-to-llvm": 0.44564710399999996,
+            "llvm-to-executable": 0.17143243749999998
+          },
+          "fresh": 11
+        }
+      },
+      "ghc_seconds": [
+        0.654981583,
+        0.643503541
+      ],
+      "ghc_median": 0.649242562,
+      "descriptive_geometric_time_reduction": 0.09167834890825555,
+      "candidate_over_ghc": 1.320241925235949
+    },
+    {
+      "case": "dependency_chain-32",
+      "family": "dependency_chain",
+      "size": 32,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            1.00960325,
+            1.03522225
+          ],
+          "whole_median": 1.02241275,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.27482,
+              0.277477417
+            ],
+            "checked-to-llvm": [
+              0.468670459,
+              0.472384041
+            ],
+            "llvm-to-executable": [
+              0.182165334,
+              0.202478542
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.2761487085,
+            "checked-to-llvm": 0.47052724999999995,
+            "llvm-to-executable": 0.19232193800000003
+          },
+          "fresh": 35
+        },
+        "B": {
+          "whole_seconds": [
+            1.010820666,
+            1.002252209
+          ],
+          "whole_median": 1.0065364374999999,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.289061791,
+              0.273792375
+            ],
+            "checked-to-llvm": [
+              0.45376825,
+              0.466337
+            ],
+            "llvm-to-executable": [
+              0.181058417,
+              0.182485292
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.28142708299999997,
+            "checked-to-llvm": 0.460052625,
+            "llvm-to-executable": 0.1817718545
+          },
+          "fresh": 35
+        }
+      },
+      "ghc_seconds": [
+        0.624893917,
+        0.624324541
+      ],
+      "ghc_median": 0.624609229,
+      "descriptive_geometric_time_reduction": 0.015459925092850546,
+      "candidate_over_ghc": 1.6114658425900392
+    },
+    {
+      "case": "dependency_chain-128",
+      "family": "dependency_chain",
+      "size": 128,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            1.583534583,
+            1.518756042
+          ],
+          "whole_median": 1.5511453125,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.764460083,
+              0.722366792
+            ],
+            "checked-to-llvm": [
+              0.526174,
+              0.514713459
+            ],
+            "llvm-to-executable": [
+              0.20908775,
+              0.199097958
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.7434134375,
+            "checked-to-llvm": 0.5204437295,
+            "llvm-to-executable": 0.204092854
+          },
+          "fresh": 131
+        },
+        "B": {
+          "whole_seconds": [
+            1.677296167,
+            1.5599435
+          ],
+          "whole_median": 1.6186198335,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.846300291,
+              0.752198125
+            ],
+            "checked-to-llvm": [
+              0.537579875,
+              0.509777125
+            ],
+            "llvm-to-executable": [
+              0.207401334,
+              0.220339708
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.799249208,
+            "checked-to-llvm": 0.5236785,
+            "llvm-to-executable": 0.21387052099999998
+          },
+          "fresh": 131
+        }
+      },
+      "ghc_seconds": [
+        0.686510542,
+        0.681895625
+      ],
+      "ghc_median": 0.6842030834999999,
+      "descriptive_geometric_time_reduction": -0.043041350758536545,
+      "candidate_over_ghc": 2.365700875272364
+    },
+    {
+      "case": "dependency_chain-512",
+      "family": "dependency_chain",
+      "size": 512,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            4.293133834,
+            4.026395125
+          ],
+          "whole_median": 4.1597644795,
+          "stages_seconds": {
+            "source-to-checked": [
+              2.815157417,
+              2.687688541
+            ],
+            "checked-to-llvm": [
+              1.068452542,
+              0.959954625
+            ],
+            "llvm-to-executable": [
+              0.32486975,
+              0.301327542
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 2.751422979,
+            "checked-to-llvm": 1.0142035835,
+            "llvm-to-executable": 0.31309864600000004
+          },
+          "fresh": 515
+        },
+        "B": {
+          "whole_seconds": [
+            4.156129833,
+            4.078417875
+          ],
+          "whole_median": 4.1172738540000005,
+          "stages_seconds": {
+            "source-to-checked": [
+              2.806238292,
+              2.713279458
+            ],
+            "checked-to-llvm": [
+              0.97977425,
+              0.994572458
+            ],
+            "llvm-to-executable": [
+              0.287013916,
+              0.291686125
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 2.759758875,
+            "checked-to-llvm": 0.9871733540000001,
+            "llvm-to-executable": 0.2893500205
+          },
+          "fresh": 515
+        }
+      },
+      "ghc_seconds": [
+        1.017290709,
+        0.982045375
+      ],
+      "ghc_median": 0.999668042,
+      "descriptive_geometric_time_reduction": 0.009749650606578286,
+      "candidate_over_ghc": 4.118641069852266
+    },
+    {
+      "case": "inferred_chain-8",
+      "family": "inferred_chain",
+      "size": 8,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            0.996116375,
+            0.852793333
+          ],
+          "whole_median": 0.924454854,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.175321,
+              0.165100208
+            ],
+            "checked-to-llvm": [
+              0.562566291,
+              0.437296292
+            ],
+            "llvm-to-executable": [
+              0.174125708,
+              0.171996541
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.170210604,
+            "checked-to-llvm": 0.4999312915,
+            "llvm-to-executable": 0.1730611245
+          },
+          "fresh": 11
+        },
+        "B": {
+          "whole_seconds": [
+            0.894991833,
+            0.901787833
+          ],
+          "whole_median": 0.898389833,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.173336375,
+              0.181876166
+            ],
+            "checked-to-llvm": [
+              0.459297125,
+              0.464407583
+            ],
+            "llvm-to-executable": [
+              0.186828,
+              0.174737292
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.1776062705,
+            "checked-to-llvm": 0.461852354,
+            "llvm-to-executable": 0.180782646
+          },
+          "fresh": 11
+        }
+      },
+      "ghc_seconds": [
+        0.632144084,
+        0.680360042
+      ],
+      "ghc_median": 0.6562520629999999,
+      "descriptive_geometric_time_reduction": 0.025268987657276587,
+      "candidate_over_ghc": 1.368970680096742
+    },
+    {
+      "case": "inferred_chain-32",
+      "family": "inferred_chain",
+      "size": 32,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            1.133782917,
+            1.246527208
+          ],
+          "whole_median": 1.1901550625000001,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.331592792,
+              0.361088834
+            ],
+            "checked-to-llvm": [
+              0.457156083,
+              0.485579125
+            ],
+            "llvm-to-executable": [
+              0.240248959,
+              0.290782084
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.346340813,
+            "checked-to-llvm": 0.471367604,
+            "llvm-to-executable": 0.2655155215
+          },
+          "fresh": 35
+        },
+        "B": {
+          "whole_seconds": [
+            1.0460055,
+            1.062298792
+          ],
+          "whole_median": 1.0541521459999998,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.319792792,
+              0.301549
+            ],
+            "checked-to-llvm": [
+              0.457875458,
+              0.485998
+            ],
+            "llvm-to-executable": [
+              0.179417333,
+              0.195100625
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.310670896,
+            "checked-to-llvm": 0.471936729,
+            "llvm-to-executable": 0.187258979
+          },
+          "fresh": 35
+        }
+      },
+      "ghc_seconds": [
+        0.893351125,
+        0.649423208
+      ],
+      "ghc_median": 0.7713871665,
+      "descriptive_geometric_time_reduction": 0.11330452500841104,
+      "candidate_over_ghc": 1.3665668704121483
+    },
+    {
+      "case": "inferred_chain-128",
+      "family": "inferred_chain",
+      "size": 128,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            1.674515,
+            1.65887325
+          ],
+          "whole_median": 1.666694125,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.87065475,
+              0.835721833
+            ],
+            "checked-to-llvm": [
+              0.526117125,
+              0.545277667
+            ],
+            "llvm-to-executable": [
+              0.1947525,
+              0.197411208
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.8531882915,
+            "checked-to-llvm": 0.535697396,
+            "llvm-to-executable": 0.196081854
+          },
+          "fresh": 131
+        },
+        "B": {
+          "whole_seconds": [
+            1.697432667,
+            1.706835542
+          ],
+          "whole_median": 1.7021341045,
+          "stages_seconds": {
+            "source-to-checked": [
+              0.887487917,
+              0.885272417
+            ],
+            "checked-to-llvm": [
+              0.52510975,
+              0.538110042
+            ],
+            "llvm-to-executable": [
+              0.203815417,
+              0.204327083
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 0.886380167,
+            "checked-to-llvm": 0.531609896,
+            "llvm-to-executable": 0.20407124999999998
+          },
+          "fresh": 131
+        }
+      },
+      "ghc_seconds": [
+        0.646539875,
+        0.685165917
+      ],
+      "ghc_median": 0.665852896,
+      "descriptive_geometric_time_reduction": -0.021270985486808502,
+      "candidate_over_ghc": 2.5563215459830335
+    },
+    {
+      "case": "inferred_chain-512",
+      "family": "inferred_chain",
+      "size": 512,
+      "sides": {
+        "A": {
+          "whole_seconds": [
+            4.756325792,
+            4.499436917
+          ],
+          "whole_median": 4.6278813544999995,
+          "stages_seconds": {
+            "source-to-checked": [
+              3.177011542,
+              3.094770584
+            ],
+            "checked-to-llvm": [
+              1.143815833,
+              1.016717291
+            ],
+            "llvm-to-executable": [
+              0.313895875,
+              0.311592083
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 3.135891063,
+            "checked-to-llvm": 1.0802665619999998,
+            "llvm-to-executable": 0.312743979
+          },
+          "fresh": 515
+        },
+        "B": {
+          "whole_seconds": [
+            4.707040917,
+            4.597158917
+          ],
+          "whole_median": 4.652099916999999,
+          "stages_seconds": {
+            "source-to-checked": [
+              3.309025167,
+              3.19099325
+            ],
+            "checked-to-llvm": [
+              1.007599166,
+              1.015511375
+            ],
+            "llvm-to-executable": [
+              0.309876708,
+              0.301817292
+            ]
+          },
+          "stage_medians": {
+            "source-to-checked": 3.2500092085,
+            "checked-to-llvm": 1.0115552705000002,
+            "llvm-to-executable": 0.305847
+          },
+          "fresh": 515
+        }
+      },
+      "ghc_seconds": [
+        0.989138041,
+        0.959381834
+      ],
+      "ghc_median": 0.9742599375000001,
+      "descriptive_geometric_time_reduction": -0.0055504489745703545,
+      "candidate_over_ghc": 4.775008945700386
+    }
+  ],
+  "growth": {
+    "dependency_chain": {
+      "interval": [
+        128,
+        512
+      ],
+      "whole_increment_seconds_per_function": {
+        "A": 0.006793279080729166,
+        "B": 0.006506911511718751
+      },
+      "whole_increment_reduction": 0.0421545421007018,
+      "frontend_increment_seconds_per_function": {
+        "A": 0.005229191514322916,
+        "B": 0.005105493924479167
+      },
+      "frontend_increment_reduction": 0.023655203582606976
+    },
+    "inferred_chain": {
+      "interval": [
+        128,
+        512
+      ],
+      "whole_increment_seconds_per_function": {
+        "A": 0.007711425076822914,
+        "B": 0.007682202636718749
+      },
+      "whole_increment_reduction": 0.003789499322504608,
+      "frontend_increment_seconds_per_function": {
+        "A": 0.005944538467447916,
+        "B": 0.006155283962239583
+      },
+      "frontend_increment_reduction": -0.03545195240062826
+    }
+  },
+  "screen_advancement": {
+    "large_gain_and_frontend": false,
+    "regression_cells_over_5pct": []
+  },
+  "decision": "Not advanced: the fixed discovery window did not meet its predeclared gain criterion; no confirmation, commit, or push.",
+  "additional_qualification": {}
+}

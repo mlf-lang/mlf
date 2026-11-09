@@ -1,0 +1,2 @@
+module RejectedOpenRec where
+openRecursion = let rec {identity : a -> a = \x -> identity x} in identity 1

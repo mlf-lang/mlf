@@ -52,31 +52,36 @@ matrix entry must pass.
 Failed, cancelled or skipped prerequisites cannot produce a passing gate.
 There are no path filters on the required workflow or lightweight native
 checks. The async-language job itself always participates in the six-job gate;
-only its expensive steps can be omitted after a successful scope decision.
+only its expensive steps can be omitted after a successful explicit policy decision.
 Manual dispatches retain
 the Windows-only mode; either `full_validation` or the compatible `self_host`
 input runs complete qualification, including Benchmark Game. Their skipped aggregate
 is named **Manual CI summary**, so it cannot satisfy the required **PR gate**.
 
-### Explicit async parity on pull requests
+### Explicit PR async parity
 
-`tools/release/async-change-scope.py` reads the exact pull-request event's labels.
-PRs default to `not-executed`; adding the maintainer-controlled `ci:async-parity`
-label requests full parity, regardless of changed paths. Adding or removing a
-label triggers CI again. Missing or malformed PR event/commit/label metadata
-fails the cheap selector without executing parity; the aggregate then fails.
+Expensive async interpreter/native parity is off for every PR by default,
+including compiler, runtime and async changes. Add the `ci:async-parity` label to
+explicitly request it; label addition/removal triggers CI again. Opt-in runs the
+campaign even for documentation-only changes. Main pushes, merge queues and
+non-Windows-only manual runs retain async coverage. Fast runtime, build-runner,
+metadata and source-smoke checks are unchanged.
 
-Main pushes, every non-Windows-only manual dispatch (including full validation),
-and merge queues still require parity. No elevated token or privileged event is
-used. The uploaded `async-change-scope/decision.json` records commit identities,
-the opt-in label, policy reason and execution decision. `not-executed` is not a
-parity test pass. All six aggregate prerequisites must still succeed; real
-failures, cancellations and skipped jobs block it. Fast runtime checks and
-complete qualification are unchanged. See [opt-in instructions](ci-async-policy.md).
-
+The cheap async policy job remains part of the strict six-job aggregate gate.
+Malformed or missing PR event/commit/label metadata fails the cheap selector
+without executing parity; the strict aggregate then fails.
+Its uploaded decision states `not-executed` when parity is omitted; this is not
+an async pass or full qualification. See [the exact policy](ci-async-policy.md).
+The older dated change-scope census is historical; its checker reports current
+selector identities separately and requires the current policy controls.
 ### Released-seed primitive transition
 
-The complete qualification producer starts from the independently pinned seed,
+Shared-source checkouts first use the verified frozen shared-source bridge in
+`bootstrap-manager.sh`, passing actual seed bytes rather than the timing wrapper.
+The produced shared-aware compiler and manager then perform the locked root
+build. The enclosing cold transition and linker remain in the timing/RSS budget.
+
+For older, legacy-source checkouts, the complete qualification producer starts from the independently pinned seed,
 but that released compiler predates `processSupervisor`. `timed-bootstrap.sh`
 therefore runs the same isolated stage-1 bridge and real stage-2 compiler
 transition as the async-language gate before its locked root build. It verifies
@@ -161,7 +166,7 @@ Every push to `main` invokes `native-qualification.yml` with `build_packages=fal
 It runs independently of the narrower PR gate, using read-only repository and
 Actions permissions. Pull requests and merge queue groups keep the six checks
 above, including the policy-aware async-language gate (always bootstrapped for
-merge queues; pull requests execute its heavy steps only when explicitly opted in).
+merge queues; pull requests run its heavy steps only with explicit opt-in).
 Manual `CI` with `full_validation=true` exercises this exact complete graph on a
 feature branch without creating SDK archives or publishing anything.
 

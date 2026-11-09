@@ -215,8 +215,9 @@ two live mutually awaiting fibers, injected primary-plus-cleanup failures, delay
 primary or parent cancellation (including recovery wrappers), and synchronous ancestor
 stop visibility before its queued notification runs, and root cancellation
 signalling and joining a suspended sibling. For those only, the
-harness copies the scheduler source and removes its export restriction. The
-production module and all three public-facing suites keep all constructors hidden.
+harness imports the committed `Async.Task.Core` implementation module directly.
+The public `Async.Task` module and all three public-facing suites keep all
+constructors hidden.
 Five compile-negative fixtures cover public/internal constructor access and
 mixing a numeric fiber with a string consumer.
 

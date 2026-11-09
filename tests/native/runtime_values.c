@@ -1,5 +1,6 @@
 /* Runtime ABI and call-by-need checks independent of generated LLVM.
  * BDWGC collection runs while update roots are live. */
+#define _POSIX_C_SOURCE 200809L
 #include "mlf_runtime.h"
 #include <inttypes.h>
 #include <stdio.h>
@@ -7,6 +8,16 @@
 #include <string.h>
 #include <gc/gc.h>
 #include <gc/gc_mark.h>
+#if defined(_WIN32)
+#include <io.h>
+#include <fcntl.h>
+#define dup _dup
+#define dup2 _dup2
+#define close _close
+#define fileno _fileno
+#else
+#include <unistd.h>
+#endif
 
 static unsigned calls, expected_calls;
 static MlfValue *saved_alias, *self;
@@ -454,6 +465,72 @@ static void inline_constructors(void) {
     }
 }
 
+/* Retain independent raw lines across scratch-buffer reuse, growth, GC and
+ * complete runtime cleanup. These bytes deliberately include NUL and invalid
+ * UTF-8: getByteLine must remain a byte operation. */
+static void check_bytes(MlfValue *array, const unsigned char *expected, size_t count) {
+    size_t length;
+    unsigned char *cells;
+    memcpy(&length, (unsigned char *)array + 8, sizeof length);
+    memcpy(&cells, (unsigned char *)array + 16, sizeof cells);
+    require(length == count, "raw line length changed");
+    require(!memcmp(cells, expected, count), "retained raw line changed");
+}
+
+static void raw_lines(void) {
+    const unsigned char first[] = {255, 0, 128, 10};
+    unsigned char long_line[4099];
+    memset(long_line, 'A', sizeof long_line);
+    long_line[sizeof long_line - 2] = 13;
+    long_line[sizeof long_line - 1] = 10;
+    const unsigned char empty[] = {10};
+    const unsigned char final[] = {0, 7, 255};
+    FILE *input = tmpfile();
+    require(input != NULL, "raw-line temporary input");
+    require(fwrite(first, 1, sizeof first, input) == sizeof first &&
+            fwrite(long_line, 1, sizeof long_line, input) == sizeof long_line &&
+            fwrite(empty, 1, sizeof empty, input) == sizeof empty &&
+            fwrite(final, 1, sizeof final, input) == sizeof final,
+            "write raw-line input");
+    rewind(input);
+    int saved_input = dup(fileno(stdin));
+    require(saved_input >= 0 && dup2(fileno(input), fileno(stdin)) >= 0,
+            "redirect raw-line input");
+#if defined(_WIN32)
+    int previous_mode = _setmode(fileno(stdin), _O_BINARY);
+    require(previous_mode != -1, "set binary raw-line input");
+#endif
+    require(!setvbuf(stdin, NULL, _IONBF, 0), "set raw-line buffering");
+    clearerr(stdin);
+    MlfValue *a = mlf_get_byte_line();
+    MlfValue *b = mlf_get_byte_line();
+    MlfValue *c = mlf_get_byte_line();
+    MlfValue *d = mlf_get_byte_line();
+    GC_gcollect();
+    check_bytes(a, first, sizeof first);
+    check_bytes(b, long_line, sizeof long_line);
+    check_bytes(c, empty, sizeof empty);
+    check_bytes(d, final, sizeof final);
+    check_bytes(mlf_get_byte_line(), empty, 0);
+    check_bytes(mlf_get_byte_line(), empty, 0);
+    require(mlf_run(mlf_integer("0"), 0) == 0, "raw-line cleanup");
+    rewind(input);
+    clearerr(stdin);
+    check_bytes(mlf_get_byte_line(), first, sizeof first);
+    GC_gcollect();
+    check_bytes(a, first, sizeof first);
+    check_bytes(b, long_line, sizeof long_line);
+    check_bytes(d, final, sizeof final);
+    require(mlf_run(mlf_integer("0"), 0) == 0, "second raw-line cleanup");
+#if defined(_WIN32)
+    require(_setmode(fileno(stdin), previous_mode) != -1, "restore raw-line mode");
+#endif
+    require(dup2(saved_input, fileno(stdin)) >= 0 && !close(saved_input),
+            "restore raw-line input");
+    clearerr(stdin);
+    require(!fclose(input), "close raw-line input");
+}
+
 int main(int argc, char **argv) {
     require(argc == 2, "expected one probe mode");
     const char *mode = argv[1];
@@ -475,6 +552,7 @@ int main(int argc, char **argv) {
         inline_constructors();
         strings();
         sparse_strings();
+        raw_lines();
         /* Ordinary cleanup must release real Unicode tables, never the shared
          * ASCII marker. It also exercises the marker after pooled values die. */
         (void)mlf_run(mlf_integer("0"), 0);

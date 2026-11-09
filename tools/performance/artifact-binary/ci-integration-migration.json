@@ -1,0 +1,59 @@
+{
+  "base_head": "d5e18cde20a6e0308a85fa219152363219c2ed6b",
+  "base_tree": "7f813ad30f6f0c8029f4a21a8b0a3c2c828837e4",
+  "current_inventory_sha256": "445572be92331b1ba280d7eef12174f4a9e337db1c30af18ea0abb1723679e69",
+  "current_registry_sha256": "1d13d7f392c42a5a067faedc705015a5082ab6fb8e58c53b8b789bee068010f1",
+  "evidence": {
+    "file": "ci-integration-provenance.json",
+    "sha256": "5cb8400988178e8af3f6879bb17a384d4817a50b46bb59464bd415df2d3e0f4d"
+  },
+  "file_count": 196,
+  "format": "ci-integration-source-migration-v1",
+  "index_contract_sha256": "7e5dc443d3f8f0305122576fc58ae5dd87c4fdaa931630fdfb37e27164d23462",
+  "index_manifest_sha256": "5289d668b8aae86409fca78e80e56f31e3a000c5f3a060f4dcf44a97a658b954",
+  "index_value_sha256": "2b37c07dfda3bbde4ad779c454f39e7778c5194ccc8e6d3274fc93a262ed7137",
+  "integration_base": {
+    "head": "a250ec334b70b0e587c2dd6e894d111bf879c024",
+    "tree": "63400c29c679ffc5e1a67b46ebbde12c5f81ddf4"
+  },
+  "module_count": 135,
+  "parent_inventory_sha256": "34eab53906c266ccbd819f051df8da3fb315a36671523219f84b007f0adf8e94",
+  "parent_registry_sha256": "24a3527efba157413cdae5657c28767f262120fc5493ec6b94e380411f27d011",
+  "primitive_count": 132,
+  "qualification_scope": "Source identity and reversible projection with pinned actual generation and O0/O2 full typecheck-only evidence; no native runtime or full-CI qualification.",
+  "transition": {
+    "added_paths": [],
+    "changed_paths": [
+      "bootstrap/MLF/BuiltinPreludeData.hs",
+      "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+      "mlf.lock"
+    ],
+    "deltas": {
+      "bootstrap/MLF/BuiltinPreludeData.hs": {
+        "file": "ci-integration-deltas/000.json",
+        "new": "3840a53007599bed84eaabfac58b2d93423f61dadaa65d02e3c5c3eea65f08f9",
+        "old": "0e04f145d180c5b3b54f29bc4cb288ab59249be62ac58f346647df8c848f9679",
+        "sha256": "20b0227a4e9257956e1f43059533ef256bc3a90ae3d72cb9ee759de76d13ea17"
+      },
+      "libraries/mlf-crates/Bootstrap/Crate.hs": {
+        "file": "ci-integration-deltas/001.json",
+        "new": "e1248bc1a71625429b122f59f153cf7448d3c13d21764937bcb0c43e668b7ade",
+        "old": "2a5a614103afb126f8dc1ed7fe286ced827f9f87471eade176b1610a25768df1",
+        "sha256": "ee07880b02ab23d8cc3f66040ffbeaca10d8cac435cf26e52035354a786b0092"
+      },
+      "libraries/mlf-crates/Bootstrap/OpenFragment.hs": {
+        "file": "ci-integration-deltas/002.json",
+        "new": "c1f6ee40041e9be3b8056bc1a9e03c539269cd1dcfec3ce69e717cfbf48948d7",
+        "old": "b3d43f1a3a46b62107b0301e6278225c97dac4477c7c8bb21e981fc887933f4b",
+        "sha256": "e7c3e20aa77401bd2330b0f5a744a36c820272ef17674629951ea520ae5b6425"
+      },
+      "mlf.lock": {
+        "file": "ci-integration-deltas/003.json",
+        "new": "0323366b84ac8a85adcd5511f04ac296fbeaa3a77de707a217be62d1dd5b1f5b",
+        "old": "79cb056a1456d4b3e94ef86d3dda7379b9614db2dbe8fae90965f8cdea77996e",
+        "sha256": "09b13cc7760e6dcf09ae94ead89b3b2eb7bcdcf0f343dcc9116396671dac4b14"
+      }
+    }
+  }
+}

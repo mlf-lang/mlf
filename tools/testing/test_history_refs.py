@@ -89,7 +89,7 @@ class PublishedMappingControls(unittest.TestCase):
             with self.subTest(path=path):
                 original = history.historical_bytes(snapshot, path)
                 digest = hashlib.sha256(original).hexdigest()
-                current = (history.ROOT / path).read_bytes()
+                current = history._git('show', 'afbe7219806881301831d79f43596811eca3279d:' + path)
                 self.assertTrue(history.checked_current(path, current, digest))
                 self.assertFalse(history.checked_current(path, current + b'\n# unrelated change\n', digest))
                 with self.assertRaisesRegex(ValueError, 'frozen reconciliation input changed'):
@@ -125,7 +125,8 @@ class SquashTransportControls(HistoryReferenceControls):
         for name, value in [('SOURCE_ANCHOR', self.precursor),
                             ('SOURCE_PARENTS', (self.new, self.old)),
                             ('MAIN_BASE', self.old),
-                            ('TRANSPORTED', frozenset([self.new]))]:
+                            ('TRANSPORTED', frozenset([self.new])),
+                            ('COMPLETED_SEALS', {}), ('SQUASH_TRANSPORTS', {})]:
             context = patch.object(history, name, value)
             context.start(); self.addCleanup(context.stop)
         self.git('reset', '--hard', '-q', self.integration)
@@ -226,6 +227,52 @@ class SquashTransportControls(HistoryReferenceControls):
                 with self.assertRaisesRegex(ValueError, 'sealed source|no exact sealed HEAD'):
                     self.verify()
 
+    def test_raw_tree_duplicate_order_and_mode_mutations_rejected(self):
+        raw = subprocess.check_output(['git', 'cat-file', 'tree', self.sealed_tree], cwd=self.root)
+        evil = subprocess.check_output(['git', 'hash-object', '-w', '--stdin'],
+                                       cwd=self.root, input=b'unreviewed duplicate\n').strip().decode()
+        records = []
+        offset = 0
+        while offset < len(raw):
+            end = raw.index(b'\0', offset) + 21
+            records.append(raw[offset:end])
+            offset = end
+        tree_record = next(record for record in records if record.startswith(b'40000 '))
+        mutations = [b'100644 evidence.txt\0' + bytes.fromhex(evil) + raw,
+                     tree_record + raw, b''.join(reversed(records))]
+        for mode in [b'0100644', b'100664', b'100640']:
+            mutations.append(raw.replace(b'100644 evidence.txt\0', mode + b' evidence.txt\0', 1))
+        for name in [b'', b'.', b'..', b'a/b']:
+            mutations.append(raw.replace(b'100644 evidence.txt\0', b'100644 ' + name + b'\0', 1))
+        mutations.append(raw[:-1])
+        for index, malformed in enumerate(mutations):
+            with self.subTest(mutation=index):
+                tree = subprocess.check_output(['git', 'hash-object', '-t', 'tree', '--literally',
+                                                '-w', '--stdin'], cwd=self.root,
+                                               input=malformed).decode().strip()
+                self.assertNotEqual(tree, self.sealed_tree)
+                candidate = self.commit(tree, [self.precursor], 'malformed source')
+                with self.assertRaisesRegex(ValueError, 'duplicate sealed tree|noncanonical sealed raw tree|malformed sealed raw tree'):
+                    history.verify_source(candidate)
+                # The same raw structural corruption must fail when used as
+                # an anchor, not only as a candidate or squash integration.
+                with self.assertRaisesRegex(ValueError, 'duplicate sealed tree|noncanonical sealed raw tree|malformed sealed raw tree'):
+                    history.verify_sealed_tree(self.source, anchor=candidate)
+                integration = self.commit(tree, [self.old], 'malformed squash')
+                self.git('reset', '--hard', '-q', self.integration)
+                # Do not check out malformed trees; verify the exact object.
+                with self.assertRaises(ValueError):
+                    history.verify_sealed_tree(integration)
+
+    def test_cached_tree_parse_does_not_cache_object_availability(self):
+        history.verify_source(self.source)
+        blob = self.git('rev-parse', self.source + ':evidence.txt').strip()
+        loose = self.root / '.git/objects' / blob[:2] / blob[2:]
+        self.assertTrue(loose.is_file())
+        loose.unlink()
+        with self.assertRaisesRegex(ValueError, 'object type differs or is unavailable'):
+            history.verify_source(self.source)
+
     def test_added_empty_subtree_rejected(self):
         empty = subprocess.check_output(['git', 'mktree'], cwd=self.root, input=b'').strip()
         root = subprocess.check_output(['git', 'ls-tree', self.sealed_tree], cwd=self.root)
@@ -270,7 +317,7 @@ class SquashTransportControls(HistoryReferenceControls):
         subprocess.run(['git', 'checkout', '-q', '--detach', 'FETCH_HEAD'], cwd=target, check=True)
 
     def test_fresh_squash_checkout_fetches_only_reviewed_source(self):
-        self.git('update-ref', 'refs/pull/19/head', self.source)
+        self.git('update-ref', 'refs/pull/22/head', self.source)
         with tempfile.TemporaryDirectory() as destination:
             target = Path(destination)
             self.fresh_checkout(target)
@@ -294,7 +341,7 @@ class SquashTransportControls(HistoryReferenceControls):
 
     def test_moved_locator_rejected(self):
         moved = self.commit(self.sealed_tree, [self.source], 'unreviewed later source')
-        self.git('update-ref', 'refs/pull/19/head', moved)
+        self.git('update-ref', 'refs/pull/22/head', moved)
         with tempfile.TemporaryDirectory() as destination:
             target = Path(destination)
             self.fresh_checkout(target)
@@ -322,7 +369,7 @@ class SquashTransportControls(HistoryReferenceControls):
                 with self.assertRaises(type(error)):
                     self.preparation.prepare()
             self.assertEqual(fetched, [['git', '--no-replace-objects', 'fetch', '--no-tags',
-                                        'origin', 'refs/pull/19/head']])
+                                        'origin', 'refs/pull/22/head']])
 
 
 if __name__ == '__main__':

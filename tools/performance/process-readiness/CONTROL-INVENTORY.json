@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "baseline_source_commit": "a700a2893c3ff857faa775af87c0ecd060e11e30",
+  "baseline_tree": "2f724d7d623bc76ba6331030bb5d5afa361f0f3b",
+  "baseline_commit_identity_policy": "Exact tree and frozen input bytes; an equivalent-tree commit is permitted.",
+  "baseline_files": {
+    "host/ghc/cbits/host.c": {
+      "fixture": "fixtures/baseline/host.c",
+      "sha256": "bfcf4b400902afaa89e0d6cbe0de5901a4e1e89c6100d203e50c3099ba7fc694"
+    },
+    "runtime/mlf_system.h": {
+      "fixture": "fixtures/baseline/mlf_system.h",
+      "sha256": "813bc6e7e15a1e9c26708ab7ac638574598b62b39126b4b000456f6e8f21e465"
+    }
+  },
+  "candidate": {
+    "base_head": "a700a2893c3ff857faa775af87c0ecd060e11e30",
+    "candidate_patch_sha256": "0553b0b2a87fb2673a61003310015ae3076407d64088f69e6f50eddea44cc3a8",
+    "changed_paths": [
+      "host/ghc/cbits/host.c",
+      "runtime/mlf_system.h"
+    ],
+    "source_hashes": {
+      "host/ghc/cbits/host.c": "8df477dce02dd40877930984c99935b92556563fbb5a90e9dd5a477919742d31",
+      "runtime/mlf_system.h": "6520eff2c7b505b2db3bfd6ea14742519b5efdb0a18090894f4f7e552b5e6786"
+    }
+  },
+  "fixture_hashes": {
+    "fixtures/Eligibility.hs": "7a07906431401e2ff2f2b7fc90f802b5ff9426fbc1b5dbe262d63428aa60b39e",
+    "fixtures/EligibilityHooks.c": "1619fb0a38786c193f7e66e4563250b546bcf8849166a5f8bd4f194199da5ba8",
+    "fixtures/Faults.c": "fde97e0d447d592cbafc034b4d242fc58ec49f69cb1fce05281639f00e91ce69",
+    "fixtures/Probe.c": "1d102195d3ad569221b990c9494db69de64b2a654d923b7a9cbc5baf369220cd",
+    "fixtures/Tree.c": "79a8709a3711130b7c7f0fb4a1079210c7bcb25f376018ed5f2a66c72b693d60",
+    "fixtures/baseline/host.c": "bfcf4b400902afaa89e0d6cbe0de5901a4e1e89c6100d203e50c3099ba7fc694",
+    "fixtures/baseline/mlf_system.h": "813bc6e7e15a1e9c26708ab7ac638574598b62b39126b4b000456f6e8f21e465"
+  },
+  "transport_cases": [
+    "true",
+    "exit7",
+    "exit124",
+    "signal-term",
+    "exec-missing",
+    "bad-cwd",
+    "missing-stdin",
+    "timeout",
+    "unterminated-spec",
+    "missing-fields",
+    "zero-timeout",
+    "large-timeout",
+    "bad-timeout",
+    "NUL-cwd",
+    "mkdir",
+    "mv",
+    "shared-redirection",
+    "write-bytes",
+    "write-bad-parent",
+    "write-NUL-path"
+  ],
+  "transport_execution_count": 40,
+  "fault_cases": [
+    "immediate",
+    "deadline-ready",
+    "ready",
+    "poll-hup",
+    "poll-eintr",
+    "close-eintr",
+    "timeout",
+    "poll-error",
+    "poll-nval",
+    "poll-err-event",
+    "open-enosys",
+    "open-emfile",
+    "open-eperm",
+    "sig-ignore",
+    "sig-custom",
+    "sig-no-wait",
+    "sig-query-fail",
+    "wait-error",
+    "start-clock-fail",
+    "fork-fail"
+  ],
+  "descendant_modes": [
+    "supervised",
+    "unsupervised"
+  ],
+  "descendant_sides": [
+    "base",
+    "candidate"
+  ],
+  "descendant_execution_count": 4,
+  "eligibility": {
+    "opens": 33,
+    "closes": 33,
+    "attempts": 33,
+    "cloexec": 33,
+    "eligible": 1,
+    "polls": "positive",
+    "fd_counts": "equal and nonnegative"
+  },
+  "missing_SYS_expected_stdout_hex": "3020302030200a",
+  "symbol_requirements": {
+    "absent": "pidfd_open",
+    "present": "syscall@GLIBC_2.2.5"
+  },
+  "platform": "Linux x86_64 glibc; pidfd_open available; eligible SIGCHLD; /proc/self/fd available",
+  "ordinary_performance_sample": false,
+  "expectation_blocks": {
+    "real_controls.py": {
+      "start": "   if name=='exit7':",
+      "stop": "   (d/'a.bin')",
+      "sha256": "3b481b55949b328cded160add4c6dbefdb7bc5706cfcf5c94b1590ca71c9f722",
+      "origin": "unchanged independently specified pre-publication finite controls; not candidate output"
+    },
+    "fault_controls.py": {
+      "start": " prefix='fork,clock,sigaction,open,'\n",
+      "stop": " assert list(cases)",
+      "sha256": "5e0c478a852467b055ee4d592aad00499ce688e36616ea2da92d014c83307620",
+      "origin": "unchanged independently specified pre-publication finite controls; not candidate output"
+    }
+  }
+}

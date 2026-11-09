@@ -28,28 +28,28 @@ prettySourceType ty = case ty of
  SBottom -> "bot"
  SBottomKind kind -> "(bot : " ++ K.prettyKind kind ++ ")"
  SArrow a b -> "(" ++ prettySourceType a ++ " -> " ++ prettySourceType b ++ ")"
- SCon name Nil -> name
- SCon name args -> "(" ++ S.unwords (Cons name (S.map prettySourceType args)) ++ ")"
+ SCon name [] -> name
+ SCon name args -> "(" ++ S.unwords ((:) name (S.map prettySourceType args)) ++ ")"
  STypeApp f a -> "(" ++ prettySourceType f ++ " " ++ prettySourceType a ++ ")"
  SForall flag name bound body -> "(forall " ++ boundParameter flag name bound ++ ". " ++ prettySourceType body ++ ")"
  _ -> panic "qualified type outside annotation corpus"
 boundParameter : Flag -> String -> SType -> String
-boundParameter flag name bound = case Pair flag bound of
- Pair Flexible SBottom -> name
+boundParameter flag name bound = case (,) flag bound of
+ (,) Flexible SBottom -> name
  _ -> "(" ++ name ++ (if S.eqFlag flag Flexible then " >= " else " = ") ++ prettySourceType bound ++ ")"
 annotationTerms =
  let identityExpr = SLam "x" Nothing (SVar "x") in
  let identityType = SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a")) in
- let types = Cons SBottom (Cons (SCon "Int" Nil) (Cons (SCon "Bool" Nil) (Cons identityType (Cons (SForall Flexible "a" SBottom (SCon "List" (Cons (STVar "a") Nil))) (Cons (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) Nil))))) in
+ let types = (:) SBottom ((:) (SCon "Int" []) ((:) (SCon "Bool" []) ((:) identityType ((:) (SForall Flexible "a" SBottom (SCon "List" ((:) (STVar "a") []))) ((:) (SForall Flexible "a" identityType (SArrow (STVar "a") (STVar "a"))) []))))) in
  let nested = S.append types (S.concatMap (\a -> S.map (SArrow a) types) types) in
- S.concatMap (\ty -> Cons (SAnn identityExpr (SAnnotation Nil (SArrow ty ty))) (Cons (SLam "x" (Just (SAnnotation Nil ty)) (SVar "x")) (Cons (SLet "f" (SAnn identityExpr (SAnnotation Nil (SArrow ty ty))) (SVar "f")) Nil))) nested
+ S.concatMap (\ty -> (:) (SAnn identityExpr (SAnnotation [] (SArrow ty ty))) ((:) (SLam "x" (Just (SAnnotation [] ty)) (SVar "x")) ((:) (SLet "f" (SAnn identityExpr (SAnnotation [] (SArrow ty ty))) (SVar "f")) []))) nested
 rows directory = do
  text <- readFile (directory ++ "/manifest.jsonl")
  S.mapM (\line -> H.right (J.parse line)) (O.nonempty (H.lines text))
 regenerate directory group expressions oracle manifest = do
  let selected = S.filter (\row -> eqString group (J.getText "category" "" row)) manifest
  H.assert (S.length selected == S.length expressions) ("changed generated corpus coverage: " ++ group)
- S.mapM_ (\(Pair row expression) -> do
+ S.mapM_ (\((,) row expression) -> do
   let path = directory ++ "/" ++ J.getText "source_path" "" row
   let text = prettyExpr expression ++ "\n"
   original <- readFile path
@@ -62,30 +62,30 @@ regenerate directory group expressions oracle manifest = do
 -- and their entry expression is the integer literal 42. The prescribed type
 -- and reference target below are independent of the candidate compiler.
 crateCycleExpectation identity = case identity of
- "module-reject-000025" -> Just (Triple "cycle includes chain" "Main -> A -> B -> A" "import A\n42\n")
- "module-reject-000026" -> Just (Triple "self import" "Main -> Main" "module Main where\nimport Main\nmain = 42\n\n")
+ "module-reject-000025" -> Just ((,,) "cycle includes chain" "Main -> A -> B -> A" "import A\n42\n")
+ "module-reject-000026" -> Just ((,,) "self import" "Main -> Main" "module Main where\nimport Main\nmain = 42\n\n")
  _ -> Nothing
 isCrateCycle row = S.isJust (crateCycleExpectation (J.getText "id" "" row))
 crateCycleReference = "oracle/crate-module-cycles/int42.xmlf"
 crateCycleMigration = "crate-module-cycles-v1"
-withoutRejection row = J.Object (S.filter (\entry -> S.not (S.elem eqString (S.fst entry) (Cons "expected_phase" (Cons "expected_error_contains" Nil)))) (J.items row))
+withoutRejection row = J.Object (S.filter (\entry -> S.not (S.elem eqString (S.fst entry) ((:) "expected_phase" ((:) "expected_error_contains" [])))) (J.items row))
 migrateCrateCycleRow : String -> J.Json -> IO J.Json
 migrateCrateCycleRow directory row =
  case crateCycleExpectation (J.getText "id" "" row) of
   Nothing -> return row
-  Just (Triple label reason source) -> do
+  Just ((,,) label reason source) -> do
    let identity = J.getText "id" "" row
    let prefix = "cases/modules/" ++ identity
    H.assert (J.equal (J.get "schema_version" row) (J.num 1) && eqString (J.getText "category" "" row) "modules" && eqString (J.getText "label" "" row) label) "crate-cycle migration no longer matches the frozen case identity"
    H.assert (S.not (J.getBool "expected_accept" true row) && eqString (J.getText "expected_phase" "" row) "ModuleResolution" && eqString (J.getText "expected_error_contains" "" row) reason) "crate-cycle migration no longer matches the frozen rejection oracle"
-   H.assert (eqString (J.getText "source_path" "" row) (prefix ++ "/Main.emlf") && H.eq (J.getStrings "include_dirs" row) (Cons (prefix ++ "/libraries") Nil) && S.not (J.getBool "no_prelude" true row)) "crate-cycle migration source configuration changed"
+   H.assert (eqString (J.getText "source_path" "" row) (prefix ++ "/Main.emlf") && H.eq (J.getStrings "include_dirs" row) ((:) (prefix ++ "/libraries") []) && S.not (J.getBool "no_prelude" true row)) "crate-cycle migration source configuration changed"
    original <- readFile (directory ++ "/" ++ prefix ++ "/Main.emlf")
    H.assert (eqString original source) "crate-cycle migration entry source changed"
    if eqString identity "module-reject-000025" then do
     a <- readFile (directory ++ "/" ++ prefix ++ "/libraries/A.emlf")
     b <- readFile (directory ++ "/" ++ prefix ++ "/libraries/B.emlf")
     H.assert (eqString a "module A where\nimport B\nx = 1\n" && eqString b "module B where\nimport A\ny = 2\n") "crate-cycle migration library sources changed"
-   else return Unit
+   else return ()
    let migrated = J.set "expected_accept" (J.Boolean true) (J.set "expected_type" (J.str "Int") (withoutRejection row))
    let provenance = J.set "previous_expected_phase" (J.str "ModuleResolution") (J.set "previous_expected_error_contains" (J.str reason) migrated)
    return (J.set "oracle_migration" (J.str crateCycleMigration) (J.set "expected_reference_target" (J.str crateCycleReference) (J.set "acceptance_oracle" (J.str "crate namespaces permit import cycles; exact frozen sources have no recursive value dependencies") (J.set "type_oracle" (J.str "independent integer-literal typing: the entry is 42 : Int") provenance))))
@@ -98,12 +98,12 @@ migrateCrateCycles directory manifest = do
  O.mkdir (directory ++ "/oracle/crate-module-cycles")
  writeFile (directory ++ "/" ++ crateCycleReference) "42\n"
  -- Preserve every other historical row byte-for-byte, including its oracle.
- writeFile (directory ++ "/manifest.jsonl") (S.unlines (S.map (\(Pair line row) -> if isCrateCycle row then J.render row else line) (S.zip lines migrated)))
-main : String -> IO Unit
+ writeFile (directory ++ "/manifest.jsonl") (S.unlines (S.map (\((,) line row) -> if isCrateCycle row then J.render row else line) (S.zip lines migrated)))
+main : String -> IO ()
 main directory = do
  root <- canonicalPath "."
  O.mkdir directory
- O.run "" (Cons "tar" (Cons "-xzf" (Cons (root ++ "/tests/golden/parity-seed.tar.gz") (Cons "-C" (Cons directory Nil)))))
+ O.run "" ((:) "tar" ((:) "-xzf" ((:) (root ++ "/tests/golden/parity-seed.tar.gz") ((:) "-C" ((:) directory [])))))
  manifest <- rows directory
  H.assert (S.length manifest == 7086) "parity baseline coverage changed"
  regenerate directory "hm-exhaustive" (W.closedTerms 6) W.hmTypable manifest

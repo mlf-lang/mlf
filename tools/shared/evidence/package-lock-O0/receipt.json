@@ -1,0 +1,31 @@
+{
+  "current_configuration_inputs": {
+    "libraries/mlf-async/mlf-package.json": "15e9ac789b283257d3ff3f1ab3053f03430859a6cbadd621d214f113994778ff",
+    "libraries/mlf-crates/mlf-package.json": "6d75e0c86a77ce607fc861cf75c02b0463d6d4115166978198af31958db786cc",
+    "libraries/mlf-developer-tools/mlf-package.json": "be337ee042323db004efa8e419db889fe24cf01b287112507c3593b30c5b3b71",
+    "libraries/mlf-foundation/mlf-package.json": "4a05ffebfa860271154e1c4b7a40e045a822e76ecca16a2bd57c95e0c176819f",
+    "libraries/mlf-frontend/mlf-package.json": "2b8262c913c6b67791695d7c562deda96055e41de90e0880c0557a566671db02",
+    "libraries/mlf-inference/mlf-package.json": "c61a4eb680d01815f5a9f812e3e124efe5de070c884d48600ae3bfc5727d1373",
+    "libraries/mlf-interpreter/mlf-package.json": "ffd00c762c3959dd6f93fc88f02076bb966ec1a45e6efee7c4b3c5d2d53a9761",
+    "libraries/mlf-language-core/mlf-package.json": "9d653cc825134f8d98919874e6b6d7e58cbd614751bfa0562af6e58f7a30366b",
+    "libraries/mlf-llvm/mlf-package.json": "c9f0fa08a35f9324b955b6759cc88812c4794e557aeb12bad13b1dcacd92020b",
+    "libraries/mlf-package-core/mlf-package.json": "b3473060f87653553b6067fb6b8b705ddb2a4a4092745ec642395e50ca645cd9",
+    "libraries/mlf-xmlf/mlf-package.json": "6f9a6c0a2d703ba884dd256fd494665c580ed028db04dedc3c7b748ec393f6f3",
+    "mlf-package.json": "7c5dadd6ba9e87fbb8d4486ec1c21725bfa558b3979a6b4b10d72284bf4db566"
+  },
+  "format": 1,
+  "limitations": "This is actual lock regeneration and --locked plan validation only. The producer overall build gate is incomplete and final configuration changed after its compilation. Repeat with qualified final tools; no native build or fixed point is claimed.",
+  "lock_sha256": "868a6af5bc0c555b8334edf90e4f3f725c2c7ca60726c0353bbddb9cc84944b7",
+  "manager": {
+    "path": "/workspace/shared/mlf-shared-source-migration/.mlf-build/shared-ghc-O0/bin/mlfpkg",
+    "sha256": "d29b7b07774996fa94003a882e213a8d6a40809eee4b7aef01c8cb6f7c7ae284"
+  },
+  "metadata_checks_complete": true,
+  "module_count": 67,
+  "overall_compiler_qualification_complete": false,
+  "package_count": 11,
+  "plan_sha256": "45802b8c6be82088eeb335c42ec2fe36af0c364911d19601d6ffb3742c86dbb4",
+  "producer_receipt_complete": false,
+  "recorded_utc": "2026-10-23T21:55:42.342287+00:00",
+  "unchanged_shared_and_host_source_hashes_match_producer": true
+}

@@ -1,0 +1,1 @@
+PASS actual Prelude.Bool, standard Functor/Applicative/Monad, polymorphic pure, numeric patterns/guards and opaque String literals

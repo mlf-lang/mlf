@@ -1,0 +1,17 @@
+{
+  "added_sources": {},
+  "changed_sources": {
+    "Bootstrap.CrateSession": {
+      "new": "51aeddfb084faf84019db88c634d972f48eeecd597d8070c60f59c7402454df9",
+      "old": "157b4d8d07986b1074cc612b89e2482783b3c80164db5f6dc74b1ece14fa7094",
+      "reviewed_change": "Only successful private C3 publication merges retained original fresh nodes with original restoration deltas. Keep all original node comparisons, exact payload choices, Graph force boundary, index order and failure epoch; no final-map interval lookup."
+    }
+  },
+  "format": "c3-survivors-source-migration-v1",
+  "host_sources": {},
+  "module_count": 128,
+  "parent_manifest_sha256": "ab3b36c9b7429bdc2b0a5e28beaf1afe92330c3279568a4ac34bb26d2a48e6e8",
+  "parent_ref": "ffa3d201e4ea9c08109ff00df3f4fd66b56f3ab2",
+  "removed_sources": {},
+  "unchanged_sources": 127
+}

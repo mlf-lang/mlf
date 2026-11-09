@@ -23,6 +23,17 @@ case "$work" in "$PWD"/.mlf-build/benchmark-provenance.*) ;; *) exit 1 ;; esac
 trap 'rm -rf -- "$work"' EXIT
 jq -r '.pinned_sha256 | to_entries[] | "\(.value)  \(.key)"' "$manifest" > "$work/SHA256SUMS"
 sha256 -c "$work/SHA256SUMS" >/dev/null
+python3 -B tools/release/check_benchmark_transition.py
+python3 -B tools/release/test_benchmark_transition.py
+python3 -B tools/performance/artifact-binary/test_query_graph_migration.py
+python3 -B -O tools/performance/artifact-binary/test_query_graph_migration.py
+# Current CI-integration controls replay the unchanged query-index,
+# package-roots, open-release, builtin and writer physical predecessors.
+# Default CI intentionally uses the complete five-level physical replay.
+python3 -B tools/performance/artifact-binary/test_ci_integration_migration.py
+python3 -B -O tools/performance/artifact-binary/test_ci_integration_migration.py
+python3 -B tools/performance/crate-prelude/test_contract.py
+python3 -B -O tools/performance/crate-prelude/test_contract.py
 jq -r '.workloads[].provenance[] | select(.original_source != .build_source) | [.original_source,.build_source] | @tsv' "$manifest" > "$work/adaptations.tsv"
 
 count=0
@@ -45,3 +56,4 @@ while IFS=$'\t' read -r original built; do
 done < "$work/adaptations.tsv"
 test "$count" -gt 0
 printf 'Benchmark provenance passed: all pinned hashes and %s exact patch reconstructions.\n' "$count"
+

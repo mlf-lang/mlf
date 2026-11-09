@@ -1,0 +1,1 @@
+Authenticated direct GHC O0 runtime suite passed all 12 commands. This is not native bootstrap, O2, full guest campaign or PR source smoke qualification. The separate TupleList runner passed 90 checks. Producer source/config/tool hashes were re-authenticated after both runs.

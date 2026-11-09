@@ -1,0 +1,30 @@
+[1 of 5] Compiling MLF.Host.Base    ( host/ghc/MLF/Host/Base.hs, nothing )
+[2 of 5] Compiling MLF.Host.Async   ( host/ghc/MLF/Host/Async.hs, nothing )
+[3 of 5] Compiling MLF.Host.IO      ( host/ghc/MLF/Host/IO.hs, nothing )
+host/ghc/MLF/Host/IO.hs:128:82: warning: [GHC-68441] [-Wdeprecations]
+    In the use of ‘hGetLine’ (imported from Data.ByteString):
+    Deprecated: "Deprecated since @bytestring-0.12@. Use 'Data.ByteString.Char8.hGetLine' instead. (Functions that rely on ASCII encodings belong in "Data.ByteString.Char8")"
+    |
+128 |   if end then throwIO (HostError "IO error: getLine reached EOF or failed") else B.hGetLine H.stdin >>= evaluate . fromUtf8
+    |                                                                                  ^^^^^^^^^^
+
+[4 of 5] Compiling MLF.Primitive    ( host/ghc/MLF/Primitive.hs, nothing )
+[5 of 5] Compiling CrossArrayIdentity ( /workspace/shared/mlf-shared-source-migration/tests/shared-host/CrossArrayIdentity.hs, nothing )
+/workspace/shared/mlf-shared-source-migration/tests/shared-host/CrossArrayIdentity.hs:5:11: error: [GHC-83865]
+    • Couldn't match expected type ‘ByteArray’
+                  with actual type ‘IntArray’
+    • In the expression: readByteArray
+      In an equation for ‘badRead’: badRead = readByteArray
+  |
+5 | badRead = readByteArray
+  |           ^^^^^^^^^^^^^
+
+/workspace/shared/mlf-shared-source-migration/tests/shared-host/CrossArrayIdentity.hs:7:12: error: [GHC-83865]
+    • Couldn't match expected type ‘IntArray’
+                  with actual type ‘ByteArray’
+    • In the expression: writeIntArray
+      In an equation for ‘badWrite’: badWrite = writeIntArray
+  |
+7 | badWrite = writeIntArray
+  |            ^^^^^^^^^^^^^
+

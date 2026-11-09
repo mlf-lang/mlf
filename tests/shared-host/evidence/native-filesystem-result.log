@@ -1,0 +1,9 @@
+fileExists /dev/null:
+False
+exit=0
+canonicalPath invalid target:
+Runtime: IO error: invalid UTF-8 input
+exit=1
+getContents then getByteLine:
+0
+exit=0

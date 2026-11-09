@@ -1,0 +1,4 @@
+Seed PID: 1011; columns: PID elapsed CPU-time CPU-percent RSS-KiB
+2026-10-23T22:39:19Z
+Stage: awaiting harness progress
+   1011       00:00 00:00:00  0.0  1792
