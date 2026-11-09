@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Filesystem and mocked-command controls; never invoke GHC, Clang or project tools."""
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+HERE = Path(__file__).resolve().parent
+spec = importlib.util.spec_from_file_location('prepare_async_ghc', HERE / 'prepare_async_ghc.py')
+prepare = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(prepare)
+
+
+class Preparation(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix='async-ghc-control-')
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve()
+        self.output = self.root / 'build'
+        for name in ('runtime/mlf_build_runner.c', 'tools/shared/prepare_async_ghc.py', 'tools/clang'):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('fixture\n')
+        (self.root / 'tools/shared/test_direct.py').write_bytes((HERE / 'test_direct.py').read_bytes())
+        self.auth = prepare.authenticator(self.root)
+        self.calls = []
+        self.bad = None
+        self.mutation = None
+        self.auth_count = 0
+        self.producer = None
+
+    def authenticate(self, receipt, binaries, root):
+        self.auth_count += 1
+        producer = json.loads(receipt.read_text())
+        if self.bad == 'authenticate' or self.bad == 'post-authenticate' and self.auth_count == 2:
+            raise ValueError('producer rejected')
+        # Command mocks do not pretend to be GHC. Exercise real path/hash checks
+        # here; the production call always uses full test_direct authentication.
+        for item in producer['outputs'].values():
+            self.auth.verify_file(item)
+        return producer
+
+    def command(self, argv, **kwargs):
+        self.calls.append(argv)
+        label = Path(kwargs['stdout'].name).stem
+        stdout = b''
+        if label == 'build':
+            binaries = self.output / 'bin'
+            binaries.mkdir(exist_ok=True)
+            names = ['emlf', 'mlfpkg'] + ['fixture-' + str(i) for i in range(11)]
+            for name in names:
+                (binaries / name).write_text(name)
+            self.producer = {'optimization': '2', 'outputs': {
+                name: self.auth.identified(binaries / name) for name in names}}
+            (self.output / 'receipt.json').write_text(json.dumps(self.producer))
+        elif label == 'runner-build':
+            Path(argv[-1]).write_text('runner')
+        elif label == 'runner-protocol':
+            stdout = b'1\n'
+        elif label.endswith('-identity'):
+            stdout = (prepare.IDENTITY + '\n').encode()
+        elif label == 'process-capability':
+            stdout = b'1\n'
+        elif label == 'completion-capability':
+            stdout = b'41\n'
+            if self.mutation:
+                self.mutation()
+        if self.bad == label:
+            stdout = b'wrong\n'
+        kwargs['stdout'].write(stdout)
+        kwargs['stdout'].flush()
+        if self.bad == 'stderr' and label == 'process-capability':
+            kwargs['stderr'].write(b'diagnostic\n')
+        if self.bad == 'timeout':
+            raise subprocess.TimeoutExpired(argv, 1)
+        return subprocess.CompletedProcess(argv, 1 if self.bad == 'exit' else 0)
+
+    def execute(self):
+        with patch.object(prepare, 'authenticator', return_value=self.auth), \
+             patch.object(self.auth, 'authenticate_build', side_effect=self.authenticate), \
+             patch.object(prepare.shutil, 'which', return_value=str(self.root / 'tools/clang')), \
+             patch.object(prepare.subprocess, 'run', side_effect=self.command):
+            return prepare.prepare(self.root, self.output, 'clang')
+
+    def fails(self):
+        self.output.mkdir(exist_ok=True)
+        (self.output / 'async-tools.json').write_text('{"complete":true}')
+        with self.assertRaises((ValueError, RuntimeError, subprocess.TimeoutExpired)):
+            self.execute()
+        self.assertFalse(json.loads((self.output / 'async-tools.json').read_text())['complete'])
+
+    def test_success_is_separate_ghc_proof_with_unchanged_inventory(self):
+        result = self.execute()
+        self.assertTrue(result['complete'])
+        self.assertEqual(result['implementation_identity'], prepare.IDENTITY)
+        self.assertEqual(self.auth_count, 2)
+        self.assertEqual(len(self.producer['outputs']), 13)
+        self.assertNotIn('mlf-build-runner', json.loads((self.output / 'receipt.json').read_text())['outputs'])
+        self.assertEqual(result['runner']['path'], str(self.output / 'bin/mlf-build-runner'))
+        self.assertIn('--bootstrap-only', self.calls[0])
+        self.assertIn('--optimization', self.calls[0])
+        self.assertEqual(self.calls[1][1:6], ['-O2', '-std=c11', '-Wall', '-Wextra', '-Werror'])
+        self.assertEqual(len(self.calls), 7)
+        self.assertEqual(result['producer_receipt'], self.auth.identified(self.output / 'receipt.json'))
+
+    def test_fail_closed_for_command_and_authentication_failures(self):
+        for bad in ['exit', 'timeout', 'stderr', 'runner-protocol', 'emlf-identity',
+                    'mlfpkg-identity', 'process-capability', 'completion-capability',
+                    'authenticate', 'post-authenticate']:
+            with self.subTest(bad=bad):
+                self.bad = bad
+                self.auth_count = 0
+                self.fails()
+
+    def test_changed_inputs_receipt_runner_outputs_and_logs_fail(self):
+        for name in ['runtime/mlf_build_runner.c', 'tools/shared/prepare_async_ghc.py',
+                     'tools/shared/test_direct.py', 'tools/clang', 'build/receipt.json',
+                     'build/bin/mlf-build-runner.new', 'build/bin/mlfpkg', 'build/build.stdout']:
+            with self.subTest(name=name):
+                path = self.root / name
+                prior = path.read_bytes() if path.exists() else None
+                self.mutation = lambda: path.write_text('changed')
+                self.fails()
+                if prior is not None:
+                    path.write_bytes(prior)
+
+    def test_missing_clang_invalidates_old_proof(self):
+        self.output.mkdir()
+        (self.output / 'async-tools.json').write_text('{"complete":true}')
+        with patch.object(prepare.shutil, 'which', return_value=None), self.assertRaises(ValueError):
+            prepare.prepare(self.root, self.output, 'missing')
+        self.assertFalse(json.loads((self.output / 'async-tools.json').read_text())['complete'])
+
+    def test_authenticator_import_does_not_execute_main(self):
+        with patch.object(subprocess, 'run', side_effect=AssertionError('unexpected command')):
+            loaded = prepare.authenticator(self.root)
+        self.assertTrue(callable(loaded.authenticate_build))
+
+    def test_real_authentication_rejects_partial_and_wrong_host_receipts(self):
+        self.output.mkdir()
+        (self.root / 'shared-sources.json').write_text('{}')
+        receipt = self.output / 'receipt.json'
+        for value in [{'complete': False}, {'complete': True, 'typecheck_only': True},
+                      {'complete': True, 'typecheck_only': False, 'producer_host': 'native-MLF'}]:
+            receipt.write_text(json.dumps(value))
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.auth.authenticate_build(receipt, self.output / 'bin', self.root)
+
+
+if __name__ == '__main__':
+    unittest.main()

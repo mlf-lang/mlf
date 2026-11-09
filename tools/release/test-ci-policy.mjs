@@ -154,8 +154,8 @@ assert.match(ci,/pull_request:\n    types: \[opened, synchronize, reopened, labe
 assert.match(fs.readFileSync('tools/release/async-change-scope.py','utf8'), /OPT_IN_LABEL = "ci:async-parity"/);
 assert.match(asyncJob,/id: scope\n        run: python3 tools\/release\/async-change-scope.py/);
 assert.match(asyncJob,/\.mlf-build\/async-change-scope\/decision.json/);
-assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 5);
-for (const name of ['Native bootstrap and parity dependencies', 'Fetch verified native seed', 'Bootstrap released seed through frozen bridge to shared native tools', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
+assert.equal((asyncJob.match(/if: steps.scope.outputs.required != 'false'/g) || []).length, 6);
+for (const name of ['GHC-origin bootstrap and native parity dependencies', 'Install pinned GHC 9.14.1 for ordinary async parity', 'Test GHC async preparation controls', 'Build and authenticate GHC-origin async tools', 'Qualify typed completions and structured process tasks', 'Qualify checked async package interfaces and cache replay']) {
   assert.ok(asyncJob.includes(`- name: ${name}\n        if: steps.scope.outputs.required != 'false'\n`));
 }
 // Only a positive false output skips the expensive steps; unknown/missing
@@ -168,7 +168,8 @@ assert.equal(Function('steps', `return (${selectionExpression});`)({scope:{outpu
 for (const name of ['build-runner', 'async-runtime', 'windows-runtime', 'native']) {
   assert.doesNotMatch(ciJob(name), /steps\.scope|async-change-scope/, `${name} must stay unconditional`);
 }
-for (const command of ['scripts/bootstrap-async.sh','tests/fixtures/async-completion/check.sh','tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh']) {
+assert.doesNotMatch(asyncJob,/scripts\/bootstrap-async\.sh/);
+for (const command of ['tools/shared/prepare_async_ghc.py','tests/fixtures/async-completion/check.sh','tools/release/test-async-process.sh','tools/release/test-async-task.sh','tools/release/test-async-package.sh']) {
   assert.ok(ciJob('async-language').includes(command), `Missing ${command}`);
 }
 assert.doesNotMatch(ci,/contents: write|continue-on-error/);

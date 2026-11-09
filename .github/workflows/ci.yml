@@ -611,37 +611,56 @@ jobs:
       - name: Decide whether expensive async parity was explicitly requested
         id: scope
         run: python3 tools/release/async-change-scope.py --output .mlf-build/async-change-scope/decision.json
-      - name: Native bootstrap and parity dependencies
+      - name: GHC-origin bootstrap and native parity dependencies
         if: steps.scope.outputs.required != 'false'
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             sudo apt-get update
-            sudo apt-get install -y clang llvm libgmp-dev libgc-dev pkg-config jq
+            sudo apt-get install -y build-essential clang-19 llvm-19 libgmp-dev libgc-dev libnuma-dev libncurses-dev pkg-config jq xz-utils
+            echo /usr/lib/llvm-19/bin >> "$GITHUB_PATH"
           else
-            brew install llvm gmp pkg-config bdw-gc jq
-            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+            brew install llvm@19 gmp pkg-config bdw-gc jq
+            echo "$(brew --prefix llvm@19)/bin" >> "$GITHUB_PATH"
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
           fi
           echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
-      - name: Fetch verified native seed
-        if: steps.scope.outputs.required != 'false'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          pin=.github/smoke-seed.env
-          if [ "$RUNNER_OS" = Linux ]; then pin=.github/smoke-seed-linux.env; fi
-          tools/release/fetch-seed.sh .mlf-build/async-seed "$pin"
-      - name: Bootstrap released seed through frozen bridge to shared native tools
+      - name: Install pinned GHC 9.14.1 for ordinary async parity
         if: steps.scope.outputs.required != 'false'
         run: |
           set -euo pipefail
-          mkdir -p .mlf-build/async-bootstrap
-          scripts/bootstrap-async.sh 2>&1 | tee .mlf-build/async-bootstrap/bootstrap.log
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          if [ "$RUNNER_OS" = Linux ]; then
+            distribution=ghc-9.14.1-x86_64-deb12-linux
+            staging=ghc-9.14.1-x86_64-unknown-linux
+            digest=60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841
+          else
+            test "$(uname -m)" = arm64
+            distribution=ghc-9.14.1-aarch64-apple-darwin
+            staging=$distribution
+            digest=841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681
+          fi
+          curl -fsSL "https://downloads.haskell.org/~ghc/9.14.1/$distribution.tar.xz" -o "$archive"
+          printf '%s  %s\n' "$digest" "$archive" | shasum -a 256 -c -
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/$staging" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
+          test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
+          if [ "$RUNNER_OS" = Linux ]; then
+            python3 -B tools/release/cleanup-ghc-install.py --receipt .mlf-build/async-ghc-install-cleanup.json
+          fi
+          echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
+      - name: Test GHC async preparation controls
+        if: steps.scope.outputs.required != 'false'
+        run: |
+          python3 -B tools/shared/test_prepare_async_ghc.py
+          python3 -B -O tools/shared/test_prepare_async_ghc.py
+      - name: Build and authenticate GHC-origin async tools
+        if: steps.scope.outputs.required != 'false'
+        run: python3 -B tools/shared/prepare_async_ghc.py --build-dir .mlf-build/async-ghc --clang clang
       - name: Qualify typed completions and structured process tasks
         if: steps.scope.outputs.required != 'false'
         run: |
           set -euo pipefail
-          compiler="$PWD/.mlf-build/async-bootstrap/stage2"
+          compiler="$PWD/.mlf-build/async-ghc/bin/emlf"
           EMLF="$compiler" tests/fixtures/async-completion/check.sh
           tools/release/test-async-process.sh "$compiler" .mlf-build/async-process-parity
           tools/release/test-async-task.sh "$compiler" .mlf-build/async-task-parity
@@ -653,8 +672,8 @@ jobs:
         if: steps.scope.outputs.required != 'false'
         run: |
           set -euo pipefail
-          compiler="$PWD/.mlf-build/async-bootstrap/stage2"
-          manager="$(cat .mlf-build/async-bootstrap/manager.path)"
+          compiler="$PWD/.mlf-build/async-ghc/bin/emlf"
+          manager="$PWD/.mlf-build/async-ghc/bin/mlfpkg"
           tools/release/test-async-package.sh "$compiler" "$manager" .mlf-build/async-package-parity
           jq -e '.complete == true and .backend == "llvm" and .cache_replay == true and .opaque_rejections == 6 and .type_rejections == 1' \
             .mlf-build/async-package-parity/result.json
@@ -666,33 +685,14 @@ jobs:
           retention-days: 14
           path: |
             .mlf-build/async-change-scope/decision.json
-            .mlf-build/async-bootstrap/bootstrap.log
-            .mlf-build/async-bootstrap/bootstrap.json
-            .mlf-build/async-bootstrap/shared-inputs.*.sha256
-            .mlf-build/async-bootstrap/source-contract.json
-            .mlf-build/async-bootstrap/bridge-source-identity.txt
-            .mlf-build/async-bootstrap/bridge-identity.txt
-            .mlf-build/async-bootstrap/implementation-identity.txt
-            .mlf-build/async-bootstrap/completion-capability.txt
-            .mlf-build/async-bootstrap/compiler.path
-            .mlf-build/async-bootstrap/native/build-report.json
-            .mlf-build/async-bootstrap/native/commands/
-            .mlf-build/async-bootstrap/native-cache/*/artifact.json
-            .mlf-build/async-bootstrap/bridge/build-*/**/build-report.json
-            .mlf-build/async-bootstrap/bridge/build-*/**/commands/
-            .mlf-build/async-bootstrap/bridge/*.sha256
-            .mlf-build/async-bootstrap/bridge/*.txt
-            .mlf-build/async-bootstrap/bridge/cache/*/artifact.json
-            .mlf-build/async-bootstrap/bridge-source-*/bridge-inputs.sha256
-            .mlf-build/async-bootstrap/capability.txt
-            .mlf-build/async-bootstrap/source-identity.txt
-            .mlf-build/async-bootstrap/compilers.sha256
-            .mlf-build/async-bootstrap/manager.sha256
-            .mlf-build/async-bootstrap/manager.path
-            .mlf-build/async-bootstrap/build-*/**/build-report.json
-            .mlf-build/async-bootstrap/build-*/**/commands/
-            .mlf-build/async-bootstrap/source-*/inputs.sha256
-            .mlf-build/async-bootstrap/cache/*/artifact.json
+            .mlf-build/async-ghc-install-cleanup.json
+            .mlf-build/async-ghc/async-tools.json
+            .mlf-build/async-ghc/receipt.json
+            .mlf-build/async-ghc/*.stdout
+            .mlf-build/async-ghc/*.stderr
+            .mlf-build/async-ghc/*.txt
+            .mlf-build/async-ghc/*.log
+            .mlf-build/async-ghc/builtin-verification/
             .mlf-build/async-completion-gate/**/*.json
             .mlf-build/async-completion-gate/**/*.stdout
             .mlf-build/async-completion-gate/**/*.stderr
