@@ -155,6 +155,10 @@ schemaChecks catalog = do
  empty <- H.right (J.parse "{\"kind\":\"coverage\",\"executions\":[],\"aliases\":{},\"metrics\":{}}")
  rejected (C.validate (changeFamily "core/hm-oracle" (J.set "evidence" empty) catalog))
  rejected (C.validate (changeEvidence "backends/strict-wrappers" (J.set "rows" (J.num 3)) catalog))
+ -- Keep each family's labels/count consistent so this reaches the independent
+ -- aggregate fixture guard, rather than failing the per-family schema check.
+ let extraFixture = changeEvidence "backends/strict-wrappers" (\entry -> J.set "fixtures" (J.num 5) (J.set "labels" (J.stringArray (S.snoc (J.getStrings "labels" entry) "unreviewed backend fixture")) entry)) catalog
+ H.assert (case C.validate extraFixture of { Left error -> eqString error "backend family partition changed"; Right _ -> False }) "backend fixture total accepted an unreviewed action"
  -- Preserve aggregate counts while forging a duplicate fixture label across families.
  let backendLabel = S.head (J.getStrings "labels" (J.get "evidence" (C.family catalog "backends/strict-wrappers")))
  rejected (C.validate (changeEvidence "backends/io-runtime" (\entry -> J.set "labels" (J.stringArray ((:) backendLabel (S.tail (J.getStrings "labels" entry)))) entry) catalog))

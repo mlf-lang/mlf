@@ -14,7 +14,7 @@ class BenchmarkTransition(unittest.TestCase):
         cls.root = bridge.ROOT
         cls.contract = bridge.load_contract(cls.root)
         cls.inputs = [(cls.root / name).read_bytes() for name in
-                      ['benchmarks/manifest.json', bridge.HISTORY, bridge.TYPES, bridge.OLD_TYPES]]
+                      ['benchmarks/manifest.json', bridge.HISTORY, bridge.TYPES, bridge.OLD_TYPES, bridge.STD]]
 
     def check(self, inputs):
         bridge.validate_bridge(*inputs, self.contract)
@@ -43,6 +43,9 @@ class BenchmarkTransition(unittest.TestCase):
 
     def test_current_source_drift(self):
         self.reject(2, lambda raw: raw + b'\n')
+
+    def test_current_std_source_drift(self):
+        self.reject(4, lambda raw: raw + b'\n')
 
     def test_old_source_is_not_live_source(self):
         self.reject(2, lambda raw: self.inputs[3])

@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-from verify import graph, unpack
+from verify import cache_directory, graph, unpack
 
 helper = Path(__file__).resolve().parents[1] / 'foundation-query/compare.py'
 loader = importlib.util.spec_from_file_location('foundation_protocol', helper)
@@ -50,9 +50,9 @@ def main():
         current, nodes = graph(cache)
         payloads = {n['payload'] for n in nodes.values() if n['payload']}
         raw = {n['payload'] for k,n in nodes.items() if unpack(k)[0] == 'InferScc'}
-        size = lambda h: (cache/'query-graph-v1/results'/(h+'.mlfqr')).stat().st_size
-        reachable = sum(map(size,payloads)) + (cache/'query-graph-v1/CURRENT').stat().st_size + \
-            (cache/'query-graph-v1/generations'/(current+'.mlfqg')).stat().st_size
+        size = lambda h: (cache_directory(cache)/'results'/(h+'.mlfqr')).stat().st_size
+        reachable = sum(map(size,payloads)) + (cache_directory(cache)/'CURRENT').stat().st_size + \
+            (cache_directory(cache)/'generations'/(current+'.mlfqg')).stat().st_size
         result['samples'].append(dict(stage=stage, counts=counts, **resources,
             phases=json.loads(prefix.with_suffix('.query-profile').read_text()),
             reachable_cache_bytes=reachable, retained_cache_bytes=sum(v[0] for v in after.values()),
@@ -60,7 +60,7 @@ def main():
             active_raw_encoded_bytes=sum(map(size,raw)),
             interface_bytes=prefix.with_suffix('.mlfci').stat().st_size,
             object_bytes=prefix.with_suffix('.mlfco').stat().st_size,
-            graph_nodes=len(nodes), retained_generations=len(list((cache/'query-graph-v1/generations').glob('*')))))
+            graph_nodes=len(nodes), retained_generations=len(list((cache_directory(cache)/'generations').glob('*')))))
         before=after; save()
     version.write_bytes(original); result['complete']=True; save()
     print(json.dumps(result['samples'],indent=2))

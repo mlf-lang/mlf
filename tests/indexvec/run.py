@@ -10,6 +10,9 @@ import sys
 
 from packages import compare_managers
 from crates import check_crates
+from interfaces import check_interfaces
+from link_fragments import check_diamond
+from diagnostics import check_diagnostics
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
@@ -49,6 +52,9 @@ def main():
     emlf = args.compiler.resolve(strict=True)
     compare_managers(out / "packages", emlf.with_name("mlfpkg"), args.reference_manager)
     check_crates(run, out / "crates", emlf, args.reference_compiler)
+    check_interfaces(run, out / "interfaces", emlf, args.reference_compiler)
+    check_diamond(run, out / "link-diamond", emlf)
+    check_diagnostics(out / "diagnostics", emlf, args.reference_compiler)
     flags = shlex.split(
         subprocess.check_output(["pkg-config", "--cflags", "--libs", "gmp", "bdw-gc"], text=True)
     )
@@ -66,7 +72,7 @@ def main():
         "-ibootstrap",
         *["-i" + str(d) for d in sorted((ROOT / "libraries").iterdir())],
     ]
-    for name in ["Graphs", "Vector", "World"]:
+    for name in ["Graphs", "Vector", "World", "DeclQueryControls", "ImportBindings", "PreparedImports", "FragmentAdmission", "DeclCore"]:
         obj = out / name
         obj.mkdir()
         run([*ghc, "-odir", obj, "-hidir", obj, HERE / (name + ".hs"), *host, "-o", obj / "probe"])
@@ -74,6 +80,15 @@ def main():
         [out / "Graphs/probe"],
         expected=b"1032 ordered SCC and reach comparisons, query DAG and package controls passed\n",
     )
+
+    run([out / "DeclQueryControls/probe", out / "decl-query-cache"])
+    run([out / "ImportBindings/probe"], expected=b"consumer import ID controls passed\n")
+    run([out / "PreparedImports/probe", out / "crates"],
+        expected=b"prepared source and native wrapper import controls passed\n")
+
+    run([out / "FragmentAdmission/probe", out], expected=b"raw and final fragment admission controls passed\n")
+    run([out / "DeclCore/probe"],
+        expected=b"Core declaration slots, lexical shadowing, polymorphic imports and recursion passed\n")
 
     source = HERE / "Vector.hs"
     mlf = [emlf, "-i", ROOT / "libraries/mlf-foundation"]

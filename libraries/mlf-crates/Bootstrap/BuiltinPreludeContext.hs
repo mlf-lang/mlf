@@ -192,10 +192,9 @@ module Bootstrap.BuiltinPreludeContext
     sameMap (\a b -> Modules.compareKey a b == 0) (sameSet sameEntity) first second;
   sameContract (Source.SourceContract ty classes protected) (Source.SourceContract other others flag) =
     T.alphaEq ty other && eqList eqString classes others && protected == flag;
-  sourceExternals iface sourceValues = let {
-    dictionaries = M.fromList compareString
-      (map (\c -> (,) ("Dict_" ++ Classes.className c) (Classes.className c)) (Artifact.crateClasses iface))
-  } in M.mapWithKey (\name ty ->
+  interfaceDictionaries iface = M.fromList compareString
+    (map (\c -> (,) ("Dict_" ++ Classes.className c) (Classes.className c)) (Artifact.crateClasses iface));
+  sourceExternals iface sourceValues = let { dictionaries = interfaceDictionaries iface } in M.mapWithKey (\name ty ->
     if S.member compareString name sourceValues then Separate.sourceScheme dictionaries ty
     else Separate.sourceSchemeIn M.empty False ty) (M.fromList compareString (Artifact.crateBindings iface));
   -- These flags govern managed evidence contraction, not graph quantifier
@@ -204,6 +203,7 @@ module Bootstrap.BuiltinPreludeContext
   sourceContracts :: Artifact.CrateInterface -> Set String -> Either String (Map String Source.SourceContract);
   sourceContracts iface sourceValues = let {
     externals = sourceExternals iface sourceValues;
+    dictionaries = interfaceDictionaries iface;
     protection = M.fromList compareString (Artifact.crateProtection iface)
   } in mapEither (M.fromList compareString) (traverseEither
     (\((,) name ty) -> do {
@@ -215,10 +215,9 @@ module Bootstrap.BuiltinPreludeContext
         Nothing -> Left "prepared source dependency lacks protection authority";
         Just value -> Right value
       };
-      let { classes = case Classes.scheme source of {
-        (,,) _ predicates _ -> map (\(SPredicate cls _) -> cls) predicates
-      } };
-      Right ((,) name (Source.SourceContract ty classes (flag || Classes.managedType source)))
+      let { classes = if S.member compareString name sourceValues then Separate.importClasses dictionaries ty else [] };
+      Right ((,) name (Source.SourceContract ty classes
+        (flag || Classes.managedType source || elem eqString Classes.callStackPredicate classes)))
     }) (Artifact.crateBindings iface));
 
   -- N7 marked Prelude preparation owns one actual-object admission operation.

@@ -96,7 +96,7 @@ def analyze(folder):
                 graph=[any(k.startswith(Q.GRAPH) or k.endswith(('.mlfqg','.mlfqr')) for k in inv)
                        for inv in inventories]
                 require(all(graph) or not any(graph),'stable query storage format')
-                row['query_storage']='query-graph-v1' if all(graph) else 'legacy-mlfq'
+                row['query_storage']=('query-graph-v2' if 'query-graph-v2/CURRENT' in inventories[0] else 'query-graph-v1') if all(graph) else 'legacy-mlfq'
                 if all(graph):
                     checks=[]
                     for directory,inventory in zip(directories,inventories):

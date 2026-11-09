@@ -6,6 +6,7 @@ import qualified Bootstrap.Types as T
 import qualified Bootstrap.X.Checked as C
 import qualified Bootstrap.X.Type as Ty
 import qualified Bootstrap.LLVM.Library as N
+import qualified Bootstrap.IndexVec as V
 import qualified Bootstrap.Map as M
 import qualified MLF.Primitive as P
 right (T.Right x)=x
@@ -34,6 +35,9 @@ main=do
  assert "no imports preserves returned lambda" (not (left (N.emitRoot layout [] checked)))
  assert "duplicate exported keys" (left (N.prepareLayout identity [("value","a",int),("value","b",int)] []))
  assert "ambiguous exported hint" (left (N.prepareLayout identity [("x","a",int),("y","a",int)] []))
+ assert "duplicate declaration ID" (left (N.prepareLayoutIds identity [(V.fromInt 7,("x","a",int)),(V.fromInt 7,("y","b",int))] []))
+ assert "negative declaration ID" (left (N.prepareLayoutIds identity [(V.fromInt (-1),("x","a",int))] []))
+ assert "unknown declaration ID" (left (N.emitRootIds layout [V.fromInt 7] checked))
  assert "open exported type" (left (N.prepareLayout identity [("x","a",T.XVar (T.XTyVar 9))] []))
  assert "nonstar exported type" (left (N.prepareLayout identity [("x","a",T.XCon "IO" [])] []))
  assert "unsafe identity in symbol" (left (N.prepareLayout "a\"\n" [("x","a",int)] []))

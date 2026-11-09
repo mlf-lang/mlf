@@ -4,66 +4,66 @@ import Bootstrap.Std
 import qualified Bootstrap.Runtime as R
 import qualified Bootstrap.Data as D
 
-runtimeData = case D.validateDeclarations Nil of
+runtimeData = case D.validateDeclarations [] of
   Left message -> panic message
   Right value -> value
 evaluate term = R.evaluate runtimeData (R.REnv MapEmpty) term
 erasedCall primitive arguments = foldl XEApp (XEPrimitive primitive) arguments
-poison message = erasedCall PPanic (Cons (XEString message) Nil)
+poison message = erasedCall PPanic ((:) (XEString message) [])
 expectInteger expected term = case R.integer (evaluate term) of
-  Right value -> if value == expected then return Unit else panic "direct primitive returned a different value"
+  Right value -> if value == expected then return () else panic "direct primitive returned a different value"
   Left message -> panic message
 expectError expected term = case evaluate term of
-  Left message -> if eqString message expected then return Unit else panic ("direct primitive changed error: " ++ message)
+  Left message -> if eqString message expected then return () else panic ("direct primitive changed error: " ++ message)
   Right value -> panic "direct primitive lost its error"
 primitiveApplications = do
-  expectInteger 2 (erasedCall PStringLength (Cons (XEString "λ😀") Nil))
-  expectInteger 7 (erasedCall PAddInt (Cons (XEInt 3) (Cons (XEInt 4) Nil)))
-  expectInteger 11 (erasedCall PIfThenElse (Cons (XEBool true) (Cons (XEInt 11) (Cons (poison "unused branch") Nil))))
-  expectInteger 13 (erasedCall PIfThenElse (Cons (XEBool false) (Cons (poison "unused branch") (Cons (XEInt 13) Nil))))
+  expectInteger 2 (erasedCall PStringLength ((:) (XEString "λ😀") []))
+  expectInteger 7 (erasedCall PAddInt ((:) (XEInt 3) ((:) (XEInt 4) [])))
+  expectInteger 11 (erasedCall PIfThenElse ((:) (XEBool true) ((:) (XEInt 11) ((:) (poison "unused branch") []))))
+  expectInteger 13 (erasedCall PIfThenElse ((:) (XEBool false) ((:) (poison "unused branch") ((:) (XEInt 13) []))))
   let argument = XName 91 "argument"
   let identity = XEAbs argument (XEVar argument)
-  expectInteger 17 (XEApp (erasedCall PSeq (Cons identity (Cons identity Nil))) (XEInt 17))
-  expectError "first argument" (erasedCall PAddInt (Cons (poison "first argument") (Cons (poison "second argument") Nil)))
+  expectInteger 17 (XEApp (erasedCall PSeq ((:) identity ((:) identity []))) (XEInt 17))
+  expectError "first argument" (erasedCall PAddInt ((:) (poison "first argument") ((:) (poison "second argument") [])))
   expectError "direct panic" (XEApp (poison "direct panic") (XEInt 0))
-  expectError "runtime application of a non-function" (erasedCall PShowInt (Cons (XEInt 3) (Cons (XEInt 4) Nil)))
-  expectError "runtime application of a non-function" (erasedCall PGetArgCount (Cons (XEInt 0) Nil))
-  case evaluate (erasedCall PAddInt (Cons (XEInt 19) Nil)) of
+  expectError "runtime application of a non-function" (erasedCall PShowInt ((:) (XEInt 3) ((:) (XEInt 4) [])))
+  expectError "runtime application of a non-function" (erasedCall PGetArgCount ((:) (XEInt 0) []))
+  case evaluate (erasedCall PAddInt ((:) (XEInt 19) [])) of
     Left message -> panic message
     Right partial -> case R.integer (R.apply runtimeData partial (Right (R.RInteger 23))) of
-      Right value -> if value == 42 then return Unit else panic "partial primitive lost its captured argument"
+      Right value -> if value == 42 then return () else panic "partial primitive lost its captured argument"
       Left message -> panic message
 
-intType = XCon "Int" Nil
-unitType = XCon "Unit" Nil
-ioUnit = XCon "IO" (Cons unitType Nil)
-arrayType = XCon "IntArray" Nil
+intType = XCon "Int" []
+unitType = XCon "()" []
+ioUnit = XCon "IO" ((:) unitType [])
+arrayType = XCon "IntArray" []
 apps f xs = foldl XApp f xs
-prim p xs = apps (XPrimitive p Nil) xs
+prim p xs = apps (XPrimitive p []) xs
 integer n = XIntTerm n
-print n = XApp (XPrimitive PPrintInt Nil) n
-ret = XApp (XPrimitive PIOReturn (Cons unitType Nil)) (XConstructor "Unit" Nil)
-thenIO a b = apps (XPrimitive PIOBind (Cons unitType (Cons unitType Nil))) (Cons a (Cons (XAbs (XName 900 "ignored") unitType b) Nil))
-bindIO ty name a b = apps (XPrimitive PIOBind (Cons ty (Cons unitType Nil))) (Cons a (Cons (XAbs name ty b) Nil))
-condition c a b = apps (XPrimitive PIfThenElse (Cons ioUnit Nil)) (Cons c (Cons a (Cons b Nil)))
+print n = XApp (XPrimitive PPrintInt []) n
+ret = XApp (XPrimitive PIOReturn ((:) unitType [])) (XConstructor "()" [])
+thenIO a b = apps (XPrimitive PIOBind ((:) unitType ((:) unitType []))) ((:) a ((:) (XAbs (XName 900 "ignored") unitType b) []))
+bindIO ty name a b = apps (XPrimitive PIOBind ((:) ty ((:) unitType []))) ((:) a ((:) (XAbs name ty b) []))
+condition c a b = apps (XPrimitive PIfThenElse ((:) ioUnit [])) ((:) c ((:) a ((:) b [])))
 
-lazyCase = XCase (XApp (XPrimitive PPanic (Cons intType Nil)) (XStringTerm "unforced")) ioUnit
-  (Cons (XAlternative (XDefaultPattern Nothing) (XApp (XPrimitive PPutStrLn Nil) (XStringTerm "lazy"))) Nil)
+lazyCase = XCase (XApp (XPrimitive PPanic ((:) intType [])) (XStringTerm "unforced")) ioUnit
+  ((:) (XAlternative (XDefaultPattern Nothing) (XApp (XPrimitive PPutStrLn []) (XStringTerm "lazy"))) [])
 
 countName = XName 1 "count"
 nName = XName 2 "n"
 countBody = XAbs nName intType
-  (condition (prim PEqInt (Cons (XVarTerm nName) (Cons (integer 0) Nil))) ret
+  (condition (prim PEqInt ((:) (XVarTerm nName) ((:) (integer 0) []))) ret
     (thenIO (print (XVarTerm nName))
-      (XApp (XVarTerm countName) (prim PSubInt (Cons (XVarTerm nName) (Cons (integer 1) Nil))))))
-recursive = XLetRec (Cons (Triple countName (XArrow intType ioUnit) countBody) Nil)
+      (XApp (XVarTerm countName) (prim PSubInt ((:) (XVarTerm nName) ((:) (integer 1) []))))))
+recursive = XLetRec ((:) ((,,) countName (XArrow intType ioUnit) countBody) [])
   (XApp (XVarTerm countName) (integer 3))
 
 arrayName = XName 3 "array"
 entryName = XName 4 "entry"
-arrayProgram = bindIO arrayType arrayName (prim PNewIntArray (Cons (integer 2) (Cons (integer 3) Nil)))
-  (thenIO (prim PWriteIntArray (Cons (XVarTerm arrayName) (Cons (integer 0) (Cons (integer 9) Nil))))
-    (bindIO intType entryName (prim PReadIntArray (Cons (XVarTerm arrayName) (Cons (integer 0) Nil))) (print (XVarTerm entryName))))
+arrayProgram = bindIO arrayType arrayName (prim PNewIntArray ((:) (integer 2) ((:) (integer 3) [])))
+  (thenIO (prim PWriteIntArray ((:) (XVarTerm arrayName) ((:) (integer 0) ((:) (integer 9) []))))
+    (bindIO intType entryName (prim PReadIntArray ((:) (XVarTerm arrayName) ((:) (integer 0) []))) (print (XVarTerm entryName))))
 
 run program = do
   result <- R.runTerm program
@@ -82,7 +82,7 @@ main = do
   case result of
     Left message -> putStrLn message
     Right unit -> panic "pure IO entry accepted"
-  result <- R.runTerm (XApp (XPrimitive PPrintInt Nil) (prim PQuotInt (Cons (integer 1) (Cons (integer 0) Nil))))
+  result <- R.runTerm (XApp (XPrimitive PPrintInt []) (prim PQuotInt ((:) (integer 1) ((:) (integer 0) []))))
   case result of
     Left message -> putStrLn message
     Right unit -> panic "division by zero accepted"

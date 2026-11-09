@@ -9,8 +9,8 @@ import qualified Bootstrap.X.Check as Check
 import qualified Bootstrap.X.Type as T
 import qualified Bootstrap.X.Syntax as X
 
-fixtures : List (Pair String String)
-fixtures = L.map (\(Quad label _ source _) -> Pair label source) Cases.stateTypeCases
+fixtures : [] ((,) String String)
+fixtures = L.map (\((,,,) label _ source _) -> (,) label source) Cases.stateTypeCases
 
 verify result = do
   parsed <- Parser.parseTerm "<roundtrip>" (XP.prettyTerm (C.compiledTerm result))
@@ -18,16 +18,16 @@ verify result = do
   if L.not (T.alphaEq ty (C.inferredType result)) then Left "xMLF roundtrip changed type"
   else if L.not (X.equalErased (X.erase parsed) (X.erase (C.compiledTerm result))) then Left "xMLF roundtrip changed erasure"
   else Right (C.sourceType result)
-report : Pair String String -> IO Unit
-report (Pair name source) = putStrLn (name ++ "\t" ++ (case C.compile "<fixture>" source of
+report : (,) String String -> IO ()
+report ((,) name source) = putStrLn (name ++ "\t" ++ (case C.compile "<fixture>" source of
   Left err -> "REJECT\t" ++ C.prettyPhase (C.phase err)
   Right result -> case verify result of
     Left err -> "FAILED\t" ++ err
     Right ty -> "ACCEPT\t" ++ ty))
-targetFixtures : List (Pair String String)
-targetFixtures = L.map (\(Triple label _ source) -> Pair label source) Cases.stateTargetCases
-reportTarget : Pair String String -> IO Unit
-reportTarget (Pair name source) = putStrLn ("target-" ++ name ++ "\t" ++ (case Parser.parseTerm "<target>" source of
+targetFixtures : [] ((,) String String)
+targetFixtures = L.map (\((,,) label _ source) -> (,) label source) Cases.stateTargetCases
+reportTarget : (,) String String -> IO ()
+reportTarget ((,) name source) = putStrLn ("target-" ++ name ++ "\t" ++ (case Parser.parseTerm "<target>" source of
   Left error -> "PARSE\t" ++ error
   Right term -> case Check.checkClosed term of
     Left error -> "REJECT"

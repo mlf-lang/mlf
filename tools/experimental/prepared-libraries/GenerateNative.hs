@@ -44,12 +44,12 @@ module Main where {
     raw <- require (case Data.libraries of { [value] -> Right value; _ -> Left "native installation requires one fixed library registry" });
     installed <- require (Prepared.nativeLibrary raw);
     ds <- require (Prepared.nativeLibraryDeclarations raw);
-    let { linked = case installed of { (,,) value _ _ -> value };
-          signatures = Prepared.nativeExportSignatures raw };
-    let { entries = map (\((,) key ty) -> (,,) key (C.targetNameHint key) ty) signatures };
-    base <- require (Library.prepareLayout (Prepared.inputIdentity raw) entries ds);
+    let { linked = case installed of { (,,) value _ _ -> value } };
+    signatures <- require (Prepared.nativeInstalledIds raw);
+    let { entries = map (\((,) d ((,) key ty)) -> (,) d ((,,) key (C.targetNameHint key) ty)) signatures };
+    base <- require (Library.prepareLayoutIds (Prepared.inputIdentity raw) entries ds);
     names <- require (Library.libraryTypeNames base linked);
-    layout <- require (Library.prepareLayoutWithTypeNames (Prepared.inputIdentity raw) entries ds names);
+    layout <- require (Library.withTypeNames base names);
     generated <- require (Library.emitLibrary layout linked);
     writeFile output (concatStrings generated);
     writeFile manifest (J.render (metadata layout) ++ "\n")

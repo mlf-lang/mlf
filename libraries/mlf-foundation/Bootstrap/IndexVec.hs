@@ -7,8 +7,6 @@ module Bootstrap.IndexVec
    Builder, new, filled, size, get, set, push, freeze,
    FixedBuilder, fixedFilled, fixedGet, fixedSet, fixedFreeze) where {
   import MLF.Primitive;
-  import Bootstrap.Types;
-  import qualified Bootstrap.Std as S;
 
   data Index domain = Index Int;
   fromInt :: forall d. Int -> Index d;
@@ -25,9 +23,12 @@ module Bootstrap.IndexVec
   at :: forall d a. IndexVec d a -> Index d -> a;
   at (Vector n lookup) (Index i) = checked n i (lookup i);
   indices :: forall d a. IndexVec d a -> [] (Index d);
-  indices vec = S.map Index (S.range 0 (count vec - 1));
+  indices vec = tabulate (\i -> i) 0 (count vec);
+  tabulate :: forall d a. (Index d -> a) -> Int -> Int -> [] a;
+  tabulate read i end =
+    if i == end then [] else (:) (read (Index i)) (tabulate read (i + 1) end);
   toList :: forall d a. IndexVec d a -> [] a;
-  toList vec = S.map (at vec) (indices vec);
+  toList vec = tabulate (at vec) 0 (count vec);
 
   -- Aliases share this header even when growth replaces the backing array.
   data FixedBuilder s domain a = FixedBuilder Int (STArray s a);
@@ -87,10 +88,17 @@ module Bootstrap.IndexVec
     [] -> stReturn ();
     (:) x rest -> stBind (writeSTArray cells i x) (\_ -> fillList cells (i + 1) rest)
   };
+  -- Keep this primitive collection below Bootstrap.Types. Core can carry the
+  -- same Index type without introducing a foundation module cycle.
+  listSize :: forall a. Int -> [] a -> Int;
+  listSize n xs = case xs of {
+    [] -> n;
+    (:) _ rest -> let { next = n + 1 } in seq next (listSize next rest)
+  };
   fromList :: forall d a. [] a -> IndexVec d a;
   fromList values = case values of {
     [] -> Vector 0 (\_ -> panic "IndexVec index out of bounds");
-    (:) _ _ -> let { n = S.length values } in runST
+    (:) _ _ -> let { n = listSize 0 values } in runST
       (stBind (newSTArray n (panic "uninitialized IndexVec slot")) (\cells ->
         stBind (fillList cells 0 values) (\_ ->
         stBind (freezeSTArray cells) (\lookup -> stReturn (Vector n lookup)))))

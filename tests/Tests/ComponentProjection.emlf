@@ -2,6 +2,7 @@ module Tests.ComponentProjection where
 import Bootstrap.Types
 import qualified Bootstrap.Std as L
 import qualified Bootstrap.IntMap as IM
+import qualified Bootstrap.IntRank as Rank
 import qualified Bootstrap.IntSet as IS
 import qualified Bootstrap.Graph as G
 import qualified Bootstrap.Graph.Solver as S
@@ -69,7 +70,7 @@ checkProjection solver starts = do
  let stubs = IM.fromDistinctAscList (L.zip (L.map L.fst hidden) (L.range count (count + L.length hidden - 1)))
  let expected = L.map (\((,) n node) -> (,) (S.compactIdentity old selected n) (S.localNode old selected scopes stubs n node)) originals
  let actual = S.projectNodes old selected scopes stubs 0 originals
- let nodeTree = case IM.fromList (L.reverse originals) of IntMap tree -> tree
+ let nodeTree = Rank.indexMap (IM.fromList (L.reverse originals))
  let retained = S.projectCanonicalNodes nodeTree scopes stubs 0 originals
  H.assert (L.eqList (\((,) n a) ((,) m b) -> n == m && G.equalNode a b) expected retained) "node-map projection changed identities, fields, binders or hidden scope roots"
  H.assert (L.eqList (\((,) n a) ((,) m b) -> n == m && G.equalNode a b) expected actual) "enumerated projection changed identities, fields, binders or scope stubs"
@@ -99,7 +100,7 @@ checkRestoration count offset stride mode = do
  let solved = L.map (\n -> (,) n (G.mkNode (if remInt n 2 == 0 then GArr (remInt (n + 1) count) 0 else GCon "T" ((:) 0 [])) (if mode == 7 then Just count else if remInt n 2 == 0 then Nothing else Just 0) (if remInt mode 2 == 0 then Rigid else Flexible))) (L.filter (\n -> remInt (n + mode) 4 /= 0) (L.range 0 (count - 1)))
  L.mapM_ (\entries -> do
   let expected = G.mapE (S.restoreNode old aliased selected) entries
-  let nodeTree = case IM.fromList (L.reverse originals) of IntMap tree -> tree
+  let nodeTree = Rank.indexMap (IM.fromList (L.reverse originals))
   let actual = S.restoreProjectedNodes aliased nodeTree 0 originals entries
   if restorationResult actual expected then return () else panic "ordered restoration disagrees with independent inverse-rank/map lookups") (let controls = (:) [] ((:) ((:) ((,) (-1) (G.mkNode GBot Nothing Flexible)) []) ((:) ((:) ((,) count (G.mkNode GBot Nothing Flexible)) []) [])) in if L.null solved then controls else (:) solved controls)
 restoration : IO ()

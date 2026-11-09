@@ -5,6 +5,7 @@
 module Bootstrap.SourceEquality where {
   import MLF.Primitive;
   import Bootstrap.Types;
+  import qualified Bootstrap.IndexVec as V;
   import qualified Bootstrap.Std as L;
   import qualified Bootstrap.Primitive as P;
   eqSourceString :: SourceString -> SourceString -> Bool;
@@ -142,6 +143,15 @@ module Bootstrap.SourceEquality where {
   eqSExpr :: SExpr -> SExpr -> Bool;
   eqSExpr a b =
     case a of {
+      SGlobal i _ -> case b of { SGlobal j _ -> V.toInt i == V.toInt j; _ -> False };
+      SDeclScope slots term -> case b of {
+        SDeclScope slots2 term2 -> L.eqList (\i j -> V.toInt i == V.toInt j) slots slots2 && eqSExpr term term2;
+        _ -> False
+      };
+      SWantedRefs n candidates -> case b of {
+        SWantedRefs m others -> eqString n m && L.eqList (L.eqPair eqEvidenceRole L.eqTermRef) candidates others;
+        _ -> False
+      };
       SVar x0 ->
         case b of {
           SVar y0 -> eqString x0 y0;
@@ -286,6 +296,10 @@ module Bootstrap.SourceEquality where {
           SStringPattern y0 -> eqString x0 y0;
           _ -> False
         };
+      SIndexedStringPattern text eq from -> case b of {
+        SIndexedStringPattern other eq2 from2 -> eqSourceString text other && L.eqTermRef eq eq2 && L.eqTermRef from from2;
+        _ -> False
+      };
       SOverloadedStringPattern x0 x1 x2 ->
         case b of {
           SOverloadedStringPattern y0 y1 y2 ->

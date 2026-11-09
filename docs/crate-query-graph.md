@@ -468,3 +468,20 @@ raw 对照覆盖开放 body、成员与外部引用映射、依赖类型和 data
 完整源码身份、控制结果和全部样本见
 [evidence.json](../tools/performance/crate-query-graph/evidence.json)。
 该报告将包含 PR #36 的合并版本与原始 `3283899e` 基线比较，不将整体收益归因于单项修改。
+
+### 第 2 版代际索引
+
+编译器将快照写入 `query-graph-v2`，继续使用二进制容器 schema 6。根节点 tag 412 的七个字段依次为格式字符串 `MLF-CRATE-QUERY-GRAPH-2`、配置字符串、声明表、组表、证据表、datatype 表和行表。各表均为 tag 1 列表。声明和 datatype 分别保存本域的稳定身份字符串。组保存非空、有序、无重复的声明编号列表。证据项是 tag 414，字段依次为组编号、非负 site 和规范化 goal。每张表中的身份唯一。
+
+| 查询 | 行键和读边的表示 |
+| --- | --- |
+| Binding | 声明编号（整数） |
+| Input/Binding | tag 415（声明编号） |
+| Input/Prepared、Input/ScopeInventory | tag 416、417（组编号） |
+| Scope、InferScc、FinishScc | tag 418、419、431（组编号） |
+| Evidence | tag 432（证据编号） |
+| Datatype、Input/Datatype | tag 433、434（datatype 编号） |
+
+每行是 tag 413，依次保存行键、结果 SHA、有序读取列表和可选 payload 地址。写者先核对所有目标行及其观察版本，然后用以上描述符替换读边中的稳定键和 SHA。读取旧代时通过该代的表恢复目标身份，通过目标行恢复当时的 SHA，保留每次读取的位置和重复次数。相邻代的整数可指向不同实体。
+
+发布前检查 DAG，持锁写入结果和索引，最后原子切换 `CURRENT`。读取者先验证外层 SHA、容器资源预算及配置，再检查表内唯一性、编号范围、行闭包、payload 地址和依赖深度。第 1 版在自己的目录继续可读，新的目录从冷缓存开始。独立 reader 能将两个版本投影为含完整有序读取的 tag 410 行，并用原版格式重新编码。

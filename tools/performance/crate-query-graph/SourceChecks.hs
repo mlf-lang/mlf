@@ -186,12 +186,12 @@ finishHashChecks group fragment = do
 graphChecks root = do
  let path=B.literal (root++"/graph-controls"); config="compiler-a/builtin-a/checker-1"
  s<-G.begin path config >>= expect "start graph"
- (input,s1)<-G.record (G.inputKey "source") [] False (W.VText "old body") s >>= expect "input"
+ (input,s1)<-G.record (G.inputKey (G.key "Prepared" (U.pack ["f"]))) [] False (W.VText "old body") s >>= expect "input"
  (binding,s2)<-G.record (G.key "Binding" "f") [G.edge input] True (W.VText "Int -> Int / unprotected") s1 >>= expect "binding"
- (caller,s3)<-G.record (G.key "InferScc" "g") [G.edge binding] True (W.VText "caller body") s2 >>= expect "caller"
+ (caller,s3)<-G.record (G.key "InferScc" (U.pack ["g"])) [G.edge binding] True (W.VText "caller body") s2 >>= expect "caller"
  _<-G.publish s3 >>= expect "publish controls"
  next<-G.begin path config >>= expect "reopen controls"
- (changed,next1)<-G.record (G.inputKey "source") [] False (W.VText "new body") next >>= expect "changed input"
+ (changed,next1)<-G.record (G.inputKey (G.key "Prepared" (U.pack ["f"]))) [] False (W.VText "new body") next >>= expect "changed input"
  assert "changed source invalidates binding" (case fst(G.validate (G.nodeKey binding) next1) of T.Nothing->True;_->False)
  (equal,next2)<-G.record (G.nodeKey binding) [G.edge changed] True (W.VText "Int -> Int / unprotected") next1 >>= expect "equal recomputed contract"
  assert "red/green result equality" (G.nodeHash binding==G.nodeHash equal)
@@ -257,7 +257,7 @@ loweredChecks root = do
 sessionTransactionChecks root = do
  let folder=root++"/session-transaction"
      source=folder++"/Tx.hs"; spec=folder++"/crate.spec"; cache=folder++"/cache"
-     pointer=cache++"/query-graph-v1/CURRENT"
+     pointer=cache++"/query-graph-v2/CURRENT"
      header="-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude, NoMonomorphismRestriction, RankNTypes, KindSignatures, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, OverloadedStrings #-}\nmodule Tx where { import MLF.Primitive; "
      program value rhs=header++"ok :: Int; ok = "++value++"; bad :: Int; bad = "++rhs++" }\n"
      compile label=Session.compileSpecFile (B.literal spec) (B.literal(folder++"/"++label))
