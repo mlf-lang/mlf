@@ -49,6 +49,61 @@ class ModularControls(unittest.TestCase):
         self.assertIn('decodeReject "legacy duplicate" "duplicate" (legacy [oldLeaf,oldLeaf,oldRoot])', source)
         self.assertIn('decodeReject "legacy missing" "unpublished" (legacy [oldRoot])', source)
 
+    def test_stamp_syntax_and_semantic_mutations_remain_distinct(self):
+        import artifact_binary_open as O
+        for value in ('0-0', '0-1', '2147483646-2147483628'):
+            O.checked_stamp_syntax(value)
+            changed = O.different_content_stamp(value)
+            self.assertNotEqual(changed, value)
+            O.checked_stamp_syntax(changed)
+        for value in ('', '1', '-1-2', '+1-2', '01-2', '1-02', '1-2-forged',
+                      '2147483647-0', '0-2147483629', '１-2', '1-2\n', '9' * 100 + '-0'):
+            with self.subTest(value=value), self.assertRaises(O.OpenPairError):
+                O.checked_stamp_syntax(value)
+        n, text, seq = O.node, O.string, O.sequence
+        ty = n(44, text('Int'), seq([]))
+        name = n(31, ('int', 1), text('value'))
+        interface = n(242, text('fixture'), seq([]), seq([text('Main')]),
+                      seq([]), seq([]), seq([]), seq([]), seq([]), seq([]),
+                      seq([n(2, text('value'), ty)]), text('value'), text(''), seq([]))
+        body = n(75, name, n(77, ('int', 41)), n(82, text('()'), seq([])))
+        fragment = n(401, text('g'), text('0-1'), seq([]), seq([]), body,
+                     seq([name]), seq([]))
+        # Synthetic canonical syntax only: this stamp is not claimed to bind body.
+        for schema in (7, 8):
+            opened = [text(O.OPEN_FORMATS[schema]), text(O.compatibility_identity()),
+                      text(O.pack([O.interface_association(interface)])),
+                      seq([n(2, text('value'), text(O.fingerprint(ty)))]), seq([]), seq([fragment])]
+            pair = O.repinned((O.tree_document([interface], 3), b''), O.open_bytes(schema, opened))
+            O.inspect_pair(pair, [])
+            label, changed, diagnostic = O.content_stamp_mutation(pair)
+            self.assertEqual(label, ('schema7-' if schema == 7 else '') + 'wrong-open-fragment-content-stamp')
+            self.assertEqual(diagnostic, 'open crate fragment fingerprint mismatch')
+            O.inspect_pair(changed, [])  # semantic authentication is NOT Python's claim
+            _, _, changed_fields = O.open_document(changed[1])
+            changed_fragment = list(O.fields(O.items(changed_fields[5])[0], 401, 7))
+            self.assertEqual(O.text(changed_fragment[1]), '1-1')
+            changed_fragment[1] = O.fields(fragment, 401, 7)[1]
+            self.assertEqual(O.node(401, *changed_fragment), fragment)
+            self.assertEqual(changed_fields[:5], tuple(opened[:5]))
+            malformed = next(row for row in O.mutation_cases(pair) if row[0] == 'wrong-open-fragment-stamp')
+            with self.assertRaisesRegex(O.OpenPairError, '^malformed open fragment stamp$'):
+                O.inspect_pair(malformed[1], [])
+
+    def test_both_stamp_schemas_require_all_three_actual_readers(self):
+        expected = {backend + '-' + case
+                    for backend in ('formal', 'shared-ghc', 'shared-native')
+                    for case in ('wrong-open-fragment-stamp', 'wrong-open-fragment-content-stamp',
+                                 'schema7-wrong-open-fragment-content-stamp')}
+        self.assertTrue(expected <= M.CONTROL_COMMANDS)
+        for name in expected:
+            rows = self.complete_commands()
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                M.require_control_commands([row for row in rows if row['name'] != name])
+            next(row for row in rows if row['name'] == name)['state'] = 'failed'
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                M.require_control_commands(rows)
+
     def test_complete_source_closure(self):
         self.assertEqual(len(self.rows), 51)
         self.assertEqual({r['module'] for r in self.rows}, M.NATIVE_MODULES)
@@ -260,11 +315,11 @@ class ModularControls(unittest.TestCase):
                 for name in sorted(M.CONTROL_COMMANDS)]
 
     def test_complete_control_inventory(self):
-        self.assertEqual(len(M.CONTROL_COMMANDS), 136)
+        self.assertEqual(len(M.CONTROL_COMMANDS), 142)
         self.assertEqual(len(M.CONTROL_REJECTIONS), 13)
         self.assertIn('shared-native-public-pair-closed', M.CONTROL_COMMANDS)
         self.assertIn('formal-corrupt-4', M.CONTROL_COMMANDS)
-        self.assertEqual(len(M.require_control_commands(self.complete_commands())), 136)
+        self.assertEqual(len(M.require_control_commands(self.complete_commands())), 142)
 
     def test_controls_reject_omitted_materialization(self):
         rows = [row for row in self.complete_commands() if row['name'] != 'release-materialize-warm']

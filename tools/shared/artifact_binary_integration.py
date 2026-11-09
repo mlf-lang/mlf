@@ -142,7 +142,13 @@ def run_integration(fixture,output,run,record,typed,ref,shared_fixtures):
     open_negatives=[]
     resource_cases, resource_witnesses = opened.resource_mutation_cases(
         binary_pair, dependency_interfaces)
-    for label,pair,diagnostic in [*opened.mutation_cases(binary_pair), *resource_cases]:
+    content_stamp_cases = [opened.content_stamp_mutation(pair)
+                           for pair in (binary_pair, schema7_pair)]
+    for _, damaged, _ in content_stamp_cases:
+        # Must reach content binding, not fail an independent syntax/shape check.
+        opened.inspect_pair(damaged, dependency_interfaces)
+    for label,pair,diagnostic in [*opened.mutation_cases(binary_pair), *resource_cases,
+                                  *content_stamp_cases]:
         bad=output/label;bad.mkdir();prefix=bad/'unit'
         for suffix,data in zip(('.mlfci','.mlfco'),pair):prefix.with_suffix(suffix).write_bytes(data)
         require(invoke('formal-'+label,'formal-error',prefix,diagnostic)==b'PASS formal-open-reject\n',

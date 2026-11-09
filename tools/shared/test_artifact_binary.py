@@ -331,6 +331,7 @@ release-builtin-branches release-forged-current release-materialize-cold release
 wrong-open-family open-checksum-priority open-sha-before-crc
 open-crc-with-matching-sha wrong-open-compatibility wrong-open-association
 wrong-open-header wrong-open-wire-version wrong-open-reference wrong-open-fragment-stamp
+wrong-open-fragment-content-stamp schema7-wrong-open-fragment-content-stamp
 open-empty-roots open-wrong-fragment-count open-noninteger-fragment-count
 open-header-after-final open-duplicate-final open-wrong-final-envelope
 open-aggregate-unique-finals open-aggregate-repeated-root
