@@ -657,9 +657,74 @@ def pin_clang_trace(trace, pin):
     return selected_tools
 
 
-def source_checkpoint(root, git, env, expected, executing):
+def _readonly_git_context(root, git):
+    """Narrow admission for the reviewed standalone, SHA-1, non-gitlink repo.
+
+    No config values are requested or reported. This is intentionally not a
+    general Git configuration sandbox: unknown keys/layouts fail closed.
+    Keep this small admission identical in the driver and collector.
+    """
+    root, git = Path(root), Path(git)
+    require(root.is_absolute() and root.resolve(strict=True) == root and root.is_dir(),
+            'read-only Git requires a canonical standalone root')
+    directory = root / '.git'
+    require(directory.is_dir() and not directory.is_symlink()
+            and directory.resolve(strict=True) == directory, 'read-only Git does not support gitfiles/worktrees')
+    for name in ('config', 'index', 'HEAD'):
+        item = directory / name
+        require(item.is_file() and not item.is_symlink() and item.resolve(strict=True) == item,
+                'read-only Git metadata must be local regular files')
+    for name in ('commondir', 'config.worktree', 'objects/info/alternates', 'objects/info/http-alternates'):
+        require(not os.path.lexists(directory / name), 'read-only Git unsupported shared/worktree/alternate metadata')
+    objects = directory / 'objects'
+    require(objects.is_dir() and not objects.is_symlink() and objects.resolve(strict=True) == objects,
+            'read-only Git requires a local object directory')
+    packs = objects / 'pack'
+    require(not packs.is_symlink() and not any(packs.glob('*.promisor')),
+            'read-only Git does not support promisor object stores')
+    env = {'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent', 'LANG': 'C', 'LC_ALL': 'C',
+           'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null',
+           'GIT_OPTIONAL_LOCKS': '0', 'GIT_TERMINAL_PROMPT': '0', 'GIT_NO_LAZY_FETCH': '1'}
+    prefix = [str(git), '--no-pager', '--no-optional-locks',
+              '-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false',
+              '-c', 'core.preloadIndex=false', '-c', 'index.threads=1']
+    def inspect(*args):
+        return subprocess.check_output([*prefix, *args], cwd=root, env=env, text=True, timeout=15, stderr=subprocess.DEVNULL)
+    raw = inspect('config', '--local', '--no-includes', '--name-only', '--null', '--list')
+    require(not raw or raw.endswith('\0'), 'read-only Git config key framing differs')
+    # These keys cannot supply a command to the admitted status operation.
+    # fsmonitor is allowed only because the explicit command-line value above
+    # overrides its repository-local value. Do not echo rejected key names:
+    # subsection names can themselves contain private URLs or other data.
+    core = {'repositoryformatversion', 'filemode', 'bare', 'logallrefupdates',
+            'ignorecase', 'precomposeunicode', 'autocrlf', 'safecrlf', 'eol', 'fsmonitor'}
+    for key in raw.split('\0')[:-1] if raw else []:
+        key = key.lower()
+        allowed = (key.startswith('core.') and key[5:] in core) or key in {'user.name', 'user.email'}
+        allowed = allowed or bool(re.fullmatch(r'remote\.[^.]+\.(?:url|fetch|pushurl|tagopt)', key))
+        allowed = allowed or bool(re.fullmatch(r'branch\.[^.]+\.(?:remote|merge)', key))
+        require(allowed, 'read-only Git unsupported configuration key; no status executed')
+    raw = inspect('ls-files', '--stage', '-z')
+    require(not raw or raw.endswith('\0'), 'read-only Git index framing differs')
+    for row in raw.split('\0')[:-1] if raw else []:
+        header, separator, filename = row.partition('\t')
+        fields = header.split()
+        require(separator and filename and len(fields) == 3, 'read-only Git index entry malformed')
+        mode, oid, stage = fields
+        require(mode != '160000', 'read-only Git does not support gitlinks/submodules')
+        require(mode in {'100644', '100755', '120000'} and re.fullmatch(r'[0-9a-f]{40}', oid)
+                and stage == '0', 'read-only Git unsupported index mode/object/conflict')
+    return prefix, env
+
+
+def source_checkpoint(root, git, env, expected, executing, *, read_only=False):
     env = {k: v for k, v in env.items() if not k.startswith('GIT_') or k in ('GIT_CONFIG_NOSYSTEM', 'GIT_CONFIG_GLOBAL')}
+    if read_only:
+        prefix, env = _readonly_git_context(root, git)
     def query(*arguments):
+        if read_only:
+            return subprocess.check_output([*prefix, *arguments], cwd=root, env=env,
+                text=True, timeout=15, stderr=subprocess.DEVNULL).strip()
         return subprocess.check_output([str(git), '-c', 'core.preloadIndex=false', '-c', 'index.threads=1',
                                         *arguments], cwd=root, env=env, text=True).strip()
     require(Path(query('rev-parse', '--show-toplevel')).resolve() == root.resolve(), 'Git checkout mismatch')
@@ -668,7 +733,6 @@ def source_checkpoint(root, git, env, expected, executing):
     if executing:
         require(head == expected and not dirty, 'execution requires exact clean reviewed source checkpoint')
     return {'head': head, 'dirty': bool(dirty), 'expected': expected, 'git': str(git), 'git_sha256': sha(git)}
-
 
 def interrupted(signum, frame):
     raise InterruptedError('bootstrap driver interrupted by signal ' + str(signum))
@@ -856,7 +920,311 @@ def retain_boundary(output, receipt, phase):
     receipt['boundary_checkpoint'] = {'path': str(destination), 'sha256': sha(destination)}
 
 
+def _require_readonly_producer_source(source_root):
+    # native_install.verify invokes ldd/otool for an enabled registry. The raw
+    # shared-source GHC route has the canonical disabled native registry. Reject
+    # the unsupported installed-source branch BEFORE either authentication call;
+    # do not silently omit its native-tool closure or execute its tools.
+    registry = source_root / 'bootstrap/MLF/PreparedNativeData.hs'
+    require(sha(regular(registry)) == '908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33',
+            'read-only completed verification does not support an enabled native registry')
+
+
+def _completed_files(receipt, output, source_root, prerequisite_inputs):
+    """Read retained files only; checkpoints/prerequisites are authenticated by caller.
+
+    This is location-bound integrity verification, not portable evidence or a
+    claim that unbound miscellaneous B files have a final sealed inventory.
+    """
+    contract = receipt['contract']
+    inputs = receipt['inputs']
+    bindings = receipt['path_bindings']
+    require(inputs and bindings, 'missing completed input/path bindings')
+    for original, resolved in bindings.items():
+        require(str(Path(original).resolve(strict=True)) == resolved, 'completed input alias changed')
+    for filename, digest in inputs.items():
+        verified(filename, digest)
+    def pin(path):
+        path = Path(path)
+        resolved = regular(path.resolve(strict=True))
+        require(inputs.get(str(resolved)) == sha(resolved), 'completed input omitted: ' + str(path))
+        if str(path) != str(resolved):
+            require(bindings.get(str(path)) == str(resolved), 'completed alias omitted')
+        return resolved
+    for filename, digest in prerequisite_inputs.items():
+        require(inputs.get(filename) == digest, 'completed prerequisite input omitted')
+    auth = producer_authentication_inputs(source_root)
+    require(contract.get('producer_authentication_inputs') == auth, 'completed producer helper closure differs')
+    for path in auth:
+        pin(path)
+    for path in (Path(__file__).resolve(), ROOT / 'tools/shared/test_direct.py',
+                 ROOT / 'tools/shared/resource_watchdog.py',
+                 ROOT / 'tools/shared/collect_ghc_native_prerequisites.py'):
+        pin(path)
+    producer = pin(contract['producer_receipt'])
+    pair = producer.parent / 'bin'
+    _require_readonly_producer_source(source_root)
+    authenticate_producer(producer, pair, source_root, auth)
+    require(read(producer).get('optimization') == '2', 'completed route requires authenticated GHC O2')
+    clang, pkg, nice, python = (pin(contract[name]) for name in ('clang', 'pkg_config', 'nice', 'python'))
+    gc = Path(contract['gc_prefix'])
+    require(gc.is_dir() and gc.resolve(strict=True) == gc, 'completed GC prefix alias')
+    pin(gc / 'lib/libgc.a')
+    for path in (gc / 'include').rglob('*.h'):
+        pin(path)
+    loaders = loader_inventory([Path(p) for p in contract['loader_dirs']])
+    require(loaders == contract['loader_inventory'], 'completed loader closure differs')
+    for path in loaders['files']:
+        pin(path)
+    require(receipt['environment'] == isolated_environment(output, clang, pkg, gc,
+            [Path(p) for p in contract['loader_dirs']]), 'completed environment differs')
+    runtime = {str(p.resolve()): sha(p) for p in (source_root / 'runtime').iterdir()
+               if p.suffix in ('.c', '.h') and p.is_file()}
+    require(runtime, 'completed runtime inventory missing')
+    for path in runtime:
+        pin(path)
+    helper = output / 'tools/mlf-build-runner'
+    require(receipt['runner'] == {'path': str(helper), 'sha256': sha(regular(helper))},
+            'completed runner differs')
+    pin(helper)
+    plan = read(Path(contract['plans_dir']) / 'root-plan.json')
+    targets = read(source_root / 'mlf-package.json')['executables']
+    stages = {}
+    for name, selected, selected_helper in [('A', pair, helper),
+            ('B', output / 'stage-A/bin', output / 'stage-A/bin/mlf-build-runner')]:
+        stage = verify_stage(output / ('stage-' + name), output / ('cache-' + name),
+            selected, selected_helper, clang, runtime, plan['packages'], targets,
+            pkg, plan['crates'], source_root)
+        require(stage == receipt['stages'][name], 'completed stage ' + name + ' evidence differs')
+        for path, digest in stage['evidence'].items():
+            require(inputs.get(path) == digest, 'completed stage evidence omitted')
+        for original, resolved in stage['dependency_path_bindings'].items():
+            require(bindings.get(original) == resolved, 'completed stage dependency binding omitted')
+        stages[name] = stage
+    comparisons = compare_stages(stages['A'], stages['B'])
+    require(receipt.get('comparisons') == comparisons, 'completed raw fixed-point comparisons differ')
+
+    # authenticate_commands alone permits arbitrary successful saved argv.
+    # Reconstruct every expected command and check the retained protocol/identity
+    # outputs; never invoke the tool to obtain these answers during verification.
+    authenticate_commands(receipt, output)
+    rows = receipt['commands']
+    commands = {row['label']: row for row in rows}
+    require('native-loader-0' in commands, 'completed preflight commands missing')
+    ldd = pin(commands['native-loader-0']['argv'][0])
+    require(ldd.name == 'ldd', 'completed native loader tool differs')
+    gmp_flags = (output / 'commands/gmp-flags/build.log').read_text().strip().split()
+    require(receipt.get('native_gmp_flags') == gmp_flags, 'completed GMP flags differ')
+    gmp_dir = Path((output / 'commands/gmp-libdir/build.log').read_text().strip())
+    pin(gmp_dir / 'libgmp.so')
+    selected = pin_clang_trace((output / 'commands/clang-link-selection/build.log').read_text(), pin)
+    require(receipt.get('clang_selected_tools') == [str(p.resolve()) for p in selected],
+            'completed Clang selected tools differ')
+    expected = [(f'native-loader-{n}', [ldd, tool]) for n, tool in enumerate((clang, pkg, python))]
+    expected += [('gmp-flags', [pkg, '--cflags', '--libs', 'gmp']),
+                 ('gmp-libdir', [pkg, '--variable=libdir', 'gmp']),
+                 ('clang-link-selection', [clang, '-###', '-O2', source_root / 'runtime/mlf_build_runner.c',
+                    gc / 'lib/libgc.a', *gmp_flags, '-lm', '-lpthread', '-ldl',
+                    '-o', output / 'tools/not-built-link-probe'])]
+    expected += [('selected-tool-loader-' + str(n), [ldd, tool])
+                 for n, tool in enumerate(dict.fromkeys(selected))]
+    for name, source, flags in [('runner', source_root / 'runtime/mlf_build_runner.c', []),
+            ('runtime', source_root / 'runtime/mlf_runtime.c',
+             ['-I' + str(gc / 'include')] + [x for x in gmp_flags if x.startswith(('-I', '-D'))])]:
+        dependency = output / 'tools' / (name + '.d')
+        pin(dependency)
+        raw = dependency.read_text().replace('\\\n', ' ')
+        require(': ' in raw, 'completed header dependency inventory missing')
+        for filename in raw.split(': ', 1)[1].split():
+            path = Path(filename)
+            pin(path if path.is_absolute() else source_root / path)
+        expected.append((name + '-dependencies',
+                         [clang, '-M', '-std=c11', *flags, '-MF', dependency, source]))
+    expected += [('build-runner', [clang, '-O2', '-std=c11', '-Wall', '-Wextra', '-Werror',
+                                  source_root / 'runtime/mlf_build_runner.c', '-o', helper]),
+                 ('runner-protocol', [helper, '--protocol-version'])]
+    seconds = contract['action_seconds']
+    require(type(seconds) is int and seconds > 0, 'invalid completed action budget')
+    stage_commands = []
+    for name, selected in [('A', pair), ('B', output / 'stage-A/bin')]:
+        argv = stage_command(source_root, selected, output / ('stage-' + name),
+                             output / ('cache-' + name), clang, gc, seconds, pkg)
+        stage_commands.append(argv)
+        expected.append(('stage-' + name, argv))
+        expected += [(name + '-' + target + '-identity',
+                      [output / ('stage-' + name) / 'bin' / target, '--implementation-identity'])
+                     for target in TARGETS]
+    require(receipt.get('planned_stage_commands') == stage_commands, 'completed planned stages differ')
+    require([row['label'] for row in rows] == [label for label, _ in expected],
+            'completed command inventory/order differs')
+    for label, argv in expected:
+        row = commands[label]
+        require(row['argv'] == list(map(str, argv)), 'completed command argv differs: ' + label)
+        if label.startswith(('stage-A', 'A-')):
+            stage_environment = {'MLF_BUILD_RUNNER': str(helper)}
+        elif label.startswith(('stage-B', 'B-')):
+            stage_environment = {'MLF_BUILD_RUNNER': str(output / 'stage-A/bin/mlf-build-runner')}
+        else:
+            stage_environment = {}
+        require(row.get('stage_environment', {}) == stage_environment, 'completed selected runner differs')
+        if label.startswith(('native-loader-', 'selected-tool-loader-')):
+            for line in (output / 'commands' / label / 'build.log').read_text().splitlines():
+                match = re.search(r'(?:=>\s+|^\s*)(/[^\s]+)', line)
+                if match:
+                    pin(Path(match.group(1)))
+    require((output / 'commands/runner-protocol/build.log').read_text().strip() == '1',
+            'completed runner protocol evidence differs')
+    for name in ('A', 'B'):
+        for target in TARGETS:
+            require((output / 'commands' / (name + '-' + target + '-identity') / 'build.log').read_text().strip()
+                    == 'MLF/shared-haskell-v1 native-MLF', 'completed native identity evidence differs')
+
+    # The retained boundary is the historical A boundary, NOT a final B seal.
+    boundary = receipt['boundary_checkpoint']
+    history_path = output / 'checkpoints/native-A-complete.json'
+    require(boundary['path'] == str(history_path), 'completed historical boundary path differs')
+    history = read(verified(history_path, boundary['sha256']))
+    require(history.get('format') == 2 and history.get('route') == ROUTE
+            and history.get('phase') == 'native-A-complete' and history.get('status') == 'paused'
+            and history.get('complete') is False and history.get('fixed_point_qualified') is False
+            and history.get('boundary_complete') is True
+            and history.get('stage_complete') == {'runner': True, 'A': True, 'B': False}
+            and history.get('contract') == contract and history.get('checkpoints') == receipt['checkpoints']
+            and history.get('stages') == {'A': stages['A']}
+            and history.get('output_inventory') == receipt.get('output_inventory'),
+            'completed historical A boundary differs')
+    count = next(n for n, row in enumerate(rows) if row['label'] == 'stage-B')
+    require(history.get('commands') == rows[:count], 'completed historical command prefix differs')
+    authenticate_commands(history, output)
+    for filename, expected in history['inputs'].items():
+        require(inputs.get(filename) == expected, 'historical input pin changed or omitted')
+        verified(filename, expected)
+    for name, item in history['output_inventory'].items():
+        relative = Path(name)
+        require(not relative.is_absolute() and '..' not in relative.parts, 'unsafe historical inventory path')
+        path = output / relative
+        if item['kind'] == 'file':
+            verified(path, item['sha256'])
+        else:
+            require(item['kind'] == 'directory' and path.is_dir(), 'historical directory missing')
+    for target, pointer in [('emlf', 'compiler.path'), ('mlfpkg', 'manager.path')]:
+        published = output / 'stage-B/bin' / target
+        verified(published, comparisons[target]['binary_sha256'])
+        require(regular(output / pointer).read_text() == str(published) + '\n',
+                'completed publication pointer differs')
+    return comparisons
+
+
+def _authenticate_completed(path, digest, *, source_root, checkpoint, driver_checkpoint,
+        producer_receipt, producer_sha256, frontend_receipt, frontend_sha256, plans_dir, plans_sha256):
+    """Authenticate a completed live store without writes or candidate execution.
+
+    The caller must independently obtain the receipt digest and exact identities.
+    Git rev-parse/status are the only subprocesses, with optional locks disabled.
+    Existing clean-source checks and full producer/prerequisite/stage verifiers
+    remain mandatory; no trusted-snapshot or portable-origin protocol is implied.
+    """
+    path = verified(path, digest)
+    require(path.name == 'receipt.json', 'completed receipt filename differs')
+    output = path.parent
+    output_tree(output)
+    for name in ('driver.lock', 'compiler.path.pending', 'manager.path.pending', 'receipt.json.tmp'):
+        require(not (output / name).exists(), 'completed store is active or has unfinished publication')
+    receipt = read(path)
+    require(receipt.get('format') == 2 and receipt.get('route') == ROUTE
+            and receipt.get('output') == str(output) and receipt.get('mode') == 'execute'
+            and receipt.get('phase') == 'fixed-point-complete' and receipt.get('status') == 'passed'
+            and receipt.get('complete') is True and receipt.get('fixed_point_qualified') is True
+            and receipt.get('boundary_complete') is True and not receipt.get('error')
+            and receipt.get('stage_complete') == {'runner': True, 'A': True, 'B': True}
+            and set(receipt.get('stages', {})) == {'A', 'B'}, 'complete fixed-point receipt required')
+    source_root = Path(source_root)
+    require(source_root.is_absolute() and source_root.resolve(strict=True) == source_root,
+            'canonical completed source root required')
+    require(all(re.fullmatch(r'[0-9a-f]{40}', value or '') for value in (checkpoint, driver_checkpoint)),
+            'completed verification needs exact source/driver checkpoints')
+    git = regular(Path('/usr/bin/git').resolve(strict=True))
+    # Authenticate the fixed executable BEFORE the first admission/Git query.
+    # Saved source and driver checkpoints must bind the same original tool.
+    git_digest = sha(git)
+    saved_checkpoints = receipt.get('checkpoints', {})
+    require(receipt.get('contract', {}).get('checkpoints') == saved_checkpoints,
+            'completed original checkpoint bindings differ')
+    for name, expected in [('source', checkpoint), ('driver', driver_checkpoint)]:
+        saved = saved_checkpoints.get(name, {})
+        require(saved.get('git') == str(git) and saved.get('git_sha256') == git_digest
+                and saved.get('head') == expected and saved.get('expected') == expected
+                and saved.get('dirty') is False, 'completed original Git/tool checkpoint pin differs')
+    require(receipt.get('inputs', {}).get(str(git)) == git_digest, 'completed original Git input pin differs')
+    env = {'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent', 'LANG': 'C',
+           'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null'}
+    def checkpoints():
+        return {'source': source_checkpoint(source_root, git, env, checkpoint, True, read_only=True),
+                'driver': source_checkpoint(ROOT, git, env, driver_checkpoint, True, read_only=True)}
+    identities = checkpoints()
+    require(receipt.get('checkpoints') == identities, 'completed source/driver identity drift')
+    producer = verified(producer_receipt, producer_sha256)
+    gate = verified(frontend_receipt, frontend_sha256)
+    require(read(gate).get('binding', {}).get('git') == {'path': str(git), 'sha256': git_digest},
+            'completed prerequisite Git pin differs from the fixed authenticated tool')
+    plans_dir = Path(plans_dir)
+    require(plans_dir.is_absolute() and plans_dir.resolve(strict=True) == plans_dir,
+            'canonical completed plans directory required')
+    verified(plans_dir / 'receipt.json', plans_sha256)
+    contract = receipt['contract']
+    required = {'source_root': str(source_root), 'driver_root': str(ROOT), 'checkpoints': identities,
+                'producer_receipt': str(producer), 'producer_sha256': producer_sha256,
+                'frontend_receipt': str(gate), 'frontend_sha256': frontend_sha256,
+                'plans_dir': str(plans_dir), 'plans_sha256': plans_sha256}
+    require(all(contract.get(key) == value for key, value in required.items()), 'completed input contract differs')
+    require(receipt.get('producer_receipt_sha256') == producer_sha256
+            and receipt.get('frontend_receipt_sha256') == frontend_sha256
+            and receipt.get('plans_receipt_sha256') == plans_sha256, 'completed receipt digest bindings differ')
+    _require_readonly_producer_source(source_root)
+    prerequisites = verify_prerequisites(gate_receipt=gate, gate_sha256=frontend_sha256,
+        plans_dir=plans_dir, plans_sha256=plans_sha256, producer_receipt=producer, producer_sha256=producer_sha256,
+        source_root=source_root, source_checkpoint=checkpoint, driver_root=ROOT,
+        driver_checkpoint=driver_checkpoint, read_only=True)
+    comparisons = _completed_files(receipt, output, source_root, prerequisites['inputs'])
+    for filename, expected in receipt['inputs'].items():
+        verified(filename, expected)
+    for original, resolved in receipt['path_bindings'].items():
+        require(str(Path(original).resolve(strict=True)) == resolved, 'completed input alias changed during authentication')
+    require(checkpoints() == identities, 'completed checkpoint changed during authentication')
+    verified(path, digest)
+    output_tree(output)
+    return {'receipt_sha256': digest, 'checkpoints': identities, 'comparisons': comparisons,
+            'scope': 'location-bound completed-result integrity; not portable or full language qualification'}
+
+
+def authenticate_completed(path, digest, **identities):
+    # Suppress import cache writes before loading any authenticated source helper.
+    # Keep this guarantee for API callers as well as the recommended python -B CLI.
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        return _authenticate_completed(path, digest, **identities)
+    finally:
+        sys.dont_write_bytecode = previous
+
+
+def completed_main(argv):
+    parser = argparse.ArgumentParser(description='Read-only completed-result authentication; no compiler execution.')
+    parser.add_argument('--verify-complete', action='store_true', required=True)
+    for name in ('receipt', 'source-root', 'producer-receipt', 'frontend-receipt', 'plans-dir'):
+        parser.add_argument('--' + name, required=True, type=Path)
+    for name in ('receipt-sha256', 'checkpoint', 'driver-checkpoint', 'producer-sha256', 'frontend-sha256', 'plans-sha256'):
+        parser.add_argument('--' + name, required=True)
+    args = vars(parser.parse_args(argv))
+    path, digest = args.pop('receipt'), args.pop('receipt_sha256')
+    args.pop('verify_complete')
+    print(json.dumps(authenticate_completed(path, digest, **args), sort_keys=True))
+
+
 def main():
+    if '--verify-complete' in sys.argv[1:]:
+        completed_main(sys.argv[1:])
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     for arg in ('producer-receipt', 'frontend-receipt', 'plans-dir', 'output', 'clang', 'gc-prefix'):
         parser.add_argument('--' + arg, required=True, type=Path)

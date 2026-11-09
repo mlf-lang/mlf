@@ -554,14 +554,78 @@ def authenticate_gate(path, digest, producer_digest, root=ROOT):
     return gate
 
 
-def checkpoint(root, expected, git, env):
+def _readonly_git_context(root, git):
+    """Narrow admission for the reviewed standalone, SHA-1, non-gitlink repo.
+
+    No config values are requested or reported. This is intentionally not a
+    general Git configuration sandbox: unknown keys/layouts fail closed.
+    Keep this small admission identical in the driver and collector.
+    """
+    root, git = Path(root), Path(git)
+    require(root.is_absolute() and root.resolve(strict=True) == root and root.is_dir(),
+            'read-only Git requires a canonical standalone root')
+    directory = root / '.git'
+    require(directory.is_dir() and not directory.is_symlink()
+            and directory.resolve(strict=True) == directory, 'read-only Git does not support gitfiles/worktrees')
+    for name in ('config', 'index', 'HEAD'):
+        item = directory / name
+        require(item.is_file() and not item.is_symlink() and item.resolve(strict=True) == item,
+                'read-only Git metadata must be local regular files')
+    for name in ('commondir', 'config.worktree', 'objects/info/alternates', 'objects/info/http-alternates'):
+        require(not os.path.lexists(directory / name), 'read-only Git unsupported shared/worktree/alternate metadata')
+    objects = directory / 'objects'
+    require(objects.is_dir() and not objects.is_symlink() and objects.resolve(strict=True) == objects,
+            'read-only Git requires a local object directory')
+    packs = objects / 'pack'
+    require(not packs.is_symlink() and not any(packs.glob('*.promisor')),
+            'read-only Git does not support promisor object stores')
+    env = {'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent', 'LANG': 'C', 'LC_ALL': 'C',
+           'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null',
+           'GIT_OPTIONAL_LOCKS': '0', 'GIT_TERMINAL_PROMPT': '0', 'GIT_NO_LAZY_FETCH': '1'}
+    prefix = [str(git), '--no-pager', '--no-optional-locks',
+              '-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false',
+              '-c', 'core.preloadIndex=false', '-c', 'index.threads=1']
+    def inspect(*args):
+        return subprocess.check_output([*prefix, *args], cwd=root, env=env, text=True, timeout=15, stderr=subprocess.DEVNULL)
+    raw = inspect('config', '--local', '--no-includes', '--name-only', '--null', '--list')
+    require(not raw or raw.endswith('\0'), 'read-only Git config key framing differs')
+    # These keys cannot supply a command to the admitted status operation.
+    # fsmonitor is allowed only because the explicit command-line value above
+    # overrides its repository-local value. Do not echo rejected key names:
+    # subsection names can themselves contain private URLs or other data.
+    core = {'repositoryformatversion', 'filemode', 'bare', 'logallrefupdates',
+            'ignorecase', 'precomposeunicode', 'autocrlf', 'safecrlf', 'eol', 'fsmonitor'}
+    for key in raw.split('\0')[:-1] if raw else []:
+        key = key.lower()
+        allowed = (key.startswith('core.') and key[5:] in core) or key in {'user.name', 'user.email'}
+        allowed = allowed or bool(re.fullmatch(r'remote\.[^.]+\.(?:url|fetch|pushurl|tagopt)', key))
+        allowed = allowed or bool(re.fullmatch(r'branch\.[^.]+\.(?:remote|merge)', key))
+        require(allowed, 'read-only Git unsupported configuration key; no status executed')
+    raw = inspect('ls-files', '--stage', '-z')
+    require(not raw or raw.endswith('\0'), 'read-only Git index framing differs')
+    for row in raw.split('\0')[:-1] if raw else []:
+        header, separator, filename = row.partition('\t')
+        fields = header.split()
+        require(separator and filename and len(fields) == 3, 'read-only Git index entry malformed')
+        mode, oid, stage = fields
+        require(mode != '160000', 'read-only Git does not support gitlinks/submodules')
+        require(mode in {'100644', '100755', '120000'} and re.fullmatch(r'[0-9a-f]{40}', oid)
+                and stage == '0', 'read-only Git unsupported index mode/object/conflict')
+    return prefix, env
+
+
+def checkpoint(root, expected, git, env, *, read_only=False):
     require(COMMIT.fullmatch(expected or ''), 'exact reviewed checkpoint required')
+    if read_only:
+        prefix, env = _readonly_git_context(root, git)
     def query(*args):
+        if read_only:
+            return subprocess.check_output([*prefix, *args], cwd=root, env=env,
+                text=True, timeout=15, stderr=subprocess.DEVNULL).strip()
         return subprocess.check_output([str(git), '-c', 'core.preloadIndex=false', '-c', 'index.threads=1',
                                         *args], cwd=root, env=env, text=True, timeout=15).strip()
     require(query('rev-parse', '--show-toplevel') == str(root) and query('rev-parse', 'HEAD') == expected
             and not query('status', '--porcelain', '--untracked-files=normal'), 'source/driver checkpoint is not exact and clean')
-
 
 def authenticate_producer(path, root, expected_helpers=None):
     expected_helpers = authentication_inputs(root) if expected_helpers is None else expected_helpers
@@ -580,7 +644,7 @@ def authenticate_producer(path, root, expected_helpers=None):
 
 def verify_prerequisites(*, gate_receipt, gate_sha256, plans_dir, plans_sha256,
                          producer_receipt, producer_sha256, source_root, source_checkpoint,
-                         driver_root=None, driver_checkpoint=None):
+                         driver_root=None, driver_checkpoint=None, read_only=False):
     """Strict public driver boundary. Return all reauthenticated evidence hashes."""
     root = canonical_dir(source_root)
     producer_path = verified(producer_receipt, producer_sha256)
@@ -596,8 +660,12 @@ def verify_prerequisites(*, gate_receipt, gate_sha256, plans_dir, plans_sha256,
         require(binding['driver_root'] == str(canonical_dir(driver_root)), 'wrong driver root')
     if driver_checkpoint is not None:
         require(binding['driver_checkpoint'] == driver_checkpoint, 'wrong driver checkpoint')
-    checkpoint(root, source_checkpoint, binding['git']['path'], binding['environment'])
-    checkpoint(ROOT, binding['driver_checkpoint'], binding['git']['path'], binding['environment'])
+    if read_only:
+        checkpoint(root, source_checkpoint, binding['git']['path'], binding['environment'], read_only=True)
+        checkpoint(ROOT, binding['driver_checkpoint'], binding['git']['path'], binding['environment'], read_only=True)
+    else:
+        checkpoint(root, source_checkpoint, binding['git']['path'], binding['environment'])
+        checkpoint(ROOT, binding['driver_checkpoint'], binding['git']['path'], binding['environment'])
     authenticate_producer(producer_path, root, binding['authentication_helpers'])
     tracked = authenticate_plans(plans, producer_sha256, root)
     tracked.update(verify_maps(gate))
