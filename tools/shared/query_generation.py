@@ -79,6 +79,25 @@ class Generation:
         require(len(roots) == 1, "expected one query index")
         root = roots[0]
         require(root[0] == "node" and root[1] in (411, 412), "unknown query generation")
+        # Main's dictionary v2 predates the seven-field declaration snapshot.
+        # Preserve its independent full-use, hash, UTF-8/work and depth checks.
+        self.dictionary_format = root[1] == 412 and len(root[2]) == 4
+        if self.dictionary_format:
+            from test_query_index import read_index
+            fields = value_node(root, 412, 4)
+            self.version, self.config = 2, fields[1]
+            require(configuration is None or text(self.config) == configuration,
+                    "generation configuration")
+            records, _ = read_index(raw, text(self.config), expected=expected_hash)
+            self.nodes = {k: dict(sha=h, reads=reads, payload=payload)
+                          for k, (h, reads, payload) in records.items()}
+            self.rows = [n(410, ("text", k), ("text", h),
+                           n(1, *(n(2, ("text", target), ("text", observed))
+                                  for target, observed in reads)),
+                           n(4) if payload is None else n(5, ("text", payload)))
+                         for k, (h, reads, payload) in records.items()]
+            self.refs = {}
+            return
         self.version = 1 if root[1] == 411 else 2
         fields = value_node(root, root[1], 3 if self.version == 1 else 7)
         require(text(fields[0]) == (V1 if self.version == 1 else V2), "generation format")
@@ -184,6 +203,25 @@ class Generation:
         config = self.config if config is None else config
         if self.version == 1:
             return tree_document([n(411, ("text", V1), config, n(1, *rows))], schema=6)
+        if self.dictionary_format:
+            logical = []
+            for row in rows:
+                key, result, reads, payload = value_node(row, 410, 4)
+                logical.append((text(key), text(result),
+                    [(text(k), text(h)) for k, h in
+                     (value_node(edge, 2, 2) for edge in list_values(reads))],
+                    None if payload == n(4) else text(value_node(payload, 5, 1)[0])))
+            strings = sorted({v for k, h, edges, payload in logical
+                              for v in [k, h, *(x for edge in edges for x in edge),
+                                        *([] if payload is None else [payload])]})
+            ids = {value: i for i, value in enumerate(strings)}
+            ref = lambda value: ("int", ids[value])
+            encoded = [n(413, ref(k), ref(h), n(1, *(n(2, ref(a), ref(b)) for a, b in edges)),
+                         n(4) if payload is None else n(5, ref(payload)))
+                       for k, h, edges, payload in sorted(logical)]
+            return tree_document([n(412, ("text", V2), config,
+                                      n(1, *(("text", value) for value in strings)),
+                                      n(1, *encoded))], schema=6)
         encoded = []
         for row in rows:
             key, result, reads, payload = value_node(row, 410, 4)

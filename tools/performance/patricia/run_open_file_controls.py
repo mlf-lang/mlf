@@ -1,4 +1,7 @@
-"""Explicit Session boundary adapter; the original C4 byte gate is untouched."""
+"""Current schema8 Session boundary; the original C4 byte gate is untouched.
+
+This gate requires exact same-format audit bytes, not schema7-to-8 migration.
+"""
 from pathlib import Path
 import os
 import re
@@ -367,6 +370,8 @@ def run_session_files(H, output, record, inputs, binaries, producer, source,
                 [path.read_bytes() for path in dependency_paths], audited,
                 (views / 'crate.xterm-v6.bin').read_bytes(),
                 (views / 'session.xterm-v6.bin').read_bytes(), entry_selection=True)
+            H.require(row['comparison']['open_wire_schema'] == 8,
+                      'current Session C4 writer emits schema8')
             H.require(row['comparison']['fragment_count'] == fragments,
                       'public and independent complete fragment inventory')
             row['cross_format_raw_bytes_equal'] = raw_files(closed_prefix) == cold_files

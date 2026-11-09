@@ -1,0 +1,55 @@
+{
+  "base_head": "eea644f405f90a81a6a81982570bb82fdf425c34",
+  "base_tree": "21fd8a08c26a350560f63bdb76c7c72ac47bbda0",
+  "builtin_contract_sha256": "80ab586aed593698fc60f1644e8f0b4b24fc5d33140e7da60675ee5cf6677c19",
+  "builtin_manifest_sha256": "fb8335e198e463d3a25b336f124d56dac141c6ad2063df531c09ade8e7411559",
+  "builtin_value_sha256": "804ffd40e4b87d835d388291d11fa982bf58845b19c3e7a5c914d30ed36b30a2",
+  "current_inventory_sha256": "939a65293025b6e055c74970eb720b943875036a75c0db5c0c4dde94327b0284",
+  "current_registry_sha256": "bd3aa59b8a3369c3b03a5319c50c1056e791f4e4569bdd7618c6c402275ebced",
+  "evidence": {
+    "file": "open-release-provenance.json",
+    "sha256": "48e6736dc6f20ebfa041ad1d8ab24b58734f237bb83fdb6fd420e8374630223b"
+  },
+  "file_count": 196,
+  "format": "open-release-source-migration-v1",
+  "module_count": 135,
+  "parent_inventory_sha256": "46b45c12e78a56b3fd134270b927fee336b7755e4ac47ad2dcbe440a4a3dd422",
+  "parent_registry_sha256": "0a4872f55933ae158cf76735bfe05c00ac7368c0ed38887638a43d244ab715d1",
+  "primitive_count": 132,
+  "qualification_scope": "Source identity and reversible projection only; no new runtime or generation qualification.",
+  "transition": {
+    "added_paths": [],
+    "changed_paths": [
+      "bootstrap/MLF/BuiltinPreludeData.hs",
+      "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "libraries/mlf-package-core/Package/Release.hs",
+      "mlf.lock"
+    ],
+    "deltas": {
+      "bootstrap/MLF/BuiltinPreludeData.hs": {
+        "file": "open-release-deltas/000.json",
+        "new": "3ef159011d588632e27cc03f76461af04615b621b4c51d8f8687e122b5ae5c85",
+        "old": "f5ec5f115ed013bc40993039f02249eb809c5aa1ecf22d0c39bc4564a8c73e78",
+        "sha256": "2669fc285a5e18aa240b3f8a2874197d81bfb7ab0d5b8b3e9d8afb13057b8ef8"
+      },
+      "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": {
+        "file": "open-release-deltas/001.json",
+        "new": "c9d33e20985b3a9b6ec34733f024e5378388799d5cf5f68bbbce13242e886453",
+        "old": "d13d59ed310bb8ef447596437516cfadbbbb025da632b18930e2b4263ac97826",
+        "sha256": "1cb119ace04563f8b78d3663b492809021b40ba5e6f12b603021c4d9e51957fa"
+      },
+      "libraries/mlf-package-core/Package/Release.hs": {
+        "file": "open-release-deltas/002.json",
+        "new": "0b23919bb1f3047a222fd8efec0da951d5b1f6e2a3d1bb69d093a9db0ccb9a4e",
+        "old": "36339e780160c328cf6b4a5cc2d2391c6b166f8bc6c53319cace55ea312801d3",
+        "sha256": "fcb0bf6dfb85fc624f024db40e64ab14614ad9d3e667837b56d2f129df481afb"
+      },
+      "mlf.lock": {
+        "file": "open-release-deltas/003.json",
+        "new": "67a194f6ed737128b55eee971ee6c2092dc6a4181ff075b1b69a900b05b799cf",
+        "old": "531c9b120eb85e1a66f90d4bc8a10cc9c537e7ac052063a0ab76f0a5336aeaae",
+        "sha256": "ab42d5c17a5b4df24476caec059a4b647cc123a2f7aac17d47b1ac00d008717a"
+      }
+    }
+  }
+}

@@ -1035,6 +1035,17 @@ module Bootstrap.ArtifactStructure where {
   decodeValue shape value = decodeInput shape (ValueInput value);
   decodeGraphValue :: DecodeShape -> W.Graph -> Int -> Either String Decoded;
   decodeGraphValue shape graph index = decodeInput shape (GraphInput graph index);
+  -- One call owns one graph-local memo. No caller can carry it into
+  -- another graph, where node IDs would have different meanings.
+  decodeGraphMany :: DecodeShape -> W.Graph -> [] Int ->
+    Either String ([] Decoded);
+  decodeGraphMany shape graph indices = do {
+    inputs <- graphInputs (W.maxExpandedWork W.defaultLimits)
+      graph indices [];
+    results <- decodeWork (W.maxExpandedWork W.defaultLimits)
+      [DecodeRepeated shape inputs] [] (NodeMemo IM.empty);
+    Right (S.reverse results)
+  };
   decodeInput :: DecodeShape -> DecodeInput -> Either String Decoded;
   decodeInput shape input = do {
     results <- decodeWork (W.maxExpandedWork W.defaultLimits)

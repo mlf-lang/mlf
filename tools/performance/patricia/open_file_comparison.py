@@ -82,6 +82,45 @@ def dependency_decoded(raw):
                             'exact added dependency primitive identity')
     return values[0]
 
+OPEN_FORMATS = {7: 'MLF-OPEN-CRATE-1/checker-1', 8: 'MLF-OPEN-CRATE-2/checker-1'}
+
+def open_document(raw):
+    """C4 same-format view, not a general schema7-to-8 migration checker.
+
+    The frozen independent codec's original 64 Mi-unit summed-work limit
+    remains unchanged, including for these small schema8 C4 fixtures. This is
+    deliberately narrower than production schema8's package resource class.
+    No fragment content, ordering or metadata is normalized by this view.
+    """
+    require(isinstance(raw, bytes) and len(raw) >= 20, 'complete open binary header')
+    schema = int.from_bytes(raw[16:20], 'little')
+    require(schema in OPEN_FORMATS, 'unsupported open schema')
+    document = read_document(raw, schema)
+    values = document.values()
+    require(tree_document(values, schema) == raw, 'canonical whole open binary bytes')
+    if schema == 7:
+        require(len(values) == 1, 'exactly one schema7 open root')
+        opened = fields(values[0], 430, 6)
+    else:
+        require(bool(values), 'open header root required')
+        header = fields(values[0], 432, 6)
+        require(header[5][0] == 'int' and header[5][1] == len(values) - 1,
+                'open fragment count mismatch')
+        opened = (*header[:5], sequence(values[1:]))
+    require(text(opened[0]) == OPEN_FORMATS[schema], 'wrong open package family')
+    for fragment in items(opened[5]):
+        fields(fragment, 401, 7)
+    return schema, opened
+
+def open_bytes(schema, opened):
+    """Native-negative fixture writer; retain the original wire family."""
+    require(schema in OPEN_FORMATS, 'unsupported fixture open schema')
+    if schema == 7:
+        return tree_document([node(430, *opened)], 7)
+    fragments = items(opened[5])
+    header = node(432, *opened[:5], ('int', len(fragments)))
+    return tree_document([header, *fragments], 8)
+
 def keyed(values, label):
     result = {}
     for key, value in values:
@@ -441,13 +480,13 @@ def _compare(closed_files, open_files, dependency_interfaces,
     ci = decoded(closed_files['.mlfci'], 3, 'CrateInterfaceFields')
     oi = decoded(open_files['.mlfci'], 3, 'CrateInterfaceFields')
     closed = fields(decoded(closed_files['.mlfco'], 4, 'CrateObjectFields'), 243, 3)
-    opened = fields(decoded(open_files['.mlfco'], 7), 430, 6)
+    open_schema, opened = open_document(open_files['.mlfco'])
     cf, of = fields(ci, 242, 13), fields(oi, 242, 13)
     require(closed[0] == node(6), 'expected ordinary nonlegacy closed family')
     require(closed[1] == ci, 'closed embedded/paired interface mismatch')
     require(all(cf[i] == of[i] for i in range(13) if i != 11), 'complete interface content changed')
     require(text(of[11]) == hashlib.sha256(open_files['.mlfco']).hexdigest(), 'actual open object SHA mismatch')
-    require(text(opened[0]) == 'MLF-OPEN-CRATE-1/checker-1', 'wrong open package family')
+    require(text(opened[0]) == OPEN_FORMATS[open_schema], 'wrong open package family')
     compatibility = compatibility_identity()
     require(text(opened[1]) == compatibility, 'wrong checker/compiler compatibility identity')
     dependencies = [dependency_decoded(raw) for raw in dependency_interfaces]
@@ -555,7 +594,8 @@ def _compare(closed_files, open_files, dependency_interfaces,
     if entry_selection:
         old_linked, selection = select_original_linked(old_linked, fragments, text(of[10]))
     linked = linked_equal(old_linked, new_linked)
-    return {'comparison': 'explicit-schema-4-to-7', 'groups': group_reports,
+    return {'comparison': 'explicit-schema-4-to-' + str(open_schema), 'open_wire_schema': open_schema,
+            'audit_scope': 'exact same-format pair; not schema7-to-8 migration', 'groups': group_reports,
             'fragment_count': len(groups), 'group_count': len(groups), 'binding_reference_count': len(br),
             'datatype_reference_count': len(dr), 'compatibility_identity': compatibility,
             'interface_content_exact': True, 'all_original_fragment_bodies_exact': True,
@@ -570,14 +610,14 @@ def make_native_negatives(closed_files, open_files):
     deletion must finish native audit/rebuild, then fail this comparator. The
     caller must retain logs and run these controls in CI, not just unit tests.
     """
-    root = decoded(open_files['.mlfco'], 7)
+    open_schema, opened = open_document(open_files['.mlfco'])
     iface = decoded(open_files['.mlfci'], 3, 'CrateInterfaceFields')
     def changed_open(value):
-        raw = tree_document([value], 7)
+        raw = open_bytes(open_schema, value)
         fs = list(fields(iface, 242, 13))
         fs[11] = string(hashlib.sha256(raw).hexdigest())
         return {'.mlfci': tree_document([node(242, *fs)], 3), '.mlfco': raw}
-    fs = list(fields(root, 430, 6))
+    fs = list(opened)
     entries = list(items(fs[5]))
     require(entries, 'native negative requires a positive artifact')
     first = list(fields(entries[0], 401, 7))
@@ -585,7 +625,7 @@ def make_native_negatives(closed_files, open_files):
     receipt_entries = [node(401, *first), *entries[1:]]
     receipt_fields = list(fs)
     receipt_fields[5] = sequence(receipt_entries)
-    receipt = changed_open(node(430, *receipt_fields))
+    receipt = changed_open(receipt_fields)
     used_entries = list(entries)
     found = False
     for index, entry in enumerate(used_entries):
@@ -599,7 +639,7 @@ def make_native_negatives(closed_files, open_files):
     require(found, 'native used-name control requires an actually used parameter')
     used_fields = list(fs)
     used_fields[5] = sequence(used_entries)
-    used = changed_open(node(430, *used_fields))
+    used = changed_open(used_fields)
     ci = decoded(closed_files['.mlfci'], 3, 'CrateInterfaceFields')
     co = list(fields(decoded(closed_files['.mlfco'], 4, 'CrateObjectFields'), 243, 3))
     cif = list(fields(ci, 242, 13))

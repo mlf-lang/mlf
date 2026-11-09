@@ -54,6 +54,20 @@ class GenerationTests(unittest.TestCase):
             graphs.append(graph.nodes)
         self.assertEqual(*graphs)
 
+    def test_main_dictionary_shape_compatibility(self):
+        # Authored four-field dictionary fixture, distinct from typed snapshots.
+        raw = tree_document([n(412, s(V2), s("cfg"), l(s("1" * 64), s("leaf")),
+                               l(n(413, i(1), i(0), l(), n(4))))], 6)
+        graph = Generation(raw, configuration="cfg")
+        self.assertTrue(graph.dictionary_format)
+        self.assertEqual(graph.nodes, {"leaf": dict(sha="1" * 64, reads=[], payload=None)})
+        self.assertEqual(graph.encode_rows(graph.rows), raw)
+        self.assertEqual(Generation(graph.legacy_bytes()).nodes, graph.nodes)
+        unused = tree_document([n(412, s(V2), s("cfg"), l(s("1" * 64), s("leaf"), s("unused")),
+                                  l(n(413, i(1), i(0), l(), n(4))))], 6)
+        with self.assertRaises(Invalid):
+            Generation(unused, configuration="cfg")
+
     def test_malformed_tables_and_edges(self):
         def corrupted(field, value):
             fields, _ = fixture(["A.f", "B.f"])

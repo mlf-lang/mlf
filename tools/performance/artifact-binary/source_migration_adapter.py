@@ -1,12 +1,12 @@
-"""Load the pinned DeclId source transition for current qualification and historical projections."""
+"""Load the pinned PR43 reconciliation source transition for current qualification and historical projections."""
 from pathlib import Path
 import hashlib
 import types
 import os
 import stat
 
-FINAL_MANIFEST_SHA256 = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
-CONTRACT_SOURCE_SHA256 = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
+FINAL_MANIFEST_SHA256 = '8441e82c7661fae5051260701ba52312f6413d81335eadff388ff0add5651433'
+CONTRACT_SOURCE_SHA256 = '40d6d24de1e397f50667624ca241d00a537e7e089784b099a5ba1cdc6c211cc0'
 
 
 def read_implementation(path):
@@ -33,12 +33,12 @@ def read_implementation(path):
 
 def live_contract(history_root, source_root=None):
     directory = Path(__file__).resolve().parent
-    path = directory / 'declid_contract.py'
+    path = directory / 'reconciliation_contract.py'
     raw = read_implementation(path)
     if hashlib.sha256(raw).hexdigest() != CONTRACT_SOURCE_SHA256:
-        raise ValueError('fixed DeclId source contract implementation SHA')
+        raise ValueError('fixed PR43 reconciliation source contract implementation SHA')
     import sys
-    name = '_mlf_declid_contract_' + CONTRACT_SOURCE_SHA256
+    name = '_mlf_pr43_contract_' + CONTRACT_SOURCE_SHA256
     if name in sys.modules:
         return sys.modules[name].Contract(directory, FINAL_MANIFEST_SHA256, history_root, source_root=source_root)
     module = types.ModuleType(name)

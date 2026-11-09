@@ -10,6 +10,8 @@ module Main where {
   import qualified Bootstrap.ArtifactStorage as Storage;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.CrateArtifact as Crate;
+  import qualified Bootstrap.OpenFragment as Open;
+  import qualified Bootstrap.Std as Std;
   import qualified Bootstrap.X.Pretty as Pretty;
   require :: String -> Bool -> IO ();
   require label okay = if okay then return () else panic label;
@@ -184,8 +186,100 @@ module Main where {
         name == "NativeToken" && constructor == "NativeToken";
       _ -> False
     });
+    let {
+      empty = W.VNode 1 [];
+      names = W.VNode 1 [A.toXName (XName 9 "typed-batch")];
+      emptyPair = W.VNode 2 [empty, empty];
+      mixedPair = W.VNode 2 [names, names]
+    };
+    batchBytes <- W.encode W.defaultLimits 7
+      [emptyPair, mixedPair, A.toXTerm (XIntTerm 41), A.toXTerm (XIntTerm 42)] >>= right;
+    batchGraph <- W.decodeGraph W.defaultLimits 7 batchBytes >>= right;
+    case W.graphRoots batchGraph of {
+      [emptyID, mixedID, firstID, secondID] -> do {
+        emptyBatch <- right (A.decodeGraphMany A.ShapeXTerm batchGraph []);
+        require "typed batch accepts no roots" (Std.null emptyBatch);
+        emptyResult <- right (A.decodeGraphMany
+          (A.ShapePair (A.ShapeList A.ShapeText) (A.ShapeList A.ShapeXName))
+          batchGraph [emptyID]);
+        require "batch shared empty list retains recursive shape" (case emptyResult of {
+          [A.DecodedPair (A.DecodedList []) (A.DecodedList [])] -> True; _ -> False
+        });
+        case A.decodeGraphMany
+          (A.ShapePair (A.ShapeList A.ShapeXName) (A.ShapeList A.ShapeText))
+          batchGraph [mixedID] of {
+          Left _ -> return ();
+          Right _ -> panic "batch reused one node under an incompatible recursive shape"
+        };
+        ordered <- right (A.decodeGraphMany A.ShapeXTerm batchGraph
+          [firstID, secondID, firstID]);
+        require "batch retains root order and repetitions" (case ordered of {
+          [A.DecodedXTerm (XIntTerm 41), A.DecodedXTerm (XIntTerm 42),
+           A.DecodedXTerm (XIntTerm 41)] -> True;
+          _ -> False
+        });
+        otherBytes <- W.encode W.defaultLimits 7
+          [emptyPair, mixedPair, A.toXTerm (XIntTerm 43), A.toXTerm (XIntTerm 44)] >>= right;
+        otherGraph <- W.decodeGraph W.defaultLimits 7 otherBytes >>= right;
+        case W.graphRoots otherGraph of {
+          [_, _, otherID, _] -> do {
+            require "cross-graph test reuses the same numeric node ID" (otherID == firstID);
+            result <- right (A.decodeGraphMany A.ShapeXTerm otherGraph [otherID]);
+            require "batch memo is graph-local" (case result of {
+              [A.DecodedXTerm (XIntTerm 43)] -> True; _ -> False
+            })
+          };
+          _ -> panic "cross-graph batch fixture roots"
+        }
+      };
+      _ -> panic "typed batch fixture roots"
+    };
     putStrLn "PASS shared-typed-graph-and-admission"
   };
+  -- Compare every retained semantic field, not the storage-dependent object SHA.
+  -- The task stack preserves deep syntax and IEEE bit patterns exactly.
+  data SameSyntaxTask = SameSyntaxValue W.Value W.Value |
+    SameSyntaxList ([] W.Value) ([] W.Value);
+  sameSyntax :: [] SameSyntaxTask -> Bool;
+  sameSyntax tasks = case tasks of {
+    [] -> True;
+    (:) task rest -> case task of {
+      SameSyntaxList left right -> case left of {
+        [] -> case right of { [] -> sameSyntax rest; _ -> False };
+        (:) a more -> case right of {
+          (:) b following -> sameSyntax
+            ((:) (SameSyntaxValue a b) ((:) (SameSyntaxList more following) rest));
+          _ -> False
+        }
+      };
+      SameSyntaxValue left right -> case left of {
+        W.VInt a -> case right of { W.VInt b -> a == b && sameSyntax rest; _ -> False };
+        W.VBits a -> case right of { W.VBits b -> a == b && sameSyntax rest; _ -> False };
+        W.VText a -> case right of { W.VText b -> a == b && sameSyntax rest; _ -> False };
+        W.VNode tag fields -> case right of {
+          W.VNode other more -> tag == other &&
+            sameSyntax ((:) (SameSyntaxList fields more) rest);
+          _ -> False
+        }
+      }
+    }
+  };
+  fragmentSyntax ((,) name fragment) = W.VNode 433
+    [A.toText name, A.toText (Open.fingerprint fragment),
+     A.toList Open.declarationValue (Open.declarations (Open.context fragment)),
+     A.toList (A.toPair A.toXName (Std.compose A.toXType Separate.normalType))
+       (Open.parameters fragment),
+     A.toXTerm (Open.body fragment),
+     A.toList (A.toPair A.toXName (Std.compose A.toXType Separate.normalType))
+       (Open.bindings fragment),
+     A.toList A.toXName (Open.usedParameters fragment)];
+  sameFragments left right = sameSyntax
+    [SameSyntaxList (Std.map fragmentSyntax left) (Std.map fragmentSyntax right)];
+  sameOpenMeaning original package restored reread =
+    Crate.encodeInterface (Crate.withObjectFingerprint original "open-object") ==
+      Crate.encodeInterface (Crate.withObjectFingerprint restored "open-object") &&
+    Open.packageMetadata package == Open.packageMetadata reread &&
+    sameFragments (Open.packageFragments package) (Open.packageFragments reread);
   formalMain :: String -> String -> IO ();
   formalMain input output = do {
     iface <- Crate.readInterface (input ++ ".mlfci") >>= right;
@@ -195,7 +289,69 @@ module Main where {
     rebuilt <- Crate.readObject (output ++ ".mlfco") reread >>= right;
     require "public interface semantic identity" (Crate.encodeInterface iface == Crate.encodeInterface reread);
     require "public object semantic identity" (Crate.encodeObject object == Crate.encodeObject rebuilt);
+    case object of {
+      Crate.OpenCrateObject original package -> do {
+        imported <- Crate.loadInterfaces (Std.map Crate.dependencyPath (Crate.crateDependencies original)) >>= right;
+        audited <- right (Std.traverseEither (\((,) name fragment) ->
+          Std.mapEither ((,) name) (Open.audit fragment)) (Open.packageFragments package));
+        require "retained checker preserves complete fragment semantics"
+          (sameFragments (Open.packageFragments package) audited);
+        case rebuilt of {
+          Crate.OpenCrateObject _ transferred -> do {
+            exact <- Storage.sameBytes (Open.packageBytes package) (Open.packageBytes transferred);
+            require "open public transfer preserves original object bytes" exact
+          };
+          _ -> panic "open public transfer changed family"
+        };
+        checked <- Crate.makeOpenObject original (Std.map Std.snd imported) audited >>= right;
+        Crate.writeObjectEither (output ++ "-audited") checked >>= right;
+        checkedInterface <- Crate.readInterface (output ++ "-audited.mlfci") >>= right;
+        checkedObject <- Crate.readObject (output ++ "-audited.mlfco") checkedInterface >>= right;
+        case checkedObject of {
+          Crate.OpenCrateObject restored rereadPackage -> do {
+            oldSchema <- readByteArray (Open.packageBytes package) 16;
+            newSchema <- readByteArray (Open.packageBytes rereadPackage) 16;
+            require "retained audit rebuild uses schema 8"
+              ((oldSchema == 7 || oldSchema == 8) && newSchema == 8);
+            require "retained checked rebuild preserves complete open semantics"
+              (sameOpenMeaning original package restored rereadPackage);
+            if oldSchema == 8 then do {
+              exactObject <- Storage.sameBytes
+                (Open.packageBytes package) (Open.packageBytes rereadPackage);
+              originalMetadata <- Storage.readRaw (input ++ ".mlfci") >>= right;
+              auditedMetadata <- Storage.readRaw (output ++ "-audited.mlfci") >>= right;
+              exactMetadata <- Storage.sameBytes originalMetadata auditedMetadata;
+              require "schema 8 retained audit rebuild exact pair bytes"
+                (exactObject && exactMetadata)
+            } else return ()
+          };
+          _ -> panic "retained audit rebuild changed open family"
+        }
+      };
+      _ -> return ()
+    };
     putStrLn "PASS shared-public-binary-pair"
+  };
+  rejectMain :: String -> String -> Bool -> IO ();
+  rejectMain input expected auditing = do {
+    iface <- Crate.readInterface (input ++ ".mlfci") >>= right;
+    result <- Crate.readObject (input ++ ".mlfco") iface;
+    let { observed = case result of {
+      Left message -> if auditing then panic "audit negative failed ordinary admission" else Left message;
+      Right object -> if auditing then case object of {
+        Crate.OpenCrateObject _ package ->
+          Std.mapLeft (\message -> input ++ ".mlfco: " ++ message)
+            (Std.mapEither (\_ -> ()) (Std.traverseEither
+              (\entry -> Open.audit (Std.snd entry)) (Open.packageFragments package)));
+        _ -> Left "audit negative requires an open object"
+      } else Right ()
+    } };
+    case observed of {
+      Left message -> require "exact open rejection, no fallback"
+        (message == input ++ ".mlfco: " ++ expected);
+      Right _ -> panic "invalid open object accepted"
+    };
+    putStrLn "PASS shared-public-reject"
   };
   main :: IO ();
   main = do {
@@ -204,6 +360,10 @@ module Main where {
       root <- getLine; typedMain root
     } else if mode == "formal" then do {
       input <- getLine; output <- getLine; formalMain input output
+    } else if mode == "reject" then do {
+      input <- getLine; expected <- getLine; rejectMain input expected False
+    } else if mode == "audit-reject" then do {
+      input <- getLine; expected <- getLine; rejectMain input expected True
     } else panic "unknown shared binary fixture mode"
   }
 }

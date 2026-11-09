@@ -22,8 +22,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 HELPERS = ('artifact_binary_reference.py', 'artifact_binary_cases.py',
-           'artifact_binary_typed.py', 'artifact_binary_integration.py',
-           'artifact_structure_contract.json', 'artifact_binary_golden.json')
+           'artifact_binary_typed.py', 'artifact_binary_integration.py', 'artifact_binary_open.py',
+           'artifact_structure_contract.json', 'artifact_binary_golden.json', 'test_query_index.py')
 
 
 def require(ok, message):
@@ -304,14 +304,14 @@ def native_crate_plan(rows, directory, source):
 CONTROL_COMMANDS = frozenset("""
 wire-corpus constructors typed-bounds raw-ghc partial-write-ghc
 shared-ghc shared-ghc-typed shared-native shared-native-typed
-production-admission source-admission base64
+production-admission source-admission base64 audit-stamp
 lowered-cold lowered-warm lowered-change lowered-changed-warm
 lowered-install-1 lowered-mixed-cache1 lowered-repair-cache1
 lowered-install-2 lowered-mixed-cache2 lowered-repair-cache2
 lowered-identified-binary-corruption distribution-seed open-interface-controls
 formal-seed formal-legacy shared-ghc-public-pair shared-native-public-pair
-shared-ghc-closed-public-pair shared-native-closed-public-pair
-formal-corrupt-3 formal-corrupt-4 formal-corrupt-7
+formal-schema7 formal-closed query-index-pure query-index-publication
+formal-corrupt-3 formal-corrupt-4
  distribution-pack-binary distribution-format2-roundtrip distribution-format2-roundtrip-formal
  distribution-format1-compatibility distribution-format1-compatibility-formal
  distribution-repack-legacy distribution-format2-old-pair distribution-format2-old-pair-formal
@@ -321,7 +321,23 @@ formal-corrupt-3 formal-corrupt-4 formal-corrupt-7
  distribution-base64-length distribution-payload-metadata-sha distribution-payload-object-sha
  distribution-asset-valid distribution-asset-invalid
 release-builtin-branches release-forged-current release-materialize-cold release-materialize-warm
-""".split())
+""".split()) | frozenset(
+    backend + '-public-pair-' + variant
+    for backend in ('shared-ghc', 'shared-native')
+    for variant in ('closed', 'legacy', 'schema7')) | frozenset(
+    backend + '-' + case
+    for backend in ('formal', 'shared-ghc', 'shared-native')
+    for case in """
+wrong-open-family open-checksum-priority open-sha-before-crc
+open-crc-with-matching-sha wrong-open-compatibility wrong-open-association
+wrong-open-header wrong-open-wire-version wrong-open-reference wrong-open-fragment-stamp
+open-empty-roots open-wrong-fragment-count open-noninteger-fragment-count
+open-header-after-final open-duplicate-final open-wrong-final-envelope
+open-aggregate-unique-finals open-aggregate-repeated-root
+open-combined-binding-remainder-1 open-combined-declaration-remainder-1
+open-combined-binding-remainder-0 open-combined-declaration-remainder-0
+""".split()) | frozenset(
+    backend + '-wrong-checked-receipt' for backend in ('shared-ghc', 'shared-native'))
 CONTROL_REJECTIONS = frozenset("""
 distribution-wrong-version distribution-missing-crate distribution-duplicate-crate
  distribution-extra-crate distribution-escaping-key distribution-unknown-envelope-field
@@ -360,6 +376,7 @@ def main():
     parser.add_argument('--build-receipt', type=Path, required=True)
     parser.add_argument('--fixture', type=Path)
     parser.add_argument('--shared-fixture', type=Path)
+    parser.add_argument('--query-fixture', type=Path)
     parser.add_argument('--controls', type=Path)
     parser.add_argument('--clang', required=True)
     parser.add_argument('--gc-prefix', required=True, type=Path)
@@ -375,6 +392,7 @@ def main():
     producer_dir = receipt_path.parent
     fixture = regular(args.fixture or source / 'tools/shared/fixtures/item4/ArtifactBinary.hs')
     shared = regular(args.shared_fixture or source / 'tools/shared/fixtures/item4/RawBinaryShared.hs')
+    query_fixture = regular(args.query_fixture or source / 'tools/shared/fixtures/item4/QueryIndex.hs')
     controls = regular(args.controls or source / 'tools/shared/run_artifact_binary_controls.py')
     helpers = [regular(controls.with_name(name)) for name in HELPERS]
     build_path = regular(source / 'tools/shared/build.py')
@@ -405,7 +423,7 @@ def main():
     headers = [regular(p) for p in sorted((source / 'runtime').rglob('*.h'))]
     require(regular(source / 'runtime/mlf_byte_file.h') in headers,
             'new byte-file transport header missing')
-    inputs = [regular(__file__), fixture, shared, controls, *helpers, build_path,
+    inputs = [regular(__file__), fixture, shared, query_fixture, controls, *helpers, build_path,
               direct_path, source_manifest, *native_manifests, runtime, *transport_sources, *headers,
               python, clang, pkg_config, gc_archive, *gc_headers]
     require(all(not p.is_relative_to(output) for p in inputs), 'input inside output')
@@ -493,7 +511,10 @@ def main():
                  if name.endswith('.o') and name != 'objects/Main.o']
         require(links, 'producer has no linkable library objects')
         binaries = {}
-        for label, source_file in (('ghc', fixture), ('shared-ghc', shared)):
+        # QueryGraph controls use the same authenticated GHC objects. They do
+        # not change RawBinaryShared's separate exact51 native source closure.
+        for label, source_file in (('ghc', fixture), ('shared-ghc', shared),
+                                   ('query-index-ghc', query_fixture)):
             directory = output / (label + '-build'); directory.mkdir()
             obj, hi, binary = directory / 'Main.o', directory / 'Main.hi', directory / 'fixture'
             runner.run('compile-' + label, [ghc, '-c', *flags, *build.EXHAUSTIVENESS_FLAGS,
@@ -634,6 +655,7 @@ def main():
         inner = output / 'controls'
         result = runner.run('artifact-binary-controls', [python, '-I', '-B', controls,
             '--fixture', binaries['ghc'], '--shared-ghc-fixture', binaries['shared-ghc'],
+            '--query-fixture', binaries['query-index-ghc'],
             '--shared-native-fixture', native, '--build-receipt', receipt_path,
             '--partial-write-sink', sink, '--output', inner], timeout=900)
         summary = json.loads(result.stdout)
@@ -645,12 +667,24 @@ def main():
                 'aggregate failure sink identity/post-audit mismatch')
         require(summary['commands'] == len(body['commands']) and
                 summary['reference_cases'] == len(body['reference_cases']), 'aggregate count summary mismatch')
+        required = {'wire-corpus', 'constructors', 'typed-bounds', 'raw-ghc', 'partial-write-ghc',
+                    'shared-ghc', 'shared-native', 'shared-ghc-typed', 'shared-native-typed',
+                    'shared-ghc-public-pair', 'shared-native-public-pair', 'distribution-seed',
+                    'query-index-pure', 'query-index-publication'}
+        require(body.get('query_index_reference_tests') == 9, 'independent query index tests omitted')
+        expected_query_tests=('test_actual_row_64_mi_boundary_tiny_wire', 'test_actual_total_256_mi_boundary_tiny_wire', 'test_alternating_long_prefix_attack', 'test_canonicality_and_closure', 'test_depth_both_key_orders', 'test_exact_fields_and_wire_hash', 'test_legacy_and_empty', 'test_small_exact_budgets', 'test_types_ranges_and_hashes')
+        require(body.get('query_index_reference_results') ==
+                [{'name': name, 'state': 'passed'} for name in expected_query_tests],
+                'independent query index named results omitted or changed')
         names = require_control_commands(body['commands'])
+        require(len(names) == len(set(names)) and required <= set(names), 'mandatory host/typed/public commands omitted')
         expected_inputs = {str(p): sha(p) for p in [controls, receipt_path, *binaries.values(), *helpers]}
         require(body['inputs'] == expected_inputs, 'aggregate input identity mismatch')
         for row in body['commands']:
-            backend = next((name for name in ('shared-ghc', 'shared-native')
-                            if row['name'].startswith(name)), 'ghc')
+            backend = ('query-index-ghc' if row['name'] in
+                       ('query-index-pure', 'query-index-publication') else
+                       next((name for name in ('shared-ghc', 'shared-native')
+                             if row['name'].startswith(name)), 'ghc'))
             require(row['argv'][0] == str(binaries[backend]),
                     'control executed with the wrong qualified backend')
             for stream in ('stdout', 'stderr'):
@@ -660,7 +694,8 @@ def main():
                         'inner capture identity mismatch')
         require(set(body['shared_backend_outputs']) == {'shared-ghc', 'shared-native'} and
                 set(body['shared_public_pairs']) == {'shared-ghc', 'shared-native'} and
-                set(body['shared_closed_public_pairs']) == {'shared-ghc', 'shared-native'},
+                all(set(variants) == {'closed', 'legacy', 'schema7', 'seed'}
+                    for variants in body['shared_public_pairs'].values()),
                 'both actual hosts must qualify raw and full public artifacts')
         postcheck()
         record.update(complete=True, post_integrity=True, producer_objects_verified_after=True,

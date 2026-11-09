@@ -607,12 +607,7 @@ module Bootstrap.Crate where {
                  result <-
                    if valid
                    then ioReturn (Right ())
-                   else case (case witness of {
-                     Just ((,) checked encoded) -> case Literal.checkedCrateObject checked encoded of {
-                       Right object -> Right object; Left _ -> Artifact.builtinPrelude
-                     };
-                     Nothing -> Artifact.builtinPrelude
-                   }) of {
+                   else case builtinForInstall witness of {
                      Left message -> ioReturn (Left message);
                      Right builtin -> Artifact.writeObjectAtomicEither prefix builtin
                    };
@@ -621,6 +616,13 @@ module Bootstrap.Crate where {
                }
         }
     };
+  builtinForInstall witness = case witness of {
+    Just ((,) checked encoded) -> case Literal.checkedCrateObject checked encoded of {
+      Right object -> Right object;
+      Left _ -> Artifact.builtinPrelude
+    };
+    Nothing -> Artifact.builtinPrelude
+  };
   withPrelude = withPreludeUsing ensureBuiltin;
   withPreludeUsing install spec sources interfaces =
     if any

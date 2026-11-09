@@ -21,6 +21,7 @@ on:
         default: false
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -32,7 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0 # Frozen migration oracles require their exact Git history.
+          fetch-depth: 0
+      - name: Prepare reviewed historical source objects
+        run: python3 -B tools/testing/prepare_history_refs.py
       - run: tools/release/check.sh
       - name: Test pinned GHC install-input cleanup guards
         run: |
@@ -42,6 +45,14 @@ jobs:
         run: |
           python3 -B tools/shared/test_generate_builtin_evidence.py
           python3 -O -B tools/shared/test_generate_builtin_evidence.py
+      - name: Test query graph verifier versions and attack fixtures
+        run: |
+          python3 -B tools/shared/test_query_index.py
+          python3 -O -B tools/shared/test_query_index.py
+          python3 -B tools/shared/test_query_generation.py
+          python3 -O -B tools/shared/test_query_generation.py
+          python3 -B tools/performance/crate-query-graph/test_verify.py
+          python3 -O -B tools/performance/crate-query-graph/test_verify.py
       - name: Verify unit evidence with jq 1.8.2
         run: |
           set -euo pipefail
@@ -83,6 +94,8 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0 # The framework oracle reads frozen Git fixtures.
+      - name: Prepare reviewed historical source objects
+        run: python3 -B tools/testing/prepare_history_refs.py
       - name: Install pinned direct-host GHC 9.14.1
         run: |
           set -euo pipefail
@@ -344,6 +357,17 @@ jobs:
             .mlf-build/artifact-binary-guard/results/**/*.json
             .mlf-build/artifact-binary-guard/results/**/*.stdout
             .mlf-build/artifact-binary-guard/results/**/*.stderr
+            .mlf-build/source-ich-guard/bounded-receipt.json
+            .mlf-build/source-ich-guard/build.log
+            .mlf-build/source-ich-guard/results/results.json
+            .mlf-build/source-ich-guard/results/**/*.stdout
+            .mlf-build/source-ich-guard/results/**/*.stderr
+            .mlf-build/source-ich-guard/results/**/*.queries
+            .mlf-build/source-graph-guard/bounded-receipt.json
+            .mlf-build/source-graph-guard/build.log
+            .mlf-build/source-graph-guard/results/receipt.json
+            .mlf-build/source-graph-guard/results/build.log
+            .mlf-build/source-graph-guard/results/checks.log
             .mlf-build/source-context-cache-guard/bounded-receipt.json
             .mlf-build/source-context-cache-guard/build.log
             .mlf-build/source-context-cache-guard/results/**/*.json
@@ -761,7 +785,9 @@ jobs:
           printf '%s\n' "$CHECKS" | jq -e 'length == 6 and all(.[]; .result == "success")'
   qualification:
     name: Complete main qualification
-    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.full_validation || inputs.self_host))) && !inputs.windows_runtime_only
+    # Automatic native qualification is paused at the user's request.
+    # Keep the entire optional layer available only through explicit manual dispatch.
+    if: github.event_name == 'workflow_dispatch' && (inputs.full_validation || inputs.self_host) && !inputs.windows_runtime_only
     permissions:
       contents: read
       actions: read

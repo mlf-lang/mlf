@@ -37,7 +37,7 @@ for platform in macos-arm64 linux-x64; do
   pin="$scratch/$platform.env"
   {
     if [ "$platform" = linux-x64 ]; then printf 'MLF_SEED_PLATFORM=linux-x64\n'; fi
-    printf 'MLF_SEED_VERSION=0.0.1\nMLF_SEED_SOURCE_COMMIT=abcdef\n'
+    printf 'MLF_SEED_TRANSPORT=release\nMLF_SEED_VERSION=0.0.1\nMLF_SEED_SOURCE_COMMIT=abcdef\n'
     printf 'MLF_SEED_ARCHIVE_SHA256=%s\n' "$(sha256 "$fixture/$package.tar.gz")"
     printf 'MLF_SEED_COMPILER_SHA256=%s\n' "$(sha256 "$fixture/$package/libexec/emlf")"
     printf 'MLF_SEED_MANAGER_SHA256=%s\n' "$(sha256 "$fixture/$package/libexec/mlfpkg")"

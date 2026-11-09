@@ -74,6 +74,29 @@ Its uploaded decision states `not-executed` when parity is omitted; this is not
 an async pass or full qualification. See [the exact policy](ci-async-policy.md).
 The older dated change-scope census is historical; its checker reports current
 selector identities separately and requires the current policy controls.
+### Released-seed primitive transition
+
+Shared-source checkouts first use the verified frozen shared-source bridge in
+`bootstrap-manager.sh`, passing actual seed bytes rather than the timing wrapper.
+The produced shared-aware compiler and manager then perform the locked root
+build. The enclosing cold transition and linker remain in the timing/RSS budget.
+
+For older, legacy-source checkouts, the complete qualification producer starts from the independently pinned seed,
+but that released compiler predates `processSupervisor`. `timed-bootstrap.sh`
+therefore runs the same isolated stage-1 bridge and real stage-2 compiler
+transition as the async-language gate before its locked root build. It verifies
+the capability receipt and compiler/manager/helper hashes, then uses the real
+stage-2 compiler and current manager to produce the ordinary root build report,
+native tools and checked portable LLVM. A stage-1 shim is never the exported
+qualification candidate. The later authenticated candidate rebuild, shared
+runner preparation and six-campaign receipts remain unchanged.
+
+The cold transition is included in the existing bootstrap RSS budget and timing
+summary, together with the checked root build and native helper. Its enclosing
+timing row includes stage-2 child calls; it must not be added to overlapping
+per-command totals. Both bootstrap callers retain the transition's source input
+hashes, capability and tool identities, build reports, command diagnostics and
+cache proof records, including on failure.
 
 ## Enforce before merging
 
@@ -137,9 +160,15 @@ in the complete `packages` campaign. All six full campaigns and the native
 macOS builds remain separate requirements; no skipped macOS job is used as a
 passing pre-merge prerequisite.
 
-## Automatic complete qualification on main
+## Optional complete qualification (automatic invocation paused)
 
-Every push to `main` invokes `native-qualification.yml` with `build_packages=false`.
+Automatic invocation of `native-qualification.yml` is paused at the user's
+request while DeclId integration precedes compiler-speed work. This pauses the
+whole optional qualification layer, not only its self-host A/B stage. Ordinary
+PR/push correctness checks, timed smoke and compatibility/bootstrap remain.
+Explicit manual `CI` dispatch with `full_validation=true` or `self_host=true`
+(and without `windows_runtime_only`) retains the complete graph with
+`build_packages=false`. No automatic restoration or A/B run is scheduled.
 It runs independently of the narrower PR gate, using read-only repository and
 Actions permissions. Pull requests and merge queue groups keep the six checks
 above, including the policy-aware async-language gate (always bootstrapped for

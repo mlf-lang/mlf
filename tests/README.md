@@ -542,9 +542,10 @@ The required Linux language job bootstraps a real primitive-aware compiler with
   target rejections through checking, interpreter and LLVM entrypoints.
 - `tools/release/test-async-process.sh /path/to/stage2 OUTPUT`: 13 process
   contracts, panic cleanup and opaque-handle rejections.
-- `tools/release/test-async-task.sh /path/to/stage2 OUTPUT`: 30 contracts
+- `tools/release/test-async-task.sh /path/to/stage2 OUTPUT`: 31 contracts
   (including six explicitly white-box scheduler cases) and five source
-  rejections. Includes jobs=1/jobs=4 dynamic dependency/artifact equivalence.
+  rejections. Includes jobs=1/jobs=4 dynamic dependency/artifact equivalence and
+  ordered guards selecting a spawned task and its awaited result.
 - `tools/release/test-async-package.sh /path/to/stage2 /path/to/matching-mlfpkg OUTPUT`:
   a fresh checked-crate consumer, two literal native executions with exact
   cache replay, six opaque-constructor rejections and one mixed-fiber rejection

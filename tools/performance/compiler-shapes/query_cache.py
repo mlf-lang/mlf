@@ -10,6 +10,7 @@ SHARED = Path(__file__).resolve().parents[2] / 'shared'
 sys.path.insert(0, str(SHARED))
 from query_generation import Generation, cache_directory
 from artifact_binary_reference import read_document  # noqa: E402
+from test_query_index import read_index  # noqa: E402
 
 GRAPH = 'query-graph-v1/'
 HASH = re.compile(r'[0-9a-f]{64}')
@@ -129,7 +130,8 @@ def check_graph(inventory, evidence, fresh, max_members, crate, compiler_sha):
     require(valid_hash(generation) and generations == [graph + 'generations/' + generation + '.mlfqg'],
             'CURRENT selects retained generation')
     wire = Generation(raw[generations[0]], expected_hash=generation)
-    require(graph == 'query-graph-v' + str(wire.version) + '/', 'generation directory version')
+    expected_directory = 1 if wire.dictionary_format else wire.version
+    require(graph == 'query-graph-v' + str(expected_directory) + '/', 'generation directory version')
     config = unpack(text(wire.config))
     require(len(config) == 5 and config[0] == crate and config[1] == compiler_sha and
             valid_hash(compiler_sha) and config[2] and config[3] in
