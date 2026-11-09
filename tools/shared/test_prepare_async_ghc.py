@@ -268,5 +268,14 @@ class MixedCompletionIntegerPayload(unittest.TestCase):
         self.assertNotEqual(self.expected, self.expected + b'diagnostic\n')
 
 
+class CompletionKindRejection(unittest.TestCase):
+    def test_wrong_kind_reaches_kind_checker_without_cons_ambiguity(self):
+        root = HERE.parents[1]
+        source = (root / 'tests/fixtures/async-completion/negative/wrong-kind.emlf').read_text()
+        self.assertEqual(source, 'main = panic "unused" :: Completion IO\n')
+        gate = (root / 'tests/fixtures/async-completion/check.sh').read_text()
+        self.assertIn("wrong-kind) expected='(kind|arity)' ;;", gate)
+
+
 if __name__ == '__main__':
     unittest.main()
