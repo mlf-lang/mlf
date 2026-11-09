@@ -14,11 +14,11 @@ buildGraph : Bool -> Int -> Graph
 buildGraph scopes count =
   let root = G.mkNode (GGen 1) Nothing Flexible in
   let bottom = G.mkNode GBot (Just 0) Flexible in
-  let leaf = G.mkNode (if scopes then GGen 1 else GCon "Int" Nil) (Just 0) Flexible in
-  let entries = Cons (Pair 0 root) (Cons (Pair 1 bottom) (L.map (\identity -> Pair identity leaf) (L.range 2 (count + 1)))) in
+  let leaf = G.mkNode (if scopes then GGen 1 else GCon "Int" []) (Just 0) Flexible in
+  let entries = (:) ((,) 0 root) ((:) ((,) 1 bottom) (L.map (\identity -> (,) identity leaf) (L.range 2 (count + 1)))) in
   G.mkGraph (IM.fromDistinctAscList entries) IM.empty (count + 2)
 
-checkFull : Bool -> Int -> IO Unit
+checkFull : Bool -> Int -> IO ()
 checkFull scopes count =
   let graph = buildGraph scopes count in
   case G.validateGraph graph of
@@ -36,7 +36,7 @@ checkFull scopes count =
 main = do
   let graph = buildGraph false 35000
   printInt (IM.size (G.nodes graph))
-  printInt (L.length (IM.findWithDefault Nil 0 (G.bindingChildrenMap graph)))
+  printInt (L.length (IM.findWithDefault [] 0 (G.bindingChildrenMap graph)))
   checkFull false 1000
   checkFull true 1000
   putStrLn "graph stack: ok"

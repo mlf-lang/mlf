@@ -11,7 +11,7 @@ import qualified Bootstrap.IntMap as IM
 import Bootstrap.Constraint
 import Tests.Graph
 import qualified Bootstrap.Graph.Solver as Solver
-import Bootstrap.Parser (parseExpr, parseProgram)
+import Tests.CoreHelpers (sourceConstraints)
 import Tests.GraphValidation (smallGraphs)
 import Tests.GraphUnificationReference (referenceUnify)
 import qualified Tests.Graph as G
@@ -20,7 +20,7 @@ graphUnificationTests : [] ((,) String (IO ()))
 graphUnificationTests =
  (:) ((,) "indexed unification and identity renaming agree with map-based reference" unificationAndRenaming)
  ((:) ((,) "indexed unification agrees on successive scoped expansions" (do { H.forM_ programs (\((,) source accepted) -> do
-  c <- H.right (bind (parseExpr "<unification reference>" source) generate)
+  c <- H.right (sourceConstraints "<unification reference>" source)
   initial <- compareUnifiers (initialGraph c) (equalities c)
   result <- S.foldM solveStep initial (solveSteps c)
   H.assert (H.eq (S.isRight result) accepted) ("unexpected reference outcome: " ++ source)); projectionPrograms }))
@@ -76,7 +76,7 @@ solveStep result action = case action of
 projectionPrograms : IO ()
 projectionPrograms = H.forM_ ((:) ((,) "data Box a = Box a\ncase ((Box (\\x -> x)) : Box (forall a. a -> a)) of { Box f -> let a = f 42 in f true }" true)
  ((:) ((,) "data Box a = Box a\n\\box -> case box of { Box f -> let a = f 42 in f true }" false) [])) (\((,) source accepted) -> do
-  c <- H.right (bind (parseProgram "<case projection reference>" source) generateProgram)
+  c <- H.right (sourceConstraints "<case projection reference>" source)
   H.assert (S.any (\step -> case step of { Instantiate _ -> false; ProjectCase _ -> true }) (solveSteps c)) "case projection replay fixture has no barrier"
   initial <- compareUnifiers (initialGraph c) (equalities c)
   result <- S.foldM solveStep initial (solveSteps c)

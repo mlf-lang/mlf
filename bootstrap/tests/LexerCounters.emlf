@@ -22,21 +22,21 @@ checkNumber source expected = case X.naturalValue source of
 
 checkComment : Int -> Bool
 checkComment depth =
-  let source = L.concatStrings (L.append (L.replicate depth "{-") (L.append (L.replicate depth "-}") (Cons "z" Nil))) in
+  let source = L.concatStrings (L.append (L.replicate depth "{-") (L.append (L.replicate depth "-}") ((:) "z" []))) in
   case X.scanTokens "nested" source of
-    Right (X.Scanned (Cons token Nil) finish) ->
+    Right (X.Scanned ((:) token []) finish) ->
       eqString (X.tokenText token) "z" && X.tokenColumn token == depth * 4 + 1 && X.tokenEndColumn finish == depth * 4 + 2
     _ -> false
 
-check : String -> Bool -> IO Unit
-check name success = if success then pure Unit else panic name
+check : String -> Bool -> IO ()
+check name success = if success then pure () else panic name
 
 main = do
   check "long source column" (checkCursor 100001 1 100002 (advanceMany 100001 32 (X.Cursor 0 1 1)))
   check "long source line" (checkCursor 100001 100002 1 (advanceMany 100001 10 (X.Cursor 0 1 1)))
   check "tab columns" (checkCursor 100001 1 800009 (advanceMany 100001 9 (X.Cursor 0 1 1)))
   check "layout indentation" (Y.lineIndent (L.concatStrings (L.replicate 20001 " ")) 1 == 20002)
-  check "numeric accumulator" (checkNumber (L.concatStrings (L.append (L.replicate 20001 "0") (Cons "1" Nil))) 1)
+  check "numeric accumulator" (checkNumber (L.concatStrings (L.append (L.replicate 20001 "0") ((:) "1" []))) 1)
   check "nested comment depth" (checkComment 2001)
   check "position resets" (checkCursor 3 2 9 (X.advance 9 (X.advance 10 (X.advance 32 (X.Cursor 0 1 1)))))
   check "radix values" (checkNumber "0xABCD" 43981 && checkNumber "0o765" 501)

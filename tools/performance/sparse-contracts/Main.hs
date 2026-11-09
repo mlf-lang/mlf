@@ -5,6 +5,7 @@ import Prelude
 import Control.Exception (SomeException, evaluate, try, displayException)
 import Control.Monad (forM_, unless, foldM)
 import Data.IORef
+import qualified Bootstrap.Dependency as Dependency
 import qualified Bootstrap.CrateQuery as Q
 import qualified FrozenCrateQuery as FQ
 import qualified Bootstrap.SourceInference as S
@@ -190,6 +191,8 @@ main = do
             check (label++" exact error") (a==b)
           _ -> fail (label++": owned and frozen results disagree")
       whenExpected wanted label = if wanted then fail (label++": expected success") else pure ()
+      compareViews label _ (S.FileSourceContext _ _ _) =
+        fail (label ++ ": named owned-source fixture received a resolver declaration table")
       compareViews label current (S.OwnedSourceContext _ _ overloads protection _) = do
         let reference=oldContracts current
         check (label++" complete overload view")
@@ -313,7 +316,7 @@ main = do
   let candidateScopes=mapOf [("root",[(T.InstanceEvidence,"candidateCollision")])]
       newCandidateInventory=case S.planInventory supportPlan of
         C.ClassInventory ds denv infos _ candidates methods supports names externals ->
-          C.ClassInventory ds denv infos candidateScopes candidates methods supports names externals
+          C.ClassInventory ds denv infos (Dependency.NamedScopes candidateScopes) candidates methods supports names externals
       oldCandidateInventory=case FS.planInventory supportOld of
         FC.ClassInventory ds denv infos _ candidates methods supports names externals ->
           FC.ClassInventory ds denv infos candidateScopes candidates methods supports names externals
@@ -338,7 +341,7 @@ main = do
        overloadEnv protection (drop 3 orderedSources) 7 collisions
   -- Cached used is independently reconstructed from the original plan used
   -- and the current contract keys. Replacement and empty deltas add no names.
-  let S.SourcePlan _ _ _ _ _ baseUsed _ _ _ _ = indexedPlan
+  let FS.SourcePlan _ _ _ _ _ baseUsed _ _ _ _ = indexedOld
       expectedUsed current=foldr (Set.insert P.compareString) baseUsed (M.keys current)
       checkUsed current owned=check "cached reservation exact current domain"
         (setList (S.ownedSourceUsed owned)==setList (expectedUsed current))

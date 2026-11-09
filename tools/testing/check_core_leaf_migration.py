@@ -139,6 +139,115 @@ RECURSION_IMPORTS = (
 )
 
 
+# The step-18 frontend-entry repair changes no label, graph assertion or test
+# input. Reconstruct its exact three spans from the independently frozen family
+# below. These blob pins authenticate the reviewed 796aaf8b -> 6d1d60c9 sources;
+# neither a current-file digest nor a candidate-derived diff supplies an oracle.
+# Evidence: 18-integration-repairs.json, solver-normal-frontend-entry.
+FRONTEND_SOLVER_BLOBS = (
+    "b1974dc654ef5a2bce140988a9fed7d21fb3adfc19ee2000e9e1b31f2f07b15f",
+    "07751f668284d009bd2a25df28773f7129af2e9b62c788d4eeac0d9f22a89370",
+)
+FRONTEND_SOLVER_EDITS = (
+    ("import Bootstrap.Constraint (generate, solve, generalization, skeleton)\n",
+     "import Bootstrap.Constraint (solve, generalization, skeleton)\n"),
+    ("import Bootstrap.Parser\n", ""),
+    (r'(bind (parseExpr "<test>" "\\x -> x") generate)',
+     r'(sourceConstraints "<test>" "\\x -> x")'),
+)
+FRONTEND_HELPERS_PATH = "tests/Tests/CoreHelpers.emlf"
+FRONTEND_HELPER_BLOBS = (
+    "ff34500a5f9ba52a1107d82c346784922cbb7448cf6a23d39852fd4f5db27d95",
+    "9ded9cdd644aebcf294d628118c020ddaf038ec2ea673848418c614cc426f359",
+)
+FRONTEND_HELPER_IMPORTS = (
+    "import qualified Bootstrap.Classes as Classes\n"
+    "import qualified Bootstrap.Standalone as Standalone\n"
+    "import qualified Bootstrap.Prelude as SourcePrelude\n"
+    "import qualified Bootstrap.Constraint as Constraint\n"
+)
+FRONTEND_HELPER_BODY = """-- Match Compiler.compileProgramWithPrelude before testing solver internals.
+sourceConstraints : String -> String -> Either String Constraints
+sourceConstraints file source = case parseProgram file source of
+ Left message -> Left message
+ Right parsed -> case Standalone.normalize ImplicitPrelude parsed of
+  Left message -> Left message
+  Right Nothing -> case SourcePrelude.withPrelude ImplicitPrelude parsed of
+   (,) imports program -> lowerSourceConstraints imports program
+  Right (Just ((,,) imports program _)) -> lowerSourceConstraints imports program
+
+lowerSourceConstraints : Set String -> SProgram -> Either String Constraints
+lowerSourceConstraints imports program = case Classes.canonicalSourceProgram imports program of
+ Left message -> Left message
+ Right canonical -> case Classes.lowerClassesWithImports imports canonical of
+  Left message -> Left message
+  Right ((,) lowered _) -> Constraint.generateProgram lowered
+"""
+
+
+def exact_frontend_edits(original, edits, pins, name):
+    require(hashlib.sha256(original.encode()).hexdigest() == pins[0],
+            "frozen frontend-entry preimage changed: " + name)
+    expected = original
+    for before, after in edits:
+        require(expected.count(before) == 1, "frontend-entry span changed: " + name)
+        expected = expected.replace(before, after, 1)
+    require(hashlib.sha256(expected.encode()).hexdigest() == pins[1],
+            "reviewed frontend-entry transcription changed: " + name)
+    return expected
+
+
+def reviewed_frontend_helpers():
+    # The entire remaining helper module is still the canonical frozen source:
+    # appended shadow definitions and unrelated oracle edits cannot hide behind
+    # a hash of just the new pipeline block.
+    edits = (
+        ("import Bootstrap.Parser\n", "import Bootstrap.Parser\n" + FRONTEND_HELPER_IMPORTS),
+        ("\nv : Int -> XType\n", "\n" + FRONTEND_HELPER_BODY + "\nv : Int -> XType\n"),
+    )
+    return exact_frontend_edits(frozen(FRONTEND_HELPERS_PATH), edits,
+                                FRONTEND_HELPER_BLOBS, FRONTEND_HELPERS_PATH)
+
+
+def verify_frontend_helpers(current):
+    require(current == reviewed_frontend_helpers(),
+            "reviewed solver frontend helper changed")
+
+
+def verify_frontend_controls():
+    current = source_text(FRONTEND_HELPERS_PATH)
+    verify_frontend_helpers(current)
+    mutations = {
+        "parse_stage": current.replace("case parseProgram file source of",
+                                       "case parseExpr file source of", 1),
+        "normalization_stage": current.replace("Standalone.normalize ImplicitPrelude parsed",
+                                                "Right Nothing", 1),
+        "prelude_stage": current.replace("SourcePrelude.withPrelude ImplicitPrelude parsed",
+                                          "SourcePrelude.withPrelude NoImplicitPrelude parsed", 1),
+        "canonical_stage": current.replace("Classes.canonicalSourceProgram imports program",
+                                            "Right program", 1),
+        "class_lowering_stage": current.replace("Classes.lowerClassesWithImports imports canonical",
+                                                 "Right ((,) canonical [])", 1),
+        "constraint_stage": current.replace("Constraint.generateProgram lowered",
+                                             "Constraint.generate lowered", 1),
+        "error_propagation": current.replace("Left message -> Left message",
+                                              "Left message -> Right message", 1),
+        "shadow_definition": current + "\nsourceConstraints file source = Right source\n",
+        "old_oracle": current.replace("T.alphaEq actual expected", "true", 1),
+        "import_placement": current.replace(FRONTEND_HELPER_IMPORTS, "", 1) + FRONTEND_HELPER_IMPORTS,
+    }
+    for index, line in enumerate(FRONTEND_HELPER_IMPORTS.splitlines(keepends=True)):
+        mutations["missing_import_" + str(index)] = current.replace(line, "", 1)
+    for name, changed in mutations.items():
+        require(changed != current, "inactive frontend helper mutation: " + name)
+        try:
+            verify_frontend_helpers(changed)
+        except ValueError:
+            continue
+        raise ValueError("accepted frontend helper mutation: " + name)
+    return len(mutations)
+
+
 def verify_family_source(path, current, original):
     # Reconstruct from the frozen original, never from a candidate-derived
     # whole-file digest. Every historical body byte remains required. Only the
@@ -175,6 +284,8 @@ def verify_family_source(path, current, original):
         expected = expected[:line.start()] + wrapped + expected[line.end():]
         require(expected.count(CORE_FAMILIES_START) == 1, "frozen family boundary changed")
         expected = expected.replace(CORE_FAMILIES_START, helpers + CORE_FAMILIES_START, 1)
+        expected = exact_frontend_edits(expected, FRONTEND_SOLVER_EDITS,
+                                        FRONTEND_SOLVER_BLOBS, path)
     require(current == expected, f"original Core family composition changed: {path}")
 
 
@@ -679,6 +790,15 @@ def main():
         solver[:helper_start] + solver[helper_end:],
         solver[:helper_start] + solver[helper_end:] + solver[helper_start:helper_end],
         solver.replace("\n", "\r\n", 1),
+        solver.replace(FRONTEND_SOLVER_EDITS[0][1], FRONTEND_SOLVER_EDITS[0][0], 1),
+        solver.replace(FRONTEND_SOLVER_EDITS[0][1],
+                       FRONTEND_SOLVER_EDITS[0][1] + "import Bootstrap.Parser\n", 1),
+        solver.replace(FRONTEND_SOLVER_EDITS[2][1], FRONTEND_SOLVER_EDITS[2][0], 1),
+        solver.replace(FRONTEND_SOLVER_EDITS[2][1], "(Right ())", 1),
+        solver.replace(r'(sourceConstraints "<test>" "\\x -> x")',
+                       r'(sourceConstraints "<test>" "\\x -> y")', 1),
+        solver.replace(r'(sourceConstraints "<test>" "\\x -> x")',
+                       r'(sourceConstraints "<changed>" "\\x -> x")', 1),
     )
     for mutated in solver_mutations:
         require(mutated != solver, "inactive CoreSolver import/body mutation")
@@ -687,6 +807,7 @@ def main():
         except ValueError:
             continue
         raise ValueError("accepted unreviewed CoreSolver source mutation")
+    frontend_mutations = verify_frontend_controls()
     verify_partition_provenance()
     projection_mutations = verify_projection_controls()
     print(json.dumps({"kind": "static-core-opt-in-controls", "baseline": BASELINE,
@@ -702,6 +823,9 @@ def main():
                       "projection_preimage": CUTOVER_BEFORE,
                       "shared_partition_mutation_controls": 3,
                       "core_solver_source_mutation_controls": len(solver_mutations),
+                      "frontend_helper_mutation_controls": frontend_mutations,
+                      "frontend_solver_source_sha256": FRONTEND_SOLVER_BLOBS[1],
+                      "frontend_helper_source_sha256": FRONTEND_HELPER_BLOBS[1],
                       "catalog_mutation_controls": len(catalog_mutations),
                       "golden_inventory_mutation_controls": 2,
                       "recursive_graph_helpers_sha256": RECURSION_HELPERS_SHA256,

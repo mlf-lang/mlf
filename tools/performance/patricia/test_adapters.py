@@ -43,9 +43,13 @@ def prebinary_hosts(base):
 def prebinary_read_bytes(path):
     raw = path.read_bytes()
     relative = str(path.resolve().relative_to(ROOT.resolve()))
+    # The authenticated implementation registry also owns shared modules under
+    # tests/ and testing/. Directory spelling must not bypass their exact live
+    # SHA or the complete historical source/API transition (CompilerTests is a
+    # production driver even though its pathname starts with tests/).
+    owned = relative in _HISTORICAL_BINARY.value['current_files']
     production = relative.split('/', 1)[0] in {'bootstrap', 'package', 'libraries', 'host', 'runtime'}
-    production = production or relative in {'mlf.lock', 'shared-sources.json', 'mlf-shared.cabal', 'mlf-package.json'}
-    if production:
+    if owned or production:
         restored = _HISTORICAL_BINARY.restore_path(raw, relative)
         if restored is None:
             raise ValueError('new binary-only file has no historical fixture bytes')
@@ -1712,13 +1716,13 @@ class CoreProofTests(unittest.TestCase):
 
 
 class BinarySourceBoundaryTests(unittest.TestCase):
-    def test_actual_live135_then_exact_historical128(self):
+    def test_actual_live137_then_exact_historical128(self):
         binary = migration.binary_contract()
         manifest = json.loads((ROOT / 'shared-sources.json').read_bytes())
         actual = {row['module']: hashlib.sha256((ROOT / row['path']).read_bytes()).hexdigest()
                   for row in manifest['modules']}
         binary.require_registry(actual, 'current')
-        self.assertEqual(len(actual), 135)
+        self.assertEqual(len(actual), 137)
         self.assertIn('Bootstrap.SourceUnit', actual)
         # Fixture preparation must not replace coverage of public live gates.
         historical = json.loads((migration.HERE / 'source-migration.json').read_bytes())
@@ -1737,6 +1741,55 @@ class BinarySourceBoundaryTests(unittest.TestCase):
         mixed[changed] = parent[changed]
         with self.assertRaises(ValueError):
             binary.require_registry(mixed, 'current')
+
+    def test_reviewed_source_repairs_project_all_declared_owners(self):
+        binary = migration.binary_contract()
+        names = ('Bootstrap.Layout', 'Package.Benchmark', 'Package.Verification', 'Tests.CompilerTests')
+        for module in names:
+            path = binary.value['module_paths'][module]
+            live = (ROOT / path).read_bytes()
+            with self.subTest(module=module):
+                # Both endpoints are authenticated independently: exact new
+                # bytes from the live source manifest and exact old Git bytes,
+                # followed by every existing binary/numeric/API inverse.
+                self.assertEqual(hashlib.sha256(live).hexdigest(), binary.changes[path][1])
+                previous = (binary.archived / path).read_bytes()
+                self.assertEqual(hashlib.sha256(previous).hexdigest(), binary.changes[path][0])
+                historical = binary.previous.restore_path(previous, path)
+                self.assertEqual(prebinary_read_bytes(ROOT / path), historical)
+                self.assertEqual(binary.project_owner(live, module), historical)
+                self.assertEqual(binary.advance_path(historical, path), live)
+                # Mutations of either endpoint and cross-owner substitution
+                # must fail; the authenticated conversion is not a hash reset.
+                for changed in (live + b' ', previous, historical, b''):
+                    with self.assertRaises(ValueError):
+                        binary.project_owner(changed, module)
+                with patch.object(Path, 'read_bytes', return_value=live + b' '), self.assertRaises(ValueError):
+                    prebinary_read_bytes(ROOT / path)
+                with self.assertRaises(ValueError):
+                    binary.project_owner(live, 'Bootstrap.Types')
+
+    def test_full_shared_source_projection_uses_declared_inventory_not_prefix(self):
+        binary = migration.binary_contract()
+        registry = json.loads(prebinary_read_bytes(ROOT / 'shared-sources.json'))
+        actual = {row['module']: hashlib.sha256(prebinary_read_bytes(ROOT / row['path'])).hexdigest()
+                  for row in registry['modules']}
+        self.assertEqual(actual, binary.parent['registry'])
+        self.assertIn('Tests.CompilerTests', actual)
+        for prefix in ('tests/', 'testing/'):
+            owners = [row for row in registry['modules'] if row['path'].startswith(prefix)]
+            self.assertTrue(owners)
+            for row in owners:
+                self.assertIn(row['path'], binary.value['current_files'])
+        # Even a plausible production path absent from the manifest must not
+        # become an unguarded passthrough when the declared path route changes.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / 'libraries/unregistered/Unknown.hs'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b'unknown production source')
+            with patch.dict(globals(), ROOT=root), self.assertRaises(ValueError):
+                prebinary_read_bytes(path)
 
     def test_added_bytes_required_before_inverse_deletion(self):
         binary = migration.binary_contract()

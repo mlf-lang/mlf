@@ -1,1 +1,1 @@
-integer containers: 1200 mixed updates and unbounded-key/laziness checks passed
+integer containers: 1200 mixed updates and Int64-key/laziness checks passed

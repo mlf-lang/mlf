@@ -7,6 +7,9 @@ import Data.List (nub, sort)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Bootstrap.Bitstream as W
+import qualified Bootstrap.Classes as Classes
+import qualified Bootstrap.Compiler as Compiler
+import qualified Bootstrap.Crate as Crate
 import qualified Bootstrap.CrateArtifact as Artifact
 import qualified Bootstrap.CrateQuery as CQ
 import qualified Bootstrap.Data as Data
@@ -15,7 +18,12 @@ import qualified Bootstrap.Resolved as R
 import qualified Bootstrap.SourceInference as Source
 import qualified Bootstrap.Surface as Surface
 import qualified Bootstrap.QueryGraph as Q
+import qualified Bootstrap.InferenceUnit as Inference
+import qualified Bootstrap.OpenFragment as Open
+import qualified Bootstrap.Separate as Separate
+import qualified Bootstrap.X.Pretty as Pretty
 import qualified Bootstrap.IndexVec as V
+import qualified Bootstrap.IntSet as I
 import qualified Bootstrap.Parser as Parser
 import qualified Bootstrap.Map as M
 import qualified Bootstrap.Module as Modules
@@ -138,7 +146,7 @@ queryChecks = do
       shared = [("a",sha),("a",sha)]
       b = node "b" shared
       c = node "c" shared
-  check "ordered index" True (order [a,b,c])
+  check "ordered v1 input needs a v2 publication" False (order [a,b,c])
   check "unordered index still admitted" False (order [c,a,b])
   check "read multiplicity" False (Q.sameNode b (node "b" [("a",sha)]))
   check "read order" False (Q.sameNode (node "c" [("a",sha),("b",sha)])
@@ -149,8 +157,10 @@ queryChecks = do
          ([node "a" [("b",sha)],node "b" [("a",sha)]], "cyclic/deep query graph"),
          ([a,node "b" [("a","bad")]], "invalid query graph digest")] $ \(ns,err) ->
     check err (Left err) (result (admitted ns))
-  let generation previous ns = do
-        answer <- Q.publication "cfg" previous (table [a,b,c]) (table ns)
+  let stable (Q.QueryNode k h edges location) = Q.QueryNode (Q.key "Binding" k) h
+        [(Q.key "Binding" target, digest) | (target,digest) <- edges] location
+      generation previous ns = do
+        answer <- Q.publication "cfg" previous (table (map stable [a,b,c])) (table (map stable ns))
         pure $ case answer of
           T.Left err -> Left (H.unpack err)
           T.Right T.Nothing -> Right False
@@ -160,11 +170,73 @@ queryChecks = do
   check "changed reads, same value hash" (Right True) =<< generation sha [a,node "b" [],c]
   check "reject stale reads in edited generation" (Left "query publication has stale dependency version")
     =<< generation sha [a,node "b" [("a",other)],c]
+  -- Both generations describe A.f, although its declaration slot changes
+  -- when A.a is added. Edges refer to the producer generation's digest.
+  let l = W.VNode 1
+      absent = W.VNode 4 []
+      row desc h reads = W.VNode 413 [desc,W.VText h,l reads,absent]
+      binding = W.VInt
+      query tag i = W.VNode tag [W.VInt i]
+      group = l . map binding
+      snapshot names groups requests types rows = W.VNode 412
+        [W.VText "MLF-CRATE-QUERY-GRAPH-2",W.VText "cfg",l (map W.VText names),l groups,
+         l requests,l (map W.VText types),l rows]
+      admit value = case W.planGraph W.defaultLimits [value] of
+        T.Left err -> error (H.unpack err)
+        T.Right graph -> Q.admitIndex "cfg" graph
+      logical value k = case admit value of
+        T.Right (m,_) -> case M.lookup H.v_compareString k m of
+          T.Just n -> [(H.unpack target,H.unpack h) | (target,h) <- Q.nodeReads n]
+          T.Nothing -> error "missing restored row"
+        T.Left err -> error (H.unpack err)
+      generationAt names g i h = snapshot names [group [i]] [] []
+        [row (binding i) h [],row (query 419 g) sha [binding i,binding i]]
+      target = Q.key "Binding" "A.f"
+      groupKey = Q.key "InferScc" "3:A.f"
+      reads h = replicate 2 (H.unpack target,H.unpack h)
+  check "old generation resolves slot zero twice with its old version" (reads sha)
+    (logical (generationAt ["A.f"] 0 0 sha) groupKey)
+  check "new generation resolves slot one twice with its new version" (reads other)
+    (logical (generationAt ["A.a","A.f"] 0 1 other) groupKey)
+  let invalid label value = case result (admit value) of
+        Left _ -> pure ()
+        Right () -> error ("accepted " ++ label)
+      f = row (binding 0) sha []
+      fx = ["A.f","A.x"]
+      two = [group [0,1]]
+      e = W.VNode 414 [W.VInt 0,W.VInt 7,W.VText "Goal"]
+      scoped = snapshot fx two [e] ["A.f"]
+        [f,row (query 415 0) sha [],row (query 416 0) sha [],row (query 417 0) sha [],
+         row (query 418 0) sha [],row (query 419 0) sha [],row (query 431 0) sha [],
+         row (query 432 0) sha [binding 0,query 419 0,query 433 0],row (query 433 0) sha [],
+         row (query 434 0) sha []]
+      evKey = Q.key "Evidence" "10:3:A.f3:A.x1:74:Goal"
+  check "typed group, binding, evidence and datatype targets preserve order"
+    [(H.unpack k,H.unpack sha) | k <- [target,Q.key "InferScc" "3:A.f3:A.x",Q.key "Datatype" "A.f"]]
+    (logical scoped evKey)
+  mapM_ (uncurry invalid)
+    [("negative declaration",snapshot fx [] [] [] [row (binding (-1)) sha []]),
+     ("out of range declaration",snapshot fx [] [] [] [row (binding 2) sha []]),
+     ("duplicate declaration",snapshot ["A.f","A.f"] [] [] [] [f]),
+     ("duplicate group members",snapshot fx [group [1,1]] [] [] []),
+     ("empty group",snapshot fx [group []] [] [] []),
+     ("duplicate row",snapshot fx [] [] [] [f,f]),
+     ("dangling typed read",snapshot fx two [] [] [row (binding 0) sha [query 419 0]]),
+     ("cycle",snapshot fx [] [] [] [row (binding 0) sha [binding 0]]),
+     ("wrong evidence group",snapshot fx [] [e] [] []),
+     ("unknown edge kind",snapshot fx [] [] [] [row (query 410 0) sha []]),
+     ("wrong datatype domain",snapshot fx [] [] [] [row (query 433 0) sha []])]
+  check "exact logical identity budget" (Right ()) (result (Q.checkIdentityBudget 4 ["a","bcd"]))
+  check "reject oversize logical identity population" (Left "query snapshot identity work limit exceeded")
+    (result (Q.checkIdentityBudget 3 ["a","bcd"]))
   let chain n = [node (key i) [(key (i+1),sha) | i+1 < n] | i <- [0..n-1]]
       key i = H.literal (show (10000+i :: Int))
   check "last legal query DFS depth" (Right ()) (result (Q.validateClosure (table (chain 4096))))
   check "query DFS depth limit" (Left "cyclic/deep query graph")
     (result (Q.validateClosure (table (chain 4097))))
+  let reverseChain n = [node (key i) [(key (i-1),sha) | i > 0] | i <- [0..n-1]]
+  check "reaching an already-complete tail cannot hide excess depth" (Left "cyclic/deep query graph")
+    (result (Q.validateClosure (table (reverseChain 4097))))
 
 datatypeChecks = do
   let decl name constructor children = T.DataDecl name []
@@ -244,9 +316,22 @@ resolverChecks = do
     [D.Bound owner _ rhs] | [ref] <- R.references rhs -> do
       check "distinct entity despite equal printed name" False (V.toInt owner == V.toInt ref)
       check "printed collision preserves distinct stable identities" False (D.symbolKey localSymbols owner == D.symbolKey localSymbols ref)
+      check "same-spelled local diagnostic" "Local.f" (H.unpack (D.symbolDisplay localSymbols owner))
+      check "same-spelled imported diagnostic" "Foreign.x" (H.unpack (D.symbolDisplay localSymbols ref))
+      check "named diagnostic chooses active definition" "Local.f"
+        (H.unpack (Modules.displayNames (Modules.resolvedCrateDisplayNames collision) "same"))
     _ -> error ("missing colliding-name fixture edge " ++ show [(V.toInt i,map V.toInt (R.references rhs)) | D.Bound i _ rhs <- entries])
   (_,active) <- right (D.resolvedGroups matching [] M.empty M.empty)
   check "external reference cannot induce self recursion" [[False]] (map (map snd) active)
+  -- The external reference prints as the local declaration. Its distinct
+  -- slot still selects the nonrecursive unsigned source path.
+  collisionPlan <- right (Source.indexedPlan matching [] M.empty M.empty)
+  case collisionPlan of
+    T.Just (Source.IndexedPlan table rows _ _ [[(slot,recursive)]]) -> do
+      let declaration = snd (Source.namedBinding table rows slot)
+      check "projected name alone would misclassify the external" False (Source.eligibleSource [declaration])
+      check "resolved edge is authoritative for source eligibility" True (Source.eligibleSourceWith recursive [declaration])
+    _ -> error "collision did not produce a singleton source plan"
   lib <- parsed ("ZLib","module ZLib (value) where\nvalue = 41\n")
   client <- parsed ("Client","module Client where\nimport qualified ZLib as L\nanswer = L.value\n")
   let entity = Modules.Entity "ZLib" "value" Modules.Value
@@ -303,6 +388,33 @@ resolverChecks = do
     T.SLet n (T.SSourceDefinition (T.SIntLit 7)) (T.SVar ref) ->
       check "local method dependency copies its source definition" ("same","same") (H.unpack n,H.unpack ref)
     _ -> error "method failed to capture its referenced helper"
+  let visibility = D.indexedScopes slots [(own,"local scope"),(method,"method scope")]
+      nested = D.nestedScopes visibility
+  check "scope indexed by defining slot" (Just "local scope") (case D.scopeAt visibility own of
+    T.Just a -> Just a; T.Nothing -> Nothing)
+  check "equal spelling does not grant the external a local scope" True (case D.scopeAt visibility external of
+    T.Nothing -> True; _ -> False)
+  check "local shadow inherits lexical candidates" "lexical" (D.bindingScope nested "same" False "lexical")
+  check "copied global helper keeps its own candidates" "local scope" (D.bindingScope nested "same" True "lexical")
+  let primitive = T.SourceModule "<MLF.Primitive>" (T.Just "MLF.Primitive") T.Nothing [] [] [] [] [] T.Nothing T.LegacyEmlfV1
+  let runScoped imports = do
+        modules <- mapM parsed [("Inspect","module Inspect where\nclass Inspect a where { inspect : a -> Bool }\n"),
+          ("Inst","module Inst () where\nimport Inspect\ninstance Inspect Int where { inspect = \\x -> true }\n"),
+          ("A","module A (f) where\nimport Inspect\n" ++ imports ++ "f :: Bool\nf = inspect (1 :: Int)\n"),
+          ("Main","module Main where\nimport A\nimport Inst ()\nmain = f\n")]
+        pure (Compiler.compileLinked T.NoImplicitPrelude (primitive:modules))
+  visible <- runScoped "import Inst ()\n"
+  case visible of
+    T.Right _ -> pure (); T.Left e -> error ("defining module lost its instance: " ++ H.unpack (Compiler.prettyError e))
+  hidden <- runScoped ""
+  case hidden of
+    T.Left _ -> pure (); T.Right _ -> error "importer granted an instance to a different defining module"
+  dictSource <- parsed ("DictRec",unlines ["module DictRec where",
+    "class Tag a where { tag :: a -> Int }","instance Tag Int where { tag x = getName x }",
+    "getName :: Int -> Int","getName x = tag x","untouched x = x"])
+  dictCrate <- right (Crate.prepareCrate (Crate.CrateSpec "dict-rec" "" T.NoImplicitPrelude [] [] "" "") [] [primitive,dictSource])
+  case Crate.preparedSourcePlan dictCrate of
+    T.Just _ -> pure (); T.Nothing -> error "copied helper incorrectly merged a source and dictionary SCC"
   let fresh = D.symbols [("a",False),("b",False),("c",True)]
   let (appended, late) = D.appendSymbols fresh ["selector","dictionary"]
   check "generation appends slots in source order" [3,4] (map V.toInt late)
@@ -336,6 +448,48 @@ resolverChecks = do
       methods = M.singleton "method" ("0selector",[] :: [H.String])
       scopes = M.singleton "B" ["Cdict"]
       oracle = reference [("Z",["B","0selector"]),("B",["B","Cdict"]),("0selector",["Z"]),("Cdict",["B"])]
+  let generatedView = D.generatedTable scope (map D.boundId [bound "Z" [],bound "B" []])
+        (map fst generated) ["external","imported_dict"] methods
+      slotNumber key = case D.generatedNameId generatedView key of
+        T.Just i -> V.toInt i; _ -> error "missing generated table entry"
+  check "selector, dictionary and imported support extend source slots" [4,5,6]
+    (map slotNumber ["0selector","Cdict","imported_dict"])
+  check "method redirects to the generated selector slot" (Just 4)
+    (case D.selectorId generatedView (ix "method") of { T.Just i -> Just (V.toInt i); _ -> Nothing })
+  check "ordinary declaration has no selector redirection" True
+    (case D.selectorId generatedView (ix "Z") of { T.Nothing -> True; _ -> False })
+  let abiSymbols = D.symbolsWithKeys [("same","own.key",False),("same","import.key",False)]
+      [abiOwn,abiImport] = V.indices (D.symbolNodes abiSymbols)
+      abiTable = D.generatedTable abiSymbols [abiOwn] [] ["import.key"] M.empty
+  check "imported ABI key reuses the resolver slot despite display collision" (Just (V.toInt abiImport))
+    (case D.generatedImportId abiTable "import.key" of T.Just i -> Just (V.toInt i); _ -> Nothing)
+  check "no duplicate ABI declaration created" 2 (V.count (D.symbolNodes (D.generatedSymbols abiTable)))
+  let splitDomain = D.symbolsWithKeys [("Z","local.Z",False),("B","B",False),("external","external",False),("method","method",True)]
+      hiddenImport = D.generatedTable splitDomain [ix "Z"] [] ["Z"] M.empty
+  check "local spelling and independent imported contract have separate slots" (Just 4,Just 0)
+    (case D.generatedImportId hiddenImport "Z" of T.Just i -> Just (V.toInt i); _ -> Nothing,
+     case D.generatedNameId hiddenImport "Z" of T.Just i -> Just (V.toInt i); _ -> Nothing)
+  let ca = Modules.Entity "A" "AClass" Modules.Class
+      cb = Modules.Entity "B" "BClass" Modules.Class
+      ma = Modules.Entity "A" "m" (Modules.Method "AClass")
+      mb = Modules.Entity "B" "m" (Modules.Method "BClass")
+      resolvedMethods = Modules.resolveNames (Modules.Names (M.fromList Modules.compareEntity
+          [(ca,"CA"),(cb,"CB"),(ma,"m"),(mb,"m")]))
+      activeClass = D.generatedTable (Modules.bindingSymbols resolvedMethods) [] ["select_m"] []
+        (M.singleton "m" ("select_m",["CA"]))
+  localMethod <- right (Modules.termId resolvedMethods ma)
+  inactiveMethod <- right (Modules.termId resolvedMethods mb)
+  check "active class owns its selector" (Just 2) (case D.selectorId activeClass localMethod of
+    T.Just i -> Just (V.toInt i); _ -> Nothing)
+  check "inactive imported method cannot capture another class's same-spelled selector" True
+    (case D.selectorId activeClass inactiveMethod of T.Nothing -> True; _ -> False)
+  let collisions = D.symbols [("method",False),("method",True)]
+      [local,importedMethod] = V.indices (D.symbolNodes collisions)
+      redirects = D.generatedTable collisions [local] ["selector"] [] (M.singleton "method" ("selector",[] :: [H.String]))
+  check "same-spelling local does not redirect to imported selector" True
+    (case D.selectorId redirects local of { T.Nothing -> True; _ -> False })
+  check "imported method retains its own selector edge" (Just 2)
+    (case D.selectorId redirects importedMethod of { T.Just i -> Just (V.toInt i); _ -> Nothing })
   groups <- right (D.resolvedGroups values generated methods scopes)
   check "late selector and dictionary retain lexical DFS order" oracle (map (map H.unpack) (D.groupSpellings groups))
   let support = [("0selector",T.Nothing,T.SVar "Z"),("Cdict",T.Nothing,T.SVar "B")]
@@ -347,11 +501,127 @@ resolverChecks = do
   case plan of
     T.Just (Source.IndexedPlan symbols table ids [] [members]) -> do
       check "plan source order" ["Z","B"] (map (H.unpack . D.symbolName symbols) ids)
-      check "plan SCC lexical order" ["B","Z"] (map (H.unpack . D.symbolName symbols) members)
-      let rows = map (Source.namedBinding symbols table) members
+      check "plan SCC lexical order" ["B","Z"] (map (H.unpack . D.symbolName symbols . fst) members)
+      let rows = map (Source.namedBinding symbols table . fst) members
       check "selected rows retain original ordinals" [(1,"B"),(0,"Z")]
         [(ordinal,H.unpack n) | (ordinal,(n,_,_)) <- rows]
     _ -> error "resolved query plan lost its indexed rows"
+
+typedClassChecks = do
+  let slots = D.symbolsWithKeys [("same","foreign.same",False),("same","own.same",False),("use","own.use",False)]
+      [foreignId,own,use] = V.indices (D.symbolNodes slots)
+      term = R.Lam "same" T.Nothing (R.Let "unused" (R.Global foreignId) (R.Global own))
+      members = D.BoundValues slots [D.Bound own T.Nothing (R.IntLit 1),D.Bound use T.Nothing term]
+      scope = D.indexedScopes slots [(own,memptyMask),(use,memptyMask)]
+      memptyMask = I.empty
+  body <- case Surface.bindIndexed members (T.SConstructor "()") of
+    T.Left reason -> error (H.unpack reason); T.Right value -> pure value
+  let rhsRefs = D.expressionGlobalIds body
+  check "only the imported slot is free after the local declaration is bound" [0] (map V.toInt rhsRefs)
+  result <- case Classes.lowerSeparateClassesAndSlots (M.singleton "foreign.same" (T.SCon "Int" [])) [] scope []
+                 (T.SClassProgram [] [] [] body) of
+    T.Left reason -> error (H.unpack reason); T.Right out -> pure out
+  case result of
+    ((T.SProgram [] (T.SDeclScope [parameter] (T.SLetRec [_] lowered)),_),T.Just generated) -> do
+      check "external signature uses its original resolved slot" 0 (V.toInt parameter)
+      check "class-free lowering keeps the imported slot despite lexical shadowing" [0] (map V.toInt (D.expressionGlobalIds lowered))
+      check "external ABI admission keeps the declaration count" 3 (V.count (D.symbolNodes (D.generatedSymbols generated)))
+    _ -> error "typed external wrapper disappeared"
+  let methods = D.symbols [("method",True),("root",False)]
+      [methodId,sourceId] = V.indices (D.symbolNodes methods)
+      root = D.BoundValues methods [D.Bound sourceId T.Nothing (R.Global methodId)]
+      klass = T.SClassDecl "C" [("a",T.Star)] [] [("method",T.SArrow (T.STVar "a") (T.STVar "a"))]
+      instanceDecl = T.SInstanceDecl [] [] "C" [T.SCon "Int" []] [("method",T.SLam "x" T.Nothing (T.SVar "x"))]
+      rootScopes = D.indexedScopes methods [(sourceId,I.singleton 0)]
+  rootBody <- case Surface.bindIndexed root (T.SConstructor "()") of
+    T.Left reason -> error (H.unpack reason); T.Right value -> pure value
+  out <- case Classes.lowerSeparateClassesAndSlots M.empty ["dictionary"] rootScopes [I.singleton 0]
+                (T.SClassProgram [] [klass] [instanceDecl] rootBody) of
+    T.Left reason -> error (H.unpack reason); T.Right value -> pure value
+  case out of
+    ((T.SProgram _ (T.SDeclScope support (T.SLetRec _ lowered)),_),T.Just table) -> do
+      check "generated selector and dictionary slots are the bound slots" [2,3] (map V.toInt support)
+      let refs = D.expressionGlobalIds lowered
+      check "lowered method occurrence selects its generated slot" True (2 `elem` map V.toInt refs)
+      check "original method marker is not a runtime binding" False (V.toInt methodId `elem` map V.toInt refs)
+      check "class candidate identity" (Just 3) (case D.generatedNameId table "dictionary" of
+        T.Just i -> Just (V.toInt i); _ -> Nothing)
+    _ -> error "class generation did not label support owners"
+  let copied = T.SDeclScope [own] (T.SLet "same" (T.SGlobal own "outer") (T.SApp
+        (T.SGlobal own "inner") (T.SApp (T.SVar "same") (T.SGlobal foreignId "same"))))
+  check "copied helper hides its own slot only in its body" [1,0] (map V.toInt (D.expressionGlobalIds copied))
+  check "scope with typed binder leaves a lexical reference free" ["same"] (map H.unpack (D.expressionNamedReads copied))
+  check "prepared syntax also inventories the owned slot and enclosed occurrence"
+    [1,1,1,0] [V.toInt i | T.DeclRef i _ <- D.querySyntaxRefs copied]
+  let factsBase = D.symbolsWithKeys [("same","A.same",False),("same","B.same",False),
+                                     ("method","C.method",True),("root","Root.root",False)]
+      [qualified,plain,_,owner] = V.indices (D.symbolNodes factsBase)
+      factsScope = D.indexedScopes factsBase [(owner,I.empty)]
+      scheme h = if V.toInt h == V.toInt qualified then T.Just (["C"],True)
+                 else if V.toInt h == V.toInt plain then T.Just ([],False) else T.Nothing
+      rootResult used = Classes.withClassScopes M.empty [] factsScope [] (T.SClassProgram [] [klass] [] (T.SConstructor "()")) $ \inv ->
+        Classes.lowerUnsignedRootAt (\_ _ _ _ -> []) (T.Just owner) (Classes.withCheckedClassContracts scheme inv)
+          M.empty M.empty "root" (T.SGlobal used "same")
+      rootContract used = case rootResult used of
+        T.Right (Classes.SourceRootLowering body labels _ protected) -> (map (\(_,c,_) -> H.unpack c) labels,protected)
+        T.Left reason -> error (H.unpack reason)
+  check "qualified predecessor read by slot despite identical display" (["C"],True) (rootContract qualified)
+  check "ordinary predecessor does not inherit its same-spelled peer's scheme" ([],False) (rootContract plain)
+  let infer slot = Inference.compileOpenGroupIndexed "answer" [(foreignId,"external",T.XCon "Int" [])] []
+        [(use,("answer",T.Nothing,T.SLet "external" (T.SBoolLit True) (T.SGlobal slot "external")))]
+  case infer foreignId of
+    T.Right fragment -> case Open.bindings fragment of
+      [(_,T.XCon n [])] -> check "raw group global import survives local shadow" "Int" (H.unpack n)
+      _ -> error "unexpected raw group export type"
+    T.Left reason -> error (H.unpack reason)
+  let externalType = T.XCon "Int" []
+      typedUnit = Inference.compileLoweredGroupIndexed (const "") "answer" [(foreignId,"external",externalType)] []
+        [(use,("answer",T.Nothing,T.SGlobal foreignId "different-display"))]
+      namedUnit = Inference.compileLoweredGroupUsing (const "") "answer" [CQ.dependencyInterface [("external",externalType)]] []
+        [("answer",T.Nothing,T.SVar "external")]
+  case (typedUnit,namedUnit) of
+    (T.Right t,T.Right n) -> check "unit and named lowering emit identical xMLF"
+      (H.unpack (Pretty.prettyTerm (Separate.objectTerm n))) (H.unpack (Pretty.prettyTerm (Separate.objectTerm t)))
+    (T.Left reason,_) -> error (H.unpack reason)
+    (_,T.Left reason) -> error (H.unpack reason)
+  case infer own of
+    T.Left _ -> pure (); _ -> error "missing declaration slot was captured by a lexical name"
+
+-- The reference propagates named flags to convergence, independently of
+-- reverse edges and the candidate's work queue.
+protectionChecks = do
+  let chain = [(show i,[show (i+1)]) | i <- [0..126::Int]] ++ [("127",[])]
+      diamond = [("join",["left","right"]),("left",["import"]),("right",["import"]),
+                 ("import",[]),("cycleA",["cycleB","join"]),("cycleB",["cycleA"]),("unrelated",[])]
+  forM_ [(chain,["127"]),(chain,[]),(diamond,["import"]),(diamond,[])] $ \(edges,seeds) -> do
+    let keys = map fst edges
+        slots = Map.fromList (zip keys (map V.fromInt [0..]))
+        rows = [(slots Map.! n,n `elem` seeds,[slots Map.! ref | ref <- deps]) | (n,deps) <- edges]
+        spread flags = [n | (n,deps) <- edges, n `elem` seeds || any (`elem` flags) deps]
+        settle flags = let next = spread flags in if next == flags then next else settle next
+        flags = Classes.propagateProtection (fromIntegral (length keys)) rows
+    check "protection equals independent named fixed point" (settle []) [n | n <- keys,V.at flags (slots Map.! n)]
+-- Recover the calling convention from the checked result path. Do not
+-- instantiate or rewrite the type actually imported by the checker.
+importConventionChecks = do
+  let names = M.fromList H.v_compareString [("DA","A"),("DB","B")]
+      a = T.XTyVar 7
+      int = T.XCon "Int" []
+      dict n = T.XCon n [int]
+      prefix n = T.XArrow (dict n)
+      observe = map H.unpack . Separate.importClasses names
+      bounded = T.XForall a (prefix "DB" (prefix "DB" (T.XArrow int int)))
+                  (prefix "DA" (T.XVar a))
+      shadowed = T.XForall a (prefix "DA" int) (T.XForall a (T.XVar a) (prefix "DB" (T.XVar a)))
+  check "bounded result retains all repeated evidence slots in order" ["A","B","B"] (observe bounded)
+  check "shadowing forall captures the outer environment of its bound" ["B","A"] (observe shadowed)
+  check "unused forall bound does not contribute evidence" [] (observe (T.XForall a bounded int))
+  check "ordinary argument ends the evidence prefix" ["A"] (observe (prefix "DA" (T.XArrow int (prefix "DB" int))))
+  check "constraint inside a function argument is local" [] (observe (T.XArrow (prefix "DA" int) int))
+  check "a bounded ordinary input remains explicit" [] (observe (T.XForall a (dict "DA") (T.XArrow (T.XVar a) int)))
+  check "unbound result variable ends the metadata view" [] (observe (T.XVar a))
+  check "managed call stack can follow an ordinary hidden slot" ["B","MLFHasCallStack"]
+    (observe (T.XForall a (T.XArrow (T.XCon "MLFStackEvidence" []) int) (prefix "DB" (T.XVar a))))
 
 main = do
   let chain = [("v" ++ show i,["v" ++ show (i+1)]) | i <- [0..24 :: Int]]
@@ -371,4 +641,7 @@ main = do
   queryChecks
   datatypeChecks
   resolverChecks
+  protectionChecks
+  importConventionChecks
+  typedClassChecks
   putStrLn "1032 ordered SCC and reach comparisons, query DAG and package controls passed"

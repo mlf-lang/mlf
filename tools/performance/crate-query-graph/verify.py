@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/shared'))
 from artifact_binary_reference import read_document, tree_document
 from artifact_binary_typed import value_node as node, text, list_values as items, unpack
+from query_generation import Generation, cache_directory
 from finish_receipts import check_receipts, forge_generation
 
 
@@ -27,36 +28,16 @@ def read(path, schema): return read_document(path.read_bytes(), schema).values()
 def pair(value): return node(value, 2, 2)
 
 def graph(cache):
-    directory = cache / 'query-graph-v1'
+    directory = cache_directory(cache)
     current = text(read(directory / 'CURRENT', 6))
     raw = (directory / 'generations' / (current + '.mlfqg')).read_bytes()
-    assert sha(raw) == current
-    fmt, config, entries = node(read_document(raw, 6).values()[0], 411, 3)
-    assert text(fmt) == 'MLF-CRATE-QUERY-GRAPH-1'
-    result = {}
-    for value in items(entries):
-        k, h, edges, location = node(value, 410, 4)
-        k, h = text(k), text(h)
-        assert k not in result
-        dependencies = [(text(a), text(b)) for a, b in map(pair, items(edges))]
-        loc = node(location)
-        payload = text(loc[0]) if loc else None
-        result[k] = {'sha': h, 'reads': dependencies, 'payload': payload}
+    generation = Generation(raw, expected_hash=current)
+    result = generation.nodes
+    for entry in result.values():
+        payload = entry['payload']
         if payload:
             raw = (directory / 'results' / (payload + '.mlfqr')).read_bytes()
-            assert sha(raw) == payload == h
-            assert tree_document(read_document(raw, 6).values(), schema=6) == raw
-    for entry in result.values():
-        for key, expected in entry['reads']:
-            assert key in result and result[key]['sha'] == expected
-    visiting, done = set(), set()
-    def visit(key):
-        if key in done: return
-        assert key not in visiting, 'query cycle'
-        visiting.add(key)
-        for child, _ in result[key]['reads']: visit(child)
-        visiting.remove(key); done.add(key)
-    for key in result: visit(key)
+            assert sha(raw) == payload and tree_document(read_document(raw, 6).values(), schema=6) == raw
     return current, result
 
 
@@ -147,8 +128,8 @@ def main():
             if name == 'scope-order' and version == 1:
                 assert receipts['rewritten'] > 0, 'expected a final evidence adapter'
             if name == 'recursive-dictionary':
-                idx = cache / 'query-graph-v1/generations' / (current + '.mlfqg')
-                configuration = text(node(read(idx, 6), 411, 3)[1])
+                idx = cache_directory(cache) / 'generations' / (current + '.mlfqg')
+                configuration = text(Generation(idx.read_bytes()).config)
                 assert unpack(configuration)[-1] == 'source', 'pure dictionary recursion should retain the source plan'
             before = {str(p.relative_to(cache)): (sha(p.read_bytes()), p.stat().st_mtime_ns)
                       for p in cache.rglob('*') if p.is_file() and p.name != '.lock'}
@@ -188,7 +169,7 @@ def main():
         # A corrupt/missing result is repaired; final output remains exact.
         current, nodes = graph(cache)
         payload = next(n['payload'] for k, n in nodes.items() if unpack(k)[0] == 'InferScc')
-        damaged = cache / 'query-graph-v1/results' / (payload + '.mlfqr')
+        damaged = cache_directory(cache) / 'results' / (payload + '.mlfqr')
         damaged.write_bytes(b'corrupt checked record')
         repaired = compile('repaired')
         assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 1
@@ -200,7 +181,7 @@ def main():
         assert outputs(missing) == outputs(inc)
         graph(cache)
         # Failed source/output/publication cannot advance the generation pointer.
-        pointer = cache / 'query-graph-v1/CURRENT'; old = pointer.read_bytes()
+        pointer = cache_directory(cache) / 'CURRENT'; old = pointer.read_bytes()
         source.write_text(source_text(versions[-1] + '\ninvalid = missingDefinition\n'))
         compile('source-failure', success=False)
         assert pointer.read_bytes() == old
@@ -218,7 +199,7 @@ def main():
             assert 'query publication interrupted' in (folder / ('failed-' + point + '.stderr')).read_text(), 'failure did not reach publication'
             assert pointer.read_bytes() == old
             graph(cache)
-            staged = set((cache / 'query-graph-v1/staging').glob('*.mlfqr'))
+            staged = set((cache_directory(cache) / 'staging').glob('*.mlfqr'))
             if point == 'after-result-staging':
                 assert staged, 'failpoint did not reach staged results'
                 staged_before_move = staged
@@ -235,11 +216,11 @@ def main():
         objectfile.write_bytes(saved)
         # Broken, checksum-correct references reject the whole generation.
         valid_generation, valid_nodes = graph(cache)
-        index = cache / 'query-graph-v1/generations' / (valid_generation + '.mlfqg')
-        fmt, config, values = node(read(index, 6), 411, 3)
+        index = cache_directory(cache) / 'generations' / (valid_generation + '.mlfqg')
+        wire = Generation(index.read_bytes())
         damaged_entries = []
         changed = False
-        for value in items(values):
+        for value in wire.rows:
             k, h, reads, location = node(value, 410, 4)
             if not changed and items(reads):
                 edges = list(items(reads))
@@ -249,7 +230,7 @@ def main():
                 changed = True
             damaged_entries.append(value)
         assert changed
-        bad_bytes = tree_document([('node',411,(fmt,config,('node',1,tuple(damaged_entries))))], schema=6)
+        bad_bytes = wire.encode_rows(damaged_entries)
         bad_hash = sha(bad_bytes)
         (index.parent / (bad_hash + '.mlfqg')).write_bytes(bad_bytes)
         pointer.write_bytes(tree_document([('text',bad_hash)],schema=6))
@@ -262,8 +243,8 @@ def main():
             # graph closure. This is an audit-policy test, not corruption: the
             # normal reader/ICH must not silently become a second typechecker.
             generation, nodes = graph(cache)
-            index = cache / 'query-graph-v1/generations' / (generation + '.mlfqg')
-            fmt, config, values = node(read(index, 6), 411, 3)
+            index = cache_directory(cache) / 'generations' / (generation + '.mlfqg')
+            wire = Generation(index.read_bytes())
             def replace_literal(value, changed):
                 if value[0] != 'node': return value
                 if value[1] == 77 and not changed[0]:
@@ -272,7 +253,7 @@ def main():
                 return ('node',value[1],tuple(replace_literal(v,changed) for v in value[2]))
             for key, entry in nodes.items():
                 if unpack(key)[0] != 'InferScc': continue
-                path = cache / 'query-graph-v1/results' / (entry['payload']+'.mlfqr')
+                path = cache_directory(cache) / 'results' / (entry['payload']+'.mlfqr')
                 changed = [False]
                 forged = replace_literal(read(path, 6), changed)
                 if changed[0]: break
@@ -280,14 +261,14 @@ def main():
             raw = tree_document([forged],schema=6); forged_hash = sha(raw)
             (path.parent/(forged_hash+'.mlfqr')).write_bytes(raw)
             new_entries = []
-            for value in items(values):
+            for value in wire.rows:
                 k,h,edges,location = node(value,410,4)
                 new_edges = tuple(('node',2,(dep,('text',forged_hash) if text(dep)==key else digest))
                                   for dep,digest in map(pair,items(edges)))
                 if text(k)==key:
                     h=('text',forged_hash); location=('node',5,(('text',forged_hash),))
                 new_entries.append(('node',410,(k,h,('node',1,new_edges),location)))
-            encoded = tree_document([('node',411,(fmt,config,('node',1,tuple(new_entries))))],schema=6)
+            encoded = wire.encode_rows(new_entries)
             forged_generation = sha(encoded)
             (index.parent/(forged_generation+'.mlfqg')).write_bytes(encoded)
             pointer.write_bytes(tree_document([('text',forged_generation)],schema=6))
@@ -306,7 +287,7 @@ def main():
         for kind in ('Binding', 'Datatype', 'Evidence', 'FinishScc'):
             matches = [n['payload'] for k,n in nodes.items() if unpack(k)[0] == kind and n['payload']]
             if not matches: continue
-            (cache / 'query-graph-v1/results' / (matches[0] + '.mlfqr')).unlink()
+            (cache_directory(cache) / 'results' / (matches[0] + '.mlfqr')).unlink()
             repaired = compile('repair-shared-' + kind)
             assert outputs(repaired) == outputs(inc)
             assert json.loads(repaired.with_suffix('.queries').read_text())['inferred_groups'] == 0
@@ -315,7 +296,7 @@ def main():
         if name == 'body':
             generation, nodes = graph(cache)
             target = next(n for k,n in nodes.items() if unpack(k)[0] == 'FinishScc')
-            path = cache / 'query-graph-v1/results' / (target['payload'] + '.mlfqr')
+            path = cache_directory(cache) / 'results' / (target['payload'] + '.mlfqr')
             path.write_bytes(b'damaged finish receipt')
             repaired = compile('damaged-finish')
             assert sha(path.read_bytes()) == target['sha'] and outputs(repaired) == outputs(inc)
