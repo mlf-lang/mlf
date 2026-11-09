@@ -68,4 +68,6 @@ def prepare():
 
 if __name__ == '__main__':
     prepare()
+    import prepare_pr43_history
+    prepare_pr43_history.prepare()
     print('Reviewed historical identities and composed squash transports verified.')

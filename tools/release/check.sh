@@ -59,6 +59,7 @@ python3 tools/testing/test_manifest_snapshot.py
 python3 tools/testing/check_manifest_snapshot.py
 python3 tools/testing/test_history_refs.py
 python3 tools/testing/test_composed_history_refs.py
+python3 -B tools/testing/test_prepare_pr43_history.py
 python3 tools/testing/check_tuple_list_migration.py
 python3 tools/testing/test_tuple_list_migration.py
 python3 tools/testing/test_migration_inventory.py
