@@ -5,8 +5,8 @@ import Async.Process
 
 fail : forall a. String -> IO a
 fail message = do { putErr ("ASYNC TEST FAILURE: " ++ message ++ "\n"); exitWith 1 }
-assert : Bool -> String -> IO Unit
-assert condition message = if condition then ioReturn Unit else fail message
+assert : Bool -> String -> IO ()
+assert condition message = if condition then ioReturn () else fail message
 right : forall a. Either AsyncError a -> IO a
 right result = case result of { Right value -> ioReturn value; Left error -> fail (showInt (errorCode error) ++ ": " ++ errorMessage error) }
 errorIs : forall a. Int -> Either AsyncError a -> Bool
@@ -17,9 +17,9 @@ cancelled : Int -> ProcessOutcome -> Bool
 cancelled reason outcome = case outcome of { Cancelled actual cleanup -> actual == reason && cleanup == 0; _ -> false }
 timedOut : ProcessOutcome -> Bool
 timedOut outcome = case outcome of { TimedOut cleanup -> cleanup == 0; _ -> false }
-args2 a b = Cons a (Cons b Nil)
-args3 a b c = Cons a (Cons b (Cons c Nil))
-args4 a b c d = Cons a (Cons b (Cons c (Cons d Nil)))
+args2 a b = (:) a ((:) b [])
+args3 a b c = (:) a ((:) b ((:) c []))
+args4 a b c d = (:) a ((:) b ((:) c ((:) d [])))
 spec helper work name arguments = command helper arguments (work ++ "/" ++ name ++ ".out") (work ++ "/" ++ name ++ ".err")
 launch scope specification = do { result <- submit scope specification; right result }
 await scope handle = do { result <- awaitProcess scope handle; right result }
@@ -27,10 +27,10 @@ assertFile path expected = do { actual <- readFile path; assert (eqString actual
 absent path = do { found <- fileExists path; assert (L.not found) ("unexpected launch: " ++ path) }
 -- A bounded await services admission/timers while waiting for child readiness.
 -- The child and outer harness both have watchdogs; no timing is a pass oracle.
-ready : ProcessScope -> ProcessHandle -> String -> IO Unit
+ready : ProcessScope -> ProcessHandle -> String -> IO ()
 ready scope handle path = do
  found <- fileExists path
- if found then ioReturn Unit else do
+ if found then ioReturn () else do
   result <- awaitWithin scope handle (ForMilliseconds 10)
   assert (errorIs 10 result) "child exited before readiness"
   ready scope handle path
@@ -77,7 +77,7 @@ dynamic helper work = do
   assert (exited 0 progressed) "unrelated child failed after requestCancel"
   requestedOutcome <- await scope pending
   assert (cancelled 61 requestedOutcome) "requestCancel lost cancellation reason"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  assertFile (work ++ "/dynamic-b.out") "B saw A=23 while C was waiting\n"
  putStrLn "PASS dynamic-nonzero-repeat-await"
@@ -101,7 +101,7 @@ events helper work = do
   assert (case second of { Right Nothing -> true; _ -> false }) "completion delivered twice"
   repeated <- await scope handle
   assert (exited 7 repeated) "event consumed retained outcome"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  putStrLn "PASS event-exactly-once"
 
@@ -131,7 +131,7 @@ queue helper work = do
   assert (cancelled 42 unchanged) "repeated cancel changed outcome"
   refused <- submit scope (spec helper work "queue-after-stop" (args2 "exit" "0"))
   assert (errorIs 5 refused) "cancelled scope accepted submission"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  absent (work ++ "/queue.forbidden")
  putStrLn "PASS queued-cancel-and-bound"
@@ -145,7 +145,7 @@ retention helper work = do
   assert (errorIs 7 full) "completed retention was silently evicted"
   again <- await scope handle
   assert (exited 0 again) "retained result disappeared"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  putStrLn "PASS retained-bound"
 
@@ -161,18 +161,18 @@ failureScope helper work = do
   handle <- launch scope (spec helper work "failure-gone" (args2 "assert-gone" (work ++ "/failure.pid")))
   outcome <- await scope handle
   assert (exited 0 outcome) "scope returned before child was reaped"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right check
  putStrLn "PASS scope-left-cancel-and-join"
 
 closed helper work = do
  escaped <- withProcessScope (ScopeOptions 1 1 1) (\scope -> do
   handle <- launch scope (spec helper work "joined" (args2 "mark" (work ++ "/joined.marker")))
-  ioReturn (Right (Pair scope handle)))
+  ioReturn (Right ((,) scope handle)))
  pair <- right escaped
  assertFile (work ++ "/joined.marker") "launched\n"
  case pair of
-  Pair scope handle -> do
+  (,) scope handle -> do
    rejected <- awaitProcess scope handle
    assert (errorIs 3 rejected || errorIs 5 rejected) "closed handle remained valid"
  putStrLn "PASS normal-scope-join-closed-handle"
@@ -183,11 +183,11 @@ crossScope helper work = do
   nested <- withProcessScope (ScopeOptions 1 1 1) (\inner -> do
    rejected <- awaitProcess inner handle
    assert (errorIs 4 rejected) "cross-scope handle accepted"
-   ioReturn (Right Unit))
+   ioReturn (Right ()))
   right nested
   outcome <- await outer handle
   assert (exited 0 outcome) "cross-scope rejection damaged owning scope"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  putStrLn "PASS cross-scope-handle"
 
@@ -207,7 +207,7 @@ timeouts helper work = do
   assert (timedOut expired) "total timeout did not include queue time"
   stopped <- cancel scope blocker 8
   right stopped
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  absent (work ++ "/total.forbidden")
  putStrLn "PASS running-and-queued-timeout"
@@ -217,7 +217,7 @@ transport helper work = do
  writeFile (work ++ "/transport.stdin") "stdin λ\n"
  setEnv "ASYNC_PARENT_ONLY" "must not be inherited"
  result <- withProcessScope (ScopeOptions 1 1 2) (\scope -> do
-  let env = ReplaceEnvironment (Cons "ASYNC_VALUE=line one\nλ=x" (Cons "ASYNC_EMPTY=" Nil))
+  let env = ReplaceEnvironment ((:) "ASYNC_VALUE=line one\nλ=x" ((:) "ASYNC_EMPTY=" []))
   let arguments = args2 "transport" "space ; $() ' \" \\ \t\nλ"
   handle <- launch scope (ProcessSpec helper arguments work "transport.stdin" "transport.out" "transport.err" env 0 0)
   outcome <- await scope handle
@@ -226,7 +226,7 @@ transport helper work = do
   assert (errorIs 1 invalid) "embedded NUL accepted"
   missingLogs <- submit scope (command helper (args2 "exit" "0") "" "")
   assert (errorIs 1 missingLogs) "unbounded implicit capture accepted"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  unsetEnv "ASYNC_PARENT_ONLY"
  assertFile (work ++ "/transport.out") "argv-exact\nenv-exact\ncwd-exact\nstdin-exact\n"
@@ -238,12 +238,12 @@ inheritedEnvironment helper work = do
   blocker <- launch scope (spec helper work "snapshot-blocker" (args3 "hold" (work ++ "/snapshot.ready") (work ++ "/snapshot.release")))
   ready scope blocker (work ++ "/snapshot.ready")
   setEnv "ASYNC_SNAPSHOT" "submitted value"
-  queued <- launch scope (spec helper work "snapshot" (Cons "environment" Nil))
+  queued <- launch scope (spec helper work "snapshot" ((:) "environment" []))
   setEnv "ASYNC_SNAPSHOT" "changed after submit"
   writeFile (work ++ "/snapshot.release") "release\n"
   outcome <- await scope queued
   assert (exited 0 outcome) "environment child failed"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  unsetEnv "ASYNC_SNAPSHOT"
  assertFile (work ++ "/snapshot.out") "changed after submit\n"
@@ -251,10 +251,10 @@ inheritedEnvironment helper work = do
 
 logs helper work = do
  result <- withProcessScope (ScopeOptions 1 1 1) (\scope -> do
-  handle <- launch scope (spec helper work "large" (Cons "large-logs" Nil))
+  handle <- launch scope (spec helper work "large" ((:) "large-logs" []))
   outcome <- await scope handle
   assert (exited 0 outcome) "large stdout/stderr child failed or deadlocked"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  out <- readFile (work ++ "/large.out")
  err <- readFile (work ++ "/large.err")
@@ -263,10 +263,10 @@ logs helper work = do
 
 launchFailure work = do
  result <- withProcessScope (ScopeOptions 1 1 1) (\scope -> do
-  handle <- launch scope (command (work ++ "/missing-executable") Nil (work ++ "/missing.out") (work ++ "/missing.err"))
+  handle <- launch scope (command (work ++ "/missing-executable") [] (work ++ "/missing.out") (work ++ "/missing.err"))
   outcome <- await scope handle
   assert (case outcome of { LaunchFailed code cleanup -> code > 0 && cleanup == 0; _ -> false }) "launch error became an exit status"
-  ioReturn (Right Unit))
+  ioReturn (Right ()))
  right result
  putStrLn "PASS explicit-launch-failure"
 

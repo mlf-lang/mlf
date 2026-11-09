@@ -150,5 +150,51 @@ class Preparation(unittest.TestCase):
                 self.auth.authenticate_build(receipt, self.output / 'bin', self.root)
 
 
+class CanonicalAsyncUnitOracles(unittest.TestCase):
+    """Keep the existing byte-exact gates, including their negative boundary."""
+    def test_canonical_oracles_remain_exact(self):
+        root = HERE.parents[1]
+        expected = b'IO ()\n'
+        values = [(root / name).read_bytes() for name in (
+            'tests/async-process/io-unit.type', 'tests/async-task/io-unit.type',
+            'tests/async-task/guards.type')]
+        script = (root / 'tests/fixtures/async-completion/check.sh').read_text()
+        self.assertIn("printf 'IO ()\\n' > \"$work/io-unit.type\"", script)
+        self.assertIn('cmp "$work/io-unit.type" "$work/$name.check.stdout"', script)
+        for actual in values:
+            self.assertEqual(actual, expected)
+            for invalid in (b'IO Int\n', b'Unit\n', b'IO Unit\n', b'IO ()',
+                            b'IO ()\nwarning\n', b'warning\nIO ()\n', b'IO () \n'):
+                with self.subTest(actual=actual, invalid=invalid):
+                    self.assertNotEqual(actual, invalid)
+        for name in ('test-async-process.sh', 'test-async-task.sh'):
+            text = (root / 'tools/release' / name).read_text()
+            self.assertIn('cmp "$fixtures/', text)
+
+
+    def test_scoped_fixture_migration_preserves_error_payloads(self):
+        root = HERE.parents[1]
+        for name in ('tests/async-process/Main.emlf', 'tests/async-process/Panic.emlf',
+                     'tests/async-task/Main.emlf', 'tests/async-task/Processes.emlf'):
+            text = (root / name).read_text()
+            self.assertNotRegex(text, r'\b(?:Unit|List|Cons|Nil|Pair)\b')
+            self.assertIn('(:)', text)
+            self.assertIn('[]', text)
+        task = (root / 'tests/async-task/Main.emlf').read_text()
+        self.assertIn('integers : [] Int -> [] Int -> Bool', task)
+        self.assertIn('case value of (,) stopped answer ->', task)
+        negative = root / 'tests/fixtures/async-completion/negative'
+        for name in ('alias-widen', 'mixed-values', 'generalize-allocated'):
+            text = (negative / (name + '.emlf')).read_text()
+            self.assertIn('asyncReadCompletion cell putStrLn (ioReturn ())', text)
+            self.assertIn('42', text)
+        self.assertIn('cell : forall a. Completion a',
+                      (negative / 'generalize-allocated.emlf').read_text())
+        self.assertIn('Completion (forall a. a -> a)',
+                      (negative / 'impredicative-overwrite.emlf').read_text())
+        self.assertIn('function "wrong"',
+                      (negative / 'function-confusion.emlf').read_text())
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -6,8 +6,8 @@ import qualified Async.Process as P
 
 bad : forall a. String -> IO a
 bad message = do { putErr ("TASK TEST FAILURE: " ++ message ++ "\n"); exitWith 1 }
-assert : Bool -> String -> IO Unit
-assert condition message = if condition then ioReturn Unit else bad message
+assert : Bool -> String -> IO ()
+assert condition message = if condition then ioReturn () else bad message
 success : forall a. T.Outcome a -> IO a
 success outcome = case outcome of
   T.Succeeded value -> ioReturn value
@@ -17,15 +17,15 @@ failed : forall a. Int -> T.Outcome a -> Bool
 failed code outcome = case outcome of { T.Failed error -> P.errorCode error == code; _ -> false }
 cancelled : forall a. Int -> T.Outcome a -> Bool
 cancelled code outcome = case outcome of { T.Cancelled (T.CancelReason actual _) -> actual == code; _ -> false }
-integers : List Int -> List Int -> Bool
+integers : [] Int -> [] Int -> Bool
 integers xs ys = case xs of
-  Nil -> case ys of { Nil -> true; _ -> false }
-  Cons x rest -> case ys of { Cons y more -> x == y && integers rest more; _ -> false }
+  [] -> case ys of { [] -> true; _ -> false }
+  (:) x rest -> case ys of { (:) y more -> x == y && integers rest more; _ -> false }
 run : forall a. T.Task a -> IO a
 run task = do { outcome <- T.run T.defaultOptions task; success outcome }
 after : forall a. Int -> a -> T.Task a
 after delay value = T.bind (T.sleep delay) (\_ -> T.pure value)
-list3 a b c = Cons a (Cons b (Cons c Nil))
+list3 a b c = (:) a ((:) b ((:) c []))
 
 mixed = do
  result <- run (T.bind (T.spawn (after 1 41)) (\number ->
@@ -64,8 +64,8 @@ waitingCancel = do
    T.bind T.yield (\_ ->
    T.bind (T.cancel consumer (T.CancelReason 10 "consumer")) (\_ ->
    T.bind (T.awaitOutcome consumer) (\cancelledConsumer ->
-   T.bind (T.await shared) (\answer -> T.pure (Pair cancelledConsumer answer))))))))
- case value of Pair stopped answer -> assert (cancelled 10 stopped && answer == 17) "consumer cancelled shared prerequisite"
+   T.bind (T.await shared) (\answer -> T.pure ((,) cancelledConsumer answer))))))))
+ case value of (,) stopped answer -> assert (cancelled 10 stopped && answer == 17) "consumer cancelled shared prerequisite"
  putStrLn "PASS waiting-cancellation-shared-prerequisite"
 
 captureErrors = do
@@ -87,7 +87,7 @@ ordered = do
  assert (integers values (list3 10 20 30)) "all result order"
  collected <- run (T.collect 2 (list3 (T.pure 1) (T.fail (P.AsyncError 205 "collected")) (T.pure 3)))
  assert (case collected of
-   Cons (T.Succeeded 1) (Cons failure (Cons (T.Succeeded 3) Nil)) -> failed 205 failure
+   (:) (T.Succeeded 1) ((:) failure ((:) (T.Succeeded 3) [])) -> failed 205 failure
    _ -> false) "collect did not preserve failure data and order"
  let limited = T.Options 4096 64 3 (P.ScopeOptions 1 4 100)
  bounded <- T.run limited (T.mapConcurrentlyN 2 (\n -> after 0 (n + 1)) (L.replicate 40 4))
@@ -96,13 +96,13 @@ ordered = do
  putStrLn "PASS bounded-ordered-combinators"
 
 invalid = do
- width <- T.run T.defaultOptions (T.all 0 (Cons (T.pure 1) Nil))
+ width <- T.run T.defaultOptions (T.all 0 ((:) (T.pure 1) []))
  assert (failed 101 width) "zero width was accepted"
  duration <- T.run T.defaultOptions (T.sleep (0 - 1))
  assert (failed 101 duration) "negative sleep was accepted"
  limit <- T.run (T.Options 7 4 1 P.defaultOptions) (T.spawn (T.pure 1))
  assert (failed 104 limit) "live limit did not reject"
- callback <- T.run (T.Options 128 4 8 P.defaultOptions) (T.all 2 (Cons (after 1 1) (Cons (after 1 2) Nil)))
+ callback <- T.run (T.Options 128 4 8 P.defaultOptions) (T.all 2 ((:) (after 1 1) ((:) (after 1 2) [])))
  assert (failed 104 callback) "callback bound did not reject"
  nestedLimit <- T.run (T.Options 1024 64 2 P.defaultOptions) (T.withScope (T.spawn (T.pure 1)))
  assert (failed 104 nestedLimit) "nested group bypassed invocation live limit"

@@ -1,7 +1,7 @@
 make : forall a. AsyncScope -> IO (Completion a)
 make scope = asyncNewCompletion scope ioReturn (panic "unexpected cell capacity")
 
-useIdentity : (forall a. a -> a) -> IO Unit
+useIdentity : (forall a. a -> a) -> IO ()
 useIdentity identity = do { printInt (identity 42); putStrLn (identity "polymorphic") }
 
 main = do

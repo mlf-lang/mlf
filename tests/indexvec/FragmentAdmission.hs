@@ -55,16 +55,27 @@ main = do
   reject "missing contract" (readFinal body hash "compiler" "metadata" (M.delete P.compareString "a" types))
   reject "wrong version" (readFinal body hash "other" "metadata" types)
   reject "wrong object owner" (readFinal body hash "compiler" "other" types)
-  [W.VNode 430 [format,compiler,meta,bindings,ds,W.VNode 1 [W.VNode 401 [n,h,layouts,W.VNode 1 params,t,bs,used]]]]
-    <- W.decode W.defaultLimits 7 body >>= ok
-  let tryParams label changed = do
-        forged <- Store.encode 7 [W.VNode 430 [format,compiler,meta,bindings,ds,
-          W.VNode 1 [W.VNode 401 [n,h,layouts,W.VNode 1 changed,t,bs,used]]]] >>= ok
-        forgedHash <- P.byteArrayDigest forged
-        reject label (readFinal forged forgedHash "compiler" "metadata" types)
-  tryParams "final missing parameter" (tail params)
-  tryParams "final extra parameter" (params ++ [head params])
-  tryParams "final wrong order" (reverse params)
+  [header@(W.VNode 432 [_,compiler,meta,bindings,ds,W.VInt 1]),
+    W.VNode 401 [n,h,layouts,W.VNode 1 params,t,bs,used]]
+    <- W.decode W.defaultLimits 8 body >>= ok
+  let final changed = W.VNode 401 [n,h,layouts,W.VNode 1 changed,t,bs,used]
+      roots8 changed = [header, final changed]
+      roots7 changed = [W.VNode 430
+        [W.VText "MLF-OPEN-CRATE-1/checker-1",compiler,meta,bindings,ds,W.VNode 1 [final changed]]]
+      checkSchema schema roots = do
+        valid <- Store.encode schema (roots params) >>= ok
+        validHash <- P.byteArrayDigest valid
+        _ <- readFinal valid validHash "compiler" "metadata" types >>= ok
+        let tryParams label changed = do
+              forged <- Store.encode schema (roots changed) >>= ok
+              forgedHash <- P.byteArrayDigest forged
+              reject ("schema " ++ show schema ++ " " ++ label)
+                (readFinal forged forgedHash "compiler" "metadata" types)
+        tryParams "final missing parameter" (tail params)
+        tryParams "final extra parameter" (params ++ [head params])
+        tryParams "final wrong order" (reverse params)
+  checkSchema 8 roots8
+  checkSchema 7 roots7
   putStrLn "raw and final fragment admission controls passed"
   where sameNames xs ys = map view xs == map view ys
         view (T.XName i n) = (i,H.unpack n)
