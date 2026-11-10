@@ -1,0 +1,339 @@
+{
+  "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "c_authentication": "exact authenticated compiler/source/command rebuild matched both copied ordinary objects",
+  "c_object_sha256": {
+    "host.o": "cb34b5da749d1b68b3ee0be9906189ca6eee5319a0f1b15919a60dfa6bbcab19",
+    "supervisor.o": "f5585ba93a0b0ef062b93a9ce40e87cc74f89b56198872c641978048b1244b55"
+  },
+  "compiler_build_passed": true,
+  "compiler_complete": false,
+  "control_passed": true,
+  "diagnostic_only": true,
+  "entry_preflight_passed": true,
+  "full_output_exists": {
+    ".mlfci": false,
+    ".mlfco": false,
+    ".queries": false
+  },
+  "full_run_attempts": 1,
+  "harness_complete": true,
+  "last_snapshot": {
+    "closed_windows": {
+      "finish": {
+        "closed_count": 956,
+        "closed_ns": 1074966639
+      },
+      "prepared_record": {
+        "closed_count": 957,
+        "closed_ns": 4654154082
+      },
+      "raw_demand": {
+        "closed_count": 956,
+        "closed_ns": 91767875213
+      },
+      "raw_record": {
+        "closed_count": 956,
+        "closed_ns": 5167865594
+      }
+    },
+    "current_group_age_ns": 45813865,
+    "current_identity": {
+      "member_count": 1,
+      "members": [
+        {
+          "id": 5198,
+          "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_49_52_5"
+        }
+      ]
+    },
+    "elapsed_ns": 119372340596,
+    "events": {
+      "entry.main.enter": 1,
+      "graph.begin.enter": 1,
+      "graph.compile.enter": 1,
+      "graph.compiler-digest.enter": 1,
+      "graph.datatypes.enter": 1,
+      "graph.initial-bindings.enter": 1,
+      "graph.initial-inputs.returned": 1,
+      "graph.lock.acquired": 1,
+      "graph.lock.enter": 1,
+      "graph.start": 1,
+      "scc.begin": 957,
+      "scc.cache-load.enter": 957,
+      "scc.finish-content.enter": 956,
+      "scc.finish-evidence.enter": 956,
+      "scc.finish-record.enter": 956,
+      "scc.finish-record.returned": 956,
+      "scc.finish.enter": 956,
+      "scc.finished.fresh": 956,
+      "scc.next": 957,
+      "scc.prepared": 957,
+      "scc.prepared-record.enter": 957,
+      "scc.raw-infer.await-whnf": 957,
+      "scc.raw-record.enter": 956,
+      "scc.scope-inventory.enter": 957,
+      "scc.scope-record.enter": 957,
+      "session.dependencies.enter": 1,
+      "session.dependencies.returned": 1,
+      "session.prelude.enter": 1,
+      "session.prepare-crate.await-whnf": 1,
+      "session.prepare-crate.returned-whnf": 1,
+      "session.source-load.enter": 1,
+      "session.source-load.returned": 1,
+      "session.spec.decode.await": 1,
+      "session.spec.enter": 1,
+      "session.spec.read": 1
+    },
+    "last_boundary": "scc.raw-infer.await-whnf",
+    "last_completed": {
+      "identity": {
+        "member_count": 1,
+        "members": [
+          {
+            "id": 5172,
+            "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_49_52_5"
+          }
+        ]
+      },
+      "ordinal": 956,
+      "span_ns": 12327166,
+      "windows": {
+        "finish": {
+          "closed_count": 1,
+          "closed_ns": 355533
+        },
+        "prepared_record": {
+          "closed_count": 1,
+          "closed_ns": 839392
+        },
+        "raw_demand": {
+          "closed_count": 1,
+          "closed_ns": 10135681
+        },
+        "raw_record": {
+          "closed_count": 1,
+          "closed_ns": 596173
+        }
+      }
+    },
+    "open_window": {
+      "age_ns": 29501142,
+      "name": "raw_demand"
+    },
+    "reason": "periodic",
+    "scc_finished_fresh": 956,
+    "scc_finished_reused": 0,
+    "scc_started": 957,
+    "slowest_completed": [
+      {
+        "identity": {
+          "member_count": 46,
+          "members": [
+            {
+              "id": 2793,
+              "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_50_50_5"
+            },
+            {
+              "id": 2810,
+              "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_50_50_5"
+            },
+            {
+              "id": 2776,
+              "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_50_50_5"
+            },
+            {
+              "id": 2839,
+              "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_50_50_5"
+            }
+          ]
+        },
+        "ordinal": 834,
+        "span_ns": 5973414824,
+        "windows": {
+          "finish": {
+            "closed_count": 1,
+            "closed_ns": 14969807
+          },
+          "prepared_record": {
+            "closed_count": 1,
+            "closed_ns": 480744855
+          },
+          "raw_demand": {
+            "closed_count": 1,
+            "closed_ns": 5102921896
+          },
+          "raw_record": {
+            "closed_count": 1,
+            "closed_ns": 173692258
+          }
+        }
+      },
+      {
+        "identity": {
+          "member_count": 1,
+          "members": [
+            {
+              "id": 3978,
+              "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_49_57_5"
+            }
+          ]
+        },
+        "ordinal": 910,
+        "span_ns": 3250546290,
+        "windows": {
+          "finish": {
+            "closed_count": 1,
+            "closed_ns": 817038
+          },
+          "prepared_record": {
+            "closed_count": 1,
+            "closed_ns": 188714802
+          },
+          "raw_demand": {
+            "closed_count": 1,
+            "closed_ns": 2885612687
+          },
+          "raw_record": {
+            "closed_count": 1,
+            "closed_ns": 81377175
+          }
+        }
+      },
+      {
+        "identity": {
+          "member_count": 1,
+          "members": [
+            {
+              "id": 3977,
+              "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_49_57_5"
+            }
+          ]
+        },
+        "ordinal": 934,
+        "span_ns": 2015470813,
+        "windows": {
+          "finish": {
+            "closed_count": 1,
+            "closed_ns": 5025270
+          },
+          "prepared_record": {
+            "closed_count": 1,
+            "closed_ns": 42562708
+          },
+          "raw_demand": {
+            "closed_count": 1,
+            "closed_ns": 1909705616
+          },
+          "raw_record": {
+            "closed_count": 1,
+            "closed_ns": 39740728
+          }
+        }
+      },
+      {
+        "identity": {
+          "member_count": 2,
+          "members": [
+            {
+              "id": 5431,
+              "stable_prefix": "instance_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_66_11"
+            },
+            {
+              "id": 5432,
+              "stable_prefix": "instance_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_66_11"
+            }
+          ]
+        },
+        "ordinal": 15,
+        "span_ns": 1960572118,
+        "windows": {
+          "finish": {
+            "closed_count": 1,
+            "closed_ns": 1278630
+          },
+          "prepared_record": {
+            "closed_count": 1,
+            "closed_ns": 14184401
+          },
+          "raw_demand": {
+            "closed_count": 1,
+            "closed_ns": 1922162775
+          },
+          "raw_record": {
+            "closed_count": 1,
+            "closed_ns": 21865724
+          }
+        }
+      },
+      {
+        "identity": {
+          "member_count": 1,
+          "members": [
+            {
+              "id": 5337,
+              "stable_prefix": "module_102_117_108_108_45_99_111_109_112_105_108_101_114_47_99_117_114_114_101_110_116_z_49_50_5"
+            }
+          ]
+        },
+        "ordinal": 127,
+        "span_ns": 1463232148,
+        "windows": {
+          "finish": {
+            "closed_count": 1,
+            "closed_ns": 750004
+          },
+          "prepared_record": {
+            "closed_count": 1,
+            "closed_ns": 70039108
+          },
+          "raw_demand": {
+            "closed_count": 1,
+            "closed_ns": 1352981619
+          },
+          "raw_record": {
+            "closed_count": 1,
+            "closed_ns": 16175252
+          }
+        }
+      }
+    ],
+    "total_scc": null
+  },
+  "local_guard_receipt_sha256": "e523fe8ddffc426c685f4a20d92f1f5467f5a258e0b4217575090015ad437196",
+  "local_raw_receipt_sha256": "8afca615818ba3cacf45a658bb5894a3deda75b7ad21b3d12ee72035e036dee0",
+  "local_raw_stderr_sha256": "49f2632b3c2e2a0536e1456b36b2c18607a3acf6b0500a7fa2501f1a0733152d",
+  "locks_checked_free": true,
+  "omitted_evidence": "Full local command/environment/object-input manifests and compiler build logs are not published in this checkpoint. Their hashes identify local evidence but do not make it recoverable after machine loss.",
+  "performance_samples": 0,
+  "production_changes": false,
+  "raw_receipts_publicly_persisted": false,
+  "semantic_qualification": false,
+  "snapshot_count": 79,
+  "termination": {
+    "exit_code": -9,
+    "reason": "wall limit",
+    "sampled_process_tree_peak_rss_bytes": 1326108672,
+    "terminal_live_descendants": [],
+    "wall_seconds": 120.48017887
+  },
+  "transformations": [
+    {
+      "after": "cb1d36744c181e7e6e257278f47e4b51b0be1a884295935eda3c59d25d8adc8b",
+      "before": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
+      "changes": 22,
+      "owner": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+      "reversible": true
+    },
+    {
+      "after": "467b84b217f8b2fff2193c682f2dec8425bc8b4ca7ae28b73937470f10da02fd",
+      "before": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
+      "changes": 23,
+      "owner": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "reversible": true
+    }
+  ],
+  "type_owner_unchanged": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+  "workload_manifest_sha256": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a",
+  "workload_modules": 90,
+  "workload_source_bytes": 5233364
+}

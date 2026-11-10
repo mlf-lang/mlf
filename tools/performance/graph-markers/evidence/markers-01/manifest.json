@@ -1,0 +1,14 @@
+{
+  "base_transform_sha256": "0d2b37392d28e51b97377501146321ad6ebd7ec3ed1482c5b8e6f50e2a48717d",
+  "files_sha256": {
+    "control-snapshots.json": "4e2d258f43e467f445240e1c4cc975e01c5f04501f2b58bb119042f6dc475d23",
+    "snapshots.jsonl": "8b375da069e41e4a0b775641aeac1708ccfecd3a02b098266d3d011f448a76fb",
+    "summary.json": "36207c40c6e8f32cef29f7c6f2a0e30719d456e011a5b628ce37e9de587892d3"
+  },
+  "source_sha256": {
+    "Controls.hs": "3276ab8b327d223279892d26dcdbebe4933aadde64bf0e02811c01441ba289ac",
+    "Progress.hs": "e5c7d3888e3f8b5fd6991f0ab3b0369bd5b4ac41bc46312345a7986d7ddd011f",
+    "locate.py": "6d2107d1f9d534081ee8db98aba00321a8929b76fa2d7d6bf0769b29891c9e22",
+    "transform.py": "c56d9e95667c2680728c9123c55605039f58055597b51dea196763c4f15de725"
+  }
+}

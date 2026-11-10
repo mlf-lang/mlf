@@ -1,0 +1,348 @@
+[
+  {
+    "closed_windows": {
+      "finish": {
+        "closed_count": 0,
+        "closed_ns": 0
+      },
+      "prepared_record": {
+        "closed_count": 0,
+        "closed_ns": 0
+      },
+      "raw_demand": {
+        "closed_count": 0,
+        "closed_ns": 0
+      },
+      "raw_record": {
+        "closed_count": 0,
+        "closed_ns": 0
+      }
+    },
+    "current_group_age_ns": null,
+    "current_identity": null,
+    "elapsed_ns": 3157,
+    "events": {},
+    "last_boundary": "main.not-entered",
+    "last_completed": null,
+    "open_window": null,
+    "reason": "start",
+    "scc_finished_fresh": 0,
+    "scc_finished_reused": 0,
+    "scc_started": 0,
+    "slowest_completed": [],
+    "total_scc": null
+  },
+  {
+    "closed_windows": {
+      "finish": {
+        "closed_count": 0,
+        "closed_ns": 0
+      },
+      "prepared_record": {
+        "closed_count": 0,
+        "closed_ns": 0
+      },
+      "raw_demand": {
+        "closed_count": 0,
+        "closed_ns": 0
+      },
+      "raw_record": {
+        "closed_count": 0,
+        "closed_ns": 0
+      }
+    },
+    "current_group_age_ns": 2002730233,
+    "current_identity": {
+      "member_count": 8,
+      "members": [
+        {
+          "id": 1,
+          "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "id": 2,
+          "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "id": 3,
+          "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        {
+          "id": 4,
+          "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      ]
+    },
+    "elapsed_ns": 2003669972,
+    "events": {
+      "scc.begin": 1,
+      "scc.prepared-record.enter": 1
+    },
+    "last_boundary": "scc.prepared-record.enter",
+    "last_completed": null,
+    "open_window": {
+      "age_ns": 2002696890,
+      "name": "prepared_record"
+    },
+    "reason": "periodic",
+    "scc_finished_fresh": 0,
+    "scc_finished_reused": 0,
+    "scc_started": 1,
+    "slowest_completed": [],
+    "total_scc": null
+  },
+  {
+    "closed_windows": {
+      "finish": {
+        "closed_count": 1,
+        "closed_ns": 4366
+      },
+      "prepared_record": {
+        "closed_count": 1,
+        "closed_ns": 2100172651
+      },
+      "raw_demand": {
+        "closed_count": 1,
+        "closed_ns": 22752
+      },
+      "raw_record": {
+        "closed_count": 1,
+        "closed_ns": 4532
+      }
+    },
+    "current_group_age_ns": 5423,
+    "current_identity": null,
+    "elapsed_ns": 2101217163,
+    "events": {
+      "scc.begin": 2,
+      "scc.finish.enter": 1,
+      "scc.finished.fresh": 1,
+      "scc.prepared-record.enter": 1,
+      "scc.raw-infer.await-whnf": 1,
+      "scc.raw-record.enter": 1,
+      "scc.scope-inventory.enter": 1
+    },
+    "last_boundary": "scc.begin",
+    "last_completed": {
+      "identity": {
+        "member_count": 8,
+        "members": [
+          {
+            "id": 1,
+            "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          {
+            "id": 2,
+            "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          {
+            "id": 3,
+            "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          {
+            "id": 4,
+            "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ]
+      },
+      "ordinal": 1,
+      "span_ns": 2100262027,
+      "windows": {
+        "finish": {
+          "closed_count": 1,
+          "closed_ns": 4366
+        },
+        "prepared_record": {
+          "closed_count": 1,
+          "closed_ns": 2100172651
+        },
+        "raw_demand": {
+          "closed_count": 1,
+          "closed_ns": 22752
+        },
+        "raw_record": {
+          "closed_count": 1,
+          "closed_ns": 4532
+        }
+      }
+    },
+    "open_window": null,
+    "reason": "identity-cleared",
+    "scc_finished_fresh": 1,
+    "scc_finished_reused": 0,
+    "scc_started": 2,
+    "slowest_completed": [
+      {
+        "identity": {
+          "member_count": 8,
+          "members": [
+            {
+              "id": 1,
+              "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            {
+              "id": 2,
+              "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            {
+              "id": 3,
+              "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            {
+              "id": 4,
+              "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+          ]
+        },
+        "ordinal": 1,
+        "span_ns": 2100262027,
+        "windows": {
+          "finish": {
+            "closed_count": 1,
+            "closed_ns": 4366
+          },
+          "prepared_record": {
+            "closed_count": 1,
+            "closed_ns": 2100172651
+          },
+          "raw_demand": {
+            "closed_count": 1,
+            "closed_ns": 22752
+          },
+          "raw_record": {
+            "closed_count": 1,
+            "closed_ns": 4532
+          }
+        }
+      }
+    ],
+    "total_scc": null
+  },
+  {
+    "closed_windows": {
+      "finish": {
+        "closed_count": 1,
+        "closed_ns": 4366
+      },
+      "prepared_record": {
+        "closed_count": 1,
+        "closed_ns": 2100172651
+      },
+      "raw_demand": {
+        "closed_count": 1,
+        "closed_ns": 22752
+      },
+      "raw_record": {
+        "closed_count": 1,
+        "closed_ns": 4532
+      }
+    },
+    "current_group_age_ns": 5478453,
+    "current_identity": null,
+    "elapsed_ns": 2106690193,
+    "events": {
+      "scc.begin": 2,
+      "scc.finish.enter": 1,
+      "scc.finished.fresh": 1,
+      "scc.prepared-record.enter": 1,
+      "scc.raw-infer.await-whnf": 1,
+      "scc.raw-record.enter": 1,
+      "scc.scope-inventory.enter": 1
+    },
+    "last_boundary": "scc.begin",
+    "last_completed": {
+      "identity": {
+        "member_count": 8,
+        "members": [
+          {
+            "id": 1,
+            "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          {
+            "id": 2,
+            "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          {
+            "id": 3,
+            "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          },
+          {
+            "id": 4,
+            "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ]
+      },
+      "ordinal": 1,
+      "span_ns": 2100262027,
+      "windows": {
+        "finish": {
+          "closed_count": 1,
+          "closed_ns": 4366
+        },
+        "prepared_record": {
+          "closed_count": 1,
+          "closed_ns": 2100172651
+        },
+        "raw_demand": {
+          "closed_count": 1,
+          "closed_ns": 22752
+        },
+        "raw_record": {
+          "closed_count": 1,
+          "closed_ns": 4532
+        }
+      }
+    },
+    "open_window": null,
+    "reason": "stop",
+    "scc_finished_fresh": 1,
+    "scc_finished_reused": 0,
+    "scc_started": 2,
+    "slowest_completed": [
+      {
+        "identity": {
+          "member_count": 8,
+          "members": [
+            {
+              "id": 1,
+              "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            {
+              "id": 2,
+              "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            {
+              "id": 3,
+              "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            {
+              "id": 4,
+              "stable_prefix": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+          ]
+        },
+        "ordinal": 1,
+        "span_ns": 2100262027,
+        "windows": {
+          "finish": {
+            "closed_count": 1,
+            "closed_ns": 4366
+          },
+          "prepared_record": {
+            "closed_count": 1,
+            "closed_ns": 2100172651
+          },
+          "raw_demand": {
+            "closed_count": 1,
+            "closed_ns": 22752
+          },
+          "raw_record": {
+            "closed_count": 1,
+            "closed_ns": 4532
+          }
+        }
+      }
+    ],
+    "total_scc": null
+  }
+]
