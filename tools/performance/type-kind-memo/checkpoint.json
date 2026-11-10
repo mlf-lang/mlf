@@ -1,0 +1,24 @@
+{
+  "status": "experimental_restart_checkpoint",
+  "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "branch": "perf/frontend-20261110",
+  "baseline_owner_sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+  "memo_candidate_owner_sha256": "151c2b6966dce76abbaa7e9c8c982a01ab19f7199a576fc57469e357bfe914ed",
+  "instrumented_baseline_owner_sha256": "cfb06d2c937c9ea05065cd96c1657847978c0ea4b3b2b266bcf2b8df340bf31c",
+  "completed": [
+    "Isolated GHC 9.14.1 O0 and O2 controls: 5184 generated environments, 17 diamonds, 9 authored demand/kind cases per optimization level",
+    "Original-algorithm counter controls: 4 roots, 12 recursive visits, 7 per-root unique variables, maximum 9 visits per root, 2 roots with repeats",
+    "Exact reversible diagnostic source transformation"
+  ],
+  "not_completed": [
+    "Actual complete-workload hotspot attribution",
+    "Execution of the prepared diagnose.py driver",
+    "Ordinary candidate compiler performance comparison",
+    "Complete candidate compiler regression suite",
+    "Candidate full endpoint qualification and CI"
+  ],
+  "performance_claim": "none",
+  "next_step": "After the coordinator grants a CPU window, execute one fresh F1 source-to-checked diagnostic against the ordinary accepted baseline reference. Require identical checked raw bytes and ordered group identities. If the hotspot cannot materially affect the complete path, stop the memo candidate and retain the diagnosis.",
+  "recovery_entry": "README.md#restore-and-continue-f1",
+  "evidence_scope": "Historical logs and source/tool hashes are preserved; executable/object outputs are not committed. The full diagnostic driver is prepared, not validated by those earlier short controls. No native fixed-point campaign was started."
+}

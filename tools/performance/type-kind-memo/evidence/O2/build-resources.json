@@ -1,0 +1,382 @@
+{
+  "complete": true,
+  "command": [
+    "/workspace/scratch/3f83e2ebe290/compiler-toolchain-20261110/ghc/bin/ghc",
+    "--make",
+    "-O2",
+    "-fpedantic-bottoms",
+    "-fno-state-hack",
+    "-package-env",
+    "-",
+    "-clear-package-db",
+    "-global-package-db",
+    "-no-user-package-db",
+    "-hide-all-packages",
+    "-package",
+    "base",
+    "-package",
+    "array",
+    "-package",
+    "bytestring",
+    "-package",
+    "text",
+    "-package",
+    "containers",
+    "-package",
+    "directory",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-async",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-crates",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-developer-tools",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-foundation",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-frontend",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-inference",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-interpreter",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-language-core",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-llvm",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-package-core",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/libraries/mlf-xmlf",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/bootstrap",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/package",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/tests",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/tests/shared",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/testing",
+    "-i/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/host/ghc",
+    "-I/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/runtime",
+    "-odir",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-controls-O2/objects",
+    "-hidir",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-controls-O2/objects",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/tools/performance/type-kind-memo/Main.hs",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/host/ghc/cbits/host.c",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/runtime/mlf_process_supervisor.c",
+    "-o",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-controls-O2/probe"
+  ],
+  "limits": {
+    "wall_seconds": 180,
+    "address_space_per_process": 6442450944,
+    "process_tree_rss_bytes": 5368709120,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 5368709120,
+    "max_output_bytes": null
+  },
+  "samples": [
+    {
+      "seconds": 0.0021333750009944197,
+      "group_rss": 94208,
+      "host_available": 9368088576,
+      "disk_free": 50599788544
+    },
+    {
+      "seconds": 0.20319463499981794,
+      "group_rss": 113913856,
+      "host_available": 9352474624,
+      "disk_free": 50599624704
+    },
+    {
+      "seconds": 0.4049298949994409,
+      "group_rss": 124145664,
+      "host_available": 9346641920,
+      "disk_free": 50599616512
+    },
+    {
+      "seconds": 0.6070240990011371,
+      "group_rss": 129404928,
+      "host_available": 9342672896,
+      "disk_free": 50599616512
+    },
+    {
+      "seconds": 0.8081554649997997,
+      "group_rss": 119332864,
+      "host_available": 9330081792,
+      "disk_free": 50599583744
+    },
+    {
+      "seconds": 1.0092450869997265,
+      "group_rss": 126095360,
+      "host_available": 9324945408,
+      "disk_free": 50599579648
+    },
+    {
+      "seconds": 1.2104011650008033,
+      "group_rss": 167297024,
+      "host_available": 9322856448,
+      "disk_free": 50599550976
+    },
+    {
+      "seconds": 1.4119442920000438,
+      "group_rss": 185802752,
+      "host_available": 9300541440,
+      "disk_free": 50599542784
+    },
+    {
+      "seconds": 1.6129102909999347,
+      "group_rss": 206516224,
+      "host_available": 9275584512,
+      "disk_free": 50599538688
+    },
+    {
+      "seconds": 1.8139658880008938,
+      "group_rss": 211488768,
+      "host_available": 9275953152,
+      "disk_free": 50599538688
+    },
+    {
+      "seconds": 2.014964731000873,
+      "group_rss": 217759744,
+      "host_available": 9267523584,
+      "disk_free": 50599477248
+    },
+    {
+      "seconds": 2.2161111740006163,
+      "group_rss": 241848320,
+      "host_available": 9234096128,
+      "disk_free": 50599022592
+    },
+    {
+      "seconds": 2.418641886999467,
+      "group_rss": 241897472,
+      "host_available": 9234096128,
+      "disk_free": 50599022592
+    },
+    {
+      "seconds": 2.623430499999813,
+      "group_rss": 242429952,
+      "host_available": 9233985536,
+      "disk_free": 50599022592
+    },
+    {
+      "seconds": 2.824604024001019,
+      "group_rss": 242626560,
+      "host_available": 9220063232,
+      "disk_free": 50598805504
+    },
+    {
+      "seconds": 3.025680458000352,
+      "group_rss": 242626560,
+      "host_available": 9220063232,
+      "disk_free": 50598805504
+    },
+    {
+      "seconds": 3.2273524060001364,
+      "group_rss": 242634752,
+      "host_available": 9220063232,
+      "disk_free": 50598805504
+    },
+    {
+      "seconds": 3.428506596999796,
+      "group_rss": 250458112,
+      "host_available": 9211887616,
+      "disk_free": 50598686720
+    },
+    {
+      "seconds": 3.6296880370009603,
+      "group_rss": 266899456,
+      "host_available": 9190711296,
+      "disk_free": 50598666240
+    },
+    {
+      "seconds": 3.8310097590001533,
+      "group_rss": 266899456,
+      "host_available": 9191587840,
+      "disk_free": 50598666240
+    },
+    {
+      "seconds": 4.032030088999818,
+      "group_rss": 266899456,
+      "host_available": 9191661568,
+      "disk_free": 50598666240
+    },
+    {
+      "seconds": 4.233169617000385,
+      "group_rss": 271622144,
+      "host_available": 9191661568,
+      "disk_free": 50598612992
+    },
+    {
+      "seconds": 4.434556612000961,
+      "group_rss": 266907648,
+      "host_available": 9191124992,
+      "disk_free": 50598379520
+    },
+    {
+      "seconds": 4.635700856000767,
+      "group_rss": 266907648,
+      "host_available": 9166356480,
+      "disk_free": 50598289408
+    },
+    {
+      "seconds": 4.838414199000908,
+      "group_rss": 266907648,
+      "host_available": 9166905344,
+      "disk_free": 50598215680
+    },
+    {
+      "seconds": 5.03945499800102,
+      "group_rss": 271896576,
+      "host_available": 9166905344,
+      "disk_free": 50598215680
+    },
+    {
+      "seconds": 5.241087460999552,
+      "group_rss": 284733440,
+      "host_available": 9150795776,
+      "disk_free": 50598215680
+    },
+    {
+      "seconds": 5.442295283000931,
+      "group_rss": 284733440,
+      "host_available": 9142865920,
+      "disk_free": 50597646336
+    },
+    {
+      "seconds": 5.643839317999664,
+      "group_rss": 284733440,
+      "host_available": 9138774016,
+      "disk_free": 50597584896
+    },
+    {
+      "seconds": 5.845096185999864,
+      "group_rss": 284733440,
+      "host_available": 9144320000,
+      "disk_free": 50597584896
+    },
+    {
+      "seconds": 6.047164558000077,
+      "group_rss": 284733440,
+      "host_available": 9136148480,
+      "disk_free": 50597584896
+    },
+    {
+      "seconds": 6.248774973999389,
+      "group_rss": 284733440,
+      "host_available": 9136308224,
+      "disk_free": 50597433344
+    },
+    {
+      "seconds": 6.451141273000758,
+      "group_rss": 284733440,
+      "host_available": 9136308224,
+      "disk_free": 50597433344
+    },
+    {
+      "seconds": 6.652972019999652,
+      "group_rss": 284733440,
+      "host_available": 9132617728,
+      "disk_free": 50596823040
+    },
+    {
+      "seconds": 6.854234940999959,
+      "group_rss": 284733440,
+      "host_available": 9134731264,
+      "disk_free": 50596388864
+    },
+    {
+      "seconds": 7.055351902999973,
+      "group_rss": 284733440,
+      "host_available": 9134731264,
+      "disk_free": 50596388864
+    },
+    {
+      "seconds": 7.2564929430009215,
+      "group_rss": 301510656,
+      "host_available": 9126797312,
+      "disk_free": 50596384768
+    },
+    {
+      "seconds": 7.457612012000027,
+      "group_rss": 301510656,
+      "host_available": 9126797312,
+      "disk_free": 50596384768
+    },
+    {
+      "seconds": 7.6588768159999745,
+      "group_rss": 301510656,
+      "host_available": 9126780928,
+      "disk_free": 50596093952
+    },
+    {
+      "seconds": 7.8629057409998495,
+      "group_rss": 301510656,
+      "host_available": 9126580224,
+      "disk_free": 50596089856
+    },
+    {
+      "seconds": 8.06403463300012,
+      "group_rss": 301510656,
+      "host_available": 9126580224,
+      "disk_free": 50596089856
+    },
+    {
+      "seconds": 8.265165778000664,
+      "group_rss": 301510656,
+      "host_available": 9127411712,
+      "disk_free": 50595995648
+    },
+    {
+      "seconds": 8.466703988000518,
+      "group_rss": 301510656,
+      "host_available": 9127415808,
+      "disk_free": 50595995648
+    },
+    {
+      "seconds": 8.667836118000196,
+      "group_rss": 302870528,
+      "host_available": 9121660928,
+      "disk_free": 50595880960
+    },
+    {
+      "seconds": 8.86897302699981,
+      "group_rss": 338268160,
+      "host_available": 9097027584,
+      "disk_free": 50595880960
+    },
+    {
+      "seconds": 9.07062166400101,
+      "group_rss": 376688640,
+      "host_available": 9058504704,
+      "disk_free": 50595876864
+    },
+    {
+      "seconds": 9.272005181001077,
+      "group_rss": 486121472,
+      "host_available": 8949006336,
+      "disk_free": 50595876864
+    },
+    {
+      "seconds": 9.473672950000037,
+      "group_rss": 533504000,
+      "host_available": 8901378048,
+      "disk_free": 50595876864
+    },
+    {
+      "seconds": 9.675781101001121,
+      "group_rss": 533573632,
+      "host_available": 8902094848,
+      "disk_free": 50595876864
+    },
+    {
+      "seconds": 9.877688575999855,
+      "group_rss": 541564928,
+      "host_available": 8899080192,
+      "disk_free": 50595876864
+    },
+    {
+      "seconds": 10.081092538999656,
+      "group_rss": 544223232,
+      "host_available": 8897417216,
+      "disk_free": 50594066432
+    },
+    {
+      "seconds": 10.283052607999707,
+      "group_rss": 0,
+      "host_available": 9183391744,
+      "disk_free": 50593345536
+    }
+  ],
+  "process_group": 9,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 10.284882674000983,
+  "peak_group_rss": 544223232
+}

@@ -1,0 +1,33 @@
+{
+  "baseline": "f9bdb40a",
+  "owner": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+  "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+  "transformed_sha256": "cfb06d2c937c9ea05065cd96c1657847978c0ea4b3b2b266bcf2b8df340bf31c",
+  "reversible": true,
+  "edits": [
+    [
+      "module Bootstrap.X.Type where {",
+      "{-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}\nmodule Bootstrap.X.Type where {"
+    ],
+    [
+      "  import MLF.Primitive;",
+      "  import MLF.Primitive;\n  import qualified KindCounters;"
+    ],
+    [
+      "  kindOf ds bounds ty =\n    do {",
+      "  kindOf ds bounds ty = KindCounters.root (\n    do {"
+    ],
+    [
+      "      kindIn ds (M.fromList compareTyVar kinds) ty\n    };",
+      "      kindIn ds (M.fromList compareTyVar kinds) ty\n    });"
+    ],
+    [
+      "  visitKind ds bounds seen a =\n    if",
+      "  visitKind ds bounds seen a = KindCounters.visit (tyVarId a) (\n    if"
+    ],
+    [
+      "         };\n  kindIn ::",
+      "         });\n  kindIn ::"
+    ]
+  ]
+}

@@ -161,8 +161,42 @@ module Bootstrap.X.Type where {
   kindOf :: DataEnv -> Map XTyVar XType -> XType -> Either String Kind;
   kindOf ds bounds ty =
     do {
-      kinds <- L.mapM (kindBinding ds bounds S.empty) (S.toList (freeVars ty));
-      kindIn ds (M.fromList compareTyVar kinds) ty
+      resolved <- kindBindingsMemo ds bounds S.empty M.empty (S.toList (freeVars ty));
+      kindIn ds (M.fromList compareTyVar (L.fst resolved)) ty
+    };
+  -- Bounds form a dependency graph. Within one kindOf call, a successfully
+  -- resolved variable has the same kind on every path. Share only successes,
+  -- keeping the original ordered traversal and active-path cycle check.
+  -- The memo is local to this immutable bounds environment, never global.
+  kindBindingsMemo :: DataEnv -> Map XTyVar XType -> Set XTyVar ->
+                      Map XTyVar Kind -> [] XTyVar ->
+                      Either String ((,) ([] ((,) XTyVar Kind)) (Map XTyVar Kind));
+  kindBindingsMemo ds bounds seen memo variables =
+    case variables of {
+      [] -> Right ((,) [] memo);
+      (:) a rest -> do {
+        resolved <- visitKindMemo ds bounds seen memo a;
+        following <- kindBindingsMemo ds bounds seen (L.snd resolved) rest;
+        Right ((,) ((:) ((,) a (L.fst resolved)) (L.fst following)) (L.snd following))
+      }
+    };
+  visitKindMemo :: DataEnv -> Map XTyVar XType -> Set XTyVar ->
+                   Map XTyVar Kind -> XTyVar ->
+                   Either String ((,) Kind (Map XTyVar Kind));
+  visitKindMemo ds bounds seen memo a =
+    if S.member compareTyVar a seen
+    then Left "cyclic type environment"
+    else case M.lookup compareTyVar a memo of {
+      Just k -> Right ((,) k memo);
+      Nothing -> case M.lookup compareTyVar a bounds of {
+        Nothing -> Left ("unbound type variable " ++ showInt (tyVarId a));
+        Just b -> do {
+          dependencies <- kindBindingsMemo ds bounds (S.insert compareTyVar a seen)
+            memo (S.toList (freeVars b));
+          k <- kindIn ds (M.fromList compareTyVar (L.fst dependencies)) b;
+          Right ((,) k (M.insert compareTyVar a k (L.snd dependencies)))
+        }
+      }
     };
   kindBinding :: DataEnv ->
                  Map XTyVar XType -> Set XTyVar -> XTyVar -> Either String ((,) XTyVar Kind);

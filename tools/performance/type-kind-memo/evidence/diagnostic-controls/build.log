@@ -1,0 +1,4 @@
+[ 1 of 16] Compiling KindCounters     ( /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-instrumented/KindCounters.hs, /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-instrumented/objects/KindCounters.o )
+[14 of 16] Compiling Bootstrap.X.Type ( /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-instrumented/Bootstrap/X/Type.hs, /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-instrumented/objects/Bootstrap/X/Type.o ) [Source file changed]
+[15 of 16] Compiling DiagnosticControls ( /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-instrumented/DiagnosticControls.hs, /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-instrumented/objects/DiagnosticControls.o )
+[16 of 16] Linking /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-instrumented/controls

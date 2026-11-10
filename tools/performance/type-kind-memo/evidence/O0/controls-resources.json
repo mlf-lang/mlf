@@ -1,0 +1,33 @@
+{
+  "complete": true,
+  "command": [
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/type-kind-controls-O0/probe"
+  ],
+  "limits": {
+    "wall_seconds": 180,
+    "address_space_per_process": 6442450944,
+    "process_tree_rss_bytes": 5368709120,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 5368709120,
+    "max_output_bytes": null
+  },
+  "samples": [
+    {
+      "seconds": 0.002229446999990614,
+      "group_rss": 90112,
+      "host_available": 9161428992,
+      "disk_free": 50583625728
+    },
+    {
+      "seconds": 0.20431181300045864,
+      "group_rss": 0,
+      "host_available": 9176141824,
+      "disk_free": 50583261184
+    }
+  ],
+  "process_group": 59,
+  "exit_code": 0,
+  "reason": null,
+  "elapsed_seconds": 0.20635154500087083,
+  "peak_group_rss": 90112
+}
