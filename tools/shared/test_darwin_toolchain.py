@@ -211,6 +211,33 @@ class DarwinToolchain(unittest.TestCase):
                 self.assertIn(str(actual), files)
                 self.assertNotIn(str(decoy), files)
 
+    def test_unused_origin_rpath_on_ghc_helper_is_inert(self):
+        self.set_commands(self.ghc, ['/usr/lib/libSystem.B.dylib'],
+                          ['$ORIGIN/../../../lib/aarch64-osx-ghc-9.14.1-a591'])
+        self.assertIn(str(self.ghc), self.closure()['files'])
+
+    def test_unused_opaque_rpath_survives_absolute_dependency_traversal(self):
+        child = self.image('plugins/helper.dylib', ['/usr/lib/libSystem.B.dylib'])
+        self.set_commands(self.ghc, [str(child)], ['$ORIGIN/../lib'])
+        self.assertIn(str(child), self.closure()['files'])
+
+    def test_successful_rpath_candidate_does_not_consult_later_origin(self):
+        self.set_commands(self.cc, ['@rpath/libclang-cpp.dylib'],
+                          ['@loader_path/../lib', '$ORIGIN/../lib'])
+        self.assertIn(str(self.clang_library), self.closure()['files'])
+
+    def test_active_origin_before_valid_rpath_is_not_silently_skipped(self):
+        self.set_commands(self.cc, ['@rpath/libclang-cpp.dylib'],
+                          ['$ORIGIN/../lib', '@loader_path/../lib'])
+        with self.assertRaisesRegex(RuntimeError, r'unsupported Mach-O path: \$ORIGIN'):
+            self.closure()
+
+    def test_descendant_rpath_search_consults_opaque_inherited_entries(self):
+        child = self.image('plugins/helper.dylib', ['@rpath/libclang-cpp.dylib'])
+        self.set_commands(self.cc, [str(child)], ['$ORIGIN/../lib', '@loader_path/../lib'])
+        with self.assertRaisesRegex(RuntimeError, r'unsupported Mach-O path: \$ORIGIN'):
+            self.closure()
+
     def test_rpath_order_selects_first_existing_library(self):
         first = self.image('first/libclang-cpp.dylib')
         second = self.image('second/libclang-cpp.dylib')

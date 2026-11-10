@@ -14,7 +14,12 @@ The starting point is main commit
 driver has SHA-256
 `eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df`.
 The repaired driver has SHA-256
-`cafdee99cd2800250e478b034adc8b9708699f12c0d07ef9b1375713c1fe7cce`.
+`89851dcdee38db8f9c5dfd869ab99f7083abcb43f271ad9dbf8f04959601a44d`.
+
+The follow-up resolves `LC_RPATH` entries lazily in search order, retaining
+their declaring loader and architecture context. This leaves the unused literal
+`$ORIGIN/...` entry in official GHC `unlit` inert while still rejecting an
+unsupported entry when dependency resolution actually reaches it.
 
 `pr43-reconciliation-migration.json` records the repaired build driver's exact
 SHA-256 both as the final `changes["tools/shared/build.py"]` endpoint and in the

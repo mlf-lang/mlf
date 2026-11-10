@@ -453,8 +453,9 @@ def darwin_toolchain_inputs(initial_paths, actual_ghc, libdir):
         paths.add(tool_paths[name])
     paths.add((sdk / 'SDKSettings.json').resolve(strict=True))
     paths.update(p.resolve() for p in caches)
-    # Each executable has its own run-path stack. Expand inherited LC_RPATHs at
-    # the image declaring them, keeping dyld's nearest-loader/first-match order.
+    # Each executable has its own run-path stack. Keep entries with their
+    # declaring image, and evaluate them only when an @rpath search reaches
+    # them. GHC helpers can carry inert ELF-style $ORIGIN entries on Darwin.
     pending = [(path, path, ()) for path in sorted(paths - set(caches))]
     visited, commands, system_names = set(), {}, set()
     while pending:
@@ -468,7 +469,7 @@ def darwin_toolchain_inputs(initial_paths, actual_ghc, libdir):
             continue
         for architecture, (dependencies, local_rpaths) in commands[path].items():
             rpaths = tuple(dict.fromkeys([
-                *(darwin_loader_path(name, path, executable).resolve() for name in local_rpaths),
+                *((path, name) for name in local_rpaths),
                 *inherited]))
             # Include the context: the same dylib can resolve @executable_path or an
             # inherited @rpath differently when loaded by another tool. Deduplicated
@@ -484,8 +485,14 @@ def darwin_toolchain_inputs(initial_paths, actual_ghc, libdir):
                     system_names.add(name)
                     continue
                 if name.startswith('@rpath/'):
-                    candidates = [root / name[len('@rpath/'):].lstrip('/') for root in rpaths]
-                    dependency = next((candidate for candidate in candidates if candidate.exists()), None)
+                    candidates, dependency = [], None
+                    for loader, rpath in rpaths:
+                        root = darwin_loader_path(rpath, loader, executable).resolve()
+                        candidate = root / name[len('@rpath/'):].lstrip('/')
+                        candidates.append(candidate)
+                        if candidate.exists():
+                            dependency = candidate
+                            break
                     if dependency is None:
                         raise RuntimeError('cannot resolve Mach-O dependency: ' + name + ' from ' +
                                            str(path) + '; searched: ' + ', '.join(map(str, candidates)))
