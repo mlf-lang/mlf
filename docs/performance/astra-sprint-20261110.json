@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 5,
-  "observed_at_utc": "2026-11-10T14:07:46Z",
+  "revision": 6,
+  "observed_at_utc": "2026-11-10T14:16:36Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -105,8 +105,7 @@
       "role": "artifact/backend",
       "status": "Small-main OPAQUE diagnostic qualification passed; full input unavailable",
       "branch": "perf/llvm-builder-20261110",
-      "remote_commit": "daa88b69cce840843d9e1197f6b1993d6580af9c",
-      "unpublished_followup": "Smoke.hs, smoke.py and small-input evidence pending publication",
+      "remote_commit": "b0144b0d66dd0806d5a00ec4eb9b0b920de1db67",
       "small_qualification": {
         "fresh_groups": 5,
         "llvm_bytes": 128805,
@@ -115,7 +114,9 @@
         "total_controls": 2,
         "native_expected_stdout": "backend λ\n42\n"
       },
-      "next": "Assess current supported fresh multi-crate route over the exact target closure, read-only; full backend diagnosis still requires a qualified full checked artifact."
+      "next": "Assess current supported fresh multi-crate route over the exact target closure, read-only; full backend diagnosis still requires a qualified full checked artifact.",
+      "remote_tree": "49d13cd1daa6926b8876acf157eef28369b79e33",
+      "persistence_scope": "Smoke source, runnable recovery script and public result summary verified by fetch/tree/readback; no raw receipts or LLVM body. Hashes identify but cannot recover missing evidence; rerun qualification if local receipts are lost."
     },
     {
       "id": "F1",
@@ -183,12 +184,12 @@
   ],
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
-    "state": "reserved",
+    "state": "held",
     "task": "F1 markers-only controls, one build and one 120-second diagnostic",
     "restart_caveat": "Reservation is not proof a process is alive; verify actual locks and receipts."
   },
   "next_diagnostic": {
-    "status": "implementation_authorized_not_run",
+    "status": "controls_and_build_started_full_run_not_yet_verified",
     "type_owner": "exact baseline bytes",
     "ordinary_flags": true,
     "query_profile_env": "not enabled",
@@ -202,11 +203,20 @@
     ],
     "top_groups_limit": 5,
     "scope": "Instrumented wall-demand localization only; includes GC and lazy residual work, not CPU shares or production speed",
-    "wall_limit_seconds": 120
+    "wall_limit_seconds": 120,
+    "c_object_policy": "Baseline receipt lists commands but not host.o/supervisor.o content hashes. Rebuild both privately using exact recorded command/source/flags, require byte equality, and record new pins before linking .o."
   },
   "main_change": {
     "commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
     "scope": "Tools, CI, contracts and docs; no frozen target, host or runtime source changes",
     "policy": "Keep current diagnostic input f9bdb40; authenticate a new build-driver identity for final integration."
+  },
+  "profiling_followup": {
+    "status": "read_only_capability_verified_private_plan_preparation_only",
+    "installed_profile_libraries": true,
+    "technique": "-prof -fprof-late over whole original CLI dependency closure",
+    "ordinary_rts_options": "ignoreAll; separate diagnostic must enable options",
+    "report_limitation": "No supported intermediate cost-centre dump API found. Internal early timeout/normal exit must be fixture-qualified before an outer guarded run; SIGKILL may leave no report.",
+    "no_run_authorized": true
   }
 }
