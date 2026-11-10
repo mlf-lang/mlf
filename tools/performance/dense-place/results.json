@@ -1,0 +1,61 @@
+{
+  "baseline_ref": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "candidate_sha256": "257c738b1c84446f02dda46b10139b2488e4ac95c8d353e6d0a1b77dca76110e",
+  "gate_only": true,
+  "speedup_claim": false,
+  "full_compiler_qualified": false,
+  "performance_samples": 0,
+  "ordinary_flags_demand_preserved": true,
+  "attempts": [
+    {
+      "attempt": "01",
+      "scope_seconds": 11.418379296,
+      "outcome": "O0 Main parse failure; controls not run"
+    },
+    {
+      "attempt": "02",
+      "scope_seconds": 12.352914686,
+      "outcome": "O0 compiled and linked; executable/log-directory name collision before controls"
+    },
+    {
+      "attempt": "03",
+      "scope_seconds": 34.71408191,
+      "outcome": "Both O0 and O2 gates passed"
+    }
+  ],
+  "scope_receipt_sha256": "2f4d58ca280aadff8b86c33acf23820f1c8d2f5b82dc487c311663681a1d3c97",
+  "raw_receipts_persisted": false,
+  "checks": {
+    "validation": 12000,
+    "public_unification": 5616,
+    "frozen_successful_rebinds": 1433,
+    "graft_parent_edges": 16,
+    "int64_and_sparse_layouts": 480,
+    "demand_failure_cases": 20,
+    "aliased_scratch_successes": 5,
+    "aliased_scratch_entry_cycles": 1
+  },
+  "cleanup": {
+    "terminal_live_descendants": [],
+    "outer_lock_free": true,
+    "inner_lock_free": true
+  },
+  "modes": {
+    "O0": {
+      "complete": true,
+      "receipt_sha256": "8068d37d98cf65727a02c7d2b548f27580f3e9e18f51dc181c5a359300ff7822",
+      "controls_stdout": "PASS 12000 exact validation outcomes\nPASS public unification=5616 frozen-successful-rebinds=1433 graft-parent-edges=16\nPASS 480 signed-Int64 and sparse-layout public results\nPASS 20 placement demand, failure and scratch-state controls\nPASS 6 aliased scratch-array controls: 5 placements and 1 entry cycle\n",
+      "pins_and_producer_reauthenticated": true,
+      "c_objects_rebuilt_and_byte_equal": true,
+      "controls_seconds": 1.328939722
+    },
+    "O2": {
+      "complete": true,
+      "receipt_sha256": "49edea45e1a581b571fb6447129b8780860cc038216c201bcf341a9f2aa7529d",
+      "controls_stdout": "PASS 12000 exact validation outcomes\nPASS public unification=5616 frozen-successful-rebinds=1433 graft-parent-edges=16\nPASS 480 signed-Int64 and sparse-layout public results\nPASS 20 placement demand, failure and scratch-state controls\nPASS 6 aliased scratch-array controls: 5 placements and 1 entry cycle\n",
+      "pins_and_producer_reauthenticated": true,
+      "c_objects_rebuilt_and_byte_equal": true,
+      "controls_seconds": 0.290203346
+    }
+  }
+}

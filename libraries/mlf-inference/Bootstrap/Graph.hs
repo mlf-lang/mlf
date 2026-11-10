@@ -1773,7 +1773,13 @@ module Bootstrap.Graph where {
                                                 } in
                                                 ST.bindE (densePlaces state candidates)
                                                   (\placedCandidates ->
-                                                     ST.bindE (densePlaces state ps)
+                                                     -- Grafted candidates include all parents. Their
+                                                     -- successful placement leaves every parent complete,
+                                                     -- so replaying that same list only reads colour 2.
+                                                     ST.bindE
+                                                       (if (graft == 0)
+                                                        then densePlaces state ps
+                                                        else ST.pureE ())
                                                        (\placedParents ->
                                                           ST.bindE
                                                             (denseCommonMany state candidates)
