@@ -109,7 +109,7 @@
 
 F1/R2第二个输出目录中的唯一完整120秒诊断已结束；第一个目录只是harness路径冲突，未运行完整诊断，原失败保留。诊断harness完成、compiler未完成：按120.126秒wall上限退出，所有受管子进程已回收，两层锁已重新验证空闲。80个快照只用于定位，无checked参考/最终产物，不当成普通性能样本。已停止Type memo；R2核对实际query/raw-infer路径；B0核查是否可复用现有QueryGraph阶段统计；B1只读评估受支持的分crate构建策略能否保持同一90模块、所有target fresh和同一runnable终点。备选策略必须另立实验，不能改写原单crate600秒失败。
 
-新的联合诊断源码和原始快照提交在本机为27efb8ff0e817fffd16d87c6759dfcf3174492f2，远端仍未确认保存。旧远端64ee679不包含这次完成结果或Type恢复。恢复时先核对JSON最新remote_commit和范围；若新内容仍未保全，应据说明重新准备诊断，不能声称原始日志还可取回。
+联合诊断源码和原始快照已保存到远端76d366c676ffe78976588b6b74a2858fd33557d6，完整tree为78a27fc00df9d2589d447223aae4f5e199c509fc，与本机27efb8ff0e817fffd16d87c6759dfcf3174492f2完全一致；已fetch、完整diff为空并回读README。该46文件检查点保留80快照、原失败01、生产Type恢复及停止memo说明。[恢复README](https://github.com/mlf-lang/mlf/blob/76d366c676ffe78976588b6b74a2858fd33557d6/tools/performance/type-kind-memo/README.md)。新的markers-only方案另行实现，不能把旧controls或已完成120秒结果当作新方案通过。
 
 ## 下一次低扰动定位的准入（2026-11-10 14:07 UTC）
 
