@@ -779,12 +779,12 @@
     "no_extra_warmups": true
   },
   "recovery_successor": {
-    "observed_at_utc": "2026-11-10T21:01:37Z",
+    "observed_at_utc": "2026-11-10T22:02:55Z",
     "branch": "perf/astra-recovery-audit-20261111",
-    "commit": "e511ee36552cb4ed334ebd36dab6b1b091b3fc16",
-    "revision": 17,
+    "commit": "8a90bff0349d51394b01ee5e28a058af61a3b1b6",
+    "revision": 21,
     "plan_path": "docs/performance/astra-sprint-20261110.json",
     "policy": "This revision15 payload is preserved historical state. Read the successor checkpoint and then verify its branch tip and live processes before restoring. Three-day budget is not reset. No native generation A/B or fixed-point resumed.",
-    "status_at_pointer": "Official pinned toolchain restore and controls passed; exact ordinary baseline producer rebuild separately admitted. No new compiler speed result."
+    "status_at_pointer": "Toolchain and original producer qualified; separate foundation14 GC diagnostic completed:60.55GB managed allocation,16.8% GC of reported CPU, exact raw3artifact/fresh-query gates passed. No full90/GHC ratio or production speedup. Next allocation attribution is source-only; no heavy work admitted."
   }
 }

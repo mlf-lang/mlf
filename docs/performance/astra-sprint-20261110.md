@@ -1,6 +1,6 @@
 # Astra 协作冲刺：完整 compiler 编译接近 GHC
 
-> 恢复入口更新（2026-11-10）：本文件下方保留第15版历史记录。Astra本次恢复与最新调度已保存于[第17版精确检查点](https://github.com/mlf-lang/mlf/blob/e511ee36552cb4ed334ebd36dab6b1b091b3fc16/docs/performance/astra-sprint-20261110.md)，持续恢复分支为`perf/astra-recovery-audit-20261111`。继续前先读取该提交并核对分支最新状态，不按下文旧队列自动重跑。官方工具链已恢复通过，普通baseline producer新构建另行准入；尚无新编译提速结果，三天预算不重置，native代际A/B与fixed-point仍暂停。
+> 恢复入口更新（2026-11-10）：本文件下方保留第15版历史记录。Astra最新状态见[第21版精确检查点](https://github.com/mlf-lang/mlf/blob/8a90bff0349d51394b01ee5e28a058af61a3b1b6/docs/performance/astra-sprint-20261110.md)，持续分支为`perf/astra-recovery-audit-20261111`。继续前核对该分支最新head，不按下文旧队列自动重跑。工具链及原ordinary producer已恢复；独立foundation14诊断通过475 fresh/0 reused与三个raw制品全等，managed分配60.55GB、GC约占reported CPU16.8%。尚无full90完成、相对GHC倍率或生产提速。下一步allocation归因仅在静态设计，无重任务准入；须重验新共享workspace锁，旧/workspace/shared已不可用。三天预算不重置，native代际A/B与fixed-point仍暂停。
 
 ## 目标、责任和时间
 
