@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 9,
-  "observed_at_utc": "2026-11-10T14:48:18Z",
+  "revision": 10,
+  "observed_at_utc": "2026-11-10T14:59:21Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -158,6 +158,29 @@
       "terminal_live_descendants": [],
       "both_locks_verified_free": true,
       "raw_receipt_persisted": false
+    },
+    "split_full_qualification": {
+      "complete": false,
+      "guard_wall_seconds": 600.039880246,
+      "last_inflight_stage": "seventh library mlf-crates compile",
+      "completed_library_count": 6,
+      "completed_module_count": 59,
+      "completed_fresh_groups": 2807,
+      "completed_compile_seconds": 346.093917351,
+      "completed_show_crate_seconds": 0.684103539,
+      "last_completed_interface_to_guard_end_seconds": 252.8775535,
+      "inflight_note": "This interval is mainly the unclosed crates compilation, not an exclusive or exact successful-stage duration; do not label it wrapper overhead.",
+      "sampled_process_tree_peak_rss_bytes": 1008721920,
+      "runnable_available": false,
+      "source_to_runnable_seconds": null,
+      "cli_qualified": false,
+      "semantic_checks_reached": false,
+      "ratio": null,
+      "cleanup": "Original transient terminal record preserved; independent exact-task process scan found none, both locks reacquired.",
+      "input_pins_unchanged": 117,
+      "completed_artifact_pins_unchanged": 18,
+      "cleanup_receipt_sha256": "494c8fedfd2c87ba010c397dd8640bdba4d49f792ce3fc05d8fdf15c03945f0a",
+      "raw_checkpoint_remote": null
     }
   },
   "tasks": [
@@ -246,7 +269,7 @@
     {
       "id": "B2",
       "role": "fresh multi-crate strategy; artifact/backend direction owns, frontend direction reviews",
-      "status": "Tiny split qualification passed; one full90 fresh qualification admitted and started, result pending",
+      "status": "Full qualification failed at600s during seventh slice; no runnable/compiler ratio",
       "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
       "module_count": 90,
       "source_bytes": 5233364,
@@ -265,7 +288,7 @@
       "total_endpoint_wall_limit_seconds": 600,
       "policy": "Same source bytes and runnable endpoint, all target slices fresh and counted. Independent strategy, not replacement of original single-crate B0. No production manifest/export/algorithm change.",
       "guards": "Existing RSS/AS/host/disk limits; no per-slice resetting the whole endpoint budget.",
-      "next": "Wait for this one full qualification; preserve failure/partial evidence and release locks, then Astra decides next action. No automatic retry or formal cohort.",
+      "next": "Preserve sanitized failure summary, unchanged input/partial-artifact identities and original guard record; no retry or strategy expansion.",
       "native_ab_scope": "Do not run potentially paused check_native.py campaign. Independent non-generational small fixtures and CLI qualification only.",
       "branch": "perf/fresh-split-20261110",
       "reviewed_execution_commit": "135a31331713baad0ddc4c22a09fd0ea312dc258",
@@ -276,9 +299,11 @@
     {
       "id": "P1",
       "role": "late cost-centre diagnostic; baseline direction owns, query direction reviews",
-      "status": "Concrete private controller/shared Main/six controls prepared and under R2 static review; no build/run/publication.",
+      "status": "v2.1 independently statically reviewed; build-only admitted, no completed build or controls",
       "policy": "Full original CLI closure, profiling ABI and installed libraries; total build guard600s; private90s internal timeout within120s outer guard. Verify actual fresh report and cleanup, never extend guard.",
-      "next": "Prepare thin controller and small controls; hold CPU until separately admitted."
+      "next": "One600s whole-CLI profiling build; report actual modules/pins/resources and cleanup, then request separate60s controls. Real90/120 remains unapproved.",
+      "controller_sha256": "1c630d5f098917de68be98a61232806b9bc321da99a389e924ac86a828888a73",
+      "plan_sha256": "757b735f441569e39793863ab5d8eb1537c5aaac4e26cbd2cb5896ba9cbc72f5"
     }
   ],
   "restart_required": [
@@ -292,9 +317,9 @@
   ],
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
-    "state": "held",
-    "task": "B2 one full90 fresh split qualification",
-    "restart_caveat": "Recorded running state must be checked against actual processes and receipts; do not automatically rerun."
+    "state": "reserved",
+    "task": "P1 build-only; no controls or target automatically",
+    "restart_caveat": "Check actual processes, locks and receipts before treating recorded admission as running or restarting it."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -327,5 +352,5 @@
     "report_limitation": "No supported intermediate cost-centre dump API found. Internal early timeout/normal exit must be fixture-qualified before an outer guarded run; SIGKILL may leave no report.",
     "no_run_authorized": true
   },
-  "next_priority": "Evaluate single full90 B2 qualification, then select actual bottleneck; P1 remains prepared diagnostic support."
+  "next_priority": "P1 real function cost-centre localization after build/control gates; no repeated blind600s attempt."
 }
