@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 2,
-  "observed_at_utc": "2026-11-10T13:26:37Z",
+  "revision": 3,
+  "observed_at_utc": "2026-11-10T13:50:56Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -67,7 +67,28 @@
       "receipt_sha256": "b4aa96e0e44a1b00ea94847f4ccb6f8314ee15260c72c8801a684d5670ee2236"
     },
     "formal_cohort_status": "not_run",
-    "complete_mlf_ghc_ratio": null
+    "complete_mlf_ghc_ratio": null,
+    "joint_diagnostic": {
+      "harness_complete": true,
+      "compiler_complete": false,
+      "performance_samples": 0,
+      "wall_limit_seconds": 120,
+      "actual_guard_wall_seconds": 120.126,
+      "snapshot_count": 80,
+      "last_snapshot_seconds": 119.098,
+      "scc_started": 957,
+      "fresh_scc_finished": 956,
+      "last_boundary": "scc.raw-infer.await-whnf",
+      "kind_roots": 1590641,
+      "recursive_variable_visits": 620367,
+      "unique_variable_roots": 620367,
+      "roots_with_repeats": 0,
+      "max_visits_per_root": 15,
+      "progress": "SCC893 to SCC957 in the final eight snapshots; not stuck in one SCC.",
+      "terminal_live_descendants": [],
+      "scope": "Bounded instrumented prefix only; no ordinary CPU fraction, whole-compiler speedup or complete semantic qualification.",
+      "raw_checkpoint_remote": null
+    }
   },
   "tasks": [
     {
@@ -76,7 +97,7 @@
       "status": "MLF timeout; GHC qualified",
       "branch": "codex/full-compiler-baseline-20261110",
       "remote_commit": "305914c90e8fdff3a912faa6b93c08146273cf3e",
-      "next": "Preserve source/tool pins and recovery instructions. Do not rerun the full MLF endpoint without a relevant intervention.",
+      "next": "Inspect existing QueryGraph profile/clock/elapsed support for low-overhead live progress; no new long run without a meaningful intervention.",
       "recovery_readme": "https://github.com/mlf-lang/mlf/blob/305914c90e8fdff3a912faa6b93c08146273cf3e/tools/performance/full-compiler/baseline-20261110/README.md"
     },
     {
@@ -94,12 +115,12 @@
         "total_controls": 2,
         "native_expected_stdout": "backend λ\n42\n"
       },
-      "next": "Publish accurate small-input checkpoint. Wait for a qualified full checked artifact before full backend diagnosis."
+      "next": "Assess current supported fresh multi-crate route over the exact target closure, read-only; full backend diagnosis still requires a qualified full checked artifact."
     },
     {
       "id": "F1",
       "role": "frontend kind counters and unified diagnostic runner",
-      "status": "Preparing one joint bounded diagnostic",
+      "status": "Memo candidate retired; joint bounded diagnostic complete; raw-infer investigation underway",
       "branch": "perf/frontend-20261110",
       "local_checkpoint": "426561414cf0c1e0df7efefc4a6d3a83a67e67df",
       "remote_commit": "64ee679848211034a3cb1e2c1b44f8f600861ab0",
@@ -109,9 +130,10 @@
         "Main",
         "diagnostic harness"
       ],
-      "next": "Integrate R2 exact two-owner transform; preflight snapshot/control format; run current 90-module source once for up to 120 seconds under the sole token. Report actual progress, not speedup.",
+      "next": "Preserve new diagnostic honestly; investigate current raw-infer and a lower-overhead marker-only design before another run. Do not resume memo candidate.",
       "remote_tree": "d4769db40c3ffa39315f80477dcbc9b2759a5e6f",
-      "checkpoint_scope": "Original memo controls and original complete-counting plan. New 120-second F1/R2 combined diagnostic is not yet covered by this commit."
+      "checkpoint_scope": "Verified remote 64ee679 is the older memo/complete-counting plan. The new joint diagnostic, raw snapshots and restored production Type are not yet verified durable.",
+      "unpublished_local_checkpoint": "27efb8ff0e817fffd16d87c6759dfcf3174492f2"
     },
     {
       "id": "R1",
@@ -119,15 +141,17 @@
       "status": "Retired from current sprint optimization queue",
       "branch": "perf/compiler-reuse-20261110",
       "local_checkpoint": "9cd9125817c150ce3826b03dd926b398058b935f",
-      "remote_commit": null,
+      "remote_commit": "d2ee44d84370d41cda90fb921e5af8c11dac677a",
       "reason": "Current compileGraph endpoint does not call the modified legacy writeSourceRecord path.",
       "next": "Preserve isolated experiment and explicit scope. Do not build a full candidate or measure it for the current endpoint.",
-      "publication_status": "Public source checkpoint remains blocked after exact confirmation; no bypass or further retry. Task is off-current-path and retired."
+      "publication_status": "Verified remote backup of parked legacy experiment; no completed producer or current-endpoint performance qualification.",
+      "remote_tree": "1a48d9369bcb2ad384b8c5f6b0c64b14ebaf77b0",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/d2ee44d84370d41cda90fb921e5af8c11dac677a/tools/performance/source-context-write-reuse/README.md"
     },
     {
       "id": "R2",
       "role": "current graph progress diagnosis",
-      "status": "Two-owner reversible source transform handed to F1",
+      "status": "Joint diagnostic complete; analyzing current graph/query and raw-infer boundaries",
       "owners": [
         "private diagnostic CrateSession",
         "private diagnostic CrateGraph"
