@@ -1,0 +1,13 @@
+{
+  "format": "astra-recovery-inventory-v1",
+  "observed_at_utc": "2026-11-10T20:54:05.181876Z",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "source_clean": true,
+  "reference_commit": "305914c90e8fdff3a912faa6b93c08146273cf3e",
+  "reference_path": "tools/performance/full-compiler/baseline-20261110/frozen-workload.json",
+  "module_count": 90,
+  "source_bytes": 5233364,
+  "every_module_path_bytecount_sha256_and_order_equal": true,
+  "module_inventory_sha256": "14fdfc5d6d2687b1ddc816a5a8aff1772e5aba98149ade3bffe0abb581df7210",
+  "scope": "source recovery only, no compiler run or regenerated producer qualification"
+}

@@ -251,3 +251,15 @@ inference11完整检查点八文件已保存到[daf2f978的恢复入口](https:/
 下一R5仅处于薄工具实现和独立review阶段，没有执行许可或新速度结论。拟setup最多120秒，私有重编原emlf六行Main及按原命令重建C、核字节后，链接对应侧已有94个非Main ordinary模块闭包；不能拿原共用位置的BuiltinPrelude Main冒充emlf，也不能把未在原receipt列hash的C对象追认为历史已认证。诊断另行最多420秒，两侧各一次原11模块fresh编译，每腿最多180秒，三个raw oracle与780 fresh条件不变。
 
 两侧只加编译内-s统计落点并保留ignoreAll，不调nursery、不加profiler或并行GC、不改Graph和原producer。每个新诊断binary只能为目标编译启动一次，启动前拒绝已有stats文件或符号链接；GHC会截断统计文件，不能先跑version或随后show-crate覆盖它。统计仅说明该次普通进程的managed-heap分配/GC，不等于所有C分配、Graph独占成本、C01异常原因或普通吞吐结果。两阶段须分别取得令牌，不能自动连跑。
+
+## Astra恢复调度与新审计（2026-11-10 20:54 UTC）
+
+本次从远端`22b50be7014ede07db9e41d44cacf286c5ef6206`第15版恢复，由Astra继续承担协作、机器窗口和候选决策。三天仍从11月10日开始，不重启预算。新恢复分支`perf/astra-recovery-audit-20261111`末尾日期只是标签；事件以实际UTC为准。原计划分支经远端核对未漂移，本次不覆盖它。
+
+冻结源码已在独立clean worktree恢复到f9bdb40；重新计算90模块、5,233,364字节，每个路径、字节数、SHA256和模块顺序均等于B0的冻结清单。见[本次库存核验](../../tools/performance/full-compiler/recovery-audit-20261110/source-inventory.json)。旧普通producer、当前sprint原始receipts和运行依赖未恢复，不能仅凭旧摘要接续旧cohort。历史F3真实ABBA不支持提速的结论保持不变，候选仍排除出集成。
+
+当前为云端Debian13.6 Linux，不切用户电脑。约9.73GiB总内存、9.0GiB可用、55GiB工作区空闲。GCC14.2.0、ld2.44和glibc2.41与原基线一致，GHC及Clang尚缺。官方固定GHC9.14.1和Clang19.1.7下载地址已实测200；Astra为官方校验和固定、仅工作区内安装分配一次600秒setup窗口，所有既有内存/磁盘保护不变。/tmp是小于5GiB的tmpfs，不能作为通过5GiB磁盘下限的工作盘。
+
+跨worktree共享flock已测试持有时拒绝竞争、释放后能独立重获；本轮所有重任务统一使用。sandbox-local ps不是全机空闲证明，不能据此推断旧机器进程。安装与重建不是性能样本；安装结束必须核对receipt、工具版本和清理后，才能另行准入producer构建。
+
+新的静态审计优先检查fresh推断中closed检查到open检查的边界、canonicalOpen表示规范化，以及已有的编码/hash复用，而非先假定witness或安全检查都是浪费。不删除语义验证或放松制品oracle。普通GC薄诊断改为先准备baseline-only新实验，避免为已不支持提速的F3再次重建第二套producer；它只是准备，执行需新的资格、依赖、raw oracle和独立准入。旧R5的A/B设想不自动恢复，旧C01/full90、native代际A/B和fixed-point均不重跑。

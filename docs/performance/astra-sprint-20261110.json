@@ -1,14 +1,14 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 15,
-  "observed_at_utc": "2026-11-10T17:55:25Z",
+  "revision": 16,
+  "observed_at_utc": "2026-11-10T20:55:01Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
   "exact_deadline": null,
   "deadline_note": "No exact cutoff was specified. Do not reset the budget after a restart or handoff.",
   "repository": "mlf-lang/mlf",
-  "plan_branch": "perf/astra-sprint-plan-20261110",
+  "plan_branch": "perf/astra-recovery-audit-20261111",
   "plan_path": "docs/performance/astra-sprint-20261110.md",
   "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
   "target": {
@@ -713,6 +713,19 @@
       "statistics_one_use_rule": "Claim each diagnostic binary once; reject pre-existing stats path including dangling symlink. Do not execute version/show-crate with this binary before or after the compile because GHC opens stats with truncation.",
       "oracles": "Original inference11 source/dependencies; 780 fresh/0 reused; all three raw outputs equal fixed historical B2 and qualified corresponding leg. Use ordinary producer for artifact inspection.",
       "admission": "Setup and diagnostic require separate review and resource token. Neither is currently executed or authorized to auto-chain."
+    },
+    {
+      "id": "RECOVERY_TOOLCHAIN",
+      "role": "Astra-owned recovery",
+      "status": "one bounded official pinned-toolchain restoration admitted; no compiler build/measurement yet",
+      "next": "Validate hashes, versions, link controls, resource receipt and cleanup; then separately decide producer rebuild."
+    },
+    {
+      "id": "R6",
+      "role": "New baseline-only ordinary GC evidence preparation",
+      "status": "static preparation only",
+      "reason": "Avoid rebuilding rejected F3 solely to explain a past noisy sample; measure restored baseline allocation/GC without claiming retrospective C01 cause.",
+      "next": "Design new qualification plus one-use compiled-in statistics diagnostic with fresh rebuilt dependencies and new raw oracle; separately admit only after review."
     }
   ],
   "restart_required": [
@@ -726,9 +739,9 @@
   ],
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
-    "state": "free",
-    "task": null,
-    "restart_caveat": "Recheck actual processes, receipts and locks before using a new machine window."
+    "state": "allocated",
+    "task": "RECOVERY_TOOLCHAIN",
+    "restart_caveat": "Lock is new to this recovery; do not infer old machine process status."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -760,7 +773,7 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Preserve complete negative/variable real-compilation result and determine a useful next measurement. Ordinary GC statistics are not yet available; no tuning or repeat measurement is pre-authorized.",
+  "next_priority": "Restore exact toolchain and authenticated baseline artifacts. Audit fresh checked-to-open validation and canonicalization without deleting checks. Prepare new baseline-only GC evidence; F3 remains excluded, no automatic old cohort repeat.",
   "next_real_compile_gate": {
     "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
@@ -777,5 +790,53 @@
     "per_leg_guard_seconds": 180,
     "order": "ABBA",
     "no_extra_warmups": true
+  },
+  "recovery_parent": {
+    "plan_branch": "perf/astra-sprint-plan-20261110",
+    "commit": "22b50be7014ede07db9e41d44cacf286c5ef6206",
+    "revision": 15,
+    "remote_tip_verified": true
+  },
+  "recovery": {
+    "status": "toolchain_restore_running; no compiler measurement restarted",
+    "event_date": "2026-11-10",
+    "name_caveat": "The branch and worktree labels ending20261111 are recovery labels, not UTC event dates.",
+    "source_inventory": "tools/performance/full-compiler/recovery-audit-20261110/source-inventory.json",
+    "environment": {
+      "os": "Debian13.6 x86_64 cloud Linux",
+      "gcc": "14.2.0-19",
+      "ld": "2.44",
+      "glibc": "2.41-12+deb13u4",
+      "memory_total_bytes": 10451423232,
+      "memory_available_observed_bytes": 9680326656,
+      "workspace_disk_available_observed_bytes": 59378974720,
+      "ghc_and_clang_initially_absent": true,
+      "old_current_sprint_producers_and_raw_artifacts_not_found": true,
+      "process_view": "sandbox-local only; not proof of whole host or other executor idleness"
+    },
+    "lock": {
+      "scope": "one shared filesystem lock, all recovery heavy workers must use it",
+      "contention_test": "contender rejected while held, succeeds after release",
+      "observed": "held by toolchain restoration or queued for it; no compiler job admitted"
+    },
+    "toolchain": {
+      "source": "305914c90e8fdff3a912faa6b93c08146273cf3e:tools/performance/full-compiler/baseline-20261110/toolchains.json",
+      "official_download_head_checks": "GHC and Clang pinned URLs200",
+      "status": "one workspace-local install admitted with600s wall and unchanged memory/disk protections"
+    },
+    "no_actions": [
+      "No native generation A/B",
+      "No fixed-point",
+      "No unchanged C01 retry",
+      "No unchanged full90 retry",
+      "No main merge or deployment"
+    ],
+    "owners": {
+      "Astra": "coordinator, machine windows, checkpoint and candidate decisions",
+      "toolchain": "Astra worker, official pinned toolchain restore only",
+      "gc_diagnostic": "Astra worker, baseline-only preparation/review, no execution",
+      "source_audit": "parent audit of checking/witness/serialization, no production edits"
+    },
+    "next_admission": "Review restored toolchain and raw receipt before ordinary baseline producer rebuild; baseline-only GC diagnostic preparation is separate and not autoexecuted."
   }
 }
