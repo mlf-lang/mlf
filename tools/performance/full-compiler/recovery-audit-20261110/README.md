@@ -21,3 +21,7 @@ Toolchain restoration subsequently passed in244.252s. See toolchain-summary.json
 The ordinary baseline producer is separately admitted, not yet recorded complete.
 The cost-audit directory distinguishes the16 frozen source identities from older
 witness/validation observations; neither is a new compiler timing result.
+
+Original ordinary baseline producer recovery and focused postqualification passed:
+279.144547s build and3.639881s controls. See producer-summary.json. This is setup,
+not a new target timing. No target/dependency/GC diagnostic is yet recorded here.

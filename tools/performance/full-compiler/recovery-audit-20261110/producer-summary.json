@@ -1,0 +1,163 @@
+{
+  "complete": true,
+  "scope": "new-cohort ordinary O2 GHC producer recovery and focused controls, not performance measurement",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "source_inventory": {
+    "all_object_inputs": 284,
+    "emlf_non_main_closure": 94,
+    "host": 4,
+    "programs": 13,
+    "shared": 137
+  },
+  "controls": [
+    {
+      "exit_code": 0,
+      "label": "version",
+      "passed": true,
+      "stderr": "",
+      "stdout": "emlf 0.3.0\n"
+    },
+    {
+      "exit_code": 0,
+      "label": "identity",
+      "passed": true,
+      "stderr": "",
+      "stdout": "MLF/shared-haskell-v1 GHC\n"
+    },
+    {
+      "exit_code": 0,
+      "label": "semantic-42",
+      "passed": true,
+      "stderr": "",
+      "stdout": "42\n"
+    },
+    {
+      "exit_code": 0,
+      "label": "unicode-positive",
+      "passed": true,
+      "stderr": "",
+      "stdout": "λ雪🙂\n"
+    },
+    {
+      "exit_code": 1,
+      "label": "type-rejection",
+      "passed": true,
+      "stderr": "Inference: type constructor mismatch: Con \"Bool\" [] versus Con \"Int\" []\n",
+      "stdout": ""
+    }
+  ],
+  "main_caution": "Producer objects/Main.o and Main.hi belong to the final program link, not necessarily emlf. Do not reuse them as the emlf Main. All 94 non-Main objects are authenticated here.",
+  "not_run": [
+    "candidate F3",
+    "builtin/dependency reconstruction",
+    "target compile",
+    "ABBA benchmarks",
+    "native generation A/B",
+    "fixed point",
+    "GC diagnostic"
+  ],
+  "format": "astra-producer-recovery-summary-v1",
+  "observed_at_utc": "2026-11-10T21:08:00Z",
+  "source_clean": true,
+  "emlf": {
+    "bytes": 20192168,
+    "sha256": "e646998cc286f75609c10194e2087d9c3418d3c8965ee37525e1b357070f4bd3"
+  },
+  "stages": {
+    "build": {
+      "both_locks_reacquired": true,
+      "elapsed_seconds": 279.144546988,
+      "final_tree_rss_bytes": 0,
+      "limits": {
+        "address_space_per_process": 6442450944,
+        "disk_free_floor": 5368709120,
+        "host_available_floor": 3221225472,
+        "max_output_bytes": 2147483648,
+        "process_tree_rss_bytes": 5368709120,
+        "wall_seconds": 600
+      },
+      "no_remaining_descendants": true,
+      "peak_tree_rss_bytes": 1022013440,
+      "tracked_process_identities": 189
+    },
+    "controls": {
+      "both_locks_reacquired": true,
+      "elapsed_seconds": 3.639880737000567,
+      "final_tree_rss_bytes": 0,
+      "limits": {
+        "address_space_per_process": 6442450944,
+        "disk_free_floor": 5368709120,
+        "host_available_floor": 3221225472,
+        "max_output_bytes": 2147483648,
+        "process_tree_rss_bytes": 5368709120,
+        "wall_seconds": 120
+      },
+      "no_remaining_descendants": true,
+      "peak_tree_rss_bytes": 41549824,
+      "tracked_process_identities": 4
+    }
+  },
+  "receipt_identities": {
+    "build/bounded-receipt.json": {
+      "bytes": 228476,
+      "sha256": "6437cbac2c54e8ffb29b5cb9768ef6b43e9fe02518a54e747108ee485f03eb88"
+    },
+    "build/controller.json": {
+      "bytes": 50746,
+      "sha256": "557bdb3982601c6d09959dbb34ce376628e49a8697a0c123325eaa4727e1bfb8"
+    },
+    "build/environment.json": {
+      "bytes": 885,
+      "sha256": "3f01fa819b65cb58aa5ffb2c62da19de3482556dc90fe9bcb5f5f61a87e88907"
+    },
+    "build/producer/builtin-verification/receipt.json": {
+      "bytes": 28995,
+      "sha256": "5af3edaf08e5b0ce1d893a54e6086d7c467e0d86c59b18ce788859ccfc920cd2"
+    },
+    "build/producer/receipt.json": {
+      "bytes": 1199532,
+      "sha256": "f3d6355d7c54acfbfe6ee82115a7a9ea950682a3ec7ae2c629584f8db5a67e4c"
+    },
+    "controls/authentication.json": {
+      "bytes": 12492,
+      "sha256": "27becaba238ab7cd9b4990a302478c1e6a7db9024db2c02927506d5761377d44"
+    },
+    "controls/bounded-receipt.json": {
+      "bytes": 3867,
+      "sha256": "30f309cf29ea20ec782cb9c4c121b1c37ea22fd31a45869e58af8dc8330477d9"
+    },
+    "controls/controller.json": {
+      "bytes": 4028,
+      "sha256": "83ca5033e31835e28cd1e380e5fb4a2fba4399fa25528d13a878c50194e9ac5a"
+    },
+    "controls/environment.json": {
+      "bytes": 888,
+      "sha256": "f18a8f2ef9a9f1b95c9747bd8446785cdf6748951567cc5f2b1642a9ada05891"
+    },
+    "frozen-workload.json": {
+      "bytes": 20933,
+      "sha256": "6df79968e24bf041494d14f493e852f756faeaa664ab57b3c362df8d75cd523f"
+    },
+    "guarded_stage.py": {
+      "bytes": 5919,
+      "sha256": "e19af9f2d629cd57cb14730c480089b84088e5fe9a08ada2d404095a6253f8e1"
+    },
+    "qualify_producer.py": {
+      "bytes": 6472,
+      "sha256": "068ee3fd38c03c1494c2ca009ab6852f33c6fce18f95fcde34365cf533bcfd3e"
+    },
+    "relink-inputs.json": {
+      "bytes": 70155,
+      "sha256": "45d4a7eb51f30b5e0fd4c7e84e84e7383996ab0634aeb08557f9de10654f39a5"
+    },
+    "static-preflight.json": {
+      "bytes": 515258,
+      "sha256": "7df9084c22ce5892715adbf6bee33fd52270bc0277e8b59858d7decbfdcd3149"
+    },
+    "workload.json": {
+      "bytes": 48595,
+      "sha256": "9d76b46083988b5c1b1cce35aed191ba2b218e36acb4508446dbfe81e8e66e9f"
+    }
+  },
+  "persistence": "Summary only. New raw receipts, binaries, objects and runtime artifacts remain local, not downloadable from these hashes. This is producer recovery/qualification, not target performance or full compiler/GHC ratio."
+}

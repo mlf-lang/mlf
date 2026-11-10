@@ -271,3 +271,11 @@ inference11完整检查点八文件已保存到[daf2f978的恢复入口](https:/
 Astra已分配下一次独立600秒普通基线producer构建，只用原f9源码及原builder、全137 shared/4host/13程序，保留check-candidate和fresh literal真实生成验证。成功后另有最多120秒小资格，重新认证receipt、全部object_inputs及C对象并运行原CLI/语义控制。运行环境明确固定，不能继承未知LD环境尾部后声称与历史相同。目标依赖重建、薄统计Main、inference11新资格及单次统计诊断尚未执行，不自动串接。
 
 [新鲜编译路径审计](../../tools/performance/full-compiler/recovery-audit-20261110/cost-audit/README.md)已核对16份生产源码，并区分历史证据。closed检查与open检查可能重复遍历主体，但后者还建立可链接声明所有权，不能全称冗余。旧15模块诊断曾记录176,557 elaboration edges而witness fallback为0，旧同图验证消除screen只有0.2478%且未满足预定门；这些是历史线索，不是当前90/11模块成本。初始import节点确有两次编码/hash，但每次publish重编码整个AST的猜测不成立。后续先量化成本覆盖再选择生产改动。
+
+## 普通baseline producer恢复资格完成（2026-11-10 21:07 UTC）
+
+原f9 ordinary O2完整producer已在279.144547秒内通过，137 shared、4 host及13程序全部建立新receipt。原check-candidate与fresh-literal两门均实际通过；未改canonical源码或跳过生成验证。峰进程树RSS1.022GB，原600秒与其他资源保护均满足。之后独立小资格3.639881秒通过原authenticator前后核验、284个object/interface全清单hash、两份C对象及原命令、CLI版本/身份、42和Unicode正例及Bool/Int类型负例。两阶段均末次RSS0、无观察到的残留后代、两锁重获，Astra独立核对原receipt和锁。
+
+[本次producer摘要](../../tools/performance/full-compiler/recovery-audit-20261110/producer-summary.json)记录新源/工具/制品身份；这只是恢复与资格，不是新target性能样本。94个emlf非Main对象与interface已独立列出。全producer共用的Main.o最后被其他程序覆盖，薄统计链接必须重编原emlf五行Main，不能混用最后Main。两份C对象还需在薄setup按原命令重建并逐字节相等，才可链接诊断。
+
+此刻重锁空闲，只有新依赖恢复与薄统计控制器在静态准备/复核。它们分别需独立准入；目标source-to-checked、普通GC统计、完整90模块倍率均未产生新结果。旧F3、C01、native代际A/B与fixed-point状态不变。

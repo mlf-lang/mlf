@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 17,
-  "observed_at_utc": "2026-11-10T21:00:27Z",
+  "revision": 18,
+  "observed_at_utc": "2026-11-10T21:08:00Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -730,12 +730,12 @@
     {
       "id": "RECOVERY_PRODUCER",
       "role": "Astra worker, exact ordinary baseline producer rebuild",
-      "status": "admitted once; waiting for worker preflight/start report",
+      "status": "completed and independently verified",
       "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
       "build_wall_limit_seconds": 600,
       "postbuild_qualification_limit_seconds": 120,
       "scope": "Original build.py --bootstrap-only --optimization2, all137 shared/4host/13programs and original builtin gates. No target compilation or F3 build.",
-      "next": "Authenticate complete receipt, full object_inputs and original-command C objects, CLI/semantic controls, cleanup/locks before dependency reconstruction admission."
+      "next": "Use exact new receipt and94non-Main closure for reviewed baseline-only diagnosis. Do not use overwritten shared Main.o."
     }
   ],
   "restart_required": [
@@ -749,9 +749,9 @@
   ],
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
-    "state": "allocated",
-    "task": "RECOVERY_PRODUCER",
-    "restart_caveat": "Record is an observation, not proof a process remains alive after restart."
+    "state": "free",
+    "task": null,
+    "restart_caveat": "Both locks independently reacquired after build and controls; recheck on restart."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -783,7 +783,7 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Finish qualified ordinary baseline producer. Then independently review baseline-only diagnostic prerequisites; prioritize concrete closed-to-open and canonicalization/stamp boundaries while retaining every semantic check.",
+  "next_priority": "Admit one bounded prerequisite restoration and one-use stats relink only after exact final plan/controller review. Obtain baseline managed-heap evidence; then attribute concrete target-check/canonicalization/stamp work without dropping semantic authority.",
   "next_real_compile_gate": {
     "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
@@ -808,7 +808,7 @@
     "remote_tip_verified": true
   },
   "recovery": {
-    "status": "official toolchain passed; baseline producer build admitted",
+    "status": "official toolchain and ordinary original baseline producer fully restored and qualified",
     "event_date": "2026-11-10",
     "name_caveat": "The branch and worktree labels ending20261111 are recovery labels, not UTC event dates.",
     "source_inventory": "tools/performance/full-compiler/recovery-audit-20261110/source-inventory.json",
@@ -848,6 +848,15 @@
       "gc_diagnostic": "Astra worker, baseline-only preparation/review, no execution",
       "source_audit": "parent audit of checking/witness/serialization, no production edits"
     },
-    "next_admission": "Ordinary original baseline producer admitted once600s; small post-build authentication/CLI controls separately120s after successful build. R6 dependencies/setup/diagnostics remain unrun and require separate review."
+    "next_admission": "Final producer-backed plan, guarded prerequisite restoration and private stats relink controllers under preparation/review. No dependencies, thin setup or Q/D admitted yet.",
+    "producer": {
+      "status": "passed build and separately admitted focused postqualification",
+      "summary": "tools/performance/full-compiler/recovery-audit-20261110/producer-summary.json",
+      "build_seconds": 279.144546988,
+      "qualification_seconds": 3.639880737000567,
+      "producer_receipt_sha256": "f3d6355d7c54acfbfe6ee82115a7a9ea950682a3ec7ae2c629584f8db5a67e4c",
+      "emlf_sha256": "e646998cc286f75609c10194e2087d9c3418d3c8965ee37525e1b357070f4bd3",
+      "no_target_compilation": true
+    }
   }
 }
