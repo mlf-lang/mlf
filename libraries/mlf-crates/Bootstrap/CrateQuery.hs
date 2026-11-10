@@ -1383,36 +1383,63 @@ module Bootstrap.CrateQuery where {
       }
     }
   };
+  -- One call-owned immutable encoding, not a publication or validation receipt.
+  -- Reusing it still performs every destination check, read/compare and repair.
+  -- Only finite parsed/checked datatype lists enter this driver-owned state.
+  -- Cap retained bytes at 1 MiB; larger contexts keep the uncached path.
+  data BinarySourceContextEncoding = BinarySourceContextEncoding ([] DataDecl) String ByteArray;
+  encodeBinarySourceContext :: Maybe BinarySourceContextEncoding -> [] DataDecl ->
+    IO (Either String BinarySourceContextEncoding);
+  encodeBinarySourceContext previous declarations = case previous of {
+    Just entry@(BinarySourceContextEncoding original _ _) ->
+      if eqList SourceEquality.eqDataDecl original declarations then ioReturn (Right entry)
+      else encodeBinarySourceContext Nothing declarations;
+    Nothing -> do {
+      encoded <- Storage.encode 1 [Structure.toDataContext declarations];
+      case encoded of {
+        Left error -> ioReturn (Left error);
+        Right bytes -> do {
+          digest <- byteArrayDigest bytes;
+          ioReturn (if validSourceContextDigest digest
+            then Right (BinarySourceContextEncoding declarations digest bytes)
+            else Left "cannot fingerprint source query context")
+        }
+      }
+    }
+  };
+  retainBinarySourceContext :: BinarySourceContextEncoding -> IO (Maybe BinarySourceContextEncoding);
+  retainBinarySourceContext entry@(BinarySourceContextEncoding _ _ bytes) = do {
+    size <- lengthByteArray bytes;
+    ioReturn (if size <= 1048576 then Just entry else Nothing)
+  };
   publishBinarySourceContext :: String -> [] DataDecl -> IO (Either String String);
   publishBinarySourceContext cacheDir declarations = do {
-    encoded <- Storage.encode 1 [Structure.toDataContext declarations];
+    encoded <- encodeBinarySourceContext Nothing declarations;
     case encoded of {
       Left error -> ioReturn (Left error);
-      Right bytes -> do {
-        digest <- byteArrayDigest bytes;
-        if not (validSourceContextDigest digest)
-        then ioReturn (Left "cannot fingerprint source query context") else do {
-          let { destination = sourceContextPath cacheDir digest;
-                staging = cacheDir ++ "/source-context.new" };
-          isDirectory <- directoryExists destination;
-          if isDirectory then ioReturn (Left "cannot publish source query context: destination is a directory")
-          else do {
-            previous <- Storage.readRaw destination;
-            same <- case previous of {
-              Left _ -> ioReturn False;
-              Right old -> Storage.sameBytes old bytes
-            };
-            if same then ioReturn (Right digest) else do {
-              written <- Storage.writeRaw staging bytes;
-              case written of {
-                Left error -> rejectSourceContextPublication cacheDir error;
-                Right _ -> do {
-                  code <- cacheCommand ["/bin/mv", "-f", staging, destination];
-                  if code == 0 then ioReturn (Right digest)
-                  else rejectSourceContextPublication cacheDir "cannot publish source query context"
-                }
-              }
-            }
+      Right context -> publishEncodedSourceContext cacheDir context
+    }
+  };
+  publishEncodedSourceContext :: String -> BinarySourceContextEncoding -> IO (Either String String);
+  publishEncodedSourceContext cacheDir (BinarySourceContextEncoding _ digest bytes) = do {
+    let { destination = sourceContextPath cacheDir digest;
+          staging = cacheDir ++ "/source-context.new" };
+    isDirectory <- directoryExists destination;
+    if isDirectory then ioReturn (Left "cannot publish source query context: destination is a directory")
+    else do {
+      previous <- Storage.readRaw destination;
+      same <- case previous of {
+        Left _ -> ioReturn False;
+        Right old -> Storage.sameBytes old bytes
+      };
+      if same then ioReturn (Right digest) else do {
+        written <- Storage.writeRaw staging bytes;
+        case written of {
+          Left error -> rejectSourceContextPublication cacheDir error;
+          Right _ -> do {
+            code <- cacheCommand ["/bin/mv", "-f", staging, destination];
+            if code == 0 then ioReturn (Right digest)
+            else rejectSourceContextPublication cacheDir "cannot publish source query context"
           }
         }
       }
@@ -1673,24 +1700,49 @@ module Bootstrap.CrateQuery where {
   };
   writeLocalSourceRecord = writeSourceRecordUsing encodeLegacyLocalRecord DirectRecords;
   writeSourceRecordWith = writeSourceRecordUsing encodeLocalRecord;
-  writeSourceRecordUsing encoder publisher encodings cacheDir destination input expectedContext object =
+  writeSourceRecordUsing encoder publisher encodings cacheDir destination input expectedContext object = do {
+    result <- writeSourceRecordUsingContext Nothing encoder publisher encodings
+      cacheDir destination input expectedContext object;
+    ioReturn (snd result)
+  };
+  writeSourceRecordWithContext previous = writeSourceRecordUsingContext previous encodeLocalRecord;
+  writeSourceRecordUsingContext previous encoder publisher encodings cacheDir destination input expectedContext object =
     let { declarations = Separate.unitData (Separate.objectInterface object);
       encode = case encodings of {
         Nothing -> encodeSourceDatatypes; Just pool -> encodeSourceDatatypesWithPool pool
       };
       shared = eqString expectedContext (encode declarations)
         && eqString expectedContext (encode (Separate.objectContext object))
-        && (case Separate.objectTerm object of { XWithData _ _ -> True; _ -> False })
-    } in if not (validSourceContextDigest input) then ioReturn (Left "invalid source input fingerprint")
+        && (case Separate.objectTerm object of { XWithData _ _ -> True; _ -> False });
+      failed message = ioReturn ((,) Nothing (Left message))
+    } in if not (validSourceContextDigest input) then failed "invalid source input fingerprint"
     else do {
       acquired <- if shared then do {
-        published <- publishBinarySourceContext cacheDir declarations;
-        ioReturn (mapEither Just published)
-      } else ioReturn (Right Nothing);
+        encoded <- encodeBinarySourceContext previous declarations;
+        case encoded of {
+          Left message -> ioReturn (Left message);
+          Right context -> do {
+            published <- publishEncodedSourceContext cacheDir context;
+            case published of {
+              Left message -> ioReturn (Left message);
+              Right digest -> do {
+                retained <- retainBinarySourceContext context;
+                ioReturn (Right ((,) retained (Just digest)))
+              }
+            }
+          }
+        }
+      } else ioReturn (Right ((,) previous Nothing));
       case acquired of {
-        Left message -> ioReturn (Left message);
-        Right reference -> publishSourceBytes publisher destination input
-          (encoder input (localPayloadFields reference object))
+        Left message -> failed message;
+        Right ((,) next reference) -> do {
+          written <- publishSourceBytes publisher destination input
+            (encoder input (localPayloadFields reference object));
+          ioReturn (case written of {
+            Left message -> (,) Nothing (Left message);
+            Right () -> (,) next (Right ())
+          })
+        }
       }
     };
   -- Use one reproducible bucket out of 32 (hex 00..07). Strict mode
@@ -2304,6 +2356,10 @@ module Bootstrap.CrateQuery where {
     runSourceGroupsPublishing DirectRecords encodings datatypeContext contractEncodings ownedContext readWindow
       crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
   runSourceGroupsPublishing publisher encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsPublishingContext Nothing publisher encodings datatypeContext contractEncodings ownedContext readWindow
+      crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
+  runSourceGroupsPublishingContext writeContext publisher encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (QueryReport inferred reused (reverse results)) contracts));
@@ -2367,16 +2423,16 @@ module Bootstrap.CrateQuery where {
           Right ((,) hit unit) -> case Source.finishSourceUnit prepared unit of {
             Left error -> ioReturn (Left error);
             Right finalized -> do {
-              saved <- if hit then ioReturn (Right ())
-                else writeSourceRecordWith publisher encodings cacheDir destination digest (fst context) (Unit.object unit);
-              case saved of {
+              saved <- if hit then ioReturn ((,) writeContext (Right ()))
+                else writeSourceRecordWithContext writeContext publisher encodings cacheDir destination digest (fst context) (Unit.object unit);
+              case snd saved of {
                 Left error -> ioReturn (Left error);
                 Right _ -> do {
                   let { finalObject = Source.finalGroupObject finalized };
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (list encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsPublishing publisher encodings (snd context) (case contractEncodings of {
+                  runSourceGroupsPublishingContext (fst saved) publisher encodings (snd context) (case contractEncodings of {
                     Nothing -> Nothing;
                     Just pool -> Just (extendSourceContractEncodings finalContracts pool)
                   }) (case ownedContext of {

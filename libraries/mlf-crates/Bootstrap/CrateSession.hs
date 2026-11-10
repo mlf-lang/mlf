@@ -376,6 +376,10 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
     runSourceGroupsPublishing Query.DirectRecords verifyAll encodings datatypeContext contractEncodings ownedContext readWindow
       crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
   runSourceGroupsPublishing publisher verifyAll encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
+    objects inferred reused results =
+    runSourceGroupsPublishingContext Nothing publisher verifyAll encodings datatypeContext contractEncodings ownedContext readWindow
+      crateId compilerHash cacheDir inventory plan groups contracts objects inferred reused results;
+  runSourceGroupsPublishingContext writeContext publisher verifyAll encodings datatypeContext contractEncodings ownedContext readWindow crateId compilerHash cacheDir inventory plan groups contracts
     objects inferred reused results = case groups of {
     [] -> ioReturn (Right ((,,) (reverse objects)
       (Query.QueryReport inferred reused (reverse results)) contracts));
@@ -439,16 +443,16 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
           Right ((,) hit unit) -> case Source.finishSourceUnit prepared unit of {
             Left error -> ioReturn (Left error);
             Right finalized -> do {
-              saved <- if hit then ioReturn (Right ())
-                else Query.writeSourceRecordWith publisher encodings cacheDir destination digest (fst context) (Unit.object unit);
-              case saved of {
+              saved <- if hit then ioReturn ((,) writeContext (Right ()))
+                else Query.writeSourceRecordWithContext writeContext publisher encodings cacheDir destination digest (fst context) (Unit.object unit);
+              case snd saved of {
                 Left error -> ioReturn (Left error);
                 Right _ -> do {
                   let { finalObject = Source.finalGroupObject finalized };
                   let { finalContracts = Source.finalGroupContracts finalized };
                   let { semantic = Separate.fingerprint (Query.list Query.encodeBinding
                     (Separate.unitBindings (Separate.objectInterface finalObject))) };
-                  runSourceGroupsPublishing publisher verifyAll encodings (snd context) (case contractEncodings of {
+                  runSourceGroupsPublishingContext (fst saved) publisher verifyAll encodings (snd context) (case contractEncodings of {
                     Nothing -> Nothing;
                     Just pool -> Just (Query.extendSourceContractEncodings finalContracts pool)
                   }) (case ownedContext of {
