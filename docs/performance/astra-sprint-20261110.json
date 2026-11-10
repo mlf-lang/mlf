@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 18,
-  "observed_at_utc": "2026-11-10T21:08:00Z",
+  "revision": 19,
+  "observed_at_utc": "2026-11-10T21:26:05Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -723,9 +723,9 @@
     {
       "id": "R6",
       "role": "New baseline-only ordinary GC evidence preparation",
-      "status": "static preparation only",
+      "status": "inference11 prerequisite attempt failed at300s; its SETUP/QD never executed",
       "reason": "Avoid rebuilding rejected F3 solely to explain a past noisy sample; measure restored baseline allocation/GC without claiming retrospective C01 cause.",
-      "next": "Design new qualification plus one-use compiled-in statistics diagnostic with fresh rebuilt dependencies and new raw oracle; separately admit only after review."
+      "next": "Preserve full failure. Prepare separately scoped foundation14/173594bytes/475fresh baseline-only GC diagnosis, no partial artifacts reused, no whole-compiler speed claim."
     },
     {
       "id": "RECOVERY_PRODUCER",
@@ -751,7 +751,7 @@
   "resource_token_at_observation": {
     "state": "free",
     "task": null,
-    "restart_caveat": "Both locks independently reacquired after build and controls; recheck on restart."
+    "restart_caveat": "Failed prerequisite controller cleanup and all locks verified; recheck on restart."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -783,7 +783,7 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Admit one bounded prerequisite restoration and one-use stats relink only after exact final plan/controller review. Obtain baseline managed-heap evidence; then attribute concrete target-check/canonicalization/stamp work without dropping semantic authority.",
+  "next_priority": "Complete small foundation14 GC diagnostic only if its new exact controller and gates review successfully. Preserve failed inference11 prerequisite scope; do not extend or resume it.",
   "next_real_compile_gate": {
     "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
@@ -808,7 +808,7 @@
     "remote_tip_verified": true
   },
   "recovery": {
-    "status": "official toolchain and ordinary original baseline producer fully restored and qualified",
+    "status": "toolchain/producer qualified; inference11 prerequisite phase failed at300s; no inference11 statistics run",
     "event_date": "2026-11-10",
     "name_caveat": "The branch and worktree labels ending20261111 are recovery labels, not UTC event dates.",
     "source_inventory": "tools/performance/full-compiler/recovery-audit-20261110/source-inventory.json",
@@ -848,7 +848,7 @@
       "gc_diagnostic": "Astra worker, baseline-only preparation/review, no execution",
       "source_audit": "parent audit of checking/witness/serialization, no production edits"
     },
-    "next_admission": "Final producer-backed plan, guarded prerequisite restoration and private stats relink controllers under preparation/review. No dependencies, thin setup or Q/D admitted yet.",
+    "next_admission": "Astra selected a separate foundation14 diagnostic proposal for preparation/review only: fresh builtin plus same thin SETUP120, fresh Q and one-use D within420/per-target180. No partial failed dependency reuse and no change to frozen inference11 cohort.",
     "producer": {
       "status": "passed build and separately admitted focused postqualification",
       "summary": "tools/performance/full-compiler/recovery-audit-20261110/producer-summary.json",
@@ -857,6 +857,20 @@
       "producer_receipt_sha256": "f3d6355d7c54acfbfe6ee82115a7a9ea950682a3ec7ae2c629584f8db5a67e4c",
       "emlf_sha256": "e646998cc286f75609c10194e2087d9c3418d3c8965ee37525e1b357070f4bd3",
       "no_target_compilation": true
+    },
+    "prerequisites": {
+      "status": "failed during xmlf at fixed300s total deadline",
+      "summary": "tools/performance/full-compiler/recovery-audit-20261110/prerequisites-failure.json",
+      "valid_handoff": false,
+      "no_retry_or_resume": true,
+      "no_stats_setup_or_target_run": true,
+      "completed_fresh_groups": [
+        1,
+        475,
+        74,
+        763
+      ],
+      "cleanup_and_locks": "independently verified; no observed owned survivors; all orchestration and query locks reacquired"
     }
   }
 }

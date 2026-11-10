@@ -25,3 +25,26 @@ witness/validation observations; neither is a new compiler timing result.
 Original ordinary baseline producer recovery and focused postqualification passed:
 279.144547s build and3.639881s controls. See producer-summary.json. This is setup,
 not a new target timing. No target/dependency/GC diagnostic is yet recorded here.
+
+The separately admitted inference11 prerequisites subsequently FAILED at the
+fixed300-second total deadline. See prerequisites-failure.md/.json. Xmlf did not
+complete; no final producer/runtime-after authentication or complete dependency
+handoff exists. Its later SETUP/QD was never run. Partial data is not a complete
+cohort and must not be resumed or silently admitted.
+
+Exact reviewed local controller source is archived in prerequisites-source and
+inference11-diagnostic-source; reviewed-source-sha256.json identifies its bytes.
+These archives are not ready-to-run recovery commands. They assume the original
+sibling worktree layout, which a future machine must independently reconstruct.
+The prerequisite controller actually ran and failed at its budget. The inference11
+SETUP/QD sources were reviewed and statically tested but NEVER executed. Private
+plans, admissions, binary/object inputs and raw receipts are not in this archive.
+Source code or an old approved receipt is not a new execution admission.
+
+Reference helpers for the diagnostic are exact public files from
+7f580a7087266f27d928196add2ea5e44fc79952 (sample-runtime.py),
+daf2f9780ba2a38e772fb65a6eb345ff01a8ef15 (inference11 run.py and workload template),
+and e0fa831b3d4cbd395f4d381dbebcb216ebc58365 (fresh-split helpers).
+Restore references under their original filenames, rerun static tests, generate
+new authenticated plans and admissions, and review current instructions first.
+A separately scoped foundation14 diagnostic is preparation-only at this checkpoint.

@@ -1,0 +1,420 @@
+{
+  "admission": {
+    "path": "${WORKSPACE}/compiler-recovery-admissions-20261110/prerequisites-01.json",
+    "sha256": "f10898b3b1ad98ea6acdf0609f684e10985cc862981b83568aa7368fd2c7fd06"
+  },
+  "builtin_files": [
+    {
+      "bytes": 40417,
+      "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/builtin.mlfci",
+      "sha256": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05"
+    },
+    {
+      "bytes": 190840,
+      "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/builtin.mlfco",
+      "sha256": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481"
+    }
+  ],
+  "cleanup": {
+    "independent_inspection_after_phase": true,
+    "independent_owned_pid_starttime_recheck": {},
+    "independently_reacquired_orchestration_locks": [
+      "/workspace/shared/mlf-astra-heavy.lock",
+      "${WORKSPACE}/compiler-audit-source-20261111/.mlf-build/.reproduction.lock",
+      "${WORKSPACE}/compiler-baseline-recovery-20261110/build/.reproduction.lock"
+    ],
+    "independently_reacquired_query_locks": [
+      "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/builtin-work/queries/.lock",
+      "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-foundation/queries/.lock",
+      "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-language-core/queries/.lock",
+      "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-frontend/queries/.lock",
+      "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-xmlf/queries/.lock"
+    ],
+    "launcher_locks_reacquired": {
+      "inner": [
+        "${WORKSPACE}/compiler-audit-source-20261111/.mlf-build/.reproduction.lock",
+        "${WORKSPACE}/compiler-baseline-recovery-20261110/build/.reproduction.lock"
+      ],
+      "shared": true
+    },
+    "launcher_remaining_after_cleanup": {}
+  },
+  "code": {
+    "REVIEW.md": {
+      "bytes": 3084,
+      "path": "${WORKSPACE}/compiler-deps-recovery-20261110/REVIEW.md",
+      "sha256": "fcd5eacc9ca2db11b3239832e79875d6dbc076524d410e1e4d9bda9504b846a0"
+    },
+    "controller.py": {
+      "bytes": 28366,
+      "path": "${WORKSPACE}/compiler-deps-recovery-20261110/controller.py",
+      "sha256": "a5358611098e7b063f26820c26f8a664c3c2acc9003814fa0425b3bafeb2a47b"
+    },
+    "run-phase.py": {
+      "bytes": 9312,
+      "path": "${WORKSPACE}/compiler-deps-recovery-20261110/run-phase.py",
+      "sha256": "e649405a883d9540ff846c1bd0b5456d56c2417f623c2dd27c018f117cff6f29"
+    },
+    "static-tests.json": {
+      "bytes": 652,
+      "path": "${WORKSPACE}/compiler-deps-recovery-20261110/static-tests.json",
+      "sha256": "85e3dd64535deb4f5c361b7fcf71af480f12c7af9aa4157b80d7f7e484dddc3f"
+    },
+    "test_controller.py": {
+      "bytes": 12355,
+      "path": "${WORKSPACE}/compiler-deps-recovery-20261110/test_controller.py",
+      "sha256": "561458ec557d3cca71fad8e6a54aba8de865538c54fab7dff54ebb81d9943060"
+    }
+  },
+  "commands_started_once": true,
+  "complete": false,
+  "evidence": {
+    "bounded-receipt.json": {
+      "bytes": 173681,
+      "path": "${WORKSPACE}/baseline-gc-new-cohort-01/bounded-receipt.json",
+      "sha256": "bc7fcfe299a0aac3227dec7bf7d8c3144215e53f8170390b309f3f4f68b35c08"
+    },
+    "build.log": {
+      "bytes": 0,
+      "path": "${WORKSPACE}/baseline-gc-new-cohort-01/build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "prerequisites-controller.json": {
+      "bytes": 15906,
+      "path": "${WORKSPACE}/baseline-gc-new-cohort-01/prerequisites-controller.json",
+      "sha256": "f39d6a33a78849d8b31efb45b8a87ae56f7e2ff5864099091a4223e0b8b431bf"
+    },
+    "prerequisites/receipt.json": {
+      "bytes": 905733,
+      "path": "${WORKSPACE}/baseline-gc-new-cohort-01/prerequisites/receipt.json",
+      "sha256": "05a5098d905df53aa5c66833d22aa9d4d4706a2d2883698d08ba576e0ae19e88"
+    },
+    "watchdog.stdout": {
+      "bytes": 899,
+      "path": "${WORKSPACE}/baseline-gc-new-cohort-01/watchdog.stdout",
+      "sha256": "aa7b9897c13980ea76565d26022287e19ce4901b8d68e20fc429c27933a016d9"
+    }
+  },
+  "failed_child_metric_note": "xmlf command receipt is incomplete; no final wait4 wall/CPU/RSS/exit status was recorded. Missing metrics are null, not zero.",
+  "failed_child_metrics_available": false,
+  "failed_command": "mlf-xmlf",
+  "final_authentication_completed": false,
+  "final_runtime_snapshot_completed": false,
+  "format": "baseline-prerequisite-failed-phase-summary-v1",
+  "interpretation": "Successful individual prefixes do not constitute a completed dependency cohort. They are partial evidence only, not authorization to resume, reuse a prefix, run inference11 or run a GC diagnostic. These are preparation observations, not compiler throughput samples or a GHC ratio.",
+  "last_guard_sample": {
+    "disk_free": 50837569536,
+    "group_rss": 165244928,
+    "host_available": 9469714432,
+    "output_bytes": 42591295,
+    "seconds": 299.6494608949997
+  },
+  "launcher_error": "ValueError: total 300-second deadline exhausted",
+  "no_later_stage": true,
+  "no_resume_or_retry": true,
+  "original_watchdog_reason": "RuntimeError: watchdog interrupted by signal 15",
+  "outer_peak_tree_rss_bytes": 361492480,
+  "path_redaction": "${WORKSPACE} replaces the absolute workspace root consistently; all remaining path components and command arguments are unchanged.",
+  "plan": {
+    "path": "${WORKSPACE}/compiler-gc-audit-prep-20261110/producer-plan.json",
+    "sha256": "4adf959801b5267d7d777eab0695c283cc0657ea95fc7b7ac4bf960f5bc8a908"
+  },
+  "producer_receipt": {
+    "path": "${WORKSPACE}/compiler-baseline-recovery-20261110/build/producer/receipt.json",
+    "sha256": "f3d6355d7c54acfbfe6ee82115a7a9ea950682a3ec7ae2c629584f8db5a67e4c"
+  },
+  "raw_dependency_bytes": 42014642,
+  "raw_dependency_file_count": 5221,
+  "raw_files_retained": true,
+  "reason": "The original 300-second total prerequisite deadline expired during mlf-xmlf compilation.",
+  "resource_limits": {
+    "address_space_per_process": 6442450944,
+    "disk_free_floor": 5368709120,
+    "host_available_floor": 3221225472,
+    "max_output_bytes": 4294967296,
+    "process_tree_rss_bytes": 5368709120,
+    "wall_seconds": 300
+  },
+  "scope": "new baseline-only prerequisite cohort; no inference11 target, native generation or fixedpoint",
+  "slices": [
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "${WORKSPACE}/compiler-audit-source-20261111/tools/performance/process-spawn/with_scope.py",
+        "${WORKSPACE}/compiler-baseline-recovery-20261110/build/producer/bin/emlf",
+        "--compile-crate",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/builtin-work/fixture.spec",
+        "-o",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/builtin-work/fixture"
+      ],
+      "compile_metrics": {
+        "child_system_seconds": 0.048503,
+        "child_user_seconds": 0.30297599999999997,
+        "complete": true,
+        "exit_code": 0,
+        "max_individual_child_rss_bytes": 22343680,
+        "reason": null,
+        "sampled_process_tree_peak_rss_bytes": 22343680,
+        "terminal_live_descendants": [],
+        "wall_seconds": 0.35148401
+      },
+      "compile_receipt": {
+        "bytes": 1951,
+        "path": "${WORKSPACE}/baseline-gc-new-cohort-01/prerequisites/commands/compile-builtin-fixture/command.json",
+        "sha256": "bf3685d729349c880ee64fd5c56d8ff0b2e63396ed076c55821b40b7a3a79876"
+      },
+      "cwd": "${WORKSPACE}/compiler-audit-source-20261111",
+      "expected_fresh": 1,
+      "files": [
+        {
+          "bytes": 616,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/builtin-work/fixture.mlfci",
+          "sha256": "fd991cbfa99c2925118a0384723d19f1bd5d6af3ecd3de672fefcaabb9890abf"
+        },
+        {
+          "bytes": 3244,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/builtin-work/fixture.mlfco",
+          "sha256": "fd7c523f3bb6b6b854f4c28ef7417422bb7cbb1572dc05f0ff906bef783123fd"
+        },
+        {
+          "bytes": 1149,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/builtin-work/fixture.queries",
+          "sha256": "37da5ee1e3f879f62441755269031891275193c97946a47945f3744cc23b6c89"
+        }
+      ],
+      "fresh_groups": 1,
+      "modules": 1,
+      "name": "builtin-fixture",
+      "per_compile_limit_seconds": 180,
+      "public_interface_checked": true,
+      "query_lock_checked_within_phase": true,
+      "reused_groups": 0,
+      "slice_checks_complete": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "${WORKSPACE}/compiler-audit-source-20261111/tools/performance/process-spawn/with_scope.py",
+        "${WORKSPACE}/compiler-baseline-recovery-20261110/build/producer/bin/emlf",
+        "--compile-crate",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-foundation/crate.spec",
+        "-o",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-foundation/unit"
+      ],
+      "compile_metrics": {
+        "child_system_seconds": 0.501854,
+        "child_user_seconds": 29.105504,
+        "complete": true,
+        "exit_code": 0,
+        "max_individual_child_rss_bytes": 124719104,
+        "reason": null,
+        "sampled_process_tree_peak_rss_bytes": 124719104,
+        "terminal_live_descendants": [],
+        "wall_seconds": 29.536470839
+      },
+      "compile_receipt": {
+        "bytes": 1945,
+        "path": "${WORKSPACE}/baseline-gc-new-cohort-01/prerequisites/commands/compile-mlf-foundation/command.json",
+        "sha256": "503c3565be533b6c3c2bf190d69a74ff1774a8170c8df01cb99a7a560ee43bce"
+      },
+      "cwd": "${WORKSPACE}/compiler-audit-source-20261111",
+      "expected_fresh": 475,
+      "files": [
+        {
+          "bytes": 338101,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-foundation/unit.mlfci",
+          "sha256": "89567e81ca72bd5fca4c7eb91190e84bc26f8970cecacbfff358a8944ee69296"
+        },
+        {
+          "bytes": 1016252,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-foundation/unit.mlfco",
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        {
+          "bytes": 685363,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-foundation/unit.queries",
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      ],
+      "fresh_groups": 475,
+      "modules": 14,
+      "name": "mlf-foundation",
+      "per_compile_limit_seconds": 180,
+      "public_interface_checked": true,
+      "query_lock_checked_within_phase": true,
+      "reused_groups": 0,
+      "slice_checks_complete": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "${WORKSPACE}/compiler-audit-source-20261111/tools/performance/process-spawn/with_scope.py",
+        "${WORKSPACE}/compiler-baseline-recovery-20261110/build/producer/bin/emlf",
+        "--compile-crate",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-language-core/crate.spec",
+        "-o",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-language-core/unit"
+      ],
+      "compile_metrics": {
+        "child_system_seconds": 2.401562,
+        "child_user_seconds": 60.622696,
+        "complete": true,
+        "exit_code": 0,
+        "max_individual_child_rss_bytes": 169050112,
+        "reason": null,
+        "sampled_process_tree_peak_rss_bytes": 170098688,
+        "terminal_live_descendants": [],
+        "wall_seconds": 64.695432391
+      },
+      "compile_receipt": {
+        "bytes": 1957,
+        "path": "${WORKSPACE}/baseline-gc-new-cohort-01/prerequisites/commands/compile-mlf-language-core/command.json",
+        "sha256": "62844c41d59ccf80daecb4fa0e4c6bb24d6def7628ca368bb1b360d30a415e42"
+      },
+      "cwd": "${WORKSPACE}/compiler-audit-source-20261111",
+      "expected_fresh": 74,
+      "files": [
+        {
+          "bytes": 31899,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-language-core/unit.mlfci",
+          "sha256": "26f7b5bf02f6bce66a348cc359e7425fe961e4a6383b8c6c107ef7f084339547"
+        },
+        {
+          "bytes": 354971,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-language-core/unit.mlfco",
+          "sha256": "2169ea5cf023a010a8657c7fe49eb2236ffefb83fbf4e3ef31eb23de43b5c2ca"
+        },
+        {
+          "bytes": 119625,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-language-core/unit.queries",
+          "sha256": "96becc2048f0e34638623cb12ad41b72a1662a3e5c942c61f4e7d6a5a5e605cf"
+        }
+      ],
+      "fresh_groups": 74,
+      "modules": 4,
+      "name": "mlf-language-core",
+      "per_compile_limit_seconds": 180,
+      "public_interface_checked": true,
+      "query_lock_checked_within_phase": true,
+      "reused_groups": 0,
+      "slice_checks_complete": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "${WORKSPACE}/compiler-audit-source-20261111/tools/performance/process-spawn/with_scope.py",
+        "${WORKSPACE}/compiler-baseline-recovery-20261110/build/producer/bin/emlf",
+        "--compile-crate",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-frontend/crate.spec",
+        "-o",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-frontend/unit"
+      ],
+      "compile_metrics": {
+        "child_system_seconds": 3.033297,
+        "child_user_seconds": 167.013712,
+        "complete": true,
+        "exit_code": 0,
+        "max_individual_child_rss_bytes": 336084992,
+        "reason": null,
+        "sampled_process_tree_peak_rss_bytes": 336568320,
+        "terminal_live_descendants": [],
+        "wall_seconds": 164.217328011
+      },
+      "compile_receipt": {
+        "bytes": 1940,
+        "path": "${WORKSPACE}/baseline-gc-new-cohort-01/prerequisites/commands/compile-mlf-frontend/command.json",
+        "sha256": "99fb8bfc3a91858802ca65a85c349564a28f248b5b82c5d80d45d8c256d307f8"
+      },
+      "cwd": "${WORKSPACE}/compiler-audit-source-20261111",
+      "expected_fresh": 763,
+      "files": [
+        {
+          "bytes": 382309,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-frontend/unit.mlfci",
+          "sha256": "d57d15b4db14e7100183de3e04b2baf11a07d54b8d94ae6a1cddc828a631954d"
+        },
+        {
+          "bytes": 2243823,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-frontend/unit.mlfco",
+          "sha256": "4f2b4c6a79738cedcd6015d1244e47d572b5ef005a3798cba3c1b44bbfd6d96f"
+        },
+        {
+          "bytes": 1197168,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-frontend/unit.queries",
+          "sha256": "ef14ac42c4e28a4a05b962ae476bc03c2b777177e22307f9eda389de64a6354c"
+        }
+      ],
+      "fresh_groups": 763,
+      "modules": 11,
+      "name": "mlf-frontend",
+      "per_compile_limit_seconds": 180,
+      "public_interface_checked": true,
+      "query_lock_checked_within_phase": true,
+      "reused_groups": 0,
+      "slice_checks_complete": true
+    },
+    {
+      "argv": [
+        "/usr/bin/python3",
+        "-B",
+        "${WORKSPACE}/compiler-audit-source-20261111/tools/performance/process-spawn/with_scope.py",
+        "${WORKSPACE}/compiler-baseline-recovery-20261110/build/producer/bin/emlf",
+        "--compile-crate",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-xmlf/crate.spec",
+        "-o",
+        "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-xmlf/unit"
+      ],
+      "compile_metrics": {
+        "child_system_seconds": null,
+        "child_user_seconds": null,
+        "complete": false,
+        "exit_code": null,
+        "max_individual_child_rss_bytes": null,
+        "reason": null,
+        "sampled_process_tree_peak_rss_bytes": null,
+        "terminal_live_descendants": null,
+        "wall_seconds": null
+      },
+      "compile_receipt": {
+        "bytes": 1205,
+        "path": "${WORKSPACE}/baseline-gc-new-cohort-01/prerequisites/commands/compile-mlf-xmlf/command.json",
+        "sha256": "15279a56920b401e91d513afb824436356e625e3405be0d86470ebba4313ffa8"
+      },
+      "cwd": "${WORKSPACE}/compiler-audit-source-20261111",
+      "expected_fresh": 173,
+      "files": [
+        {
+          "bytes": 80355,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-xmlf/unit.mlfci",
+          "sha256": "d37d43c576a8f8f2c38f4f85fca06862e66e15998fbdc0bd5ab9397a5e6f0e34"
+        },
+        {
+          "bytes": 549528,
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-xmlf/unit.mlfco",
+          "sha256": "31f7768dc8ff2728128aa2e7420d5ab6492d85c39346622560c7fb80822a3d6b"
+        },
+        {
+          "path": "${WORKSPACE}/baseline-gc-new-cohort-01/dependencies/mlf-xmlf/unit.queries",
+          "present": false
+        }
+      ],
+      "fresh_groups": null,
+      "modules": 6,
+      "name": "mlf-xmlf",
+      "per_compile_limit_seconds": 26.855082599,
+      "public_interface_checked": false,
+      "query_lock_checked_within_phase": false,
+      "reused_groups": null,
+      "slice_checks_complete": false
+    }
+  ],
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "total_elapsed_including_cleanup_seconds": 300.441334943,
+  "valid_dependency_handoff": false,
+  "watchdog_child_exit_code": -15,
+  "watchdog_elapsed_seconds": 299.9209265069994
+}

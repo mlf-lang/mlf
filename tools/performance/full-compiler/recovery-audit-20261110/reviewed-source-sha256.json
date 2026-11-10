@@ -1,0 +1,65 @@
+{
+  "format": "reviewed-recovery-source-archive-v1",
+  "files": [
+    {
+      "path": "prerequisites-source/controller.py",
+      "sha256": "a5358611098e7b063f26820c26f8a664c3c2acc9003814fa0425b3bafeb2a47b",
+      "bytes": 28366,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "prerequisites-source/run-phase.py",
+      "sha256": "e649405a883d9540ff846c1bd0b5456d56c2417f623c2dd27c018f117cff6f29",
+      "bytes": 9312,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "prerequisites-source/test_controller.py",
+      "sha256": "561458ec557d3cca71fad8e6a54aba8de865538c54fab7dff54ebb81d9943060",
+      "bytes": 12355,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "prerequisites-source/audit16-source-manifest.json",
+      "sha256": "9a695adb2393bf61275754a6abad0c8e66f2f0f99e593535c2eff7b3ef92f6ec",
+      "bytes": 3776,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "inference11-diagnostic-source/prepare_plan.py",
+      "sha256": "4d818ab5b053f564feb763e95802f9f0ae2ccf0f011a9f5e112b2f696d4f7581",
+      "bytes": 15201,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "inference11-diagnostic-source/run_diagnostic.py",
+      "sha256": "991ed9294fd7bbc27f72d446a8bcb3baa3d6ba3242bfde4b12a68eaffe7b0dd9",
+      "bytes": 32261,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "inference11-diagnostic-source/run_envelope.py",
+      "sha256": "3cd2d281a738ff8aa2e09b9198ba8be216a268fd3f398554db8c58faa7b1a025",
+      "bytes": 7331,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "inference11-diagnostic-source/run-phase.sh",
+      "sha256": "6e9e386602ca4b5ebb586099d894f01a4e9d4d9f420a03255771e4745d6bbe3c",
+      "bytes": 1158,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "inference11-diagnostic-source/test_diagnostic.py",
+      "sha256": "e902ca2e94d92d82014750721cedbf3c9a86c45f8a329a933dd4be43dd8a1a5e",
+      "bytes": 2330,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "inference11-diagnostic-source/test_prepare_plan.py",
+      "sha256": "092b2d31f1cc9b71891eaab264184fd2af6e8f57d9e171478c0dc0dd965813ef",
+      "bytes": 7106,
+      "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    }
+  ]
+}

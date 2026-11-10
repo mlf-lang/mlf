@@ -279,3 +279,11 @@ Astra已分配下一次独立600秒普通基线producer构建，只用原f9源�
 [本次producer摘要](../../tools/performance/full-compiler/recovery-audit-20261110/producer-summary.json)记录新源/工具/制品身份；这只是恢复与资格，不是新target性能样本。94个emlf非Main对象与interface已独立列出。全producer共用的Main.o最后被其他程序覆盖，薄统计链接必须重编原emlf五行Main，不能混用最后Main。两份C对象还需在薄setup按原命令重建并逐字节相等，才可链接诊断。
 
 此刻重锁空闲，只有新依赖恢复与薄统计控制器在静态准备/复核。它们分别需独立准入；目标source-to-checked、普通GC统计、完整90模块倍率均未产生新结果。旧F3、C01、native代际A/B与fixed-point状态不变。
+
+## 新依赖恢复在总保护下失败，明确缩小诊断负载（2026-11-10 21:24 UTC）
+
+唯一新inference11前置恢复在固定300秒总预算终止，未提高上限或续接。builtin fixture、foundation、language-core和frontend分别通过1、475、74、763 fresh / 0 reused与完整公开interface/query-lock检查，compile wall依次0.351484、29.536471、64.695432、164.217328秒。xmlf只剩26.855秒预算，虽然出现两份部分制品，但没有.queries和完成校验，不能列为已通过。语言核心与前端的已记录user CPU也增多，不能仅归因于等待；原因尚未判定。
+
+launcher在300秒触发停止，包含终止清理的总耗时300.441秒；外guard被正常TERM协调停止并记录失败。峰RSS361.5MB，资源上限未放宽。所有原始失败与部分输出保留，无观察到的owned残留，三层orchestration锁与五个query锁已独立重获。但最终producer再认证和runtime-after未执行，因此没有完整依赖handoff，更没有inference11薄setup、GC统计或新的提速结果。见[失败报告](../../tools/performance/full-compiler/recovery-audit-20261110/prerequisites-failure.md)。
+
+Astra不重跑或续接该失败。下一步仅准备一个另立的foundation14诊断：原f9的14模块、173,594字节、475 fresh，重新建立builtin、新ordinary Q和one-use D；只复用成功的ordinary producer/工具链，不拿失败依赖前缀充完整资格。保留SETUP120、QD420/每目标180秒及全部语义、raw三制品、runtime和资源条件，仍需新代码的独立复核与分阶段准入。它只能说明较小负载的普通managed-heap工作，不能替代11模块、full90或GHC比较。未改任何生产源码、验证策略或暂停任务。

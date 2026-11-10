@@ -1,0 +1,104 @@
+{
+  "schema": "mlf-compiler-cost-source-audit-v1",
+  "observed_at_utc": "2026-11-10T20:55:06Z",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "plan_commit": "22b50be7014ede07db9e41d44cacf286c5ef6206",
+  "source_files": [
+    {
+      "path": "bootstrap/MLF/Entry/Emlf.hs",
+      "sha256": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
+      "bytes": 58175
+    },
+    {
+      "path": "bootstrap/MLF/PreparedCompiler.hs",
+      "sha256": "2812caad746141ddb82c21a5dfdc779f1c33ae383ccd08aaa496ebecf8046a51",
+      "bytes": 26327
+    },
+    {
+      "path": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "sha256": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+      "bytes": 3354
+    },
+    {
+      "path": "libraries/mlf-inference/Bootstrap/Constraint.hs",
+      "sha256": "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c",
+      "bytes": 53972
+    },
+    {
+      "path": "libraries/mlf-inference/Bootstrap/Elaborate.hs",
+      "sha256": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+      "bytes": 31616
+    },
+    {
+      "path": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+      "bytes": 99201
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+      "sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
+      "bytes": 83407
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
+      "bytes": 28172
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+      "sha256": "ab3bf4aa00ac0c2eea90b4bfc7d35b5430b1ac959187f3e2d99850f1bd35e46e",
+      "bytes": 19341
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
+      "sha256": "f62f60fdee8d63541f326572d791b7d2c0cb492603bacefd8cd61d4e5b437f3b",
+      "bytes": 97416
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+      "sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+      "bytes": 35625
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71",
+      "bytes": 44928
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8",
+      "bytes": 82558
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
+      "sha256": "e8f69d41475c332991f122c765f79cc11cddf708044db859846818dc26ade920",
+      "bytes": 15899
+    },
+    {
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+      "sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+      "bytes": 17179
+    },
+    {
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+      "sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
+      "bytes": 26092
+    }
+  ],
+  "new_timing_samples": 0,
+  "production_changes": false,
+  "verification": "Each audited file compared byte-for-byte to frozen Git blob; source checkout clean. This does not execute semantics or measure cost.",
+  "evidence_documents": [
+    {
+      "path": "docs/performance/validation-reuse-20261030.md",
+      "bytes": 4004,
+      "sha256": "67b75a7fa728e92a8f83429273a520fc5065dc1a2db791f638e281558e4d2bbf"
+    },
+    {
+      "path": "tools/performance/foundation-query/README.md",
+      "bytes": 16114,
+      "sha256": "422e875b4ac036457e14b2a1586ead8fb78b3ed55093cd04ae71a0a06f52cbe1"
+    }
+  ],
+  "last_updated_at_utc": "2026-11-10T20:59:29Z"
+}
