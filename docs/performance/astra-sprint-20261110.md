@@ -1,5 +1,7 @@
 # Astra 协作冲刺：完整 compiler 编译接近 GHC
 
+> 恢复入口更新（2026-11-10）：本文件下方保留第15版历史记录。Astra本次恢复与最新调度已保存于[第17版精确检查点](https://github.com/mlf-lang/mlf/blob/e511ee36552cb4ed334ebd36dab6b1b091b3fc16/docs/performance/astra-sprint-20261110.md)，持续恢复分支为`perf/astra-recovery-audit-20261111`。继续前先读取该提交并核对分支最新状态，不按下文旧队列自动重跑。官方工具链已恢复通过，普通baseline producer新构建另行准入；尚无新编译提速结果，三天预算不重置，native代际A/B与fixed-point仍暂停。
+
 ## 目标、责任和时间
 
 本轮由 Astra 负责设计协作、认领分工、调整优先级、分配机器窗口、审查证据和决定候选去留。主会话负责向用户传达结果和需要用户决定的事项，不代替 Astra 做日常技术调度。
