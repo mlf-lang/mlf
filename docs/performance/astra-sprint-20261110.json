@@ -1,6 +1,6 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 4,
+  "revision": 5,
   "observed_at_utc": "2026-11-10T14:07:46Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
@@ -87,7 +87,7 @@
       "progress": "SCC893 to SCC957 in the final eight snapshots; not stuck in one SCC.",
       "terminal_live_descendants": [],
       "scope": "Bounded instrumented prefix only; no ordinary CPU fraction, whole-compiler speedup or complete semantic qualification.",
-      "raw_checkpoint_remote": null
+      "raw_checkpoint_remote": "76d366c676ffe78976588b6b74a2858fd33557d6"
     }
   },
   "tasks": [
@@ -122,17 +122,17 @@
       "role": "frontend kind counters and unified diagnostic runner",
       "status": "Memo retired; implementing markers-only diagnostic, not yet run",
       "branch": "perf/frontend-20261110",
-      "local_checkpoint": "426561414cf0c1e0df7efefc4a6d3a83a67e67df",
-      "remote_commit": "64ee679848211034a3cb1e2c1b44f8f600861ab0",
+      "local_checkpoint": "27efb8ff0e817fffd16d87c6759dfcf3174492f2",
+      "remote_commit": "76d366c676ffe78976588b6b74a2858fd33557d6",
       "owners": [
         "private diagnostic Counters",
         "private diagnostic Main",
         "diagnostic harness"
       ],
       "next": "Ordinary flags and original Type, existing IO markers with bounded consumed owner identity, four closed monotonic wall-demand windows and top five; controls then one 120-second run under existing guards.",
-      "remote_tree": "d4769db40c3ffa39315f80477dcbc9b2759a5e6f",
-      "checkpoint_scope": "Verified remote 64ee679 is the older memo/complete-counting plan. The new joint diagnostic, raw snapshots and restored production Type are not yet verified durable.",
-      "unpublished_local_checkpoint": "27efb8ff0e817fffd16d87c6759dfcf3174492f2"
+      "remote_tree": "78a27fc00df9d2589d447223aae4f5e199c509fc",
+      "checkpoint_scope": "46-file checkpoint: original bounded diagnostic, 80 snapshots, retained failed output01, restored production Type, archived memo; markers-only followup is separate and not yet complete.",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/76d366c676ffe78976588b6b74a2858fd33557d6/tools/performance/type-kind-memo/README.md"
     },
     {
       "id": "R1",
