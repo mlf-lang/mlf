@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 19,
-  "observed_at_utc": "2026-11-10T21:26:05Z",
+  "revision": 20,
+  "observed_at_utc": "2026-11-10T21:40:28Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -723,9 +723,9 @@
     {
       "id": "R6",
       "role": "New baseline-only ordinary GC evidence preparation",
-      "status": "inference11 prerequisite attempt failed at300s; its SETUP/QD never executed",
+      "status": "inference11 dependencies failed at300s; separate foundation14 SETUP01 failed before commands at8.386s",
       "reason": "Avoid rebuilding rejected F3 solely to explain a past noisy sample; measure restored baseline allocation/GC without claiming retrospective C01 cause.",
-      "next": "Preserve full failure. Prepare separately scoped foundation14/173594bytes/475fresh baseline-only GC diagnosis, no partial artifacts reused, no whole-compiler speed claim."
+      "next": "Review alias-specific pinned symlink correction for new foundation14 cohort02. No repeated target sample exists."
     },
     {
       "id": "RECOVERY_PRODUCER",
@@ -751,7 +751,7 @@
   "resource_token_at_observation": {
     "state": "free",
     "task": null,
-    "restart_caveat": "Failed prerequisite controller cleanup and all locks verified; recheck on restart."
+    "restart_caveat": "Use new workspace lock epoch, prove exclusion/current file identity; no old /workspace/shared continuity."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -783,7 +783,7 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Complete small foundation14 GC diagnostic only if its new exact controller and gates review successfully. Preserve failed inference11 prerequisite scope; do not extend or resume it.",
+  "next_priority": "Complete one foundation14 GC diagnostic only after narrow tool-alias provenance correction and new cohort admission. Never relabel preparation as measurements.",
   "next_real_compile_gate": {
     "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
@@ -808,7 +808,7 @@
     "remote_tip_verified": true
   },
   "recovery": {
-    "status": "toolchain/producer qualified; inference11 prerequisite phase failed at300s; no inference11 statistics run",
+    "status": "ordinary producer qualified; inference11 prerequisite timed out; foundation14 SETUP failed before any command on recorded tool alias representation",
     "event_date": "2026-11-10",
     "name_caveat": "The branch and worktree labels ending20261111 are recovery labels, not UTC event dates.",
     "source_inventory": "tools/performance/full-compiler/recovery-audit-20261110/source-inventory.json",
@@ -825,9 +825,11 @@
       "process_view": "sandbox-local only; not proof of whole host or other executor idleness"
     },
     "lock": {
-      "scope": "one shared filesystem lock, all recovery heavy workers must use it",
-      "contention_test": "contender rejected while held, succeeds after release",
-      "observed": "held by toolchain restoration or queued for it; no compiler job admitted"
+      "scope": "one shared workspace flock for all current/future recovery heavy workers",
+      "observed": "free after foundation SETUP preflight failure; no live owned descendants",
+      "new_epoch": true,
+      "proof": "tools/performance/full-compiler/recovery-audit-20261110/lock-epoch.json",
+      "continuity_caveat": "Previous /workspace/shared directory absent and its parent filesystem read-only. Both views verified absent; new workspace lock verified across workers, no historical continuity claimed."
     },
     "toolchain": {
       "source": "305914c90e8fdff3a912faa6b93c08146273cf3e:tools/performance/full-compiler/baseline-20261110/toolchains.json",
@@ -848,7 +850,7 @@
       "gc_diagnostic": "Astra worker, baseline-only preparation/review, no execution",
       "source_audit": "parent audit of checking/witness/serialization, no production edits"
     },
-    "next_admission": "Astra selected a separate foundation14 diagnostic proposal for preparation/review only: fresh builtin plus same thin SETUP120, fresh Q and one-use D within420/per-target180. No partial failed dependency reuse and no change to frozen inference11 cohort.",
+    "next_admission": "Astra must independently verify corrected alias authentication and separate phase admission. None now.",
     "producer": {
       "status": "passed build and separately admitted focused postqualification",
       "summary": "tools/performance/full-compiler/recovery-audit-20261110/producer-summary.json",
@@ -871,6 +873,12 @@
         763
       ],
       "cleanup_and_locks": "independently verified; no observed owned survivors; all orchestration and query locks reacquired"
+    },
+    "foundation14": {
+      "setup_01": "failed before commands at8.386s",
+      "summary": "tools/performance/full-compiler/recovery-audit-20261110/foundation14-setup-failure.json",
+      "qd_executed": false,
+      "next": "Review separate cohort02 alias-binding preflight correction; do not resume failed cohort01."
     }
   }
 }

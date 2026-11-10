@@ -1,0 +1,25 @@
+{
+  "format": "foundation14-setup-failure-v1",
+  "observed_at_utc": "2026-11-10T21:40:28Z",
+  "cohort": "baseline-gc-foundation14-cohort-01",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "status": "failed before any compiler/loader/control/builtin command",
+  "work_seconds": 8.167147856000156,
+  "guard_seconds": 8.385558680000031,
+  "guard_exit_code": 1,
+  "guard_reason": null,
+  "work_error": "RuntimeError('regular file required: ${WORKSPACE}/compiler-toolchain-recovery-20261110/ghc/bin/ghc')",
+  "commands": [],
+  "guard_complete": false,
+  "envelope_complete": false,
+  "internal_lock_reacquired": true,
+  "shared_lock_reacquired": true,
+  "owned_live_descendants": {},
+  "receipts_sha256": {
+    "receipt.json": "983bece9ec52b91228b77f017cf1b550f7ce12d3e1a10a3fe112a8b321d6faa6",
+    "bounded-receipt.json": "4203757080b828270b944e180085f679a33af6a757b7641456267ce55f33f677",
+    "envelope.json": "f09aa2c97f63cb03e5d9035453e8b38729ae2b4ed3f2cf737fee27a1413a1d79"
+  },
+  "interpretation": "The generic nested receipt pin collector requires a regular file; the official GHC lexical launcher is an already-recorded symlink. Original producer authentication passed, but SETUP did not complete. No target or GC data exists; no automatic retry or partial reuse.",
+  "next_gate": "Separately prepared alias-specific authentication correction, negative tests and independent review for a new cohort; no broad symlink allowance, unchanged guards and source checks."
+}

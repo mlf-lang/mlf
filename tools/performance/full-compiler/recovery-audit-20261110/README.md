@@ -48,3 +48,5 @@ and e0fa831b3d4cbd395f4d381dbebcb216ebc58365 (fresh-split helpers).
 Restore references under their original filenames, rerun static tests, generate
 new authenticated plans and admissions, and review current instructions first.
 A separately scoped foundation14 diagnostic is preparation-only at this checkpoint.
+
+Foundation SETUP01 later failed before any commands at8.386s on the recorded official GHC launcher symlink. See foundation14-setup-failure.json. A new shared workspace lock epoch was verified; see lock-epoch.json. A separately scoped strict alias-authentication repair is preparation only; no GC data or target run yet.

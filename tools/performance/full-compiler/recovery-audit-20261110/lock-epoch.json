@@ -1,0 +1,16 @@
+{
+  "format": "astra-shared-lock-epoch-v1",
+  "observed_utc": "2026-11-10T21:36:47Z",
+  "path": "${WORKSPACE}/.astra-resource-locks/heavy.lock",
+  "device": 27,
+  "inode": 2892172,
+  "previous_path": "/workspace/shared/mlf-astra-heavy.lock",
+  "previous_path_status": "directory and file absent in coordinator and worker views; parent filesystem read-only",
+  "historical_continuity_claimed": false,
+  "same_namespace_contender": "BlockingIOError while held",
+  "peer_contender": "same dev/inode; BlockingIOError errno11 while coordinator held",
+  "release_reacquire": "passed twice with same dev/inode",
+  "heavy_execution_started": false,
+  "never_unlink_or_replace": true,
+  "ready_utc": "2026-11-10T21:37:19Z"
+}

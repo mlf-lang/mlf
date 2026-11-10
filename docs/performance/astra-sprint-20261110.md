@@ -287,3 +287,11 @@ Astra已分配下一次独立600秒普通基线producer构建，只用原f9源�
 launcher在300秒触发停止，包含终止清理的总耗时300.441秒；外guard被正常TERM协调停止并记录失败。峰RSS361.5MB，资源上限未放宽。所有原始失败与部分输出保留，无观察到的owned残留，三层orchestration锁与五个query锁已独立重获。但最终producer再认证和runtime-after未执行，因此没有完整依赖handoff，更没有inference11薄setup、GC统计或新的提速结果。见[失败报告](../../tools/performance/full-compiler/recovery-audit-20261110/prerequisites-failure.md)。
 
 Astra不重跑或续接该失败。下一步仅准备一个另立的foundation14诊断：原f9的14模块、173,594字节、475 fresh，重新建立builtin、新ordinary Q和one-use D；只复用成功的ordinary producer/工具链，不拿失败依赖前缀充完整资格。保留SETUP120、QD420/每目标180秒及全部语义、raw三制品、runtime和资源条件，仍需新代码的独立复核与分阶段准入。它只能说明较小负载的普通managed-heap工作，不能替代11模块、full90或GHC比较。未改任何生产源码、验证策略或暂停任务。
+
+## 共享锁新epoch与foundation14预检失败（2026-11-10 21:40 UTC）
+
+当前sandbox中旧/workspace/shared目录已消失，其父文件系统只读，不能声称旧锁连续有效。Astra在共享工作区新建单一flock；协调端和执行端核对同一device/inode，持有时竞争被拒，释放后两次重获。只有foundation新envelope的锁位置改变，经36项测试和独立复核，原失败依赖和inference11文件未动。后续重任务必须采用此新epoch，不能回退为各自私有锁。
+
+唯一准入的foundation SETUP01在8.386秒安全停止，commands为空，任何compiler、loader、builtin或统计控制均未启动。原producer认证通过，但新的通用嵌套pin收集器拒绝官方GHC launcher的已记录symlink；这是新诊断控制器的兼容性缺陷，不是编译失败或性能样本。外guard exit1、无资源理由，无owned残留，两锁均重获，失败原样保留。见[预检失败证据](../../tools/performance/full-compiler/recovery-audit-20261110/foundation14-setup-failure.json)。
+
+只准备另立cohort02的严格alias绑定修正：须匹配已固定工具链receipt中的resolved_path和目标SHA并核验前后链接，不放宽通用regular-file输入门。需新增retarget/broken/missing/unknown-alias负控、独立复核、重新分阶段准入。没有SETUP/QD自动重试，没有GC结果，也没有任何生产优化或完整倍率。
