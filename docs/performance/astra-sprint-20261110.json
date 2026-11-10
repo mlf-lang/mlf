@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 12,
-  "observed_at_utc": "2026-11-10T16:41:36Z",
+  "revision": 13,
+  "observed_at_utc": "2026-11-10T16:53:28Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -310,6 +310,46 @@
       "remote_commit": "221764d065a0ac0db9314073478fa4b14e00fcd7",
       "failure_region": "Preflight interval after initial state save and before first binary launch; exact blocking function was not recorded.",
       "root_cause_caveat": "Lock acquisition is nonblocking and no recursive lock was found. Large build-provenance scanning exists, but bytes alone do not prove the exact timeout cause."
+    },
+    "f3_ordinary_graph": {
+      "diagnostic_scope": "Ordinary O2 renamed-module Graph harness, including startup, selection, ID renaming, public unification and complete serialization; not a compiler or native performance endpoint.",
+      "status": "complete",
+      "sample_attempt": 2,
+      "scope_seconds": 29.452074332,
+      "runtime_controls_seconds": 0.339976448,
+      "runtime_controls_passed": true,
+      "warmups": 2,
+      "sample_order": "ABBAABBA",
+      "batch_count": 32,
+      "unifications_per_process": 179712,
+      "wall_seconds": [
+        2.914547461,
+        2.620056983,
+        2.597147202,
+        4.398374533,
+        3.762157255,
+        2.946048692,
+        2.236740465,
+        2.457958738
+      ],
+      "baseline_median_seconds": 3.338352358,
+      "candidate_median_seconds": 2.6086020925,
+      "candidate_over_baseline": 0.7814040618716498,
+      "geometric_mean_ratio": 0.7842363822884914,
+      "block_ratios": [
+        0.728571,
+        0.844155
+      ],
+      "all_samples_retained": true,
+      "input_pins_count": 25,
+      "runtime_mapping_and_bytes_unchanged": true,
+      "post_pins_passed": true,
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "checksum_caveat": "Weak character checksum demonstrates consumption and weak equality only; exact semantic evidence is from separate full controls.",
+      "statistical_caveat": "Four observations per side, noticeable variation, one complete cohort; do not extrapolate21.9 percent less wall time to the full compiler.",
+      "remote_checkpoint": "9c9d2fe08afcbca11774279d269286ed4deda118",
+      "raw_persisted_remotely": false
     }
   },
   "tasks": [
@@ -470,8 +510,8 @@
       "baseline": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
       "candidate_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
       "mechanism": "Only54 saturated internal readDense calls in34 functions are beta-expanded to readSTArray array(identity-low), preserving helpers, partial applications, writes, flags and all validation. F2 patch excluded.",
-      "status": "Semantics and representative codegen passed; sample01 timed out before any binary launch; new explicitly qualified runtime execution-closure design being implemented, not executed",
-      "remote_commit": "221764d065a0ac0db9314073478fa4b14e00fcd7",
+      "status": "Semantic and representative codegen gates passed; one complete ordinary Graph harness cohort shows lower wall time; whole compiler benefit unmeasured",
+      "remote_commit": "9c9d2fe08afcbca11774279d269286ed4deda118",
       "semantic_gate": {
         "optimizations": [
           "O0",
@@ -490,12 +530,12 @@
         "scope": "Same original Bootstrap.Graph module name and ordinary O2 flags on both sides; original authenticated object as third anchor. Actual caller allocations and moved closures must be inspected.",
         "remote_commit": "d79f7492c3b051d4cc14c1e2ae594d86a31f852e"
       },
-      "next": "Statically review new explicitly qualified runtime execution-closure sampler, then obtain a new one-cohort execution grant. Preserve failed01; no change to32 batches, fixed sample order or60s total guard.",
-      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/221764d065a0ac0db9314073478fa4b14e00fcd7/tools/performance/graph-read-fusion/README.md",
+      "next": "Prepare normal full ordinary candidate producer with own receipt and normal reverse-dependency recompilation, then a separately admitted frozen-f9 inference11 source-to-checked slice. No producer build or slice execution yet.",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/9c9d2fe08afcbca11774279d269286ed4deda118/tools/performance/graph-read-fusion/README.md",
       "persistence_scope": "Eight files: production patch, reversible54-site manifest/script, tested controls/runner, sanitized summary and README; raw receipts remain local.",
       "source_semantic_checkpoint": "7d03b4c6278317f743311392d5d4cc3606ab1bc0",
       "proposed_runtime_revision": {
-        "status": "implementation and static review only",
+        "status": "Implemented, independently reviewed and executed once successfully; retained original failed01 separately",
         "new_environment_qualification": true,
         "history_incomplete": true,
         "scope": "Fixed historical provenance receipts plus current binary/source/controller and ELF loader/library pins. New explicit environment runs the same O2 binary seven-line controls before fixed warmups/samples.",
@@ -555,5 +595,16 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Review minimal existing-binary runtime qualification; only after admission run one fixed ordinary Graph harness cohort. No production speedup or complete current MLF/GHC ratio is established."
+  "next_priority": "Prepare an honest complete candidate producer and exact-f9 inference11 real compilation slice. Three public artifacts initially require byte equality; no ordinary full compiler speedup or complete current MLF/GHC ratio yet.",
+  "next_real_compile_gate": {
+    "status": "preparation only",
+    "target_source": "exact original f9 workload, not candidate-modified Graph",
+    "module_count": 11,
+    "historical_groups": 780,
+    "historical_seconds_capacity_only": 99.039,
+    "expected_public_artifact_oracle": "Raw .mlfci, .mlfco and .queries byte equality, with original crate id/source/dependency paths/order. Cache-generation metadata is not cross-producer oracle.",
+    "correction": "Legacy Q.queryKey reasoning was withdrawn after verifying current QueryGraph rawNode hash reports content only; no preemptive normalization is allowed.",
+    "candidate_producer": "Normal full manifest GHC --make -fforce-recomp and a new honest receipt; no Graph-only object swap mixed with stale Solver/Constraint objects.",
+    "paused_campaigns": "Native generation A/B and fixed-point remain paused."
+  }
 }
