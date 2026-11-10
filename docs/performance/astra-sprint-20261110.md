@@ -113,10 +113,16 @@ F1/R2第二个输出目录中的唯一完整120秒诊断已结束；第一个目
 
 ## 下一次低扰动定位的准入（2026-11-10 14:07 UTC）
 
-Astra已批准F1统一实现一次markers-only诊断，R2复核已有成功/失败路径和安全身份来源。生产Type保持冻结基线原字节，移除每根/每次访问计数和诊断专用优化限制，使用ordinary完整flags与认证C对象；controls使用独立对象目录。现有MLF_QUERY_PROFILE保持关闭，避免重复计时；其六槽最终汇总把raw需求和raw编码合并，不能替代此次按组定位。
+Astra已批准F1统一实现一次markers-only诊断，R2复核已有成功/失败路径和安全身份来源。生产Type保持冻结基线原字节，移除每根/每次访问计数和诊断专用优化限制，使用ordinary完整flags；controls使用独立对象目录。baseline receipt未记录host.o/supervisor.o的内容hash，因此不能直接声称这两个对象已经认证。新harness按原receipt的完整C编译命令/固定源/flags在私有目录重建，逐字节核对原对象并记录新pins，再仅传入.o链接。现有MLF_QUERY_PROFILE保持关闭，避免重复计时；其六槽最终汇总把raw需求和raw编码合并，不能替代此次按组定位。
 
 每组只严格复制已由原prepared payload编码消费的有界owner信息，不投影可能仍惰性的sourceNode，不让reporter持有AST或thunk。身份包含运行源码身份、started ordinal、数字owner IDs和截断名称预览；不把截断名称当完整稳定身份。每组开始清空current，成功finish后保留last_completed。总SCC数在自然遍历结束前保持unknown，不提前求length。
 
 现有IO marker之间用单调时钟累计四个已闭合需求wall窗口：prepared-record、raw-await、raw-record和finish；另报当前未闭合窗口age，仅保留最慢五组的有界身份。这些窗口包含GC和惰性残留，不是独占CPU份额或普通速度。小controls先验证零状态、窗口闭合、身份清空、未闭合age和top-five有界性，再允许一次最多120秒定位；构建600秒与现有资源守卫不变。当前只批准准备和该次有界运行，没有新增已完成性能证据。
 
 main已合并#50至fc300bc9fdc389b585cbef0630fc8915d53e89c5；变化限于工具/CI/契约/文档，没有修改冻结90模块、host或runtime源码。当前诊断仍严格使用f9bdb40，不把旧producer重标成新main；最终集成需新建并认证相应build-driver身份。
+
+## 后端小输入恢复资料（2026-11-10 14:16 UTC）
+
+B1已保存并取回验证到perf/llvm-builder-20261110@b0144b0d66dd0806d5a00ec4eb9b0b920de1db67，tree为49d13cd1daa6926b8876acf157eef28369b79e33。[提交入口](https://github.com/mlf-lang/mlf/commit/b0144b0d66dd0806d5a00ec4eb9b0b920de1db67)。此次只新增/更新Smoke源码、恢复脚本、README和公开摘要，不含原始receipts、LLVM实体、内部绝对路径或完整tool/object清单。摘要保留精确receipt SHA，但hash不能恢复内容；如果本机原始证据丢失，需要重新执行并建立新资格，不能宣称完整raw证据已持久化。
+
+已只读确认官方GHC安装自带profiling依赖库，支持-prof/-fprof-late，无需另装。Astra已要求准备下一层成本中心诊断草稿，尚未授权其构建或运行；只有当前markers-only结果仍不足时才准入。现有ordinary -rtsopts=ignoreAll不能直接追加-p取得报告。任何profiling会改变ABI/分配/成本，不作普通样本；外guard先终止则可能没有报告，不能放宽保护等待。当前唯一重任务仍为F1的markers-only控制/构建/单120秒运行。
