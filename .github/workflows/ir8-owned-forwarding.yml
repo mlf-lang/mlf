@@ -1,0 +1,83 @@
+name: IR8 owned forwarding
+on:
+  pull_request:
+    paths:
+      - 'tools/experimental/resource-native/**'
+      - '.github/workflows/ir8-owned-forwarding.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ir8-owned-forwarding-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  host:
+    name: Fresh checked owner forwarding
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check transformations and original refusals
+        env:
+          PYTHONHASHSEED: '0'
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            python3 -B -S tools/experimental/resource-native/tests/test_ir8_forwarding.py -v \
+            2>&1 | tee "$RUNNER_TEMP/ir8-owned-forwarding-host.log"
+      - name: Retain host results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-owned-forwarding-host-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ir8-owned-forwarding-host.log
+          if-no-files-found: warn
+  native:
+    name: Native forwarding (${{ matrix.profile }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: O0
+            optimization: O0
+            sanitize: 'no'
+          - profile: O2
+            optimization: O2
+            sanitize: 'no'
+          - profile: asan-ubsan
+            optimization: O0
+            sanitize: 'yes'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Compare six finite programs before and after forwarding
+        env:
+          PYTHONHASHSEED: '0'
+          PROFILE: ${{ matrix.profile }}
+          OPTIMIZATION: ${{ matrix.optimization }}
+          SANITIZE: ${{ matrix.sanitize }}
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -euo pipefail
+          flags=()
+          if [[ "$SANITIZE" == yes ]]; then flags+=(--sanitize); fi
+          timeout --signal=TERM --kill-after=5s 600s \
+            python3 -B -S tools/experimental/resource-native/tests/test_ir8_forwarding_native.py \
+            --output "$RUNNER_TEMP/ir8-owned-forwarding-$PROFILE" \
+            --cc gcc --optimization "$OPTIMIZATION" "${flags[@]}" \
+            2>&1 | tee "$RUNNER_TEMP/ir8-owned-forwarding-$PROFILE.log"
+      - name: Retain native results, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-owned-forwarding-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ir8-owned-forwarding-${{ matrix.profile }}/
+            ${{ runner.temp }}/ir8-owned-forwarding-${{ matrix.profile }}.log
+          if-no-files-found: warn
