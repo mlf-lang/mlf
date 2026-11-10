@@ -126,3 +126,9 @@ main已合并#50至fc300bc9fdc389b585cbef0630fc8915d53e89c5；变化限于工具
 B1已保存并取回验证到perf/llvm-builder-20261110@b0144b0d66dd0806d5a00ec4eb9b0b920de1db67，tree为49d13cd1daa6926b8876acf157eef28369b79e33。[提交入口](https://github.com/mlf-lang/mlf/commit/b0144b0d66dd0806d5a00ec4eb9b0b920de1db67)。此次只新增/更新Smoke源码、恢复脚本、README和公开摘要，不含原始receipts、LLVM实体、内部绝对路径或完整tool/object清单。摘要保留精确receipt SHA，但hash不能恢复内容；如果本机原始证据丢失，需要重新执行并建立新资格，不能宣称完整raw证据已持久化。
 
 已只读确认官方GHC安装自带profiling依赖库，支持-prof/-fprof-late，无需另装。Astra已要求准备下一层成本中心诊断草稿，尚未授权其构建或运行；只有当前markers-only结果仍不足时才准入。现有ordinary -rtsopts=ignoreAll不能直接追加-p取得报告。任何profiling会改变ABI/分配/成本，不作普通样本；外guard先终止则可能没有报告，不能放宽保护等待。当前唯一重任务仍为F1的markers-only控制/构建/单120秒运行。
+
+## 低扰动定位完成（2026-11-10 14:21 UTC）
+
+markers-only唯一运行已在120.480秒guard上限退出，compiler未完成；79快照，最后119.372秒时已开始957组、完成956个fresh组，reused为0、总数仍未知。尾端持续推进，非一个SCC卡死。已闭合的诊断wall需求窗口为raw-demand 91.767875213秒（956组）、prepared-record 4.654154082秒（957组）、raw-record 5.167865594秒（956组）、finish 1.074966639秒（956组）。最慢完成SCC为ordinal834，46个成员，span5.973414824秒，其中raw窗口5.102921896秒；后四个span约3.251、2.015、1.961、1.463秒。成本分散在许多组，不能称为某个Solver热点、普通CPU百分比或生产提速。
+
+C对象重建逐字节认证、helper控制、输入post-pins均通过；这是一次构建和一次完整有界尝试，没有失败重试。子进程已回收，内外锁验证空闲。新源码/证据的远端持久化尚待核验，当前数字是结果摘要；不能仅凭摘要声称raw receipts仍可取回。下一步优先审查完整原CLI的late cost-centre诊断草稿，而非继续增加粗标签。96字符stable-name预览可能只容纳公共前缀，不能假称能从它唯一还原源函数；数字owner IDs需要精确源版本下的实际映射。
