@@ -32,8 +32,10 @@ mark label = do
   hPutStrLn stderr ("MLF_BACKEND_PHASE " ++ label ++ " " ++ show now)
 
 -- A fresh call traverses the same result again, recording forcing overhead.
--- NOINLINE prevents the second call becoming a shared already-forced unit.
-{-# NOINLINE forceAt #-}
+-- The pinned GHC 9.14 OPAQUE boundary forbids inlining, specialization and
+-- worker/wrapper transformation here. NOINLINE alone would still permit
+-- transformations that expose the pure traversal at its calling sites.
+{-# OPAQUE forceAt #-}
 forceAt label force value = do
   _ <- evaluate (force value)
   mark label
@@ -45,6 +47,8 @@ forced label force value = do
 
 forceList f = foldr (\x rest -> f x `seq` rest) ()
 scalar value = value `seq` ()
+-- Force the host String representation and scalar count, not a byte scan or
+-- its lazy scalar-offset index. Output bytes are checked separately by run.py.
 string value = P.stringLength value `seq` ()
 name (T.XName identity hint) = identity `seq` string hint
 variable (T.XTyVar identity) = scalar identity

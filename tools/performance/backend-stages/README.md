@@ -16,6 +16,11 @@ It separates these forced boundaries:
 7. Write the exact LLVM chunks through the production String IO primitive.
 
 Each pure boundary has a second traversal of the already evaluated result.
+The checkpoint uses the pinned GHC 9.14 `OPAQUE` boundary to prevent inlining,
+specialization and worker/wrapper transformation from exposing the pure
+traversal at its calling sites. String visitors force the host representation
+and scalar length, not a scan of every byte or the lazy scalar-offset index.
+The final raw-byte comparison is a separate output check.
 The visitors have no catch-all alternative for compiler datatypes, compile
 with exhaustive-pattern errors, and are checked with 26 nested-bottom and two
 total-value controls. The private constructor-table policy is reproduced in
