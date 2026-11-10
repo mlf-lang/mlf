@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 8,
-  "observed_at_utc": "2026-11-10T14:25:32Z",
+  "revision": 9,
+  "observed_at_utc": "2026-11-10T14:48:18Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -64,7 +64,8 @@
       "fresh_shared_modules": 90,
       "fresh_main_wrappers": 1,
       "native_cli_checks": true,
-      "receipt_sha256": "b4aa96e0e44a1b00ea94847f4ccb6f8314ee15260c72c8801a684d5670ee2236"
+      "receipt_sha256": "b4aa96e0e44a1b00ea94847f4ccb6f8314ee15260c72c8801a684d5670ee2236",
+      "timing_boundary": "Runner elapsed through Clang output and worker exit; CLI checks were separate. Do not say 155.931809537 seconds includes CLI."
     },
     "formal_cohort_status": "not_run",
     "complete_mlf_ghc_ratio": null,
@@ -133,6 +134,30 @@
       "raw_checkpoint_remote": null,
       "scope": "Instrumented prefix only; broad raw demand across many SCCs, not a proven solver hotspot, ordinary CPU fraction or production speedup.",
       "publication_status": "9-file new source/snapshot payload denied, known not executed, stopped; remote76d366c is the previous counted diagnostic."
+    },
+    "split_fixture": {
+      "complete": true,
+      "scope": "Independent two-library and entry fixture, not compiler generation A/B",
+      "whole_guard_seconds": 5.160891106,
+      "process_tree_peak_rss_bytes": 178864128,
+      "fresh_groups": [
+        3,
+        2,
+        2
+      ],
+      "reused_groups": 0,
+      "native_expected_stdout": "split λ\n42\n42\n",
+      "negative_controls": [
+        "private export not in scope",
+        "Int/String type constructor mismatch",
+        "unknown direct imported module Model",
+        "open crate SHA mismatch after intact same-location copy LLVM equality"
+      ],
+      "all_passed": true,
+      "receipt_sha256": "4df13e0ce4805d1fabcc0b7148d3964288fcd86dfd74abc3fbc9f374f7cca99a",
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "raw_receipt_persisted": false
     }
   },
   "tasks": [
@@ -221,7 +246,7 @@
     {
       "id": "B2",
       "role": "fresh multi-crate strategy; artifact/backend direction owns, frontend direction reviews",
-      "status": "source-level feasibility confirmed; harness and controls preparation, no run",
+      "status": "Tiny split qualification passed; one full90 fresh qualification admitted and started, result pending",
       "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
       "module_count": 90,
       "source_bytes": 5233364,
@@ -240,13 +265,18 @@
       "total_endpoint_wall_limit_seconds": 600,
       "policy": "Same source bytes and runnable endpoint, all target slices fresh and counted. Independent strategy, not replacement of original single-crate B0. No production manifest/export/algorithm change.",
       "guards": "Existing RSS/AS/host/disk limits; no per-slice resetting the whole endpoint budget.",
-      "next": "Independent inventory/topology/new-artifact review, tiny real split semantic controls, then one full qualification only after admission.",
-      "native_ab_scope": "Do not run potentially paused check_native.py campaign. Independent non-generational small fixtures and CLI qualification only."
+      "next": "Wait for this one full qualification; preserve failure/partial evidence and release locks, then Astra decides next action. No automatic retry or formal cohort.",
+      "native_ab_scope": "Do not run potentially paused check_native.py campaign. Independent non-generational small fixtures and CLI qualification only.",
+      "branch": "perf/fresh-split-20261110",
+      "reviewed_execution_commit": "135a31331713baad0ddc4c22a09fd0ea312dc258",
+      "remote_commit": "9c0bea5847b995334e3bdd2b588509d45f0111e1",
+      "remote_scope": "Execution source and fixture summary verified by fetch and readback; no raw receipt/LLVM or private machine metadata.",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/9c0bea5847b995334e3bdd2b588509d45f0111e1/tools/performance/fresh-split/README.md"
     },
     {
       "id": "P1",
       "role": "late cost-centre diagnostic; baseline direction owns, query direction reviews",
-      "status": "51-line private driver and plan statically reviewed, execution controller/controls incomplete; no run",
+      "status": "Concrete private controller/shared Main/six controls prepared and under R2 static review; no build/run/publication.",
       "policy": "Full original CLI closure, profiling ABI and installed libraries; total build guard600s; private90s internal timeout within120s outer guard. Verify actual fresh report and cleanup, never extend guard.",
       "next": "Prepare thin controller and small controls; hold CPU until separately admitted."
     }
@@ -262,9 +292,9 @@
   ],
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
-    "state": "free",
-    "task": null,
-    "restart_caveat": "Recorded free state is not proof of current availability; verify actual processes and locks."
+    "state": "held",
+    "task": "B2 one full90 fresh split qualification",
+    "restart_caveat": "Recorded running state must be checked against actual processes and receipts; do not automatically rerun."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -297,5 +327,5 @@
     "report_limitation": "No supported intermediate cost-centre dump API found. Internal early timeout/normal exit must be fixture-qualified before an outer guarded run; SIGKILL may leave no report.",
     "no_run_authorized": true
   },
-  "next_priority": "B2 direct fresh split strategy preparation and control review; P1 profiling remains prepared followup, not cancelled."
+  "next_priority": "Evaluate single full90 B2 qualification, then select actual bottleneck; P1 remains prepared diagnostic support."
 }
