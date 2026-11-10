@@ -1,0 +1,203 @@
+{
+  "format": "fresh-split-compiler90-attempt-v1",
+  "date_utc": "2026-11-10",
+  "attempt_finished": true,
+  "qualified": false,
+  "performance_samples": 0,
+  "production_optimization": false,
+  "native_generational_or_fixed_point_test": false,
+  "harness_checkout_commit": "9c0bea5847b995334e3bdd2b588509d45f0111e1",
+  "reviewed_executable_source_commit": "135a31331713baad0ddc4c22a09fd0ea312dc258",
+  "target_source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "original_b0_workload_sha256": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a",
+  "new_plan_sha256": "6f07027b4203a49cc0e58d44ef4a09b7a374bb76d4b6f23e99dacef066f0bbee",
+  "expected_modules": 90,
+  "expected_source_bytes": 5233364,
+  "completed_modules": 59,
+  "completed_fresh_groups": 2807,
+  "source_to_runnable_seconds": null,
+  "source_to_cli_seconds": null,
+  "semantic_validation_seconds": null,
+  "whole_qualification_scope_seconds": 600.039880246,
+  "comparable_compiler_ratio": null,
+  "guard_reason": "wall limit",
+  "outer_child_exit_code": -9,
+  "limits": {
+    "address_space_per_process_bytes": 6442450944,
+    "disk_free_floor_bytes": 5368709120,
+    "host_available_floor_bytes": 3221225472,
+    "max_work_bytes": 4294967296,
+    "process_tree_rss_bytes": 5368709120,
+    "wall_seconds": 600
+  },
+  "final_stage": "mlf-crates-compile",
+  "completed_slices": [
+    {
+      "slice": "mlf-foundation",
+      "module_count": 14,
+      "source_bytes": 173594,
+      "fresh_groups": 475,
+      "reused_groups": 0,
+      "compile_seconds": 30.744545859,
+      "interface_qualification_seconds": 0.15495216,
+      "artifact_identity": {
+        ".mlfci": {
+          "bytes": 338115,
+          "sha256": "eee22ef2c122ca410196a11591271aeff369be9aefa226dcd13028cd43729425"
+        },
+        ".mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        ".queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      }
+    },
+    {
+      "slice": "mlf-language-core",
+      "module_count": 4,
+      "source_bytes": 86482,
+      "fresh_groups": 74,
+      "reused_groups": 0,
+      "compile_seconds": 13.477588664,
+      "interface_qualification_seconds": 0.019356599,
+      "artifact_identity": {
+        ".mlfci": {
+          "bytes": 31946,
+          "sha256": "e35bd09025b4ee7c879dcc6c3b272ca6f76d8700acde49021d5b4203fd087b07"
+        },
+        ".mlfco": {
+          "bytes": 354971,
+          "sha256": "2169ea5cf023a010a8657c7fe49eb2236ffefb83fbf4e3ef31eb23de43b5c2ca"
+        },
+        ".queries": {
+          "bytes": 119625,
+          "sha256": "96becc2048f0e34638623cb12ad41b72a1662a3e5c942c61f4e7d6a5a5e605cf"
+        }
+      }
+    },
+    {
+      "slice": "mlf-frontend",
+      "module_count": 11,
+      "source_bytes": 371912,
+      "fresh_groups": 763,
+      "reused_groups": 0,
+      "compile_seconds": 96.968449019,
+      "interface_qualification_seconds": 0.195121407,
+      "artifact_identity": {
+        ".mlfci": {
+          "bytes": 382389,
+          "sha256": "d10fe8cf07a53986ab1f09003e947847f990035f0f298538161004f4bc1d0cda"
+        },
+        ".mlfco": {
+          "bytes": 2243823,
+          "sha256": "4f2b4c6a79738cedcd6015d1244e47d572b5ef005a3798cba3c1b44bbfd6d96f"
+        },
+        ".queries": {
+          "bytes": 1197168,
+          "sha256": "ef14ac42c4e28a4a05b962ae476bc03c2b777177e22307f9eda389de64a6354c"
+        }
+      }
+    },
+    {
+      "slice": "mlf-xmlf",
+      "module_count": 6,
+      "source_bytes": 86429,
+      "fresh_groups": 173,
+      "reused_groups": 0,
+      "compile_seconds": 29.390679458,
+      "interface_qualification_seconds": 0.037877243,
+      "artifact_identity": {
+        ".mlfci": {
+          "bytes": 80467,
+          "sha256": "72b085f7c067d1779c2afed8b9703f69c2f53b782ab3b6399fcddcc652829691"
+        },
+        ".mlfco": {
+          "bytes": 549528,
+          "sha256": "31f7768dc8ff2728128aa2e7420d5ab6492d85c39346622560c7fb80822a3d6b"
+        },
+        ".queries": {
+          "bytes": 261014,
+          "sha256": "001c8bd9b1352305faa3c7dfa8abc769aaa09e2f5c57ab2370ec3ac7629fb0f0"
+        }
+      }
+    },
+    {
+      "slice": "mlf-inference",
+      "module_count": 11,
+      "source_bytes": 515309,
+      "fresh_groups": 780,
+      "reused_groups": 0,
+      "compile_seconds": 99.03903515,
+      "interface_qualification_seconds": 0.165804406,
+      "artifact_identity": {
+        ".mlfci": {
+          "bytes": 380913,
+          "sha256": "5ceb3d6c75c53d972f7af57e976ff2208c1d24132831401ed33626c81b6dbf24"
+        },
+        ".mlfco": {
+          "bytes": 2549913,
+          "sha256": "24b84aa8c1390c94a213d16569a5a35f1c409f39bb87339db52142c474ada9ef"
+        },
+        ".queries": {
+          "bytes": 1241210,
+          "sha256": "0f5921121410a3224b33606fe0e29bb45999dc0ead4df5f7ab753e6b04c8ad13"
+        }
+      }
+    },
+    {
+      "slice": "mlf-llvm",
+      "module_count": 13,
+      "source_bytes": 381412,
+      "fresh_groups": 542,
+      "reused_groups": 0,
+      "compile_seconds": 76.473619201,
+      "interface_qualification_seconds": 0.110991724,
+      "artifact_identity": {
+        ".mlfci": {
+          "bytes": 259861,
+          "sha256": "60728ad653649b1d9c348b2ac126ce6a6693646f966cfa355c944ea9fdbab7cf"
+        },
+        ".mlfco": {
+          "bytes": 1660141,
+          "sha256": "811a4928bd9a418f8b0ce18754654fce3bf71f5545600540e477ca53aaedcb3b"
+        },
+        ".queries": {
+          "bytes": 828253,
+          "sha256": "ba759310b0a576563d411ee694be0fb63fea77b1a2af4e83c2db6f3db42c8cc0"
+        }
+      }
+    }
+  ],
+  "remaining_slices_not_started": [
+    "mlf-interpreter",
+    "mlf-package-core",
+    "entry"
+  ],
+  "whole_program_llvm_clang_cli_and_small_semantic_checks": "not reached",
+  "closed_compile_seconds_sum": 346.093917351,
+  "closed_interface_qualification_seconds_sum": 0.684103539,
+  "final_open_window_seconds": 252.8775535,
+  "final_open_window_definition": "Last completed LLVM-library interface command through outer termination. This contains the unfinished crates compilation and small surrounding checks/transport. The interrupted stage has no persisted start timestamp, so this is not an exact exclusive crates duration or wrapper-overhead estimate.",
+  "sampled_process_tree_peak_rss_bytes": 1008721920,
+  "max_individual_child_rss_bytes": 444919808,
+  "resource_caveat": "Process-group RSS is sampled every 100 ms. wait4 child usage after a forced worker termination need not include all unfinished descendant CPU usage; do not treat it as complete compiler CPU accounting.",
+  "cleanup": {
+    "guard_terminal_snapshot": "One zero-RSS running descendant was sampled during termination; the guard sent a second SIGKILL. This snapshot is retained in the original receipt, not rewritten as empty.",
+    "host_visible_exact_task_processes_found": 0,
+    "identity_caveat": "The original PID was namespace-local and had no saved process starttime. No global process with the same numeric PID was assumed to be the same process or killed. A later host-visible exact-argv scan found no original worker or unfinished crate compiler.",
+    "shared_and_producer_locks_reacquired": true,
+    "final_input_pins_unchanged": 117,
+    "completed_artifact_pins_unchanged": 18
+  },
+  "raw_local_evidence_sha256": {
+    "receipt.json": "9f04e2e041df2cb6ea5072728391f2c8c37f85d38481ff7ffe65c9230f9300fe",
+    "stages.json": "35a5db866e563b9bc14170e896936d32994e66adf7dcc145693894373e2ca4e9",
+    "command/command.json": "2b649a3e4e8fc89150ef805dad75355609100f81d9be0b0153c64be375b20e02",
+    "cleanup.json": "494c8fedfd2c87ba010c397dd8640bdba4d49f792ce3fc05d8fdf15c03945f0a"
+  },
+  "evidence_persistence": "Only this portable summary and source are publicly persisted. Raw receipts, absolute paths, full tool metadata, query caches and partial compiler artifacts remain local, not durably backed up here. Their hashes identify them but cannot recover lost bytes.",
+  "conclusion": "The strict fresh-split strategy also did not complete within the unchanged 600-second guard. No runnable/compiler ratio or speedup is available. Original B0 single-crate failure remains unchanged. No retry, longer limit, target reuse or formal cohort was performed."
+}

@@ -104,7 +104,7 @@ control window and its time is not included in a later compiler sample.
 
 Python contract tests exercise positive inventory and negative ownership, hash,
 topology, count, fresh-query and interface checks. They start no compiler processes.
-The real fixture passed on 2026-11-10 using source commit `135a31331713baad0ddc4c22a09fd0ea312dc258`: all seven groups fresh, the exact native output, intact-copy LLVM equality and all four targeted rejection controls passed. Its complete outer guarded scope was 5.160891106 seconds. See `fixture-results.json` for the portable summary and evidence limits. The full 90-module compiler remains unrun; this prerequisite is not a compiler speed measurement.
+The real fixture passed on 2026-11-10 using source commit `135a31331713baad0ddc4c22a09fd0ea312dc258`: all seven groups fresh, the exact native output, intact-copy LLVM equality and all four targeted rejection controls passed. Its complete outer guarded scope was 5.160891106 seconds. See `fixture-results.json` for the portable summary and evidence limits. The small prerequisite is not a compiler speed measurement. A subsequent strict 90-module attempt exhausted its unchanged 600-second guard during the seventh library; see the result below.
 
 ## Commands
 
@@ -139,3 +139,21 @@ original SHA256 is `0d11b29419a32fc9832096951aa085cc317c8a304b9db110ee96ba411a4c
 The instrumented SHA256 is `03e12fd51ae1e5587d400a59ebbe160d9f21fe0dccf22b6ce24ab693f465a126`.
 Neither the frozen B0 checkout nor another worker's files are changed. No guard,
 start time, wait4, exit handling, environment or resource-limit logic is changed.
+
+## Strict 90-module qualification outcome
+
+The single admitted full attempt used checkout `9c0bea5847b995334e3bdd2b588509d45f0111e1`,
+whose executable harness bytes remain the reviewed `135a31331713baad0ddc4c22a09fd0ea312dc258`.
+It failed the original 600-second wall guard at 600.039880246 seconds, while compiling
+`mlf-crates`. Six completed libraries cover 59 modules and 2,807 newly inferred groups.
+No final entry, whole-program LLVM, runnable compiler, CLI or small compiler semantic
+check was reached, so there is no runnable time, qualified compiler ratio or speedup.
+
+Closed library compile stages total 346.093917351 seconds and the six explicit
+interface checks total 0.684103539 seconds. The final 252.8775535-second open window
+starts at the last completed interface command and ends at termination; it chiefly
+contains unfinished crates compilation, not an inferred 253 seconds of wrapper
+overhead. Its exact exclusive stage duration was not persisted. The original B0
+single-crate failure remains visible and unchanged. There was no retry or longer
+budget. See `compiler90-results.json` for portable phase/partial-artifact identities,
+resource observations, cleanup limitations and raw-evidence persistence limits.
