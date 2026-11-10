@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 7,
-  "observed_at_utc": "2026-11-10T14:21:09Z",
+  "revision": 8,
+  "observed_at_utc": "2026-11-10T14:25:32Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -131,7 +131,8 @@
       "terminal_live_descendants": [],
       "both_locks_verified_free": true,
       "raw_checkpoint_remote": null,
-      "scope": "Instrumented prefix only; broad raw demand across many SCCs, not a proven solver hotspot, ordinary CPU fraction or production speedup."
+      "scope": "Instrumented prefix only; broad raw demand across many SCCs, not a proven solver hotspot, ordinary CPU fraction or production speedup.",
+      "publication_status": "9-file new source/snapshot payload denied, known not executed, stopped; remote76d366c is the previous counted diagnostic."
     }
   },
   "tasks": [
@@ -174,10 +175,11 @@
         "private diagnostic Main",
         "diagnostic harness"
       ],
-      "next": "Preserve source/recovery and honest bounded result summary; wait for cost-centre evidence to select a real frontend optimization.",
+      "next": "Preserve bounded markers result honestly; public 9-file source/snapshot checkpoint denied and stopped. Independently review B2 fresh split harness while publication is unresolved.",
       "remote_tree": "78a27fc00df9d2589d447223aae4f5e199c509fc",
       "checkpoint_scope": "46-file checkpoint: original bounded diagnostic, 80 snapshots, retained failed output01, restored production Type, archived memo; markers-only followup is separate and not yet complete.",
-      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/76d366c676ffe78976588b6b74a2858fd33557d6/tools/performance/type-kind-memo/README.md"
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/76d366c676ffe78976588b6b74a2858fd33557d6/tools/performance/type-kind-memo/README.md",
+      "new_markers_local_checkpoint": "b44b11fc10f99530aba4c61a0bfe02018f58ca69"
     },
     {
       "id": "R1",
@@ -215,6 +217,38 @@
       "role": "Astra integration",
       "status": "awaiting eligible current-path candidates",
       "next": "Review and serialize accepted changes on one integration branch; rerun combined correctness and whole endpoint. No main merge or fixed-point implied."
+    },
+    {
+      "id": "B2",
+      "role": "fresh multi-crate strategy; artifact/backend direction owns, frontend direction reviews",
+      "status": "source-level feasibility confirmed; harness and controls preparation, no run",
+      "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+      "module_count": 90,
+      "source_bytes": 5233364,
+      "library_module_counts": [
+        14,
+        4,
+        11,
+        6,
+        11,
+        2,
+        13,
+        21,
+        2
+      ],
+      "entry_module_count": 6,
+      "total_endpoint_wall_limit_seconds": 600,
+      "policy": "Same source bytes and runnable endpoint, all target slices fresh and counted. Independent strategy, not replacement of original single-crate B0. No production manifest/export/algorithm change.",
+      "guards": "Existing RSS/AS/host/disk limits; no per-slice resetting the whole endpoint budget.",
+      "next": "Independent inventory/topology/new-artifact review, tiny real split semantic controls, then one full qualification only after admission.",
+      "native_ab_scope": "Do not run potentially paused check_native.py campaign. Independent non-generational small fixtures and CLI qualification only."
+    },
+    {
+      "id": "P1",
+      "role": "late cost-centre diagnostic; baseline direction owns, query direction reviews",
+      "status": "51-line private driver and plan statically reviewed, execution controller/controls incomplete; no run",
+      "policy": "Full original CLI closure, profiling ABI and installed libraries; total build guard600s; private90s internal timeout within120s outer guard. Verify actual fresh report and cleanup, never extend guard.",
+      "next": "Prepare thin controller and small controls; hold CPU until separately admitted."
     }
   ],
   "restart_required": [
@@ -256,11 +290,12 @@
     "policy": "Keep current diagnostic input f9bdb40; authenticate a new build-driver identity for final integration."
   },
   "profiling_followup": {
-    "status": "read_only_capability_verified_private_plan_preparation_only",
+    "status": "Private driver/plan statically reviewed; controller/controls incomplete; no build or run.",
     "installed_profile_libraries": true,
     "technique": "-prof -fprof-late over whole original CLI dependency closure",
     "ordinary_rts_options": "ignoreAll; separate diagnostic must enable options",
     "report_limitation": "No supported intermediate cost-centre dump API found. Internal early timeout/normal exit must be fixture-qualified before an outer guarded run; SIGKILL may leave no report.",
     "no_run_authorized": true
-  }
+  },
+  "next_priority": "B2 direct fresh split strategy preparation and control review; P1 profiling remains prepared followup, not cancelled."
 }
