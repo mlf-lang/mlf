@@ -49,9 +49,9 @@
 
 ## 当前候选的边界
 
-### F1：kindOf共享bound DAG
+### F1：已停止的kindOf memo候选；转向当前raw-infer定位
 
-单次调用内缓存成功kind结果；原算法作为诊断参考。已有O0/O2有限环境、菱形和需求/首错控制，但没有当前真实热点或性能收益证据。原计划对完整输入记录 roots、recursive_visits、unique_variable_roots、max_visits_per_root、roots_with_repeats，再核对checked原始字节与group身份。当前B0在产出checked前超时，因此先设计可在运行中读到计数及真实IO边界的有界诊断；完整输出验证仍是后续必需项。计数不是CPU份额；如果实际覆盖不足，停止候选，不用更多微基准粉饰收益。
+单次调用内缓存成功kind结果；原算法作为诊断参考。已有O0/O2有限环境、菱形和需求/首错控制，但没有当前真实热点或性能收益证据。原计划对完整输入记录 roots、recursive_visits、unique_variable_roots、max_visits_per_root、roots_with_repeats，再核对checked原始字节与group身份。当前B0在产出checked前超时，因此先设计可在运行中读到计数及真实IO边界的有界诊断；完整输出验证仍是后续必需项。计数不是CPU份额。2026-11-10的唯一120秒诊断已提供停止依据：最后119.098秒快照完成956个fresh SCC，kindOf根调用1,590,641次，递归变量访问620,367次与每根去重求和完全相等，重复根为0、最大15访问/根。末段SCC持续推进，未卡在单一SCC。该证据只覆盖插桩前缀，不是全程序断言或普通CPU占比；本轮已停止memo候选，不追加微基准，并将生产Type恢复基线，保留原补丁和失败证据。新的前端任务是和R2共同分析实际raw-infer/query成本。
 
 ### B1：checked到LLVM分段诊断
 
@@ -103,4 +103,10 @@
 
 - 基线工具链、冻结90模块清单与失败/成功资格位于独立分支 codex/full-compiler-baseline-20261110，提交 305914c90e8fdff3a912faa6b93c08146273cf3e。请使用 [该提交的README](https://github.com/mlf-lang/mlf/blob/305914c90e8fdff3a912faa6b93c08146273cf3e/tools/performance/full-compiler/baseline-20261110/README.md)，当前计划分支不包含其新增文件。
 - 前端原始实验checkpoint：perf/frontend-20261110，提交 64ee679848211034a3cb1e2c1b44f8f600861ab0；[恢复README](https://github.com/mlf-lang/mlf/blob/64ee679848211034a3cb1e2c1b44f8f600861ab0/tools/performance/type-kind-memo/README.md)。该版本保存原始完整计数方案和memo控制，当前调度已改为F1/R2单次120秒组合诊断；不能按旧README盲跑完整600秒。组合方案后续提交以JSON为准。
-- R1实验源码远端发布尚未完成，JSON如实标记null；本轮已经因不覆盖实际调用链而停止该候选，不让重启恢复依赖未保全源码。
+- R1隔离实验已备份到 perf/compiler-reuse-20261110，提交 d2ee44d84370d41cda90fb921e5af8c11dac677a；[恢复README](https://github.com/mlf-lang/mlf/blob/d2ee44d84370d41cda90fb921e5af8c11dac677a/tools/performance/source-context-write-reuse/README.md)。它仍因不覆盖当前调用链而停用，不恢复producer/性能排期，也没有完整认证通过声明。
+
+## 联合诊断完成后的调度（2026-11-10 13:50 UTC）
+
+F1/R2第二个输出目录中的唯一完整120秒诊断已结束；第一个目录只是harness路径冲突，未运行完整诊断，原失败保留。诊断harness完成、compiler未完成：按120.126秒wall上限退出，所有受管子进程已回收，两层锁已重新验证空闲。80个快照只用于定位，无checked参考/最终产物，不当成普通性能样本。已停止Type memo；R2核对实际query/raw-infer路径；B0核查是否可复用现有QueryGraph阶段统计；B1只读评估受支持的分crate构建策略能否保持同一90模块、所有target fresh和同一runnable终点。备选策略必须另立实验，不能改写原单crate600秒失败。
+
+新的联合诊断源码和原始快照提交在本机为27efb8ff0e817fffd16d87c6759dfcf3174492f2，远端仍未确认保存。旧远端64ee679不包含这次完成结果或Type恢复。恢复时先核对JSON最新remote_commit和范围；若新内容仍未保全，应据说明重新准备诊断，不能声称原始日志还可取回。
