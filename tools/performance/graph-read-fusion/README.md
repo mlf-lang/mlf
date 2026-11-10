@@ -85,3 +85,18 @@ not been remotely persisted; their hashes do not restore those bytes.
 
 Any subsequent ordinary owner-object check or short sample needs separate
 coordinator admission after the semantic gate. No full producer is planned here.
+
+
+## Small Graph sampling attempt
+
+After the independent original-name codegen review, one separately admitted
+60-second sampling scope was attempted using the existing O2 semantic binary.
+It timed out in preflight before launching any Graph warm-up or sample. There
+is no elapsed-time comparison, median, ratio or throughput conclusion.
+See `sample-plan.md` and `sample-01-summary.json`; no replacement cohort ran.
+The producer, native MLF performance and full90 endpoint remain unmeasured here.
+
+The separately preserved code-generation evidence is available in the
+[owner-codegen checkpoint](https://github.com/mlf-lang/mlf/blob/d79f7492c3b051d4cc14c1e2ae594d86a31f852e/tools/performance/full-compiler/graph-read-codegen-20261110/README.md).
+It supports the mechanism for representative callers, not a measured compiler
+speedup or universal reduction at every source site.

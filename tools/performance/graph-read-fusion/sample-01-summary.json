@@ -1,0 +1,42 @@
+{
+  "candidate_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+  "runner_sha256": "64913a6b430a4b78e396285b26e01a7d241caf2730d2c85dec367d119541375c",
+  "complete": false,
+  "outcome": "scope wall limit before first Graph process launch",
+  "scope_seconds": 60.739835975,
+  "scope_exit_code": -9,
+  "scope_reason": "wall limit",
+  "completed_warmups": 0,
+  "completed_samples": 0,
+  "fixed_repetitions": 32,
+  "fixed_order": [
+    "base",
+    "candidate",
+    "base",
+    "candidate",
+    "candidate",
+    "base",
+    "base",
+    "candidate",
+    "candidate",
+    "base"
+  ],
+  "descriptive_wall_summary": null,
+  "performance_conclusion_available": false,
+  "preflight_last_persisted_state": "initial worker record, before SerialLock; exact later preflight phase unknown",
+  "child_user_seconds": 22.235104,
+  "child_system_seconds": 30.550685,
+  "full_postflight_checks_complete": false,
+  "six_critical_source_receipt_hashes_checked_after": true,
+  "cleanup": {
+    "terminal_live_descendants": [],
+    "exact_worker_and_graph_argv_absent": true,
+    "outer_lock_free": true,
+    "inner_lock_free": true
+  },
+  "scope_receipt_sha256": "0a2d314cbed85f96c7e7677edd2db9a577680bad8b458f781e0f45b0ff832c97",
+  "samples_receipt_sha256": "1afaea12afa57adb0544ddcf9f31a86d33f3161f9c6ce659ac236ccf89c9acba",
+  "raw_receipts_persisted": false,
+  "automatic_retry_performed": false,
+  "plan_sha256_at_execution": "4b10a49a8637ffb9507b004ec311c040b04abef82eb634cf0cb8375461874db9"
+}
