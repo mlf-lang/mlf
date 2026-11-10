@@ -829,7 +829,7 @@ module Bootstrap.Graph where {
                                          (\loaded -> denseValidateEntries state entries))))))));
   denseGetNode :: forall s. DenseValidation s -> Int -> ST s (Maybe Node);
   denseGetNode (DenseValidation graph low high table descendants colours kinds starts ends visited) n =
-    if ((n < low) || (high < n)) then stReturn Nothing else readDense low table n;
+    if ((n < low) || (high < n)) then stReturn Nothing else readSTArray table (n - low);
   denseRequire :: forall s. DenseValidation s -> Int -> ST s (Either String Node);
   denseRequire state n =
     stBind (denseGetNode state n)
@@ -855,7 +855,7 @@ module Bootstrap.Graph where {
     case binder v of {
       Nothing -> stReturn ();
       Just b ->
-        stBind (readDense low descendants b)
+        stBind (readSTArray descendants (b - low))
           (\previous -> writeDense low descendants b ((:) n previous))
     };
   denseBindingVisit :: forall s. DenseValidation s -> Int -> Int -> ST s Int;
@@ -864,17 +864,17 @@ module Bootstrap.Graph where {
       DenseValidation graph low high table descendants colours kinds starts ends visited ->
         stBind (writeDenseInt low starts n position)
           (\ignored ->
-             stBind (readDense low descendants n)
+             stBind (readSTArray descendants (n - low))
                (\children ->
                   stBind (denseBindingChildren state (position + 1) children)
                     (\end -> stBind (writeDenseInt low ends n end) (\written -> stReturn end))))
     };
   denseContains :: forall s. DenseValidation s -> Int -> Int -> ST s Bool;
   denseContains (DenseValidation graph low high table descendants colours kinds starts ends visited) ancestor n =
-    stBind (readDense low starts ancestor)
+    stBind (readSTArray starts (ancestor - low))
       (\a ->
-         stBind (readDense low ends ancestor)
-           (\b -> stBind (readDense low starts n) (\p -> stReturn ((a <= p) && (p < b)))));
+         stBind (readSTArray ends (ancestor - low))
+           (\b -> stBind (readSTArray starts (n - low)) (\p -> stReturn ((a <= p) && (p < b)))));
   denseStructurally :: forall s. DenseValidation s ->
                                  Int -> Int -> [] Int -> ST s (Either String Bool);
   denseStructurally state wanted stamp pending =
@@ -890,7 +890,7 @@ module Bootstrap.Graph where {
             then ST.pureE True
             else ST.bindE (denseRequire state n)
                    (\v ->
-                      stBind (readDense low visited n)
+                      stBind (readSTArray visited (n - low))
                         (\mark ->
                            if (mark == stamp)
                            then denseStructurally state wanted stamp rest
@@ -960,7 +960,7 @@ module Bootstrap.Graph where {
                     DenseValidation graph low high table descendants colours kinds starts ends visited ->
                       if L.any (\child -> (resolve graph child == n)) (children (tag parent))
                       then ST.pureE ()
-                      else stBind (readDense low starts n)
+                      else stBind (readSTArray starts (n - low))
                              (\stamp ->
                                 ST.bindE (denseStructurally state n stamp ((:) b []))
                                   (\found ->
@@ -972,12 +972,12 @@ module Bootstrap.Graph where {
   denseKind state n v =
     case state of {
       DenseValidation graph low high table descendants colours kinds starts ends visited ->
-        stBind (readDense low colours n)
+        stBind (readSTArray colours (n - low))
           (\colour ->
              if (colour == 1)
              then ST.failE "infinite type (occurs check)"
              else if (colour == 2)
-                  then ST.liftE (readDense low kinds n)
+                  then ST.liftE (readSTArray kinds (n - low))
                   else stBind (writeDenseInt low colours n 1)
                          (\active ->
                             ST.bindE (denseKindBinder state n v)
@@ -1630,7 +1630,7 @@ module Bootstrap.Graph where {
                                                                                                                           skeleton))))))))))))))))))))))));
   denseTableNode :: forall s. Int -> STArray s (Maybe Node) -> Int -> ST s Node;
   denseTableNode low table n =
-    stBind (readDense low table n)
+    stBind (readSTArray table (n - low))
       (\entry ->
          case entry of {
            Nothing -> panic ("missing graph node " ++ showInt n);
@@ -1649,7 +1649,7 @@ module Bootstrap.Graph where {
                (\bound ->
                   stBind (writeDense low images n image)
                     (\mapped ->
-                       stBind (readDense low classes image)
+                       stBind (readSTArray classes (image - low))
                          (\previous ->
                             stBind (writeDense low classes image ((:) n previous))
                               (\added ->
@@ -1672,7 +1672,7 @@ module Bootstrap.Graph where {
     then stReturn ()
     else case state of {
            DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-             stBind (readDense low images n)
+             stBind (readSTArray images (n - low))
                (\image ->
                   stBind (denseTableNode low newNodes image)
                     (\result -> denseMarks state (children (tag result))))
@@ -1681,7 +1681,7 @@ module Bootstrap.Graph where {
   denseMark state n =
     case state of {
       DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-        stBind (readDense low grafted n)
+        stBind (readSTArray grafted (n - low))
           (\seen ->
              if (seen == 0)
              then stBind (writeDenseInt low grafted n 1)
@@ -1697,12 +1697,12 @@ module Bootstrap.Graph where {
       (:) n rest ->
         case state of {
           DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-            stBind (readDense low oldBinders n)
+            stBind (readSTArray oldBinders (n - low))
               (\original ->
                  case original of {
                    Nothing -> denseCandidates state rest;
                    Just b ->
-                     stBind (readDense low images b)
+                     stBind (readSTArray images (b - low))
                        (\image ->
                           stBind (denseCandidates state rest)
                             (\remaining -> stReturn ((:) image remaining)))
@@ -1713,7 +1713,7 @@ module Bootstrap.Graph where {
   denseParent state n =
     case state of {
       DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-        stBind (readDense low tree n)
+        stBind (readSTArray tree (n - low))
           (\parent ->
              case parent of {
                Nothing -> ST.failE "binders have no common ancestor";
@@ -1726,9 +1726,9 @@ module Bootstrap.Graph where {
     then ST.pureE a
     else case state of {
            DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-             stBind (readDense low depths a)
+             stBind (readSTArray depths (a - low))
                (\da ->
-                  stBind (readDense low depths b)
+                  stBind (readSTArray depths (b - low))
                     (\db ->
                        if (db < da)
                        then ST.bindE (denseParent state a) (\p -> denseCommon state p b)
@@ -1750,7 +1750,7 @@ module Bootstrap.Graph where {
   densePlace state n =
     case state of {
       DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-        stBind (readDense low colours n)
+        stBind (readSTArray colours (n - low))
           (\colour ->
              if (colour == 1)
              then ST.failE "cyclic structure/binding dependencies"
@@ -1758,11 +1758,11 @@ module Bootstrap.Graph where {
                   then ST.pureE ()
                   else stBind (writeDenseInt low colours n 1)
                          (\active ->
-                            stBind (readDense low grafted n)
+                            stBind (readSTArray grafted (n - low))
                               (\graft ->
-                                 stBind (readDense low parents n)
+                                 stBind (readSTArray parents (n - low))
                                    (\ps ->
-                                      stBind (readDense low classes n)
+                                      stBind (readSTArray classes (n - low))
                                         (\members ->
                                            stBind (denseCandidates state members)
                                              (\originals ->
@@ -1783,7 +1783,7 @@ module Bootstrap.Graph where {
                                                                     Nothing -> stReturn 0;
                                                                     Just p ->
                                                                       stBind
-                                                                        (readDense low depths p)
+                                                                        (readSTArray depths (p - low))
                                                                         (\depth ->
                                                                            stReturn (depth + 1))
                                                                   })
@@ -1810,9 +1810,9 @@ module Bootstrap.Graph where {
   denseFinalNode state ((,) n v) =
     case state of {
       DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-        stBind (readDense low tree n)
+        stBind (readSTArray tree (n - low))
           (\parent ->
-             stBind (readDense low flags n)
+             stBind (readSTArray flags (n - low))
                (\newFlag ->
                   ST.pureE
                     ((,) n
@@ -1827,11 +1827,11 @@ module Bootstrap.Graph where {
       Just b ->
         case state of {
           DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-            stBind (readDense low images b)
+            stBind (readSTArray images (b - low))
               (\image ->
                  if (image == wanted)
                  then ST.pureE (Just b)
-                 else stBind (readDense low oldBinders b)
+                 else stBind (readSTArray oldBinders (b - low))
                         (\parent -> denseClimb state wanted parent))
         }
     };
@@ -1839,9 +1839,9 @@ module Bootstrap.Graph where {
   denseRaiseOriginal state ((,) n v) =
     case state of {
       DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-        stBind (readDense low images n)
+        stBind (readSTArray images (n - low))
           (\image ->
-             stBind (readDense low tree image)
+             stBind (readSTArray tree (image - low))
                (\wanted ->
                   ST.bindE
                     (case wanted of {
@@ -1896,8 +1896,8 @@ module Bootstrap.Graph where {
     (:) ((,) n v) rest ->
       if equalFlag (flag v) Rigid
       then sameDensePermissionBindings low before after rest
-      else stBind (readDense low before n)
-        (\oldParent -> stBind (readDense low after n)
+      else stBind (readSTArray before (n - low))
+        (\oldParent -> stBind (readSTArray after (n - low))
           (\newParent ->
             if equalMaybeInt oldParent newParent
             then sameDensePermissionBindings low before after rest
@@ -1922,7 +1922,7 @@ module Bootstrap.Graph where {
   denseInert state n =
     case state of {
       DensePermissions low table binding descendants inertness paths permissions ->
-        stBind (readDense low inertness n)
+        stBind (readSTArray inertness (n - low))
           (\cached ->
              if (cached >= 0)
              then stReturn (cached == 1)
@@ -1931,7 +1931,7 @@ module Bootstrap.Graph where {
                        stBind
                          (if isBottom (tag v)
                           then stReturn False
-                          else stBind (readDense low descendants n)
+                          else stBind (readSTArray descendants (n - low))
                                  (\descendants -> denseAllInert state descendants))
                          (\answer ->
                             stBind (writeDenseInt low inertness n (if answer then 1 else 0))
@@ -1941,7 +1941,7 @@ module Bootstrap.Graph where {
   denseFlexiblePath state n =
     case state of {
       DensePermissions low table binding descendants inertness paths permissions ->
-        stBind (readDense low paths n)
+        stBind (readSTArray paths (n - low))
           (\cached ->
              if (cached >= 0)
              then stReturn (cached == 1)
@@ -1952,7 +1952,7 @@ module Bootstrap.Graph where {
                           then stReturn True
                           else if equalFlag (flag v) Rigid
                                then stReturn False
-                               else stBind (readDense low binding n)
+                               else stBind (readSTArray binding (n - low))
                                       (\parent ->
                                          case parent of {
                                            Nothing -> stReturn True;
@@ -1966,7 +1966,7 @@ module Bootstrap.Graph where {
   densePermission state n =
     case state of {
       DensePermissions low table binding descendants inertness paths permissions ->
-        stBind (readDense low permissions n)
+        stBind (readSTArray permissions (n - low))
           (\cached ->
              case cached of {
                Just value -> stReturn value;
@@ -1994,7 +1994,7 @@ module Bootstrap.Graph where {
   denseCheckOriginal state oldPermissions raisedPermissions ((,) n v) =
     case state of {
       DenseRebinding old skeleton low high oldNodes newNodes images classes flags parents tree depths colours grafted oldBinders raised ->
-        stBind (readDense low images n)
+        stBind (readSTArray images (n - low))
           (\image ->
              ST.bindE
                (if L.not (isBottom (tag v))
@@ -2008,7 +2008,7 @@ module Bootstrap.Graph where {
                                     ST.check (equalPermission permission Green)
                                       "cannot instantiate a rigid or protected type variable")))
                (\instantiated ->
-                  stBind (readDense low raised n)
+                  stBind (readSTArray raised (n - low))
                     (\up ->
                        ST.bindE
                          (if equalMaybeInt (binder v) up
@@ -2018,7 +2018,7 @@ module Bootstrap.Graph where {
                                     ST.check (L.not (equalPermission permission Red))
                                       "cannot raise a protected type variable"))
                          (\lifted ->
-                            stBind (readDense low flags image)
+                            stBind (readSTArray flags (image - low))
                               (\newFlag ->
                                  if equalFlag (flag v) newFlag
                                  then ST.pureE ()
@@ -2639,7 +2639,7 @@ module Bootstrap.Graph where {
                     else case binder v of {
                            Nothing -> stReturn ();
                            Just parent ->
-                             stBind (readDense low descendants parent)
+                             stBind (readSTArray descendants (parent - low))
                                (\previous -> writeDense low descendants parent ((:) n previous))
                          })
                    (\added -> normalLoad state rest))
@@ -2649,7 +2649,7 @@ module Bootstrap.Graph where {
   normalInert state n =
     case state of {
       DenseNormalization graph low table descendants inertness seen rigid candidates ->
-        stBind (readDense low inertness n)
+        stBind (readSTArray inertness (n - low))
           (\known ->
              if (known >= 0)
              then stReturn (known == 1)
@@ -2658,7 +2658,7 @@ module Bootstrap.Graph where {
                        stBind
                          (if isBottom (tag v)
                           then stReturn False
-                          else stBind (readDense low descendants n) (normalAllInert state))
+                          else stBind (readSTArray descendants (n - low)) (normalAllInert state))
                          (\answer ->
                             stBind (writeDenseInt low inertness n (if answer then 1 else 0))
                               (\stored -> stReturn answer))))
@@ -2694,7 +2694,7 @@ module Bootstrap.Graph where {
                                          GGen root ->
                                            if (n == resolve graph root)
                                            then writeDense low rigid n True
-                                           else stBind (readDense low candidates parent)
+                                           else stBind (readSTArray candidates (parent - low))
                                                   (\previous ->
                                                      writeDense low candidates parent
                                                        ((:) n previous));
@@ -2714,7 +2714,7 @@ module Bootstrap.Graph where {
             stBind
               (case tag v of {
                  GGen root ->
-                   stBind (readDense low candidates n)
+                   stBind (readSTArray candidates (n - low))
                      (\pending ->
                         if L.null pending
                         then stReturn ()
@@ -2735,7 +2735,7 @@ module Bootstrap.Graph where {
             let {
               n = resolve graph original
             } in
-            stBind (readDense low seen n)
+            stBind (readSTArray seen (n - low))
               (\previous ->
                  if (previous == stamp)
                  then normalReach state stamp rest
@@ -2752,7 +2752,7 @@ module Bootstrap.Graph where {
       (:) n rest ->
         case state of {
           DenseNormalization graph low table descendants inertness seen rigid candidates ->
-            stBind (readDense low seen n)
+            stBind (readSTArray seen (n - low))
               (\visited ->
                  stBind (writeDense low rigid n (visited /= stamp))
                    (\marked -> normalExistentials state stamp rest))
@@ -2766,7 +2766,7 @@ module Bootstrap.Graph where {
       (:) ((,) n v) rest ->
         case state of {
           DenseNormalization graph low table descendants inertness seen rigid candidates ->
-            stBind (readDense low rigid n)
+            stBind (readSTArray rigid (n - low))
               (\changed ->
                  stBind (normalResults state rest)
                    (\tail ->
@@ -2931,7 +2931,7 @@ module Bootstrap.Graph where {
         ST.bindE
           (case entry of {
              (,) n v ->
-               stBind (readDense low classes n)
+               stBind (readSTArray classes (n - low))
                  (\members -> denseCheckMerges low raised raisedPermissions members)
            })
           (\ignored -> denseCheckMergeEntries low classes raised raisedPermissions rest)
@@ -2942,7 +2942,7 @@ module Bootstrap.Graph where {
       [] -> stReturn ();
       (:) entry rest ->
         stBind
-          (stBind (readDense low parents entry)
+          (stBind (readSTArray parents (entry - low))
              (\previous -> writeDense low parents entry ((:) n previous)))
           (\ignored -> denseLoadParents low parents n rest)
     };
@@ -2977,12 +2977,12 @@ module Bootstrap.Graph where {
              (,) n v ->
                if equalFlag (flag v) Rigid
                then stReturn ()
-               else stBind (readDense low binding n)
+               else stBind (readSTArray binding (n - low))
                       (\parent ->
                          case parent of {
                            Nothing -> stReturn ();
                            Just b ->
-                             stBind (readDense low descendants b)
+                             stBind (readSTArray descendants (b - low))
                                (\previous -> writeDense low descendants b ((:) n previous))
                          })
            })
@@ -2997,9 +2997,9 @@ module Bootstrap.Graph where {
       [] -> ST.pureE ();
       (:) entry rest ->
         ST.bindE
-          (stBind (readDense low raised first)
+          (stBind (readSTArray raised (first - low))
              (\a ->
-                stBind (readDense low raised entry)
+                stBind (readSTArray raised (entry - low))
                   (\b ->
                      if L.not (equalMaybeInt a b)
                      then ST.pureE ()

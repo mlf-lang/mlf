@@ -1,0 +1,445 @@
+{
+  "baseline_ref": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "owner": "libraries/mlf-inference/Bootstrap/Graph.hs",
+  "before_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "after_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+  "saturated_calls": 54,
+  "public_helper_unchanged": true,
+  "write_helpers_and_calls_unchanged": true,
+  "parent_replay_candidate_included": false,
+  "reversible_exact_bytes": true,
+  "sites": [
+    {
+      "line": 832,
+      "function": "denseGetNode",
+      "original_start": 30650,
+      "transformed_start": 30650,
+      "before": "readDense low table n",
+      "after": "readSTArray table (n - low)"
+    },
+    {
+      "line": 858,
+      "function": "denseAddDescendant",
+      "original_start": 31673,
+      "transformed_start": 31679,
+      "before": "readDense low descendants b",
+      "after": "readSTArray descendants (b - low)"
+    },
+    {
+      "line": 867,
+      "function": "denseBindingVisit",
+      "original_start": 32106,
+      "transformed_start": 32118,
+      "before": "readDense low descendants n",
+      "after": "readSTArray descendants (n - low)"
+    },
+    {
+      "line": 874,
+      "function": "denseContains",
+      "original_start": 32547,
+      "transformed_start": 32565,
+      "before": "readDense low starts ancestor",
+      "after": "readSTArray starts (ancestor - low)"
+    },
+    {
+      "line": 876,
+      "function": "denseContains",
+      "original_start": 32608,
+      "transformed_start": 32632,
+      "before": "readDense low ends ancestor",
+      "after": "readSTArray ends (ancestor - low)"
+    },
+    {
+      "line": 877,
+      "function": "denseContains",
+      "original_start": 32663,
+      "transformed_start": 32693,
+      "before": "readDense low starts n",
+      "after": "readSTArray starts (n - low)"
+    },
+    {
+      "line": 893,
+      "function": "denseStructurally",
+      "original_start": 33354,
+      "transformed_start": 33390,
+      "before": "readDense low visited n",
+      "after": "readSTArray visited (n - low)"
+    },
+    {
+      "line": 963,
+      "function": "denseKindBinder",
+      "original_start": 36432,
+      "transformed_start": 36474,
+      "before": "readDense low starts n",
+      "after": "readSTArray starts (n - low)"
+    },
+    {
+      "line": 975,
+      "function": "denseKind",
+      "original_start": 37039,
+      "transformed_start": 37087,
+      "before": "readDense low colours n",
+      "after": "readSTArray colours (n - low)"
+    },
+    {
+      "line": 980,
+      "function": "denseKind",
+      "original_start": 37242,
+      "transformed_start": 37296,
+      "before": "readDense low kinds n",
+      "after": "readSTArray kinds (n - low)"
+    },
+    {
+      "line": 1633,
+      "function": "denseTableNode",
+      "original_start": 73016,
+      "transformed_start": 73076,
+      "before": "readDense low table n",
+      "after": "readSTArray table (n - low)"
+    },
+    {
+      "line": 1652,
+      "function": "denseLoadOriginal",
+      "original_start": 73810,
+      "transformed_start": 73876,
+      "before": "readDense low classes image",
+      "after": "readSTArray classes (image - low)"
+    },
+    {
+      "line": 1675,
+      "function": "denseMarkOriginal",
+      "original_start": 75111,
+      "transformed_start": 75183,
+      "before": "readDense low images n",
+      "after": "readSTArray images (n - low)"
+    },
+    {
+      "line": 1684,
+      "function": "denseMark",
+      "original_start": 75567,
+      "transformed_start": 75645,
+      "before": "readDense low grafted n",
+      "after": "readSTArray grafted (n - low)"
+    },
+    {
+      "line": 1700,
+      "function": "denseCandidates",
+      "original_start": 76263,
+      "transformed_start": 76347,
+      "before": "readDense low oldBinders n",
+      "after": "readSTArray oldBinders (n - low)"
+    },
+    {
+      "line": 1705,
+      "function": "denseCandidates",
+      "original_start": 76471,
+      "transformed_start": 76561,
+      "before": "readDense low images b",
+      "after": "readSTArray images (b - low)"
+    },
+    {
+      "line": 1716,
+      "function": "denseParent",
+      "original_start": 76983,
+      "transformed_start": 77079,
+      "before": "readDense low tree n",
+      "after": "readSTArray tree (n - low)"
+    },
+    {
+      "line": 1729,
+      "function": "denseCommon",
+      "original_start": 77525,
+      "transformed_start": 77627,
+      "before": "readDense low depths a",
+      "after": "readSTArray depths (a - low)"
+    },
+    {
+      "line": 1731,
+      "function": "denseCommon",
+      "original_start": 77598,
+      "transformed_start": 77706,
+      "before": "readDense low depths b",
+      "after": "readSTArray depths (b - low)"
+    },
+    {
+      "line": 1753,
+      "function": "densePlace",
+      "original_start": 78752,
+      "transformed_start": 78866,
+      "before": "readDense low colours n",
+      "after": "readSTArray colours (n - low)"
+    },
+    {
+      "line": 1761,
+      "function": "densePlace",
+      "original_start": 79101,
+      "transformed_start": 79221,
+      "before": "readDense low grafted n",
+      "after": "readSTArray grafted (n - low)"
+    },
+    {
+      "line": 1763,
+      "function": "densePlace",
+      "original_start": 79208,
+      "transformed_start": 79334,
+      "before": "readDense low parents n",
+      "after": "readSTArray parents (n - low)"
+    },
+    {
+      "line": 1765,
+      "function": "densePlace",
+      "original_start": 79322,
+      "transformed_start": 79454,
+      "before": "readDense low classes n",
+      "after": "readSTArray classes (n - low)"
+    },
+    {
+      "line": 1786,
+      "function": "densePlace",
+      "original_start": 80896,
+      "transformed_start": 81034,
+      "before": "readDense low depths p",
+      "after": "readSTArray depths (p - low)"
+    },
+    {
+      "line": 1813,
+      "function": "denseFinalNode",
+      "original_start": 83020,
+      "transformed_start": 83164,
+      "before": "readDense low tree n",
+      "after": "readSTArray tree (n - low)"
+    },
+    {
+      "line": 1815,
+      "function": "denseFinalNode",
+      "original_start": 83085,
+      "transformed_start": 83235,
+      "before": "readDense low flags n",
+      "after": "readSTArray flags (n - low)"
+    },
+    {
+      "line": 1830,
+      "function": "denseClimb",
+      "original_start": 83806,
+      "transformed_start": 83962,
+      "before": "readDense low images b",
+      "after": "readSTArray images (b - low)"
+    },
+    {
+      "line": 1834,
+      "function": "denseClimb",
+      "original_start": 83963,
+      "transformed_start": 84125,
+      "before": "readDense low oldBinders b",
+      "after": "readSTArray oldBinders (b - low)"
+    },
+    {
+      "line": 1842,
+      "function": "denseRaiseOriginal",
+      "original_start": 84386,
+      "transformed_start": 84554,
+      "before": "readDense low images n",
+      "after": "readSTArray images (n - low)"
+    },
+    {
+      "line": 1844,
+      "function": "denseRaiseOriginal",
+      "original_start": 84452,
+      "transformed_start": 84626,
+      "before": "readDense low tree image",
+      "after": "readSTArray tree (image - low)"
+    },
+    {
+      "line": 1899,
+      "function": "sameDensePermissionBindings",
+      "original_start": 87626,
+      "transformed_start": 87806,
+      "before": "readDense low before n",
+      "after": "readSTArray before (n - low)"
+    },
+    {
+      "line": 1900,
+      "function": "sameDensePermissionBindings",
+      "original_start": 87681,
+      "transformed_start": 87867,
+      "before": "readDense low after n",
+      "after": "readSTArray after (n - low)"
+    },
+    {
+      "line": 1925,
+      "function": "denseInert",
+      "original_start": 88857,
+      "transformed_start": 89049,
+      "before": "readDense low inertness n",
+      "after": "readSTArray inertness (n - low)"
+    },
+    {
+      "line": 1934,
+      "function": "denseInert",
+      "original_start": 89219,
+      "transformed_start": 89417,
+      "before": "readDense low descendants n",
+      "after": "readSTArray descendants (n - low)"
+    },
+    {
+      "line": 1944,
+      "function": "denseFlexiblePath",
+      "original_start": 89754,
+      "transformed_start": 89958,
+      "before": "readDense low paths n",
+      "after": "readSTArray paths (n - low)"
+    },
+    {
+      "line": 1955,
+      "function": "denseFlexiblePath",
+      "original_start": 90223,
+      "transformed_start": 90433,
+      "before": "readDense low binding n",
+      "after": "readSTArray binding (n - low)"
+    },
+    {
+      "line": 1969,
+      "function": "densePermission",
+      "original_start": 90969,
+      "transformed_start": 91185,
+      "before": "readDense low permissions n",
+      "after": "readSTArray permissions (n - low)"
+    },
+    {
+      "line": 1997,
+      "function": "denseCheckOriginal",
+      "original_start": 92402,
+      "transformed_start": 92624,
+      "before": "readDense low images n",
+      "after": "readSTArray images (n - low)"
+    },
+    {
+      "line": 2011,
+      "function": "denseCheckOriginal",
+      "original_start": 93097,
+      "transformed_start": 93325,
+      "before": "readDense low raised n",
+      "after": "readSTArray raised (n - low)"
+    },
+    {
+      "line": 2021,
+      "function": "denseCheckOriginal",
+      "original_start": 93643,
+      "transformed_start": 93877,
+      "before": "readDense low flags image",
+      "after": "readSTArray flags (image - low)"
+    },
+    {
+      "line": 2642,
+      "function": "normalLoad",
+      "original_start": 121766,
+      "transformed_start": 122006,
+      "before": "readDense low descendants parent",
+      "after": "readSTArray descendants (parent - low)"
+    },
+    {
+      "line": 2652,
+      "function": "normalInert",
+      "original_start": 122213,
+      "transformed_start": 122459,
+      "before": "readDense low inertness n",
+      "after": "readSTArray inertness (n - low)"
+    },
+    {
+      "line": 2661,
+      "function": "normalInert",
+      "original_start": 122572,
+      "transformed_start": 122824,
+      "before": "readDense low descendants n",
+      "after": "readSTArray descendants (n - low)"
+    },
+    {
+      "line": 2697,
+      "function": "normalGather",
+      "original_start": 124311,
+      "transformed_start": 124569,
+      "before": "readDense low candidates parent",
+      "after": "readSTArray candidates (parent - low)"
+    },
+    {
+      "line": 2717,
+      "function": "normalScopes",
+      "original_start": 125183,
+      "transformed_start": 125447,
+      "before": "readDense low candidates n",
+      "after": "readSTArray candidates (n - low)"
+    },
+    {
+      "line": 2738,
+      "function": "normalReach",
+      "original_start": 126001,
+      "transformed_start": 126271,
+      "before": "readDense low seen n",
+      "after": "readSTArray seen (n - low)"
+    },
+    {
+      "line": 2755,
+      "function": "normalExistentials",
+      "original_start": 126748,
+      "transformed_start": 127024,
+      "before": "readDense low seen n",
+      "after": "readSTArray seen (n - low)"
+    },
+    {
+      "line": 2769,
+      "function": "normalResults",
+      "original_start": 127323,
+      "transformed_start": 127605,
+      "before": "readDense low rigid n",
+      "after": "readSTArray rigid (n - low)"
+    },
+    {
+      "line": 2934,
+      "function": "denseCheckMergeEntries",
+      "original_start": 134209,
+      "transformed_start": 134497,
+      "before": "readDense low classes n",
+      "after": "readSTArray classes (n - low)"
+    },
+    {
+      "line": 2945,
+      "function": "denseLoadParents",
+      "original_start": 134662,
+      "transformed_start": 134956,
+      "before": "readDense low parents entry",
+      "after": "readSTArray parents (entry - low)"
+    },
+    {
+      "line": 2980,
+      "function": "densePermissionChildren",
+      "original_start": 136139,
+      "transformed_start": 136439,
+      "before": "readDense low binding n",
+      "after": "readSTArray binding (n - low)"
+    },
+    {
+      "line": 2985,
+      "function": "densePermissionChildren",
+      "original_start": 136365,
+      "transformed_start": 136671,
+      "before": "readDense low descendants b",
+      "after": "readSTArray descendants (b - low)"
+    },
+    {
+      "line": 3000,
+      "function": "denseCheckMergeRest",
+      "original_start": 137014,
+      "transformed_start": 137326,
+      "before": "readDense low raised first",
+      "after": "readSTArray raised (first - low)"
+    },
+    {
+      "line": 3002,
+      "function": "denseCheckMergeRest",
+      "original_start": 137086,
+      "transformed_start": 137404,
+      "before": "readDense low raised entry",
+      "after": "readSTArray raised (entry - low)"
+    }
+  ]
+}
