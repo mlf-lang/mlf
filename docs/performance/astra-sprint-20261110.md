@@ -158,3 +158,15 @@ B2在原600.039880246秒wall保护下结束，第7库mlf-crates未完成。此�
 原guard的瞬间终端记录保留未改。独立精确任务进程核验无残留，两锁空闲，117个固定输入pins和18个已完成artifact pins均未变。原始receipts/部分artifact是否持久化以对应分支明确说明为准。
 
 P1私有工具v2.1已完成独立静态复审，Astra现在只准入一次构建：完整原CLI95个home模块使用-prof ABI，600秒总build保护；成功后另行准入60秒控制，真实90秒内部/120秒外层诊断仍需单独决定。不会因为静态review通过就声称profiling工具已经可运行。它不恢复native A/B、代际验证或固定点。
+
+## P1实证与新优化分工（2026-11-10 15:35 UTC）
+
+P1完整95-home-module构建通过（320.047秒，峰值2,115,162,112字节）；六项控制在13.585秒内全部通过，包括真实正常/超时报告、实际POSIX持锁和活跃子进程取消清理，以及拒绝普通124退出或硬杀无报告。随后唯一完整90模块目标的有界诊断成功落盘：internal-timeout 90.2385秒、exit124、fresh有效89,395 ticks，报告89.39秒、约91.303GB分配；外scope98.475秒，峰值1,784,209,408字节。compiler未完成，这不是ordinary样本。子进程/锁清理通过。
+
+证据指向Constraint.solvePrepared继承34.34%采样时间、Graph.Solver.instantiateExpandedPrepared25.32%、unifyPreparedFallback16.24%、Graph.unify12.11%、denseValidation9.51%。这些继承行重叠，不能相加；GC自占20.37%、PROFILING自占6.77%，safe FFI/子进程覆盖也有限，不能将比例当成普通CPU份额或预言提速。
+
+F2由前端方向独占Graph.hs，B1方向独立复核。当前窄补丁只消除densePlace中非零graft成功路径已经完整执行过的第二次parents遍历，保留首次验证、graft0、失败和需求次序；尚未执行控制或证明收益。freeze区间表仅为备选，不混入patch。densePlaces全局继承仅0.630%，重复部分更小，不为该小机制直接安排完整compiler构建；同时只读考察更大的denseValidation/denseKind成本。
+
+R3由query方向独占Graph/Solver.hs，B0方向独立复核。bitmap-seen提案已停用：其直接lookup宽松上界仅0.649%总ticks，且还含其他lookup，额外bitmap插入可能抵消。未执行控制或计时，生产Solver已恢复f9，归档保存到db68c774ae1d5919c4c5e28e62f9d6aca28c0017。下一步只读研究instantiateExpandedPrepared/fallback中同一操作内可能重复的已完成工作，不删除验证、扩缓存生命周期或改public API。
+
+P1安全恢复checkpoint位于[fa7df4c39897a7dad4d21a44087c5927a12dc8d4的README](https://github.com/mlf-lang/mlf/blob/fa7df4c39897a7dad4d21a44087c5927a12dc8d4/tools/performance/full-compiler/late-profile-20261110/README.md)，四份源码与实际测试owners逐字相同，fetch树一致。只有源码、SHA清单和脱敏摘要持久化；13MB raw profile、完整receipts和binary未公开保存。B2失败摘要另已保存并取回验证到e0fa831b3d4cbd395f4d381dbebcb216ebc58365，原失败结论不变。
