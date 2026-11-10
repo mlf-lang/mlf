@@ -132,3 +132,13 @@ B1已保存并取回验证到perf/llvm-builder-20261110@b0144b0d66dd0806d5a00ec4
 markers-only唯一运行已在120.480秒guard上限退出，compiler未完成；79快照，最后119.372秒时已开始957组、完成956个fresh组，reused为0、总数仍未知。尾端持续推进，非一个SCC卡死。已闭合的诊断wall需求窗口为raw-demand 91.767875213秒（956组）、prepared-record 4.654154082秒（957组）、raw-record 5.167865594秒（956组）、finish 1.074966639秒（956组）。最慢完成SCC为ordinal834，46个成员，span5.973414824秒，其中raw窗口5.102921896秒；后四个span约3.251、2.015、1.961、1.463秒。成本分散在许多组，不能称为某个Solver热点、普通CPU百分比或生产提速。
 
 C对象重建逐字节认证、helper控制、输入post-pins均通过；这是一次构建和一次完整有界尝试，没有失败重试。子进程已回收，内外锁验证空闲。新源码/证据的远端持久化尚待核验，当前数字是结果摘要；不能仅凭摘要声称raw receipts仍可取回。下一步优先审查完整原CLI的late cost-centre诊断草稿，而非继续增加粗标签。96字符stable-name预览可能只容纳公共前缀，不能假称能从它唯一还原源函数；数字owner IDs需要精确源版本下的实际映射。
+
+## 新直接干预候选：同90模块的fresh分crate策略（2026-11-10 14:25 UTC）
+
+Astra将下一优先级调整为B2：使用现有公开--compile-crate协议，按原包边界将冻结90模块分为9个library slice和6模块entry，全部从空target构建，最后仍使用普通whole-program checked→LLVM→Clang→runnable入口。9库模块数分别为14、4、11、6、11、2、13、21、2，连entry共90；模块源码、exports和生产manifest不改，固定复用仅限B0原已允许的builtin/runtime等依赖。当次先前slice产物属于目标工作，其生成成本全部计入同一个600秒总端点，不能变成每库各600秒。现成mlfpkg --target emlf会编98模块，不能拿它与GHC90作同工作量比较。
+
+该候选目前只有源码层面的可行性，尚无完整可执行产物或速度结果。B1方向负责实现独立调度harness，F1独立复核模块并集/唯一归属/哈希/依赖拓扑、新artifact身份与预算；先做小型真实分crate语义控制，再另行准入一次完整资格。所有失败和策略差异明确保留，不能覆盖原单crate600秒失败或声称生产算法已经变快。
+
+暂停边界继续保守：不运行可能属于native A/B、代际或固定点验证的整套check_native.py。仅做不构成自举代际A/B的独立小crate语义fixture和CLI资格，并记录实际命令，不把这些检查说成完整compiler语义验收。完整原CLI late-profiler草稿继续准备和审查，但尚未编译/运行。
+
+markers-only的9文件新源码/结构化快照检查点尚未获准公开上传，已知create_tree未执行且已停止。当前远端76d366c仍是前一个含Type计数的诊断。新的markers摘要已在本计划保全，但raw及新runner恢复状态要以JSON中确切remote_commit为准，不能假称其已push。
