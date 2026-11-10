@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 11,
-  "observed_at_utc": "2026-11-10T15:35:35Z",
+  "revision": 12,
+  "observed_at_utc": "2026-11-10T16:41:36Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -133,7 +133,8 @@
       "both_locks_verified_free": true,
       "raw_checkpoint_remote": null,
       "scope": "Instrumented prefix only; broad raw demand across many SCCs, not a proven solver hotspot, ordinary CPU fraction or production speedup.",
-      "publication_status": "9-file new source/snapshot payload denied, known not executed, stopped; remote76d366c is the previous counted diagnostic."
+      "publication_status": "Verified nine-file source and structured snapshot checkpoint33bed9fb4073877ac5589097abf34a3fbac0d1f9; raw command/guard receipts remain local.",
+      "safe_checkpoint": "33bed9fb4073877ac5589097abf34a3fbac0d1f9"
     },
     "split_fixture": {
       "complete": true,
@@ -216,6 +217,99 @@
         "PROFILING": 6.77
       },
       "caveat": "Inherited rows overlap; profiling/GC and FFI/child coverage prevent interpreting these as ordinary CPU fractions or guaranteed speedup."
+    },
+    "f2_controls": {
+      "status": "passed_O0_and_O2",
+      "attempt": 3,
+      "total_wall_seconds": 34.714,
+      "ordinary_performance_sample": false,
+      "validation_cases": 12000,
+      "public_unifications": 5616,
+      "frozen_successful_rebinds": 1433,
+      "graft_parent_edges": 16,
+      "int64_layouts": 480,
+      "demand_error_cases": 20,
+      "alias_cases": 6,
+      "real_alias_placements": 5,
+      "entry_cycles": 1,
+      "failed_harness_attempts_preserved": [
+        1,
+        2
+      ],
+      "post_pins_passed": true,
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "raw_persisted_remotely": false,
+      "complete_compiler_qualified": false,
+      "speedup": null
+    },
+    "ordinary_graph_wrapper": {
+      "objects_authenticated": true,
+      "method": "Read-only ordinary O2 interface and disassembly inspection, not a timed run",
+      "readDense_entry_allocation_bytes": 56,
+      "writeDense_entry_allocation_bytes": 64,
+      "direct_readDense_jumps": 66,
+      "profiled_readDense_bytes_per_scc_entry": 72,
+      "caveat": "Some callers already inline. Static jumps do not measure dynamic frequency or correspond one-to-one to source sites. Public helper must remain; caller allocation must be checked, not just disappearance of a symbol."
+    },
+    "f3_controls": {
+      "status": "passed_O0_and_O2",
+      "attempt": 1,
+      "total_wall_seconds": 41.017,
+      "validation_cases": 12000,
+      "public_unifications": 5616,
+      "frozen_successful_rebinds": 1433,
+      "graft_parent_edges": 16,
+      "int64_layouts": 480,
+      "placement_demand_cases": 20,
+      "alias_cases": 6,
+      "valid_normalize_cases": 120,
+      "read_demand_cases": 21,
+      "post_pins_passed": true,
+      "c_objects_byte_equal": true,
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "ordinary_performance_sample": false,
+      "speedup": null
+    },
+    "f3_codegen": {
+      "capture_attempt": 2,
+      "wall_seconds": 24.718,
+      "baseline_object_and_interface_equal_authenticated_original": true,
+      "mechanism_review_sha256": "bcb421e427f48fd10c10408f700f498ef6819375b2441ecaa0a8c75322e34426",
+      "representative_denseContains_success_bytes": [
+        352,
+        176
+      ],
+      "denseContains_construct_only_bytes": [
+        96,
+        104
+      ],
+      "densePlace_action_entry_bytes": [
+        168,
+        120
+      ],
+      "text_bytes": [
+        346382,
+        354814
+      ],
+      "caveat": "Static representative paths only; not dynamic whole-compiler allocation or throughput.",
+      "remote_commit": "d79f7492c3b051d4cc14c1e2ae594d86a31f852e"
+    },
+    "f3_sample_attempt01": {
+      "status": "preflight_timeout_no_samples",
+      "wall_seconds": 60.74,
+      "warmups": [],
+      "samples": [],
+      "source": "sample.py64913a6b",
+      "precise_stage_unknown": true,
+      "full_post_pins_reached": false,
+      "terminal_live_descendants": [],
+      "locks_released": true,
+      "ratio": null,
+      "remote_commit": "221764d065a0ac0db9314073478fa4b14e00fcd7",
+      "failure_region": "Preflight interval after initial state save and before first binary launch; exact blocking function was not recorded.",
+      "root_cause_caveat": "Lock acquisition is nonblocking and no recursive lock was found. Large build-provenance scanning exists, but bytes alone do not prove the exact timeout cause."
     }
   },
   "tasks": [
@@ -225,7 +319,7 @@
       "status": "MLF timeout; GHC qualified",
       "branch": "codex/full-compiler-baseline-20261110",
       "remote_commit": "305914c90e8fdff3a912faa6b93c08146273cf3e",
-      "next": "Read-only existing profiler and installed GHC profiling capability review; no additional long ordinary runs without an intervention.",
+      "next": "Prepare reviewed original-name Graph ordinary O2 codegen gate. Do not mix renamed semantic oracle objects or stale reverse dependencies into a claimed complete producer.",
       "recovery_readme": "https://github.com/mlf-lang/mlf/blob/305914c90e8fdff3a912faa6b93c08146273cf3e/tools/performance/full-compiler/baseline-20261110/README.md"
     },
     {
@@ -249,19 +343,19 @@
     {
       "id": "F1",
       "role": "frontend kind counters and unified diagnostic runner",
-      "status": "Markers-only bounded diagnostic complete; no production candidate",
+      "status": "Both bounded diagnostics completed and persisted; Type memo retired",
       "branch": "perf/frontend-20261110",
       "local_checkpoint": "27efb8ff0e817fffd16d87c6759dfcf3174492f2",
-      "remote_commit": "76d366c676ffe78976588b6b74a2858fd33557d6",
+      "remote_commit": "33bed9fb4073877ac5589097abf34a3fbac0d1f9",
       "owners": [
         "private diagnostic Counters",
         "private diagnostic Main",
         "diagnostic harness"
       ],
-      "next": "Preserve bounded markers result honestly; public 9-file source/snapshot checkpoint denied and stopped. Independently review B2 fresh split harness while publication is unresolved.",
-      "remote_tree": "78a27fc00df9d2589d447223aae4f5e199c509fc",
-      "checkpoint_scope": "46-file checkpoint: original bounded diagnostic, 80 snapshots, retained failed output01, restored production Type, archived memo; markers-only followup is separate and not yet complete.",
-      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/76d366c676ffe78976588b6b74a2858fd33557d6/tools/performance/type-kind-memo/README.md",
+      "next": "Preserve diagnostic checkpoints; current production Graph work is separately tracked as F2/F3.",
+      "remote_tree": "3cbb6096a8b5269f74c85289ad6736647efd870b",
+      "checkpoint_scope": "Previous46-file counted diagnostic plus new9-file markers source and structured snapshots. Raw markers receipts and command metadata are not remote.",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/33bed9fb4073877ac5589097abf34a3fbac0d1f9/tools/performance/graph-markers/README.md",
       "new_markers_local_checkpoint": "b44b11fc10f99530aba4c61a0bfe02018f58ca69"
     },
     {
@@ -280,14 +374,14 @@
     {
       "id": "R2",
       "role": "current graph progress diagnosis",
-      "status": "Joint diagnostic complete; analyzing current graph/query and raw-infer boundaries",
+      "status": "Independent F3 source and read-demand reviewer",
       "owners": [
         "private diagnostic CrateSession",
         "private diagnostic CrateGraph"
       ],
       "transform_sha256": "0d2b37392d28e51b97377501146321ad6ebd7ec3ed1482c5b8e6f50e2a48717d",
       "remote_commit": null,
-      "next": "Read-only map exact sampled owner IDs where evidence permits; admit mapping limitations rather than reconstruct from truncated name prefixes."
+      "next": "Review stable ordinary codegen gate; no extra diagnostic run or production owner changes."
     },
     {
       "id": "M0_M1",
@@ -348,22 +442,72 @@
       "id": "F2",
       "role": "Graph validation/rebinding optimization; frontend direction owns, backend direction reviews",
       "owner_file": "libraries/mlf-inference/Bootstrap/Graph.hs",
-      "status": "One narrow redundant-success-path traversal patch under review; no controls or ordinary benefit established",
+      "status": "O0/O2 correctness and demand gates passed on attempt03; no benchmark or whole compiler benefit established",
       "mechanism": "For nonzero graft, after originals++parents traversal fully succeeds with no intervening writes, avoid second traversal of already completed parents. Keep first checks, zero graft, errors and demand behavior.",
       "scope_ceiling": "All densePlaces inherited0.630% of profiled ticks; redundant replay is only a subset. No full compiler build solely for this small unmeasured candidate.",
-      "next": "Small current-f9 differential/demand gates and ordinary representative control; independently study larger denseValidation/denseKind mechanisms without mixing patches.",
-      "remote_commit": null
+      "next": "Keep isolated and unmerged; no full producer for this narrow mechanism without ordinary value evidence.",
+      "remote_commit": "6c53a64a28230d3afa5c10f378d683473b930d74",
+      "branch": "perf/graph-dense-20261110",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/6c53a64a28230d3afa5c10f378d683473b930d74/tools/performance/dense-place/README.md",
+      "persistence_scope": "Production tiny patch, controls and sanitized summary verified; raw receipts remain local."
     },
     {
       "id": "R3",
       "role": "Prepared solver fallback optimization; query direction owns, baseline direction reviews",
       "owner_file": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
-      "status": "Bitmap-seen candidate parked unmeasured; production owner restored to f9; larger mechanism read-only investigation",
+      "status": "Bitmap parked; larger Solver audit found no safe high-coverage duplicated work; ordinary Graph wrapper evidence delivered",
       "branch": "perf/solver-fallback-20261110",
       "remote_commit": "db68c774ae1d5919c4c5e28e62f9d6aca28c0017",
       "remote_tree": "669c6fed690bf0b7aada7d945a0e3a578d84164a",
       "parked_reason": "Exact relevant lookup self580/89395 ticks=0.649% is already a generous upper bound including non-seen queries; extra bitmap insertion could offset it.",
-      "next": "Inspect larger instantiateExpandedPrepared/unifyPreparedFallback operation-local repeated work and actual branch coverage. No new production change or CPU gate yet."
+      "next": "Independent review of F3 demand/codegen evidence; no Solver production change or CPU queue."
+    },
+    {
+      "id": "F3",
+      "role": "Graph saturated read call-site fusion; frontend owns; query reviews semantics; baseline owns codegen evidence",
+      "owner_file": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "branch": "perf/graph-read-fusion-20261110",
+      "baseline": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+      "candidate_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+      "mechanism": "Only54 saturated internal readDense calls in34 functions are beta-expanded to readSTArray array(identity-low), preserving helpers, partial applications, writes, flags and all validation. F2 patch excluded.",
+      "status": "Semantics and representative codegen passed; sample01 timed out before any binary launch; new explicitly qualified runtime execution-closure design being implemented, not executed",
+      "remote_commit": "221764d065a0ac0db9314073478fa4b14e00fcd7",
+      "semantic_gate": {
+        "optimizations": [
+          "O0",
+          "O2"
+        ],
+        "total_guard_seconds": 240,
+        "bench_repetitions": 0,
+        "additional_read_demand_cases": 21,
+        "additional_valid_normalize_cases": 120,
+        "coverage_caveat": "120 valid normalize comparisons do not prove all normal-path branches are covered.",
+        "status": "passed"
+      },
+      "codegen_gate": {
+        "status": "Passed capture and independent representative allocation mechanism review; no dynamic performance sample",
+        "max_total_seconds": 180,
+        "scope": "Same original Bootstrap.Graph module name and ordinary O2 flags on both sides; original authenticated object as third anchor. Actual caller allocations and moved closures must be inspected.",
+        "remote_commit": "d79f7492c3b051d4cc14c1e2ae594d86a31f852e"
+      },
+      "next": "Statically review new explicitly qualified runtime execution-closure sampler, then obtain a new one-cohort execution grant. Preserve failed01; no change to32 batches, fixed sample order or60s total guard.",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/221764d065a0ac0db9314073478fa4b14e00fcd7/tools/performance/graph-read-fusion/README.md",
+      "persistence_scope": "Eight files: production patch, reversible54-site manifest/script, tested controls/runner, sanitized summary and README; raw receipts remain local.",
+      "source_semantic_checkpoint": "7d03b4c6278317f743311392d5d4cc3606ab1bc0",
+      "proposed_runtime_revision": {
+        "status": "implementation and static review only",
+        "new_environment_qualification": true,
+        "history_incomplete": true,
+        "scope": "Fixed historical provenance receipts plus current binary/source/controller and ELF loader/library pins. New explicit environment runs the same O2 binary seven-line controls before fixed warmups/samples.",
+        "total_guard_seconds": 60,
+        "batches": 32,
+        "warmups": 2,
+        "samples": 8,
+        "sample_order": "ABBAABBA",
+        "no_build_or_rts_change": true,
+        "toolchain_not_reauthenticated": true,
+        "caveat": "Not a byte-pinned full operating system; no claim of reproducing the old unrecorded LD environment."
+      }
     }
   ],
   "restart_required": [
@@ -379,7 +523,7 @@
   "resource_token_at_observation": {
     "state": "free",
     "task": null,
-    "restart_caveat": "Recheck actual processes and locks after restart."
+    "restart_caveat": "Recheck actual receipts, processes and locks after restart."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -405,12 +549,11 @@
     "policy": "Keep current diagnostic input f9bdb40; authenticate a new build-driver identity for final integration."
   },
   "profiling_followup": {
-    "status": "Private driver/plan statically reviewed; controller/controls incomplete; no build or run.",
+    "status": "Completed; see evidence.late_profile and P1 task",
     "installed_profile_libraries": true,
-    "technique": "-prof -fprof-late over whole original CLI dependency closure",
-    "ordinary_rts_options": "ignoreAll; separate diagnostic must enable options",
-    "report_limitation": "No supported intermediate cost-centre dump API found. Internal early timeout/normal exit must be fixture-qualified before an outer guarded run; SIGKILL may leave no report.",
-    "no_run_authorized": true
+    "technique": "-prof -fprof-late on full original CLI dependency closure",
+    "raw_remote": false,
+    "no_automatic_rerun": true
   },
-  "next_priority": "F2 narrowly reviewed correctness gate and deeper Graph/solver analysis; reject tiny unsupported targets before heavy measurement. No qualified current complete MLF endpoint yet."
+  "next_priority": "Review minimal existing-binary runtime qualification; only after admission run one fixed ordinary Graph harness cohort. No production speedup or complete current MLF/GHC ratio is established."
 }
