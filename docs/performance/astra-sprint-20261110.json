@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 21,
-  "observed_at_utc": "2026-11-10T21:59:04Z",
+  "revision": 22,
+  "observed_at_utc": "2026-11-10T22:08:36Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -741,10 +741,12 @@
     {
       "id": "A7",
       "role": "Astra-owned allocation-source attribution design",
-      "status": "source-only feasibility and protocol preparation active",
-      "next": "Choose one bounded profiling/allocation-demand experiment that respects lazy ownership; no execution admitted.",
+      "status": "source-only design completed; implementation/review pending",
+      "next": "Implement and review source-only allocation-attribution design: invertible host-only sparse SCC mirror,95non-Main diagnostic union/twoMains, original137source check andactual builtin gates, fresh raw3/query qualification before one attribution run. No execution yet.",
       "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
-      "no_heavy_execution_admitted": true
+      "no_heavy_execution_admitted": true,
+      "report": "tools/performance/full-compiler/recovery-audit-20261110/allocation-attribution-design/DECISION.md",
+      "scope": "Diagnostic95module union (91shared+4host) plus twoMains, not full137/4/13 producer. Required profiling dependencies present for23-unit closure; actual link unrun."
     }
   ],
   "restart_required": [
@@ -792,7 +794,7 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Attribute high managed allocation to actual demand paths before selecting optimization: solve/elaboration, closed/open checker ownership, canonical graph materialization, fingerprint/encoding. Preserve laziness and all correctness checks. GC tuning alone is not evidence of feature cost or full90 progress.",
+  "next_priority": "Implement and review source-only allocation-attribution design: invertible host-only sparse SCC mirror,95non-Main diagnostic union/twoMains, original137source check andactual builtin gates, fresh raw3/query qualification before one attribution run. No execution yet.",
   "next_real_compile_gate": {
     "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
@@ -858,9 +860,9 @@
       "toolchain": "Astra worker, official pinned toolchain restore only",
       "gc_diagnostic": "Astra worker, completed and independently verified; no further heavy task",
       "source_audit": "parent audit of checking/witness/serialization, no production edits",
-      "allocation_attribution": "Astra designer, source-only feasibility and experiment design; no build/target admitted"
+      "allocation_attribution": "Astra designer completed source-only protocol; implementation and independent review next, no build/target admitted"
     },
-    "next_admission": "None. Astra-owned source-only allocation-attribution design is active; any profiling setup and target need new reviewed exact plans and separate resource admissions.",
+    "next_admission": "None. Implement/review sparse manual SCC diagnostic protocol first. Toolchain profiling-library presence and95module union are statically verified, not successful profiling build/link.",
     "producer": {
       "status": "passed build and separately admitted focused postqualification",
       "summary": "tools/performance/full-compiler/recovery-audit-20261110/producer-summary.json",

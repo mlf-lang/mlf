@@ -1,0 +1,37 @@
+{
+  "format": "source-only-attribution-design-archive-v1",
+  "execution_admitted": false,
+  "controller_implemented": false,
+  "files": [
+    {
+      "file": "DECISION.md",
+      "original_sha256": "597e27c89360fc29e47d26f35c82c6b5628f305634fe3d1ed8f33078bda122c8",
+      "published_sha256": "597e27c89360fc29e47d26f35c82c6b5628f305634fe3d1ed8f33078bda122c8",
+      "sanitization": "Only exact workspace root replaced by <WORKSPACE>; source/tool hashes unchanged."
+    },
+    {
+      "file": "PROTOCOL-DETAIL.md",
+      "original_sha256": "98529aedf60c505b05358d2b67aae4a354b6d4dc2e9d6dcc10cbeed3c55f6a2a",
+      "published_sha256": "98529aedf60c505b05358d2b67aae4a354b6d4dc2e9d6dcc10cbeed3c55f6a2a",
+      "sanitization": "Only exact workspace root replaced by <WORKSPACE>; source/tool hashes unchanged."
+    },
+    {
+      "file": "proposed-build-closure.json",
+      "original_sha256": "4a82057203df6c48e8a3760f17864e33494c2affc5d872ac4b09486a53d9538f",
+      "published_sha256": "4a82057203df6c48e8a3760f17864e33494c2affc5d872ac4b09486a53d9538f",
+      "sanitization": "Only exact workspace root replaced by <WORKSPACE>; source/tool hashes unchanged."
+    },
+    {
+      "file": "toolchain-profiling-inventory.json",
+      "original_sha256": "2ae5bff1d63607d541bd776759c8326875257a338543eac7f3681fae090f5d6d",
+      "published_sha256": "74bb0579befb0b341a752b31ee1736fab8776a64442414196f09739a7cc7a561",
+      "sanitization": "Only exact workspace root replaced by <WORKSPACE>; source/tool hashes unchanged."
+    },
+    {
+      "file": "recovery-inputs.json",
+      "original_sha256": "0c3d2a3fb9c4835983d2347ba674ab54ba9615fcf8e8d7e7d21b590b6f77878f",
+      "published_sha256": "cfa125b33c20c6aa6e1a405c5d163a2516f6169fd40ea0738ee0a444010e5b62",
+      "sanitization": "Only exact workspace root replaced by <WORKSPACE>; source/tool hashes unchanged."
+    }
+  ]
+}

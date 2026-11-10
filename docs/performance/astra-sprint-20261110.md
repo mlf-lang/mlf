@@ -305,3 +305,11 @@ Astra不重跑或续接该失败。下一步仅准备一个另立的foundation14
 原RTS文本保留了两项报告问题：冻结decoder把MiB convenience unit误写MB，分析按raw MiB；原%GC行显示0.0而time/productivity不符，16.8%明确按GC/Total推导，未改raw统计行。统计不含C/BDWGC全部分配，residency不是峰RSS。原raw SHA及仅路径banner脱敏文本、完整source/receipt身份和已复核控制器均已归档。
 
 Astra将下一优先级改为allocation来源归因的只读设计：比较可用prof工具链/manual cost centre与低扰动demand标记，明确惰性边界，区分solve/elaboration、closed/open ownership、canonical图物化、fingerprint/编码。尚未准入新构建或目标执行，不盲调nursery，不删除安全检查或witness。失败inference11前置、foundation01及历史F3负结果均保留。full90完成、相对GHC倍率、生产提速、native代际A/B及fixed-point仍未新增通过。
+
+## 下一归因实验的静态设计完成（2026-11-10 22:08 UTC）
+
+Astra选择稀疏manual SCC的host-only可逆源码镜像，而非增加无法拆分惰性纯工作的新IO时钟。官方GHC9.14.1已存在所需23个package unit的profiling依赖；全安装库存53个_p.a、2,212个.p_hi，这只是presence，不等于实际link通过。静态import闭包是95个非Main模块（emlf94再加BuiltinPrelude一项），加两个独立Main；明确不冒充原137/4/13完整producer。
+
+[决策和门槛](../../tools/performance/full-compiler/recovery-audit-20261110/allocation-attribution-design/DECISION.md)保留原137 frozen source --check-shared、实际check-candidate与fresh-generator字节门、普通producer独立认证、fresh Q/P三raw制品及完整query资格，之后才能另行准入单次profile。不能加deepseq/seq或提前提取inventory来制造易读归因，也不能把重叠inherited成本相加或把prof份额乘到普通60.55GB上。结果只能叫profiled source-demand allocation，不是普通独占CPU或可删除功能成本。
+
+设计及工具链/源码库存已保存；执行控制器尚未实现，独立implementation审查及BUILD/QUALIFY/CONTROLS/TARGET-QUALIFICATION/ATTRIBUTION全部未准入。机器重锁空闲；后续先实现及复核，不自动恢复旧profile runner的RTS解析或弱oracle。

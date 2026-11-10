@@ -1,0 +1,394 @@
+{
+  "status": "read-only metadata inspection; not link/build qualification",
+  "root_packages": [
+    "base",
+    "array",
+    "bytestring",
+    "text",
+    "containers",
+    "directory"
+  ],
+  "dependency_unit_count": 23,
+  "all_declared_profiling_archives_present": true,
+  "all_toolchain_profile_archive_count": 53,
+  "all_toolchain_profile_interface_count": 2212,
+  "units": [
+    {
+      "unit_id": "array-0.5.8.0-93e8",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/array-0.5.8.0-93e8.conf",
+      "configuration_sha256": "7e066a638de21b263bd209c076cde714b51701815df76a8a5e465a3bd2df462b",
+      "profiling_archives": [
+        {
+          "library": "HSarray-0.5.8.0-93e8",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/array-0.5.8.0-93e8/libHSarray-0.5.8.0-93e8_p.a",
+              "bytes": 2806638
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "base-4.22.0.0-66f8",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/base-4.22.0.0-66f8.conf",
+      "configuration_sha256": "4e908334d40d99e19bc65f63bbb2d0a22ef2c237aa58d791062728d1455ca31b",
+      "profiling_archives": [
+        {
+          "library": "HSbase-4.22.0.0-66f8",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/base-4.22.0.0-66f8/libHSbase-4.22.0.0-66f8_p.a",
+              "bytes": 16912426
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "binary-0.8.9.3-0d14",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/binary-0.8.9.3-0d14.conf",
+      "configuration_sha256": "0c7062d82a51bde66d1dd5f9e647947dde4318a4664099aa2b7eb2851240a7b4",
+      "profiling_archives": [
+        {
+          "library": "HSbinary-0.8.9.3-0d14",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/binary-0.8.9.3-0d14/libHSbinary-0.8.9.3-0d14_p.a",
+              "bytes": 4963906
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "bytestring-0.12.2.0-f1bc",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/bytestring-0.12.2.0-f1bc.conf",
+      "configuration_sha256": "4ccbdda18980d3349e2a0513a7663557ae447d298c6541574aed833948dcd4ed",
+      "profiling_archives": [
+        {
+          "library": "HSbytestring-0.12.2.0-f1bc",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/bytestring-0.12.2.0-f1bc/libHSbytestring-0.12.2.0-f1bc_p.a",
+              "bytes": 8235658
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "containers-0.8-9e90",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/containers-0.8-9e90.conf",
+      "configuration_sha256": "d87de5a2eb3885ce8bc2772993418397246ac0acba46abec1ac106d8da043789",
+      "profiling_archives": [
+        {
+          "library": "HScontainers-0.8-9e90",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/containers-0.8-9e90/libHScontainers-0.8-9e90_p.a",
+              "bytes": 19599052
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "deepseq-1.5.1.0-2129",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/deepseq-1.5.1.0-2129.conf",
+      "configuration_sha256": "2c71bade93f71f821d3d8fc900a0ce0381a7259831ca50ab99ac5db49a6f7ed3",
+      "profiling_archives": [
+        {
+          "library": "HSdeepseq-1.5.1.0-2129",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/deepseq-1.5.1.0-2129/libHSdeepseq-1.5.1.0-2129_p.a",
+              "bytes": 1036932
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "directory-1.3.10.0-b291",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/directory-1.3.10.0-b291.conf",
+      "configuration_sha256": "0fd58a6a15df6142c146383bfabc3d03b634b782c4c0ea83b2dd5ea95c689cc0",
+      "profiling_archives": [
+        {
+          "library": "HSdirectory-1.3.10.0-b291",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/directory-1.3.10.0-b291/libHSdirectory-1.3.10.0-b291_p.a",
+              "bytes": 2972642
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "exceptions-0.10.11-e9cb",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/exceptions-0.10.11-e9cb.conf",
+      "configuration_sha256": "87372d43990866ba0db5c25d827d35f33bffbfef28c0c9866229f96aa7582aaf",
+      "profiling_archives": [
+        {
+          "library": "HSexceptions-0.10.11-e9cb",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/exceptions-0.10.11-e9cb/libHSexceptions-0.10.11-e9cb_p.a",
+              "bytes": 1855542
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "file-io-0.1.5-525e",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/file-io-0.1.5-525e.conf",
+      "configuration_sha256": "a2ab33b34cd19b510305e5df19f2612a147390fa7975f3215d123a65d51b3747",
+      "profiling_archives": [
+        {
+          "library": "HSfile-io-0.1.5-525e",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/file-io-0.1.5-525e/libHSfile-io-0.1.5-525e_p.a",
+              "bytes": 569378
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "filepath-1.5.4.0-bbe0",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/filepath-1.5.4.0-bbe0.conf",
+      "configuration_sha256": "092cfa19cf9a0ff876735fb719d90802a477fc672cde19ed8cc818f7ef640563",
+      "profiling_archives": [
+        {
+          "library": "HSfilepath-1.5.4.0-bbe0",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/filepath-1.5.4.0-bbe0/libHSfilepath-1.5.4.0-bbe0_p.a",
+              "bytes": 2688644
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "ghc-boot-th-9.14.1-1fb7",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/ghc-boot-th-9.14.1-1fb7.conf",
+      "configuration_sha256": "925b54ef6725421d4f95a9ed1b4178acb8ca985defec28d7e91156bce67a09ea",
+      "profiling_archives": [
+        {
+          "library": "HSghc-boot-th-9.14.1-1fb7",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/ghc-boot-th-9.14.1-1fb7/libHSghc-boot-th-9.14.1-1fb7_p.a",
+              "bytes": 3851254
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "ghc-internal-9.1401.0-555c",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/ghc-internal-9.1401.0-555c.conf",
+      "configuration_sha256": "fe1c90d7c760e2e346191104c4c77e106ba5ee22a1829e584b3c3ff1c726a036",
+      "profiling_archives": [
+        {
+          "library": "HSghc-internal-9.1401.0-555c",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/ghc-internal-9.1401.0-555c/libHSghc-internal-9.1401.0-555c_p.a",
+              "bytes": 109892654
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "ghc-prim-0.13.1-d287",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/ghc-prim-0.13.1-d287.conf",
+      "configuration_sha256": "c1427e96a6063b0d98013f358afabc8df9d8e4142515f31b49592eab2abca7ba",
+      "profiling_archives": [
+        {
+          "library": "HSghc-prim-0.13.1-d287",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/ghc-prim-0.13.1-d287/libHSghc-prim-0.13.1-d287_p.a",
+              "bytes": 5764
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "mtl-2.3.1-77f5",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/mtl-2.3.1-77f5.conf",
+      "configuration_sha256": "1b7c37773b24e50c1af8de59c82f1d9f178b18f80b8923b036d8e0ed76d89598",
+      "profiling_archives": [
+        {
+          "library": "HSmtl-2.3.1-77f5",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/mtl-2.3.1-77f5/libHSmtl-2.3.1-77f5_p.a",
+              "bytes": 2476266
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "os-string-2.0.8-4a54",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/os-string-2.0.8-4a54.conf",
+      "configuration_sha256": "8a82f16e9525c0678385b46d97b85f7bad4dcee78de26cf4cd253ad51e548ddf",
+      "profiling_archives": [
+        {
+          "library": "HSos-string-2.0.8-4a54",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/os-string-2.0.8-4a54/libHSos-string-2.0.8-4a54_p.a",
+              "bytes": 2927462
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "pretty-1.1.3.6-72f5",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/pretty-1.1.3.6-72f5.conf",
+      "configuration_sha256": "cf0bb598384778f020762f5ba6afe21fc8521b3fdd60c98114b378acd8fc16da",
+      "profiling_archives": [
+        {
+          "library": "HSpretty-1.1.3.6-72f5",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/pretty-1.1.3.6-72f5/libHSpretty-1.1.3.6-72f5_p.a",
+              "bytes": 2453880
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "rts-1.0.3",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/rts-1.0.3.conf",
+      "configuration_sha256": "e9ef77288426a1501298bc10717dde05421c1e6d358f68295463e58116989c7a",
+      "profiling_archives": [
+        {
+          "library": "HSrts-1.0.3",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/rts-1.0.3/libHSrts-1.0.3_p.a",
+              "bytes": 1882916
+            }
+          ]
+        },
+        {
+          "library": "Cffi",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/rts-1.0.3/libCffi_p.a",
+              "bytes": 105878
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "stm-2.5.3.1-8f1a",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/stm-2.5.3.1-8f1a.conf",
+      "configuration_sha256": "2e12d31a992813c76a9ba414349fb360d37a08156f3a9ad0b71a0a21a369e02a",
+      "profiling_archives": [
+        {
+          "library": "HSstm-2.5.3.1-8f1a",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/stm-2.5.3.1-8f1a/libHSstm-2.5.3.1-8f1a_p.a",
+              "bytes": 750106
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "template-haskell-2.24.0.0-7769",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/template-haskell-2.24.0.0-7769.conf",
+      "configuration_sha256": "93b060506c982ca31d19f98b22ea6b65568a15fa5d8aaec487d65a21ad584713",
+      "profiling_archives": [
+        {
+          "library": "HStemplate-haskell-2.24.0.0-7769",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/template-haskell-2.24.0.0-7769/libHStemplate-haskell-2.24.0.0-7769_p.a",
+              "bytes": 1330532
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "text-2.1.3-075e",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/text-2.1.3-075e.conf",
+      "configuration_sha256": "975abcbed5dfc481963184385a71ca9be8263247fe266b99e247a4c14d7307f9",
+      "profiling_archives": [
+        {
+          "library": "HStext-2.1.3-075e",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/text-2.1.3-075e/libHStext-2.1.3-075e_p.a",
+              "bytes": 12125984
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "time-1.15-2842",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/time-1.15-2842.conf",
+      "configuration_sha256": "e728a80fa9f586086a3339b5b66d0f31ce581c3862db629e4a65fe6b8848099e",
+      "profiling_archives": [
+        {
+          "library": "HStime-1.15-2842",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/time-1.15-2842/libHStime-1.15-2842_p.a",
+              "bytes": 10637524
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "transformers-0.6.1.2-53bb",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/transformers-0.6.1.2-53bb.conf",
+      "configuration_sha256": "a76cad6c12da9c1065f755db571ba88550f682d329f0be645760b2d9c518b724",
+      "profiling_archives": [
+        {
+          "library": "HStransformers-0.6.1.2-53bb",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/transformers-0.6.1.2-53bb/libHStransformers-0.6.1.2-53bb_p.a",
+              "bytes": 8863140
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "unit_id": "unix-2.8.8.0-98c9",
+      "configuration": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/package.conf.d/unix-2.8.8.0-98c9.conf",
+      "configuration_sha256": "afa339ecae6ff1950c2f0fd5ae236a2c0c87928693aba35fa0e5eab1900e6901",
+      "profiling_archives": [
+        {
+          "library": "HSunix-2.8.8.0-98c9",
+          "matches": [
+            {
+              "path": "<WORKSPACE>/compiler-toolchain-recovery-20261110/ghc/lib/ghc-9.14.1/lib/x86_64-linux-ghc-9.14.1-2d39/unix-2.8.8.0-98c9/libHSunix-2.8.8.0-98c9_p.a",
+              "bytes": 8020142
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

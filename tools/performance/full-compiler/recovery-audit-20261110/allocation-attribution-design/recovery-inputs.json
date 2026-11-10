@@ -1,0 +1,112 @@
+{
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "read_only_recovery_inputs": {
+    "<WORKSPACE>/compiler-audit-plan-20261111/docs/performance/astra-sprint-20261110.json": {
+      "sha256": "4ad392ec91de62ff55aa0b2b7263c0c0a7f65afa51767675d2b4a7547276eb38",
+      "bytes": 47560
+    },
+    "<WORKSPACE>/compiler-audit-plan-20261111/tools/performance/full-compiler/recovery-audit-20261110/cost-audit/README.md": {
+      "sha256": "9b0fec5b59be8323edd52f053e4a3904c21606581a057579d1ea8057e8076cd6",
+      "bytes": 11775
+    },
+    "<WORKSPACE>/compiler-audit-plan-20261111/tools/performance/full-compiler/recovery-audit-20261110/cost-audit/source-manifest.json": {
+      "sha256": "9a695adb2393bf61275754a6abad0c8e66f2f0f99e593535c2eff7b3ef92f6ec",
+      "bytes": 3776
+    },
+    "<WORKSPACE>/compiler-toolchain-recovery-20261110/toolchains.json": {
+      "sha256": "f99eb3a422a1fa0f3ff63b6ed9572a5a9a0aef69f27a51e4aebb120c4afcefbd",
+      "bytes": 3597
+    },
+    "<WORKSPACE>/compiler-toolchain-recovery-20261110/setup-result.json": {
+      "sha256": "b460fb20ac2bb1e7bcaa4fe391f88b4a15e6bb26306ea4a5776379bb004350b3",
+      "bytes": 9346
+    },
+    "<WORKSPACE>/compiler-baseline-recovery-20261110/relink-inputs.json": {
+      "sha256": "45d4a7eb51f30b5e0fd4c7e84e84e7383996ab0634aeb08557f9de10654f39a5",
+      "bytes": 70155
+    },
+    "<WORKSPACE>/compiler-baseline-recovery-20261110/controls/authentication.json": {
+      "sha256": "27becaba238ab7cd9b4990a302478c1e6a7db9024db2c02927506d5761377d44",
+      "bytes": 12492
+    },
+    "<WORKSPACE>/compiler-baseline-recovery-20261110/build/producer/builtin-verification/receipt.json": {
+      "sha256": "5af3edaf08e5b0ce1d893a54e6086d7c467e0d86c59b18ce788859ccfc920cd2",
+      "bytes": 28995
+    },
+    "<WORKSPACE>/compiler-foundation-gc-prep-20261110-02/producer-plan.json": {
+      "sha256": "490184e14c618f3c53cc2f743edc20abed11c689dc1f8a33a516d1ec69b309e1",
+      "bytes": 143244
+    },
+    "<WORKSPACE>/compiler-foundation-gc-prep-20261110-02/run_envelope.py": {
+      "sha256": "158fa23f6c919289fbd803714390b0d446c9d0b5c39273abe6aea2402125b42c",
+      "bytes": 7357
+    },
+    "<WORKSPACE>/compiler-foundation-gc-prep-20261110-02/run_diagnostic.py": {
+      "sha256": "5a9c995fc1257b44b7cba9348a4252fabb5176d835c4bf346cd6b31f3ee298b4",
+      "bytes": 38610
+    },
+    "<WORKSPACE>/compiler-foundation-gc-prep-20261110-02/qd-handoff.json": {
+      "sha256": "78d2518f2f60ebc83ae01d856383d42d5d3000b9858f3b672599570c1104f056",
+      "bytes": 4831
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/receipt.json": {
+      "sha256": "df219a2407cb953d7a63c988699022b67c8a284b8b1041de7b030ffdab9d1916",
+      "bytes": 678589
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/bounded-receipt.json": {
+      "sha256": "04bdb168c44813e89f4d688f358f492442ac297bdd1c8adc3a4fc958a0086ada",
+      "bytes": 75892
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/envelope.json": {
+      "sha256": "ce4830a29fc1cf3513ab654c6b9f7c8aaafc304aec386210b9ffc6a7043238c1",
+      "bytes": 4245
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/diagnostic-stats.txt": {
+      "sha256": "ddab3f617d14cc9e74cc5cca27de45f5f84c4f184efd9b72f2c503ab256e4912",
+      "bytes": 1297
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/thin-setup/receipt.json": {
+      "sha256": "79d61b3e0f21a9663867f9aba3a57fc2860e7740c321f5fe928bbe106b107627",
+      "bytes": 696427
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/thin-setup/builtin.mlfci": {
+      "sha256": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05",
+      "bytes": 40417
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/thin-setup/builtin.mlfco": {
+      "sha256": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481",
+      "bytes": 190840
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/ordinary-Q/unit.mlfci": {
+      "sha256": "45b4c72b3a7f18a398639f2d8ea97e11348c0f903e0ecdb24f68a676e68d86da",
+      "bytes": 338108
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/ordinary-Q/unit.mlfco": {
+      "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52",
+      "bytes": 1016252
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/ordinary-Q/unit.queries": {
+      "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e",
+      "bytes": 685363
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/diagnostic-D/unit.mlfci": {
+      "sha256": "45b4c72b3a7f18a398639f2d8ea97e11348c0f903e0ecdb24f68a676e68d86da",
+      "bytes": 338108
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/diagnostic-D/unit.mlfco": {
+      "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52",
+      "bytes": 1016252
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/diagnostic-D/unit.queries": {
+      "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e",
+      "bytes": 685363
+    },
+    "<WORKSPACE>/baseline-gc-foundation14-cohort-02/execution/ordinary-Q/crate.spec": {
+      "sha256": "ad36d3cbdc1586229df1108796af9e46c7b9a36811496cdf9cf5561cf2ccfa6d",
+      "bytes": 2205
+    }
+  },
+  "archived_profile_commit": "fa7df4c39897a7dad4d21a44087c5927a12dc8d4",
+  "archive_root": "tools/performance/full-compiler/late-profile-20261110",
+  "warning": "Current paths and hashes identify local files, not remotely recoverable binaries. Coordinator files may later change; this is a design checkpoint, not execution admission."
+}
