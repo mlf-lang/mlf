@@ -1,0 +1,151 @@
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/host/ghc/MLF/Host/IO.hs:157:82: warning: [GHC-68441] [-Wdeprecations]
+    In the use of ‘hGetLine’ (imported from Data.ByteString):
+    Deprecated: "Deprecated since @bytestring-0.12@. Use 'Data.ByteString.Char8.hGetLine' instead. (Functions that rely on ASCII encodings belong in "Data.ByteString.Char8")"
+    |
+157 |   if end then throwIO (HostError "IO error: getLine reached EOF or failed") else B.hGetLine H.stdin >>= evaluate . fromUtf8
+    |                                                                                  ^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:532:25: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+532 |   mapM :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> [] a -> m ([] b);
+    |                         ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:532:30: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+532 |   mapM :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> [] a -> m ([] b);
+    |                              ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:543:26: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+543 |   mapM_ :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> [] a -> m ();
+    |                          ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:543:31: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+543 |   mapM_ :: forall (m :: (* -> *)) a b. (Monad m) => (a -> m b) -> [] a -> m ();
+    |                               ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:553:25: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+553 |   forM :: forall (m :: (* -> *)) a b. (Monad m) => [] a -> (a -> m b) -> m ([] b);
+    |                         ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:553:30: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+553 |   forM :: forall (m :: (* -> *)) a b. (Monad m) => [] a -> (a -> m b) -> m ([] b);
+    |                              ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:555:26: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+555 |   forM_ :: forall (m :: (* -> *)) a b. (Monad m) => [] a -> (a -> m b) -> m ();
+    |                          ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:555:31: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+555 |   forM_ :: forall (m :: (* -> *)) a b. (Monad m) => [] a -> (a -> m b) -> m ();
+    |                               ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:557:26: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+557 |   foldM :: forall (m :: (* -> *)) b a. (Monad m) => (b -> a -> m b) -> b -> [] a -> m b;
+    |                          ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:557:31: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+557 |   foldM :: forall (m :: (* -> *)) b a. (Monad m) => (b -> a -> m b) -> b -> [] a -> m b;
+    |                               ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:567:29: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+567 |   sequence :: forall (m :: (* -> *)) a. (Monad m) => [] (m a) -> m ([] a);
+    |                             ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:567:34: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+567 |   sequence :: forall (m :: (* -> *)) a. (Monad m) => [] (m a) -> m ([] a);
+    |                                  ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:569:25: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+569 |   when :: forall (m :: (* -> *)). (Monad m) => Bool -> m () -> m ();
+    |                         ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:569:30: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+569 |   when :: forall (m :: (* -> *)). (Monad m) => Bool -> m () -> m ();
+    |                              ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:571:27: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+571 |   unless :: forall (m :: (* -> *)). (Monad m) => Bool -> m () -> m ();
+    |                           ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs:571:32: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+571 |   unless :: forall (m :: (* -> *)). (Monad m) => Bool -> m () -> m ();
+    |                                ^
+

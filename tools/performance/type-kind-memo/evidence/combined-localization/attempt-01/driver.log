@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/tools/performance/type-kind-memo/locate.py", line 185, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/tools/performance/type-kind-memo/locate.py", line 134, in main
+    run('controls',[str(controls)])
+  File "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/tools/performance/type-kind-memo/locate.py", line 127, in run
+    try:return H.Runner(out,limits).run(argv,source,out/label)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/a1-private-index/helper.py", line 200, in run
+    require(not output.exists(), 'fresh command output required: ' + str(output))
+  File "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/a1-private-index/helper.py", line 24, in require
+    raise RuntimeError(message)
+RuntimeError: fresh command output required: /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-01/controls

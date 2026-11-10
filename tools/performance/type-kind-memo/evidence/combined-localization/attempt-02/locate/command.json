@@ -1,0 +1,47 @@
+{
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/process-spawn/with_scope.py",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/diagnostic-emlf",
+    "--compile-crate",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/crate.spec",
+    "-o",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/unit"
+  ],
+  "boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+  "child_system_seconds": 4.163714,
+  "child_user_seconds": 116.016937,
+  "complete": false,
+  "cwd": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110",
+  "environment": {
+    "GHCRTS": "",
+    "GHC_ENVIRONMENT": "-",
+    "LC_ALL": "C.UTF-8",
+    "MAKEFLAGS": "-j1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "exit_code": -9,
+  "involuntary_context_switches": 2309,
+  "limits": {
+    "address_space_per_process_bytes": 6442450944,
+    "disk_free_floor_bytes": 5368709120,
+    "host_available_floor_bytes": 3221225472,
+    "max_work_bytes": 4294967296,
+    "process_tree_rss_bytes": 5368709120,
+    "wall_seconds": 120
+  },
+  "logs": {
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/locate/stderr": "90ba430995f15af9b95ffef5df6c0b2ee207b7791cd5f103ebf30187cc594400",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/locate/stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "max_individual_child_rss_bytes": 1404477440,
+  "reason": "wall limit",
+  "sampled_process_tree_peak_rss_bytes": 1404477440,
+  "started_utc": "2026-11-10T13:40:40Z",
+  "terminal_live_descendants": [],
+  "timed_target_leg": false,
+  "voluntary_context_switches": 11559,
+  "wall_seconds": 120.125960216
+}

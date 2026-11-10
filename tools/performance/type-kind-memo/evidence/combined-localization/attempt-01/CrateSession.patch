@@ -1,0 +1,104 @@
+--- libraries/mlf-crates/Bootstrap/CrateSession.hs
++++ /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-01/source/Bootstrap/CrateSession.hs
+@@ -5,6 +5,7 @@
+ -- File-owned candidate route. No raw AST, Solver, region, or callback escapes.
+ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, compileSpecFileWithVerification, compileSpecFileUsingInstaller) where {
+   import MLF.Primitive;
++  import qualified KindCounters as Progress;
+   import Bootstrap.Types;
+   import Bootstrap.Std;
+   import qualified Bootstrap.Std as L;
+@@ -175,7 +176,9 @@
+   compileSourcesWithEncoding verifyAll witness = compileSourcesUsingInstaller verifyAll (ensureBuiltinWith witness);
+   compileSourcesUsingInstaller verifyAll install shareEncoding spec sources interfaces prefix =
+     do {
++      Progress.boundary "session.prelude.enter";
+       dependencies <- withPreludeUsing install spec sources interfaces;
++      Progress.boundary "session.prepare-crate.await-whnf";
+       case do {
+              boundValueShared20 <- dependencies;
+              case boundValueShared20 of {
+@@ -189,6 +192,7 @@
+         Left message -> ioReturn (Left message);
+         Right ((,,) updated loaded prepared) ->
+           do {
++            Progress.boundary "session.prepare-crate.returned-whnf";
+             result <- compileGraphSources verifyAll updated loaded prepared (preparedSourcePlan prepared) prefix;
+             case result of {
+               Left message ->
+@@ -213,7 +217,9 @@
+     let { directory = Query.cachePath (specCache spec) };
+     created <- Query.cacheCommand ["/bin/mkdir","-p",directory];
+     if created /= 0 then ioReturn (Left "cannot create query graph cache directory") else do {
++      Progress.boundary "graph.lock.enter";
+       lock <- acquireFileLock (directory ++ "/.lock");
++      Progress.boundary "graph.lock.acquired";
+       result <- catchIOError (compileGraphLocked verify spec interfaces prepared plan prefix directory)
+         (\error -> ioReturn (Left (textFromChars (ioeGetErrorString error))));
+       releaseFileLock lock;
+@@ -222,7 +228,9 @@
+   };
+   compileGraphLocked verify spec interfaces prepared plan prefix directory = do {
+     executable <- getExecutablePath;
++    Progress.boundary "graph.compiler-digest.enter";
+     compiler <- fileDigest executable;
++    Progress.boundary "graph.compile.enter";
+     let { imported = map (\((,) _ iface) -> Separate.UnitInterface (Artifact.crateId iface)
+           [] [] [] [] [] (Artifact.crateBindings iface) "metadata") interfaces;
+       protected = M.fromList compareString (concatMap (compose Artifact.crateProtection snd) interfaces) };
+@@ -232,20 +240,26 @@
+         Nothing -> CrateGraph.compileLoweredIn (preparedLowered prepared) verify (specIdentity spec) compiler directory imported
+       }
+       else ioReturn (Left "cannot fingerprint query graph compiler");
++    Progress.boundary "graph.compile.returned";
+     case compiled of { Left e -> ioReturn (Left e); Right state -> case CrateGraph.checkedResult state of {
+       (,,,) fragments report contracts session -> case graphInterface spec interfaces prepared fragments contracts of {
+         Left e -> ioReturn (Left e);
+         Right iface -> do {
+           outputStarted <- QueryGraph.clock (CrateGraph.statistics state);
++          Progress.boundary "output.make-object.enter";
+           made <- Artifact.makeOpenObject iface (map snd interfaces) (map (\((,,) n f _) -> (,) n f) fragments);
+           case made of { Left e -> ioReturn (Left e); Right object -> do {
++            Progress.boundary "output.write-object.enter";
+             written <- Artifact.writeObjectEither prefix object;
++            Progress.boundary "output.write-object.returned";
+             case written of { Left e -> ioReturn (Left e); Right _ -> do {
+               writeFile (prefix ++ ".queries") (Query.reportJSON (specIdentity spec)
+                 (Artifact.semanticFingerprint (Artifact.objectInterface object)) report);
+               QueryGraph.elapsed (CrateGraph.statistics state) 4 outputStarted;
+               publishStarted <- QueryGraph.clock (CrateGraph.statistics state);
++              Progress.boundary "query.publish.enter";
+               published <- QueryGraph.publish session;
++              Progress.boundary "query.publish.returned";
+               QueryGraph.elapsed (CrateGraph.statistics state) 5 publishStarted;
+               QueryGraph.writeProfile (prefix ++ ".query-profile") (CrateGraph.statistics state);
+               ioReturn (mapEither (\_ -> ()) published)
+@@ -320,21 +334,28 @@
+   compileSpecFileWithVerification verifyAll witness = compileSpecFileUsingInstaller verifyAll (ensureBuiltinWith witness);
+   compileSpecFileUsingInstaller verifyAll install file prefix =
+     do {
++      Progress.boundary "session.spec.enter";
+       present <- fileExists file;
+       if not present
+       then ioReturn (Left ("crate specification does not exist: " ++ file))
+       else do {
++             Progress.boundary "session.spec.read";
+              text <- readFile file;
++             Progress.boundary "session.spec.decode.await";
+              case decodeSpec text of {
+                Left message -> ioReturn (Left message);
+                Right spec ->
+                  do {
++                   Progress.boundary "session.source-load.enter";
+                    sourceResult <- loadSourcesInPackage (specIdentity spec) (specSources spec);
++                   Progress.boundary "session.source-load.returned";
+                    paths <- mapM canonicalPath (specDependencies spec);
+                    let {
+                      normalized = withDependencies spec paths
+                    };
++                   Progress.boundary "session.dependencies.enter";
+                    dependencies <- Artifact.loadInterfaces paths;
++                   Progress.boundary "session.dependencies.returned";
+                    case do {
+                           sources <- sourceResult;
+                           interfaces <- dependencies;

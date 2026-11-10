@@ -1,81 +1,136 @@
-# Per-call bound-kind memo investigation
+# Bound-kind investigation: negative result and restart checkpoint
 
-**Experimental restart checkpoint, not a merge-ready optimization.** Candidate
-based on `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`. No actual compiler hotspot
-or compiler speedup has been established. Full endpoint qualification and CI
-for this candidate have not run.
+**The memo candidate is stopped. No compiler speedup was established.** This
+branch retains a reproducible, private diagnostic and its bounded observations,
+not a merge-ready optimization. The production `Bootstrap.X.Type` owner is
+restored byte-for-byte to baseline `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`.
+The rejected candidate remains in `archive/memo-candidate.patch` and in the
+[original experimental checkpoint](https://github.com/mlf-lang/mlf/commit/64ee679848211034a3cb1e2c1b44f8f600861ab0).
 
-`Bootstrap.X.Type.kindOf` currently re-traverses a type-variable bound every
-time it is reached through another dependency path. A bounds DAG can therefore
-require exponentially many recursive visits. The candidate stores successful
-kinds in one map owned by one `kindOf` call. It retains sorted free-variable
-traversal, active-path cycle rejection and the original `kindIn` checks. No
-memo crosses a call or changes a bounds environment. Errors are not cached.
+## Decision and observation limits
 
-The existing public `kindBinding` and `visitKind` retain their historical
-algorithm. The diagnostic's explicit old entry calls those helpers and is
-compared with the candidate. The generated finite cases cover shared bounds,
-cycles, unbound references and higher kinds. Authored cases also cover shadowing,
-closed types, unused bottom bindings and first-error order. These finite controls
-are not a universal partial-value equivalence proof.
+One combined F1/R2 diagnostic ran against the frozen 90-module, 5,233,364-byte
+compiler source closure. At its last live snapshot, 119.098 diagnostic seconds:
 
-Run the small isolated GHC dependency closure with the standard demand flags,
-without constructing a new full producer or invoking a native fixed point:
+- `kindOf` had completed 1,590,641 roots, with no active root in that snapshot.
+- 620,367 recursive variable visits equalled 620,367 per-root unique variables.
+- No observed root repeated a variable; the maximum was 15 visits in one root.
+- 957 SCCs had started and 956 fresh SCCs had finished. The last fixed label was
+  `scc.raw-infer.await-whnf`.
+- The final eight snapshots advanced from 893 to 957 started SCCs and from
+  1,354,455 to 1,590,641 roots. The observed tail did not remain in one SCC.
 
-    python3 -B tools/performance/type-kind-memo/run.py --ghc /path/to/ghc \
-      --optimization 2 --controls-only --output /fresh/output
+Per-call memoization therefore had no repeated bound traversal to eliminate in
+the observed prefix. This is sufficient to stop this candidate in this sprint.
+It is not a claim that every unseen suffix or other program has no repetition.
+Do not add synthetic microbenchmarks to turn this negative result into a win.
 
-Repeat with optimization 0 in a separate directory for demand controls. The
-four old/memo/memo/old observations measure only the synthetic depth-20 bounds
-DAG. They are mechanism diagnostics, not ordinary compiler timings. The runner
-preserves commands, source hashes and existing resource-watchdog receipts.
-Current-corpus profiling and ordinary compilation comparison remain required
-before deciding whether to retain this production candidate.
+The existing guard stopped the compiler at 120.126 wall seconds with exit -9
+and reason `wall limit`. `harness_complete` is true because evidence collection,
+input reauthentication and child cleanup succeeded; `compiler_complete` and
+`complete` remain false. There were 80 readable snapshots and no final `.mlfci`,
+`.mlfco` or `.queries` output. The separate ordinary baseline had already timed
+out at 600 seconds, so no independent complete checked reference existed.
+No checked-byte/group-identity comparison, complete semantic qualification,
+ordinary performance comparison or CI qualification is claimed here.
 
-## Initial semantic screen
+Instrumentation changes demand and allocation behavior. Its wall time is not
+an ordinary compiler sample, and the labels do not establish exclusive phase
+costs. In particular, an IO return or `Either` WHNF does not force all lazy
+parsing, resolution, lowering or inference. `scc.raw-infer.await-whnf` identifies
+a demand window, not a completed inference pass. All reported counters are
+monotone observations of the executed prefix.
 
-The isolated GHC 9.14.1 O0 and O2 closures both passed 5,184 generated
-environment comparisons, 17 diamond graphs and nine authored kind/demand
-controls on Linux. Microtimings were disabled while the shared baseline
-producer was being built. This does not yet qualify current-corpus performance
-or the complete compiler regression suite.
+## What is preserved
 
-## Restore and continue F1
+- `instrument.py` transforms only the frozen baseline Type owner. It wraps the
+  original algorithm, never the rejected memo implementation. Exact inverse
+  reconstruction is checked before building.
+- `progress.py` is the separately owned reversible Session/CrateGraph transform.
+  It adds sparse IO boundary labels and fixed per-SCC events. It contains no
+  legacy query-writer optimization and no `Crate.hs` pure-stage probes.
+- `Counters.hs` stores only numbers, variable-ID sets and fixed labels in one
+  atomic state. The reporting thread reads that state every two seconds and
+  does not retain or force compiler syntax. Event updates also update the last
+  label; sparse boundaries flush immediately.
+- `locate.py` assembles and builds one private diagnostic, authenticates the
+  unchanged ordinary producer, checks the exact input closure and fixed
+  dependencies, runs controls and entry preflight, then runs one guarded
+  120-second source-to-checked attempt. It records all transforms and hashes.
+- `evidence/combined-localization/` retains every snapshot, both attempt
+  receipts, commands, stdout/stderr, workload/setup manifests, generated entry
+  wrappers and owner patches. `manifest.json` hashes the preserved files and
+  diagnostic sources. Executables and object files are intentionally excluded.
 
-The checkpoint is on branch `perf/frontend-20261110`. There are deliberately
-two separate paths:
+The query directory inventory contains `.lock` and
+`query-graph-v2/{generations,results,staging}`. Lack of published payload files
+cannot locate execution before graph initialization: publication follows all
+SCCs, while the observed events prove inference was already underway.
 
-1. The production file `libraries/mlf-xmlf/Bootstrap/X/Type.hs` contains the
-   unaccepted memo candidate. `Main.hs` and `run.py --controls-only` exercise
-   that candidate. The complete compiler's ordinary regression and performance
-   qualification remain pending. Do not merge this file merely because the
-   finite controls passed.
-2. `instrument.py` reads the frozen baseline owner from Git and emits a private
-   diagnostic copy. `diagnose.py` instead receives the authenticated baseline
-   producer and its unchanged source checkout explicitly. It instruments the
-   original algorithm, never the memo candidate. The original owner hash must
-   be `5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d`.
+## Executed attempts and controls
 
-Resume only after the team coordinator grants the CPU window, following its
-persisted plan. Recreate or authenticate the ordinary baseline producer,
-90-module frozen workload, fixed dependencies and independent checked
-reference through that plan. Local build outputs are conveniences, not durable
-inputs or proof. Then run exactly one fresh diagnostic:
+Attempt 01 built the counter-control executable, then failed before executing
+controls because its filename collided with the guard output directory. It did
+not build the complete diagnostic compiler or run the complete workload. Its
+receipt and reconstructed, hash-verified original `locate.py` are retained.
+The only change for attempt 02 was naming the executable `controls-probe`.
 
-    python3 -B tools/performance/type-kind-memo/diagnose.py \
-      --producer /baseline/producer --producer-source /baseline/source \
-      --workload /baseline/workload.json --setup /baseline/setup.json \
-      --reference-prefix /baseline/accepted/unit --output /fresh/F1-diagnostic
+Attempt 02 passed all of the following before the one bounded complete-workload
+invocation:
 
-The driver uses the existing resource guard, copied authenticated ordinary
-objects and GHC's downstream invalidation. It records all private source edits
-and compares complete checked raw bytes and ordered group identities with the
-independent reference. Its elapsed times are diagnostic only. At this checkpoint
-the full driver is **prepared but unexecuted**; preserve and diagnose any failure
-rather than replacing it with a successful sample or raising resource limits.
+- Exact reversible transforms of the three private owners.
+- Four original-algorithm value/demand controls, with the exact expected counts:
+  4 roots, 12 visits, 7 per-root unique variables, maximum 9, 2 repeated roots.
+- An immediate zero-count snapshot, a live periodic snapshot after controls,
+  and a final reporter-stop snapshot with the same expected counts.
+- Complete diagnostic build and an `emlf 0.3.0` entry preflight with immediate
+  zero-count output.
 
-The next decision is based on actual `kindOf` roots, recursive visits and
-per-root unique variables, not the synthetic diamond timing. If repetition
-cannot materially affect the complete path, retain the diagnosis and stop the
-memo candidate. Do not add more microbenchmarks to manufacture a positive result.
-Any later ordinary performance comparison is scheduled by the baseline owner.
+The final guard recorded no live descendants. Both the coordinator resource
+lock and the baseline reproduction lock were independently acquired after the
+run to verify release. Ordinary producer/source/input hashes were rechecked.
+No further CPU experiments were run for this candidate.
+
+Earlier candidate O0 and O2 finite screens each passed 5,184 generated
+environments, 17 diamond DAGs and 9 authored kind/demand controls. Those controls
+remain historical evidence, not a universal partial-value proof or full compiler
+qualification. `run.py` now rejects a non-candidate Type owner so it cannot
+silently compare the restored baseline with itself. No synthetic timing was
+run. `diagnose.py` is the superseded, unexecuted full-reference proposal; it is
+not the harness that produced the result above.
+
+## Restart safely
+
+Read `checkpoint.json` and the evidence before scheduling more work. The memo
+candidate is not active and does not need another producer or benchmark run.
+Use the team coordinator's persisted plan for the next optimization decision.
+This branch and the exact baseline commit are sufficient to recover the code;
+old absolute build paths in historical receipts are evidence, not reusable
+inputs on another machine.
+
+If the coordinator specifically requests reproducing this localization:
+
+1. Restore a separate checkout at baseline
+   `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`. Rebuild and authenticate its ordinary
+   producer, 90-module workload and fixed builtin through the baseline team's
+   plan. Keep this diagnostic branch separate. Do not substitute newer main or
+   relabel old receipts.
+2. Verify the frozen Type, CrateSession and CrateGraph hashes against
+   `evidence/combined-localization/manifest.json`. The diagnostic must still
+   transform the original algorithms exactly and reversibly.
+3. Acquire the single coordinator CPU window and a fresh output directory. Run
+   the following with local paths supplied by the recovered baseline setup:
+
+       flock -n /shared/sprint/resource.lock \
+         python3 -B tools/performance/type-kind-memo/locate.py \
+           --producer /baseline/producer --producer-source /baseline/source \
+           --workload /baseline/workload.json --setup /baseline/setup.json \
+           --output /fresh/F1-R2-localization
+
+The driver also holds the baseline `.mlf-build/.reproduction.lock` and uses the
+existing process guard and scope supervisor. Do not run concurrent heavy work,
+raise limits to hide failure, or repeat a timeout without a changed diagnostic
+question. Preserve failure/timeout receipts. Inspect the separate compiler and
+harness completion flags, verify child cleanup and both locks, then return the
+resource window. The current checkpoint is diagnosis only and is not ready to
+merge as a compiler optimization.

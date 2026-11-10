@@ -1,0 +1,137 @@
+--- libraries/mlf-crates/Bootstrap/CrateGraph.hs
++++ /workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-01/source/Bootstrap/CrateGraph.hs
+@@ -4,6 +4,7 @@
+              MultiParamTypeClasses, OverloadedStrings #-}
+ module Bootstrap.CrateGraph where {
+   import MLF.Primitive;
++  import qualified KindCounters as Progress;
+   import Bootstrap.Types;
+   import Bootstrap.Std;
+   import qualified Bootstrap.Map as M;
+@@ -153,17 +154,22 @@
+     start verify crateId compilerHash cacheDir "lowered" inventory datatypes checked steps
+   };
+   start verify crateId compilerHash cacheDir flavor inventory datatypes contracts groups = do {
++        Progress.boundary "graph.start";
+         statistics <- G.profile;
+         graphStarted <- G.clock statistics;
+         auditSetting <- getEnv "MLF_QUERY_SEMANTIC_AUDIT";
++        Progress.boundary "graph.begin.enter";
+         started <- G.begin (cacheDir ++ "/query-graph-v2")
+           (Separate.pack [crateId,compilerHash,Q.sourceQueryFormat,"open-fragment-checker-1/finish-receipt-1",flavor]);
+         case started of { Left e -> ioReturn (Left e); Right session -> do {
++          Progress.boundary "graph.initial-bindings.enter";
+           initial <- case contracts of { Source.CheckedContracts scope indexed _ ->
+             recordInitialBindings scope (M.toList indexed) session };
+           case initial of { Left e -> ioReturn (Left e); Right first -> do {
++            Progress.boundary "graph.datatypes.enter";
+             loaded <- recordDatatypes datatypes first;
+             case loaded of { Left e -> ioReturn (Left e); Right ready -> do {
++              Progress.boundary "graph.initial-inputs.returned";
+               G.elapsed statistics 0 graphStarted;
+               runGroups verify (eqString auditSetting "1") crateId inventory groups
+                 (State ready contracts M.empty [] 0 0 [] statistics)
+@@ -171,9 +177,17 @@
+           } }
+         } }
+     };
+-  runGroups verify audit crateId inventory groups state = case groups of {
+-    [] -> ioReturn (Right state);
+-    (:) ((,) owners prepare) rest -> case state of {
++  runGroups verify audit crateId inventory groups state = do {
++    Progress.event "scc.next";
++    case groups of {
++      [] -> do { Progress.boundary "groups.complete"; ioReturn (Right state) };
++      (:) ((,) owners prepare) rest -> do {
++        Progress.event "scc.begin";
++        runGroupStep verify audit crateId inventory owners prepare rest state
++      }
++    }
++  };
++  runGroupStep verify audit crateId inventory owners prepare rest state = case state of {
+       State session contracts contexts objects inferred reused reports statistics ->
+         let { scope = Source.checkedScope contracts; names = map (Source.declName scope) owners } in
+         case bindEither (prepare contracts) (Source.slotPrepared contracts owners) of {
+@@ -183,9 +197,12 @@
+                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
+               group = Q.groupName crateId names;
+               rawKey = groupKey InferQuery slots };
++            Progress.event "scc.prepared";
+             graphStarted <- G.clock statistics;
++            Progress.event "scc.prepared-record.enter";
+             source <- input (groupKey PreparedQuery slots) (preparedValue slots prepared) session;
+             case source of { Left e -> ioReturn (Left e); Right ((,) sourceNode first) -> do {
++              Progress.event "scc.scope-inventory.enter";
+               scopeInput <- input (groupKey ScopeInventoryQuery slots) (scopeInventory prepared) first;
+               case scopeInput of { Left e -> ioReturn (Left e); Right ((,) scopeLeaf second) ->
+                 case do {
+@@ -196,6 +213,7 @@
+                 } of {
+                   Left e -> ioReturn (Left e);
+                   Right ((,,) candidateNodes bindingNodes dataNodes) -> do {
++                    Progress.event "scc.scope-record.enter";
+                     scoped <- G.record (groupKey ScopeQuery slots)
+                       ((:) (G.edge scopeLeaf) (map G.edge candidateNodes)) True
+                       (scopeValue prepared candidateNodes) second;
+@@ -210,6 +228,7 @@
+                           validated = G.validate rawKey third;
+                           previous = fst validated; active = snd validated };
+                         seq previous (G.elapsed statistics 0 graphStarted);
++                        Progress.event "scc.cache-load.enter";
+                         loadStarted <- G.clock statistics;
+                         cached <- case previous of {
+                           Nothing -> ioReturn (Left "query is dirty");
+@@ -238,6 +257,7 @@
+                           }
+                         };
+                         seq cached (G.elapsed statistics 1 loadStarted);
++                        Progress.event "scc.raw-infer.await-whnf";
+                         inferStarted <- G.clock statistics;
+                         let { hit = case cached of { Right _ -> True; Left _ -> False };
+                           raw = case cached of {
+@@ -254,16 +274,19 @@
+                             }
+                           } };
+                         case raw of { Left e -> ioReturn (Left e); Right fragment -> do {
++                          Progress.event "scc.raw-record.enter";
+                           recorded <- if hit then case previous of {
+                             Just node -> ioReturn (Right ((,) node active));
+                             Nothing -> ioReturn (Left "missing validated source query")
+                           } else G.record rawKey reads True (rawValue references group fragment) active;
+                           G.elapsed statistics 2 inferStarted;
++                          Progress.event "scc.finish.enter";
+                           finishStarted <- G.clock statistics;
+                           case recorded of { Left e -> ioReturn (Left e); Right ((,) rawNode fourth) ->
+                             case Source.prepareOpenFinish slots contracts prepared fragment of {
+                               Left e -> ioReturn (Left e);
+                               Right finish -> do {
++                                Progress.event "scc.finish-evidence.enter";
+                                 evidence <- resolveRequests env slots ((:) (G.edge scopeNode) (map G.edge dataNodes))
+                                   (Source.openFinishRequests finish) fourth;
+                                 case evidence of { Left e -> ioReturn (Left e); Right ((,,) answers evidenceReads afterEvidence) ->
+@@ -279,11 +302,15 @@
+                                   finalRefs = append bindingEdges (map G.edge dataNodes);
+                                   reads = append [G.edge rawNode,G.edge sourceNode,G.edge scopeNode]
+                                     (append evidenceReads bindingEdges) };
++                                Progress.event "scc.finish-content.enter";
+                                 content <- finishContentHash (verify || audit) group body final rawNode references finalRefs;
++                                Progress.event "scc.finish-record.enter";
+                                 supplied <- case content of { Left e -> ioReturn (Left e); Right hash ->
+                                   recordFinish slots group hash delta reads afterEvidence };
+                                 case supplied of { Left e -> ioReturn (Left e); Right next -> do {
+                                     G.elapsed statistics 3 finishStarted;
++                                    Progress.event "scc.finish-record.returned";
++                                    Progress.event (if hit then "scc.finished.reused" else "scc.finished.fresh");
+                                     runGroups verify audit crateId inventory rest
+                                       (State next (Source.publishContracts contracts delta) currentContexts
+                                         ((:) ((,,) group final (map fst delta)) objects)
+@@ -308,8 +335,7 @@
+             } }
+           }
+         }
+-    }
+-  };
++    };
+   -- One canonical content address for a fragment and its ordered environment,
+   -- regardless of how it was produced. KeepRawBody proves the body is exactly
+   -- the one obtained from InferScc. A changed environment invalidates reuse.

@@ -1,0 +1,45 @@
+{
+  "builtin": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin",
+  "builtin_record": {
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin.mlfci": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin.mlfco": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481",
+    "fixture_sha256": "6e0305dcb5867f308830b94325227c4b4caa3f8cc76268cc4514f7b6ec57c2fd",
+    "groups": 1,
+    "origin": "prepared by the public crate path",
+    "queries_sha256": "37da5ee1e3f879f62441755269031891275193c97946a47945f3744cc23b6c89",
+    "spec_sha256": "0bb1b41b31cf42c24ee845527b874fd4a53692a7476ede7916930725edd84f5f"
+  },
+  "clang": "/workspace/scratch/3f83e2ebe290/compiler-toolchain-20261110/debian/usr/lib/llvm-19/bin/clang",
+  "complete": true,
+  "endpoint": "crate-bootstrap-v1",
+  "endpoint_label": "bootstrap crate producer (no installed native data)",
+  "expose_entry_host": true,
+  "ghc": "/workspace/scratch/3f83e2ebe290/compiler-toolchain-20261110/ghc/bin/ghc-9.14.1",
+  "identity": {
+    "builtin_interface": "mlf-primitive/shared-haskell-v1/13",
+    "builtin_prelude_sha256": "cea8d61bbac7b4a359025897166d553c693db0b223aad013a13ee88ad3a0fc36",
+    "clang_version": "Debian clang version 19.1.7 (3+b1)",
+    "ghc_version": "9.14.1",
+    "optimization": "2",
+    "producer_emlf_sha256": "6120355c75ea590cf37777f38b3f58a7df7ce6dbd6d0857788f4049124dc2642",
+    "producer_receipt_sha256": "b71bbb5ebb757a206ed41932cdafca982f1e7246218496953be273afad5a8caf"
+  },
+  "libs": [
+    "-lgc",
+    "-lpthread",
+    "-ldl",
+    "-lgmp"
+  ],
+  "limits": {
+    "address_space_per_process_bytes": 6442450944,
+    "disk_free_floor_bytes": 5368709120,
+    "host_available_floor_bytes": 3221225472,
+    "max_work_bytes": 2147483648,
+    "process_tree_rss_bytes": 5368709120,
+    "wall_seconds": 600
+  },
+  "package_db": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-setup/dependencies/package-db",
+  "producer": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-producer",
+  "runtime": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-setup/dependencies/runtime.o",
+  "source": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110"
+}

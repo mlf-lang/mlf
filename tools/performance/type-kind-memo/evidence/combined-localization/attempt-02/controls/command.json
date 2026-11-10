@@ -1,0 +1,40 @@
+{
+  "argv": [
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/controls-probe"
+  ],
+  "boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+  "child_system_seconds": 0.004373,
+  "child_user_seconds": 0.0,
+  "complete": true,
+  "cwd": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110",
+  "environment": {
+    "GHCRTS": "",
+    "GHC_ENVIRONMENT": "-",
+    "LC_ALL": "C.UTF-8",
+    "MAKEFLAGS": "-j1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "exit_code": 0,
+  "involuntary_context_switches": 1,
+  "limits": {
+    "address_space_per_process_bytes": 6442450944,
+    "disk_free_floor_bytes": 5368709120,
+    "host_available_floor_bytes": 3221225472,
+    "max_work_bytes": 4294967296,
+    "process_tree_rss_bytes": 5368709120,
+    "wall_seconds": 600
+  },
+  "logs": {
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/controls/stderr": "6f4c8fe789c770964f04a23aed5068c879ab800efffa7f7ec7a056ff3be21454",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/controls/stdout": "85e87a4aeefc0d7ae51a698a7732853d5ae617c8b559886b6bb0cf50255b8496"
+  },
+  "max_individual_child_rss_bytes": 16056320,
+  "reason": null,
+  "sampled_process_tree_peak_rss_bytes": 0,
+  "started_utc": "2026-11-10T13:38:07Z",
+  "terminal_live_descendants": [],
+  "timed_target_leg": false,
+  "voluntary_context_switches": 4,
+  "wall_seconds": 0.005244318
+}

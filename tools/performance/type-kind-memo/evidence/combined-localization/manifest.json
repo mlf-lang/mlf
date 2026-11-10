@@ -1,0 +1,97 @@
+{
+  "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "baseline_workload_sha256": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a",
+  "diagnostic_source_sha256": {
+    "Counters.hs": "ec42e376f57031a1d0c90aca9e0b051fa4ce9aa7a3a52414160951348486c3cc",
+    "DiagnosticControls.hs": "692e394199a7d546e96dcd2acf506a1bd212887fdd82d7bf2737153a00a99c20",
+    "instrument.py": "a871c49ee9045bdbc591fb3fe8d225d4460ef26bc1fa496455832a1a6a628d98",
+    "locate.py": "4a6ecd108079f343be4cda24a2d49de9c1b7d4f7e2fdf10b756f0c670c11755e",
+    "progress.py": "0d2b37392d28e51b97377501146321ad6ebd7ec3ed1482c5b8e6f50e2a48717d"
+  },
+  "files_sha256": {
+    "attempt-01/CrateGraph.patch": "3e7842344b9beb1aa67b02dd4cc777e4587523caf07bfe7887e5d2359c7daccd",
+    "attempt-01/CrateSession.patch": "218c13f4408a8d2bc6104a9328536fc73cdb614ce1312b217038763f6702f4eb",
+    "attempt-01/build-controls/command.json": "e0ba0bcf313be8321f7c93afbac30fb18f2213005d6eaca824d0ecfd8a52a3e6",
+    "attempt-01/build-controls/stderr": "f544553b13d1bcda3c67f5752b663d1f148f6ac4bd00d99bbc433b96543dc212",
+    "attempt-01/build-controls/stdout": "fdd90358e227376b6ef2dfa9d939b608835d889920112436e160913b28c1054d",
+    "attempt-01/driver.log": "03371f3bf6570f16a6bf099af66fc96ff5f0d1b03b4bb005025b5b987e5988bc",
+    "attempt-01/generated-entry/Main.hs": "a419ceb58fc4ab9442cdf4fd3ca8d0d340519eb7f4253a6faf6019afd77479cd",
+    "attempt-01/locate.py": "0fbd08109ab7ccbabae7cc588e2474b77a5a29f5a94bcf59e18b8761a2b8d601",
+    "attempt-01/receipt.json": "ff02192949260815b8ff4537b533b626326eb8dd5419c4142216c9080931d904",
+    "attempt-02/CrateGraph.patch": "b8d17c33a3395affde8d0a642ade068a8b2c844d4a0184ccfa14527812494510",
+    "attempt-02/CrateSession.patch": "706c662aea8c8ef80e3adea138c0e7ab46ea7c062d0ff65e876d7b46e53479dd",
+    "attempt-02/build-compiler/command.json": "a286f4b2d2b8fb0183b023d9d51f752d0d5d69f1b63db3940555b933235326be",
+    "attempt-02/build-compiler/stderr": "436335d1765784578c56b2d629f6de928ac4363342248a0f37bfda85e4350b6a",
+    "attempt-02/build-compiler/stdout": "847d31f3b7a670160b5e2ec7ae72161b6d4d094b96a55bcf37aac8ef6ba973b0",
+    "attempt-02/build-controls/command.json": "47b681408ad4bfdd8d5539ed82e09fff81734f7f4265a54f8ab1aaabf193e916",
+    "attempt-02/build-controls/stderr": "f544553b13d1bcda3c67f5752b663d1f148f6ac4bd00d99bbc433b96543dc212",
+    "attempt-02/build-controls/stdout": "0c10d40d178501c3e1fa975702f50e38416558b464c9ee73887e313e238c904c",
+    "attempt-02/controls/command.json": "8b4503605affa3f6eda794f2bc6e7c85e3a03ea8cdd18a4b0a77ce387ea390d5",
+    "attempt-02/controls/stderr": "6f4c8fe789c770964f04a23aed5068c879ab800efffa7f7ec7a056ff3be21454",
+    "attempt-02/controls/stdout": "85e87a4aeefc0d7ae51a698a7732853d5ae617c8b559886b6bb0cf50255b8496",
+    "attempt-02/driver.log": "e8ef1ce604a1f53745bd9de524a61f2c328e0fe0522129a8cb005ea0e6b0a689",
+    "attempt-02/entry-preflight/command.json": "f72590c17fe6206db4c865c434640c3bad87570fc24b09b4cc722ca8f20882a4",
+    "attempt-02/entry-preflight/stderr": "60a49205e33f1fe1960f8382e4d0cede8bec7bc3ebb4bc43c12be8846a34fd2a",
+    "attempt-02/entry-preflight/stdout": "05d40051731444c5ddd4388f9213568ee1efbbf8646fe9a3ae02b648e24e32ae",
+    "attempt-02/generated-entry/Main.hs": "a419ceb58fc4ab9442cdf4fd3ca8d0d340519eb7f4253a6faf6019afd77479cd",
+    "attempt-02/locate/command.json": "c68b5bd3fbced89e05d2672808d2a329ac2536e2075c1bf9a291256c758df659",
+    "attempt-02/locate/stderr": "90ba430995f15af9b95ffef5df6c0b2ee207b7791cd5f103ebf30187cc594400",
+    "attempt-02/locate/stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "attempt-02/receipt.json": "d7600d6aa01566acd59788094c70808a34d2399c33fc2b7f57cd2268b870bc9b",
+    "attempt-02/reporter-controls/command.json": "f90a5dc94be93d787794bec5a5c5be9726459011194f21735f945e08b47dd167",
+    "attempt-02/reporter-controls/stderr": "11d0adbe3ab5276f0edd8f195717a20a109a743e505fec519bcb1fd4b32b1f44",
+    "attempt-02/reporter-controls/stdout": "1ab2162b6a137bd358418eae1f110d6489a45603ed84ca7bc34d8f5cbfd2a1b3",
+    "setup.json": "a7073db2aeb7b3c9232201e1bb60322edeece95eff542940b7bdb280d83b5cf8",
+    "snapshots.json": "3947d198cbcf10d9f2052dc8edccdd04b99f7643aff4d247a5c9a1bd292dd10a",
+    "workload.json": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a"
+  },
+  "owner_transformations": [
+    {
+      "after": "cfb06d2c937c9ea05065cd96c1657847978c0ea4b3b2b266bcf2b8df340bf31c",
+      "before": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+      "edits": [
+        [
+          "module Bootstrap.X.Type where {",
+          "{-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}\nmodule Bootstrap.X.Type where {"
+        ],
+        [
+          "  import MLF.Primitive;",
+          "  import MLF.Primitive;\n  import qualified KindCounters;"
+        ],
+        [
+          "  kindOf ds bounds ty =\n    do {",
+          "  kindOf ds bounds ty = KindCounters.root (\n    do {"
+        ],
+        [
+          "      kindIn ds (M.fromList compareTyVar kinds) ty\n    };",
+          "      kindIn ds (M.fromList compareTyVar kinds) ty\n    });"
+        ],
+        [
+          "  visitKind ds bounds seen a =\n    if",
+          "  visitKind ds bounds seen a = KindCounters.visit (tyVarId a) (\n    if"
+        ],
+        [
+          "         };\n  kindIn ::",
+          "         });\n  kindIn ::"
+        ]
+      ],
+      "owner": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+      "reversible": true
+    },
+    {
+      "after": "b5b2ed66bb0eea95999905108308133d685738770972f05a0703c469d0e17842",
+      "before": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
+      "changes": 21,
+      "owner": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+      "reversible": true
+    },
+    {
+      "after": "ff5b6d524376459b7f9059a06a5344106eacf9463c7d6da8d9ebf3853dfa7d01",
+      "before": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
+      "changes": 21,
+      "owner": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "reversible": true
+    }
+  ],
+  "snapshots": 80
+}

@@ -1,0 +1,164 @@
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:56:30: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+56 |   loadGraph :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
+   |                              ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:56:35: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+56 |   loadGraph :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
+   |                                   ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:70:32: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+70 |   loadGraphBy :: forall (m :: (* -> *)) a. (Monad m) =>
+   |                                ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:70:37: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+70 |   loadGraphBy :: forall (m :: (* -> *)) a. (Monad m) =>
+   |                                     ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:77:26: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+77 |   visit :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
+   |                          ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:77:31: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+77 |   visit :: forall (m :: (* -> *)). (Monad m) => (String -> m (Either String SourceModule)) ->
+   |                               ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:88:28: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+88 |   visitBy :: forall (m :: (* -> *)) a. (Monad m) =>
+   |                            ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:88:33: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+   |
+88 |   visitBy :: forall (m :: (* -> *)) a. (Monad m) =>
+   |                                 ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:106:38: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+106 |   visitDependencies :: forall (m :: (* -> *)). (Monad m) => (String ->
+    |                                      ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:106:43: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+106 |   visitDependencies :: forall (m :: (* -> *)). (Monad m) => (String ->
+    |                                           ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:117:40: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+117 |   visitDependenciesBy :: forall (m :: (* -> *)) a. (Monad m) =>
+    |                                        ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:117:45: warning: [GHC-39567] [-Wstar-is-type]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: Use ‘Type’ from ‘Data.Kind’ instead.
+    |
+117 |   visitDependenciesBy :: forall (m :: (* -> *)) a. (Monad m) =>
+    |                                             ^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs:827:15: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: Abstract -> ...
+    |
+827 |               Abstract -> [];
+    |               ^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs:88:21: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+   |
+88 |                     _ ->
+   |                     ^^^^...
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs:277:68: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+277 |                                                                    _ ->
+    |                                                                    ^^^^...
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs:293:55: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+293 |                                                       _ ->
+    |                                                       ^^^^...
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs:377:73: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+377 |                                                                         _ ->
+    |                                                                         ^^^^...
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs:393:60: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+393 |                                                            _ ->
+    |                                                            ^^^^...
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs:689:21: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+689 |                     _ -> Left usage
+    |                     ^^^^^^^^^^^^^^^
+
+/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs:701:7: warning: [GHC-53633] [-Woverlapping-patterns]
+    Pattern match is redundant
+    In a case alternative: _ -> ...
+    |
+701 |       _ -> Left usage
+    |       ^^^^^^^^^^^^^^^
+

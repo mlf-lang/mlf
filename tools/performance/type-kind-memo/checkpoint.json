@@ -1,5 +1,5 @@
 {
-  "status": "experimental_restart_checkpoint",
+  "status": "stopped_memo_candidate_negative_bounded_diagnostic",
   "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
   "branch": "perf/frontend-20261110",
   "baseline_owner_sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
@@ -8,17 +8,39 @@
   "completed": [
     "Isolated GHC 9.14.1 O0 and O2 controls: 5184 generated environments, 17 diamonds, 9 authored demand/kind cases per optimization level",
     "Original-algorithm counter controls: 4 roots, 12 recursive visits, 7 per-root unique variables, maximum 9 visits per root, 2 roots with repeats",
-    "Exact reversible diagnostic source transformation"
+    "Exact reversible diagnostic source transformation",
+    "One combined reversible three-owner live diagnostic build, exact counter controls, reporter controls and entry preflight",
+    "One 120-second 90-module localization: 80 snapshots, 1590641 roots, 620367 recursive visits, no repeated root, 957 SCCs started and 956 fresh SCCs finished",
+    "Input and ordinary producer reauthentication, no terminal descendants, both resource locks released"
   ],
   "not_completed": [
-    "Actual complete-workload hotspot attribution",
-    "Execution of the prepared diagnose.py driver",
+    "Complete-workload completion and checked-byte/group-identity equality; no reference existed after the ordinary baseline 600-second timeout",
+    "Execution of superseded diagnose.py driver",
     "Ordinary candidate compiler performance comparison",
-    "Complete candidate compiler regression suite",
-    "Candidate full endpoint qualification and CI"
+    "Complete candidate compiler regression suite and CI"
   ],
   "performance_claim": "none",
-  "next_step": "After the coordinator grants a CPU window, execute one fresh F1 source-to-checked diagnostic against the ordinary accepted baseline reference. Require identical checked raw bytes and ordered group identities. If the hotspot cannot materially affect the complete path, stop the memo candidate and retain the diagnosis.",
-  "recovery_entry": "README.md#restore-and-continue-f1",
-  "evidence_scope": "Historical logs and source/tool hashes are preserved; executable/object outputs are not committed. The full diagnostic driver is prepared, not validated by those earlier short controls. No native fixed-point campaign was started."
+  "next_step": "Do not continue the memo candidate. Consult the coordinator plan for the next current-corpus hypothesis; retain this bounded negative result and the exact recovery recipe.",
+  "recovery_entry": "README.md#restart-safely",
+  "evidence_scope": "One 120-second instrumented prefix, no ordinary timing or complete semantic qualification. Historical O0/O2 controls are preserved separately. No native fixed-point campaign ran.",
+  "production_owner": "restored_to_frozen_baseline",
+  "original_experimental_commit": "64ee679848211034a3cb1e2c1b44f8f600861ab0",
+  "diagnostic_harness": "locate.py",
+  "memo_archive": "archive/memo-candidate.patch",
+  "bounded_result": {
+    "compiler_complete": false,
+    "harness_complete": true,
+    "ordinary_performance_samples": 0,
+    "wall_limit_seconds": 120,
+    "snapshot_count": 80,
+    "last_elapsed_ns": 119097608785,
+    "roots": 1590641,
+    "recursive_visits": 620367,
+    "unique_variable_roots": 620367,
+    "roots_with_repeats": 0,
+    "scc_started": 957,
+    "scc_finished_fresh": 956,
+    "last_boundary": "scc.raw-infer.await-whnf",
+    "receipt": "evidence/combined-localization/attempt-02/receipt.json"
+  }
 }

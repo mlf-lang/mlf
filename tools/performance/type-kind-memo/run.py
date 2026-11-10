@@ -21,6 +21,9 @@ def main():
     parser.add_argument('--optimization', choices=['0','2'], default='2')
     parser.add_argument('--controls-only', action='store_true')
     args = parser.parse_args()
+    owner = ROOT/'libraries/mlf-xmlf/Bootstrap/X/Type.hs'
+    if sha(owner) != '151c2b6966dce76abbaa7e9c8c982a01ab19f7199a576fc57469e357bfe914ed':
+        raise RuntimeError('memo candidate is stopped; use the archived experimental checkpoint only for explicit historical reproduction')
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=False)
     manifest = json.loads((ROOT/'shared-sources.json').read_text())

@@ -1,0 +1,41 @@
+{
+  "argv": [
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/controls-probe",
+    "--reporter-control"
+  ],
+  "boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+  "child_system_seconds": 0.01143,
+  "child_user_seconds": 0.007802,
+  "complete": true,
+  "cwd": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110",
+  "environment": {
+    "GHCRTS": "",
+    "GHC_ENVIRONMENT": "-",
+    "LC_ALL": "C.UTF-8",
+    "MAKEFLAGS": "-j1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "exit_code": 0,
+  "involuntary_context_switches": 1,
+  "limits": {
+    "address_space_per_process_bytes": 6442450944,
+    "disk_free_floor_bytes": 5368709120,
+    "host_available_floor_bytes": 3221225472,
+    "max_work_bytes": 4294967296,
+    "process_tree_rss_bytes": 5368709120,
+    "wall_seconds": 600
+  },
+  "logs": {
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/reporter-controls/stderr": "11d0adbe3ab5276f0edd8f195717a20a109a743e505fec519bcb1fd4b32b1f44",
+    "/workspace/scratch/3f83e2ebe290/mlf-frontend-speed-20261110/.mlf-build/F1-R2-locate-02/reporter-controls/stdout": "1ab2162b6a137bd358418eae1f110d6489a45603ed84ca7bc34d8f5cbfd2a1b3"
+  },
+  "max_individual_child_rss_bytes": 16056320,
+  "reason": null,
+  "sampled_process_tree_peak_rss_bytes": 3432448,
+  "started_utc": "2026-11-10T13:38:07Z",
+  "terminal_live_descendants": [],
+  "timed_target_leg": false,
+  "voluntary_context_switches": 49,
+  "wall_seconds": 2.114723711
+}
