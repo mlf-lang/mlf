@@ -42,8 +42,8 @@
 3. 当前 B0 先完成 MLF-native 资格，再完成 GHC-native 资格。资格数据不并入正式样本；MLF资格开头可能与一次约3秒控制有重叠，保留说明。
 4. 当前MLF资格已在600.099秒触发wall保护，无checked/LLVM产物；GHC资格已完成，outer为155.931809537秒。完整MLF/GHC倍率仍不可用。依赖已调整：B1先验证小main crate完整runner；F1与R2合做真实IO边界及运行中kindOf计数的单次120秒有界诊断，避免再次等待600秒却没有信息；R1已确认不在当前调用链上，停止producer/计时排期。完整90模块目标不变，不能用小输入顶替。
 5. 之后正式样本由B0方向统一排队。这个队列可按真实阻塞调整，不能让无输入任务占着机器。
-5. 不允许长时间同时构建多个内存重候选。没有令牌时继续源码审查、控制设计、文档与轻量git保存。
-6. 中断的cohort保持不完整，不能拼接重启前后样本充当原定完整对照。新的cohort必须新目录、新计划；不要覆盖旧receipt。
+6. 不允许长时间同时构建多个内存重候选。没有令牌时继续源码审查、控制设计、文档与轻量git保存。
+7. 中断的cohort保持不完整，不能拼接重启前后样本充当原定完整对照。新的cohort必须新目录、新计划；不要覆盖旧receipt。
 
 共享锁的具体机器路径在恢复后由 Astra 为所有任务统一设置，而不是复制上次机器的绝对路径。建议外层使用 `flock -n`，不支持时用等价的、经过检查的进程级排他锁。现有本地目录锁本身不证明跨worktree互斥。
 
@@ -72,7 +72,7 @@
 - B0 MLF：600.09899221秒wall保护退出（-9）；采样峰值1,745,485,824字节；无完成stage/checked/LLVM。父进程wait4的0.235秒CPU未包含被终止compiler子进程，不能冒充完整任务CPU。
 - 失败目录存在query-graph-v2及generations/results/staging子目录，仅文件是lock；payload到最终publish才写，不能据此认定未开始推断。
 - B0 GHC：完整90模块加Main fresh、链接和version/identity检查通过，outer155.931809537秒；这只是单次资格，不是正式配对cohort。
-- B1：远端 OPAQUE 修订 daa88b69cce840843d9e1197f6b1993d6580af9c；小main完整runner待验证。全量诊断等待完整checked输入。
+- B1：远端 OPAQUE 修订 daa88b69cce840843d9e1197f6b1993d6580af9c；小main完整runner现已通过：5个目标group全fresh，128,805字节LLVM与fresh ordinary逐字节相等，26 nested与2 total forcing控制及独立native输出通过。后续源码/证据保存版本见JSON。全量诊断仍等待完整checked输入。
 - F1/R2：组合诊断采用只读快照线程，每2秒flush数值计数与真实IO边界；不遍历/强制编译器AST。F1负责Counters/Main/Type和唯一构建/运行，R2负责私有Session/Graph边界。一次120秒、仅定位，不声称完整语义等价。
 - 任何running状态只表示记录当时状态，恢复时必须重新核验进程、锁及产物。
 
@@ -98,3 +98,9 @@
 ## 保存和发布边界
 
 本分支仅保存协作设计、可恢复任务状态及公开项目证据；不含凭据、会话token或个人路径。实验分支不等于已经通过验收，不自动合并main或触发发布。不能将远端计划保存成功说成候选已完成。精确保存版本由Git提交固定，检查点引用的分支应同时记录commit以防漂移。
+
+## 已核验远端恢复入口
+
+- 基线工具链、冻结90模块清单与失败/成功资格位于独立分支 codex/full-compiler-baseline-20261110，提交 305914c90e8fdff3a912faa6b93c08146273cf3e。请使用 [该提交的README](https://github.com/mlf-lang/mlf/blob/305914c90e8fdff3a912faa6b93c08146273cf3e/tools/performance/full-compiler/baseline-20261110/README.md)，当前计划分支不包含其新增文件。
+- 前端原始实验checkpoint：perf/frontend-20261110，提交 64ee679848211034a3cb1e2c1b44f8f600861ab0；[恢复README](https://github.com/mlf-lang/mlf/blob/64ee679848211034a3cb1e2c1b44f8f600861ab0/tools/performance/type-kind-memo/README.md)。该版本保存原始完整计数方案和memo控制，当前调度已改为F1/R2单次120秒组合诊断；不能按旧README盲跑完整600秒。组合方案后续提交以JSON为准。
+- R1实验源码远端发布尚未完成，JSON如实标记null；本轮已经因不覆盖实际调用链而停止该候选，不让重启恢复依赖未保全源码。
