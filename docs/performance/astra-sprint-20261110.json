@@ -1,6 +1,6 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 1,
+  "revision": 2,
   "observed_at_utc": "2026-11-10T13:26:37Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
@@ -75,8 +75,9 @@
       "role": "baseline and evidence",
       "status": "MLF timeout; GHC qualified",
       "branch": "codex/full-compiler-baseline-20261110",
-      "remote_commit": null,
-      "next": "Preserve source/tool pins and recovery instructions. Do not rerun the full MLF endpoint without a relevant intervention."
+      "remote_commit": "305914c90e8fdff3a912faa6b93c08146273cf3e",
+      "next": "Preserve source/tool pins and recovery instructions. Do not rerun the full MLF endpoint without a relevant intervention.",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/305914c90e8fdff3a912faa6b93c08146273cf3e/tools/performance/full-compiler/baseline-20261110/README.md"
     },
     {
       "id": "B1",
@@ -101,14 +102,16 @@
       "status": "Preparing one joint bounded diagnostic",
       "branch": "perf/frontend-20261110",
       "local_checkpoint": "426561414cf0c1e0df7efefc4a6d3a83a67e67df",
-      "remote_commit": null,
+      "remote_commit": "64ee679848211034a3cb1e2c1b44f8f600861ab0",
       "owners": [
         "private diagnostic Type",
         "Counters",
         "Main",
         "diagnostic harness"
       ],
-      "next": "Integrate R2 exact two-owner transform; preflight snapshot/control format; run current 90-module source once for up to 120 seconds under the sole token. Report actual progress, not speedup."
+      "next": "Integrate R2 exact two-owner transform; preflight snapshot/control format; run current 90-module source once for up to 120 seconds under the sole token. Report actual progress, not speedup.",
+      "remote_tree": "d4769db40c3ffa39315f80477dcbc9b2759a5e6f",
+      "checkpoint_scope": "Original memo controls and original complete-counting plan. New 120-second F1/R2 combined diagnostic is not yet covered by this commit."
     },
     {
       "id": "R1",
@@ -118,7 +121,8 @@
       "local_checkpoint": "9cd9125817c150ce3826b03dd926b398058b935f",
       "remote_commit": null,
       "reason": "Current compileGraph endpoint does not call the modified legacy writeSourceRecord path.",
-      "next": "Preserve isolated experiment and explicit scope. Do not build a full candidate or measure it for the current endpoint."
+      "next": "Preserve isolated experiment and explicit scope. Do not build a full candidate or measure it for the current endpoint.",
+      "publication_status": "Public source checkpoint remains blocked after exact confirmation; no bypass or further retry. Task is off-current-path and retired."
     },
     {
       "id": "R2",
