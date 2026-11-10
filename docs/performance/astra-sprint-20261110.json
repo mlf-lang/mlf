@@ -1,0 +1,158 @@
+{
+  "schema": "mlf-astra-sprint-checkpoint-v1",
+  "revision": 1,
+  "observed_at_utc": "2026-11-10T13:26:37Z",
+  "coordinator": "Astra",
+  "start_date": "2026-11-10",
+  "duration_goal_days": 3,
+  "exact_deadline": null,
+  "deadline_note": "No exact cutoff was specified. Do not reset the budget after a restart or handoff.",
+  "repository": "mlf-lang/mlf",
+  "plan_branch": "perf/astra-sprint-plan-20261110",
+  "plan_path": "docs/performance/astra-sprint-20261110.md",
+  "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "target": {
+    "entry": "MLF.Entry.Emlf",
+    "module_count": 90,
+    "source_bytes": 5233364,
+    "workload_sha256": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a",
+    "endpoint": "Same frozen full source closure through runnable compiler, target fresh; MLF is a GHC-hosted ordinary compiler.",
+    "mlf_path": "Single full-closure crate, not the mlfpkg multi-package pipeline.",
+    "desired_ratio": "Approximately 1x GHC; no promise to reach it within three days.",
+    "native_ab_selfhost": "paused",
+    "fixed_point": "paused"
+  },
+  "toolchain": {
+    "ghc": "9.14.1",
+    "clang": "Debian 19.1.7",
+    "libraries": [
+      "GMP",
+      "BDWGC"
+    ],
+    "producer_receipt_sha256": "b71bbb5ebb757a206ed41932cdafca982f1e7246218496953be273afad5a8caf",
+    "setup_sha256": "a7073db2aeb7b3c9232201e1bb60322edeece95eff542940b7bdb280d83b5cf8"
+  },
+  "resources": {
+    "observed_cloud_memory_gib": 9.7,
+    "heavy_job_slots": 1,
+    "require_cross_worktree_exclusive_lock": true,
+    "limits": {
+      "endpoint_wall_seconds": 600,
+      "process_tree_rss_gib": 5,
+      "per_process_address_space_gib": 6,
+      "free_disk_floor_gib": 5,
+      "available_host_memory_floor_gib": 3
+    },
+    "restart_rule": "Treat all recorded running tasks and locks as unverified. Check actual processes and outputs before resuming."
+  },
+  "evidence": {
+    "mlf_qualification": {
+      "status": "wall_limit_failure",
+      "wall_seconds": 600.09899221,
+      "exit_code": -9,
+      "sampled_process_tree_peak_rss_bytes": 1745485824,
+      "checked_artifacts_available": false,
+      "completed_stages": 0,
+      "guard_receipt_sha256": "27faa523726f4754d1009b49b2e3a8c2224b497d987c880288116f49866726d4",
+      "cpu_caveat": "Parent wait4 CPU omitted unreaped compiler child CPU; do not use it as whole-task CPU.",
+      "directory_caveat": "query-graph-v2 and generations/results/staging existed, but no payload files. Publication happens later, so missing payload is not an inference-stage locator."
+    },
+    "ghc_qualification": {
+      "status": "passed",
+      "whole_endpoint_seconds": 155.931809537,
+      "stage_seconds": 155.815914475,
+      "fresh_shared_modules": 90,
+      "fresh_main_wrappers": 1,
+      "native_cli_checks": true,
+      "receipt_sha256": "b4aa96e0e44a1b00ea94847f4ccb6f8314ee15260c72c8801a684d5670ee2236"
+    },
+    "formal_cohort_status": "not_run",
+    "complete_mlf_ghc_ratio": null
+  },
+  "tasks": [
+    {
+      "id": "B0",
+      "role": "baseline and evidence",
+      "status": "MLF timeout; GHC qualified",
+      "branch": "codex/full-compiler-baseline-20261110",
+      "remote_commit": null,
+      "next": "Preserve source/tool pins and recovery instructions. Do not rerun the full MLF endpoint without a relevant intervention."
+    },
+    {
+      "id": "B1",
+      "role": "artifact/backend",
+      "status": "Small-main OPAQUE diagnostic qualification passed; full input unavailable",
+      "branch": "perf/llvm-builder-20261110",
+      "remote_commit": "daa88b69cce840843d9e1197f6b1993d6580af9c",
+      "unpublished_followup": "Smoke.hs, smoke.py and small-input evidence pending publication",
+      "small_qualification": {
+        "fresh_groups": 5,
+        "llvm_bytes": 128805,
+        "ordinary_llvm_byte_equal": true,
+        "nested_forcing_controls": 26,
+        "total_controls": 2,
+        "native_expected_stdout": "backend λ\n42\n"
+      },
+      "next": "Publish accurate small-input checkpoint. Wait for a qualified full checked artifact before full backend diagnosis."
+    },
+    {
+      "id": "F1",
+      "role": "frontend kind counters and unified diagnostic runner",
+      "status": "Preparing one joint bounded diagnostic",
+      "branch": "perf/frontend-20261110",
+      "local_checkpoint": "426561414cf0c1e0df7efefc4a6d3a83a67e67df",
+      "remote_commit": null,
+      "owners": [
+        "private diagnostic Type",
+        "Counters",
+        "Main",
+        "diagnostic harness"
+      ],
+      "next": "Integrate R2 exact two-owner transform; preflight snapshot/control format; run current 90-module source once for up to 120 seconds under the sole token. Report actual progress, not speedup."
+    },
+    {
+      "id": "R1",
+      "role": "legacy source-context write reuse experiment",
+      "status": "Retired from current sprint optimization queue",
+      "branch": "perf/compiler-reuse-20261110",
+      "local_checkpoint": "9cd9125817c150ce3826b03dd926b398058b935f",
+      "remote_commit": null,
+      "reason": "Current compileGraph endpoint does not call the modified legacy writeSourceRecord path.",
+      "next": "Preserve isolated experiment and explicit scope. Do not build a full candidate or measure it for the current endpoint."
+    },
+    {
+      "id": "R2",
+      "role": "current graph progress diagnosis",
+      "status": "Two-owner reversible source transform handed to F1",
+      "owners": [
+        "private diagnostic CrateSession",
+        "private diagnostic CrateGraph"
+      ],
+      "transform_sha256": "0d2b37392d28e51b97377501146321ad6ebd7ec3ed1482c5b8e6f50e2a48717d",
+      "remote_commit": null,
+      "next": "Support F1's single diagnostic; do not create a second parallel build/run."
+    },
+    {
+      "id": "M0_M1",
+      "role": "ordinary measurement",
+      "status": "blocked until complete current endpoint and eligible candidate",
+      "next": "Freeze new fresh ordinary cohorts only after a relevant intervention; no sample replacement, pooling with diagnostics or cached target work."
+    },
+    {
+      "id": "I1",
+      "role": "Astra integration",
+      "status": "awaiting eligible current-path candidates",
+      "next": "Review and serialize accepted changes on one integration branch; rerun combined correctness and whole endpoint. No main merge or fixed-point implied."
+    }
+  ],
+  "restart_required": [
+    "Read plan and checkpoint at an exact remote commit.",
+    "Check later user instructions and original three-day budget.",
+    "Verify environment, current processes, locks and tool identities.",
+    "Materialize independent clean baseline/candidate worktrees from recorded remote commits.",
+    "Rebuild or authenticate missing producer/dependencies/artifacts; local paths and summary hashes alone are insufficient.",
+    "Recompute and verify frozen 90-module workload; use a new cohort for any new source version.",
+    "Establish one cross-worktree lock and restore dependency-aware queue; never silently resume native A/B or fixed-point."
+  ],
+  "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly."
+}
