@@ -149,6 +149,14 @@ for (const name of ['build-runner','async-runtime','async-language']) {
 }
 assert.match(ciJob('build-runner'),/process-supervisor-tests/);
 const asyncJob = ciJob('async-language');
+// LLVM 19 otherwise infers macOS 16 on Tahoe, below the Homebrew bottle target.
+const verifyAsyncMacTarget = job => {
+  assert.match(job, /else\n            brew install llvm@19 gmp pkg-config bdw-gc jq\n(?:[^\n]*\n)*?            echo 'MACOSX_DEPLOYMENT_TARGET=26\.0' >> "\$GITHUB_ENV"\n          fi/);
+};
+verifyAsyncMacTarget(asyncJob);
+for (const replacement of ['', "echo 'MACOSX_DEPLOYMENT_TARGET=16.0' >> \"$GITHUB_ENV\"", "echo 'MACOSX_DEPLOYMENT_TARGET=26.0'"]) {
+  assert.throws(() => verifyAsyncMacTarget(asyncJob.replace("echo 'MACOSX_DEPLOYMENT_TARGET=26.0' >> \"$GITHUB_ENV\"", replacement)));
+}
 assert.match(asyncJob,/fetch-depth: 0/);
 assert.match(ci,/pull_request:\n    types: \[opened, synchronize, reopened, labeled, unlabeled\]/);
 assert.match(fs.readFileSync('tools/release/async-change-scope.py','utf8'), /OPT_IN_LABEL = "ci:async-parity"/);

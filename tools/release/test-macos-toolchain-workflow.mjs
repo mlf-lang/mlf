@@ -4,18 +4,45 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 const workflow = fs.readFileSync('.github/workflows/macos-toolchain.yml', 'utf8');
+const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+const parityStart = ci.indexOf('      - name: Qualify typed completions and structured process tasks');
+const parityEnd = ci.indexOf('      - uses: actions/upload-artifact@', parityStart);
+const paritySteps = ci.slice(parityStart, parityEnd).replaceAll("        if: steps.scope.outputs.required != 'false'\n", '');
+const parityArtifacts = [...ci.slice(parityEnd).matchAll(/^            (\.mlf-build\/async-(?:completion-gate|process-parity|task-parity|package-parity)\/[^\n]+)$/gm)].map(match => match[0]);
 const clangLibraryProof = String.raw`.toolchain.files | keys | any(test("/libclang-cpp(\\.[0-9]+)*\\.dylib$"))`;
+const probeName = '      - name: Verify diagnostic-free native completion links\n';
+const ghcName = '      - name: Install pinned official GHC 9.14.1\n';
+const probeCommands = [
+  'clang -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c runtime/mlf_runtime.c -o "$output/runtime.o" > "$output/runtime.stdout" 2> "$output/runtime.stderr"',
+  'clang -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" "tests/native/$native.c" "$output/runtime.o" "${libs[@]}" -o "$output/$native" > "$output/$native.link.stdout" 2> "$output/$native.link.stderr"',
+  '"$output/$native" > "$output/$native.execute.stdout" 2> "$output/$native.execute.stderr"',
+];
 const verify = text => {
+  assert.ok(text.includes(paritySteps), 'Run the same ordinary async parity commands and assertions as main');
+  assert.ok(text.indexOf('      - name: Build and authenticate actual GHC-origin async tools') < text.indexOf('      - name: Qualify typed completions'), 'Authenticate before parity');
+  assert.ok(parityArtifacts.length > 0);
+  for (const artifact of parityArtifacts) assert.ok(text.includes(artifact), artifact);
+  const probe = text.match(/      - name: Verify diagnostic-free native completion links\n([\s\S]*?)(?=      - name:)/)?.[1];
+  assert.ok(probe, 'Native completion probe must be present');
+  for (const command of probeCommands) assert.ok(probe.includes(command), command);
+  assert.ok(text.indexOf(probeName) < text.indexOf(ghcName), 'Probe must precede expensive GHC installation');
   assert.match(text, /^  pull_request:\n    paths:\n/m);
   for (const path of ['.github/workflows/macos-toolchain.yml', 'tools/shared/build.py',
+    '.github/workflows/ci.yml', 'tests/native/completion_cell_tests.c',
+    'tests/native/async_completion_primitives.c', 'runtime/mlf_runtime.c',
     'tools/shared/test_darwin_toolchain.py', 'tools/release/test-macos-toolchain-workflow.mjs']) {
     assert.ok(text.includes('      - ' + path + '\n'));
   }
   assert.match(text, /^  contents: read$/m);
   assert.match(text, /^    runs-on: macos-26$/m);
-  assert.match(text, /^    timeout-minutes: 120$/m);
+  assert.match(text, /^    timeout-minutes: 360$/m);
   assert.ok(text.includes('test "$(uname -m)" = arm64'));
   assert.ok(text.includes('brew install llvm@19 gmp pkg-config bdw-gc jq'));
+  for (const required of ["echo 'MACOSX_DEPLOYMENT_TARGET=26.0' >> \"$GITHUB_ENV\"",
+    'for native in completion_cell_tests async_completion_primitives; do',
+    'libs+=("$MLF_GC_PREFIX/lib/libgc.a" -lm -lpthread)',
+    'test ! -s "$output/runtime.stderr"', 'test ! -s "$output/$native.link.stderr"',
+    'test ! -s "$output/$native.execute.stderr"']) assert.ok(text.includes(required), required);
   assert.ok(text.includes('841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681 "$archive" | shasum -a 256 -c -'));
   for (const flags of ['-B', '-O -B']) {
     assert.ok(text.includes(`python3 ${flags} tools/shared/test_darwin_toolchain.py`));
@@ -33,12 +60,25 @@ const verify = text => {
   assert.doesNotMatch(text, /self_host|self-host|full_validation|continue-on-error|pull_request_target|secrets\.|set \+e|\|\| true/);
 };
 verify(workflow);
-for (const required of ['runs-on: macos-26', 'contents: read', 'timeout-minutes: 120',
+for (const required of ['runs-on: macos-26', 'contents: read', 'timeout-minutes: 360',
+  'MACOSX_DEPLOYMENT_TARGET=26.0', 'test ! -s "$output/$native.link.stderr"',
+  'test ! -s "$output/$native.execute.stderr"', 'libs+=("$MLF_GC_PREFIX/lib/libgc.a" -lm -lpthread)',
   'tools/shared/build.py', '841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681',
   'python3 -B tools/shared/prepare_async_ghc.py', '.toolchain.files | keys',
   '.runner_protocol_version == 1', 'if: always()', '.mlf-build/async-ghc/*.stderr']) {
   assert.throws(() => verify(workflow.replace(required, 'removed')));
 }
+for (const required of ['EMLF="$compiler" tests/fixtures/async-completion/check.sh',
+  'tools/release/test-async-process.sh "$compiler"', 'tools/release/test-async-task.sh "$compiler"',
+  'tools/release/test-async-package.sh "$compiler" "$manager"', ...parityArtifacts]) {
+  assert.throws(() => verify(workflow.replace(required, 'removed')));
+}
+for (const command of probeCommands) {
+  assert.throws(() => verify(workflow.replace(command, 'removed')));
+}
+const probeStep = workflow.match(/      - name: Verify diagnostic-free native completion links\n[\s\S]*?(?=      - name:)/)[0];
+const reordered = workflow.replace(probeStep, '').replace('      - name: Exercise resolver', probeStep + '      - name: Exercise resolver');
+assert.throws(() => verify(reordered));
 assert.throws(() => verify(workflow + '\n    continue-on-error: true\n'));
 assert.throws(() => verify(workflow + '\n    self_host: true\n'));
 assert.throws(() => verify(workflow.replace('        run: |', '        if: false\n        run: |')));

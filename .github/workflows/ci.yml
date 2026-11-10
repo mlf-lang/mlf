@@ -622,6 +622,8 @@ jobs:
             brew install llvm@19 gmp pkg-config bdw-gc jq
             echo "$(brew --prefix llvm@19)/bin" >> "$GITHUB_PATH"
             echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+            # LLVM 19 predates the macOS 26 version jump; match Tahoe bottles.
+            echo 'MACOSX_DEPLOYMENT_TARGET=26.0' >> "$GITHUB_ENV"
           fi
           echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
       - name: Install pinned GHC 9.14.1 for ordinary async parity

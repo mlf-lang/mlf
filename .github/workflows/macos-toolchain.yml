@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - .github/workflows/macos-toolchain.yml
+      - .github/workflows/ci.yml
+      - tests/native/completion_cell_tests.c
+      - tests/native/async_completion_primitives.c
+      - runtime/mlf_runtime.c
       - tools/shared/build.py
       - tools/shared/test_darwin_toolchain.py
       - tools/release/test-macos-toolchain-workflow.mjs
@@ -16,7 +20,7 @@ jobs:
   provenance:
     name: GHC and LLVM toolchain provenance (macos-26)
     runs-on: macos-26
-    timeout-minutes: 120
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -32,7 +36,25 @@ jobs:
           brew install llvm@19 gmp pkg-config bdw-gc jq
           echo "$(brew --prefix llvm@19)/bin" >> "$GITHUB_PATH"
           echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          # Keep the real link probe aligned with ordinary async parity.
+          echo 'MACOSX_DEPLOYMENT_TARGET=26.0' >> "$GITHUB_ENV"
           echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
+      - name: Verify diagnostic-free native completion links
+        run: |
+          set -euo pipefail
+          output="$PWD/.mlf-build/macos-toolchain"
+          read -r -a cflags <<< "$(pkg-config --cflags gmp)"
+          read -r -a libs <<< "$(pkg-config --libs gmp)"
+          cflags+=("-I$MLF_GC_PREFIX/include")
+          libs+=("$MLF_GC_PREFIX/lib/libgc.a" -lm -lpthread)
+          clang -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" -c runtime/mlf_runtime.c -o "$output/runtime.o" > "$output/runtime.stdout" 2> "$output/runtime.stderr"
+          test ! -s "$output/runtime.stderr"
+          for native in completion_cell_tests async_completion_primitives; do
+            clang -O2 -std=c11 -Wall -Wextra -Werror "${cflags[@]}" "tests/native/$native.c" "$output/runtime.o" "${libs[@]}" -o "$output/$native" > "$output/$native.link.stdout" 2> "$output/$native.link.stderr"
+            test ! -s "$output/$native.link.stderr"
+            "$output/$native" > "$output/$native.execute.stdout" 2> "$output/$native.execute.stderr"
+            test ! -s "$output/$native.execute.stderr"
+          done
       - name: Install pinned official GHC 9.14.1
         run: |
           set -euo pipefail
@@ -58,6 +80,25 @@ jobs:
           jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false and .optimization == "2"' .mlf-build/async-ghc/receipt.json
           jq -e '.toolchain.files | keys | any(test("/libclang-cpp(\\.[0-9]+)*\\.dylib$"))' .mlf-build/async-ghc/receipt.json
           jq -e '.complete == true and .producer_host == "GHC" and .runner_protocol_version == 1' .mlf-build/async-ghc/async-tools.json
+      - name: Qualify typed completions and structured process tasks
+        run: |
+          set -euo pipefail
+          compiler="$PWD/.mlf-build/async-ghc/bin/emlf"
+          EMLF="$compiler" tests/fixtures/async-completion/check.sh
+          tools/release/test-async-process.sh "$compiler" .mlf-build/async-process-parity
+          tools/release/test-async-task.sh "$compiler" .mlf-build/async-task-parity
+          jq -e '.complete == true and .backends == ["source-interpreter", "target-interpreter", "llvm"]' .mlf-build/async-completion-gate/result.json
+          for suite in async-process-parity async-task-parity; do
+            jq -e '.complete == true and .backends == ["interpreter", "llvm"]' ".mlf-build/$suite/result.json"
+          done
+      - name: Qualify checked async package interfaces and cache replay
+        run: |
+          set -euo pipefail
+          compiler="$PWD/.mlf-build/async-ghc/bin/emlf"
+          manager="$PWD/.mlf-build/async-ghc/bin/mlfpkg"
+          tools/release/test-async-package.sh "$compiler" "$manager" .mlf-build/async-package-parity
+          jq -e '.complete == true and .backend == "llvm" and .cache_replay == true and .opaque_rejections == 6 and .type_rejections == 1' \
+            .mlf-build/async-package-parity/result.json
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
@@ -73,3 +114,23 @@ jobs:
             .mlf-build/async-ghc/*.txt
             .mlf-build/async-ghc/*.log
             .mlf-build/async-ghc/builtin-verification/
+            .mlf-build/async-completion-gate/**/*.json
+            .mlf-build/async-completion-gate/**/*.stdout
+            .mlf-build/async-completion-gate/**/*.stderr
+            .mlf-build/async-completion-gate/**/*.status
+            .mlf-build/async-completion-gate/**/*.timed-out
+            .mlf-build/async-process-parity/**/*.json
+            .mlf-build/async-process-parity/**/*.stdout
+            .mlf-build/async-process-parity/**/*.stderr
+            .mlf-build/async-process-parity/**/*.status
+            .mlf-build/async-process-parity/**/*.timed-out
+            .mlf-build/async-task-parity/**/*.json
+            .mlf-build/async-task-parity/**/*.stdout
+            .mlf-build/async-task-parity/**/*.stderr
+            .mlf-build/async-task-parity/**/*.status
+            .mlf-build/async-task-parity/**/*.timed-out
+            .mlf-build/async-package-parity/**/*.json
+            .mlf-build/async-package-parity/**/*.stdout
+            .mlf-build/async-package-parity/**/*.stderr
+            .mlf-build/async-package-parity/**/*.status
+            .mlf-build/async-package-parity/**/*.timed-out
