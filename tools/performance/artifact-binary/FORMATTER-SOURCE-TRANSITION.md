@@ -22,8 +22,13 @@ The complete inventory differs from that endpoint at exactly these paths:
   endpoint.
 - `mlf.lock`: regenerated package source and dependency identities.
 
-All other owned source hashes and existing historical maintenance transitions
-are unchanged. Package-local locks outside the historical inventory are not
+All other owned source hashes are unchanged. The sole maintenance follow-on
+updates the live `patricia/test_adapters.py` endpoint to check Layout's exact
+formatter transition after its DeclId repair. Its original frozen oracle hash
+and all predecessor bytes remain unchanged. The boundary test authenticates
+both layers separately, rejects intermediate bytes as live inputs and live
+bytes as DeclId inputs, and retains the original mutation and wrong-owner
+rejections. Package-local locks outside the historical inventory are not
 silently added to it. New formatter fixtures and tools have their own tests;
 this inventory does not claim to authenticate every repository file.
 

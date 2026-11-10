@@ -113,7 +113,7 @@ def tree_snapshot(root, device, installed=False):
             "allocated_bytes": allocated, "runtime_files_scanned": scanned}
 
 
-def same_installed_tree(before, after):
+def same_tree_snapshot(before, after):
     # Allocation accounting may change without an inode or content change.
     # Keep both complete snapshots in the receipt; ignore only this statistic.
     return ({key: value for key, value in before.items() if key != "allocated_bytes"} ==
@@ -180,15 +180,19 @@ def cleanup(root, receipt, save):
     require(identity(archive) == archive_identity, "Archive changed during verification")
     stage_snapshot = tree_snapshot(staging, device)
     before = tree_snapshot(prefix, device, installed=True)
+    receipt.update(staging=stage_snapshot, installed_tree_before=before)
     receipt["installed_before"] = installed_check(prefix)
-    require(same_installed_tree(before, tree_snapshot(prefix, device, installed=True)),
+    receipt["installed_tree_validated"] = tree_snapshot(prefix, device, installed=True)
+    require(same_tree_snapshot(before, receipt["installed_tree_validated"]),
             "Installed files changed during validation")
-    receipt.update(staging=stage_snapshot, installed_tree_before=before, status="validated")
+    receipt["status"] = "validated"
     save()
     # Recheck the exact owned inputs immediately before the only two removals.
     check_mounts((archive, staging, prefix))
     require(identity(archive) == archive_identity, "Archive changed before cleanup")
-    require(tree_snapshot(staging, device) == stage_snapshot, "Staging changed before cleanup")
+    receipt["staging_before_cleanup"] = tree_snapshot(staging, device)
+    require(same_tree_snapshot(stage_snapshot, receipt["staging_before_cleanup"]),
+            "Staging changed before cleanup")
     canonical_directory(root)
     root_identity = identity(root)[:2]
     parent = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
@@ -210,7 +214,7 @@ def cleanup(root, receipt, save):
     receipt["installed_after"] = installed_check(prefix)
     receipt["installed_tree_after"] = tree_snapshot(prefix, device, installed=True)
     require(receipt["installed_after"] == receipt["installed_before"], "Installed checks changed after cleanup")
-    require(same_installed_tree(before, receipt["installed_tree_after"]), "Installed files changed after cleanup")
+    require(same_tree_snapshot(before, receipt["installed_tree_after"]), "Installed files changed after cleanup")
     receipt.update(status="complete", free_bytes_after=shutil.disk_usage(root).free)
     save()
 

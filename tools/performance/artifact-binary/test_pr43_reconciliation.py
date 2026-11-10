@@ -56,8 +56,18 @@ class PR43SourceReconciliation(unittest.TestCase):
                 with self.subTest(path=path), self.assertRaises(ValueError):
                     c.restore_path(wrong, path)
         current = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
-        for field in ('format', 'predecessor', 'additions', 'maintenance'):
+        for field in ('format', 'predecessor', 'additions'):
             self.assertEqual(current[field], prior[field])
+        # Only the live Patricia boundary test follows the Layout overlap.
+        # Its frozen predecessor oracle and every other maintenance row remain
+        # unchanged, and the production constructor authenticates the new SHA.
+        maintenance = 'patricia/test_adapters.py'
+        self.assertEqual(set(current['maintenance']), set(prior['maintenance']))
+        self.assertEqual({p for p in prior['maintenance']
+                          if current['maintenance'][p] != prior['maintenance'][p]}, {maintenance})
+        self.assertEqual(current['maintenance'][maintenance][0], prior['maintenance'][maintenance][0])
+        self.assertEqual(current['maintenance'][maintenance][1],
+                         hashlib.sha256((HISTORY / maintenance).read_bytes()).hexdigest())
         for path, row in prior['changes'].items():
             self.assertEqual(current['changes'][path][0], row[0])
             if path not in reviewed:
