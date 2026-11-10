@@ -67,3 +67,47 @@ phase intervals and output equality. A failed command, missing or reordered
 marker, changed input or different LLVM fails closed. Source paths containing
 newlines are explicitly rejected. Fast Python tests validate bookkeeping only;
 they do **not** substitute for compiling/running the probe and LLVM comparison.
+
+Before a large diagnostic, qualify the complete runner on the authored
+`Smoke.hs` main crate with the same producer and fixed-dependency setup:
+
+```sh
+python3 -B tools/performance/backend-stages/smoke.py \
+  --producer /path/to/producer \
+  --producer-source /path/to/producer-checkout \
+  --setup /path/to/compiler-shapes-setup/setup.json \
+  --output /path/to/fresh-small-qualification
+```
+
+This compiles a fresh target crate, runs all diagnostic controls and byte
+comparison, and builds/runs only the small emitted program with Clang `-O2`.
+Its independently authored output is `backend λ` followed by `42`, each on a
+line. This is a tooling/semantic qualification, not a compiler-generation or
+performance comparison. Preserve the setup's workspace toolchain environment
+(`PATH`, `LD_LIBRARY_PATH`, `LIBRARY_PATH`, `PKG_CONFIG_PATH` when applicable).
+
+## Qualification on 2026-11-10
+
+The OPAQUE probe and complete small-crate runner passed against authenticated
+current-main producer `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`, GHC 9.14.1
+ordinary O2, and Clang 19.1.7. All five target groups were inferred freshly.
+The 26 nested-bottom and two total controls passed; ordinary and diagnostic
+emission produced exactly the same 128,805 LLVM bytes. The resulting small
+native executable produced the independently specified two output lines.
+
+The largest sampled single-command process-tree RSS was 451,817,472 bytes
+while linking the probe. Sampling can miss short peaks; the outer orchestration
+row does not aggregate the separately guarded nested command groups. Every
+command exited successfully and recorded no terminal live descendants. The
+coordinated shared resource lock and producer lock were both checked released.
+See [results.json](results.json) for the public qualification summary.
+Original raw receipts remain local; the summary records their exact SHA-256
+identities without publishing absolute paths or tool/object inventories.
+This publication does not durably preserve the raw receipts. Their hashes
+cannot restore their contents; if local evidence is lost, rerun `smoke.py`
+and retain the newly identified qualification before relying on it.
+
+This qualifies the diagnostic tooling only. The current full 90-module target
+did not produce a checked artifact before the existing 600-second frontend
+limit, so no complete-workload backend profile or performance improvement is
+claimed. Production backend changes remain deferred until that input exists.

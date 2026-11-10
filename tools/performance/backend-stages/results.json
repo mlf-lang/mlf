@@ -1,0 +1,40 @@
+{
+  "format": 1,
+  "complete": true,
+  "scope": "small-crate diagnostic tooling and semantic qualification only",
+  "ordinary_performance_comparison": false,
+  "full_compiler_backend_profile": false,
+  "production_optimization": false,
+  "native_compiler_fixed_point": false,
+  "producer_main_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "diagnostic_commit_before_smoke_fixture": "daa88b69cce840843d9e1197f6b1993d6580af9c",
+  "fresh_target_groups": 5,
+  "ordinary_llvm_byte_identical": true,
+  "llvm_bytes": 128805,
+  "llvm_sha256": "005ad37fb573731da67cc2a88b614d2e3fc13a4bae43156e6cfb251cd7e6e532",
+  "nested_forcing_checks": 26,
+  "total_value_checks": 2,
+  "independent_native_stdout": "backend λ\n42\n",
+  "all_recorded_commands_exit_zero": true,
+  "all_recorded_terminal_live_descendants_empty": true,
+  "largest_individual_command_sampled_process_tree_rss_bytes": 451817472,
+  "resource_sampling_caveat": "100ms sampling can miss short processes/peaks; zero samples are not zero actual memory. Each nested command has its own resource receipt; the outer orchestration row is not an aggregate nested peak.",
+  "full_workload_blocker": "Current full 90-module source-to-checked qualification timed out at the existing 600-second limit before publishing a checked artifact. No complete-workload backend measurements or speedup claim are available.",
+  "omitted_large_artifacts": {
+    "ordinary.ll": {
+      "sha256": "005ad37fb573731da67cc2a88b614d2e3fc13a4bae43156e6cfb251cd7e6e532",
+      "bytes": 128805,
+      "reason": "Exact local output retained with the complete run; avoid committing an unnecessary generated LLVM listing."
+    }
+  },
+  "local_raw_evidence_sha256": {
+    "unit.queries.json": "9f7d497f98f9d05242c1ee493dcca12548f82d2ffd07f152abf9a7cf630b5c5d",
+    "receipt.json": "40de868263d10e8eed4416d74a66934940ae449d894ebd0182e76ea65154b61c",
+    "forcing-controls.stdout": "49c72357f83db0285270188eaebef83ef74198a9ff6404c42de5083b58e06900",
+    "diagnostic-receipt.json": "655cf6a920e7ea6f39ea54bf0210b1983c11bcea2dad91756800e9a152068208",
+    "native.stdout": "5af90e318331c5848e33f22f17f6bdaa58cc94928bfb676e5668f6d262b0d42e",
+    "phases.stderr": "d6c3dbfb28264cdfeb89a8eb4fdca611b777e9d030fb02408300420d398f794b"
+  },
+  "raw_receipts_publicly_published": false,
+  "raw_receipt_policy": "Original raw receipts remain local and are not durably persisted by this public checkpoint. SHA-256 identities cannot restore their contents. If local evidence is unavailable, rerun smoke.py and preserve a new qualification with its own identities."
+}
