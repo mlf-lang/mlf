@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 14,
-  "observed_at_utc": "2026-11-10T17:45:25Z",
+  "revision": 15,
+  "observed_at_utc": "2026-11-10T17:55:25Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -464,7 +464,9 @@
       "work_receipt_sha256": "ecfd8d9fec6d6096f55776dec188a6da81a81fb41f4b888e4fa73818b8f43218",
       "interpretation": "This complete small cohort does not support real compilation speedup. Candidate's slow leg also has greater recorded user CPU. Cause is unknown: throttling, CPU frequency and host competition were not measured. No sample deletion, replacement, extra run or full90 follow-on.",
       "scope": "Only fixed original-source inference11 source-to-checked, not full90, native-host or MLF/GHC ratio.",
-      "safe_remote_checkpoint": null
+      "safe_remote_checkpoint": "daf2f9780ba2a38e772fb65a6eb345ff01a8ef15",
+      "persistence_scope": "Eight sanitized source, template, SHA and Q01/Q02/C01 summary files verified by full fetch, tree and per-file bytes. Raw logs, receipts, query artifacts and binaries remain local. Public launcher has parameterized machine lock and is explicitly untested; original tested launcher hash retained.",
+      "read_only_post_investigation": "Recorded argv differ only by predeclared producer and fresh paths; fixed env and runtime match, stdout/stderr empty. No observed source/binary/parameter drift. No ordinary GC or allocation statistics were recorded; slow-leg cause is still unknown."
     },
     "static_followups": {
       "rebinding_map": {
@@ -480,8 +482,13 @@
         "reason": "Ordinary code contains a forced lazy advanceCRC result, but its old profiled self cost is only 0.50%; no candidate, codegen gate or speed claim."
       },
       "ghc_nursery": {
-        "status": "remote_read_only_preparation",
-        "reason": "Builder uses ignoreAll with no nursery override; GHC9.14.1 defaults A=4MiB. Compiled-in RTS options can coexist with ignoreAll, but no ordinary GC/allocation counters exist. First investigate ordinary statistics, not a tuning candidate or native claim."
+        "status": "ordinary_statistics_diagnostic_preparation_only",
+        "reason": "No nursery tuning admitted. Prepare non-prof ordinary statistics first, with ignoreAll unchanged. Original common Main object belongs to final builtin-prelude wrapper, so explicit private original-emlf Main recompilation is required; original C objects also lack producer receipt content hashes."
+      },
+      "validation_reuse": {
+        "status": "not_queued",
+        "result": "Two exact same-graph revalidation boundaries exist. Main generateProgram-to-prepare repeat accounts for 799/89395 old profiled ticks (0.894%) and 1.814% allocations; recursive export repeat was not observed in the prefix. No high-coverage reuse found in dominant fallback, where local and rebuilt graphs differ.",
+        "safety": "Preserve first validation/demand/error position. Public Graph/Constraints/Solver constructors and altered graph states cannot inherit a proof. Validation does not certify all IntMap cached counts."
       }
     }
   },
@@ -691,6 +698,21 @@
       "remote_tree": "b890098711bf81d1106558a0ec484557b744b613",
       "recovery_readme": "https://github.com/mlf-lang/mlf/blob/7f580a7087266f27d928196add2ea5e44fc79952/tools/performance/graph-read-fusion/producer-plan.md",
       "persistence_scope": "Five files: tested wrapper, plan, sanitized result, README and canonical generated source. Full remote tree and bytes verified. Large producer, full receipts and runtime artifacts must be rebuilt/requalified if missing."
+    },
+    {
+      "id": "R5",
+      "role": "Ordinary GC/allocation evidence; query direction implements, frontend and baseline independently review",
+      "status": "thin diagnostic tool preparation, no build or execution",
+      "production_changes": false,
+      "setup_scope": "Private original six-line emlf Main per side, original-command C reconstruction and byte-equality, then link existing corresponding 94 non-Main ordinary object closures. No full producer rebuild.",
+      "setup_total_seconds": 120,
+      "diagnostic_total_seconds": 420,
+      "per_compile_seconds": 180,
+      "diagnostic_order": "A then B, once each; not performance samples",
+      "scope": "Only compiled-in -s unique absolute file; retain ignoreAll and ordinary flags. No nursery, profiler, parallel GC or heap-policy setting.",
+      "statistics_one_use_rule": "Claim each diagnostic binary once; reject pre-existing stats path including dangling symlink. Do not execute version/show-crate with this binary before or after the compile because GHC opens stats with truncation.",
+      "oracles": "Original inference11 source/dependencies; 780 fresh/0 reused; all three raw outputs equal fixed historical B2 and qualified corresponding leg. Use ordinary producer for artifact inspection.",
+      "admission": "Setup and diagnostic require separate review and resource token. Neither is currently executed or authorized to auto-chain."
     }
   ],
   "restart_required": [
