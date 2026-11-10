@@ -14,6 +14,7 @@ module MLF.Tests.SharedFrontend where {
   import qualified Bootstrap.Lexer as L;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Surface as Surface;
+  import qualified Bootstrap.SourceEquality as SourceEquality;
   import qualified Bootstrap.Map as M;
   import qualified Bootstrap.Compiler as C;
   import qualified Bootstrap.Constraint as Constraint;
@@ -1444,9 +1445,61 @@ module MLF.Tests.SharedFrontend where {
     check "independent checker rejects recursive RHS type mismatch" (isLeft (Independent.checkClosed malformed));
     putStrLn "shared frontend: recursive inference checks passed"
   };
+  -- Compare maintained parser trees, using explicit braces as the layout
+  -- oracle. Only call-site positions are erased for these value-only cases;
+  -- signatures, binding order, shadowing and recursive groups stay exact.
+  layoutValueModule (SourceModule file name exports imports ds cs instances values body syntax) =
+    SourceModule file name exports imports ds cs instances
+      (map (\((,,) n a e) -> (,,) n a (Classes.eraseCallSites e)) values)
+      body syntax;
+  sameLayout left right = case (,) (parse left) (parse right) of {
+    (,) (Right a) (Right b) -> SourceEquality.eqSourceModule (layoutValueModule a) (layoutValueModule b);
+    _ -> False
+  };
+  formatterChecks :: IO ();
+  formatterChecks = do {
+      check "inline shared let" (accept "main = let x = 1 in x");
+      check "inline shared let forward scope" (sameLayout "main = let x = y; y = 3 in x" "main = let { x = y; y = 3 } in x");
+      check "multiline shared let forward scope"
+        (sameLayout "main =\n  let x = y\n      y = 3\n   in x" "main = let { x = y; y = 3 } in x");
+      check "inline nested let shadowing"
+        (sameLayout "main = let x = 1 in let x = 2; y = x in y" "main = let { x = 1 } in let { x = 2; y = x } in y");
+      check "implicit inline do" (accept "main = do ioReturn 1");
+      check "implicit inline case" (sameLayout "main = case True of True -> 1; False -> 2" "main = case True of { True -> 1; False -> 2 }");
+      check "inline case before next declaration"
+        (sameLayout "f b = case b of True -> 1; False -> 2\nmain = f False" "f b = case b of { True -> 1; False -> 2 }\nmain = f False");
+      check "case scrutinee closes implicit nested case"
+        (sameLayout "main = case case True of True -> False; False -> True of True -> 1; False -> 2" "main = case case True of { True -> False; False -> True } of { True -> 1; False -> 2 }");
+      check "case scrutinee closes implicit do"
+        (accept "main = case do ioReturn 1 of value -> value");
+      check "inline case closes at parenthesis"
+        (sameLayout "f a b = a + b\nmain = f (case True of True -> 1; False -> 2) 3" "f a b = a + b\nmain = f (case True of { True -> 1; False -> 2 }) 3");
+      check "inline case closes at collection comma"
+        (sameLayout "main = [case True of True -> 1; False -> 2, 3]" "main = [case True of { True -> 1; False -> 2 }, 3]");
+      check "inline do closes at else"
+        (accept "main = if True then do ioReturn 1; ioReturn 2 else do ioReturn 3; ioReturn 4");
+      check "inline do explicit let group"
+        (accept "main = do let { x = y; y = 3 }; ioReturn x");
+      check "multiline do implicit let group"
+        (accept "main = do\n  let x = y\n      y = 3\n  ioReturn x");
+      check "formatter split prologue and relocated marker"
+        (isRight (P.parseModule "Example.hs"
+          ("{-# LANGUAGE FlexibleContexts #-}\n{-# LANGUAGE FlexibleInstances #-}\n{-# LANGUAGE KindSignatures #-}\n{-# LANGUAGE MultiParamTypeClasses #-}\n{-# LANGUAGE OverloadedStrings #-}\n{-# LANGUAGE RankNTypes #-}\n-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude #-}\n{-# LANGUAGE NoMonomorphismRestriction #-}\nmodule Example where\nmain = 1\n")));
+      check "same-indent of after do rejected"
+        (reject "main = case do ioReturn 1; ioReturn 2\nof x -> x");
+      check "same-indent of after case rejected"
+        (reject "main = case case True of True -> 1; False -> 2\nof x -> x");
+      check "same-indent in after case rejected"
+        (reject "main = let x = case True of True -> 1; False -> 2\nin x");
+      check "formatter retains legacy sequential scope" legacyScope;
+      check "formatter same-indent RHS rejected" (reject "main =\n1");
+      check "formatter same-indent operator rejected" (reject "main = 1 +\n2");
+      check "formatter retains explicit boundary rejection" (reject "main = do { ioReturn 1; do\n  ioReturn 2 }")
+  };
   frontendChecks :: IO ();
   frontendChecks =
     do {
+      formatterChecks;
       check "legacy malformed pragma comment"
         (isRight
            (P.parseModule "Legacy.emlf" "{-# LANGUAGE X, #-}\nmodule Legacy where\nmain = 1\n"));
@@ -1490,9 +1543,6 @@ module MLF.Tests.SharedFrontend where {
       check "explicit separator layout accepted" (accept "a = 1;\nmain = a");
       check "implicit block closed by explicit brace rejected"
         (reject "main = do { ioReturn 1; do\n  ioReturn 2 }");
-      check "explicit local braces" (reject "main = let x = 1 in x");
-      check "implicit inline do" (reject "main = do ioReturn 1");
-      check "implicit inline case" (reject "main = case True of True -> 1; False -> 2");
       check "recursive spelling rejected" (reject "main = let rec { x :: Int; x = x } in 1");
       check "single-colon signature" (reject "main : Int\nmain = 1");
       check "inline signature" (reject "main :: Int = 1");
@@ -1664,6 +1714,7 @@ module MLF.Tests.SharedFrontend where {
     else do {
       mode <- getArg 0;
       if eqString mode "--recursive-inference" then recursiveInferenceChecks
+      else if eqString mode "--formatter" then do { formatterChecks; putStrLn "shared frontend: formatter checks passed" }
       else if eqString mode "--frontend" then frontendChecks
       else if eqString mode "--native-first" then nativeFirst
       else if eqString mode "--native-second" then nativeSecond

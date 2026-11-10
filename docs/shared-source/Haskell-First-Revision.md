@@ -98,9 +98,13 @@ Use `::`, `forall a.`, kind annotations `(m :: * -> *)`, ordinary arrows and
 class contexts. Do not reinterpret a Haskell-local signature as a legacy
 sequential binder. Explicit braces/semicolons in maintained code are ordinary
 Haskell, not a new layout dialect. Accepted indentation must produce Haskell
-layout; unsupported layout forms are rejected rather than interpreted with the
-legacy separator algorithm. Same-indentation continuations and explicit/implicit
-brace boundaries have dedicated differential tests.
+layout. Shared sources accept inline and multiline `let`, `do`, and `case`
+blocks, including nested `case` or `do` scrutinees closed by the surrounding
+`of`. The legacy sequential-let route is unchanged. Same-indentation
+continuations and explicit/implicit brace boundaries retain their rejection
+controls. The [formatter compatibility gate](Formatter-Compatibility.md)
+compares maintained-library ASTs before and after safe Ormolu formatting;
+this does not claim support for every Haskell extension or layout form.
 
 ### Operators, if and guards
 

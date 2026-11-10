@@ -2,6 +2,7 @@
 """Independent transition checks and immutable predecessor regression replay."""
 from pathlib import Path
 import hashlib
+import json
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,49 @@ class PR43SourceReconciliation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.contract = live_contract(HISTORY)
+
+    def test_formatter_follow_on_is_exactly_the_reviewed_live_delta(self):
+        # Keep the previously published endpoint independently recoverable. This
+        # is source provenance, not a claim that old measurements cover new code.
+        base = 'd925341c0f617db3ba9847a1975cc8720196f400'
+        git = ['git', '--no-replace-objects', '-C', str(ROOT)]
+        def archived(path):
+            return subprocess.check_output([*git, 'show', base + ':' + path])
+        tree = subprocess.check_output([*git, 'rev-parse', base + '^{tree}'], text=True).strip()
+        self.assertEqual(tree, 'feb2870d5067b8b434b2ebaf2843d468288838c7')
+        manifest = archived('tools/performance/artifact-binary/pr43-reconciliation-migration.json')
+        self.assertEqual(hashlib.sha256(manifest).hexdigest(),
+                         'f0379aba40e33ae97d57381658ad1f7d12756831af9ea604dd3ab063ff107bf4')
+        prior = json.loads(manifest)
+        c = self.contract
+        previous_endpoint = dict(c.previous.value['current_files'])
+        previous_endpoint.update({p: row[1] for p, row in prior['changes'].items()})
+        previous_endpoint.update(prior['additions'])
+        reviewed = {
+            'bootstrap/MLF/BuiltinPreludeData.hs',
+            'libraries/mlf-crates/Bootstrap/SourceInference.hs',
+            'libraries/mlf-frontend/Bootstrap/Layout.hs',
+            'mlf.lock',
+            'tests/shared/MLF/Tests/SharedFrontend.hs',
+            'tools/shared/build.py',
+        }
+        self.assertEqual(set(previous_endpoint), set(c.value['current_files']))
+        self.assertEqual({p for p, digest in previous_endpoint.items()
+                          if c.value['current_files'][p] != digest}, reviewed)
+        for path in reviewed:
+            old = archived(path)
+            self.assertEqual(hashlib.sha256(old).hexdigest(), previous_endpoint[path])
+            # A previous-endpoint source or unreviewed byte must not pass as live.
+            for wrong in (old, (ROOT / path).read_bytes() + b' '):
+                with self.subTest(path=path), self.assertRaises(ValueError):
+                    c.restore_path(wrong, path)
+        current = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        for field in ('format', 'predecessor', 'additions', 'maintenance'):
+            self.assertEqual(current[field], prior[field])
+        for path, row in prior['changes'].items():
+            self.assertEqual(current['changes'][path][0], row[0])
+            if path not in reviewed:
+                self.assertEqual(current['changes'][path], row)
 
     def test_complete_tree_projections_recover_exact_predecessor_and_live_inputs(self):
         c = self.contract

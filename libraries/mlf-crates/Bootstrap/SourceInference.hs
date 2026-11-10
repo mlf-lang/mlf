@@ -1304,7 +1304,13 @@ module Bootstrap.SourceInference where {
         entries = sortBy (\a b -> compareInt (fst (snd a)) (fst (snd b)))
           (map (\i -> (,) i (indexedBindingWith name rows i)) ids);
         memberOrder = map fst entries; members = map (compose snd snd) entries;
-        support = case ids of { (:) i _ -> case V.at rows i of { PlannedSupport _ _ _ -> True; _ -> False }; [] -> False };
+        support = case ids of {
+          (:) i _ -> case V.at rows i of {
+            PlannedSupport _ _ _ -> True;
+            _ -> False
+          };
+          [] -> False
+        };
         prepare checked contracts = prepareWithChecked checked (Just memberOrder) selectBindings Nothing (case ids of { [i] -> Just i; _ -> Nothing })
           (eligibleSourceWith (any snd group)) plan contracts names
           (if support then [] else members) (if support then members else [])

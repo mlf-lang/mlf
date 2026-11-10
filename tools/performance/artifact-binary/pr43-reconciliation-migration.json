@@ -3,7 +3,7 @@
   "changes": {
     "bootstrap/MLF/BuiltinPreludeData.hs": [
       "91b2dee48f06af0432c7d2e81372d3a51d223c0e91ff22eab6e132559b4e3211",
-      "af45b8f1846c57c167cc203a37b31dfa077edd3dbdb43d16fcf1c58335149c87"
+      "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692"
     ],
     "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs": [
       "93713ba56536cc32eea5e5474548381509238e8016f42e46f8a3c8356b4b85d6",
@@ -29,13 +29,29 @@
       "3280476968d34ab9a71f91e003008fe6b3bc9b28dcf805d1fc948d8c6b2b593c",
       "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
     ],
+    "libraries/mlf-crates/Bootstrap/SourceInference.hs": [
+      "19076e1521695b68a8eed8ba97305498bd863ed7f5602898cd2c34bdf1a40593",
+      "f62f60fdee8d63541f326572d791b7d2c0cb492603bacefd8cd61d4e5b437f3b"
+    ],
+    "libraries/mlf-frontend/Bootstrap/Layout.hs": [
+      "2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de",
+      "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8"
+    ],
     "libraries/mlf-package-core/Package/Release.hs": [
       "c948c574e757238df2d75fb68f5e03b15635e9dcd589feda61a91d7a4219fc60",
       "0b23919bb1f3047a222fd8efec0da951d5b1f6e2a3d1bb69d093a9db0ccb9a4e"
     ],
     "mlf.lock": [
       "5f7f58dece7a251711a3da2b78ba42502bd25554672bbbeaf8bf95abbc469077",
-      "ebce6286ef3254a5c9d40b4b056b62d1382b289aa15765c6ed1c43a40bb7cb72"
+      "351b07e06e28bae17717c9e860c22e3302bc73a63313e5e12c5cce33125abd99"
+    ],
+    "tests/shared/MLF/Tests/SharedFrontend.hs": [
+      "5bff1513b7f401241ebbff89888ad8790bd92d0ee7858d8148bc7cec334f735a",
+      "f5f2956a34248a6e107ec275250c72399416d39a69317df9c0b136979e24ad03"
+    ],
+    "tools/shared/build.py": [
+      "3ac387f43f4ce6261a94fd514da2108d7dce607867bab2a4267bb73918b1de1f",
+      "eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df"
     ]
   },
   "format": "pr43-reconciliation-source-migration-v1",

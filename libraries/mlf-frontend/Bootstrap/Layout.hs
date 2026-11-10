@@ -8,14 +8,17 @@ module Bootstrap.Layout where {
   import Bootstrap.Std;
   import Bootstrap.Lexer;
   data LayoutKind = LayoutTop | LayoutBlock | LayoutBindings;
-  data LayoutMark = LetMark | IfMark;
+  data LayoutMark = LetMark | IfMark | CaseMark;
   data Frame = Layout LayoutKind Int | Explicit String | Marker LayoutMark Int;
   data Pending = Open LayoutKind | AfterLet Int;
   layoutTokens :: Bool -> String -> String -> Either String Scanned;
   layoutTokens = layoutTokensWithScanner scanTokens;
   layoutTokensWithScanner :: (String -> String -> Either String Scanned) ->
                              Bool -> String -> String -> Either String Scanned;
-  layoutTokensWithScanner scanner program file source =
+  layoutTokensWithScanner = layoutTokensUsing False;
+  layoutTokensUsing :: Bool -> (String -> String -> Either String Scanned) ->
+                       Bool -> String -> String -> Either String Scanned;
+  layoutTokensUsing shared scanner program file source =
     case scanner file source of {
       Left e -> Left e;
       Right (Scanned tokens finish) ->
@@ -38,7 +41,7 @@ module Bootstrap.Layout where {
             else []
         } in
         let {
-          arranged = arrange frames Nothing Nothing tokens finish
+          arranged = arrange shared frames Nothing Nothing tokens finish
         } in
         Right (Scanned (if implicit then (:) (virtual "{" first) arranged else arranged) finish)
     };
@@ -74,8 +77,8 @@ module Bootstrap.Layout where {
     then []
     else (:) (virtual (stringFromCode (stringCodeAt text i)) token)
            (punctuationAt text token (i + 1) size);
-  arrange :: [] Frame -> Maybe Pending -> Maybe Token -> [] Token -> Token -> [] Token;
-  arrange frames pending previous tokens finish =
+  arrange :: Bool -> [] Frame -> Maybe Pending -> Maybe Token -> [] Token -> Token -> [] Token;
+  arrange shared frames pending previous tokens finish =
     case tokens of {
       [] ->
         let {
@@ -90,23 +93,23 @@ module Bootstrap.Layout where {
         case pending of {
           Just (AfterLet line) ->
             if eqString (tokenText t) "rec"
-            then (:) t (arrange frames (Just (AfterLet (tokenEndLine t))) (Just t) ts finish)
+            then (:) t (arrange shared frames (Just (AfterLet (tokenEndLine t))) (Just t) ts finish)
             else if eqString (tokenText t) "{"
-                 then (:) t (nextToken t ts finish (pushToken t frames))
-                 else if (tokenLine t > line)
-                      then opened LayoutBindings frames previous t ts finish
-                      else normal frames previous t ts finish;
+                 then (:) t (nextToken shared t ts finish (pushToken shared t frames))
+                 else if (shared || tokenLine t > line)
+                      then opened shared LayoutBindings frames previous t ts finish
+                      else normal shared frames previous t ts finish;
           Just (Open kind) ->
             if eqString (tokenText t) "{"
-            then (:) t (nextToken t ts finish (pushToken t frames))
-            else opened kind frames previous t ts finish;
-          Nothing -> normal frames previous t ts finish
+            then (:) t (nextToken shared t ts finish (pushToken shared t frames))
+            else opened shared kind frames previous t ts finish;
+          Nothing -> normal shared frames previous t ts finish
         }
     };
-  nextToken :: Token -> [] Token -> Token -> [] Frame -> [] Token;
+  nextToken :: Bool -> Token -> [] Token -> Token -> [] Frame -> [] Token;
   -- A braced guard-if closes at }, so it must not intercept an enclosing
   -- ordinary if's then/else (which may also close an implicit do block).
-  nextToken token rest finish stack =
+  nextToken shared token rest finish stack =
     let {
       scoped =
         if eqString (tokenText token) "if"
@@ -122,7 +125,7 @@ module Bootstrap.Layout where {
              }
         else stack
     } in
-    arrange scoped (keyword token) (Just token) rest finish;
+    arrange shared scoped (keyword token) (Just token) rest finish;
   previousText :: Maybe Token -> String;
   previousText previous =
     case previous of {
@@ -167,8 +170,8 @@ module Bootstrap.Layout where {
                                                                      ((:) ">"
                                                                         ((:) ">="
                                                                            [])))))))))))))))))))))));
-  opened :: LayoutKind -> [] Frame -> Maybe Token -> Token -> [] Token -> Token -> [] Token;
-  opened kind stack previous token rest finish =
+  opened :: Bool -> LayoutKind -> [] Frame -> Maybe Token -> Token -> [] Token -> Token -> [] Token;
+  opened shared kind stack previous token rest finish =
     let {
       column = tokenColumn token
     } in
@@ -178,25 +181,27 @@ module Bootstrap.Layout where {
                 stack of {
            (,) prefix remaining ->
              append (punctuation ("{}" ++ prefix) token)
-               ((:) token (nextToken token rest finish (pushToken token remaining)))
+               ((:) token (nextToken shared token rest finish (pushToken shared token remaining)))
          }
     else (:) (virtual "{" token)
            ((:) token
-              (nextToken token rest finish (pushToken token ((:) (Layout kind column) stack))));
+              (nextToken shared token rest finish (pushToken shared token ((:) (Layout kind column) stack))));
   isTop :: LayoutKind -> Bool;
   isTop kind =
     case kind of {
       LayoutTop -> True;
       _ -> False
     };
-  normal :: [] Frame -> Maybe Token -> Token -> [] Token -> Token -> [] Token;
-  normal stack previous token rest finish =
+  normal :: Bool -> [] Frame -> Maybe Token -> Token -> [] Token -> Token -> [] Token;
+  normal shared stack previous token rest finish =
     let {
       text = tokenText token
     } in
     let {
       closing =
-        if eqString text "in"
+        if (shared && eqString text "of")
+        then closeMark CaseMark False stack
+        else if eqString text "in"
         then closeMark LetMark False stack
         else if eqString text "then"
              then closeMark IfMark True stack
@@ -246,12 +251,12 @@ module Bootstrap.Layout where {
           (,) separator scoped ->
             append (punctuation (ending ++ separator) token)
               ((:) token
-                 (nextToken token rest finish
-                    (if closingToken then scoped else pushToken token scoped)))
+                 (nextToken shared token rest finish
+                    (if closingToken then scoped else pushToken shared token scoped)))
         }
     };
-  pushToken :: Token -> [] Frame -> [] Frame;
-  pushToken token frames =
+  pushToken :: Bool -> Token -> [] Frame -> [] Frame;
+  pushToken shared token frames =
     let {
       text = tokenText token
     } in
@@ -261,7 +266,9 @@ module Bootstrap.Layout where {
          then (:) (Marker LetMark (tokenColumn token)) frames
          else if eqString text "if"
               then (:) (Marker IfMark (tokenColumn token)) frames
-              else frames;
+              else if (shared && eqString text "case")
+                   then (:) (Marker CaseMark (tokenColumn token)) frames
+                   else frames;
   keyword :: Token -> Maybe Pending;
   keyword token =
     let {
@@ -312,6 +319,11 @@ module Bootstrap.Layout where {
       IfMark ->
         case b of {
           IfMark -> True;
+          _ -> False
+        };
+      CaseMark ->
+        case b of {
+          CaseMark -> True;
           _ -> False
         }
     };
@@ -382,10 +394,9 @@ module Bootstrap.Layout where {
       (:) (Layout _ _) rest -> ("}" ++ closes rest);
       (:) _ rest -> closes rest
     };
-  -- The shared dialect deliberately accepts canonical layout only. Local lets
-  -- and inline blocks are explicit; all remaining layout blocks must begin on
-  -- the next line. These checks reject cases needing Haskell's parse-error
-  -- layout closure rather than interpreting them with the legacy heuristics.
+  -- Shared Haskell layout opens let bindings on the same line as well as
+  -- subsequent lines. Inline do/of/where use the same indentation and
+  -- delimiter closures as multiline blocks; legacy let remains sequential.
   layoutTokensWithProfile :: SourceSyntax -> Bool -> String -> String -> Either String Scanned;
   layoutTokensWithProfile syntax program file source =
     if not (isSharedSyntax syntax)
@@ -399,8 +410,7 @@ module Bootstrap.Layout where {
              Scanned tokens finish ->
                do {
                  validateSharedTokens file tokens;
-                 validateSharedLayout file tokens;
-                 arranged <- layoutTokensWithScanner scanSourceTokens program file source;
+                 arranged <- layoutTokensUsing True scanSourceTokens program file source;
                  case arranged of {
                    Scanned ordered _ -> validateSharedArranged file [] Nothing ordered
                  };
@@ -408,30 +418,6 @@ module Bootstrap.Layout where {
                }
            }
          };
-  validateSharedLayout :: String -> [] Token -> Either String ();
-  validateSharedLayout file tokens =
-    case tokens of {
-      [] -> Right ();
-      (:) token rest ->
-        do {
-          let {
-            text = tokenText token
-          };
-          case rest of {
-            (:) next _ ->
-              if eqString text "let"
-              then unless (eqString (tokenText next) "{")
-                     (Left (file ++ ": shared let groups require explicit braces"))
-              else if elem eqString text ((:) "do" ((:) "of" ((:) "where" [])))
-                   then unless
-                          (eqString (tokenText next) "{" || (tokenLine next > tokenEndLine token))
-                          (Left (file ++ ": inline shared blocks require explicit braces"))
-                   else Right ();
-            _ -> Right ()
-          };
-          validateSharedLayout file rest
-        }
-    };
   virtualToken :: Token -> Bool;
   virtualToken token =
     ((tokenLine token == tokenEndLine token) && (tokenColumn token == tokenEndColumn token));
@@ -498,7 +484,11 @@ module Bootstrap.Layout where {
                              }
                         else frames
           };
-          validateSharedArranged file nextFrames (Just token) rest
+          -- Virtual closing braces do not turn a dedented continuation into
+          -- a same-line token. Keep the preceding real token until a genuine
+          -- separator is seen, so `of`/`in` at declaration indent still fail.
+          validateSharedArranged file nextFrames
+            (if virtual && eqString text "}" then previous else Just token) rest
         }
     };
   closedByExplicitBrace :: Token -> [] Token -> Bool;

@@ -102,11 +102,46 @@ def source_imports(text):
     return imports
 
 
+def source_prologue_markers(text):
+    """Read real leading marker comments; the compiler validates pragma syntax."""
+    markers, index, size = [], 0, len(text)
+    while index < size:
+        if text[index].isspace():
+            index += 1
+        elif text.startswith('--', index):
+            end = text.find('\n', index)
+            if end < 0:
+                end = size
+            comment = text[index + 2:end].strip()
+            if comment.startswith('mlf:syntax'):
+                markers.append(comment[len('mlf:syntax'):].strip())
+            index = end
+        elif text.startswith('{-', index):
+            # LANGUAGE pragmas are block comments here, including any marker
+            # lookalikes inside them. Respect nested ordinary block comments.
+            depth = 1
+            index += 2
+            while index < size and depth:
+                if text.startswith('{-', index):
+                    depth += 1
+                    index += 2
+                elif text.startswith('-}', index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            if depth:
+                return []  # Unterminated prologues never prove a profile.
+        else:
+            break  # Never discover markers in source code or string literals.
+    return markers
+
+
 def source_builtins(source, text):
     # This is a conservative inventory check, not the compiler prologue parser.
     # Shared sources explicitly opt in before code; a filename alone is not proof.
-    marker = text.splitlines()[0] if text.splitlines() else ''
-    shared = marker == '-- mlf:syntax shared-haskell-v1'
+    markers = source_prologue_markers(text)
+    shared = markers == ['shared-haskell-v1']
     if Path(source).suffix == '.hs' and not shared:
         raise ValueError(f'shared source requires explicit profile marker: {source}')
     # Both builtins may be explicitly imported by legacy guests. This does not
