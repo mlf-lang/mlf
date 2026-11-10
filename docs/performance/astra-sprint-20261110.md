@@ -200,3 +200,15 @@ F3原名Graph代码生成第01次捕获因GHC -c接口搜索布局失败，未�
 下一版目前仅获准实现和静态审查，没有第二轮执行许可：本次只运行既有O2 binary，不执行GHC或producer，因此区分历史构建来源与实际执行闭包。固定原语义/码形receipt身份，保留当前binary、源/fixture及测量harness前后pins，并验证实际ELF loader与解析运行库；不再声称本次重认证未使用的整套GHC安装、旧对象和raw dumps。旧gate没有记录完整LD环境且脚本拼接未知尾部，不能假称清理后仍为原环境。新环境应明确固定，先用同一个O2 binary重跑原七行语义controls作为独立runtime资格，成功后再同环境运行原32批、两warmup和ABBAABBA八样本，全部仍在一个60秒scope内。保留阶段状态、失败和所有样本；不pilot、缩N或补样追逐好结果。
 
 截至本节，没有任何普通编译器提速被验证或合并，当前完整MLF/GHC倍率仍不可用。B0单crate和B2同源分crate600秒失败都保持不变，GHC155.931809537秒只是一次资格。语义通过、静态分配减少、内部诊断比例和失败的零样本尝试都不能代替速度结果。下一步先取得可信小样本，再决定是否值得普通完整candidate构建与同边界复测；目标仍约1×GHC，native代际A/B与fixed-point继续暂停。
+
+## 首个普通局部结果与下一真实编译门（2026-11-10 16:53 UTC）
+
+F3-samples-02在29.452074332秒内完整通过。明确的新runtime下原七行语义controls耗时0.339976448秒并通过，随后两次warmup及预先固定ABBAABBA八样本全部完成，25个输入pins、实际ELF运行库映射/字节、后验及进程/锁清理均通过。没有构建、RTS变化、删样、pilot、补样或调整32批输入。
+
+八条wall依次为2.914547461、2.620056983、2.597147202、4.398374533、3.762157255、2.946048692、2.236740465、2.457958738秒。基线中位3.338352358秒，候选2.6086020925秒，candidate/base为0.781404，描述性耗时降低约21.9%；几何均值比0.784236，两块比值约0.728571和0.844155。每侧只有4条，波动明显，不能当稳定普遍收益承诺。该harness计时含启动、选集、ID改名、Graph操作和完整序列化，不是纯unify成本、完整编译器速度或MLF-native速度。弱字符和仅证明消费及弱一致，不能替代先前精确语义门。
+
+[已测新runner和完整脱敏样本检查点9c9d2fe0](https://github.com/mlf-lang/mlf/blob/9c9d2fe08afcbca11774279d269286ed4deda118/tools/performance/graph-read-fusion/README.md)已取回完整tree和README核验；旧649脚本及零样本失败01保留，raw receipts和机器路径未公开。这是本轮第一份普通局部性能结果，尚没有可确认的完整compiler提速或新的MLF/GHC倍率。
+
+Astra准入下一阶段的准备而非执行：F1用正常完整manifest的GHC --make -fforce-recomp构建独立ordinary候选producer，生成自己的receipt，不把Graph.o换入旧Solver/Constraint反向依赖冒充完整candidate；具体600秒构建窗口待实际命令/范围审查。B0准备原冻结f9的inference11模块source→checked切片，历史99.039秒/780fresh组仅作容量参考，不充新样本，也不将切片换成candidate修改后的目标源码。切片始终不是完整90模块或GHC对照。
+
+格式源码核查后的初始正确性门为.mlfci、.mlfco和.queries三个公开产物原始字节一致，保留相同crate id、源和依赖路径/顺序，仅fresh cache/output目录变化。早期依据legacy Q.queryKey猜测queries必随compiler digest改变的推断已撤回：当前QueryGraph rawNode hash描述内容，compiler digest绑定cache generation；不能预先放宽public query比较。任何不一致先停解释，不事后忽略字段。native代际A/B和fixed-point仍暂停。
