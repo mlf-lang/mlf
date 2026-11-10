@@ -1,0 +1,269 @@
+{
+  "additional_after_scope_input_and_runtime_readback_passed": true,
+  "admitted_plan_sha256": "a2a9a312895d130d69c0016bcde42493f32d2ff0311170dfa87999f9b3db8690",
+  "baseline_ref": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "borrowed_build_objects_reauthenticated_this_run": false,
+  "build_provenance_verified_at_gate": true,
+  "candidate_graph_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+  "checksum_is_weak_not_exact_graph_oracle": true,
+  "checksum_stdout": "(179712,978066951)\n",
+  "controller_sha256": "6cfa19c71442422d0a5f1b5386618e60bca6883821ab556a4dff67f3643e7093",
+  "descriptive_wall_summary": {
+    "all_base_seconds": [
+      2.914547461,
+      4.398374533,
+      3.762157255,
+      2.457958738
+    ],
+    "all_candidate_seconds": [
+      2.620056983,
+      2.597147202,
+      2.946048692,
+      2.236740465
+    ],
+    "base_median_seconds": 3.338352358,
+    "block_candidate_divided_by_base_geometric_mean": [
+      0.7285711687958019,
+      0.8441545996411991
+    ],
+    "candidate_divided_by_base_geometric_mean": 0.7842363822884912,
+    "candidate_divided_by_base_median": 0.7814040618716498,
+    "candidate_median_seconds": 2.6086020925,
+    "no_outliers_removed": true,
+    "no_significance_claim": true,
+    "warmups_excluded": true
+  },
+  "exact_target_argv_survivors": [],
+  "execution_pin_count": 25,
+  "formal_samples_per_side": 4,
+  "historical_codegen_outputs_reauthenticated_this_run": false,
+  "historical_runtime_environment_reproduced": false,
+  "limitations": [
+    "one small predeclared cohort, no significance or compiler-speedup claim",
+    "same renamed dual-module ordinary O2 probe; not original-name production compiler timing",
+    "startup, frozen input filtering, ID renaming, unify, serialization and checksum included",
+    "eight normalization read sites not sampled; other sites not individually counted",
+    "no allocation measurement; RSS is not allocated bytes",
+    "loader-listed dependencies and trusted Python/OS context, not entire OS or arbitrary runtime dlopen capture",
+    "original codegen evidence is separate; not all 54 sites proved faster",
+    "01 and 02 use different explicit authentication/runtime qualification contracts; 02 is not a retrospective repair of 01"
+  ],
+  "locks_released": true,
+  "operations_per_process": 179712,
+  "phases": [
+    {
+      "complete": true,
+      "label": "historical-receipts",
+      "wall_seconds": 0.058015237
+    },
+    {
+      "complete": true,
+      "label": "semantic-inputs",
+      "wall_seconds": 0.011110287
+    },
+    {
+      "complete": true,
+      "label": "execution-inputs",
+      "wall_seconds": 0.075702637
+    },
+    {
+      "complete": true,
+      "label": "runtime-before",
+      "wall_seconds": 0.012307284
+    },
+    {
+      "complete": true,
+      "label": "runtime-controls",
+      "wall_seconds": 0.345511705
+    },
+    {
+      "complete": true,
+      "label": "warmup-0-base",
+      "wall_seconds": 2.558444614
+    },
+    {
+      "complete": true,
+      "label": "warmup-1-candidate",
+      "wall_seconds": 2.131264753
+    },
+    {
+      "complete": true,
+      "label": "sample-2-base",
+      "wall_seconds": 2.926950664
+    },
+    {
+      "complete": true,
+      "label": "sample-3-candidate",
+      "wall_seconds": 2.62695593
+    },
+    {
+      "complete": true,
+      "label": "sample-4-candidate",
+      "wall_seconds": 2.60244671
+    },
+    {
+      "complete": true,
+      "label": "sample-5-base",
+      "wall_seconds": 4.409810198
+    },
+    {
+      "complete": true,
+      "label": "sample-6-base",
+      "wall_seconds": 3.783335736
+    },
+    {
+      "complete": true,
+      "label": "sample-7-candidate",
+      "wall_seconds": 2.954277649
+    },
+    {
+      "complete": true,
+      "label": "sample-8-candidate",
+      "wall_seconds": 2.242648952
+    },
+    {
+      "complete": true,
+      "label": "sample-9-base",
+      "wall_seconds": 2.464055865
+    },
+    {
+      "complete": true,
+      "label": "post-inputs",
+      "wall_seconds": 0.047193867
+    },
+    {
+      "complete": true,
+      "label": "runtime-after",
+      "wall_seconds": 0.014323148
+    }
+  ],
+  "pins_unchanged": true,
+  "prior_attempt_preserved": "sample.py 64913a6b and sample-01-summary.json: preflight timeout, zero target processes",
+  "qualification_environment_changed": true,
+  "qualification_environment_history_incomplete": true,
+  "raw_local_receipts": {
+    "hashes_do_not_restore_bytes": true,
+    "remotely_persisted": false,
+    "samples_sha256": "ad7fd37b309d76e4de928c627c68babe45a2d3bb3af590ff4b09de5509e8da72",
+    "scope_sha256": "da4a966b9902b237f3cfbf123b59aeea2891c16ee909db4dc59fa8181eca18f3"
+  },
+  "repetitions_per_process": 32,
+  "runtime_controls": {
+    "complete": true,
+    "exit_code": 0,
+    "reason": null,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "0110af2e586cc5545fa05328c96300a897cabf48c6a08713081dc61a65299826",
+    "wall_seconds": 0.339976448
+  },
+  "runtime_environment": {
+    "GHCRTS": "",
+    "GHC_ENVIRONMENT": "-",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "LD_LIBRARY_PATH": "one explicitly supplied private Debian library directory; no inherited tail",
+    "MAKEFLAGS": "-j1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "PATH": "/usr/bin:/bin",
+    "TZ": "UTC",
+    "all_other_variables_absent": true
+  },
+  "runtime_file_libraries": [
+    {
+      "name": "ld-linux-x86-64.so.2",
+      "sha256": "c8438e4fde1934e61c88311633f00949ff645d5c04cdb8671fa3d78164d2f307"
+    },
+    {
+      "name": "libc.so.6",
+      "sha256": "9792e3cbb541c8f44c7acf5f14f4022ea62998ecc787d326bed4d8b6547dfd92"
+    },
+    {
+      "name": "libgmp.so.10",
+      "sha256": "d15e1585c6c267296459570c8ac217ca9123044bcd4e896d2f686b32333445d2"
+    },
+    {
+      "name": "libm.so.6",
+      "sha256": "6d567d53e895273ca14a1f9dc164fc6c8d39aed2f60aa46a733c2784228915f3"
+    }
+  ],
+  "runtime_kernel_mapping": "linux-vdso.so.1; not a file hash",
+  "runtime_mapping_and_bytes_unchanged": true,
+  "samples": [
+    {
+      "complete": true,
+      "index": 2,
+      "side": "base",
+      "wall_seconds": 2.914547461
+    },
+    {
+      "complete": true,
+      "index": 3,
+      "side": "candidate",
+      "wall_seconds": 2.620056983
+    },
+    {
+      "complete": true,
+      "index": 4,
+      "side": "candidate",
+      "wall_seconds": 2.597147202
+    },
+    {
+      "complete": true,
+      "index": 5,
+      "side": "base",
+      "wall_seconds": 4.398374533
+    },
+    {
+      "complete": true,
+      "index": 6,
+      "side": "base",
+      "wall_seconds": 3.762157255
+    },
+    {
+      "complete": true,
+      "index": 7,
+      "side": "candidate",
+      "wall_seconds": 2.946048692
+    },
+    {
+      "complete": true,
+      "index": 8,
+      "side": "candidate",
+      "wall_seconds": 2.236740465
+    },
+    {
+      "complete": true,
+      "index": 9,
+      "side": "base",
+      "wall_seconds": 2.457958738
+    }
+  ],
+  "scope": {
+    "complete": true,
+    "exit_code": 0,
+    "reason": null,
+    "sampled_process_tree_peak_rss_bytes": 31711232,
+    "terminal_live_descendants": [],
+    "wall_seconds": 29.452074332
+  },
+  "semantic_input_count": 15,
+  "status": "complete bounded Graph harness cohort; not compiler throughput",
+  "system_preload_absent": true,
+  "toolchain_reauthenticated_this_run": false,
+  "wall_time_variability": "noticeable; all observations retained, no confidence guarantee",
+  "warmups": [
+    {
+      "complete": true,
+      "index": 0,
+      "side": "base",
+      "wall_seconds": 2.554538158
+    },
+    {
+      "complete": true,
+      "index": 1,
+      "side": "candidate",
+      "wall_seconds": 2.127145595
+    }
+  ]
+}

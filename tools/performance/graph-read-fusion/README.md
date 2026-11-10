@@ -1,7 +1,8 @@
 # Read-action fusion experiment
 
-Status: O0/O2 semantic gate passed. The ordinary owner-codegen gate and all
-performance samples remain pending. There is no speedup or full-compiler claim.
+Status: O0/O2 semantics and representative ordinary code-generation review
+passed. One fixed, small Graph harness cohort completed under a newly qualified
+runtime. It suggests a local improvement, not a compiler or native MLF speedup.
 
 Baseline is exact `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`, independent of the
 small parent-placement experiment. Only `libraries/mlf-inference/Bootstrap/Graph.hs`
@@ -91,12 +92,55 @@ coordinator admission after the semantic gate. No full producer is planned here.
 
 After the independent original-name codegen review, one separately admitted
 60-second sampling scope was attempted using the existing O2 semantic binary.
-It timed out in preflight before launching any Graph warm-up or sample. There
-is no elapsed-time comparison, median, ratio or throughput conclusion.
-See `sample-plan.md` and `sample-01-summary.json`; no replacement cohort ran.
+It timed out in preflight before launching any Graph warm-up or sample. That attempt
+has no elapsed-time comparison, median, ratio or throughput conclusion.
+See `sample-plan.md` and `sample-01-summary.json`; the failed cohort remains intact.
 The producer, native MLF performance and full90 endpoint remain unmeasured here.
 
 The separately preserved code-generation evidence is available in the
 [owner-codegen checkpoint](https://github.com/mlf-lang/mlf/blob/d79f7492c3b051d4cc14c1e2ae594d86a31f852e/tools/performance/full-compiler/graph-read-codegen-20261110/README.md).
 It supports the mechanism for representative callers, not a measured compiler
 speedup or universal reduction at every source site.
+
+
+## Fixed-runtime Graph sample 02
+
+A separately admitted version now authenticates the actual executable and its
+loader-resolved libraries, preserving the exact historical build/semantic/codegen
+receipts and all 15 semantic input pins. It does not rescan unused GHC installation
+files, borrowed object/interface files or raw codegen dumps. This narrower boundary
+is explicit; those historical build environments were not reauthenticated.
+
+The old loader environment was incompletely recorded. Therefore 02 used a fixed
+allowlist environment and first reran the original seven-line controls with the
+same O2 binary. This is a new runtime qualification, not a claim that the old
+runtime was identical. The controls passed in 0.339976448 seconds. All preflight,
+loader resolution, controls, two warmups, eight samples and postchecks finished
+in one 29.452074332-second scope below the 60-second limit. No child exceeded its
+15-second cap. Every source/executable pin and runtime mapping/byte check passed;
+there were no surviving descendants and both locks were released.
+
+Formal sample order was the predeclared ABBAABBA, N=32 batches per process:
+
+- Baseline walls: 2.914547461, 4.398374533, 3.762157255, 2.457958738 seconds.
+- Candidate walls: 2.620056983, 2.597147202, 2.946048692, 2.236740465 seconds.
+- Baseline median: 3.338352358 seconds; candidate median: 2.6086020925 seconds.
+- Candidate/base median ratio: 0.781404; geometric-mean ratio: 0.784236.
+- The two ABBA block ratios were 0.728571 and 0.844155.
+
+There are only four formal samples per side, with noticeable wall-time variation.
+The roughly 22% median elapsed-time reduction is limited to this harness.
+All eight observations are retained, with no outlier removal, replacement, pilot
+or significance claim. Two warmups are excluded from the descriptive statistics.
+The complete serialized results were consumed, but the reported checksum is weak
+and is not a byte-exact graph oracle. Exact semantic comparisons were separate.
+The timing includes startup, frozen input filtering, renaming, public unification,
+serialization and checksum. It is not pure-unify time, full compiler throughput,
+a native MLF result, or an allocation measurement.
+
+`sample-runtime.py` is the exact executed controller. `runtime-sample-plan.md`
+contains the reviewed contract and restoration variables; `sample-02-summary.json`
+contains safe statistics and receipt hashes. Raw commands, local machine paths,
+full receipts and binaries remain local and are not remotely persisted. The
+original `sample.py` and failed 01 evidence are not overwritten. Any further
+experiment needs a new admission; no full producer or long endpoint ran here.
