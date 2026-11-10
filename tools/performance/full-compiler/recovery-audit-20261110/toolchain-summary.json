@@ -1,0 +1,118 @@
+{
+  "format": "astra-toolchain-recovery-summary-v1",
+  "observed_at_utc": "2026-11-10T21:00:27Z",
+  "complete": true,
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "manifest_commit": "305914c90e8fdff3a912faa6b93c08146273cf3e",
+  "original_manifest_sha256": "f99eb3a422a1fa0f3ff63b6ed9572a5a9a0aef69f27a51e4aebb120c4afcefbd",
+  "official_downloads": [
+    {
+      "url": "https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz",
+      "sha256": "60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841",
+      "expected_sha256": "60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841",
+      "bytes": 306812040,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/libg/libgc/libgc-dev_8.2.8-1_amd64.deb",
+      "sha256": "f448fae874b4824b486fcb3dab8c1fff4235a129334fa7a556f97e37aa7bc29f",
+      "expected_sha256": "f448fae874b4824b486fcb3dab8c1fff4235a129334fa7a556f97e37aa7bc29f",
+      "bytes": 415664,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/libg/libgc/libgc1_8.2.8-1_amd64.deb",
+      "sha256": "0279fc16692a3a4a6d5f84051f5e55fc721f3cbb0e2bbc052d8980888f18c698",
+      "expected_sha256": "0279fc16692a3a4a6d5f84051f5e55fc721f3cbb0e2bbc052d8980888f18c698",
+      "bytes": 247256,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/clang-19_19.1.7-3+b1_amd64.deb",
+      "sha256": "bbb74458d782b7792b61b0eed92746df5e6d033778c045cf8c2b3835b7c4efc4",
+      "expected_sha256": "bbb74458d782b7792b61b0eed92746df5e6d033778c045cf8c2b3835b7c4efc4",
+      "bytes": 116584,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libclang-common-19-dev_19.1.7-3+b1_amd64.deb",
+      "sha256": "4018e40e2d4144fe38c45822e68cca63c1bf6c7872c3073ebb262ad4b2f9b8bc",
+      "expected_sha256": "4018e40e2d4144fe38c45822e68cca63c1bf6c7872c3073ebb262ad4b2f9b8bc",
+      "bytes": 739932,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libclang-cpp19_19.1.7-3+b1_amd64.deb",
+      "sha256": "a7d2b6df51050834f6ea5c0d5e34869c2298b0bcdaa91eff17ba3db2cd545c47",
+      "expected_sha256": "a7d2b6df51050834f6ea5c0d5e34869c2298b0bcdaa91eff17ba3db2cd545c47",
+      "bytes": 13191148,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libclang1-19_19.1.7-3+b1_amd64.deb",
+      "sha256": "4e7e2a5fe236e280d32fb529350b3c1cfd9410a964629a57ea079a314c45d7a3",
+      "expected_sha256": "4e7e2a5fe236e280d32fb529350b3c1cfd9410a964629a57ea079a314c45d7a3",
+      "bytes": 7623496,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libllvm19_19.1.7-3+b1_amd64.deb",
+      "sha256": "db0d614d61345ca710fb73e75105f1ec6e38898fa7b3aa99fa7eb7d8b0a11d57",
+      "expected_sha256": "db0d614d61345ca710fb73e75105f1ec6e38898fa7b3aa99fa7eb7d8b0a11d57",
+      "bytes": 25978316,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/llvm-19-linker-tools_19.1.7-3+b1_amd64.deb",
+      "sha256": "874a0a5cde797cda3e94e9310a0a9958608f526f177637414a8ce9620c804818",
+      "expected_sha256": "874a0a5cde797cda3e94e9310a0a9958608f526f177637414a8ce9620c804818",
+      "bytes": 1263460,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/n/numactl/libnuma-dev_2.0.19-1_amd64.deb",
+      "sha256": "7fea9248b09311b008dc6707c201671e7b14ce5f9278dda4694e726990897436",
+      "expected_sha256": "7fea9248b09311b008dc6707c201671e7b14ce5f9278dda4694e726990897436",
+      "bytes": 36528,
+      "verified": true
+    },
+    {
+      "url": "https://deb.debian.org/debian/pool/main/z/z3/libz3-4_4.13.3-1_amd64.deb",
+      "sha256": "71383373523ef62d47eccf660cf6535c3febcbb3f88e54cb7a43124014b57359",
+      "expected_sha256": "71383373523ef62d47eccf660cf6535c3febcbb3f88e54cb7a43124014b57359",
+      "bytes": 8560036,
+      "verified": true
+    }
+  ],
+  "versions": {
+    "GHC": "9.14.1",
+    "Clang": "Debian19.1.7(3+b1)",
+    "BDWGC": "8.2.8",
+    "GMP": "6.3.0"
+  },
+  "controls": {
+    "clang_gc_gmp_compile_link_run": "passed",
+    "ghc_compile_link_run": "passed",
+    "shared_lock_post_completion_reacquisition": "passed",
+    "final_sample_tree_rss_bytes": 0
+  },
+  "limits": {
+    "wall_seconds": 600,
+    "address_space_per_process": 6442450944,
+    "process_tree_rss_bytes": 5368709120,
+    "host_available_floor": 3221225472,
+    "disk_free_floor": 5368709120,
+    "max_output_bytes": 12884901888
+  },
+  "elapsed_seconds": 244.25216691900005,
+  "peak_tree_rss_bytes": 2589757440,
+  "min_available_host_bytes": 6530035712,
+  "min_disk_free_bytes": 51064336384,
+  "exit_code": 0,
+  "reason": null,
+  "receipt_sha256": "40d25096d49dd828e54a3e7b780e734b1131d32ea05ddca088097135b264be27",
+  "setup_result_sha256": "b460fb20ac2bb1e7bcaa4fe391f88b4a15e6bb26306ea4a5776379bb004350b3",
+  "actual_ghc_executable_sha256": "26628fcfe6f3f7176e5c8fc1766fe19b196e7922ff5d812e4c96bc146ae7dc92",
+  "clang_executable_sha256": "0a3c55936ac43954fbe4914e6e73b577ca9e35e75d89ef13d3e28c187f41ca1a",
+  "scope": "New workspace-local toolchain installation and small toolchain controls only; no MLF producer/target compilation. Raw large archives/installations and machine paths remain local; hashes cannot recover them."
+}

@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 16,
-  "observed_at_utc": "2026-11-10T20:55:01Z",
+  "revision": 17,
+  "observed_at_utc": "2026-11-10T21:00:27Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -717,8 +717,8 @@
     {
       "id": "RECOVERY_TOOLCHAIN",
       "role": "Astra-owned recovery",
-      "status": "one bounded official pinned-toolchain restoration admitted; no compiler build/measurement yet",
-      "next": "Validate hashes, versions, link controls, resource receipt and cleanup; then separately decide producer rebuild."
+      "status": "completed and independently verified",
+      "next": "Retain installation and raw receipts locally; official pins and summary durable."
     },
     {
       "id": "R6",
@@ -726,6 +726,16 @@
       "status": "static preparation only",
       "reason": "Avoid rebuilding rejected F3 solely to explain a past noisy sample; measure restored baseline allocation/GC without claiming retrospective C01 cause.",
       "next": "Design new qualification plus one-use compiled-in statistics diagnostic with fresh rebuilt dependencies and new raw oracle; separately admit only after review."
+    },
+    {
+      "id": "RECOVERY_PRODUCER",
+      "role": "Astra worker, exact ordinary baseline producer rebuild",
+      "status": "admitted once; waiting for worker preflight/start report",
+      "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+      "build_wall_limit_seconds": 600,
+      "postbuild_qualification_limit_seconds": 120,
+      "scope": "Original build.py --bootstrap-only --optimization2, all137 shared/4host/13programs and original builtin gates. No target compilation or F3 build.",
+      "next": "Authenticate complete receipt, full object_inputs and original-command C objects, CLI/semantic controls, cleanup/locks before dependency reconstruction admission."
     }
   ],
   "restart_required": [
@@ -740,8 +750,8 @@
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
     "state": "allocated",
-    "task": "RECOVERY_TOOLCHAIN",
-    "restart_caveat": "Lock is new to this recovery; do not infer old machine process status."
+    "task": "RECOVERY_PRODUCER",
+    "restart_caveat": "Record is an observation, not proof a process remains alive after restart."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -773,7 +783,7 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Restore exact toolchain and authenticated baseline artifacts. Audit fresh checked-to-open validation and canonicalization without deleting checks. Prepare new baseline-only GC evidence; F3 remains excluded, no automatic old cohort repeat.",
+  "next_priority": "Finish qualified ordinary baseline producer. Then independently review baseline-only diagnostic prerequisites; prioritize concrete closed-to-open and canonicalization/stamp boundaries while retaining every semantic check.",
   "next_real_compile_gate": {
     "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
@@ -798,7 +808,7 @@
     "remote_tip_verified": true
   },
   "recovery": {
-    "status": "toolchain_restore_running; no compiler measurement restarted",
+    "status": "official toolchain passed; baseline producer build admitted",
     "event_date": "2026-11-10",
     "name_caveat": "The branch and worktree labels ending20261111 are recovery labels, not UTC event dates.",
     "source_inventory": "tools/performance/full-compiler/recovery-audit-20261110/source-inventory.json",
@@ -822,7 +832,8 @@
     "toolchain": {
       "source": "305914c90e8fdff3a912faa6b93c08146273cf3e:tools/performance/full-compiler/baseline-20261110/toolchains.json",
       "official_download_head_checks": "GHC and Clang pinned URLs200",
-      "status": "one workspace-local install admitted with600s wall and unchanged memory/disk protections"
+      "status": "passed all11 official SHA256s, exact versions and C/Haskell compile/link/run controls;244.252s under unchanged guards",
+      "summary": "tools/performance/full-compiler/recovery-audit-20261110/toolchain-summary.json"
     },
     "no_actions": [
       "No native generation A/B",
@@ -837,6 +848,6 @@
       "gc_diagnostic": "Astra worker, baseline-only preparation/review, no execution",
       "source_audit": "parent audit of checking/witness/serialization, no production edits"
     },
-    "next_admission": "Review restored toolchain and raw receipt before ordinary baseline producer rebuild; baseline-only GC diagnostic preparation is separate and not autoexecuted."
+    "next_admission": "Ordinary original baseline producer admitted once600s; small post-build authentication/CLI controls separately120s after successful build. R6 dependencies/setup/diagnostics remain unrun and require separate review."
   }
 }

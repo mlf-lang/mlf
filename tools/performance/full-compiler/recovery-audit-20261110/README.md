@@ -16,3 +16,8 @@ Large historical local artifacts are not recoverable from hashes alone. New
 setup/build/qualification receipts must identify the restored runtime honestly.
 No main merge, deployment, native-generation campaign or fixed-point is authorized
 by this checkpoint. The three-day sprint budget still begins2026-11-10.
+
+Toolchain restoration subsequently passed in244.252s. See toolchain-summary.json.
+The ordinary baseline producer is separately admitted, not yet recorded complete.
+The cost-audit directory distinguishes the16 frozen source identities from older
+witness/validation observations; neither is a new compiler timing result.

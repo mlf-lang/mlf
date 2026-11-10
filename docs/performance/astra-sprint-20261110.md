@@ -263,3 +263,11 @@ inference11完整检查点八文件已保存到[daf2f978的恢复入口](https:/
 跨worktree共享flock已测试持有时拒绝竞争、释放后能独立重获；本轮所有重任务统一使用。sandbox-local ps不是全机空闲证明，不能据此推断旧机器进程。安装与重建不是性能样本；安装结束必须核对receipt、工具版本和清理后，才能另行准入producer构建。
 
 新的静态审计优先检查fresh推断中closed检查到open检查的边界、canonicalOpen表示规范化，以及已有的编码/hash复用，而非先假定witness或安全检查都是浪费。不删除语义验证或放松制品oracle。普通GC薄诊断改为先准备baseline-only新实验，避免为已不支持提速的F3再次重建第二套producer；它只是准备，执行需新的资格、依赖、raw oracle和独立准入。旧R5的A/B设想不自动恢复，旧C01/full90、native代际A/B和fixed-point均不重跑。
+
+## 工具链恢复完成，普通基线producer另行准入（2026-11-10 20:59 UTC）
+
+官方11份固定archive/package的SHA256均通过，GHC9.14.1、Clang19.1.7、BDWGC8.2.8和GMP6.3.0已在工作区恢复；GHC小程序及Clang+GC/GMP的编译、链接、运行控制通过。整个setup实际244.252秒，峰进程树RSS2.590GB，最低可用内存6.530GB、最低可用磁盘51.064GB，所有原有限额满足。guard完整成功、末次RSS0，Astra独立重读receipt并重获共享锁。见[工具链摘要](../../tools/performance/full-compiler/recovery-audit-20261110/toolchain-summary.json)。这不是MLF编译性能数据。
+
+Astra已分配下一次独立600秒普通基线producer构建，只用原f9源码及原builder、全137 shared/4host/13程序，保留check-candidate和fresh literal真实生成验证。成功后另有最多120秒小资格，重新认证receipt、全部object_inputs及C对象并运行原CLI/语义控制。运行环境明确固定，不能继承未知LD环境尾部后声称与历史相同。目标依赖重建、薄统计Main、inference11新资格及单次统计诊断尚未执行，不自动串接。
+
+[新鲜编译路径审计](../../tools/performance/full-compiler/recovery-audit-20261110/cost-audit/README.md)已核对16份生产源码，并区分历史证据。closed检查与open检查可能重复遍历主体，但后者还建立可链接声明所有权，不能全称冗余。旧15模块诊断曾记录176,557 elaboration edges而witness fallback为0，旧同图验证消除screen只有0.2478%且未满足预定门；这些是历史线索，不是当前90/11模块成本。初始import节点确有两次编码/hash，但每次publish重编码整个AST的猜测不成立。后续先量化成本覆盖再选择生产改动。

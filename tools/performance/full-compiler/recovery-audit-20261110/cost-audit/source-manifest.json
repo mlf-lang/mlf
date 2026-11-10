@@ -87,5 +87,18 @@
   ],
   "new_timing_samples": 0,
   "production_changes": false,
-  "verification": "Each audited file compared byte-for-byte to frozen Git blob; source checkout clean. This does not execute semantics or measure cost."
+  "verification": "Each audited file compared byte-for-byte to frozen Git blob; source checkout clean. This does not execute semantics or measure cost.",
+  "evidence_documents": [
+    {
+      "path": "docs/performance/validation-reuse-20261030.md",
+      "bytes": 4004,
+      "sha256": "67b75a7fa728e92a8f83429273a520fc5065dc1a2db791f638e281558e4d2bbf"
+    },
+    {
+      "path": "tools/performance/foundation-query/README.md",
+      "bytes": 16114,
+      "sha256": "422e875b4ac036457e14b2a1586ead8fb78b3ed55093cd04ae71a0a06f52cbe1"
+    }
+  ],
+  "last_updated_at_utc": "2026-11-10T20:59:29Z"
 }

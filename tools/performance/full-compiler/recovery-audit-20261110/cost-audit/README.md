@@ -86,7 +86,10 @@ ticks (about 0.894%) in the old instrumented prefix, not an ordinary CPU share.
 Other validations surround graph expansion, unification, rebinding and changed
 local graphs. An old certificate cannot cover a new graph. The old inherited
 `denseValidation` share of 9.51% includes required work and overlapping callers;
-it is not a 9.51% removable budget. The present prepared elaboration path already
+it is not a 9.51% removable budget. An older private-driver validation-reuse
+screen reported 0.2478% pooled wall improvement and failed its prespecified
+0.5%/both-blocks-positive rule; that result is historical, not a current-path
+performance claim. The present prepared elaboration path already
 retains the finished solver (`CompilerCore.hs:60`, `Elaborate.hs:474–481`) rather
 than unconditionally calling the legacy re-preparation entry.
 
@@ -97,7 +100,11 @@ than unconditionally calling the legacy re-preparation entry.
   direct proof fails. `Solver.hs:1875–1887` expands and unifies to recover an
   image used to construct the explicit target proof. This is a semantic fallback,
   not an unconditional second solve. Its hit rate and separate cost remain
-  unmeasured.
+  unmeasured. The older October 30 15-module diagnostic recorded 176,557
+  elaboration edges with zero witness fallbacks (all reflexivity/direct proof).
+  That historical coverage does not establish current 90/11-module behavior or
+  CPU cost, but argues against prioritizing witness from static complexity alone.
+  See `docs/performance/validation-reuse-20261030.md` at the frozen commit.
 - Builtin source witness: `BuiltinPreludeContext.hs:48–91` checks generated
   Prelude metadata and its target. `PreparedCompiler.hs:271–272` holds that
   preparation in a shared top-level value; it is not a per-SCC source-witness
@@ -121,7 +128,15 @@ than unconditionally calling the legacy re-preparation entry.
   retained payloads once per digest. It does not reread/hash every freshly
   written result again.
 
-However, every fresh fragment still takes `SourceInference.canonicalOpen`
+There is a real, narrower duplicate at initialization: `CrateGraph.hs:49–68`
+records each imported contract/datatype first as an Input node and then as its
+derived node, passing the same value through `G.record` twice. Both calls encode
+and hash. This is not per-SCC whole-AST publication. The previous plan classified
+remaining double encoding as low coverage; no new ordinary coverage estimate
+was obtained here. Reusing the first encoding could retain both authority nodes
+and edges, but does not yet justify an expensive producer experiment.
+
+Every fresh fragment also takes `SourceInference.canonicalOpen`
 (`1629–1636`): AST → bounded `Wire.GraphPlan` → graph materialization →
 `finalSyntaxRun`. An unchanged result returns the original checked fragment;
 a changed result is checked again. This is source-finalization representation
