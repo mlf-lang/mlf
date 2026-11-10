@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 10,
-  "observed_at_utc": "2026-11-10T14:59:21Z",
+  "revision": 11,
+  "observed_at_utc": "2026-11-10T15:35:35Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -181,6 +181,41 @@
       "completed_artifact_pins_unchanged": 18,
       "cleanup_receipt_sha256": "494c8fedfd2c87ba010c397dd8640bdba4d49f792ce3fc05d8fdf15c03945f0a",
       "raw_checkpoint_remote": null
+    },
+    "late_profile": {
+      "diagnostic_only": true,
+      "ordinary_performance_sample": false,
+      "compiler_complete": false,
+      "internal_timeout_seconds": 90.2385,
+      "exit_code": 124,
+      "phase_wall_seconds": 98.475196329,
+      "total_ticks": 89395,
+      "reported_total_seconds": 89.39,
+      "reported_allocated_gb": 91.303,
+      "peak_tree_rss_bytes": 1784209408,
+      "profile_sha256": "f83eee5c87165f847b7fd9b938ed9753a5ba7690ea6557b63b4391a53ae86e91",
+      "build_seconds": 320.047,
+      "build_peak_rss_bytes": 2115162112,
+      "build_home_modules": 95,
+      "control_count": 6,
+      "controls_seconds": 13.585,
+      "controls_all_passed": true,
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "raw_persisted_remotely": false,
+      "safe_checkpoint": "fa7df4c39897a7dad4d21a44087c5927a12dc8d4",
+      "inherited_percentages": {
+        "solvePrepared": 34.34,
+        "instantiateExpandedPrepared": 25.32,
+        "unifyPreparedFallback": 16.24,
+        "graphUnify": 12.11,
+        "denseValidation": 9.51
+      },
+      "self_percentages": {
+        "GC": 20.37,
+        "PROFILING": 6.77
+      },
+      "caveat": "Inherited rows overlap; profiling/GC and FFI/child coverage prevent interpreting these as ordinary CPU fractions or guaranteed speedup."
     }
   },
   "tasks": [
@@ -207,7 +242,7 @@
         "total_controls": 2,
         "native_expected_stdout": "backend λ\n42\n"
       },
-      "next": "Assess current supported fresh multi-crate route over the exact target closure, read-only; full backend diagnosis still requires a qualified full checked artifact.",
+      "next": "Independently review F2 Graph-only production candidate; no backend diagnostic without full current input.",
       "remote_tree": "49d13cd1daa6926b8876acf157eef28369b79e33",
       "persistence_scope": "Smoke source, runnable recovery script and public result summary verified by fetch/tree/readback; no raw receipts or LLVM body. Hashes identify but cannot recover missing evidence; rerun qualification if local receipts are lost."
     },
@@ -292,18 +327,43 @@
       "native_ab_scope": "Do not run potentially paused check_native.py campaign. Independent non-generational small fixtures and CLI qualification only.",
       "branch": "perf/fresh-split-20261110",
       "reviewed_execution_commit": "135a31331713baad0ddc4c22a09fd0ea312dc258",
-      "remote_commit": "9c0bea5847b995334e3bdd2b588509d45f0111e1",
+      "remote_commit": "e0fa831b3d4cbd395f4d381dbebcb216ebc58365",
       "remote_scope": "Execution source and fixture summary verified by fetch and readback; no raw receipt/LLVM or private machine metadata.",
       "recovery_readme": "https://github.com/mlf-lang/mlf/blob/9c0bea5847b995334e3bdd2b588509d45f0111e1/tools/performance/fresh-split/README.md"
     },
     {
       "id": "P1",
       "role": "late cost-centre diagnostic; baseline direction owns, query direction reviews",
-      "status": "v2.1 independently statically reviewed; build-only admitted, no completed build or controls",
+      "status": "Build, six controls and one real bounded profile completed; compiler itself incomplete",
       "policy": "Full original CLI closure, profiling ABI and installed libraries; total build guard600s; private90s internal timeout within120s outer guard. Verify actual fresh report and cleanup, never extend guard.",
-      "next": "One600s whole-CLI profiling build; report actual modules/pins/resources and cleanup, then request separate60s controls. Real90/120 remains unapproved.",
+      "next": "Preserve evidence and support ordinary candidate evaluation; no automatic reprofile.",
       "controller_sha256": "1c630d5f098917de68be98a61232806b9bc321da99a389e924ac86a828888a73",
-      "plan_sha256": "757b735f441569e39793863ab5d8eb1537c5aaac4e26cbd2cb5896ba9cbc72f5"
+      "plan_sha256": "757b735f441569e39793863ab5d8eb1537c5aaac4e26cbd2cb5896ba9cbc72f5",
+      "remote_commit": "fa7df4c39897a7dad4d21a44087c5927a12dc8d4",
+      "branch": "codex/full-compiler-baseline-20261110",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/fa7df4c39897a7dad4d21a44087c5927a12dc8d4/tools/performance/full-compiler/late-profile-20261110/README.md",
+      "persistence_scope": "Four tested source owners exact, SHA manifest and sanitized summary verified. Raw13MB profile, full receipts and binary not persisted remotely."
+    },
+    {
+      "id": "F2",
+      "role": "Graph validation/rebinding optimization; frontend direction owns, backend direction reviews",
+      "owner_file": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "status": "One narrow redundant-success-path traversal patch under review; no controls or ordinary benefit established",
+      "mechanism": "For nonzero graft, after originals++parents traversal fully succeeds with no intervening writes, avoid second traversal of already completed parents. Keep first checks, zero graft, errors and demand behavior.",
+      "scope_ceiling": "All densePlaces inherited0.630% of profiled ticks; redundant replay is only a subset. No full compiler build solely for this small unmeasured candidate.",
+      "next": "Small current-f9 differential/demand gates and ordinary representative control; independently study larger denseValidation/denseKind mechanisms without mixing patches.",
+      "remote_commit": null
+    },
+    {
+      "id": "R3",
+      "role": "Prepared solver fallback optimization; query direction owns, baseline direction reviews",
+      "owner_file": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "status": "Bitmap-seen candidate parked unmeasured; production owner restored to f9; larger mechanism read-only investigation",
+      "branch": "perf/solver-fallback-20261110",
+      "remote_commit": "db68c774ae1d5919c4c5e28e62f9d6aca28c0017",
+      "remote_tree": "669c6fed690bf0b7aada7d945a0e3a578d84164a",
+      "parked_reason": "Exact relevant lookup self580/89395 ticks=0.649% is already a generous upper bound including non-seen queries; extra bitmap insertion could offset it.",
+      "next": "Inspect larger instantiateExpandedPrepared/unifyPreparedFallback operation-local repeated work and actual branch coverage. No new production change or CPU gate yet."
     }
   ],
   "restart_required": [
@@ -317,9 +377,9 @@
   ],
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
-    "state": "reserved",
-    "task": "P1 build-only; no controls or target automatically",
-    "restart_caveat": "Check actual processes, locks and receipts before treating recorded admission as running or restarting it."
+    "state": "free",
+    "task": null,
+    "restart_caveat": "Recheck actual processes and locks after restart."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -352,5 +412,5 @@
     "report_limitation": "No supported intermediate cost-centre dump API found. Internal early timeout/normal exit must be fixture-qualified before an outer guarded run; SIGKILL may leave no report.",
     "no_run_authorized": true
   },
-  "next_priority": "P1 real function cost-centre localization after build/control gates; no repeated blind600s attempt."
+  "next_priority": "F2 narrowly reviewed correctness gate and deeper Graph/solver analysis; reject tiny unsupported targets before heavy measurement. No qualified current complete MLF endpoint yet."
 }
