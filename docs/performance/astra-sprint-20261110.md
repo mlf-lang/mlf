@@ -27,7 +27,7 @@
 | --- | --- | --- | --- | --- |
 | B0 | 基线与证据 | 测量harness，不改生产算法 | 当前MLF/GHC完整端点资格、精确artifact/receipt、普通基线cohort | 工具链与producer认证 |
 | B1 | 制品和后端 | 当前只有 backend-stages 诊断工具 | 小crate预检、当前完整checked输入分段诊断、ordinary LLVM原始字节一致 | B0可用checked artifact、资源令牌 |
-| F1 | 前端 | Bootstrap.X.Type | 一次完整输入kindOf重复访问计数；覆盖值得优化才保留memo候选 | 当前独立checked参考、资源令牌 |
+| F1 | 前端与统一诊断harness | 当前只改私有诊断入口/计数器；生产Type恢复基线 | kindOf memo已停止；下一步用低扰动SCC身份和需求窗口定位 | R2边界审查、资源令牌 |
 | R1（停止） | legacy调用内复用实验 | Bootstrap.CrateQuery、Bootstrap.CrateSession | 仅保留可恢复实验；已确认不在当前端点调用链上，不再安排producer/计时 | 不作为当前优化候选 |
 | R2 | 当前graph边界定位 | 私有诊断中的CrateSession、CrateGraph | 真实IO返回/每SCC进度事件，与F1共用一次有界诊断 | 与F1固定接口、资源令牌 |
 | M0/M1 | 基线与证据 | 冻结测量配置 | 基线和每个已符合条件候选的fresh、配对、ordinary端点 | B0成功；相应候选完成控制 |
@@ -39,8 +39,8 @@
 
 1. 重任务开始前由 Astra 确认唯一令牌持有者。不要仅凭本shell的ps判断全机空闲：不同执行环境的进程视图可能不同。
 2. 所有新重任务使用同一个共享排他锁，并保留各harness原有锁。锁作用域必须覆盖整个构建/测量cohort；失败时先确认子进程已回收，再释放令牌。
-3. 当前 B0 先完成 MLF-native 资格，再完成 GHC-native 资格。资格数据不并入正式样本；MLF资格开头可能与一次约3秒控制有重叠，保留说明。
-4. 当前MLF资格已在600.099秒触发wall保护，无checked/LLVM产物；GHC资格已完成，outer为155.931809537秒。完整MLF/GHC倍率仍不可用。依赖已调整：B1先验证小main crate完整runner；F1与R2合做真实IO边界及运行中kindOf计数的单次120秒有界诊断，避免再次等待600秒却没有信息；R1已确认不在当前调用链上，停止producer/计时排期。完整90模块目标不变，不能用小输入顶替。
+3. B0已先后完成MLF-native失败资格与GHC-native成功资格。资格数据不并入正式样本；MLF资格开头可能与一次约3秒控制有重叠，保留说明。
+4. 当前MLF资格已在600.099秒触发wall保护，无checked/LLVM产物；GHC资格outer为155.931809537秒。完整倍率仍不可用。B1小main资格与F1/R2单次120秒计数定位都已完成。下一步F1/R2共同准备去除Type计数的低扰动SCC窗口诊断；R1停止排期。完整90模块目标不变，小输入不顶替目标。
 5. 之后正式样本由B0方向统一排队。这个队列可按真实阻塞调整，不能让无输入任务占着机器。
 6. 不允许长时间同时构建多个内存重候选。没有令牌时继续源码审查、控制设计、文档与轻量git保存。
 7. 中断的cohort保持不完整，不能拼接重启前后样本充当原定完整对照。新的cohort必须新目录、新计划；不要覆盖旧receipt。
@@ -67,7 +67,7 @@
 
 两owner overlay只是窄语义gate，不是完整producer。完整性能对照必须普通build.py构建独立候选、产生自己receipt，不能借用baseline身份。所有已知corruption/missing repair、publication错误和需求/首错行为继续受控。
 
-## 当前可核验检查点（2026-11-10 13:26 UTC）
+## 当前可核验检查点（后续更新见JSON）
 
 - B0 MLF：600.09899221秒wall保护退出（-9）；采样峰值1,745,485,824字节；无完成stage/checked/LLVM。父进程wait4的0.235秒CPU未包含被终止compiler子进程，不能冒充完整任务CPU。
 - 失败目录存在query-graph-v2及generations/results/staging子目录，仅文件是lock；payload到最终publish才写，不能据此认定未开始推断。
@@ -110,3 +110,13 @@
 F1/R2第二个输出目录中的唯一完整120秒诊断已结束；第一个目录只是harness路径冲突，未运行完整诊断，原失败保留。诊断harness完成、compiler未完成：按120.126秒wall上限退出，所有受管子进程已回收，两层锁已重新验证空闲。80个快照只用于定位，无checked参考/最终产物，不当成普通性能样本。已停止Type memo；R2核对实际query/raw-infer路径；B0核查是否可复用现有QueryGraph阶段统计；B1只读评估受支持的分crate构建策略能否保持同一90模块、所有target fresh和同一runnable终点。备选策略必须另立实验，不能改写原单crate600秒失败。
 
 新的联合诊断源码和原始快照提交在本机为27efb8ff0e817fffd16d87c6759dfcf3174492f2，远端仍未确认保存。旧远端64ee679不包含这次完成结果或Type恢复。恢复时先核对JSON最新remote_commit和范围；若新内容仍未保全，应据说明重新准备诊断，不能声称原始日志还可取回。
+
+## 下一次低扰动定位的准入（2026-11-10 14:07 UTC）
+
+Astra已批准F1统一实现一次markers-only诊断，R2复核已有成功/失败路径和安全身份来源。生产Type保持冻结基线原字节，移除每根/每次访问计数和诊断专用优化限制，使用ordinary完整flags与认证C对象；controls使用独立对象目录。现有MLF_QUERY_PROFILE保持关闭，避免重复计时；其六槽最终汇总把raw需求和raw编码合并，不能替代此次按组定位。
+
+每组只严格复制已由原prepared payload编码消费的有界owner信息，不投影可能仍惰性的sourceNode，不让reporter持有AST或thunk。身份包含运行源码身份、started ordinal、数字owner IDs和截断名称预览；不把截断名称当完整稳定身份。每组开始清空current，成功finish后保留last_completed。总SCC数在自然遍历结束前保持unknown，不提前求length。
+
+现有IO marker之间用单调时钟累计四个已闭合需求wall窗口：prepared-record、raw-await、raw-record和finish；另报当前未闭合窗口age，仅保留最慢五组的有界身份。这些窗口包含GC和惰性残留，不是独占CPU份额或普通速度。小controls先验证零状态、窗口闭合、身份清空、未闭合age和top-five有界性，再允许一次最多120秒定位；构建600秒与现有资源守卫不变。当前只批准准备和该次有界运行，没有新增已完成性能证据。
+
+main已合并#50至fc300bc9fdc389b585cbef0630fc8915d53e89c5；变化限于工具/CI/契约/文档，没有修改冻结90模块、host或runtime源码。当前诊断仍严格使用f9bdb40，不把旧producer重标成新main；最终集成需新建并认证相应build-driver身份。
