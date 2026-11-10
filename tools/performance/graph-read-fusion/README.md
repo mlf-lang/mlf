@@ -5,8 +5,9 @@ passed. One fixed, small Graph harness cohort completed under a newly qualified
 runtime. It suggests a local improvement, not a compiler or native MLF speedup.
 
 Baseline is exact `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`, independent of the
-small parent-placement experiment. Only `libraries/mlf-inference/Bootstrap/Graph.hs`
-changes. Its baseline SHA-256 is
+small parent-placement experiment. The only algorithmic change is in
+`libraries/mlf-inference/Bootstrap/Graph.hs`; the producer qualification below also
+updates and verifies one generated canonical source-identity field. Its baseline SHA-256 is
 `9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f`, and its candidate
 SHA-256 is `fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3`.
 
@@ -144,3 +145,35 @@ contains safe statistics and receipt hashes. Raw commands, local machine paths,
 full receipts and binaries remain local and are not remotely persisted. The
 original `sample.py` and failed 01 evidence are not overwritten. Any further
 experiment needs a new admission; no full producer or long endpoint ran here.
+
+
+## Complete ordinary producer qualification
+
+A separate final source checkout preserved the Graph-only sample checkout and
+prepared one additional derived source delta: the unique RawPrelude identity in
+bootstrap/MLF/BuiltinPreludeData.hs. The unchanged official 56-source algorithm
+computed that identity; only Graph changed in its nongenerated closure. It was
+explicitly an unverified candidate until the original fresh gates completed.
+
+One normal GHC O2 build then forced all 137 shared and four host modules and
+linked all 13 executables with no borrowed objects or interfaces. The original
+build.py and builtin validators were unchanged. The existing cross-session
+resource watchdog covered the complete build, authentication and independent
+CLI/positive/negative semantic checks in 317.4046 seconds, below the 600-second
+limit. The original check-candidate and fresh-literal commands both passed.
+Actual generator stdout matched all 2,220,407 canonical bytes; inverse replacement
+of its one new identity string restored every original canonical byte. Thus this
+derived source is now verified, not merely a predicted metadata update.
+
+The independent CLI and expression checks passed, including Unicode output and
+an expected Int/String type error. Full producer authentication passed before
+and after these checks; all 202 wrapper input pins remained unchanged. The
+watchdog and follow-up checks found no surviving target processes, and both locks
+were free. This qualification duration is not a compiler throughput sample.
+
+See producer-plan.md, the exact executed build-producer.py and the safe
+producer-01-summary.json. Full raw receipts, object/tool tables and executable
+remain local and are not remotely persisted; hashes do not restore them. The
+next frozen-f9 inference11 compatibility/performance gate has not run, nor has a
+full90 or native-generation/fixed-point campaign. No full compiler speedup follows
+from this qualification or from the earlier small Graph harness observations.

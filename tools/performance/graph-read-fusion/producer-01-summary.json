@@ -1,0 +1,125 @@
+{
+  "admitted_plan_sha256": "c030b0e65bfae2b32bd88fa6227cd7e1b8f913d3b72075911078ee5691aa4bf3",
+  "baseline_ref": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "borrowed_objects": false,
+  "build_environment": {
+    "GHCRTS": "",
+    "GHC_ENVIRONMENT": "-",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "LD_LIBRARY_PATH": "one explicit private Debian library directory, no inherited tail",
+    "LIBRARY_PATH": "same explicit directory",
+    "MAKEFLAGS": "-j1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "PATH": "qualified GHC bin plus /usr/bin:/bin",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "all_other_child_environment_variables_absent": true
+  },
+  "candidate_graph_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+  "canonical_bytes": 2220407,
+  "cli_expected": {
+    "identity": "MLF/shared-haskell-v1 GHC",
+    "negative_diagnostic": "Inference: type constructor mismatch: Con \"Int\" [] versus Con \"String\" []",
+    "negative_exit": 1,
+    "positive_stdout": "42\nfusion \u03bb\n",
+    "version": "emlf 0.3.0"
+  },
+  "controller_sha256": "8ba615a9f5c4767a421680472685e0f8c9ffa5a6f423f45a18e3110a8c504d0a",
+  "derived_canonical_sha256": "c0d4205ebfe8fde9fddf7ab63442558ada389056916fa2fe41dfc94b90297be8",
+  "exact_target_argv_survivors": [],
+  "fixed_point": false,
+  "fresh_host_modules": 4,
+  "fresh_shared_modules": 137,
+  "frozen_inference11_not_run": true,
+  "full90_not_run": true,
+  "full_producer_authentication_before_and_after": true,
+  "graph_only_checkpoint": "9c9d2fe08afcbca11774279d269286ed4deda118",
+  "guard": {
+    "complete": true,
+    "elapsed_seconds": 317.40460154500033,
+    "exit_code": 0,
+    "limits": {
+      "address_space_per_process": 6442450944,
+      "disk_free_floor": 5368709120,
+      "host_available_floor": 3221225472,
+      "max_output_bytes": 3221225472,
+      "process_tree_rss_bytes": 5368709120,
+      "wall_seconds": 600
+    },
+    "peak_group_rss": 1099911168,
+    "reason": null
+  },
+  "linked_executables": 13,
+  "locks_released": true,
+  "native_generational_comparison": false,
+  "new_source_identity": "builtin-source-v1:dc560ede03721d9bff79319b3cc8c3de81110c2acbe4e8a7c1186d7db79a0214",
+  "old_source_identity": "builtin-source-v1:7190a5739fd1a1f55dbb0762a9129b83aeb0a6ca81e518cd2e8ca598cd845620",
+  "only_changed_closure_module": "Bootstrap.Graph",
+  "ordinary_flags_match_modulo_owned_paths": true,
+  "original_builder_and_verifiers_unchanged": true,
+  "original_builtin_gates": {
+    "actual_fresh_literal_bytes": 2220407,
+    "actual_fresh_literal_raw_equals_canonical": true,
+    "candidate_verified": true,
+    "complete": true,
+    "exact_regeneration": true,
+    "immutable_inputs_verified_after": true,
+    "only_identity_delta_full_byte_inverse": true
+  },
+  "original_canonical_sha256": "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692",
+  "performance_samples": [],
+  "producer_binary_sha256": "7b89000b35b6a086af14efc896eab414851e37e4e447d6c6679e10292941d943",
+  "raw_local_evidence": {
+    "builtin_verification_sha256": "883d482c7eeb747221ed6fe40c88a357c3f8df052af2ef1df527a675152b09fe",
+    "handoff_sha256": "59f8c404b5f9f1ae9d4b572528f9d696557b0fdffa9e133724047646e2cfdc56",
+    "hashes_do_not_restore_receipts_or_binary": true,
+    "outer_sha256": "fb96488f2657a55314dd1670a2de4edc90285c0c67348c0f8f3d8eb4a2b17b54",
+    "producer_sha256": "32a27e17ee756c4c71da0af1ebf960cbf645e7dbf137cdaa8d226f6f837c50bf",
+    "remotely_persisted": false,
+    "work_sha256": "eefd13725fffe3b5548c7d9138def93fc0e4e3448e9306b52aa0302044e996a1"
+  },
+  "source_counts": {
+    "configuration_inputs": 19,
+    "host_inputs": 33,
+    "shared_inputs": 137
+  },
+  "source_identity_closure_count": 56,
+  "stages": [
+    {
+      "complete": true,
+      "exit_code": 0,
+      "label": "build",
+      "wall_seconds": 312.087066416
+    },
+    {
+      "complete": true,
+      "exit_code": 0,
+      "label": "version",
+      "wall_seconds": 0.004912726
+    },
+    {
+      "complete": true,
+      "exit_code": 0,
+      "label": "identity",
+      "wall_seconds": 0.004662558
+    },
+    {
+      "complete": true,
+      "exit_code": 0,
+      "label": "positive",
+      "wall_seconds": 0.171946885
+    },
+    {
+      "complete": true,
+      "exit_code": 1,
+      "label": "negative",
+      "wall_seconds": 0.031506107
+    }
+  ],
+  "status": "complete ordinary producer qualification; not a compiler performance sample",
+  "toolchain_and_installed_dependencies_match_baseline": true,
+  "unchanged_original_watchdog_sha256": "5368803eb84dabc9dcefa89225b6ff56afd637e105f227bade15e40f9a5e923f",
+  "work_input_count": 202,
+  "work_pins_unchanged": true
+}
