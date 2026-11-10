@@ -51,10 +51,21 @@
     ],
     "tools/shared/build.py": [
       "3ac387f43f4ce6261a94fd514da2108d7dce607867bab2a4267bb73918b1de1f",
-      "eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df"
+      "89851dcdee38db8f9c5dfd869ab99f7083abcb43f271ad9dbf8f04959601a44d"
     ]
   },
   "format": "pr43-reconciliation-source-migration-v1",
+  "live_transition": {
+    "changes": {
+      "tools/shared/build.py": [
+        "eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df",
+        "89851dcdee38db8f9c5dfd869ab99f7083abcb43f271ad9dbf8f04959601a44d"
+      ]
+    },
+    "predecessor": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+    "predecessor_manifest_sha256": "63598306f049a050def3fd21ddf21878a7f4f882b59a48a86c53a3398624e9c5",
+    "predecessor_tree": "3148203097e7622ced1b272e606bfa892fad746b"
+  },
   "maintenance": {
     "patricia/test_adapters.py": [
       "fe299bd576901e008a1a7473abab98377f66785c4ec239a50f7c139b553e834f",
