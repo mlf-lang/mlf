@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Independent transition checks and immutable predecessor regression replay."""
 from pathlib import Path
+import copy
 import hashlib
 import json
 import shutil
@@ -13,12 +14,94 @@ from source_migration_adapter import live_contract
 
 ROOT = Path(__file__).resolve().parents[3]
 HISTORY = ROOT / 'tools/performance'
+MACOS_BASE = 'f9bdb40a659bfdff4cbb782d438afbb0417dd2e1'
+MACOS_BASE_TREE = '3148203097e7622ced1b272e606bfa892fad746b'
+MACOS_BASE_MANIFEST = '63598306f049a050def3fd21ddf21878a7f4f882b59a48a86c53a3398624e9c5'
+MACOS_PATH = 'tools/shared/build.py'
+MACOS_BASE_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df'
+
+
+def main_bytes(path):
+    return subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
+                                    'show', MACOS_BASE + ':' + path])
 
 
 class PR43SourceReconciliation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.contract = live_contract(HISTORY)
+
+    def test_macos_repair_is_exactly_the_declared_main_follow_on(self):
+        c = self.contract
+        tree = subprocess.check_output(['git', '--no-replace-objects', '-C', str(ROOT),
+                                        'rev-parse', MACOS_BASE + '^{tree}'], text=True).strip()
+        self.assertEqual(tree, MACOS_BASE_TREE)
+        raw = main_bytes('tools/performance/artifact-binary/pr43-reconciliation-migration.json')
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), MACOS_BASE_MANIFEST)
+        prior = json.loads(raw)
+        before = dict(c.previous.value['current_files'])
+        before.update({p: row[1] for p, row in prior['changes'].items()})
+        before.update(prior['additions'])
+        self.assertEqual(set(before), set(c.value['current_files']))
+        self.assertEqual({p for p in before if before[p] != c.value['current_files'][p]}, {MACOS_PATH})
+        self.assertEqual(before[MACOS_PATH], MACOS_BASE_SOURCE)
+        self.assertEqual(hashlib.sha256(main_bytes(MACOS_PATH)).hexdigest(), MACOS_BASE_SOURCE)
+        current = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        transition = current.pop('live_transition')
+        self.assertEqual(transition, {
+            'predecessor': MACOS_BASE, 'predecessor_tree': MACOS_BASE_TREE,
+            'predecessor_manifest_sha256': MACOS_BASE_MANIFEST,
+            'changes': {MACOS_PATH: [MACOS_BASE_SOURCE, c.value['current_files'][MACOS_PATH]]},
+        })
+        # Rewind precisely one live endpoint. Everything else, including all
+        # first endpoints and the Patricia maintenance boundary, must be equal.
+        self.assertEqual(current['changes'][MACOS_PATH][0], prior['changes'][MACOS_PATH][0])
+        current['changes'][MACOS_PATH][1] = MACOS_BASE_SOURCE
+        self.assertEqual(current, prior)
+
+    def test_macos_transition_validator_cannot_expand_or_rewrite_the_delta(self):
+        c = self.contract
+        module = sys.modules[type(c).__module__]
+        spec = json.loads((c.directory / 'pr43-reconciliation-migration.json').read_bytes())
+        module.validate_live_transition(spec, ROOT, c.core)
+        mutations = []
+        def changed(label, mutate):
+            value = copy.deepcopy(spec)
+            mutate(value)
+            mutations.append((label, value))
+        changed('old source endpoint', lambda s: s['changes'][MACOS_PATH].__setitem__(0, '0' * 64))
+        changed('another live endpoint', lambda s: s['changes']['mlf.lock'].__setitem__(1, '0' * 64))
+        changed('added path', lambda s: s['additions'].__setitem__('extra', '0' * 64))
+        changed('maintenance endpoint', lambda s: s['maintenance']['patricia/test_adapters.py'].__setitem__(1, '0' * 64))
+        changed('wrong base commit', lambda s: s['live_transition'].__setitem__('predecessor', '0' * 40))
+        changed('wrong base tree', lambda s: s['live_transition'].__setitem__('predecessor_tree', '0' * 40))
+        changed('wrong base manifest', lambda s: s['live_transition'].__setitem__('predecessor_manifest_sha256', '0' * 64))
+        changed('wrong prior bytes', lambda s: s['live_transition']['changes'][MACOS_PATH].__setitem__(0, '0' * 64))
+        changed('wrong current bytes', lambda s: s['live_transition']['changes'][MACOS_PATH].__setitem__(1, '0' * 64))
+        changed('extra transition path', lambda s: s['live_transition']['changes'].__setitem__('mlf.lock', ['0' * 64, '1' * 64]))
+        changed('unchanged endpoint', lambda s: s['changes'][MACOS_PATH].__setitem__(1, MACOS_BASE_SOURCE))
+        for label, value in mutations:
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                module.validate_live_transition(value, ROOT, c.core)
+
+    def test_macos_source_rejects_prior_mutated_and_wrong_layer_bytes(self):
+        c = self.contract
+        live = (ROOT / MACOS_PATH).read_bytes()
+        prior = main_bytes(MACOS_PATH)
+        predecessor = (c.archived / MACOS_PATH).read_bytes()
+        ancestor = c.restore_path(live, MACOS_PATH)
+        self.assertEqual(c.advance_path(ancestor, MACOS_PATH), live)
+        for label, raw in [('main', prior), ('PR43 predecessor', predecessor), ('mutated', live + b' ')]:
+            with self.subTest(restore=label), self.assertRaises(ValueError):
+                c.restore_path(raw, MACOS_PATH)
+        for label, raw in [('main', prior), ('live', live), ('mutated ancestor', ancestor + b' ')]:
+            with self.subTest(advance=label), self.assertRaises(ValueError):
+                c.advance_path(raw, MACOS_PATH)
+        with self.assertRaises(ValueError):
+            c.previous.restore_path(live, MACOS_PATH)
+        raw = {p: (ROOT / p).read_bytes() for p in c.value['current_files']}
+        with self.assertRaises(ValueError):
+            c.project_tree_bytes({**raw, MACOS_PATH: prior})
 
     def test_formatter_follow_on_is_exactly_the_reviewed_live_delta(self):
         # Keep the previously published endpoint independently recoverable. This
@@ -116,7 +199,14 @@ class PR43SourceReconciliation(unittest.TestCase):
                 file.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / path, file)
             self.assertEqual(c.live_source_inventory(root), c.value['current_files'])
-            for path in ('shared-sources.json', 'libraries/mlf-foundation/Bootstrap/IndexVec.hs', 'mlf.lock'):
+            build = root / MACOS_PATH
+            build.write_bytes(main_bytes(MACOS_PATH))
+            with self.assertRaises(ValueError):
+                c.live_source_inventory(root)
+            with self.assertRaises(ValueError):
+                live_contract(HISTORY, source_root=root)
+            shutil.copyfile(ROOT / MACOS_PATH, build)
+            for path in ('shared-sources.json', 'libraries/mlf-foundation/Bootstrap/IndexVec.hs', 'mlf.lock', MACOS_PATH):
                 file = root / path
                 file.write_bytes(file.read_bytes() + b'\n')
                 with self.subTest(path=path), self.assertRaises(ValueError):
@@ -137,13 +227,21 @@ class PR43SourceReconciliation(unittest.TestCase):
                 copy.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(c.directory / path, copy)
             manifest = directory / 'pr43-reconciliation-migration.json'
-            raw = manifest.read_bytes().replace(c.changes['mlf.lock'][1].encode(), b'0' * 64)
-            manifest.write_bytes(raw)
-            wrong = hashlib.sha256(raw).hexdigest()
-            self.assertNotEqual(wrong, c.manifest_sha256)
-            for digest in (c.manifest_sha256, wrong):
-                with self.subTest(digest=digest), self.assertRaises(ValueError):
-                    type(c)(directory, digest, HISTORY, source_root=ROOT)
+            original = manifest.read_bytes()
+            variants = [
+                ('lock', original.replace(c.changes['mlf.lock'][1].encode(), b'0' * 64)),
+                # Replace both copies, so the transition record is internally
+                # consistent but still cannot authorize different live bytes.
+                ('build', original.replace(c.changes[MACOS_PATH][1].encode(), b'0' * 64)),
+                ('prior main', main_bytes('tools/performance/artifact-binary/pr43-reconciliation-migration.json')),
+            ]
+            for label, raw in variants:
+                manifest.write_bytes(raw)
+                wrong = hashlib.sha256(raw).hexdigest()
+                self.assertNotEqual(wrong, c.manifest_sha256)
+                for digest in (c.manifest_sha256, wrong):
+                    with self.subTest(label=label, digest=digest), self.assertRaises(ValueError):
+                        type(c)(directory, digest, HISTORY, source_root=ROOT)
 
     def test_rejected_manifest_does_not_materialize_a_predecessor(self):
         from unittest.mock import patch

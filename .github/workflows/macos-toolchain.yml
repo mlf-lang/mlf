@@ -1,0 +1,75 @@
+name: macOS toolchain provenance
+on:
+  pull_request:
+    paths:
+      - .github/workflows/macos-toolchain.yml
+      - tools/shared/build.py
+      - tools/shared/test_darwin_toolchain.py
+      - tools/release/test-macos-toolchain-workflow.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: macos-toolchain-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  provenance:
+    name: GHC and LLVM toolchain provenance (macos-26)
+    runs-on: macos-26
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Preserve checkout identity
+        run: |
+          mkdir -p .mlf-build/macos-toolchain
+          git rev-parse HEAD > .mlf-build/macos-toolchain/checkout.txt
+      - name: Install ordinary async native dependencies
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          brew install llvm@19 gmp pkg-config bdw-gc jq
+          echo "$(brew --prefix llvm@19)/bin" >> "$GITHUB_PATH"
+          echo "MLF_GC_PREFIX=$(brew --prefix bdw-gc)" >> "$GITHUB_ENV"
+          echo 'GC_FREE_SPACE_DIVISOR=8' >> "$GITHUB_ENV"
+      - name: Install pinned official GHC 9.14.1
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          distribution=ghc-9.14.1-aarch64-apple-darwin
+          curl -fsSL "https://downloads.haskell.org/~ghc/9.14.1/$distribution.tar.xz" -o "$archive"
+          printf '%s  %s\n' 841591f152085be605616682779341847d24fd56bd6d22ca61bb37ee32b50681 "$archive" | shasum -a 256 -c -
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/$distribution" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
+          test "$("$RUNNER_TEMP/ghc/bin/ghc" --numeric-version)" = 9.14.1
+          echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
+      - name: Exercise resolver and preparation rejection controls
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/test_darwin_toolchain.py 2>&1 | tee .mlf-build/macos-toolchain/resolver.log
+          python3 -O -B tools/shared/test_darwin_toolchain.py 2>&1 | tee .mlf-build/macos-toolchain/resolver-optimized.log
+          python3 -B tools/shared/test_prepare_async_ghc.py
+          python3 -O -B tools/shared/test_prepare_async_ghc.py
+      - name: Build and authenticate actual GHC-origin async tools
+        run: |
+          set -euo pipefail
+          python3 -B tools/shared/prepare_async_ghc.py --build-dir .mlf-build/async-ghc --clang clang
+          jq -e '.complete == true and .producer_host == "GHC" and .typecheck_only == false and .optimization == "2"' .mlf-build/async-ghc/receipt.json
+          jq -e '.toolchain.files | keys | any(test("/libclang-cpp(\\.[0-9]+)*\\.dylib$"))' .mlf-build/async-ghc/receipt.json
+          jq -e '.complete == true and .producer_host == "GHC" and .runner_protocol_version == 1' .mlf-build/async-ghc/async-tools.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: macos-toolchain-provenance
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .mlf-build/macos-toolchain/
+            .mlf-build/async-ghc/async-tools.json
+            .mlf-build/async-ghc/receipt.json
+            .mlf-build/async-ghc/*.stdout
+            .mlf-build/async-ghc/*.stderr
+            .mlf-build/async-ghc/*.txt
+            .mlf-build/async-ghc/*.log
+            .mlf-build/async-ghc/builtin-verification/

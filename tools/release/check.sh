@@ -24,7 +24,10 @@ tools/release/test-pr-gate.sh
 tools/release/test-qualification-gate.sh
 node tools/release/test-benchmark-gate.mjs
 node tools/release/test-ci-policy.mjs
+node tools/release/test-macos-toolchain-workflow.mjs
 python3 tools/shared/test_provenance.py
+python3 -B tools/shared/test_darwin_toolchain.py
+python3 -O -B tools/shared/test_darwin_toolchain.py
 python3 -B tools/shared/test_generated_string_pool.py
 python3 -B tools/shared/test_prepared_verification.py
 python3 tools/performance/a1-private-index/test_platform.py

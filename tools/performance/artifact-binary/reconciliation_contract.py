@@ -13,8 +13,13 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = '63598306f049a050def3fd21ddf21878a7f4f882b59a48a86c53a3398624e9c5'
+MANIFEST_SHA256 = '09958311b54bb8ddbe3c5cf99dfb2ddcbc0d7dbe04aa218f3856f4a2db7c040f'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
+LIVE_PREDECESSOR = 'f9bdb40a659bfdff4cbb782d438afbb0417dd2e1'
+LIVE_PREDECESSOR_TREE = '3148203097e7622ced1b272e606bfa892fad746b'
+LIVE_PREDECESSOR_MANIFEST = '63598306f049a050def3fd21ddf21878a7f4f882b59a48a86c53a3398624e9c5'
+LIVE_TRANSITION_PATH = 'tools/shared/build.py'
+LIVE_PREDECESSOR_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df'
 
 
 def require(condition, message):
@@ -75,6 +80,37 @@ def manifest_bytes(directory):
         os.close(descriptor)
 
 
+def validate_live_transition(spec, repository, core):
+    """Admit only the declared build-driver repair after the fixed main endpoint."""
+    git = ['git', '--no-replace-objects', '-C', str(repository)]
+    tree = subprocess.check_output([*git, 'rev-parse', LIVE_PREDECESSOR + '^{tree}'], text=True).strip()
+    require(tree == LIVE_PREDECESSOR_TREE, 'pinned live predecessor tree')
+    raw = subprocess.check_output([*git, 'show', LIVE_PREDECESSOR +
+                                   ':tools/performance/artifact-binary/' + MANIFEST])
+    require(len(raw) <= core.MAX_METADATA_BYTES and sha(raw) == LIVE_PREDECESSOR_MANIFEST,
+            'pinned live predecessor manifest')
+    prior = core.strict_json(raw)
+    old = subprocess.check_output([*git, 'show', LIVE_PREDECESSOR + ':' + LIVE_TRANSITION_PATH])
+    require(len(old) <= core.MAX_SOURCE_BYTES and sha(old) == LIVE_PREDECESSOR_SOURCE and
+            prior['changes'][LIVE_TRANSITION_PATH][1] == LIVE_PREDECESSOR_SOURCE,
+            'pinned live predecessor source')
+    row = spec['changes'].get(LIVE_TRANSITION_PATH)
+    require(type(row) is list and len(row) == 2 and row[1] != LIVE_PREDECESSOR_SOURCE,
+            'changed live build endpoint')
+    transition = {
+        'predecessor': LIVE_PREDECESSOR,
+        'predecessor_tree': LIVE_PREDECESSOR_TREE,
+        'predecessor_manifest_sha256': LIVE_PREDECESSOR_MANIFEST,
+        'changes': {LIVE_TRANSITION_PATH: [LIVE_PREDECESSOR_SOURCE, row[1]]},
+    }
+    # Preserve the original PR43 endpoints, every other current endpoint,
+    # additions, registry ownership and historical maintenance records verbatim.
+    expected = {**prior, 'changes': {**prior['changes'], LIVE_TRANSITION_PATH:
+                                  [prior['changes'][LIVE_TRANSITION_PATH][0], row[1]]},
+                'live_transition': transition}
+    require(spec == expected, 'only the declared live build endpoint may change')
+
+
 class Contract:
     def __init__(self, directory, manifest_sha256, history_root, source_root=None):
         self.directory = Path(directory).resolve(strict=True)
@@ -106,9 +142,10 @@ class Contract:
         raw = self.core.read_file(self.directory, MANIFEST, self.core.MAX_METADATA_BYTES)
         require(sha(raw) == manifest_sha256, 'successor manifest SHA')
         spec = self.core.strict_json(raw)
-        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance'} and
+        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance', 'live_transition'} and
                 spec['format'] == 'pr43-reconciliation-source-migration-v1' and spec['predecessor'] == PREDECESSOR,
                 'successor manifest schema')
+        validate_live_transition(spec, location, self.core)
         self.changes = spec['changes']
         self.maintenance = spec['maintenance']
         files = dict(self.previous.value['current_files'])

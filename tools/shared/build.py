@@ -364,63 +364,138 @@ def toolchain_inputs(ghc, libdir, ghc_info, cc):
 
 
 
+def darwin_load_commands(path, lipo):
+    """Keep each compatible Mach-O slice's load commands and rpaths separate."""
+    slices = subprocess.run([str(lipo), '-archs', str(path)], capture_output=True, text=True)
+    if slices.returncode:
+        raise RuntimeError('lipo failed: ' + str(path) + ': ' + slices.stderr.strip())
+    reported = slices.stdout.split()
+    if (not reported or len(set(reported)) != len(reported) or
+            set(reported) - {'arm64', 'arm64e', 'x86_64', 'x86_64h', 'i386'}):
+        raise RuntimeError('malformed or unsupported Mach-O slice list: ' + str(path))
+    architectures = sorted(set(reported) & {'arm64', 'arm64e'})
+    if not architectures:
+        raise RuntimeError('no supported Darwin toolchain slice: ' + str(path))
+    # cctools treats arm64 and arm64e as distinct, not as a family selector.
+    # Hash the union of both native closures when present, without inspecting
+    # Intel slices or mixing the native slices' local run-path search orders.
+    commands = {}
+    load_kinds = {'LC_LOAD_DYLIB', 'LC_LOAD_WEAK_DYLIB', 'LC_REEXPORT_DYLIB',
+                  'LC_LOAD_UPWARD_DYLIB', 'LC_LAZY_LOAD_DYLIB'}
+    for architecture in architectures:
+        result = subprocess.run(['/usr/bin/otool', '-arch', architecture, '-l', str(path)],
+                                capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError('otool failed: ' + str(path) + ': ' + result.stderr.strip())
+        dependencies, rpaths = [], []
+        blocks = re.split(r'(?m)^Load command \d+\s*$', result.stdout)[1:]
+        if not blocks:
+            raise RuntimeError('malformed Mach-O load commands: ' + str(path))
+        for block in blocks:
+            command = re.search(r'(?m)^\s*cmd (\S+)\s*$', block)
+            if not command:
+                raise RuntimeError('malformed Mach-O load command: ' + str(path))
+            kind = command.group(1)
+            if kind == 'LC_DYLD_ENVIRONMENT':
+                raise RuntimeError('unsupported Mach-O loader environment: ' + str(path))
+            if kind == 'LC_RPATH' or kind in load_kinds:
+                field = 'path' if kind == 'LC_RPATH' else 'name'
+                value = re.search(r'(?m)^\s*' + field + r' (.+) \(offset \d+\)\s*$', block)
+                if not value:
+                    raise RuntimeError('malformed Mach-O ' + kind + ': ' + str(path))
+                (rpaths if kind == 'LC_RPATH' else dependencies).append(value.group(1))
+        commands[architecture] = dependencies, rpaths
+    return commands
+
+
+def darwin_loader_path(name, loader, executable):
+    for token, directory in [('@loader_path', loader.parent),
+                             ('@executable_path', executable.parent)]:
+        if name == token:
+            return directory
+        if name.startswith(token + '/'):
+            return directory / name[len(token) + 1:].lstrip('/')
+    if name.startswith('/'):
+        return Path(name)
+    # Relative paths depend on the subprocess cwd; nested @rpath is unsupported.
+    # Never substitute a unique basename from an unrelated GHC/CLT installation.
+    raise RuntimeError('unsupported Mach-O path: ' + name + ' from ' + str(loader))
+
+
 def darwin_toolchain_inputs(initial_paths, actual_ghc, libdir):
     """Record the real Mach-O dependency closure and dyld shared-cache bytes."""
+    overrides = ('DYLD_LIBRARY_PATH', 'DYLD_FRAMEWORK_PATH', 'DYLD_FALLBACK_LIBRARY_PATH',
+                 'DYLD_FALLBACK_FRAMEWORK_PATH', 'DYLD_VERSIONED_LIBRARY_PATH',
+                 'DYLD_VERSIONED_FRAMEWORK_PATH', 'DYLD_INSERT_LIBRARIES',
+                 'DYLD_ROOT_PATH', 'DYLD_IMAGE_SUFFIX', 'DYLD_SHARED_CACHE_DIR',
+                 'DYLD_SHARED_REGION')
+    for name in overrides:
+        if os.environ.get(name):
+            raise RuntimeError('unsupported Mach-O loader environment: ' + name)
     sdk = Path(subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()).resolve(strict=True)
     cache_dir = Path('/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld')
     cache_map = cache_dir / 'dyld_shared_cache_arm64e.map'
     if not cache_map.is_file():
         raise RuntimeError('cannot identify Darwin shared-cache map')
-    cache_text = cache_map.read_text()
+    # Apple's .map has one unindented install name per image, followed by
+    # indented segment rows. A prefix/substring is not proof of that image.
+    cache_images = {line for line in cache_map.read_text().splitlines() if line.startswith('/')}
+    if not (cache_dir / 'dyld_shared_cache_arm64e').is_file():
+        raise RuntimeError('missing primary dyld shared-cache file')
     caches = sorted(p for p in cache_dir.glob('dyld_shared_cache_arm64e*') if p.is_file())
     if not caches:
         raise RuntimeError('missing dyld shared-cache files')
     paths = set(initial_paths)
-    for name in ['clang', 'ld', 'as', 'ar', 'ranlib', 'otool', 'install_name_tool']:
+    tool_paths = {}
+    for name in ['clang', 'ld', 'as', 'ar', 'ranlib', 'otool', 'install_name_tool', 'lipo']:
         value = subprocess.check_output(['xcrun', '--find', name], text=True).strip()
-        paths.add(Path(value).resolve(strict=True))
+        tool_paths[name] = Path(value).resolve(strict=True)
+        paths.add(tool_paths[name])
     paths.add((sdk / 'SDKSettings.json').resolve(strict=True))
     paths.update(p.resolve() for p in caches)
-    ghc_libraries = {}
-    for root in [libdir, Path('/Library/Developer/CommandLineTools/usr/lib')]:
-        for path in root.rglob('*.dylib'):
-            ghc_libraries.setdefault(path.name, set()).add(path.resolve())
-    pending = list(paths - set(caches)); visited = set(); system_names = set()
+    # Each executable has its own run-path stack. Expand inherited LC_RPATHs at
+    # the image declaring them, keeping dyld's nearest-loader/first-match order.
+    pending = [(path, path, ()) for path in sorted(paths - set(caches))]
+    visited, commands, system_names = set(), {}, set()
     while pending:
-        path = pending.pop()
-        if path in visited:
+        path, executable, inherited = pending.pop()
+        if path not in commands:
+            kind = subprocess.check_output(['/usr/bin/file', '-b', str(path)], text=True)
+            commands[path] = darwin_load_commands(path, tool_paths['lipo']) if 'Mach-O' in kind else None
+        if commands[path] is None:
+            if path != executable:
+                raise RuntimeError('Mach-O dependency is not a Mach-O image: ' + str(path))
             continue
-        visited.add(path)
-        kind = subprocess.check_output(['/usr/bin/file', '-b', str(path)], text=True)
-        if 'Mach-O' not in kind:
-            continue
-        result = subprocess.run(['/usr/bin/otool', '-L', str(path)], capture_output=True, text=True)
-        if result.returncode:
-            raise RuntimeError('otool failed: ' + str(path))
-        for line in result.stdout.splitlines():
-            match = re.match(r'^\s+(\S+) \(compatibility version ', line)
-            if not match:
+        for architecture, (dependencies, local_rpaths) in commands[path].items():
+            rpaths = tuple(dict.fromkeys([
+                *(darwin_loader_path(name, path, executable).resolve() for name in local_rpaths),
+                *inherited]))
+            # Include the context: the same dylib can resolve @executable_path or an
+            # inherited @rpath differently when loaded by another tool. Deduplicated
+            # stacks also ensure dependency cycles terminate without losing inputs.
+            state = (path, executable, architecture, rpaths)
+            if state in visited:
                 continue
-            name = match.group(1)
-            if name.startswith('/usr/lib/') or name.startswith('/System/Library/'):
-                if name not in cache_text:
-                    raise RuntimeError('system dylib absent from dyld cache map: ' + name)
-                system_names.add(name)
-                continue
-            if name.startswith('@rpath/'):
-                candidates = ghc_libraries.get(Path(name).name, set())
-                if len(candidates) != 1:
-                    raise RuntimeError('cannot uniquely resolve Mach-O dependency: ' + name)
-                dependency = next(iter(candidates))
-            elif name.startswith('@loader_path/'):
-                dependency = (path.parent / name[len('@loader_path/'):]).resolve(strict=True)
-            elif name.startswith('/'):
-                dependency = Path(name).resolve(strict=True)
-            else:
-                raise RuntimeError('unsupported Mach-O dependency: ' + name)
-            if dependency not in paths:
+            visited.add(state)
+            for name in dependencies:
+                if name.startswith('/usr/lib/') or name.startswith('/System/Library/'):
+                    if name not in cache_images:
+                        raise RuntimeError('system dylib absent from dyld cache map: ' + name)
+                    system_names.add(name)
+                    continue
+                if name.startswith('@rpath/'):
+                    candidates = [root / name[len('@rpath/'):].lstrip('/') for root in rpaths]
+                    dependency = next((candidate for candidate in candidates if candidate.exists()), None)
+                    if dependency is None:
+                        raise RuntimeError('cannot resolve Mach-O dependency: ' + name + ' from ' +
+                                           str(path) + '; searched: ' + ', '.join(map(str, candidates)))
+                else:
+                    dependency = darwin_loader_path(name, path, executable)
+                dependency = dependency.resolve(strict=True)
+                if not dependency.is_file():
+                    raise RuntimeError('Mach-O dependency is not a regular file: ' + str(dependency))
                 paths.add(dependency)
-                pending.append(dependency)
+                pending.append((dependency, executable, rpaths))
     return {'actual_ghc': identified(actual_ghc), 'files': {str(path): sha(path) for path in sorted(paths)},
             'platform_qualification': 'Darwin Mach-O and dyld cache; experimental',
             'sdk': str(sdk), 'system_dylibs': sorted(system_names)}
