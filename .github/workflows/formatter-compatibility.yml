@@ -1,0 +1,51 @@
+name: Formatter compatibility
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: formatter-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  formatter-compatibility:
+    name: Safe Ormolu 0.9.0.0 / current parser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install pinned official GHC and Ormolu
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y build-essential libgmp-dev libnuma-dev libncurses-dev xz-utils unzip
+          archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
+          curl -fsSL https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz -o "$archive"
+          printf '%s  %s\n' 60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841 "$archive" | sha256sum -c -
+          tar -xJf "$archive" -C "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP/ghc-9.14.1-x86_64-unknown-linux" && ./configure --prefix="$RUNNER_TEMP/ghc" && make install)
+          echo "$RUNNER_TEMP/ghc/bin" >> "$GITHUB_PATH"
+          curl -fsSL https://github.com/tweag/ormolu/releases/download/0.9.0.0/ormolu-x86_64-linux.zip -o "$RUNNER_TEMP/ormolu.zip"
+          printf '%s  %s\n' 367eb4969986504cf171f71f91e24ea5d7d9d97c41701e8e6eef9b642fd0d201 "$RUNNER_TEMP/ormolu.zip" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/ormolu"
+          unzip "$RUNNER_TEMP/ormolu.zip" -d "$RUNNER_TEMP/ormolu"
+          chmod +x "$RUNNER_TEMP/ormolu/ormolu"
+          echo "$RUNNER_TEMP/ormolu" >> "$GITHUB_PATH"
+      - name: Test runner failure guards
+        run: |
+          python3 -B tools/shared/test_formatter_compatibility_controls.py
+          python3 -O -B tools/shared/test_formatter_compatibility_controls.py
+          python3 -B tools/shared/test_source_prologue.py
+          python3 -O -B tools/shared/test_source_prologue.py
+          python3 -B tools/testing/test_manifest_snapshot.py
+      - name: Format isolated copies and compare current parser ASTs
+        run: python3 -B tools/shared/test_formatter_compatibility.py --output .mlf-build/formatter-compatibility
+      - name: Preserve receipts and diagnostics
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: formatter-compatibility
+          path: .mlf-build/formatter-compatibility
+          if-no-files-found: warn

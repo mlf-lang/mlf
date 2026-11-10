@@ -75,6 +75,24 @@ class SnapshotControls(unittest.TestCase):
         (self.root / 'Main.hs').write_text('-- mlf:syntax shared-haskell-v1\nmodule Main where\nimport MLF.Primitive\nmain = 1\n')
         self.save()
 
+    def test_shared_marker_after_formatter_pragmas(self):
+        self.value['executables']['probe']['main'] = 'Main.hs'
+        (self.root / 'Main.hs').write_text('{-# LANGUAGE RankNTypes #-}\n'
+            '-- mlf:syntax shared-haskell-v1\n{-# LANGUAGE NoImplicitPrelude #-}\n'
+            'module Main where\nimport MLF.Primitive\nmain = 1\n')
+        self.save()
+
+    def test_shared_marker_must_be_unique_and_before_module(self):
+        self.value['executables']['probe']['main'] = 'Main.hs'
+        marker = '-- mlf:syntax shared-haskell-v1\n'
+        body = 'module Main where\nimport MLF.Primitive\nmain = 1\n'
+        for source in [body + marker, marker + marker + body,
+                       '-- mlf:syntax future-v2\n' + marker + body]:
+            with self.subTest(source=source):
+                (self.root / 'Main.hs').write_text(source)
+                with self.assertRaisesRegex(ValueError, 'explicit profile marker'):
+                    self.save()
+
     def test_hs_filename_requires_explicit_syntax_marker(self):
         self.value['executables']['probe']['main'] = 'Main.hs'
         (self.root / 'Main.hs').write_text('module Main where\nimport MLF.Primitive\nmain = 1\n')

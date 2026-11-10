@@ -1744,10 +1744,18 @@ class BinarySourceBoundaryTests(unittest.TestCase):
 
     def test_reviewed_source_repairs_project_all_declared_owners(self):
         binary = migration.binary_contract()
-        # These repairs belong to the authenticated DeclId predecessor, not
-        # the later PR43 reconciliation delta. Keep both boundaries explicit.
+        # The DeclId repairs remain independently authenticated. Formatter
+        # compatibility subsequently changes Layout only among these owners;
+        # prove that exact overlap instead of treating the live bytes as DeclId.
         repairs = binary.previous
         names = ('Bootstrap.Layout', 'Package.Benchmark', 'Package.Verification', 'Tests.CompilerTests')
+        layout = binary.value['module_paths']['Bootstrap.Layout']
+        self.assertEqual({binary.value['module_paths'][name] for name in names}
+                         & set(binary.changes), {layout})
+        self.assertEqual(binary.changes[layout], [
+            '2d728d0dedebb05abe620095abe0f03999e3a8e00fca845faf47036fc81178de',
+            'b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8',
+        ])
         for module in names:
             path = binary.value['module_paths'][module]
             live = (ROOT / path).read_bytes()
@@ -1755,12 +1763,24 @@ class BinarySourceBoundaryTests(unittest.TestCase):
                 # Both endpoints are authenticated independently: exact new
                 # bytes from the live source manifest and exact old Git bytes,
                 # followed by every existing binary/numeric/API inverse.
-                self.assertNotIn(path, binary.changes)
-                self.assertEqual(binary.value['current_files'][path], repairs.changes[path][1])
-                self.assertEqual(hashlib.sha256(live).hexdigest(), repairs.changes[path][1])
+                self.assertEqual(hashlib.sha256(live).hexdigest(), binary.value['current_files'][path])
+                repaired = (binary.archived / path).read_bytes()
+                self.assertEqual(hashlib.sha256(repaired).hexdigest(), repairs.changes[path][1])
+                self.assertEqual(binary._older_bytes(live, path), repaired)
+                if path == layout:
+                    self.assertEqual(binary.changes[path][0], repairs.changes[path][1])
+                    with self.assertRaises(ValueError):
+                        binary.project_owner(repaired, module)
+                    with self.assertRaises(ValueError):
+                        repairs.project_owner(live, module)
+                else:
+                    self.assertNotIn(path, binary.changes)
+                    self.assertEqual(live, repaired)
                 previous = (repairs.archived / path).read_bytes()
                 self.assertEqual(hashlib.sha256(previous).hexdigest(), repairs.changes[path][0])
                 historical = repairs.previous.restore_path(previous, path)
+                self.assertEqual(repairs.project_owner(repaired, module), historical)
+                self.assertEqual(repairs.advance_path(historical, path), repaired)
                 self.assertEqual(prebinary_read_bytes(ROOT / path), historical)
                 self.assertEqual(binary.project_owner(live, module), historical)
                 self.assertEqual(binary.advance_path(historical, path), live)

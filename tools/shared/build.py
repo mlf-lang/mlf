@@ -69,6 +69,41 @@ def executable(name):
     return Path(found).resolve()
 
 
+def source_prologue_markers(text):
+    """Read real leading marker comments; the compiler validates pragma syntax."""
+    markers, index, size = [], 0, len(text)
+    while index < size:
+        if text[index].isspace():
+            index += 1
+        elif text.startswith('--', index):
+            end = text.find('\n', index)
+            if end < 0:
+                end = size
+            comment = text[index + 2:end].strip()
+            if comment.startswith('mlf:syntax'):
+                markers.append(comment[len('mlf:syntax'):].strip())
+            index = end
+        elif text.startswith('{-', index):
+            # LANGUAGE pragmas are block comments here, including any marker
+            # lookalikes inside them. Respect nested ordinary block comments.
+            depth = 1
+            index += 2
+            while index < size and depth:
+                if text.startswith('{-', index):
+                    depth += 1
+                    index += 2
+                elif text.startswith('-}', index):
+                    depth -= 1
+                    index += 2
+                else:
+                    index += 1
+            if depth:
+                return []  # Unterminated prologues never prove a profile.
+        else:
+            break  # Never discover markers in source code or string literals.
+    return markers
+
+
 def load_manifest():
     manifest = json.loads((ROOT / 'shared-sources.json').read_text())
     if manifest['format'] != 1 or manifest['source_syntax'] != 'shared-haskell-v1':
@@ -85,9 +120,12 @@ def load_manifest():
         if not source.is_file() or source.suffix != '.hs':
             raise RuntimeError('missing raw shared implementation source: ' + str(path))
         text = source.read_text()
-        if not text.startswith('-- mlf:syntax shared-haskell-v1\n'):
-            raise RuntimeError('missing shared source marker: ' + str(path))
         declared = re.search(r'^module\s+([A-Z][\w.]*)\b', text, re.M)
+        # Ormolu may split/sort LANGUAGE pragmas ahead of the marker.
+        # Ignore nested comment contents and stop at the first source token.
+        markers = source_prologue_markers(text)
+        if markers != ['shared-haskell-v1']:
+            raise RuntimeError('missing or ambiguous shared source marker: ' + str(path))
         if not declared or declared.group(1) != name:
             raise RuntimeError('module identity mismatch: ' + str(path))
         if re.search(r'^\s*import\s+(?:qualified\s+)?MLF\.Host\.', text, re.M):
