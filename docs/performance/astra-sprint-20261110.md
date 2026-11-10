@@ -27,7 +27,7 @@
 | --- | --- | --- | --- | --- |
 | B0 | 基线与证据 | 测量harness，不改生产算法 | 当前MLF/GHC完整端点资格、精确artifact/receipt、普通基线cohort | 工具链与producer认证 |
 | B1 | 制品和后端 | 当前只有 backend-stages 诊断工具 | 小crate预检、当前完整checked输入分段诊断、ordinary LLVM原始字节一致 | B0可用checked artifact、资源令牌 |
-| F1 | 前端与统一诊断harness | 当前只改私有诊断入口/计数器；生产Type恢复基线 | kindOf memo已停止；下一步用低扰动SCC身份和需求窗口定位 | R2边界审查、资源令牌 |
+| F1/F2/F3 | 前端和Graph优化 | 生产Graph.hs；实验独立分支 | Type memo已停止；F2小候选正确性已通过；F3语义及代表码形通过，局部普通样本尚未完成 | R2语义审查、B0普通码形证据、资源令牌 |
 | R1（停止） | legacy调用内复用实验 | Bootstrap.CrateQuery、Bootstrap.CrateSession | 仅保留可恢复实验；已确认不在当前端点调用链上，不再安排producer/计时 | 不作为当前优化候选 |
 | R2 | 当前graph边界定位 | 私有诊断中的CrateSession、CrateGraph | 真实IO返回/每SCC进度事件，与F1共用一次有界诊断 | 与F1固定接口、资源令牌 |
 | M0/M1 | 基线与证据 | 冻结测量配置 | 基线和每个已符合条件候选的fresh、配对、ordinary端点 | B0成功；相应候选完成控制 |
@@ -40,7 +40,7 @@
 1. 重任务开始前由 Astra 确认唯一令牌持有者。不要仅凭本shell的ps判断全机空闲：不同执行环境的进程视图可能不同。
 2. 所有新重任务使用同一个共享排他锁，并保留各harness原有锁。锁作用域必须覆盖整个构建/测量cohort；失败时先确认子进程已回收，再释放令牌。
 3. B0已先后完成MLF-native失败资格与GHC-native成功资格。资格数据不并入正式样本；MLF资格开头可能与一次约3秒控制有重叠，保留说明。
-4. 当前MLF资格已在600.099秒触发wall保护，无checked/LLVM产物；GHC资格outer为155.931809537秒。完整倍率仍不可用。B1小main资格与F1/R2单次120秒计数定位都已完成。下一步F1/R2共同准备去除Type计数的低扰动SCC窗口诊断；R1停止排期。完整90模块目标不变，小输入不顶替目标。
+4. 当前MLF资格已在600.099秒触发wall保护，无checked/LLVM产物；GHC资格outer为155.931809537秒。完整倍率仍不可用。B1小main资格与F1/R2单次120秒计数定位都已完成。后续markers和P1诊断均已完成；当前F3语义门及普通码形门状态见末节和JSON，R1停止排期。完整90模块目标不变，小输入不顶替目标。
 5. 之后正式样本由B0方向统一排队。这个队列可按真实阻塞调整，不能让无输入任务占着机器。
 6. 不允许长时间同时构建多个内存重候选。没有令牌时继续源码审查、控制设计、文档与轻量git保存。
 7. 中断的cohort保持不完整，不能拼接重启前后样本充当原定完整对照。新的cohort必须新目录、新计划；不要覆盖旧receipt。
@@ -67,7 +67,7 @@
 
 两owner overlay只是窄语义gate，不是完整producer。完整性能对照必须普通build.py构建独立候选、产生自己receipt，不能借用baseline身份。所有已知corruption/missing repair、publication错误和需求/首错行为继续受控。
 
-## 当前可核验检查点（后续更新见JSON）
+## 首轮检查点（历史记录；最新状态见末节和JSON）
 
 - B0 MLF：600.09899221秒wall保护退出（-9）；采样峰值1,745,485,824字节；无完成stage/checked/LLVM。父进程wait4的0.235秒CPU未包含被终止compiler子进程，不能冒充完整任务CPU。
 - 失败目录存在query-graph-v2及generations/results/staging子目录，仅文件是lock；payload到最终publish才写，不能据此认定未开始推断。
@@ -170,3 +170,33 @@ F2由前端方向独占Graph.hs，B1方向独立复核。当前窄补丁只消�
 R3由query方向独占Graph/Solver.hs，B0方向独立复核。bitmap-seen提案已停用：其直接lookup宽松上界仅0.649%总ticks，且还含其他lookup，额外bitmap插入可能抵消。未执行控制或计时，生产Solver已恢复f9，归档保存到db68c774ae1d5919c4c5e28e62f9d6aca28c0017。下一步只读研究instantiateExpandedPrepared/fallback中同一操作内可能重复的已完成工作，不删除验证、扩缓存生命周期或改public API。
 
 P1安全恢复checkpoint位于[fa7df4c39897a7dad4d21a44087c5927a12dc8d4的README](https://github.com/mlf-lang/mlf/blob/fa7df4c39897a7dad4d21a44087c5927a12dc8d4/tools/performance/full-compiler/late-profile-20261110/README.md)，四份源码与实际测试owners逐字相同，fetch树一致。只有源码、SHA清单和脱敏摘要持久化；13MB raw profile、完整receipts和binary未公开保存。B2失败摘要另已保存并取回验证到e0fa831b3d4cbd395f4d381dbebcb216ebc58365，原失败结论不变。
+
+## Graph候选与恢复状态更新（2026-11-10 16:13 UTC）
+
+markers-only九文件检查点已依具体公开许可保存并完整取回核验：perf/frontend-20261110@33bed9fb4073877ac5589097abf34a3fbac0d1f9，tree3cbb6096a8b5269f74c85289ad6736647efd870b。[恢复README](https://github.com/mlf-lang/mlf/blob/33bed9fb4073877ac5589097abf34a3fbac0d1f9/tools/performance/graph-markers/README.md)。此前的发布阻塞已解除；源码及79个结构化快照持久化，原始command/guard receipts仍仅本机，不能由hash恢复。
+
+F2仅省去非零graft成功路径的重复parents回放。第01次门因测试代码布局语法错误停止，第02次因二进制与日志目录同名停止，两次都没有执行语义controls，失败证据保留。最小修正经独立复核后，第03次单240秒scope在34.714秒退出0：O0/O2均通过12000个validation、5616个public unify、1433个实际成功rebind及16条graft-parent边、480个Int64布局、20个需求/错误和6个alias控制。pins、C重建字节一致与清理通过。没有跑bench或完整producer，没有速度结论。[F2恢复版本6c53a64a](https://github.com/mlf-lang/mlf/blob/6c53a64a28230d3afa5c10f378d683473b930d74/tools/performance/dense-place/README.md)已取回核验，保留为独立未合并小候选。
+
+Solver较大路径审查没有发现可以安全省掉的大块重复prepare/projection。unify前后验证对应不同图，不能复用旧证书删验证。bitmap候选继续停用，不用微小覆盖消耗完整compiler预算。
+
+新的直接证据来自认证ordinary O2对象：Graph.readDense入口仍分配56字节，writeDense入口64字节，readDense有66个实际直接跳转，同时部分caller已经展开。P1中readDense为72字节/SCC entry，说明profiling确实放大，但不能把所有包装都称为剖析假象。这只是静态代码形状，不是动态频次、可省总分配或速度证明。Host Base的pure/bind和Primitive别名已经内联，故不盲改Base、pseq或编译flags。
+
+F3在独立精确f9分支perf/graph-read-fusion-20261110只把34个函数中的54个饱和readDense调用按原body原位展开为readSTArray array(identity-low)。Graph SHA为fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3。公开helper、部分应用、所有write和F2补丁均不改；共享语法不支持INLINE类pragma，因此不增加pragma或改变parser。54处变换可精确逆回f9，独立语义审查通过。
+
+F3唯一O0/O2语义门已通过，总240秒保护下实际41.017秒，bench=0；除了原有固定控制，21个实际改变路径的读需求控制和120个已验证有效图normalize对照均通过。控制审查已纠正共享<=先需parent cell的实际顺序；120个normalize对照不声称覆盖全部normal分支。pins、C对象原命令重建字节一致、producer复认证及子进程/两锁清理均通过。没有运行codegen、bench或完整producer；源码和脱敏结果已独立保存并取回核验：[F3恢复版本7d03b4c6](https://github.com/mlf-lang/mlf/blob/7d03b4c6278317f743311392d5d4cc3606ab1bc0/tools/performance/graph-read-fusion/README.md)，tree69b5d18ee1611a8d67141df6dfc02015eb12afbe。8文件含patch、可逆54点清单、已测controls/runner和脱敏摘要，raw receipts仍仅本机。
+
+后续普通码形门由B0独立准备、R2复核，最多180秒，必须同原模块名Bootstrap.Graph、同ordinary O2 flags和认证依赖，不能用改名语义oracle对象证明生产码形。公开readDense入口理应仍在，必须看真实caller的跳转与heap分配是否消失或仅迁移。语义门通过及锁清理后才另行准入；短ordinary计时、11模块诊断切片和完整producer均未在此授权。若后来构建完整候选，须正常GHC --make重编接口fingerprint影响的反向依赖，不能只换Graph.o混链旧Solver/Constraint冒充完整candidate。当前仍没有合格完整MLF端点或提速倍率；native代际A/B与固定点继续暂停。
+
+## 普通码形通过，首次短样本仍未产生（2026-11-10 16:41 UTC）
+
+F3原名Graph代码生成第01次捕获因GHC -c接口搜索布局失败，未编译出baseline或candidate对象；原失败保留。仅把已认证接口复制到各侧-hidir，经独立差异复审后第02次在24.718秒完成，两份receipt、输入/输出pins和清理均通过。重编baseline Graph.o及Graph.hi与原ordinary producer逐字节相同，建立了真正可比的第三锚。
+
+独立Core/Cmm复核确认代表性denseChild1到denseContains成功三读路径的局部静态分配由352降至176字节，不是只删除符号或把闭包搬到caller；仅构造但不执行action则由96增至104字节。densePlace action入口168降至120字节，其他入口不一定减少。.text由346382增至354814字节，约增2.43%。readDense直接跳转66降至0只是辅证，不能代表54处等量收益或动态调用次数。writeDenseInt源码虽未改，直接跳转也从41降至11，不能把旧profile写侧覆盖再全部当作增量机会。
+
+[码形恢复检查点d79f7492](https://github.com/mlf-lang/mlf/blob/d79f7492c3b051d4cc14c1e2ae594d86a31f852e/tools/performance/full-compiler/graph-read-codegen-20261110/README.md)已远端逐文件和本机fetch全树核验。Python为已测原字节；公开shell仅参数化机器锁路径，明确未执行，原shell身份保留。没有公开raw dumps、完整receipts或对象。
+
+唯一F3-samples-01短普通Graph尝试在60.740秒wall保护下停止，首次binary尚未启动：warmups和samples均为空，无法给中位数或比率。只知道停在初始状态save与预检结束save之间，不能指认具体hash或函数；已排除源码中的重复同锁等待。全post-pins未达，仅六个关键小文件后验身份吻合，不能冒称完整认证。子进程清理和两锁释放通过。原执行脚本、计划和脱敏失败摘要已保存并取回核验到[221764d0的恢复README](https://github.com/mlf-lang/mlf/blob/221764d065a0ac0db9314073478fa4b14e00fcd7/tools/performance/graph-read-fusion/README.md)，raw receipts仍只在本机。
+
+下一版目前仅获准实现和静态审查，没有第二轮执行许可：本次只运行既有O2 binary，不执行GHC或producer，因此区分历史构建来源与实际执行闭包。固定原语义/码形receipt身份，保留当前binary、源/fixture及测量harness前后pins，并验证实际ELF loader与解析运行库；不再声称本次重认证未使用的整套GHC安装、旧对象和raw dumps。旧gate没有记录完整LD环境且脚本拼接未知尾部，不能假称清理后仍为原环境。新环境应明确固定，先用同一个O2 binary重跑原七行语义controls作为独立runtime资格，成功后再同环境运行原32批、两warmup和ABBAABBA八样本，全部仍在一个60秒scope内。保留阶段状态、失败和所有样本；不pilot、缩N或补样追逐好结果。
+
+截至本节，没有任何普通编译器提速被验证或合并，当前完整MLF/GHC倍率仍不可用。B0单crate和B2同源分crate600秒失败都保持不变，GHC155.931809537秒只是一次资格。语义通过、静态分配减少、内部诊断比例和失败的零样本尝试都不能代替速度结果。下一步先取得可信小样本，再决定是否值得普通完整candidate构建与同边界复测；目标仍约1×GHC，native代际A/B与fixed-point继续暂停。
