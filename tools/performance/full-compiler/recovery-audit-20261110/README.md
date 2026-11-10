@@ -50,3 +50,5 @@ new authenticated plans and admissions, and review current instructions first.
 A separately scoped foundation14 diagnostic is preparation-only at this checkpoint.
 
 Foundation SETUP01 later failed before any commands at8.386s on the recorded official GHC launcher symlink. See foundation14-setup-failure.json. A new shared workspace lock epoch was verified; see lock-epoch.json. A separately scoped strict alias-authentication repair is preparation only; no GC data or target run yet.
+
+Foundation cohort02 SETUP and the separately admitted one-use QD subsequently PASSED. See foundation14-gc/REPORT.md and summary.json for real managed-heap evidence and limitations; foundation14-diagnostic-source archives the exact reviewed implementation. No production compiler algorithm changed, no full90/GHC ratio or speedup was established. The next allocation-source attribution design is source-only, with no heavy execution admitted.

@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 20,
-  "observed_at_utc": "2026-11-10T21:40:28Z",
+  "revision": 21,
+  "observed_at_utc": "2026-11-10T21:59:04Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -723,9 +723,10 @@
     {
       "id": "R6",
       "role": "New baseline-only ordinary GC evidence preparation",
-      "status": "inference11 dependencies failed at300s; separate foundation14 SETUP01 failed before commands at8.386s",
+      "status": "completed foundation14 baseline-only diagnostic; prior failed scopes retained",
       "reason": "Avoid rebuilding rejected F3 solely to explain a past noisy sample; measure restored baseline allocation/GC without claiming retrospective C01 cause.",
-      "next": "Review alias-specific pinned symlink correction for new foundation14 cohort02. No repeated target sample exists."
+      "next": "Preserve exact result/source and read limitations. No repetition or F3 integration.",
+      "report": "tools/performance/full-compiler/recovery-audit-20261110/foundation14-gc/REPORT.md"
     },
     {
       "id": "RECOVERY_PRODUCER",
@@ -736,6 +737,14 @@
       "postbuild_qualification_limit_seconds": 120,
       "scope": "Original build.py --bootstrap-only --optimization2, all137 shared/4host/13programs and original builtin gates. No target compilation or F3 build.",
       "next": "Use exact new receipt and94non-Main closure for reviewed baseline-only diagnosis. Do not use overwritten shared Main.o."
+    },
+    {
+      "id": "A7",
+      "role": "Astra-owned allocation-source attribution design",
+      "status": "source-only feasibility and protocol preparation active",
+      "next": "Choose one bounded profiling/allocation-demand experiment that respects lazy ownership; no execution admitted.",
+      "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+      "no_heavy_execution_admitted": true
     }
   ],
   "restart_required": [
@@ -751,7 +760,7 @@
   "resource_token_at_observation": {
     "state": "free",
     "task": null,
-    "restart_caveat": "Use new workspace lock epoch, prove exclusion/current file identity; no old /workspace/shared continuity."
+    "restart_caveat": "New shared workspace lock epoch must be reverified; no automatic next execution."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -783,7 +792,7 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Complete one foundation14 GC diagnostic only after narrow tool-alias provenance correction and new cohort admission. Never relabel preparation as measurements.",
+  "next_priority": "Attribute high managed allocation to actual demand paths before selecting optimization: solve/elaboration, closed/open checker ownership, canonical graph materialization, fingerprint/encoding. Preserve laziness and all correctness checks. GC tuning alone is not evidence of feature cost or full90 progress.",
   "next_real_compile_gate": {
     "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
@@ -808,7 +817,7 @@
     "remote_tip_verified": true
   },
   "recovery": {
-    "status": "ordinary producer qualified; inference11 prerequisite timed out; foundation14 SETUP failed before any command on recorded tool alias representation",
+    "status": "toolchain and original producer qualified; separate foundation14 ordinary managed-heap diagnostic completed; no compiler speedup or full90/GHC ratio",
     "event_date": "2026-11-10",
     "name_caveat": "The branch and worktree labels ending20261111 are recovery labels, not UTC event dates.",
     "source_inventory": "tools/performance/full-compiler/recovery-audit-20261110/source-inventory.json",
@@ -826,7 +835,7 @@
     },
     "lock": {
       "scope": "one shared workspace flock for all current/future recovery heavy workers",
-      "observed": "free after foundation SETUP preflight failure; no live owned descendants",
+      "observed": "free; QD complete, zero final observed RSS/no owned descendants; both locks independently reacquired",
       "new_epoch": true,
       "proof": "tools/performance/full-compiler/recovery-audit-20261110/lock-epoch.json",
       "continuity_caveat": "Previous /workspace/shared directory absent and its parent filesystem read-only. Both views verified absent; new workspace lock verified across workers, no historical continuity claimed."
@@ -847,10 +856,11 @@
     "owners": {
       "Astra": "coordinator, machine windows, checkpoint and candidate decisions",
       "toolchain": "Astra worker, official pinned toolchain restore only",
-      "gc_diagnostic": "Astra worker, baseline-only preparation/review, no execution",
-      "source_audit": "parent audit of checking/witness/serialization, no production edits"
+      "gc_diagnostic": "Astra worker, completed and independently verified; no further heavy task",
+      "source_audit": "parent audit of checking/witness/serialization, no production edits",
+      "allocation_attribution": "Astra designer, source-only feasibility and experiment design; no build/target admitted"
     },
-    "next_admission": "Astra must independently verify corrected alias authentication and separate phase admission. None now.",
+    "next_admission": "None. Astra-owned source-only allocation-attribution design is active; any profiling setup and target need new reviewed exact plans and separate resource admissions.",
     "producer": {
       "status": "passed build and separately admitted focused postqualification",
       "summary": "tools/performance/full-compiler/recovery-audit-20261110/producer-summary.json",
@@ -858,7 +868,7 @@
       "qualification_seconds": 3.639880737000567,
       "producer_receipt_sha256": "f3d6355d7c54acfbfe6ee82115a7a9ea950682a3ec7ae2c629584f8db5a67e4c",
       "emlf_sha256": "e646998cc286f75609c10194e2087d9c3418d3c8965ee37525e1b357070f4bd3",
-      "no_target_compilation": true
+      "producer_stage_had_no_target_compilation": true
     },
     "prerequisites": {
       "status": "failed during xmlf at fixed300s total deadline",
@@ -875,10 +885,18 @@
       "cleanup_and_locks": "independently verified; no observed owned survivors; all orchestration and query locks reacquired"
     },
     "foundation14": {
-      "setup_01": "failed before commands at8.386s",
-      "summary": "tools/performance/full-compiler/recovery-audit-20261110/foundation14-setup-failure.json",
-      "qd_executed": false,
-      "next": "Review separate cohort02 alias-binding preflight correction; do not resume failed cohort01."
+      "setup_01": "failed before any compiler command at8.386s; preserved",
+      "setup_02": "passed separately in94.321527273s",
+      "qd_02": "passed separately in98.849183465s; each475fresh/0reuse, raw3artifacts and full ordered query equality",
+      "summary": "tools/performance/full-compiler/recovery-audit-20261110/foundation14-gc/summary.json",
+      "allocated_bytes": 60546927152,
+      "copied_bytes": 4299126432,
+      "maximum_sampled_residency_bytes": 36197520,
+      "gc_cpu_seconds": 5.413,
+      "rts_total_cpu_seconds": 32.23,
+      "gc_share_from_reported_times": 0.16794911573068572,
+      "no_feature_attribution": true,
+      "no_performance_claim": true
     }
   }
 }

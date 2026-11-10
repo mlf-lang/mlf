@@ -295,3 +295,13 @@ Astra不重跑或续接该失败。下一步仅准备一个另立的foundation14
 唯一准入的foundation SETUP01在8.386秒安全停止，commands为空，任何compiler、loader、builtin或统计控制均未启动。原producer认证通过，但新的通用嵌套pin收集器拒绝官方GHC launcher的已记录symlink；这是新诊断控制器的兼容性缺陷，不是编译失败或性能样本。外guard exit1、无资源理由，无owned残留，两锁均重获，失败原样保留。见[预检失败证据](../../tools/performance/full-compiler/recovery-audit-20261110/foundation14-setup-failure.json)。
 
 只准备另立cohort02的严格alias绑定修正：须匹配已固定工具链receipt中的resolved_path和目标SHA并核验前后链接，不放宽通用regular-file输入门。需新增retarget/broken/missing/unknown-alias负控、独立复核、重新分阶段准入。没有SETUP/QD自动重试，没有GC结果，也没有任何生产优化或完整倍率。
+
+## foundation14实际GC诊断完成（2026-11-10 21:56 UTC）
+
+独立复核的alias专用修正只认证工具链receipt已有的三条链接及全部中间target，保留通用regular-file检查；46项测试通过。新cohort02的SETUP在94.322秒内通过新builtin、C原命令重建逐字节相等、原emlf Main/94对象、真实RTS传输控制和runtime/pin前后门。随后另行准入的一次QD在98.849秒完成，Q32.938978秒、D34.016559秒只是资格耗时，不是性能AB。两腿均475 fresh/0 reused，全部14 owner/builtin检查通过，三种公开制品与完整有序query JSON全等。所有原保护、one-use claim、收尾认证和锁均通过；最终观察RSS0，无owned残留。
+
+[完整结果](../../tools/performance/full-compiler/recovery-audit-20261110/foundation14-gc/REPORT.md)：173,594字节的14模块工作负载分配60,546,927,152 managed-heap字节，GC复制4,299,126,432字节，59次major采样的最高存活堆36,197,520字节；raw memory105MiB。GC CPU5.413秒/RTS total32.230秒≈16.8%，mutator26.817秒。这支持继续定位大量短命分配及重复遍历，但不能判定哪项语义功能不必要。即使其他工作不变而把本次GC完全消除，纯算术上限也只约1.20倍，不能据此宣称完整编译已接近GHC。
+
+原RTS文本保留了两项报告问题：冻结decoder把MiB convenience unit误写MB，分析按raw MiB；原%GC行显示0.0而time/productivity不符，16.8%明确按GC/Total推导，未改raw统计行。统计不含C/BDWGC全部分配，residency不是峰RSS。原raw SHA及仅路径banner脱敏文本、完整source/receipt身份和已复核控制器均已归档。
+
+Astra将下一优先级改为allocation来源归因的只读设计：比较可用prof工具链/manual cost centre与低扰动demand标记，明确惰性边界，区分solve/elaboration、closed/open ownership、canonical图物化、fingerprint/编码。尚未准入新构建或目标执行，不盲调nursery，不删除安全检查或witness。失败inference11前置、foundation01及历史F3负结果均保留。full90完成、相对GHC倍率、生产提速、native代际A/B及fixed-point仍未新增通过。

@@ -1,0 +1,182 @@
+--- ../compiler-foundation-gc-prep-20261110/run_diagnostic.py	2026-11-11 06:29:35.133346371 +0900
++++ run_diagnostic.py	2026-11-11 06:42:56.559970947 +0900
+@@ -9,6 +9,7 @@
+ import os
+ import re
+ import shutil
++import stat
+ import sys
+ import time
+ import types
+@@ -22,6 +23,11 @@
+ LIMITS = dict(address_space_per_process_bytes=6*1024**3, disk_free_floor_bytes=5*1024**3,
+               host_available_floor_bytes=3*1024**3, max_work_bytes=4*1024**3,
+               process_tree_rss_bytes=5*1024**3)
++TOOLCHAIN_ALIASES = {
++    'ghc':('ghc/bin/ghc','ghc/bin/ghc-9.14.1'),
++    'ghc-pkg':('ghc/bin/ghc-pkg','ghc/bin/ghc-pkg-9.14.1'),
++    'clang':('bin/clang','debian/usr/lib/llvm-19/bin/clang'),
++}
+ 
+ 
+ def require(value, message):
+@@ -41,6 +47,41 @@
+     return result
+ 
+ 
++def toolchain_alias(name,item,root,expected=None):
++    """Only three declared official-tool aliases; never a generic pin fallback."""
++    require(name in TOOLCHAIN_ALIASES,'unknown toolchain alias')
++    require(root.is_absolute() and root.resolve(strict=True)==root,'canonical toolchain root')
++    relative,target=TOOLCHAIN_ALIASES[name]
++    path=root/relative;resolved=root/target
++    require(item.get('path')==str(path) and item.get('resolved_path')==str(resolved),'recorded toolchain alias/resolved path')
++    require(path.is_symlink(),'declared toolchain alias must be a symlink')
++    binding=os.readlink(path)
++    def trace():
++        pending=list(path.parts[1:]);current=Path('/');links=[]
++        while pending:
++            component=pending.pop(0)
++            if component in ['', '.']:continue
++            if component=='..':current=current.parent;continue
++            candidate=current/component;info=candidate.lstat()
++            if stat.S_ISLNK(info.st_mode):
++                target=os.readlink(candidate);links.append(dict(path=str(candidate),symlink_target=target))
++                require(len(links)<=32,'toolchain alias resolution cycle/depth')
++                parts=Path(target).parts
++                if Path(target).is_absolute():current=Path('/');parts=parts[1:]
++                pending=list(parts)+pending
++            else:current=candidate
++        return current,links
++    actual,chain=trace()
++    require(actual==resolved and path.resolve(strict=True)==resolved and resolved.resolve(strict=True)==resolved and
++            resolved.is_file() and not resolved.is_symlink(),'toolchain alias regular target binding')
++    digest=sha(resolved);require(digest==item['sha256'],'toolchain alias resolved SHA')
++    result=dict(path=str(path),resolved_path=str(resolved),sha256=digest,symlink_target=binding,symlink_chain=chain)
++    require(os.readlink(path)==binding and trace()==(actual,chain) and path.resolve(strict=True)==resolved,
++            'toolchain alias changed during authentication')
++    require(expected is None or result==expected,'exact admitted toolchain symlink binding changed')
++    return result
++
++
+ def parse_statistics(raw):
+     """Strict ordinary -s summary; preserve original report separately."""
+     text = raw.decode('utf-8')
+@@ -151,7 +192,7 @@
+                   handoff=dict(path=str(a.handoff),sha256=a.handoff_sha256),
+                   target='foundation14',inference11=False,full90=False, performance_sample=False, native_generation=False, fixed_point=False)
+     save = lambda:H.save(output/'receipt.json', record)
+-    save(); pins = record['input_pins']; outputs = record['output_pins']
++    save(); pins = record['input_pins']; outputs = record['output_pins']; alias_inputs={}
+     def pin(path, digest=None):
+         path = H.regular(path); value = H.sha(path)
+         require(digest is None or value == digest, 'input pin differs: '+str(path))
+@@ -169,6 +210,10 @@
+             for child in value: nested_pins(child)
+     def output_pin(path):
+         path = H.regular(path); outputs[str(path)] = H.sha(path)
++    def check_inputs():
++        H.check_pins(pins)
++        require(set(alias_inputs)==set(TOOLCHAIN_ALIASES),'all three declared alias bindings required')
++        for name,(item,root,expected) in alias_inputs.items():toolchain_alias(name,item,root,expected)
+     def stage(label, fn):
+         row = dict(label=label, complete=False, begin_seconds=time.monotonic()-started)
+         record['stages'].append(row); save()
+@@ -231,9 +276,24 @@
+                 require(plan['producer_outer']==handoff['producer_evidence']['build_outer'],'same admitted producer outer')
+                 required = {'build_outer','build_controller','controls_outer','controls_controller','authentication','relink','toolchain_setup'}
+                 require(set(evidence) == required, 'complete producer recovery evidence')
++                require(set(handoff['toolchain_aliases'])==set(TOOLCHAIN_ALIASES),'exact admitted toolchain alias inventory')
+                 for name,value in evidence.items():
+                     require(value.get('complete') is True, 'incomplete producer evidence '+name)
+-                    nested_pins(value)
++                    if name=='toolchain_setup':
++                        # This pinned receipt intentionally records launcher aliases.
++                        # Everything outside these exact three entries remains strict.
++                        remaining=json.loads(json.dumps(value))
++                        root=Path(handoff['producer_evidence']['toolchain_setup']['path']).parent
++                        for alias in TOOLCHAIN_ALIASES:
++                            item=remaining['tool_identities'].pop(alias)
++                            expected=handoff['toolchain_aliases'][alias]
++                            actual=toolchain_alias(alias,item,root,expected)
++                            pin(actual['resolved_path'],actual['sha256'])
++                            alias_inputs[alias]=(item,root,expected)
++                        record['toolchain_alias_pins']=handoff['toolchain_aliases']
++                        nested_pins(remaining)
++                    else:
++                        nested_pins(value)
+                 for prefix in ['build','controls']:
+                     outer,ctrl = evidence[prefix+'_outer'],evidence[prefix+'_controller']
+                     require(outer['exit_code']==0 and outer['reason'] is None and ctrl['watchdog_exit']==0 and
+@@ -266,6 +326,7 @@
+                 for part in plan['slices']: nested_pins(part['package_manifest'])
+                 return auth
+             auth = stage('original-producer-authentication',provenance)
++            stage('toolchain-aliases-and-inputs-before',check_inputs)
+             ordinary = Path(plan['ordinary_binary']['path']); diagnostic = Path(plan['statistics_binary'])
+             stats = Path(plan['statistics_path'])
+             programs = {'ordinary':ordinary,'python':Path(sys.executable),
+@@ -304,7 +365,7 @@
+                 for path in [fixture,builtin_spec]:output_pin(path)
+                 for prefix in [builtin,fixture_prefix]:
+                     for suffix in ['.mlfci','.mlfco','.queries']:P.absent(str(prefix)+suffix)
+-                H.check_pins(pins);require(not any(builtin_queries.iterdir()),'fresh builtin fixture queries')
++                check_inputs();require(not any(builtin_queries.iterdir()),'fresh builtin fixture queries')
+                 builtin_result,builtin_stdout,builtin_stderr=command('compile-fixed-builtin',
+                     [ordinary,'--compile-crate',builtin_spec,'-o',fixture_prefix],maximum=120)
+                 require(not builtin_stdout and not builtin_stderr,'fresh builtin fixture output')
+@@ -320,7 +381,7 @@
+                 builtin_lock=H.regular(builtin_queries/'.lock')
+                 with builtin_lock.open('r+') as stream:
+                     fcntl.lockf(stream,fcntl.LOCK_EX|fcntl.LOCK_NB);fcntl.lockf(stream,fcntl.LOCK_UN)
+-                output_pin(builtin_lock);H.check_pins(pins);H.check_pins(outputs)
++                output_pin(builtin_lock);check_inputs();H.check_pins(outputs)
+                 record['builtin']=dict(complete=True,identity=P.BUILTIN,prefix=str(builtin),
+                     fixture_prefix=str(fixture_prefix),fixture_spec=str(builtin_spec),fixture=str(fixture),
+                     fresh_groups=1,reused_groups=0,query_lock_reacquired=True,interface_checked=True,
+@@ -357,7 +418,7 @@
+                     if item['suffix']!='.hi':continue
+                     dest=output/'objects'/(item['module'].replace('.','/')+'.hi');dest.parent.mkdir(parents=True,exist_ok=True)
+                     shutil.copyfile(item['path'],dest);require(sha(dest)==item['sha256'],'copied interface');output_pin(dest)
+-                stage('input-pins-before-setup',lambda:H.check_pins(pins))
++                stage('input-pins-before-setup',check_inputs)
+                 for recipe in plan['thin_setup_command_recipes']:
+                     command(recipe['label'],recipe['argv'],maximum=120,cwd=Path(recipe['cwd']),command_environment=build_environment)
+                     if 'byte_equality_required_with' in recipe:
+@@ -394,7 +455,8 @@
+                         setup['statistics_transport_control']['complete'] is True,'successful unspent thin setup')
+                 require(setup['input_pins'][handoff['plan']['path']]==handoff['plan']['sha256'] and
+                         setup['input_pins'][str(HERE/'run_diagnostic.py')]==sha(HERE/'run_diagnostic.py') and
+-                        setup['environment']==environment,'same setup plan/controller/environment')
++                        setup['environment']==environment and setup['toolchain_alias_pins']==handoff['toolchain_aliases'],
++                        'same setup plan/controller/environment/alias bindings')
+                 H.check_pins(setup['input_pins']);H.check_pins(setup['output_pins']);pins.update(setup['input_pins']);pins.update(setup['output_pins'])
+                 require('dependencies' not in handoff,'no failed or external dependency cohort may be imported')
+                 fixed=setup['builtin'];builtin=Path(plan['builtin_prefix'])
+@@ -417,7 +479,7 @@
+                     decoded=O.unpack(H,spec.read_text());decoded[6]=plan['spec_recipes']['ordinary-Q']['fields'][6]
+                     require(P.pack(decoded)==plan['spec_recipes']['ordinary-Q']['packed'],'only query directory changed')
+                     row=dict(label=label,complete=False,spec_sha256=sha(spec));record['legs'].append(row);save()
+-                    H.check_pins(pins);require(not any(queries.iterdir()),'fresh empty query directory')
++                    check_inputs();require(not any(queries.iterdir()),'fresh empty query directory')
+                     for suffix in ['.mlfci','.mlfco','.queries']:P.absent(recipe['prefix']+suffix)
+                     if label=='diagnostic-D':
+                         P.safe_absolute(stats);P.absent(stats)
+@@ -443,7 +505,7 @@
+                         fcntl.lockf(stream,fcntl.LOCK_EX|fcntl.LOCK_NB);fcntl.lockf(stream,fcntl.LOCK_UN)
+                     require(sha(spec)==row['spec_sha256'],'target spec changed');output_pin(spec)
+                     for path in paths:output_pin(path)
+-                    H.check_pins(pins);H.check_pins(outputs)
++                    check_inputs();H.check_pins(outputs)
+                     row.update(complete=True,fresh_groups=475,reused_groups=0,query_lock_reacquired=True,interface_checked=True,
+                                raw_three_equal_to_new_Q=label=='diagnostic-D');save()
+                 stats=H.regular(stats);require(stats.stat().st_size>0,'empty RTS report');output_pin(stats)
+@@ -451,7 +513,7 @@
+                 after=stage('runtime-after',lambda:runtime_snapshot('runtime-after',True))
+                 require(before==after,'runtime drift');record['runtime_after']=after
+                 require(sha(stats)==record['statistics_raw']['sha256'],'statistics overwritten')
+-            stage('final-input-pins',lambda:H.check_pins(pins))
++            stage('final-input-pins-and-toolchain-aliases',check_inputs)
+             stage('final-output-pins',lambda:H.check_pins(outputs))
+             require(time.monotonic()-started < budget,'phase deadline')
+             record.update(complete=True,elapsed_seconds=time.monotonic()-started);save()

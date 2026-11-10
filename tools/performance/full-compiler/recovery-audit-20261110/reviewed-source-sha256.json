@@ -60,6 +60,66 @@
       "sha256": "092b2d31f1cc9b71891eaab264184fd2af6e8f57d9e171478c0dc0dd965813ef",
       "bytes": 7106,
       "scope": "Exact locally reviewed source; prerequisite execution failed at cap; inference11 diagnostic unexecuted."
+    },
+    {
+      "path": "foundation14-diagnostic-source/prepare_plan.py",
+      "sha256": "611380caafd1d26c3b9ecedd3be8411e9613e55121547c7795f3dc8d8dd8d5ca",
+      "bytes": 15157,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/run_diagnostic.py",
+      "sha256": "5a9c995fc1257b44b7cba9348a4252fabb5176d835c4bf346cd6b31f3ee298b4",
+      "bytes": 38610,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/run_envelope.py",
+      "sha256": "158fa23f6c919289fbd803714390b0d446c9d0b5c39273abe6aea2402125b42c",
+      "bytes": 7357,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/run-phase.sh",
+      "sha256": "6e9e386602ca4b5ebb586099d894f01a4e9d4d9f420a03255771e4745d6bbe3c",
+      "bytes": 1158,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/test_diagnostic.py",
+      "sha256": "e902ca2e94d92d82014750721cedbf3c9a86c45f8a329a933dd4be43dd8a1a5e",
+      "bytes": 2330,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/test_prepare_plan.py",
+      "sha256": "092b2d31f1cc9b71891eaab264184fd2af6e8f57d9e171478c0dc0dd965813ef",
+      "bytes": 7106,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/test_foundation.py",
+      "sha256": "e7e469870ef121677cbd4694ca745f326ccbee65f518ed9fb75e2ca7628ba699",
+      "bytes": 4561,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/test_toolchain_alias.py",
+      "sha256": "844271a2894ea8319e32aed792b139298f3bb36fa3e2e968db65d01a74128b16",
+      "bytes": 3587,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/alias-correction.diff",
+      "sha256": "ae62729dd2af5c3198816361c1bd77c901a23bb2cd0733c46e38f8741e8a74bb",
+      "bytes": 12175,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
+    },
+    {
+      "path": "foundation14-diagnostic-source/reference/foundation14-source.json",
+      "sha256": "e85b2776812a28fafd4074b5c4823f26a76ad2e0137492964ade76450f68d7fa",
+      "bytes": 2884,
+      "scope": "Exact reviewed cohort02 foundation source. SETUP passed. QD outcome separately recorded in final summary. Archive is not an execution admission."
     }
   ]
 }

@@ -1,0 +1,222 @@
+{
+  "execution": {
+    "actual_diagnostic_one_use": true,
+    "complete": true,
+    "complete_ordered_query_JSON_equal": true,
+    "legs": [
+      {
+        "child_system_seconds": 0.603092,
+        "child_user_seconds": 32.396387,
+        "complete": true,
+        "fresh_groups": 475,
+        "interface_checked": true,
+        "label": "ordinary-Q",
+        "query_lock_reacquired": true,
+        "reused_groups": 0,
+        "sampled_process_tree_peak_rss_bytes": 122601472,
+        "use": "Diagnostic qualification, not throughput comparison.",
+        "wall_boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+        "wall_seconds": 32.938978249
+      },
+      {
+        "child_system_seconds": 2.46638,
+        "child_user_seconds": 31.037959,
+        "complete": true,
+        "fresh_groups": 475,
+        "interface_checked": true,
+        "label": "diagnostic-D",
+        "query_lock_reacquired": true,
+        "reused_groups": 0,
+        "sampled_process_tree_peak_rss_bytes": 238530560,
+        "use": "Diagnostic qualification, not throughput comparison.",
+        "wall_boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+        "wall_seconds": 34.01655877
+      }
+    ],
+    "outer_seconds": 98.84918346499944,
+    "raw_artifacts": {
+      ".mlfci": {
+        "bytes": 338108,
+        "diagnostic_D_sha256": "45b4c72b3a7f18a398639f2d8ea97e11348c0f903e0ecdb24f68a676e68d86da",
+        "ordinary_Q_sha256": "45b4c72b3a7f18a398639f2d8ea97e11348c0f903e0ecdb24f68a676e68d86da",
+        "raw_equal": true
+      },
+      ".mlfco": {
+        "bytes": 1016252,
+        "diagnostic_D_sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52",
+        "ordinary_Q_sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52",
+        "raw_equal": true
+      },
+      ".queries": {
+        "bytes": 685363,
+        "diagnostic_D_sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e",
+        "ordinary_Q_sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e",
+        "raw_equal": true
+      }
+    },
+    "raw_reports": {
+      "diagnostic-rts": {
+        "original_bytes": 1297,
+        "original_sha256": "ddab3f617d14cc9e74cc5cca27de45f5f84c4f184efd9b72f2c503ab256e4912",
+        "sanitization": "Only exact private cohort-root prefix replaced by <COHORT_ROOT>. Every statistics line is byte-for-byte unchanged.",
+        "sanitized_file": "diagnostic-rts.sanitized.txt",
+        "sanitized_sha256": "65674f0dcd0b7b2e038fc17f89782c2af310f25e4cb70e977a8a3488cea7261b"
+      },
+      "transport-control-rts": {
+        "original_bytes": 1106,
+        "original_sha256": "4b968d141b2fa6463e0eb7fbae0d4836c1fbed5ffad8dba8959fdcdcc822554a",
+        "sanitization": "Only exact private cohort-root prefix replaced by <COHORT_ROOT>. Every statistics line is byte-for-byte unchanged.",
+        "sanitized_file": "transport-control-rts.sanitized.txt",
+        "sanitized_sha256": "b125baa543456c73ff502dcf315be3db3544e46d179d859b0bbafeccef870284"
+      }
+    },
+    "runtime_pins_unchanged": true,
+    "statistics": {
+      "GC_only_theoretical_speedup_at_fixed_nonGC_work": {
+        "cpu": 1.201849573032032,
+        "elapsed": 1.2025057530043468,
+        "interpretation": "Arithmetic upper bound for eliminating only measured GC time at unchanged non-GC work in this one run; not an achievable optimization or full90/GHC extrapolation."
+      },
+      "allocated_bytes": 60546927152,
+      "copied_bytes": 4299126432,
+      "gc_cpu_share_from_reported_times": 0.16794911573068572,
+      "gc_elapsed_share_from_reported_times": 0.16840314692749309,
+      "generations": [
+        {
+          "average_pause_seconds": 0.0003,
+          "collections": 14400,
+          "cpu_seconds": 3.571,
+          "elapsed_seconds": 3.702,
+          "generation": 0,
+          "maximum_pause_seconds": 0.2216,
+          "parallel_collections": 0
+        },
+        {
+          "average_pause_seconds": 0.0312,
+          "collections": 59,
+          "cpu_seconds": 1.842,
+          "elapsed_seconds": 1.842,
+          "generation": 1,
+          "maximum_pause_seconds": 0.2527,
+          "parallel_collections": 0
+        }
+      ],
+      "limitations": "One completed managed-heap diagnostic; rounded RTS values; residency is sampled major-GC liveness, not peak RSS; no attribution to C01, individual features, C allocation or full90.",
+      "literal_rts_percent_gc_line": "  %GC     time       0.0%  (0.0% elapsed)",
+      "major_gc_residency_samples": 59,
+      "maximum_residency_bytes": 36197520,
+      "maximum_slop_bytes": 1576568,
+      "percent_gc_note": "Raw literal %GC line is inconsistent with its nonzero GC table and productivity. Shares above are explicitly derived from GC/Total times, not that literal line. The cause of the anomalous literal line is unknown.",
+      "productivity_percent": {
+        "elapsed": 83.2,
+        "user": 83.2
+      },
+      "rts_memory_in_use": {
+        "raw_line": "             105 MiB total memory in use (0 MiB lost due to fragmentation)",
+        "source": "Exact raw RTS memory line, not the frozen decoder convenience-unit field.",
+        "unit": "MiB",
+        "value": 105
+      },
+      "times": {
+        "EXIT": {
+          "cpu_seconds": 0.0,
+          "elapsed_seconds": 0.0
+        },
+        "GC": {
+          "cpu_seconds": 5.413,
+          "elapsed_seconds": 5.544
+        },
+        "INIT": {
+          "cpu_seconds": 0.0,
+          "elapsed_seconds": 0.001
+        },
+        "MUT": {
+          "cpu_seconds": 26.817,
+          "elapsed_seconds": 27.375
+        },
+        "Total": {
+          "cpu_seconds": 32.23,
+          "elapsed_seconds": 32.921
+        }
+      }
+    },
+    "work_seconds": 98.48828548500023
+  },
+  "guard": {
+    "AS_bytes_max": 6442450944,
+    "QD_seconds_max": 420,
+    "RSS_bytes_max": 5368709120,
+    "disk_free_bytes_min": 5368709120,
+    "each_target_seconds_max": 180,
+    "host_available_bytes_min": 3221225472,
+    "internal_lock_reacquired": true,
+    "no_observed_descendants": true,
+    "output_bytes_max": 4294967296,
+    "same_new_lock_epoch_independently_reacquired": true,
+    "setup_seconds_max": 120,
+    "shared_lock_reacquired": true,
+    "violations": null
+  },
+  "limitations": [
+    "Foundation14 only; not inference11 or full90 and not a compiler/GHC throughput comparison.",
+    "Single diagnostic qualification pair, no repetition or speedup inference. Q and D durations are retained only as observed qualification timings.",
+    "Q is a fresh raw RTS-only equivalence oracle, not independent baseline correctness proof or historical B2/C01 raw-byte equality. Original producer semantic qualification is separately bound.",
+    "Ordinary GHC RTS statistics cover the Haskell managed heap, not C malloc, BDWGC or other native allocations, and give no allocation attribution to features or checking passes.",
+    "Maximum residency is sampled live heap after major GC, not peak RSS or cumulative allocation.",
+    "The frozen parser labels optional-i memory units incorrectly as MB. Corrected analysis uses the raw 105 MiB token; byte/time fields are unaffected.",
+    "The raw literal %GC line says 0.0%; derived GC share uses the separately reported GC and Total times."
+  ],
+  "ordinary_producer": {
+    "binary_sha256": "e646998cc286f75609c10194e2087d9c3418d3c8965ee37525e1b357070f4bd3",
+    "receipt_sha256": "f3d6355d7c54acfbfe6ee82115a7a9ea950682a3ec7ae2c629584f8db5a67e4c"
+  },
+  "preserved_failures": [
+    "Inference11 prerequisite cohort failed at300s; no partial dependencies reused.",
+    "Foundation cohort01 setup failed on strict symlink representation before compiler commands; code and receipts preserved."
+  ],
+  "publication_state": "Archived in coordinator recovery checkpoint revision21; exact raw reports remain local, sanitized reports are included.",
+  "schema": "foundation14-managed-heap-diagnostic-v1",
+  "setup": {
+    "C_objects_raw_equal": true,
+    "actual_diagnostic_launched": false,
+    "complete": true,
+    "fresh_builtin_one_group": true,
+    "literal_RTS_argument_transport_passed": true,
+    "outer_seconds": 94.32152727300036,
+    "private_non_Main_modules": 94,
+    "work_seconds": 93.51727765400028
+  },
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "status": "completed",
+  "target": {
+    "dependency": "Fresh setup-local builtin only",
+    "fresh_groups_per_leg": 475,
+    "module_count": 14,
+    "modules": [
+      "Bootstrap.Fresh",
+      "Bootstrap.Host",
+      "Bootstrap.IndexVec",
+      "Bootstrap.IntMap",
+      "Bootstrap.IntRank",
+      "Bootstrap.IntSet",
+      "Bootstrap.IntTree",
+      "Bootstrap.Map",
+      "Bootstrap.ST",
+      "Bootstrap.Set",
+      "Bootstrap.Std",
+      "Bootstrap.Types",
+      "Bootstrap.Unicode",
+      "Bootstrap.Version"
+    ],
+    "name": "foundation14",
+    "reused_groups_per_leg": 0,
+    "source_bytes": 173594
+  },
+  "unrun_gates": [
+    "Inference11 Q/D: prerequisite restoration failed its 300-second deadline; no complete dependency handoff.",
+    "Full90 completion and baseline-versus-GHC target qualification.",
+    "Feature-removal or checking/witness/serialization A/B attribution.",
+    "Candidate F3 integration, fixed-point or native-generation runs.",
+    "Repeated diagnostic samples or throughput benchmark."
+  ]
+}
