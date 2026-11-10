@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 6,
-  "observed_at_utc": "2026-11-10T14:16:36Z",
+  "revision": 7,
+  "observed_at_utc": "2026-11-10T14:21:09Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -88,6 +88,50 @@
       "terminal_live_descendants": [],
       "scope": "Bounded instrumented prefix only; no ordinary CPU fraction, whole-compiler speedup or complete semantic qualification.",
       "raw_checkpoint_remote": "76d366c676ffe78976588b6b74a2858fd33557d6"
+    },
+    "markers_diagnostic": {
+      "harness_complete": true,
+      "compiler_complete": false,
+      "performance_samples": 0,
+      "guard_wall_seconds": 120.48,
+      "snapshot_count": 79,
+      "last_snapshot_seconds": 119.372340596,
+      "scc_started": 957,
+      "fresh_scc_finished": 956,
+      "reused": 0,
+      "total_scc": null,
+      "closed_windows_seconds": {
+        "raw_demand": 91.767875213,
+        "prepared_record": 4.654154082,
+        "raw_record": 5.167865594,
+        "finish": 1.074966639
+      },
+      "slowest_completed_span_seconds": [
+        5.973414824,
+        3.25054629,
+        2.015470813,
+        1.960572118,
+        1.463232148
+      ],
+      "slowest_group": {
+        "ordinal": 834,
+        "member_count": 46,
+        "first_ids": [
+          2793,
+          2810,
+          2776,
+          2839
+        ],
+        "raw_demand_seconds": 5.102921896
+      },
+      "type_owner_unchanged": true,
+      "controls_passed": true,
+      "c_objects_rebuilt_and_byte_equal": true,
+      "post_pins_passed": true,
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "raw_checkpoint_remote": null,
+      "scope": "Instrumented prefix only; broad raw demand across many SCCs, not a proven solver hotspot, ordinary CPU fraction or production speedup."
     }
   },
   "tasks": [
@@ -121,7 +165,7 @@
     {
       "id": "F1",
       "role": "frontend kind counters and unified diagnostic runner",
-      "status": "Memo retired; implementing markers-only diagnostic, not yet run",
+      "status": "Markers-only bounded diagnostic complete; no production candidate",
       "branch": "perf/frontend-20261110",
       "local_checkpoint": "27efb8ff0e817fffd16d87c6759dfcf3174492f2",
       "remote_commit": "76d366c676ffe78976588b6b74a2858fd33557d6",
@@ -130,7 +174,7 @@
         "private diagnostic Main",
         "diagnostic harness"
       ],
-      "next": "Ordinary flags and original Type, existing IO markers with bounded consumed owner identity, four closed monotonic wall-demand windows and top five; controls then one 120-second run under existing guards.",
+      "next": "Preserve source/recovery and honest bounded result summary; wait for cost-centre evidence to select a real frontend optimization.",
       "remote_tree": "78a27fc00df9d2589d447223aae4f5e199c509fc",
       "checkpoint_scope": "46-file checkpoint: original bounded diagnostic, 80 snapshots, retained failed output01, restored production Type, archived memo; markers-only followup is separate and not yet complete.",
       "recovery_readme": "https://github.com/mlf-lang/mlf/blob/76d366c676ffe78976588b6b74a2858fd33557d6/tools/performance/type-kind-memo/README.md"
@@ -158,7 +202,7 @@
       ],
       "transform_sha256": "0d2b37392d28e51b97377501146321ad6ebd7ec3ed1482c5b8e6f50e2a48717d",
       "remote_commit": null,
-      "next": "Review safe identity consumption and existing success/error paths for F1's one markers-only build/run."
+      "next": "Read-only map exact sampled owner IDs where evidence permits; admit mapping limitations rather than reconstruct from truncated name prefixes."
     },
     {
       "id": "M0_M1",
@@ -184,12 +228,12 @@
   ],
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
-    "state": "held",
-    "task": "F1 markers-only controls, one build and one 120-second diagnostic",
-    "restart_caveat": "Reservation is not proof a process is alive; verify actual locks and receipts."
+    "state": "free",
+    "task": null,
+    "restart_caveat": "Recorded free state is not proof of current availability; verify actual processes and locks."
   },
   "next_diagnostic": {
-    "status": "controls_and_build_started_full_run_not_yet_verified",
+    "status": "bounded_markers_run_complete_compiler_incomplete",
     "type_owner": "exact baseline bytes",
     "ordinary_flags": true,
     "query_profile_env": "not enabled",
