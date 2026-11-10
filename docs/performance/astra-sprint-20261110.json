@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 3,
-  "observed_at_utc": "2026-11-10T13:50:56Z",
+  "revision": 4,
+  "observed_at_utc": "2026-11-10T14:07:46Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -97,7 +97,7 @@
       "status": "MLF timeout; GHC qualified",
       "branch": "codex/full-compiler-baseline-20261110",
       "remote_commit": "305914c90e8fdff3a912faa6b93c08146273cf3e",
-      "next": "Inspect existing QueryGraph profile/clock/elapsed support for low-overhead live progress; no new long run without a meaningful intervention.",
+      "next": "Read-only existing profiler and installed GHC profiling capability review; no additional long ordinary runs without an intervention.",
       "recovery_readme": "https://github.com/mlf-lang/mlf/blob/305914c90e8fdff3a912faa6b93c08146273cf3e/tools/performance/full-compiler/baseline-20261110/README.md"
     },
     {
@@ -120,17 +120,16 @@
     {
       "id": "F1",
       "role": "frontend kind counters and unified diagnostic runner",
-      "status": "Memo candidate retired; joint bounded diagnostic complete; raw-infer investigation underway",
+      "status": "Memo retired; implementing markers-only diagnostic, not yet run",
       "branch": "perf/frontend-20261110",
       "local_checkpoint": "426561414cf0c1e0df7efefc4a6d3a83a67e67df",
       "remote_commit": "64ee679848211034a3cb1e2c1b44f8f600861ab0",
       "owners": [
-        "private diagnostic Type",
-        "Counters",
-        "Main",
+        "private diagnostic Counters",
+        "private diagnostic Main",
         "diagnostic harness"
       ],
-      "next": "Preserve new diagnostic honestly; investigate current raw-infer and a lower-overhead marker-only design before another run. Do not resume memo candidate.",
+      "next": "Ordinary flags and original Type, existing IO markers with bounded consumed owner identity, four closed monotonic wall-demand windows and top five; controls then one 120-second run under existing guards.",
       "remote_tree": "d4769db40c3ffa39315f80477dcbc9b2759a5e6f",
       "checkpoint_scope": "Verified remote 64ee679 is the older memo/complete-counting plan. The new joint diagnostic, raw snapshots and restored production Type are not yet verified durable.",
       "unpublished_local_checkpoint": "27efb8ff0e817fffd16d87c6759dfcf3174492f2"
@@ -158,7 +157,7 @@
       ],
       "transform_sha256": "0d2b37392d28e51b97377501146321ad6ebd7ec3ed1482c5b8e6f50e2a48717d",
       "remote_commit": null,
-      "next": "Support F1's single diagnostic; do not create a second parallel build/run."
+      "next": "Review safe identity consumption and existing success/error paths for F1's one markers-only build/run."
     },
     {
       "id": "M0_M1",
@@ -182,5 +181,32 @@
     "Recompute and verify frozen 90-module workload; use a new cohort for any new source version.",
     "Establish one cross-worktree lock and restore dependency-aware queue; never silently resume native A/B or fixed-point."
   ],
-  "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly."
+  "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
+  "resource_token_at_observation": {
+    "state": "reserved",
+    "task": "F1 markers-only controls, one build and one 120-second diagnostic",
+    "restart_caveat": "Reservation is not proof a process is alive; verify actual locks and receipts."
+  },
+  "next_diagnostic": {
+    "status": "implementation_authorized_not_run",
+    "type_owner": "exact baseline bytes",
+    "ordinary_flags": true,
+    "query_profile_env": "not enabled",
+    "bounded_identity_source": "Only owners/declStable already consumed by prepared payload encoding, not lazy sourceNode projections",
+    "total_scc": "unknown until natural end",
+    "windows": [
+      "prepared-record",
+      "raw-await",
+      "raw-record",
+      "finish"
+    ],
+    "top_groups_limit": 5,
+    "scope": "Instrumented wall-demand localization only; includes GC and lazy residual work, not CPU shares or production speed",
+    "wall_limit_seconds": 120
+  },
+  "main_change": {
+    "commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "scope": "Tools, CI, contracts and docs; no frozen target, host or runtime source changes",
+    "policy": "Keep current diagnostic input f9bdb40; authenticate a new build-driver identity for final integration."
+  }
 }
