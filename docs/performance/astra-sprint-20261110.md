@@ -240,3 +240,14 @@ C01在462.613秒内完整结束，按预先固定ABBA保留全部四条wall：A9
 正确性和执行证据全部成立：每腿780 fresh/0 reused，三个公开产物逐字节等原B2并彼此一致，show-crate/query锁检查通过；423个输入pins、16个输出pins及实际runtime后验通过。22个命令无残留后代，末次RSS0，两锁独立重获。完整outer receipt SHA为2708239e20b1af91f428892e412259d589a01d1220a29c94db5010753d3c86b2，work SHA为ecfd8d9fec6d6096f55776dec188a6da81a81fb41f4b888e4fa73818b8f43218。原始数据尚仅本机，独立安全恢复检查点正在整理，不以这些hash声称可以恢复缺失文件。
 
 Astra决定暂不把F3纳入性能集成；它仍是正确性/码形已验证、局部harness有收益，但真实编译收益未成立的候选。先持久化全部结果，再只读检查执行与GC证据。没有自动重复C、开启full90或native代际验证。下一份普通GC诊断如实施须独立审查/准入，保留原资源保护、全部语义oracle及ignoreAll契约；不能把带统计的诊断wall混入普通样本。
+
+
+## 恢复证据闭合与下一诊断边界（2026-11-10 17:55 UTC）
+
+inference11完整检查点八文件已保存到[daf2f978的恢复入口](https://github.com/mlf-lang/mlf/blob/daf2f9780ba2a38e772fb65a6eb345ff01a8ef15/tools/performance/full-compiler/inference11-read-fusion-20261110/README.md)，整tree98c0cec31914101c0bfc8b7280796470c94eec6b与本地一致，完整fetch和逐文件字节核验通过。共55,768字节，含controller、launcher、workload模板、测试源码hash、README及Q01失败/Q02通过/C01四样本摘要。原始日志、receipts、查询树和binary不在公开检查点中。公开launcher仅参数化机器锁路径，明确未执行；原已测源码hash保留，换机器仍需重建依赖和重新资格。
+
+四腿已有记录未见可辨source、binary、参数或runtime漂移，compile stdout/stderr均为空。仍没有ordinary GC/分配记录，不能据P1 profiled GC比例给C01慢B作事后解释。补充算法只读筛选找到了generateProgram成功验证后prepare对同一Graph重验的真实边界，但第二次验证仅799 ticks、约0.894%旧profile采样时间；recursive export链另一处同图重验未在该前缀命中。高频prepared fallback仍是不同local/rebuilt图，不能复用证书删除验证。当前不为这些低覆盖边界排CPU候选。
+
+下一R5仅处于薄工具实现和独立review阶段，没有执行许可或新速度结论。拟setup最多120秒，私有重编原emlf六行Main及按原命令重建C、核字节后，链接对应侧已有94个非Main ordinary模块闭包；不能拿原共用位置的BuiltinPrelude Main冒充emlf，也不能把未在原receipt列hash的C对象追认为历史已认证。诊断另行最多420秒，两侧各一次原11模块fresh编译，每腿最多180秒，三个raw oracle与780 fresh条件不变。
+
+两侧只加编译内-s统计落点并保留ignoreAll，不调nursery、不加profiler或并行GC、不改Graph和原producer。每个新诊断binary只能为目标编译启动一次，启动前拒绝已有stats文件或符号链接；GHC会截断统计文件，不能先跑version或随后show-crate覆盖它。统计仅说明该次普通进程的managed-heap分配/GC，不等于所有C分配、Graph独占成本、C01异常原因或普通吞吐结果。两阶段须分别取得令牌，不能自动连跑。
