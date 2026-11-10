@@ -21,13 +21,13 @@
 
 ## 协作结构与任务认领
 
-借鉴 [多代理团队文章](https://claude.dev/blog/safely-scaling-multi-agent-teams-with-fable-5-2/) 的独立工作区、明确任务所有权、依赖拆分和可检查的交付物，不照搬1000人规模。本轮共享一台约9.7GiB内存的云机器，编码和只读审查可并行，重构建和计时串行。
+借鉴 [多代理团队文章](https://claude.dev/blog/safely-scaling-multi-agent-teams-with-fable-5-2/) 的独立工作区、明确任务所有权、依赖拆分和可检查的交付物，不照搬1000人规模。本轮共享一台约9.7GiB内存的云机器，编码和只读审查可并行，重构建和计时串行。下方按时间保留的事件段是历史记录，不能把旧段的“在途/未运行/未发布”当成最新状态；恢复时以最后一节及配套JSON为准。
 
 | ID | 责任方向 | 独占源码范围 | 交付物 | 前提 |
 | --- | --- | --- | --- | --- |
 | B0 | 基线与证据 | 测量harness，不改生产算法 | 当前MLF/GHC完整端点资格、精确artifact/receipt、普通基线cohort | 工具链与producer认证 |
 | B1 | 制品和后端 | 当前只有 backend-stages 诊断工具 | 小crate预检、当前完整checked输入分段诊断、ordinary LLVM原始字节一致 | B0可用checked artifact、资源令牌 |
-| F1/F2/F3 | 前端和Graph优化 | 生产Graph.hs；实验独立分支 | Type memo已停止；F2小候选正确性已通过；F3语义及代表码形通过，局部普通样本尚未完成 | R2语义审查、B0普通码形证据、资源令牌 |
+| F1/F2/F3 | 前端和Graph优化 | 生产Graph.hs；实验独立分支 | Type memo已停止；F2小候选正确性已通过；F3语义、代表码形、普通Graph样本及完整ordinary producer通过；真实11模块Q通过，C进行中 | R2语义审查、B0普通码形证据、资源令牌 |
 | R1（停止） | legacy调用内复用实验 | Bootstrap.CrateQuery、Bootstrap.CrateSession | 仅保留可恢复实验；已确认不在当前端点调用链上，不再安排producer/计时 | 不作为当前优化候选 |
 | R2 | 当前graph边界定位 | 私有诊断中的CrateSession、CrateGraph | 真实IO返回/每SCC进度事件，与F1共用一次有界诊断 | 与F1固定接口、资源令牌 |
 | M0/M1 | 基线与证据 | 冻结测量配置 | 基线和每个已符合条件候选的fresh、配对、ordinary端点 | B0成功；相应候选完成控制 |
@@ -212,3 +212,20 @@ F3-samples-02在29.452074332秒内完整通过。明确的新runtime下原七行
 Astra准入下一阶段的准备而非执行：F1用正常完整manifest的GHC --make -fforce-recomp构建独立ordinary候选producer，生成自己的receipt，不把Graph.o换入旧Solver/Constraint反向依赖冒充完整candidate；具体600秒构建窗口待实际命令/范围审查。B0准备原冻结f9的inference11模块source→checked切片，历史99.039秒/780fresh组仅作容量参考，不充新样本，也不将切片换成candidate修改后的目标源码。切片始终不是完整90模块或GHC对照。
 
 格式源码核查后的初始正确性门为.mlfci、.mlfco和.queries三个公开产物原始字节一致，保留相同crate id、源和依赖路径/顺序，仅fresh cache/output目录变化。早期依据legacy Q.queryKey猜测queries必随compiler digest改变的推断已撤回：当前QueryGraph rawNode hash描述内容，compiler digest绑定cache generation；不能预先放宽public query比较。任何不一致先停解释，不事后忽略字段。native代际A/B和fixed-point仍暂停。
+
+
+## 完整候选已资格，真实编译对照进行中（2026-11-10 17:41 UTC）
+
+F3正常完整ordinary producer在317.4046秒内通过原600秒保护，137个shared模块和4个host模块正常强制重编，13个程序建立完整新receipt。不是将Graph.o换入旧反向依赖。原builder、checker和verifier均未修改，CLI版本/身份、42与Unicode正例及Int/String类型负例通过；202个pins、实际进程清理和两锁释放通过。
+
+构建前的两个实质阻塞已通过受支持路径解决。首先，原builtin verifier会创建新session子进程，不能让只监原pgrp/session的runner冒充完整资源保护；本轮改用仓库已有、可按PPID及PID启动身份追踪跨session后代的resource_watchdog，限额不变。其次，Graph属于官方56源builtin-source身份闭包，Graph修改必须产生新identity。独立候选只替换canonical文件唯一RawPrelude身份字段，事前明确为未验证派生候选；随后原check-candidate及fresh-literal真的执行成功，2,220,407字节实际生成stdout逐字节等于候选canonical，逆替换identity后整文件精确恢复f9原字节。因此现在有真实生成核验证据，绝未用旧identity、跳过gate或把手改字段先称为生成成功。
+
+[完整producer恢复检查点7f580a70](https://github.com/mlf-lang/mlf/blob/7f580a7087266f27d928196add2ea5e44fc79952/tools/performance/graph-read-fusion/producer-plan.md)已在perf/graph-read-producer-20261110保存。完整tree b890098711bf81d1106558a0ec484557b744b613及五文件，包括canonical源码，均已通过连接器逐字节回读。计时静默期间没有运行本机fetch；这是远端全内容核验，不冒称本机fetch完成。完整binary、原始receipts和运行依赖不在该公开检查点内，丢失后须重建重新资格。
+
+真实inference11门固定原f9的11模块、515,309字节、原5个依赖及其顺序。候选程序改变不改变被编译的目标源码。Q01只在启动层失败：裸python3交给os.execv导致找不到程序，未进入controller或编译。原失败保留；仅将同一Python解析为绝对路径，经独立差异复审后以全新Q02运行。Q02在212.283秒内通过，A为107.053秒、B为101.709秒，均是资格时间，不充正式样本。每腿780 fresh、0 reused，.mlfci、.mlfco和.queries三产物原始字节逐一等于历史B2及彼此。show-crate、query锁、421个输入pins、8个输出pins、实际runtime后验和清理通过。
+
+Astra已另行准入并实际启动唯一C01正式切片对照：固定ABBA四腿，600秒总保护、每compile最多180秒，无额外warmup。全部源、五依赖、producer、runtime、Q双receipt及controller/launcher身份固定。前三项raw oracle和780 fresh门每腿都必须通过，四腿和最后pins完成之前不形成结果。观察时已完成的前两腿96.666秒与151.642秒波动明显，不能据部分数据判断收益或原因；全部保留，不删样、不补样、不续接重启前后结果。C即使完成也只描述11模块source→checked切片，不是完整90模块source→runnable或MLF/GHC倍率。
+
+更大热点的只读筛选继续进行，但不挤占计时窗口。重绑定末尾整map构造只占旧profile约0.321% ticks/0.520% allocation，直接复用还可能改变惰性需求和修复错误缓存计数的语义，未进入CPU队列。当前QueryGraph已有encoded bytes、raw hash和contract复用，剩余双编码覆盖很小；CRC饱和调用只保留静态线索，不启动完整producer。GHC nursery调查仅核实默认4MiB和现有ignoreAll契约；没有ordinary GC计数，也没有调参或提速结论，下一步如需要先独立取得普通统计。任何host RTS结果都不外推MLF-native。
+
+当前没有已合并的本轮性能收益，也没有完整current MLF/GHC倍率。单crate与split的600秒失败保留；目标仍接近1×GHC，不保证三天达到。native代际A/B和fixed-point继续暂停。恢复时先核C01真实结束状态及锁/进程，不能因本节写“进行中”就再启动一份。
