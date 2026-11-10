@@ -1,0 +1,68 @@
+diff --git a/libraries/mlf-inference/Bootstrap/Graph/Solver.hs b/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+index ac4807f..7e445e4 100644
+--- a/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
++++ b/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+@@ -642,6 +642,54 @@ module Bootstrap.Graph.Solver where {
+                    connected
+              }
+     };
++  -- A prepared fallback starts with two empty views of the same discovered
++  -- keys. The bitmap set is only the membership index; the original node map
++  -- retains every payload and exactly the original insertion order. Dense ID
++  -- blocks use one bitmap leaf instead of one map leaf per discovered node.
++  -- Force the retained map root on each nonempty pending step, as the original
++  -- map membership test did, rather than accumulating deferred insertions.
++  -- The empty-pending case, Gen boundary, edge order and missing-node errors
++  -- retain the original demand. No bitmap is retained across solver operations.
++  componentCanonicalBitmapVisit :: Solver -> IntSet ->
++                                  IntMap Node ->
++                                  IntSet -> [] Int -> Either String ((,) (IntMap Node) IntSet);
++  componentCanonicalBitmapVisit solver visited seen scopes pending =
++    case pending of {
++      [] -> Right ((,) seen scopes);
++      (:) original rest ->
++        let {
++          currentGraph = graph solver
++        } in
++        let {
++          n = original
++        } in
++        seq (G.forceIntMap seen) (if IS.member n visited
++        then componentCanonicalBitmapVisit solver visited seen scopes rest
++        else case IM.lookup n (G.nodes currentGraph) of {
++               Nothing -> Left ("missing graph node " ++ showInt n);
++               Just node ->
++                 let {
++                   boundary = G.isGen (G.tag node)
++                 } in
++                 let {
++                   connected =
++                     if boundary
++                     then rest
++                     else L.append (G.children (G.tag node))
++                            (L.append (L.maybeToList (G.binder node))
++                               (L.append
++                                  (IS.toList
++                                     (IM.findWithDefault IS.empty n (structuralParents solver)))
++                                  (L.append
++                                     (IS.toList
++                                        (IM.findWithDefault IS.empty n (bindingChildren solver)))
++                                     rest)))
++                 } in
++                 componentCanonicalBitmapVisit solver (IS.insert n visited) (IM.insert n node seen)
++                   (if boundary then IS.insert n scopes else scopes)
++                   connected
++             })
++    };
+   componentVisit :: Solver -> IntSet -> [] Int -> Either String IntSet;
+   componentVisit solver seen pending =
+     G.bindE (componentScopesVisit solver seen IS.empty pending)
+@@ -2029,7 +2077,7 @@ module Bootstrap.Graph.Solver where {
+                                     ((,,) (Rank.MapIndex Node) (IntMap (Maybe Int)) (IntMap Int)));
+   preparedFallbackProjection solver current first fresh equations =
+     G.bindE
+-      (componentCanonicalNodesVisit solver IM.empty IS.empty
++      (componentCanonicalBitmapVisit solver IS.empty IM.empty IS.empty
+         (L.append (L.filter (\n -> n < first) (L.concatMap G.equationNodes equations))
+           (expandedOldSeeds first fresh)))
+       (\((,) connected boundaries) ->
