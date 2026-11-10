@@ -1,0 +1,93 @@
+{
+  "schema": "mlf.graph-read-fusion.code-shape.v1",
+  "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "baseline_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "candidate_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
+  "mechanism_supported": true,
+  "eligible_for_graph_sample": true,
+  "execution_authorized_by_this_file": false,
+  "performance_demonstrated": false,
+  "complete_compiler_ratio_available": false,
+  "capture": {
+    "version": 2,
+    "run_py_sha256": "068ff1572915e15ee241e26989667412438fe80fd474ea322277efadcc0fd23a",
+    "outer_receipt_sha256": "4855bb5e2c857f03c6ffde9de7b04fa6e024b9fdc59d3c5d4539c299beffb9dd",
+    "work_receipt_sha256": "eaa78545d5a7f7eb71928c04094a69cb44d59b28c6095e5bd859ae5ec1e36ede",
+    "outer_complete": true,
+    "work_complete": true,
+    "outer_wall_seconds": 24.7182857350017,
+    "peak_process_tree_rss_bytes": 312680448,
+    "budget_seconds": 180,
+    "input_pins_checked": 20,
+    "borrowed_interface_pins_checked": 420,
+    "output_pins_checked": 339,
+    "all_child_commands_exit_zero": true,
+    "all_child_commands_terminal_live_descendants": [],
+    "outer_final_sample_rss_bytes": 0,
+    "both_serial_locks_independently_reacquired": true
+  },
+  "object_identity": {
+    "module": "Bootstrap.Graph",
+    "optimization": "ordinary O2, fpedantic-bottoms, fno-state-hack",
+    "rebuilt_baseline_identical_to_authenticated_producer": true,
+    "anchor_and_baseline_o_sha256": "ebe745b5d50f8dfc113e252bff8dc726716e45125ae75857d6965e181c050e20",
+    "anchor_and_baseline_hi_sha256": "0e0721158f1c6c7f4bdf46577c3a964f377efcd827cb87c7718945ee12bb4c63",
+    "candidate_o_sha256": "7f328e979d016c6078d25d987a1a8131a90495d1ca2c45fa759ad887eabc8931",
+    "candidate_hi_sha256": "b3a24ab26e7f31ffeac9d9c3d08aeb764c45bab06d9b62bd7b3cdf3a201583fc"
+  },
+  "findings": [
+    {
+      "caller": "denseChild1 -> $wdenseContains",
+      "source_review": "Independent review followed the same five-argument caller and actual worker/action labels. The caller did not gain replacement read-action closures.",
+      "core_evidence": "baseline Graph.dump-simpl:1896-1966 has three readDense applications; candidate:3867-4000 has three readArray# operations and two delayed offsets, sharing the ancestor offset. Caller structure remains at baseline:24638ff / candidate:26336ff.",
+      "cmm_evidence": "baseline Graph.dump-cmm-raw:7015 entry Hp+=96, ds_s9N6_entry:6832 and calls:6975/6986 reach readDense_entry:6589 Hp+=56; offset:6508 Hp+=16; result:6990 Hp+=40. Candidate:12168 entry Hp+=104; offsets:11903/11959 each Hp+=16; direct reads:12103/12124/12148; result:12132 Hp+=40. Upstream denseChild1 retains only its32-byte n thunk at baseline:83232 / candidate:85296 and same five-argument call at83303/85367.",
+      "allocation_boundary": "Static owned allocation along one newly constructed action that executes all three successful reads once. Action replay does not have this same one-shot total. Excludes evaluation cost of arbitrary argument thunks, GC and callers. Not dynamic aggregate allocation or throughput.",
+      "baseline_bytes": 352,
+      "candidate_bytes": 176,
+      "baseline_components": "96-byte entry closures + three 56-byte readDense helper allocations + three 16-byte offset boxes + 40-byte lazy comparison result",
+      "candidate_components": "104-byte entry closures + two 16-byte offset boxes + 40-byte lazy comparison result",
+      "construction_only_regression_bytes": 8,
+      "demand_boundary": "Array and offset checks and lazy cell/comparison result remain; construction without execution is not a win. Semantic controls passed separately."
+    },
+    {
+      "caller": "densePlace",
+      "core_evidence": "baseline Graph.dump-simpl:20511ff has separate initial read action and later helper reads; candidate:20717ff has direct readArray# operations sharing the same delayed offset.",
+      "cmm_evidence": "baseline Graph.dump-cmm-raw:73535-73605 constructs 168 bytes (offset thunk, read-action thunk and returned action); candidate:73702-73769 constructs 120 bytes (offset thunk and returned action). Candidate action:73330-73450 contains the checked direct loads for colours/grafted/parents/classes, rather than constructing replacement read actions at those reads.",
+      "entry_allocation_bytes_before": 168,
+      "entry_allocation_bytes_after": 120,
+      "scope": "Representative same-action path evidence, not a sum over every branch or a dynamic allocation claim."
+    },
+    {
+      "caller": "$wdenseCheckOriginal",
+      "cmm_evidence": "Both entries allocate 120 bytes (baseline:78497ff, candidate:80229ff). Baseline action/helper calls at78047/78290/78407 become candidate checked direct loads at79911/79998/80143. The candidate retains a delayed offset and result/error allocations.",
+      "scope": "Entry allocation is not reduced here. Action work is fused, but no whole-function allocation saving is claimed."
+    },
+    {
+      "caller": "$wdenseGetNode / public readDense and writeDense",
+      "evidence": "The already-partly-inlined denseGetNode worker remains a 40-byte construction entry and size0x11d in both ordinary objects. Public readDense and writeDense definitions remain, with 56-byte and 64-byte entry allocations. Their presence is expected."
+    }
+  ],
+  "secondary_static_observations": {
+    "direct_readDense_jumps_before": 66,
+    "direct_readDense_jumps_after": 0,
+    "text_bytes_before": 346382,
+    "text_bytes_after": 354814,
+    "object_file_bytes_before": 781024,
+    "object_file_bytes_after": 794184,
+    "warning": "These are static counts and sizes, not dynamic call counts or a measured speedup. Text grows 8432 bytes (2.43%)."
+  },
+  "prior_failed_capture": {
+    "version": 1,
+    "outer_wall_seconds": 6.296744577000936,
+    "reason": "One-shot GHC -c searched its private -hidir and could not find the separately copied imported interfaces. No owner object was emitted; candidate compile was not started.",
+    "remedy": "Reviewed version2 only copied the same authenticated non-owner interfaces into each side's private -hidir and pinned them. Failed capture01 was retained."
+  },
+  "limits": [
+    "This admits consideration of a separately authorized short ordinary Graph sample only. No benchmark was run by the capture or this review.",
+    "The exact candidate passed O0 and O2 finite semantic/demand controls, not a proof for every possible graph or every changed branch.",
+    "No profile entry count was multiplied by static allocation sizes. Bounded profiling percentages are not ordinary full-compiler timing.",
+    "The owner pair is not a linked compiler. A later real compiler experiment must rebuild affected reverse dependencies, not mix candidate Graph with stale Solver/Constraint unfoldings.",
+    "Original full90 single-crate and split qualifications still failed their600-second guards. No complete90 compiler/GHC ratio is available.",
+    "Raw Core/Cmm/objdump and full local receipts remain local. This summary does not claim those large artifacts are remotely persisted."
+  ]
+}

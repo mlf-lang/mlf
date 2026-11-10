@@ -1,0 +1,13 @@
+{
+  "tested_run_py_sha256": "068ff1572915e15ee241e26989667412438fe80fd474ea322277efadcc0fd23a",
+  "retained_failed_run_v1_py_sha256": "8cc9e396c78886a59e8eb9f6a0b40b31e488c6e00cd6411055632dee5b06b0bf",
+  "tested_shell_sha256": "a9032045eeaf25e260ca4b9018ee015a1b145397c2a9c69b02b11ea33b078cf0",
+  "published_shell_is_tested_shell": false,
+  "wrapper_change": "The fixed local absolute sprint lock path is replaced by required MLF_SPRINT_LOCK. This wrapper has not been executed. Python sources are exact tested/failed copies.",
+  "published_files": {
+    "source/run-gate.sh": "743bfe4bb368512bbfe6360a00fe8972280a5dba04e77ec62453f913f3f7bad6",
+    "source/run-v1.py": "8cc9e396c78886a59e8eb9f6a0b40b31e488c6e00cd6411055632dee5b06b0bf",
+    "source/run.py": "068ff1572915e15ee241e26989667412438fe80fd474ea322277efadcc0fd23a",
+    "summary.json": "bcb421e427f48fd10c10408f700f498ef6819375b2441ecaa0a8c75322e34426"
+  }
+}
