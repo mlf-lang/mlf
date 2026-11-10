@@ -142,3 +142,11 @@ Astra将下一优先级调整为B2：使用现有公开--compile-crate协议，�
 暂停边界继续保守：不运行可能属于native A/B、代际或固定点验证的整套check_native.py。仅做不构成自举代际A/B的独立小crate语义fixture和CLI资格，并记录实际命令，不把这些检查说成完整compiler语义验收。完整原CLI late-profiler草稿继续准备和审查，但尚未编译/运行。
 
 markers-only的9文件新源码/结构化快照检查点尚未获准公开上传，已知create_tree未执行且已停止。当前远端76d366c仍是前一个含Type计数的诊断。新的markers摘要已在本计划保全，但raw及新runner恢复状态要以JSON中确切remote_commit为准，不能假称其已push。
+
+## B2小控制通过、完整资格在途（2026-11-10 14:48 UTC）
+
+B2执行代码在perf/fresh-split-20261110@135a31331713baad0ddc4c22a09fd0ea312dc258，源码tree和10文件已取回核验；小控制摘要另保存到9c0bea5847b995334e3bdd2b588509d45f0111e1，执行代码未变。[恢复入口](https://github.com/mlf-lang/mlf/blob/9c0bea5847b995334e3bdd2b588509d45f0111e1/tools/performance/fresh-split/README.md)。小控制唯一运行5.160891106秒，采样进程树峰值178,864,128字节，三个crate分别3/2/2组全部fresh。原生输出、私有导出拒绝、类型错误拒绝、缺直接依赖拒绝及同位置完好副本先等价再损坏的SHA拒绝全部通过。原始receipt未公开，摘要明确不能从hash恢复raw内容。
+
+Astra已准入并启动一次完整90模块fresh split资格，仍一组600秒总保护；截至本节时间没有完整结果，不应当作性能成功。重启后先查实际进程和receipt，不自动重跑。下一步按真实阶段和失败/成功结果决定优化，不自动开启正式cohort或被暂停的代际验证。
+
+测量细节已据B0源码更正：GHC的155.931809537秒Runner到Clang产物完成及worker退出，CLI检查另在外侧，不包含其中。B2记录原Runner起点到Clang完成的时间，另列CLI、两项独立语义检查及整个资格scope；Clang标记与旧worker退出存在小的运输边界差异，应保留原时间戳，在正式比较时统一边界，不从单次资格宣称精确配对提速。
