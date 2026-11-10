@@ -1,6 +1,6 @@
 # Fresh split strategy (B2)
 
-Review candidate, not a measured optimization. No production code or package API
+Reviewed candidate with a passed small fixture, not a measured optimization. No production code or package API
 changes. Original B0 remains the single-crate, 90-module build that exhausted its
 600-second guard before producing checked artifacts. This experiment changes the
 build strategy and crate identities; it is not a same-implementation algorithm
@@ -104,7 +104,7 @@ control window and its time is not included in a later compiler sample.
 
 Python contract tests exercise positive inventory and negative ownership, hash,
 topology, count, fresh-query and interface checks. They start no compiler processes.
-The real fixture must pass before requesting the full 90-module qualification.
+The real fixture passed on 2026-11-10 using source commit `135a31331713baad0ddc4c22a09fd0ea312dc258`: all seven groups fresh, the exact native output, intact-copy LLVM equality and all four targeted rejection controls passed. Its complete outer guarded scope was 5.160891106 seconds. See `fixture-results.json` for the portable summary and evidence limits. The full 90-module compiler remains unrun; this prerequisite is not a compiler speed measurement.
 
 ## Commands
 

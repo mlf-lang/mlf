@@ -1,0 +1,55 @@
+{
+  "format": "fresh-split-fixture-summary-v1",
+  "date_utc": "2026-11-10",
+  "source_commit": "135a31331713baad0ddc4c22a09fd0ea312dc258",
+  "compiler_baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "qualification_only": true,
+  "performance_samples": 0,
+  "full_compiler_run": false,
+  "production_optimization": false,
+  "native_generational_or_fixed_point_test": false,
+  "complete": true,
+  "whole_control_scope_seconds": 5.160891106,
+  "sampled_process_tree_peak_rss_bytes": 178864128,
+  "max_individual_child_rss_bytes": 94683136,
+  "memory_caveat": "RSS sampled every 100 ms can miss short peaks; the entire worker and inherited children share one guarded process group.",
+  "fresh_groups": {
+    "entry": 2,
+    "facade": 2,
+    "model": 3
+  },
+  "reused_groups": 0,
+  "expected_native_stdout": "split λ\n42\n42\n",
+  "native_stdout_equal": true,
+  "intact_relocated_llvm_equal": true,
+  "negative_controls": [
+    {
+      "name": "private-export",
+      "exit_code": 1,
+      "diagnostic": "name is not in scope: hidden"
+    },
+    {
+      "name": "type-error",
+      "exit_code": 1,
+      "diagnostic": "type constructor mismatch: Int versus String"
+    },
+    {
+      "name": "missing-direct-dependency",
+      "exit_code": 1,
+      "diagnostic": "unknown imported module Model"
+    },
+    {
+      "name": "corrupt-object",
+      "exit_code": 1,
+      "diagnostic": "open crate SHA mismatch"
+    }
+  ],
+  "raw_local_receipt_sha256": {
+    "receipt.json": "4df13e0ce4805d1fabcc0b7148d3964288fcd86dfd74abc3fbc9f374f7cca99a",
+    "stages.json": "8c849813d189031382713b30b28b5ea8145b4fb88c551f2d15f0cd381246f1b5",
+    "command/command.json": "d01395f18761de310700b8c5246f9ef869d77f9a392e480781fce00c22350c3d"
+  },
+  "evidence_persistence": "Raw receipts, local absolute paths, full tool/object metadata and LLVM are not published. These hashes cannot recover raw contents. If local evidence is lost, rerun the documented fixture with authenticated original inputs.",
+  "terminal_live_descendants": [],
+  "shared_and_producer_locks_reacquired": true
+}
