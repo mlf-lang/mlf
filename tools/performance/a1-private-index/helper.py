@@ -274,6 +274,7 @@ class Runner:
                             pass
                         reason = reason or 'live descendants after leader completion'
                     record.update(exit_code=process.returncode, reason=reason,
+                                  started_monotonic_ns=begin, completed_monotonic_ns=end,
                                   wall_seconds=(end-begin)/1e9, child_user_seconds=usage.ru_utime,
                                   child_system_seconds=usage.ru_stime,
                                   max_individual_child_rss_bytes=usage.ru_maxrss if sys.platform == 'darwin' else usage.ru_maxrss*1024,
