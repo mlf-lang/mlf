@@ -1,0 +1,82 @@
+{
+  "correctness_limits": [
+    "MLF did not complete source-to-checked, so no complete checked freshness count, ordered group comparison, raw-byte reference or generated MLF compiler behavior result is available.",
+    "GHC exact compiled-source provenance and authored version/implementation identity checks passed. The two-generated-compiler behavior comparison was not run.",
+    "No formal MGGM comparison, optimization-effect claim or native self-host fixed-point test was run."
+  ],
+  "endpoint": "Same frozen complete shared-source closure to runnable compiler including native link. MLF compiles the closure as one fresh crate, not a package-manager build. GHC uses --make -O2 -j1 and the original Main wrapper.",
+  "formal_performance_samples": 0,
+  "format": "full-compiler-baseline-qualification-v1",
+  "ghc": {
+    "complete": true,
+    "endpoint_wall_seconds": 155.931809537,
+    "fresh_host_wrapper": 1,
+    "fresh_shared_modules": 90,
+    "native_cli_checks": true,
+    "reused_shared_target_modules": 0,
+    "sampled_process_tree_peak_rss_bytes": 1216823296,
+    "stages": [
+      {
+        "exit_code": 0,
+        "name": "source-to-ghc-native",
+        "system_seconds": 7.440147,
+        "user_seconds": 148.415633,
+        "wall_seconds": 155.815914475
+      }
+    ]
+  },
+  "mlf": {
+    "checked_artifacts_produced": false,
+    "complete": false,
+    "completed_stages": [],
+    "cpu_measurement_note": "The parent worker was killed before reaping the compiler child; the retained wait4 CPU numbers do not represent compiler CPU. No CPU/GC phase claim is made.",
+    "cpu_measurement_valid": false,
+    "exit_code": -9,
+    "internal_phase_at_timeout": "Unknown. Graph payloads are published only after successful computation; missing records do not establish that inference had not run.",
+    "qualification_overlap_note": "A roughly three-second frontend control may have overlapped this qualification start. This failed qualification is not an ordinary performance sample.",
+    "query_directory_observation": {
+      "directories": [
+        "query-graph-v2",
+        "query-graph-v2/generations",
+        "query-graph-v2/results",
+        "query-graph-v2/staging"
+      ],
+      "files": [
+        {
+          "bytes": 0,
+          "path": ".lock"
+        }
+      ]
+    },
+    "reason": "wall limit",
+    "sampled_process_tree_peak_rss_bytes": 1745485824,
+    "stderr_bytes": 0,
+    "wall_seconds": 600.09899221
+  },
+  "native_fixed_point_or_self_host_ab": false,
+  "not_checked_into_git": {
+    "producer_binary_sha256": "6120355c75ea590cf37777f38b3f58a7df7ce6dbd6d0857788f4049124dc2642",
+    "producer_receipt_sha256": "b71bbb5ebb757a206ed41932cdafca982f1e7246218496953be273afad5a8caf",
+    "reason": "Large producer objects, executable outputs, toolchains and checked dependencies must be restored/rebuilt and reauthenticated. Hashes identify this run but are not replacement artifacts.",
+    "setup_receipt_sha256": "a7073db2aeb7b3c9232201e1bb60322edeece95eff542940b7bdb280d83b5cf8"
+  },
+  "same_endpoint_ratio": null,
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "status": "blocked-before-complete-MLF-endpoint",
+  "tracked_receipt_sha256": {
+    "environment.json": "89549a8667411249720eb7f4626c4577350b25361ff8efa1cede3fad65f9e290",
+    "frozen-workload.json": "6df79968e24bf041494d14f493e852f756faeaa664ab57b3c362df8d75cd523f",
+    "ghc-command.json": "ba50b9db13f60e98c91af5208b5eaa76cb3af5b30e32a37ceb5f950e600ab1f6",
+    "ghc-qualification.json": "b4aa96e0e44a1b00ea94847f4ccb6f8314ee15260c72c8801a684d5670ee2236",
+    "ghc-stages.json": "fb8a3555b8182a83d1c562fbd5aeb3c0d2d10d6383696031b5f41d412c6cbe1b",
+    "mlf-command.json": "27faa523726f4754d1009b49b2e3a8c2224b497d987c880288116f49866726d4",
+    "mlf-qualification.json": "58d25ed061ab7aa8bdb00be3f6bc3d903c194132e77862a016d786529f6ba73c",
+    "qualification-plan.json": "c64ba62c5dfbc60b914f64dfa9f80222cc1311f4daff32e870f97570d2317e34",
+    "toolchains.json": "f99eb3a422a1fa0f3ff63b6ed9572a5a9a0aef69f27a51e4aebb120c4afcefbd"
+  },
+  "workload": {
+    "host_wrapper_count": 1,
+    "module_count": 90,
+    "source_bytes": 5233364
+  }
+}

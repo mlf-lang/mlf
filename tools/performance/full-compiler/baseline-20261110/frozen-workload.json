@@ -1,0 +1,559 @@
+{
+  "entry": "MLF.Entry.Emlf",
+  "exclusions": "Other executables, tests and unreachable shared modules are outside emlf compiler entry closure.",
+  "format": "portable-full-emlf-source-freeze-v1",
+  "freshness": "All listed 90 shared modules compile fresh in each leg; no target query/object reuse. Only primitive/host adapters, installed GHC packages and builtin/runtime may be fixed dependencies.",
+  "host_wrapper": {
+    "relative": "host/ghc/app/emlf/Main.hs",
+    "sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79"
+  },
+  "module_count": 90,
+  "modules": [
+    {
+      "bytes": 5573,
+      "module": "Bootstrap.IndexVec",
+      "relative": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+      "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+    },
+    {
+      "bytes": 12757,
+      "module": "Bootstrap.Types",
+      "relative": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+    },
+    {
+      "bytes": 20088,
+      "module": "Bootstrap.Std",
+      "relative": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+    },
+    {
+      "bytes": 55534,
+      "module": "Bootstrap.Unicode",
+      "relative": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+      "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+    },
+    {
+      "bytes": 44635,
+      "module": "Bootstrap.Lexer",
+      "relative": "libraries/mlf-frontend/Bootstrap/Lexer.hs",
+      "sha256": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43"
+    },
+    {
+      "bytes": 11604,
+      "module": "Bootstrap.Parsec",
+      "relative": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
+      "sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90"
+    },
+    {
+      "bytes": 20056,
+      "module": "Bootstrap.Layout",
+      "relative": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "sha256": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8"
+    },
+    {
+      "bytes": 17218,
+      "module": "Bootstrap.Map",
+      "relative": "libraries/mlf-foundation/Bootstrap/Map.hs",
+      "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+    },
+    {
+      "bytes": 4093,
+      "module": "Bootstrap.Set",
+      "relative": "libraries/mlf-foundation/Bootstrap/Set.hs",
+      "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+    },
+    {
+      "bytes": 2592,
+      "module": "Bootstrap.Fresh",
+      "relative": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+      "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+    },
+    {
+      "bytes": 1161,
+      "module": "Bootstrap.Kind",
+      "relative": "libraries/mlf-language-core/Bootstrap/Kind.hs",
+      "sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b"
+    },
+    {
+      "bytes": 18847,
+      "module": "Bootstrap.Data",
+      "relative": "libraries/mlf-language-core/Bootstrap/Data.hs",
+      "sha256": "80545c6378de8e846d3a13df8b5418b8fd7854d011346f12dbfd4c99c47c7558"
+    },
+    {
+      "bytes": 10638,
+      "module": "Bootstrap.Desugar",
+      "relative": "libraries/mlf-frontend/Bootstrap/Desugar.hs",
+      "sha256": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37"
+    },
+    {
+      "bytes": 5990,
+      "module": "Bootstrap.Resolved",
+      "relative": "libraries/mlf-frontend/Bootstrap/Resolved.hs",
+      "sha256": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052"
+    },
+    {
+      "bytes": 3727,
+      "module": "Bootstrap.IntTree",
+      "relative": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+      "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+    },
+    {
+      "bytes": 6684,
+      "module": "Bootstrap.IntRank",
+      "relative": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+      "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+    },
+    {
+      "bytes": 17405,
+      "module": "Bootstrap.IntSet",
+      "relative": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+    },
+    {
+      "bytes": 21811,
+      "module": "Bootstrap.IntMap",
+      "relative": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+    },
+    {
+      "bytes": 2539,
+      "module": "Bootstrap.ST",
+      "relative": "libraries/mlf-foundation/Bootstrap/ST.hs",
+      "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+    },
+    {
+      "bytes": 32565,
+      "module": "Bootstrap.Dependency",
+      "relative": "libraries/mlf-frontend/Bootstrap/Dependency.hs",
+      "sha256": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2"
+    },
+    {
+      "bytes": 36496,
+      "module": "Bootstrap.Surface",
+      "relative": "libraries/mlf-frontend/Bootstrap/Surface.hs",
+      "sha256": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa"
+    },
+    {
+      "bytes": 70221,
+      "module": "Bootstrap.Parser",
+      "relative": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c"
+    },
+    {
+      "bytes": 64524,
+      "module": "Bootstrap.Primitive",
+      "relative": "libraries/mlf-language-core/Bootstrap/Primitive.hs",
+      "sha256": "53a7d3b4c605cd15071a528185ab7252099027feb8c40db23d5dd40ac42e2726"
+    },
+    {
+      "bytes": 29247,
+      "module": "Bootstrap.Prelude",
+      "relative": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2"
+    },
+    {
+      "bytes": 79471,
+      "module": "Bootstrap.Module",
+      "relative": "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "sha256": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca"
+    },
+    {
+      "bytes": 327,
+      "module": "Bootstrap.Version",
+      "relative": "libraries/mlf-foundation/Bootstrap/Version.hs",
+      "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+    },
+    {
+      "bytes": 30989,
+      "module": "Bootstrap.Standalone",
+      "relative": "libraries/mlf-frontend/Bootstrap/Standalone.hs",
+      "sha256": "31ee00d6ba44ca91b613176f20cc1726b8ff4348b9ac3a101c2e81e96af8e9f5"
+    },
+    {
+      "bytes": 17441,
+      "module": "Bootstrap.ClassDemand",
+      "relative": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+      "sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379"
+    },
+    {
+      "bytes": 1950,
+      "module": "Bootstrap.Kinding",
+      "relative": "libraries/mlf-language-core/Bootstrap/Kinding.hs",
+      "sha256": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c"
+    },
+    {
+      "bytes": 12549,
+      "module": "Bootstrap.X.Pretty",
+      "relative": "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+      "sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f"
+    },
+    {
+      "bytes": 120915,
+      "module": "Bootstrap.Classes",
+      "relative": "libraries/mlf-inference/Bootstrap/Classes.hs",
+      "sha256": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b"
+    },
+    {
+      "bytes": 137874,
+      "module": "Bootstrap.Graph",
+      "relative": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f"
+    },
+    {
+      "bytes": 99201,
+      "module": "Bootstrap.Graph.Solver",
+      "relative": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612"
+    },
+    {
+      "bytes": 4813,
+      "module": "Bootstrap.X.Syntax",
+      "relative": "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+      "sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d"
+    },
+    {
+      "bytes": 9309,
+      "module": "Bootstrap.X.Type",
+      "relative": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+      "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d"
+    },
+    {
+      "bytes": 53972,
+      "module": "Bootstrap.Constraint",
+      "relative": "libraries/mlf-inference/Bootstrap/Constraint.hs",
+      "sha256": "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c"
+    },
+    {
+      "bytes": 17179,
+      "module": "Bootstrap.X.Check",
+      "relative": "libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+      "sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c"
+    },
+    {
+      "bytes": 14164,
+      "module": "Bootstrap.Evidence",
+      "relative": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd"
+    },
+    {
+      "bytes": 31616,
+      "module": "Bootstrap.Elaborate",
+      "relative": "libraries/mlf-inference/Bootstrap/Elaborate.hs",
+      "sha256": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58"
+    },
+    {
+      "bytes": 26092,
+      "module": "Bootstrap.X.Checked",
+      "relative": "libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+      "sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a"
+    },
+    {
+      "bytes": 3354,
+      "module": "Bootstrap.CompilerCore",
+      "relative": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "sha256": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2"
+    },
+    {
+      "bytes": 7821,
+      "module": "Bootstrap.Compiler",
+      "relative": "libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "sha256": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e"
+    },
+    {
+      "bytes": 3246,
+      "module": "Bootstrap.Host",
+      "relative": "libraries/mlf-foundation/Bootstrap/Host.hs",
+      "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+    },
+    {
+      "bytes": 16511,
+      "module": "Bootstrap.SourceEquality",
+      "relative": "libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+      "sha256": "806297f22ce1d35a02b6db393ecc18771e571a08f13665f981e509358525c6f8"
+    },
+    {
+      "bytes": 16487,
+      "module": "Bootstrap.X.Parser",
+      "relative": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209"
+    },
+    {
+      "bytes": 68595,
+      "module": "Bootstrap.Separate",
+      "relative": "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "sha256": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba"
+    },
+    {
+      "bytes": 82558,
+      "module": "Bootstrap.Bitstream",
+      "relative": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+    },
+    {
+      "bytes": 141700,
+      "module": "Bootstrap.ArtifactStructure",
+      "relative": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
+      "sha256": "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23"
+    },
+    {
+      "bytes": 55963,
+      "module": "Bootstrap.ArtifactStorage",
+      "relative": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+      "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7"
+    },
+    {
+      "bytes": 20210,
+      "module": "Bootstrap.EvidenceBoundary",
+      "relative": "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs",
+      "sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2"
+    },
+    {
+      "bytes": 35625,
+      "module": "Bootstrap.OpenFragment",
+      "relative": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+      "sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b"
+    },
+    {
+      "bytes": 44928,
+      "module": "Bootstrap.QueryGraph",
+      "relative": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+    },
+    {
+      "bytes": 219831,
+      "module": "Bootstrap.CrateArtifact",
+      "relative": "libraries/mlf-crates/Bootstrap/CrateArtifact.hs",
+      "sha256": "da416111adcfafa18eb473ae611379fc1ef521c84d1dab3d2d5a4dc3eb51c6f0"
+    },
+    {
+      "bytes": 19341,
+      "module": "Bootstrap.InferenceUnit",
+      "relative": "libraries/mlf-crates/Bootstrap/InferenceUnit.hs",
+      "sha256": "ab3bf4aa00ac0c2eea90b4bfc7d35b5430b1ac959187f3e2d99850f1bd35e46e"
+    },
+    {
+      "bytes": 2690,
+      "module": "Bootstrap.SourceUnit",
+      "relative": "libraries/mlf-crates/Bootstrap/SourceUnit.hs",
+      "sha256": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f"
+    },
+    {
+      "bytes": 97416,
+      "module": "Bootstrap.SourceInference",
+      "relative": "libraries/mlf-crates/Bootstrap/SourceInference.hs",
+      "sha256": "f62f60fdee8d63541f326572d791b7d2c0cb492603bacefd8cd61d4e5b437f3b"
+    },
+    {
+      "bytes": 130545,
+      "module": "Bootstrap.CrateQuery",
+      "relative": "libraries/mlf-crates/Bootstrap/CrateQuery.hs",
+      "sha256": "504c1da39204fa87c67c2ba1c9ab8e0914b3c41f81f170b85dd7076e0ead9748"
+    },
+    {
+      "bytes": 15899,
+      "module": "Bootstrap.BuiltinPreludeContext",
+      "relative": "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs",
+      "sha256": "e8f69d41475c332991f122c765f79cc11cddf708044db859846818dc26ade920"
+    },
+    {
+      "bytes": 29528,
+      "module": "Bootstrap.BuiltinPreludeLiteral",
+      "relative": "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs",
+      "sha256": "f3bad10172df0e35b36fc5926cbbfe688e2c6e6603761823d96baee5769e6357"
+    },
+    {
+      "bytes": 36306,
+      "module": "Bootstrap.Crate",
+      "relative": "libraries/mlf-crates/Bootstrap/Crate.hs",
+      "sha256": "169a65e03680313755c0bcfe25b462cc96c9b260e077891771785a43a3d7c063"
+    },
+    {
+      "bytes": 5206,
+      "module": "Bootstrap.ImportParameters",
+      "relative": "libraries/mlf-crates/Bootstrap/ImportParameters.hs",
+      "sha256": "e6f840d764e3f07f74fa532b151f8cfb890b7ddb0d1035e062cac299da460954"
+    },
+    {
+      "bytes": 16178,
+      "module": "Bootstrap.ImportedRoot",
+      "relative": "libraries/mlf-crates/Bootstrap/ImportedRoot.hs",
+      "sha256": "101b25c1acd5a6af94081b1364b16f2461bbd19b50f9df90d6fb9f50c9140dd1"
+    },
+    {
+      "bytes": 2220407,
+      "module": "MLF.BuiltinPreludeData",
+      "relative": "bootstrap/MLF/BuiltinPreludeData.hs",
+      "sha256": "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692"
+    },
+    {
+      "bytes": 39331,
+      "module": "Bootstrap.PreparedLibraries",
+      "relative": "libraries/mlf-crates/Bootstrap/PreparedLibraries.hs",
+      "sha256": "0b158d893dab7ac0e5037c1b4ead43fa80f03207c597fc1bf5a4498fec249ada"
+    },
+    {
+      "bytes": 921,
+      "module": "MLF.PreparedLibraryData",
+      "relative": "bootstrap/MLF/PreparedLibraryData.hs",
+      "sha256": "eececfa9f5b0ef2901e749b4a1798ac2cf78bea3378d9e33fcbc0a0ded94c6b1"
+    },
+    {
+      "bytes": 1077,
+      "module": "MLF.PreparedNativeData",
+      "relative": "bootstrap/MLF/PreparedNativeData.hs",
+      "sha256": "908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33"
+    },
+    {
+      "bytes": 58442,
+      "module": "Bootstrap.LLVM.Optimize",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs",
+      "sha256": "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f"
+    },
+    {
+      "bytes": 12318,
+      "module": "Bootstrap.LLVM.Analysis",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs",
+      "sha256": "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e"
+    },
+    {
+      "bytes": 12136,
+      "module": "Bootstrap.LLVM.Result",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Result.hs",
+      "sha256": "792da71fe323dee4b2497b552c090e38e98f6f51d6997ee9da07286420f1396e"
+    },
+    {
+      "bytes": 19376,
+      "module": "Bootstrap.LLVM.Argument",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Argument.hs",
+      "sha256": "8d8a897eb4019ad40fe5cb756a30fd8c789e4c745205e654254bbf702d12710b"
+    },
+    {
+      "bytes": 17714,
+      "module": "Bootstrap.LLVM.LazyProducer",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/LazyProducer.hs",
+      "sha256": "88d750f0671a228da67403a555a43b71054dee8307da88e5070752474e1cf7c8"
+    },
+    {
+      "bytes": 36754,
+      "module": "Bootstrap.LLVM.Build",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs",
+      "sha256": "e78bf81269ae16b493f3170d91cd2c451891479aca184a2fa302194b95679e86"
+    },
+    {
+      "bytes": 9374,
+      "module": "Bootstrap.LLVM.StrictFields",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs",
+      "sha256": "50c76597138b9fe9c7a4eeba22976f096b513038450c830f4e204059c2a91d9e"
+    },
+    {
+      "bytes": 11404,
+      "module": "Bootstrap.LLVM.Kernel",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs",
+      "sha256": "46ae5be45d9c6f58a61a1c52856bd11befeb3b6fa4ed7c7b09118a9226948642"
+    },
+    {
+      "bytes": 55931,
+      "module": "Bootstrap.LLVM.Native",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs",
+      "sha256": "dd5c283b74aa407a7555ad7c5c1793d5b1e8e72bf7bdc61bb946c96aef0ac242"
+    },
+    {
+      "bytes": 106307,
+      "module": "Bootstrap.LLVM.Codegen",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs",
+      "sha256": "d4c94567ae188538e107306e6730206547261aa8c461e87fdb564bcdad7e11db"
+    },
+    {
+      "bytes": 3918,
+      "module": "Bootstrap.LLVM.StrictWrappers",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs",
+      "sha256": "b8e09c8fe3af9f14c7e7b6f6deae008ada04fc84923a41fa5c29d1e16857ed13"
+    },
+    {
+      "bytes": 16828,
+      "module": "Bootstrap.LLVM",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM.hs",
+      "sha256": "4ca4c87e0a32932b4d2227b9ff55bd73d34e4f1c5570f027b7e7677fc86d2750"
+    },
+    {
+      "bytes": 20910,
+      "module": "Bootstrap.LLVM.Library",
+      "relative": "libraries/mlf-llvm/Bootstrap/LLVM/Library.hs",
+      "sha256": "03eac45b9fd31cf625e37cf0e7d245429ca500c19d5717db1eb01b93cadf293d"
+    },
+    {
+      "bytes": 9951,
+      "module": "Package.OS",
+      "relative": "libraries/mlf-package-core/Package/OS.hs",
+      "sha256": "ff025ef05b6cb63c5591b756a78b898f50497cc5349bdc5d19812f47a6dadda2"
+    },
+    {
+      "bytes": 15270,
+      "module": "Package.Json",
+      "relative": "libraries/mlf-package-core/Package/Json.hs",
+      "sha256": "90c6e3ad566b92c01bf58106c27a5d467a52f11586ddad9fa1e44c2a62165604"
+    },
+    {
+      "bytes": 26327,
+      "module": "MLF.PreparedCompiler",
+      "relative": "bootstrap/MLF/PreparedCompiler.hs",
+      "sha256": "2812caad746141ddb82c21a5dfdc779f1c33ae383ccd08aaa496ebecf8046a51"
+    },
+    {
+      "bytes": 12556,
+      "module": "MLF.NativeBuild",
+      "relative": "bootstrap/MLF/NativeBuild.hs",
+      "sha256": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143"
+    },
+    {
+      "bytes": 2142,
+      "module": "Bootstrap.ProcessHost",
+      "relative": "libraries/mlf-interpreter/Bootstrap/ProcessHost.hs",
+      "sha256": "2fcd44e92c3b0a889e7ed16316ed68209f940f357fdb68b049c596f6d3a3dc24"
+    },
+    {
+      "bytes": 88290,
+      "module": "Bootstrap.Runtime",
+      "relative": "libraries/mlf-interpreter/Bootstrap/Runtime.hs",
+      "sha256": "a764518838cc7ca32b58a5b13901e542d30b269b50cdcd67bf4a23f5ac4d11f6"
+    },
+    {
+      "bytes": 28172,
+      "module": "Bootstrap.CrateGraph",
+      "relative": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee"
+    },
+    {
+      "bytes": 8741,
+      "module": "Bootstrap.Graph.IndexStore",
+      "relative": "libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs",
+      "sha256": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41"
+    },
+    {
+      "bytes": 83407,
+      "module": "Bootstrap.CrateSession",
+      "relative": "libraries/mlf-crates/Bootstrap/CrateSession.hs",
+      "sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd"
+    },
+    {
+      "bytes": 13380,
+      "module": "Bootstrap.CrateCodegen",
+      "relative": "libraries/mlf-crates/Bootstrap/CrateCodegen.hs",
+      "sha256": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad"
+    },
+    {
+      "bytes": 58175,
+      "module": "MLF.Entry.Emlf",
+      "relative": "bootstrap/MLF/Entry/Emlf.hs",
+      "sha256": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480"
+    }
+  ],
+  "nonshared_imports": [
+    "MLF.Primitive"
+  ],
+  "original_absolute_workload_sha256": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a",
+  "source_bytes": 5233364,
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1"
+}

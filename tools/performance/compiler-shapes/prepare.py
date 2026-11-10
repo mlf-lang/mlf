@@ -22,7 +22,7 @@ def pack(values):
     return ''.join(str(len(x))+':'+x for x in values)
 
 
-def prepare_host_package(ghc, source, producer, deps, run):
+def prepare_host_package(ghc, source, producer, deps, run, expose_entry_host=False):
     pkg=ghc.with_name('ghc-pkg');deps.mkdir()
     objects=deps/'objects';objects.mkdir();db=deps/'package-db'
     packages=['base','array','bytestring','text','containers','directory']
@@ -36,7 +36,8 @@ def prepare_host_package(ghc, source, producer, deps, run):
     ids=[subprocess.check_output([pkg,'--global','field',name,'id','--simple-output'],text=True).strip() for name in packages]
     conf=deps/'package.conf'
     conf.write_text('name: mlf-shape-primitives\nversion: 0.1\nid: mlf-shape-primitives-0.1\nkey: mlf-shape-primitives-0.1\n'
-        'exposed: True\nexposed-modules: MLF.Primitive\nhidden-modules: MLF.Host.Base MLF.Host.IO MLF.Host.Async\n'
+        'exposed: True\nexposed-modules: MLF.Primitive'+(' MLF.Host.IO' if expose_entry_host else '')+
+        '\nhidden-modules: MLF.Host.Base MLF.Host.Async'+('' if expose_entry_host else ' MLF.Host.IO')+'\n'
         +'import-dirs: '+str(objects)+'\nlibrary-dirs: '+str(deps)+'\nhs-libraries: HSmlf-shape-primitives-0.1\ndepends: '+' '.join(ids)+'\n')
     run('register-package',[pkg,'--package-db',db,'register',conf])
     return db
@@ -51,6 +52,7 @@ def main():
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--clang',default='/usr/bin/clang')
     p.add_argument('--ghc')
+    p.add_argument('--expose-entry-host',action='store_true',help='Expose MLF.Host.IO for the complete compiler original GHC Main wrapper.')
     p.add_argument('--endpoint',default='crate-bootstrap-v1',choices=sorted(PROFILES))
     a=p.parse_args();out=a.output.resolve();out.mkdir(parents=True,exist_ok=False)
     hp=ROOT/'tools/performance/a1-private-index/helper.py'
@@ -70,7 +72,7 @@ def main():
     builtin_record={}
     with H.SerialLock(ROOT/'.mlf-build'):
         deps=out/'dependencies'
-        db=prepare_host_package(ghc,source,producer,deps,run)
+        db=prepare_host_package(ghc,source,producer,deps,run,a.expose_entry_host)
         cflags=shlex.split(subprocess.check_output(['pkg-config','--cflags','bdw-gc','gmp'],text=True))
         libs=shlex.split(subprocess.check_output(['pkg-config','--libs','bdw-gc','gmp'],text=True))
         clang=Path(a.clang).resolve();runtime=deps/'runtime.o'
@@ -100,6 +102,7 @@ def main():
     H.save(out/'setup.json',{'complete':True,'endpoint':a.endpoint,'endpoint_label':profile['label'],
         'producer':str(producer),'source':str(source),'ghc':str(ghc),'package_db':str(db),
         'clang':str(clang),'runtime':str(runtime),'libs':libs,'limits':limits,'builtin':str(builtin),
+        'expose_entry_host':a.expose_entry_host,
         'builtin_record':builtin_record,
         'identity':{'producer_receipt_sha256':H.sha(producer/'receipt.json'),
             'producer_emlf_sha256':H.sha(producer/'bin/emlf'),

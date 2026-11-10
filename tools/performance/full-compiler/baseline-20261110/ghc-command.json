@@ -1,0 +1,47 @@
+{
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/process-spawn/with_scope.py",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/full-compiler/worker.py",
+    "--job",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/job.json"
+  ],
+  "boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+  "child_system_seconds": 7.480425,
+  "child_user_seconds": 148.492353,
+  "complete": true,
+  "cwd": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110",
+  "environment": {
+    "GHCRTS": "",
+    "GHC_ENVIRONMENT": "-",
+    "LC_ALL": "C.UTF-8",
+    "MAKEFLAGS": "-j1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "exit_code": 0,
+  "involuntary_context_switches": 2451,
+  "limits": {
+    "address_space_per_process_bytes": 6442450944,
+    "disk_free_floor_bytes": 5368709120,
+    "host_available_floor_bytes": 3221225472,
+    "max_work_bytes": 4294967296,
+    "process_tree_rss_bytes": 5368709120,
+    "wall_seconds": 600
+  },
+  "logs": {
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/command/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/command/stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "max_individual_child_rss_bytes": 925114368,
+  "reason": null,
+  "sampled_process_tree_peak_rss_bytes": 1216823296,
+  "started_utc": "2026-11-10T13:21:24Z",
+  "terminal_live_descendants": [],
+  "timed_target_leg": true,
+  "voluntary_context_switches": 18217,
+  "wall_seconds": 155.931809537
+}

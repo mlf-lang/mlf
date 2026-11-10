@@ -1,0 +1,23 @@
+{
+  "affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "boot_id": "e8b56774-929c-4da9-8c5a-cbef33c00eb2",
+  "captured_utc": "2026-11-10T13:03:39Z",
+  "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "logical_cpus": 9,
+  "machine": "x86_64",
+  "memory_total_kib": 10206468,
+  "note": "Fresh cloud workspace, not user computer. No host tuning or cache flushing. Toolkit is isolated in compiler-toolchain-20261110. Historical result cohorts are not pooled.",
+  "os_release": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.6\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1"
+}

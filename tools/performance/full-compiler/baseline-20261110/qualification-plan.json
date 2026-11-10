@@ -1,0 +1,29 @@
+{
+  "format": "current-main-baseline-plan-v1",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "purpose": "Qualify the current complete compiler workload; ordinary current-main MLF/GHC timing and separate diagnostic profile. No compiler optimization effect or native fixed-point A/B.",
+  "primary_endpoint": "Source through runnable compiler including link. GHC-built ordinary O2 MLF vs GHC9.14.1 O2 -j1 on the same frozen 90 shared modules. Original five-line GHC Main wrapper and fixed host adapters are explicitly accounted for.",
+  "qualification_order": [
+    "mlf-native",
+    "ghc-native"
+  ],
+  "following_comparison": "Only after both endpoints qualify, use the existing fixed MLF/GHC/GHC/MLF four-run controller with the first accepted main checked output as frozen reference. Do not replace, extend or pool samples.",
+  "diagnostics": "A separate MLF_QUERY_PROFILE=1 fresh checked run may follow, always outside ordinary timing. Compare checked artifact bytes and ordered groups with ordinary main reference before interpreting its phases.",
+  "freshness": "No target query or object reuse. Fresh output directories and complete independently reconstructed import closure per leg. Fixed builtin, primitive/host, runtime and installed GHC dependencies may be reused.",
+  "limits": {
+    "address_space_per_process_bytes": 6442450944,
+    "process_tree_rss_bytes": 5368709120,
+    "disk_free_floor_bytes": 5368709120,
+    "host_available_floor_bytes": 3221225472,
+    "max_work_bytes": 4294967296,
+    "wall_seconds": 600
+  },
+  "failure_rule": "Record any timeout/resource/correctness failure and stop that comparison. Do not silently raise caps, skip work, remove failed observations or retry an uncertain outcome. Qualification-only tool defects are retained and corrected with a new output identity before timing.",
+  "input_sha256": {
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-evidence-20261110/workload.json": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/full-compiler/qualify.py": "5ec13cc17f2a9a309d6b645c835c99b2c051378a10dd94ca9ed5c3d1dc78d3fe",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/full-compiler/worker.py": "71d4739421c3ab4dcf44d4ddfc21fc9a68ec9d07f7e23c59e944712999e6bb3d",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/a1-private-index/helper.py": "0d11b29419a32fc9832096951aa085cc317c8a304b9db110ee96ba411a4ce7cc"
+  },
+  "supersedes": "plan.json: before first endpoint execution, add shared-sources manifest pin and remove unused source-root calculation"
+}

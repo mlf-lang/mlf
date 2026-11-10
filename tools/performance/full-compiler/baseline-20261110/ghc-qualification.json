@@ -1,0 +1,668 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-B",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/process-spawn/with_scope.py",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-B",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/full-compiler/worker.py",
+        "--job",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/job.json"
+      ],
+      "boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+      "child_system_seconds": 7.480425,
+      "child_user_seconds": 148.492353,
+      "complete": true,
+      "cwd": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "involuntary_context_switches": 2451,
+      "limits": {
+        "address_space_per_process_bytes": 6442450944,
+        "disk_free_floor_bytes": 5368709120,
+        "host_available_floor_bytes": 3221225472,
+        "max_work_bytes": 4294967296,
+        "process_tree_rss_bytes": 5368709120,
+        "wall_seconds": 600
+      },
+      "logs": {
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/command/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/command/stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "max_individual_child_rss_bytes": 925114368,
+      "reason": null,
+      "sampled_process_tree_peak_rss_bytes": 1216823296,
+      "started_utc": "2026-11-10T13:21:24Z",
+      "terminal_live_descendants": [],
+      "timed_target_leg": true,
+      "voluntary_context_switches": 18217,
+      "wall_seconds": 155.931809537
+    },
+    {
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/program",
+        "--version"
+      ],
+      "boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+      "child_system_seconds": 0.005973,
+      "child_user_seconds": 0.0,
+      "complete": true,
+      "cwd": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "involuntary_context_switches": 0,
+      "limits": {
+        "address_space_per_process_bytes": 6442450944,
+        "disk_free_floor_bytes": 5368709120,
+        "host_available_floor_bytes": 3221225472,
+        "max_work_bytes": 4294967296,
+        "process_tree_rss_bytes": 5368709120,
+        "wall_seconds": 600
+      },
+      "logs": {
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/version/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/version/stdout": "05d40051731444c5ddd4388f9213568ee1efbbf8646fe9a3ae02b648e24e32ae"
+      },
+      "max_individual_child_rss_bytes": 16961536,
+      "reason": null,
+      "sampled_process_tree_peak_rss_bytes": 0,
+      "started_utc": "2026-11-10T13:24:00Z",
+      "terminal_live_descendants": [],
+      "timed_target_leg": false,
+      "voluntary_context_switches": 5,
+      "wall_seconds": 0.00843371
+    },
+    {
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/program",
+        "--implementation-identity"
+      ],
+      "boundary": "Popen launch through exact-child wait4 completion; setup/copy/auth/postchecks excluded",
+      "child_system_seconds": 0.003988,
+      "child_user_seconds": 0.0,
+      "complete": true,
+      "cwd": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110",
+      "environment": {
+        "GHCRTS": "",
+        "GHC_ENVIRONMENT": "-",
+        "LC_ALL": "C.UTF-8",
+        "MAKEFLAGS": "-j1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1"
+      },
+      "exit_code": 0,
+      "involuntary_context_switches": 0,
+      "limits": {
+        "address_space_per_process_bytes": 6442450944,
+        "disk_free_floor_bytes": 5368709120,
+        "host_available_floor_bytes": 3221225472,
+        "max_work_bytes": 4294967296,
+        "process_tree_rss_bytes": 5368709120,
+        "wall_seconds": 600
+      },
+      "logs": {
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/identity/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/identity/stdout": "b14c8f8bd9432364e7c7de30e7a8c9f53cbf8e4e58b09050d1f570cb87c479b8"
+      },
+      "max_individual_child_rss_bytes": 16961536,
+      "reason": null,
+      "sampled_process_tree_peak_rss_bytes": 0,
+      "started_utc": "2026-11-10T13:24:00Z",
+      "terminal_live_descendants": [],
+      "timed_target_leg": false,
+      "voluntary_context_switches": 6,
+      "wall_seconds": 0.004825881
+    }
+  ],
+  "compiled": [
+    [
+      "Bootstrap.IndexVec",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IndexVec.hs"
+    ],
+    [
+      "Bootstrap.Types",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Types.hs"
+    ],
+    [
+      "Bootstrap.Std",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs"
+    ],
+    [
+      "Bootstrap.ST",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/ST.hs"
+    ],
+    [
+      "Bootstrap.Resolved",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Resolved.hs"
+    ],
+    [
+      "Bootstrap.ProcessHost",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs"
+    ],
+    [
+      "Bootstrap.Primitive",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core/Bootstrap/Primitive.hs"
+    ],
+    [
+      "Bootstrap.SourceEquality",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/SourceEquality.hs"
+    ],
+    [
+      "Bootstrap.Map",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Map.hs"
+    ],
+    [
+      "Bootstrap.Set",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Set.hs"
+    ],
+    [
+      "Bootstrap.Kind",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core/Bootstrap/Kind.hs"
+    ],
+    [
+      "Bootstrap.IntTree",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IntTree.hs"
+    ],
+    [
+      "Bootstrap.IntRank",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IntRank.hs"
+    ],
+    [
+      "Bootstrap.IntSet",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IntSet.hs"
+    ],
+    [
+      "Bootstrap.IntMap",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IntMap.hs"
+    ],
+    [
+      "Bootstrap.Host",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Host.hs"
+    ],
+    [
+      "Bootstrap.Graph.IndexStore",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs"
+    ],
+    [
+      "Bootstrap.Graph",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph.hs"
+    ],
+    [
+      "Bootstrap.Graph.Solver",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph/Solver.hs"
+    ],
+    [
+      "Bootstrap.Fresh",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Fresh.hs"
+    ],
+    [
+      "Bootstrap.ClassDemand",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/ClassDemand.hs"
+    ],
+    [
+      "Bootstrap.Bitstream",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/Bitstream.hs"
+    ],
+    [
+      "Bootstrap.Unicode",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Unicode.hs"
+    ],
+    [
+      "Bootstrap.Lexer",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Lexer.hs"
+    ],
+    [
+      "Bootstrap.Parsec",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Parsec.hs"
+    ],
+    [
+      "Bootstrap.Layout",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Layout.hs"
+    ],
+    [
+      "Bootstrap.Data",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core/Bootstrap/Data.hs"
+    ],
+    [
+      "Bootstrap.Kinding",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core/Bootstrap/Kinding.hs"
+    ],
+    [
+      "Bootstrap.Desugar",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Desugar.hs"
+    ],
+    [
+      "Bootstrap.Dependency",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Dependency.hs"
+    ],
+    [
+      "Bootstrap.Surface",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Surface.hs"
+    ],
+    [
+      "Bootstrap.Prelude",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Prelude.hs"
+    ],
+    [
+      "Bootstrap.Parser",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Parser.hs"
+    ],
+    [
+      "Bootstrap.Module",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs"
+    ],
+    [
+      "Bootstrap.Standalone",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Standalone.hs"
+    ],
+    [
+      "Bootstrap.Version",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Version.hs"
+    ],
+    [
+      "Bootstrap.X.Pretty",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs"
+    ],
+    [
+      "Bootstrap.Classes",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Classes.hs"
+    ],
+    [
+      "Bootstrap.X.Syntax",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Optimize",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Analysis",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs"
+    ],
+    [
+      "Bootstrap.LLVM.StrictFields",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs"
+    ],
+    [
+      "Bootstrap.LLVM.StrictWrappers",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Result",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Result.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Kernel",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Argument",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Argument.hs"
+    ],
+    [
+      "Bootstrap.LLVM.LazyProducer",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/LazyProducer.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Build",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Native",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Codegen",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs"
+    ],
+    [
+      "Bootstrap.X.Type",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Type.hs"
+    ],
+    [
+      "Bootstrap.X.Parser",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Parser.hs"
+    ],
+    [
+      "Bootstrap.X.Check",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Check.hs"
+    ],
+    [
+      "Bootstrap.X.Checked",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Checked.hs"
+    ],
+    [
+      "Bootstrap.LLVM",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM.hs"
+    ],
+    [
+      "Bootstrap.Runtime",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-interpreter/Bootstrap/Runtime.hs"
+    ],
+    [
+      "Bootstrap.Separate",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/Separate.hs"
+    ],
+    [
+      "Bootstrap.ImportParameters",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/ImportParameters.hs"
+    ],
+    [
+      "Bootstrap.ArtifactStructure",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/ArtifactStructure.hs"
+    ],
+    [
+      "Bootstrap.LLVM.Library",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Library.hs"
+    ],
+    [
+      "Bootstrap.Evidence",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Evidence.hs"
+    ],
+    [
+      "Bootstrap.EvidenceBoundary",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs"
+    ],
+    [
+      "Bootstrap.Constraint",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Constraint.hs"
+    ],
+    [
+      "Bootstrap.Elaborate",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Elaborate.hs"
+    ],
+    [
+      "Bootstrap.CompilerCore",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/CompilerCore.hs"
+    ],
+    [
+      "Bootstrap.ImportedRoot",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/ImportedRoot.hs"
+    ],
+    [
+      "Bootstrap.Compiler",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Compiler.hs"
+    ],
+    [
+      "Bootstrap.ArtifactStorage",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/ArtifactStorage.hs"
+    ],
+    [
+      "Bootstrap.SourceUnit",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/SourceUnit.hs"
+    ],
+    [
+      "Bootstrap.QueryGraph",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/QueryGraph.hs"
+    ],
+    [
+      "Bootstrap.OpenFragment",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/OpenFragment.hs"
+    ],
+    [
+      "Bootstrap.InferenceUnit",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/InferenceUnit.hs"
+    ],
+    [
+      "Bootstrap.SourceInference",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/SourceInference.hs"
+    ],
+    [
+      "Bootstrap.CrateQuery",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateQuery.hs"
+    ],
+    [
+      "Bootstrap.CrateGraph",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateGraph.hs"
+    ],
+    [
+      "Bootstrap.CrateArtifact",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateArtifact.hs"
+    ],
+    [
+      "Bootstrap.PreparedLibraries",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/PreparedLibraries.hs"
+    ],
+    [
+      "Bootstrap.CrateCodegen",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateCodegen.hs"
+    ],
+    [
+      "Bootstrap.BuiltinPreludeContext",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs"
+    ],
+    [
+      "Bootstrap.BuiltinPreludeLiteral",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs"
+    ],
+    [
+      "Bootstrap.Crate",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/Crate.hs"
+    ],
+    [
+      "Bootstrap.CrateSession",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateSession.hs"
+    ],
+    [
+      "MLF.BuiltinPreludeData",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/BuiltinPreludeData.hs"
+    ],
+    [
+      "MLF.PreparedLibraryData",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/PreparedLibraryData.hs"
+    ],
+    [
+      "MLF.PreparedNativeData",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/PreparedNativeData.hs"
+    ],
+    [
+      "Package.OS",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-package-core/Package/OS.hs"
+    ],
+    [
+      "Package.Json",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-package-core/Package/Json.hs"
+    ],
+    [
+      "MLF.PreparedCompiler",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/PreparedCompiler.hs"
+    ],
+    [
+      "MLF.NativeBuild",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/NativeBuild.hs"
+    ],
+    [
+      "MLF.Entry.Emlf",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs"
+    ],
+    [
+      "Main",
+      "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/host/ghc/app/emlf/Main.hs"
+    ]
+  ],
+  "complete": true,
+  "endpoint_wall_seconds": 155.931809537,
+  "fresh_host_wrapper": 1,
+  "fresh_shared_modules": 90,
+  "fresh_target_module_count": 90,
+  "inputs": {
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/job.json": "97d77bcc8e678cbb3ff3ac859a2fc93e757ae392c4c236259763be6d96d1fb57",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-setup/setup.json": "a7073db2aeb7b3c9232201e1bb60322edeece95eff542940b7bdb280d83b5cf8",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/BuiltinPreludeData.hs": "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/Entry/Emlf.hs": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/NativeBuild.hs": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/PreparedCompiler.hs": "2812caad746141ddb82c21a5dfdc779f1c33ae383ccd08aaa496ebecf8046a51",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/PreparedLibraryData.hs": "eececfa9f5b0ef2901e749b4a1798ac2cf78bea3378d9e33fcbc0a0ded94c6b1",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap/MLF/PreparedNativeData.hs": "908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/host/ghc/app/emlf/Main.hs": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/ArtifactStorage.hs": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/ArtifactStructure.hs": "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/Bitstream.hs": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs": "e8f69d41475c332991f122c765f79cc11cddf708044db859846818dc26ade920",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs": "f3bad10172df0e35b36fc5926cbbfe688e2c6e6603761823d96baee5769e6357",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/Crate.hs": "169a65e03680313755c0bcfe25b462cc96c9b260e077891771785a43a3d7c063",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateArtifact.hs": "da416111adcfafa18eb473ae611379fc1ef521c84d1dab3d2d5a4dc3eb51c6f0",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateCodegen.hs": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateGraph.hs": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateQuery.hs": "504c1da39204fa87c67c2ba1c9ab8e0914b3c41f81f170b85dd7076e0ead9748",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/CrateSession.hs": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/ImportParameters.hs": "e6f840d764e3f07f74fa532b151f8cfb890b7ddb0d1035e062cac299da460954",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/ImportedRoot.hs": "101b25c1acd5a6af94081b1364b16f2461bbd19b50f9df90d6fb9f50c9140dd1",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/InferenceUnit.hs": "ab3bf4aa00ac0c2eea90b4bfc7d35b5430b1ac959187f3e2d99850f1bd35e46e",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/OpenFragment.hs": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/PreparedLibraries.hs": "0b158d893dab7ac0e5037c1b4ead43fa80f03207c597fc1bf5a4498fec249ada",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/QueryGraph.hs": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/Separate.hs": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/SourceEquality.hs": "806297f22ce1d35a02b6db393ecc18771e571a08f13665f981e509358525c6f8",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/SourceInference.hs": "f62f60fdee8d63541f326572d791b7d2c0cb492603bacefd8cd61d4e5b437f3b",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates/Bootstrap/SourceUnit.hs": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Fresh.hs": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Host.hs": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IndexVec.hs": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IntMap.hs": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IntRank.hs": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IntSet.hs": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/IntTree.hs": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Map.hs": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/ST.hs": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Set.hs": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Std.hs": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Types.hs": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Unicode.hs": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation/Bootstrap/Version.hs": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Dependency.hs": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Desugar.hs": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Layout.hs": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Lexer.hs": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Module.hs": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Parsec.hs": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Parser.hs": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Prelude.hs": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Resolved.hs": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Standalone.hs": "31ee00d6ba44ca91b613176f20cc1726b8ff4348b9ac3a101c2e81e96af8e9f5",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend/Bootstrap/Surface.hs": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/ClassDemand.hs": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Classes.hs": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Compiler.hs": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/CompilerCore.hs": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Constraint.hs": "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Elaborate.hs": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Evidence.hs": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph.hs": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph/Solver.hs": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-interpreter/Bootstrap/ProcessHost.hs": "2fcd44e92c3b0a889e7ed16316ed68209f940f357fdb68b049c596f6d3a3dc24",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-interpreter/Bootstrap/Runtime.hs": "a764518838cc7ca32b58a5b13901e542d30b269b50cdcd67bf4a23f5ac4d11f6",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core/Bootstrap/Data.hs": "80545c6378de8e846d3a13df8b5418b8fd7854d011346f12dbfd4c99c47c7558",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core/Bootstrap/Kind.hs": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core/Bootstrap/Kinding.hs": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core/Bootstrap/Primitive.hs": "53a7d3b4c605cd15071a528185ab7252099027feb8c40db23d5dd40ac42e2726",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM.hs": "4ca4c87e0a32932b4d2227b9ff55bd73d34e4f1c5570f027b7e7677fc86d2750",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs": "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Argument.hs": "8d8a897eb4019ad40fe5cb756a30fd8c789e4c745205e654254bbf702d12710b",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Build.hs": "e78bf81269ae16b493f3170d91cd2c451891479aca184a2fa302194b95679e86",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": "d4c94567ae188538e107306e6730206547261aa8c461e87fdb564bcdad7e11db",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs": "46ae5be45d9c6f58a61a1c52856bd11befeb3b6fa4ed7c7b09118a9226948642",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/LazyProducer.hs": "88d750f0671a228da67403a555a43b71054dee8307da88e5070752474e1cf7c8",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Library.hs": "03eac45b9fd31cf625e37cf0e7d245429ca500c19d5717db1eb01b93cadf293d",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Native.hs": "dd5c283b74aa407a7555ad7c5c1793d5b1e8e72bf7bdc61bb946c96aef0ac242",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/Result.hs": "792da71fe323dee4b2497b552c090e38e98f6f51d6997ee9da07286420f1396e",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs": "50c76597138b9fe9c7a4eeba22976f096b513038450c830f4e204059c2a91d9e",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs": "b8e09c8fe3af9f14c7e7b6f6deae008ada04fc84923a41fa5c29d1e16857ed13",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-package-core/Package/Json.hs": "90c6e3ad566b92c01bf58106c27a5d467a52f11586ddad9fa1e44c2a62165604",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-package-core/Package/OS.hs": "ff025ef05b6cb63c5591b756a78b898f50497cc5349bdc5d19812f47a6dadda2",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Check.hs": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Checked.hs": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Parser.hs": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Syntax.hs": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf/Bootstrap/X/Type.hs": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/shared-sources.json": "7264b9d556d1112d6c6883e6a1269ff812c76e4eb6557f6445bc67dd28e031a4",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/a1-private-index/helper.py": "0d11b29419a32fc9832096951aa085cc317c8a304b9db110ee96ba411a4ce7cc",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/full-compiler/qualify.py": "5ec13cc17f2a9a309d6b645c835c99b2c051378a10dd94ca9ed5c3d1dc78d3fe",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tools/performance/full-compiler/worker.py": "71d4739421c3ab4dcf44d4ddfc21fc9a68ec9d07f7e23c59e944712999e6bb3d",
+    "/workspace/scratch/3f83e2ebe290/compiler-baseline-evidence-20261110/workload.json": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a"
+  },
+  "lane": "ghc-native",
+  "native_cli_checks": true,
+  "performance_samples": 0,
+  "producer_receipt_sha256": "b71bbb5ebb757a206ed41932cdafca982f1e7246218496953be273afad5a8caf",
+  "reused_shared_target_modules": 0,
+  "stages": [
+    {
+      "argv": [
+        "/workspace/scratch/3f83e2ebe290/compiler-toolchain-20261110/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-async",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-crates",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-developer-tools",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-foundation",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-frontend",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-inference",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-interpreter",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-language-core",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-llvm",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-package-core",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/libraries/mlf-xmlf",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/bootstrap",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/package",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tests",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/tests/shared",
+        "-i/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/testing",
+        "-odir",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/objects",
+        "-hidir",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/objects",
+        "-rtsopts=ignoreAll",
+        "-o",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/program",
+        "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/host/ghc/app/emlf/Main.hs"
+      ],
+      "exit_code": 0,
+      "name": "source-to-ghc-native",
+      "stderr": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/source-to-ghc-native.stderr",
+      "stdout": "/workspace/scratch/3f83e2ebe290/compiler-baseline-20261110/.mlf-build/baseline-qualification-ghc-native-01/source-to-ghc-native.stdout",
+      "system_seconds": 7.440147,
+      "user_seconds": 148.415633,
+      "wall_seconds": 155.815914475
+    }
+  ],
+  "workload_sha256": "db93d2deffdb38c524636218a6a85dcb7f40dd63c39dd4fe07a50191a2206f9a"
+}

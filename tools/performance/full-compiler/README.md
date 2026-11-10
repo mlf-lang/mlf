@@ -1,5 +1,38 @@
 # Complete compiler endpoints and private projection views
 
+## Current-source qualification
+
+The results below are historical, frozen 81-module workloads. A fresh inventory
+of main `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1` contains **90 shared modules
+and 5,233,364 source bytes**. Changing this inventory does not update or extend
+any historical timing cohort, fresh-group count, or performance claim.
+
+`qualify.py` validates the frozen workload's count and source pins, each source's
+manifest identity and byte count, and an independently traversed complete import
+closure. It no longer assumes that every future compiler contains 81 modules.
+The GHC provenance check still requires exactly the listed target modules and
+the original Main wrapper, freshly compiled once each. Resource caps are unchanged.
+
+When preparing fixed dependencies for this complete endpoint, use
+`compiler-shapes/prepare.py --expose-entry-host`. This exposes `MLF.Host.IO` in
+the **private** package database for the original Main wrapper, while keeping
+the shape workload's default exposure unchanged. It avoids editing package
+registration files after their preparation receipt is written.
+
+The new inventory and setup controls can run without a compiler:
+
+```sh
+python3 -B tools/performance/full-compiler/test_workload.py
+python3 -B tools/performance/full-compiler/test_setup.py
+```
+
+The separate [2026-11-10 cloud qualification and recovery checkpoint](baseline-20261110/README.md)
+records the current attempt: MLF timed out before producing checked artifacts,
+while GHC completed. No complete MLF/GHC ratio was established. In particular,
+the historical 7.157× result linked below is not a measurement of current main.
+
+## Historical complete-compiler study
+
 Follow-up: the [2026-11-02 UTF-8 host fix](../llvm-memory/README.md) resolves the
 LLVM-command memory failure and establishes a complete native MLF/GHC endpoint
 comparison. The observations below remain the original, separate cohort.

@@ -9,6 +9,24 @@ HERE=Path(__file__).resolve().parent
 def pack(xs):return ''.join(str(len(x))+':'+x for x in xs)
 
 
+def validate_inventory(workload):
+    """Accept a frozen complete closure, not one historical module count."""
+    rows=workload['modules'];count=workload['module_count']
+    if workload.get('format')!='full-emlf-source-closure-v1' or workload.get('entry')!='MLF.Entry.Emlf':
+        raise ValueError('unexpected complete compiler workload format or entry')
+    if type(count) is not int or count<=0 or len(rows)!=count:
+        raise ValueError('invalid complete target module count')
+    if len({x['module'] for x in rows})!=count or len({x['source'] for x in rows})!=count:
+        raise ValueError('duplicate complete target module or source')
+    if workload['input_files']!={x['source']:x['sha256'] for x in rows}:
+        raise ValueError('complete target source pins disagree')
+    if workload['source_bytes']!=sum(x['bytes'] for x in rows):
+        raise ValueError('complete target source byte count disagrees')
+    if workload.get('nonshared_imports')!=['MLF.Primitive']:
+        raise ValueError('unexpected complete target external imports')
+    return count
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--workload',type=Path,required=True);p.add_argument('--setup',type=Path,required=True)
@@ -33,12 +51,16 @@ def main():
         H.os.killpg=logged_killpg
     try:
         with H.SerialLock(ROOT/'.mlf-build'):
-            auth=H.authenticate(a.producer,a.producer_source);H.require(set(w['input_files'])=={x['source'] for x in w['modules']} and len(w['modules'])==w['module_count']==81,'exact complete target inventory');H.check_pins(w['input_files'])
-            source=Path(w['modules'][0]['source']).parents[3]
+            auth=H.authenticate(a.producer,a.producer_source);module_count=validate_inventory(w);H.check_pins(w['input_files'])
             # Source root comes from the frozen entry path, not caller search paths.
             entry=next(x for x in w['modules'] if x['module']==w['entry']);source=Path(entry['source']).parents[3]
             H.require((source/'shared-sources.json').is_file(),'frozen checkout source root')
             manifest=H.load(source/'shared-sources.json');known={x['module']:x for x in manifest['modules']};seen=set();outside=set()
+            H.require(len(known)==len(manifest['modules']),'unique shared manifest module identities')
+            for row in w['modules']:
+                H.require(row['module'] in known and row['relative']==known[row['module']]['path'] and
+                    Path(row['source']).resolve()==(source/row['relative']).resolve() and
+                    Path(row['source']).stat().st_size==row['bytes'],'exact complete target source identity')
             def visit(name):
                 if name in seen:return
                 if name not in known:outside.add(name);return
@@ -46,7 +68,7 @@ def main():
                 for n in re.findall(r'(?m)^\s*import\s+(?:qualified\s+)?([A-Z][\w.]*)',(source/known[name]['path']).read_text()):visit(n)
             visit(w['entry']);H.require(seen=={x['module'] for x in w['modules']} and outside=={'MLF.Primitive'},'independent current complete import closure')
             roots=[str(source/x) for x in manifest['source_roots'] if x!='host/ghc'];wrapper=source/'host/ghc/app/emlf/Main.hs'
-            inputs={**w['input_files'],**{str(x):H.sha(x) for x in [a.workload.resolve(),a.setup.resolve(),Path(__file__),HERE/'worker.py',hp,wrapper]}}
+            inputs={**w['input_files'],**{str(x):H.sha(x) for x in [a.workload.resolve(),a.setup.resolve(),Path(__file__),HERE/'worker.py',hp,wrapper,source/'shared-sources.json']}}
             job={'lane':a.lane,'output':str(out),'setup':setup,'producer':str(a.producer.resolve()),'source_roots':roots,'wrapper':str(wrapper)}
             if a.lane in ['mlf-checked','mlf-native']:
                 queries=out/'queries';queries.mkdir()
@@ -56,7 +78,7 @@ def main():
                 H.require(a.checked_prefix is not None,'checked input for LLVM-only qualification');job['checked_prefix']=str(a.checked_prefix.resolve())
                 for suffix in ['.mlfci','.mlfco']:inputs[str(a.checked_prefix.resolve())+suffix]=H.sha(str(a.checked_prefix)+suffix)
             else:(out/'objects').mkdir()
-            H.save(out/'job.json',job);inputs[str(out/'job.json')]=H.sha(out/'job.json');record.update(inputs=inputs,producer_receipt_sha256=H.sha(a.producer/'receipt.json'));save()
+            H.save(out/'job.json',job);inputs[str(out/'job.json')]=H.sha(out/'job.json');record.update(inputs=inputs,producer_receipt_sha256=H.sha(a.producer/'receipt.json'),fresh_target_module_count=module_count);save()
             cmd=[sys.executable,'-B',ROOT/'tools/performance/process-spawn/with_scope.py',sys.executable,'-B',HERE/'worker.py','--job',out/'job.json']
             result=H.Runner(out,limits).run(cmd,source,out/'command',timed=True);record['commands'].append(result);save()
             stages=H.load(out/'stages.json');H.require(stages['complete'] and all(x['exit_code']==0 for x in stages['stages']),'complete endpoint stages');record['stages']=stages['stages']
@@ -69,7 +91,7 @@ def main():
                 for name,path in re.findall(r'Compiling\s+([\w.]+)\s+\(\s*([^,\n]+),',log):
                     resolved=Path(path.strip());resolved=resolved if resolved.is_absolute() else out/resolved;actual.append((name,str(resolved.resolve())))
                 expected={x['module']:x['source'] for x in w['modules']};expected['Main']=str(wrapper)
-                H.require(len(actual)==len(expected) and dict(actual)==expected,'exactly 81 fresh shared modules plus the 5-line host entry wrapper');record.update(fresh_shared_modules=81,fresh_host_wrapper=1,reused_shared_target_modules=0,compiled=actual)
+                H.require(len(actual)==len(expected) and dict(actual)==expected,'exact complete fresh shared closure plus the host entry wrapper');record.update(fresh_shared_modules=module_count,fresh_host_wrapper=1,reused_shared_target_modules=0,compiled=actual)
             if a.lane.endswith('native'):
                 for name,args in [('version',['--version']),('identity',['--implementation-identity'])]:
                     check=H.Runner(out,limits).run([out/'program',*args],source,out/name);record['commands'].append(check)

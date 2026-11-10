@@ -1,0 +1,81 @@
+{
+  "base_versions": {
+    "cc": "cc (Debian 14.2.0-19) 14.2.0",
+    "glibc": "ldd (Debian GLIBC 2.41-12+deb13u4) 2.41",
+    "gmp": "6.3.0",
+    "ld": "GNU ld (GNU Binutils for Debian) 2.44"
+  },
+  "clang_version": "Debian clang version 19.1.7 (3+b1)",
+  "debian_index": {
+    "sha256": "7778d3e3f303b7ddb8ce0fe7c8d57473a076c6bf2e8f241f75421d2396352498",
+    "url": "https://deb.debian.org/debian/dists/trixie/main/binary-amd64/Packages.xz"
+  },
+  "debian_packages": [
+    {
+      "package": "libgc-dev",
+      "sha256": "f448fae874b4824b486fcb3dab8c1fff4235a129334fa7a556f97e37aa7bc29f",
+      "url": "https://deb.debian.org/debian/pool/main/libg/libgc/libgc-dev_8.2.8-1_amd64.deb",
+      "version": "1:8.2.8-1"
+    },
+    {
+      "package": "libgc1",
+      "sha256": "0279fc16692a3a4a6d5f84051f5e55fc721f3cbb0e2bbc052d8980888f18c698",
+      "url": "https://deb.debian.org/debian/pool/main/libg/libgc/libgc1_8.2.8-1_amd64.deb",
+      "version": "1:8.2.8-1"
+    },
+    {
+      "package": "clang-19",
+      "sha256": "bbb74458d782b7792b61b0eed92746df5e6d033778c045cf8c2b3835b7c4efc4",
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/clang-19_19.1.7-3+b1_amd64.deb",
+      "version": "1:19.1.7-3+b1"
+    },
+    {
+      "package": "libclang-common-19-dev",
+      "sha256": "4018e40e2d4144fe38c45822e68cca63c1bf6c7872c3073ebb262ad4b2f9b8bc",
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libclang-common-19-dev_19.1.7-3+b1_amd64.deb",
+      "version": "1:19.1.7-3+b1"
+    },
+    {
+      "package": "libclang-cpp19",
+      "sha256": "a7d2b6df51050834f6ea5c0d5e34869c2298b0bcdaa91eff17ba3db2cd545c47",
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libclang-cpp19_19.1.7-3+b1_amd64.deb",
+      "version": "1:19.1.7-3+b1"
+    },
+    {
+      "package": "libclang1-19",
+      "sha256": "4e7e2a5fe236e280d32fb529350b3c1cfd9410a964629a57ea079a314c45d7a3",
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libclang1-19_19.1.7-3+b1_amd64.deb",
+      "version": "1:19.1.7-3+b1"
+    },
+    {
+      "package": "libllvm19",
+      "sha256": "db0d614d61345ca710fb73e75105f1ec6e38898fa7b3aa99fa7eb7d8b0a11d57",
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/libllvm19_19.1.7-3+b1_amd64.deb",
+      "version": "1:19.1.7-3+b1"
+    },
+    {
+      "package": "llvm-19-linker-tools",
+      "sha256": "874a0a5cde797cda3e94e9310a0a9958608f526f177637414a8ce9620c804818",
+      "url": "https://deb.debian.org/debian/pool/main/l/llvm-toolchain-19/llvm-19-linker-tools_19.1.7-3+b1_amd64.deb",
+      "version": "1:19.1.7-3+b1"
+    },
+    {
+      "package": "libnuma-dev",
+      "sha256": "7fea9248b09311b008dc6707c201671e7b14ce5f9278dda4694e726990897436",
+      "url": "https://deb.debian.org/debian/pool/main/n/numactl/libnuma-dev_2.0.19-1_amd64.deb",
+      "version": "2.0.19-1"
+    },
+    {
+      "package": "libz3-4",
+      "sha256": "71383373523ef62d47eccf660cf6535c3febcbb3f88e54cb7a43124014b57359",
+      "url": "https://deb.debian.org/debian/pool/main/z/z3/libz3-4_4.13.3-1_amd64.deb",
+      "version": "4.13.3-1"
+    }
+  ],
+  "ghc": {
+    "sha256": "60f7ab75f28df892729fbaff3a54f58ee3ad7e731929f1b2f3eb0208f73de841",
+    "url": "https://downloads.haskell.org/~ghc/9.14.1/ghc-9.14.1-x86_64-deb12-linux.tar.xz",
+    "version": "9.14.1"
+  },
+  "note": "Packages were downloaded over HTTPS from the official Debian archive and checked against its package-index SHA256. The GHC archive hash matches the repository-pinned CI value. No user computer or global package database was modified."
+}
