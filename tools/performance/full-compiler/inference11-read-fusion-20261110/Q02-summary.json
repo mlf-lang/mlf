@@ -1,0 +1,56 @@
+{
+  "format": "inference11-qualification-summary-v1",
+  "phase": "Q",
+  "formal_cohort": false,
+  "full90": false,
+  "ghc_ratio": false,
+  "complete": true,
+  "failed_launch_q01_preserved": true,
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "target_modules": 11,
+  "target_source_bytes": 515309,
+  "fixed_dependencies": 5,
+  "order": [
+    "A",
+    "B"
+  ],
+  "outer_seconds": 212.28303002500252,
+  "outer_peak_rss_bytes": 400506880,
+  "final_outer_rss_bytes": 0,
+  "input_pins_rechecked": 421,
+  "output_pins_rechecked": 8,
+  "all_child_terminal_live_descendants": [],
+  "orchestration_locks_independently_reacquired": true,
+  "runtime_mapping_before_after_equal": true,
+  "postexit_runtime_files_rechecked": true,
+  "controller_sha256": "363067f5d136250bd382d9bfd77234882123e22acc2d8482dedcdc0aafcfd68e",
+  "launcher_sha256": "0f7aafbcc2113b69b99be74c0391ee5636114c88c14e0ca6d10ab2904e339215",
+  "handoff_sha256": "59f8c404b5f9f1ae9d4b572528f9d696557b0fdffa9e133724047646e2cfdc56",
+  "outer_receipt_sha256": "283634479600c3404148bef7cbeb6cb2fd499aff52a6e6e5853489c8dea8ecf6",
+  "work_receipt_sha256": "8cb2e8d3a43583b9a688a3784c64417de6e28ba33d325d3f0d4d1b4d201fc840",
+  "legs": [
+    {
+      "side": "A",
+      "wall_seconds": 107.052748211,
+      "user_seconds": 102.468374,
+      "system_seconds": 4.679087,
+      "fresh_groups": 780,
+      "reused_groups": 0,
+      "raw_three_equal_historical_B2": true,
+      "query_lock_reacquired": true,
+      "interface_checked": true
+    },
+    {
+      "side": "B",
+      "wall_seconds": 101.709313582,
+      "user_seconds": 98.78376,
+      "system_seconds": 3.267152,
+      "fresh_groups": 780,
+      "reused_groups": 0,
+      "raw_three_equal_historical_B2": true,
+      "query_lock_reacquired": true,
+      "interface_checked": true
+    }
+  ],
+  "scope": "source-to-checked diagnostic inference library; dependency construction, LLVM and native linking excluded; new target/query per leg; no cache normalization; no automatic cohort"
+}

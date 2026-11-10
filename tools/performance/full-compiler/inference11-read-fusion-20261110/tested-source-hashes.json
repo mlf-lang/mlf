@@ -1,0 +1,12 @@
+{
+  "actual_private_tested_files": {
+    "run.py": "363067f5d136250bd382d9bfd77234882123e22acc2d8482dedcdc0aafcfd68e",
+    "run-phase.sh": "0f7aafbcc2113b69b99be74c0391ee5636114c88c14e0ca6d10ab2904e339215",
+    "run-phase-v1.sh": "4426e0a706f69d65c502386c7f214bf3f29973ad1871cc06cc50a6df8df28668",
+    "workload.json": "d3b0795eaeb995a4a1be9f0926632e335867cc2c411807c1296018bae47a2775",
+    "REVIEW.md": "5184e026273433969f285ec7b0e8e926dfe02320071a12e0141e50f669297333"
+  },
+  "published_run_py_exact": true,
+  "published_launcher_changed_and_unexecuted": true,
+  "workload_template_is_not_authenticated_runtime_manifest": true
+}

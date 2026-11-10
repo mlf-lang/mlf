@@ -1,0 +1,16 @@
+{
+  "format": "inference11-launch-failure-summary-v1",
+  "complete": false,
+  "elapsed_seconds": 4.425634008999623,
+  "compiler_executed": false,
+  "target_legs": [],
+  "reason": "bare python3 passed to os.execv in original with_scope; no PATH search",
+  "exit_code": 1,
+  "final_sampled_rss_bytes": 0,
+  "both_locks_independently_reacquired": true,
+  "failed_launcher_sha256": "4426e0a706f69d65c502386c7f214bf3f29973ad1871cc06cc50a6df8df28668",
+  "outer_receipt_sha256": "407259f2521d40d66341ce25d457acd0543ddae09bb67b5714378f754527aab4",
+  "startup_log_sha256": "ad9e8ad5c12e10ee607558c551a5e3c03b520e65982d5f8d066ac00a1c603f17",
+  "retry_automatic": false,
+  "subsequent_action": "minimal reviewed absolute-Python launcher correction; fresh Q02 separately admitted"
+}

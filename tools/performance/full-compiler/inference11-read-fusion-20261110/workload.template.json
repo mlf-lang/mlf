@@ -1,0 +1,226 @@
+{
+  "format": "frozen-inference11-v1",
+  "status": "design-only; no execution admission",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "crate_identity": "fresh-split/compiler90/mlf-inference",
+  "module_count": 11,
+  "module_bytes": 515309,
+  "modules": [
+    {
+      "bytes": 17441,
+      "module": "Bootstrap.ClassDemand",
+      "relative": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+      "sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/ClassDemand.hs"
+    },
+    {
+      "bytes": 120915,
+      "module": "Bootstrap.Classes",
+      "relative": "libraries/mlf-inference/Bootstrap/Classes.hs",
+      "sha256": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Classes.hs"
+    },
+    {
+      "bytes": 7821,
+      "module": "Bootstrap.Compiler",
+      "relative": "libraries/mlf-inference/Bootstrap/Compiler.hs",
+      "sha256": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Compiler.hs"
+    },
+    {
+      "bytes": 3354,
+      "module": "Bootstrap.CompilerCore",
+      "relative": "libraries/mlf-inference/Bootstrap/CompilerCore.hs",
+      "sha256": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/CompilerCore.hs"
+    },
+    {
+      "bytes": 53972,
+      "module": "Bootstrap.Constraint",
+      "relative": "libraries/mlf-inference/Bootstrap/Constraint.hs",
+      "sha256": "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Constraint.hs"
+    },
+    {
+      "bytes": 31616,
+      "module": "Bootstrap.Elaborate",
+      "relative": "libraries/mlf-inference/Bootstrap/Elaborate.hs",
+      "sha256": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Elaborate.hs"
+    },
+    {
+      "bytes": 14164,
+      "module": "Bootstrap.Evidence",
+      "relative": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Evidence.hs"
+    },
+    {
+      "bytes": 20210,
+      "module": "Bootstrap.EvidenceBoundary",
+      "relative": "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs",
+      "sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs"
+    },
+    {
+      "bytes": 137874,
+      "module": "Bootstrap.Graph",
+      "relative": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph.hs"
+    },
+    {
+      "bytes": 8741,
+      "module": "Bootstrap.Graph.IndexStore",
+      "relative": "libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs",
+      "sha256": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs"
+    },
+    {
+      "bytes": 99201,
+      "module": "Bootstrap.Graph.Solver",
+      "relative": "libraries/mlf-inference/Bootstrap/Graph/Solver.hs",
+      "sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+      "source": "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph/Solver.hs"
+    }
+  ],
+  "direct_dependencies": [
+    {
+      "name": "builtin",
+      "prefix": "${WORKSPACE}/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin",
+      "files": [
+        {
+          "path": "${WORKSPACE}/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin.mlfci",
+          "bytes": 40417,
+          "sha256": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05"
+        },
+        {
+          "path": "${WORKSPACE}/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin.mlfco",
+          "bytes": 190840,
+          "sha256": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481"
+        }
+      ]
+    },
+    {
+      "name": "mlf-foundation",
+      "prefix": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-foundation/unit",
+      "files": [
+        {
+          "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-foundation/unit.mlfci",
+          "bytes": 338115,
+          "sha256": "eee22ef2c122ca410196a11591271aeff369be9aefa226dcd13028cd43729425"
+        },
+        {
+          "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-foundation/unit.mlfco",
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        }
+      ]
+    },
+    {
+      "name": "mlf-frontend",
+      "prefix": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-frontend/unit",
+      "files": [
+        {
+          "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-frontend/unit.mlfci",
+          "bytes": 382389,
+          "sha256": "d10fe8cf07a53986ab1f09003e947847f990035f0f298538161004f4bc1d0cda"
+        },
+        {
+          "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-frontend/unit.mlfco",
+          "bytes": 2243823,
+          "sha256": "4f2b4c6a79738cedcd6015d1244e47d572b5ef005a3798cba3c1b44bbfd6d96f"
+        }
+      ]
+    },
+    {
+      "name": "mlf-language-core",
+      "prefix": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-language-core/unit",
+      "files": [
+        {
+          "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-language-core/unit.mlfci",
+          "bytes": 31946,
+          "sha256": "e35bd09025b4ee7c879dcc6c3b272ca6f76d8700acde49021d5b4203fd087b07"
+        },
+        {
+          "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-language-core/unit.mlfco",
+          "bytes": 354971,
+          "sha256": "2169ea5cf023a010a8657c7fe49eb2236ffefb83fbf4e3ef31eb23de43b5c2ca"
+        }
+      ]
+    },
+    {
+      "name": "mlf-xmlf",
+      "prefix": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-xmlf/unit",
+      "files": [
+        {
+          "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-xmlf/unit.mlfci",
+          "bytes": 80467,
+          "sha256": "72b085f7c067d1779c2afed8b9703f69c2f53b782ab3b6399fcddcc652829691"
+        },
+        {
+          "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-xmlf/unit.mlfco",
+          "bytes": 549528,
+          "sha256": "31f7768dc8ff2728128aa2e7420d5ab6492d85c39346622560c7fb80822a3d6b"
+        }
+      ]
+    }
+  ],
+  "builtin_prefix": "${WORKSPACE}/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin",
+  "original_spec": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-inference/crate.spec",
+  "reference_artifacts": [
+    {
+      "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-inference/unit.mlfci",
+      "bytes": 380913,
+      "sha256": "5ceb3d6c75c53d972f7af57e976ff2208c1d24132831401ed33626c81b6dbf24"
+    },
+    {
+      "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-inference/unit.mlfco",
+      "bytes": 2549913,
+      "sha256": "24b84aa8c1390c94a213d16569a5a35f1c409f39bb87339db52142c474ada9ef"
+    },
+    {
+      "path": "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-inference/unit.queries",
+      "bytes": 1241210,
+      "sha256": "0f5921121410a3224b33606fe0e29bb45999dc0ead4df5f7ab753e6b04c8ad13"
+    }
+  ],
+  "expected_fresh_groups": 780,
+  "expected_reused_groups": 0,
+  "raw_byte_equality_required": [
+    ".mlfci",
+    ".mlfco",
+    ".queries"
+  ],
+  "historical_capacity_seconds": 99.03903515,
+  "historical_capacity_is_paired_sample": false,
+  "input_pins": {
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/partial-inventory.json": "1bcbf9722edb2cac4d8a15e31067153f2f60d014284c75da3f4fc58e216cdd9a",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-inference/crate.spec": "5b7f9eba769ab06761a911a3b1aede4fb2e7755ba92cecede1d3b62f57694f4e",
+    "${WORKSPACE}/compiler-baseline-20261110/.mlf-build/baseline-setup/setup.json": "a7073db2aeb7b3c9232201e1bb60322edeece95eff542940b7bdb280d83b5cf8",
+    "${WORKSPACE}/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin.mlfci": "cb7140bce683550c8b16dcc189fc8c582b64eaac9b91da4d6b9b3a9ed2d66c05",
+    "${WORKSPACE}/compiler-baseline-20261110/.mlf-build/baseline-setup/builtin.mlfco": "476df4e37a9306a2e5a20f109b7ca499e0296101e464c9b624e1fc51e4248481",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-foundation/unit.mlfci": "eee22ef2c122ca410196a11591271aeff369be9aefa226dcd13028cd43729425",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-foundation/unit.mlfco": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-frontend/unit.mlfci": "d10fe8cf07a53986ab1f09003e947847f990035f0f298538161004f4bc1d0cda",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-frontend/unit.mlfco": "4f2b4c6a79738cedcd6015d1244e47d572b5ef005a3798cba3c1b44bbfd6d96f",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-language-core/unit.mlfci": "e35bd09025b4ee7c879dcc6c3b272ca6f76d8700acde49021d5b4203fd087b07",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-language-core/unit.mlfco": "2169ea5cf023a010a8657c7fe49eb2236ffefb83fbf4e3ef31eb23de43b5c2ca",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-xmlf/unit.mlfci": "72b085f7c067d1779c2afed8b9703f69c2f53b782ab3b6399fcddcc652829691",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-xmlf/unit.mlfco": "31f7768dc8ff2728128aa2e7420d5ab6492d85c39346622560c7fb80822a3d6b",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-inference/unit.mlfci": "5ceb3d6c75c53d972f7af57e976ff2208c1d24132831401ed33626c81b6dbf24",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-inference/unit.mlfco": "24b84aa8c1390c94a213d16569a5a35f1c409f39bb87339db52142c474ada9ef",
+    "${WORKSPACE}/compiler-backend-20261110/.mlf-build/fresh-split-compiler90-01/targets/mlf-inference/unit.queries": "0f5921121410a3224b33606fe0e29bb45999dc0ead4df5f7ab753e6b04c8ad13",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/ClassDemand.hs": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Classes.hs": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Compiler.hs": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/CompilerCore.hs": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Constraint.hs": "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Elaborate.hs": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Evidence.hs": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph.hs": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41",
+    "${WORKSPACE}/compiler-baseline-20261110/libraries/mlf-inference/Bootstrap/Graph/Solver.hs": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612"
+  }
+}
