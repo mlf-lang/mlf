@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 13,
-  "observed_at_utc": "2026-11-10T16:53:28Z",
+  "revision": 14,
+  "observed_at_utc": "2026-11-10T17:45:25Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -350,16 +350,149 @@
       "statistical_caveat": "Four observations per side, noticeable variation, one complete cohort; do not extrapolate21.9 percent less wall time to the full compiler.",
       "remote_checkpoint": "9c9d2fe08afcbca11774279d269286ed4deda118",
       "raw_persisted_remotely": false
+    },
+    "f3_normal_producer": {
+      "status": "passed",
+      "wall_seconds": 317.4046,
+      "shared_modules": 137,
+      "host_modules": 4,
+      "executables": 13,
+      "all_fresh_forced_recompilation": true,
+      "original_builtin_check_candidate_passed": true,
+      "original_builtin_fresh_literal_passed": true,
+      "fresh_literal_bytes": 2220407,
+      "canonical_change": "Only official source-identity string. Exact inverse replacement restores baseline canonical bytes; full actual fresh-generator output equals new canonical.",
+      "source_changes": [
+        "Bootstrap.Graph saturated read call-site beta expansion",
+        "MLF.BuiltinPreludeData official generated source-identity field"
+      ],
+      "original_builder_and_verifier_unchanged": true,
+      "supervisor": "Existing source-authenticated resource_watchdog tracks PPID descendants and PID start identity across sessions.",
+      "peak_tree_rss_gb": 1.1,
+      "post_input_pins": 202,
+      "cli_and_positive_negative_semantics_passed": true,
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "handoff_sha256": "59f8c404b5f9f1ae9d4b572528f9d696557b0fdffa9e133724047646e2cfdc56",
+      "remote_checkpoint": "7f580a7087266f27d928196add2ea5e44fc79952",
+      "remote_tree": "b890098711bf81d1106558a0ec484557b744b613",
+      "remote_verification": "Branch, full tree and all five file contents including canonical were read back byte-for-byte; no local fetch during measurement quiet window.",
+      "raw_receipts_or_binary_persisted_remotely": false
+    },
+    "inference11_qualification": {
+      "status": "passed",
+      "attempt": 2,
+      "whole_scope_seconds": 212.283,
+      "baseline_compile_seconds": 107.053,
+      "candidate_compile_seconds": 101.709,
+      "performance_cohort_sample": false,
+      "target_modules": 11,
+      "target_source_bytes": 515309,
+      "fresh_groups_per_leg": 780,
+      "reused_groups_per_leg": 0,
+      "raw_outputs_equal": [
+        "unit.mlfci",
+        "unit.mlfco",
+        "unit.queries"
+      ],
+      "oracle": "Each leg byte-for-byte equals historical fixed B2 outputs and the other leg.",
+      "input_pins": 421,
+      "output_pins": 8,
+      "runtime_postcheck_passed": true,
+      "completed_commands": 18,
+      "peak_tree_rss_mb": 400.5,
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "outer_receipt_sha256": "283634479600c3404148bef7cbeb6cb2fd499aff52a6e6e5853489c8dea8ecf6",
+      "work_receipt_sha256": "8cb2e8d3a43583b9a688a3784c64417de6e28ba33d325d3f0d4d1b4d201fc840",
+      "failed_attempt_01": "4.426s launcher failure before controller or target execution: bare python3 was passed to os.execv. Original failure retained; independently reviewed absolute-Python repair admitted as new Q02.",
+      "controller_sha256": "363067f5d136250bd382d9bfd77234882123e22acc2d8482dedcdc0aafcfd68e",
+      "launcher_sha256": "0f7aafbcc2113b69b99be74c0391ee5636114c88c14e0ca6d10ab2904e339215"
+    },
+    "inference11_cohort": {
+      "status": "complete_no_speedup_supported",
+      "attempt": 1,
+      "order": "ABBA",
+      "total_guard_seconds": 600,
+      "per_compile_guard_seconds": 180,
+      "extra_warmups": 0,
+      "complete": true,
+      "total_scope_seconds": 462.613,
+      "wall_seconds": [
+        96.666402,
+        151.642281,
+        104.524868,
+        104.961783
+      ],
+      "wait4_user_seconds": [
+        93.38788,
+        153.728915,
+        101.349673,
+        101.551
+      ],
+      "wait4_system_seconds": [
+        3.584719,
+        4.775379,
+        3.233474,
+        3.54831
+      ],
+      "individual_peak_rss_mb": [
+        380.09,
+        361.9,
+        361.63,
+        380.18
+      ],
+      "candidate_over_baseline_median": 1.270493,
+      "candidate_over_baseline_geometric_mean": 1.249875,
+      "observations_per_side": 2,
+      "all_samples_retained": true,
+      "raw_outputs_equal_historical_and_each_other": true,
+      "fresh_groups_per_leg": 780,
+      "reused_groups_per_leg": 0,
+      "show_crate_and_query_lock_checks_passed": true,
+      "input_pins": 423,
+      "output_pins": 16,
+      "runtime_postcheck_passed": true,
+      "completed_commands": 22,
+      "terminal_live_descendants": [],
+      "both_locks_verified_free": true,
+      "peak_tree_rss_mb": 404.6,
+      "lowest_available_ram_gb": 9.194,
+      "lowest_disk_free_gb": 48.334,
+      "peak_output_mb": 114.88,
+      "outer_receipt_sha256": "2708239e20b1af91f428892e412259d589a01d1220a29c94db5010753d3c86b2",
+      "work_receipt_sha256": "ecfd8d9fec6d6096f55776dec188a6da81a81fb41f4b888e4fa73818b8f43218",
+      "interpretation": "This complete small cohort does not support real compilation speedup. Candidate's slow leg also has greater recorded user CPU. Cause is unknown: throttling, CPU frequency and host competition were not measured. No sample deletion, replacement, extra run or full90 follow-on.",
+      "scope": "Only fixed original-source inference11 source-to-checked, not full90, native-host or MLF/GHC ratio.",
+      "safe_remote_checkpoint": null
+    },
+    "static_followups": {
+      "rebinding_map": {
+        "status": "not_queued",
+        "reason": "Full final-map reconstruction is only 0.321% profiled ticks and 0.520% allocated bytes. Reuse also risks lazy demand order and repair of inconsistent cached trie sizes; no implementation or tests."
+      },
+      "serialization": {
+        "status": "not_queued",
+        "reason": "Current QueryGraph already retains encoded bytes and reuses applicable hashes/contracts. Same-value datatype double encoding covers only about 0.17–0.19% profiled ticks for one side; no broad repeated-payload opportunity."
+      },
+      "crc": {
+        "status": "static_lead_only",
+        "reason": "Ordinary code contains a forced lazy advanceCRC result, but its old profiled self cost is only 0.50%; no candidate, codegen gate or speed claim."
+      },
+      "ghc_nursery": {
+        "status": "remote_read_only_preparation",
+        "reason": "Builder uses ignoreAll with no nursery override; GHC9.14.1 defaults A=4MiB. Compiled-in RTS options can coexist with ignoreAll, but no ordinary GC/allocation counters exist. First investigate ordinary statistics, not a tuning candidate or native claim."
+      }
     }
   },
   "tasks": [
     {
       "id": "B0",
       "role": "baseline and evidence",
-      "status": "MLF timeout; GHC qualified",
+      "status": "Q02 and fixed C01 complete; C01 does not support real inference11 speedup",
       "branch": "codex/full-compiler-baseline-20261110",
       "remote_commit": "305914c90e8fdff3a912faa6b93c08146273cf3e",
-      "next": "Prepare reviewed original-name Graph ordinary O2 codegen gate. Do not mix renamed semantic oracle objects or stale reverse dependencies into a claimed complete producer.",
+      "next": "Persist all four samples and exact oracle evidence; read-only execution/provenance investigation. No automatic repeat, full90 or paused native campaign.",
       "recovery_readme": "https://github.com/mlf-lang/mlf/blob/305914c90e8fdff3a912faa6b93c08146273cf3e/tools/performance/full-compiler/baseline-20261110/README.md"
     },
     {
@@ -376,7 +509,7 @@
         "total_controls": 2,
         "native_expected_stdout": "backend λ\n42\n"
       },
-      "next": "Independently review F2 Graph-only production candidate; no backend diagnostic without full current input.",
+      "next": "Independent review and exact artifact/provenance cross-checking; no concurrent local work during timing.",
       "remote_tree": "49d13cd1daa6926b8876acf157eef28369b79e33",
       "persistence_scope": "Smoke source, runnable recovery script and public result summary verified by fetch/tree/readback; no raw receipts or LLVM body. Hashes identify but cannot recover missing evidence; rerun qualification if local receipts are lost."
     },
@@ -421,7 +554,7 @@
       ],
       "transform_sha256": "0d2b37392d28e51b97377501146321ad6ebd7ec3ed1482c5b8e6f50e2a48717d",
       "remote_commit": null,
-      "next": "Review stable ordinary codegen gate; no extra diagnostic run or production owner changes."
+      "next": "Independent source, guard and inference11 controller review; no local work during timing."
     },
     {
       "id": "M0_M1",
@@ -510,7 +643,7 @@
       "baseline": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
       "candidate_sha256": "fdb9e899392ac0068f9f11432d512d1168934455a6da733a10e7cabb52d19df3",
       "mechanism": "Only54 saturated internal readDense calls in34 functions are beta-expanded to readSTArray array(identity-low), preserving helpers, partial applications, writes, flags and all validation. F2 patch excluded.",
-      "status": "Semantic and representative codegen gates passed; one complete ordinary Graph harness cohort shows lower wall time; whole compiler benefit unmeasured",
+      "status": "Correctness, codegen and Graph harness benefit established; full producer qualified; real inference11 C01 does not support speedup",
       "remote_commit": "9c9d2fe08afcbca11774279d269286ed4deda118",
       "semantic_gate": {
         "optimizations": [
@@ -530,7 +663,7 @@
         "scope": "Same original Bootstrap.Graph module name and ordinary O2 flags on both sides; original authenticated object as third anchor. Actual caller allocations and moved closures must be inspected.",
         "remote_commit": "d79f7492c3b051d4cc14c1e2ae594d86a31f852e"
       },
-      "next": "Prepare normal full ordinary candidate producer with own receipt and normal reverse-dependency recompilation, then a separately admitted frozen-f9 inference11 source-to-checked slice. No producer build or slice execution yet.",
+      "next": "Hold out of performance integration. Preserve measured code and all results. Investigate ordinary execution evidence before proposing another independent measurement.",
       "recovery_readme": "https://github.com/mlf-lang/mlf/blob/9c9d2fe08afcbca11774279d269286ed4deda118/tools/performance/graph-read-fusion/README.md",
       "persistence_scope": "Eight files: production patch, reversible54-site manifest/script, tested controls/runner, sanitized summary and README; raw receipts remain local.",
       "source_semantic_checkpoint": "7d03b4c6278317f743311392d5d4cc3606ab1bc0",
@@ -548,6 +681,16 @@
         "toolchain_not_reauthenticated": true,
         "caveat": "Not a byte-pinned full operating system; no claim of reproducing the old unrecorded LD environment."
       }
+    },
+    {
+      "id": "F3_PRODUCER",
+      "role": "Complete ordinary producer; frontend owns, backend reviews",
+      "status": "built, qualified and publicly saved",
+      "branch": "perf/graph-read-producer-20261110",
+      "remote_commit": "7f580a7087266f27d928196add2ea5e44fc79952",
+      "remote_tree": "b890098711bf81d1106558a0ec484557b744b613",
+      "recovery_readme": "https://github.com/mlf-lang/mlf/blob/7f580a7087266f27d928196add2ea5e44fc79952/tools/performance/graph-read-fusion/producer-plan.md",
+      "persistence_scope": "Five files: tested wrapper, plan, sanitized result, README and canonical generated source. Full remote tree and bytes verified. Large producer, full receipts and runtime artifacts must be rebuilt/requalified if missing."
     }
   ],
   "restart_required": [
@@ -563,7 +706,7 @@
   "resource_token_at_observation": {
     "state": "free",
     "task": null,
-    "restart_caveat": "Recheck actual receipts, processes and locks after restart."
+    "restart_caveat": "Recheck actual processes, receipts and locks before using a new machine window."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -595,16 +738,22 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Prepare an honest complete candidate producer and exact-f9 inference11 real compilation slice. Three public artifacts initially require byte equality; no ordinary full compiler speedup or complete current MLF/GHC ratio yet.",
+  "next_priority": "Preserve complete negative/variable real-compilation result and determine a useful next measurement. Ordinary GC statistics are not yet available; no tuning or repeat measurement is pre-authorized.",
   "next_real_compile_gate": {
-    "status": "preparation only",
+    "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
     "module_count": 11,
     "historical_groups": 780,
     "historical_seconds_capacity_only": 99.039,
     "expected_public_artifact_oracle": "Raw .mlfci, .mlfco and .queries byte equality, with original crate id/source/dependency paths/order. Cache-generation metadata is not cross-producer oracle.",
     "correction": "Legacy Q.queryKey reasoning was withdrawn after verifying current QueryGraph rawNode hash reports content only; no preemptive normalization is allowed.",
-    "candidate_producer": "Normal full manifest GHC --make -fforce-recomp and a new honest receipt; no Graph-only object swap mixed with stale Solver/Constraint objects.",
-    "paused_campaigns": "Native generation A/B and fixed-point remain paused."
+    "candidate_producer": "Fresh complete original build with verified Graph change plus official canonical identity field; actual fresh-generator raw-byte validation passed.",
+    "paused_campaigns": "Native generation A/B and fixed-point remain paused.",
+    "workload_sha256": "d3b0795eaeb995a4a1be9f0926632e335867cc2c411807c1296018bae47a2775",
+    "qualification_total_guard_seconds": 420,
+    "cohort_total_guard_seconds": 600,
+    "per_leg_guard_seconds": 180,
+    "order": "ABBA",
+    "no_extra_warmups": true
   }
 }
