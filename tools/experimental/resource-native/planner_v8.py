@@ -88,9 +88,12 @@ class Block:
 
 
 class Planner:
-    def __init__(self, fragment, *, data_groups=False):
+    def __init__(self, fragment, *, data_groups=False, reuse_int_branches=False):
         require(type(data_groups) is bool, 'data_groups must be a boolean')
         self.data_groups = data_groups
+        require(type(reuse_int_branches) is bool, 'reuse_int_branches must be a boolean')
+        self.reuse_int_branches = reuse_int_branches
+        self.branch_owner_reuse = []
         self.group_map = []
         self.knot_map = []
         self.knot_depth = 0
@@ -1146,6 +1149,25 @@ class Planner:
         return Reference(out,typ)
 
     def delayed(self,node,path,env,views,home,block,kind,scope=None):
+        # Opt-in only: a plain Int variable already denotes an owned lazy value.
+        # Retain its complete original owner/Access instead of wrapping it in
+        # another thunk. Never force, substitute, clone or inline its RHS.
+        if self.reuse_int_branches and node['tag'] == 'var':
+            self.tick()
+            ref = env.get(node['name']['id'])
+            if isinstance(ref, Reference) and ref.logical == SCALARS['Int']:
+                require(kind in ('conditional-then', 'conditional-else'),
+                        'branch owner reuse requires a conditional branch')
+                index = len(block.body)
+                result = self.emit(node,path,env,views,home,block,scope)
+                require(len(block.body) == index + 1 and
+                        block.body[index] == {'op':'retain','out':result.variable,'value':ref.variable},
+                        'branch owner reuse must emit exactly one original-owner retain')
+                self.branch_owner_reuse.append({'source':address(path), 'branch':kind,
+                    'binding':node['name']['id'], 'type_scope':scope,
+                    'logical_type':self.type_name(result.logical), 'source_owner':ref.variable,
+                    'retained_owner':result.variable, 'retain':block.path(index)})
+                return result
         name=self.code_name('C')
         actual,contracts,inner,saved,temps,carrier=self.captures(node,path,env,views,block,scope,kind,name)
         if scope is not None:
@@ -1224,6 +1246,8 @@ class Planner:
             source_map['group_map'] = self.group_map
         if self.knot_map:
             source_map['knot_map'] = self.knot_map
+        if self.reuse_int_branches:
+            source_map['branch_owner_reuse'] = self.branch_owner_reuse
         encoded=json.dumps(program,sort_keys=True,separators=(',',':'),ensure_ascii=False)
         result={'program':program,'binding':{'status':'candidate-not-resource-checked','fragment_only':True,
                 'source_admitted':False,'ordinary_K_checked':False,
@@ -1231,17 +1255,23 @@ class Planner:
                 'input_sha256':hashlib.sha256(json.dumps(self.fragment['input_annotated'],sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest(),
                 'candidate_sha256':hashlib.sha256(encoded.encode()).hexdigest(),'source_map':source_map,
                 'work':self.work,'instructions':self.instructions}}
+        if self.reuse_int_branches:
+            result['binding']['optimizations'] = {'int_branch_owner_reuse': {
+                'policy':'plain-int-variable-branch-owner-reuse/1',
+                'reused_branches':len(self.branch_owner_reuse)}}
         require(len(json.dumps(result,ensure_ascii=False).encode('utf-8'))<=MAX_OUTPUT_BYTES, 'planner output byte limit')
         return result
 
 
-def plan_fragment(projected_annotated, *, fragment=None, data_groups=False):
+def plan_fragment(projected_annotated, *, fragment=None, data_groups=False, reuse_int_branches=False):
     """Fresh proof replay, then isolated candidate lowering, never source custody.
 
     Supplying a fragment is not an authority shortcut: all fields are recomputed
     and compared by validate_shared_fragment. Caller objects are not mutated.
     Every execution caller must independently resource-check the returned raw IR.
+    reuse_int_branches opts into retaining plain Int branch variables directly;
+    the default plan and source-admission boundary remain unchanged.
     """
     checked = (transport.derive_shared_fragment(projected_annotated) if fragment is None else
                transport.validate_shared_fragment(projected_annotated, fragment))
-    return Planner(checked,data_groups=data_groups).finish()
+    return Planner(checked,data_groups=data_groups,reuse_int_branches=reuse_int_branches).finish()
