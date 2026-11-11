@@ -313,3 +313,11 @@ Astra选择稀疏manual SCC的host-only可逆源码镜像，而非增加无法�
 [决策和门槛](../../tools/performance/full-compiler/recovery-audit-20261110/allocation-attribution-design/DECISION.md)保留原137 frozen source --check-shared、实际check-candidate与fresh-generator字节门、普通producer独立认证、fresh Q/P三raw制品及完整query资格，之后才能另行准入单次profile。不能加deepseq/seq或提前提取inventory来制造易读归因，也不能把重叠inherited成本相加或把prof份额乘到普通60.55GB上。结果只能叫profiled source-demand allocation，不是普通独占CPU或可删除功能成本。
 
 设计及工具链/源码库存已保存；执行控制器尚未实现，独立implementation审查及BUILD/QUALIFY/CONTROLS/TARGET-QUALIFICATION/ATTRIBUTION全部未准入。机器重锁空闲；后续先实现及复核，不自动恢复旧profile runner的RTS解析或弱oracle。
+
+## 11月11日恢复实际实施，未把静态方案冒充持续运行
+
+远端仍为revision22，先前阶段结束后没有新的profile执行。09:25UTC重连时，当前cloud挂载中的旧源码、工具链、producer、receipts和锁目录全部缺失；不能推断确切中断机制或旧主机全部进程状态。本次从2aa3208恢复干净f9源码，建立并交叉核验新共享锁epoch，三天预算不重置。
+
+新TOOLCHAIN_SETUP_2已实际通过：176.852536秒、11个官方archive SHA、固定版本和两种compile/link/run控制均通过；峰RSS2.564GB、最终RSS0、最低可用RAM6.760GB、磁盘51.041GB，锁重获，源码clean。保留原600秒/5GiB RSS/6GiB AS/5GiB磁盘floor/3GiB RAM floor；工具链原12GiB输出cap与目标诊断cap分开，不混用。见[本轮证据](../../tools/performance/full-compiler/continuation-20261111/README.md)。
+
+Astra已开始编写可逆SCC镜像、JSON归因解析、Linux保护runner、runtime pins及分阶段controller，并在进行实际轻量负例测试；不是仅重读计划。新ordinary producer恢复controller也在准备。所有旧缺失二进制必须重新资格，尚未准入新producer/profile目标执行；不会重复失败full90/C01或启用暂停campaign。阶段完成后继续已授权下一步或报告具体阻塞，不能把保存计划当作有进程持续运行。

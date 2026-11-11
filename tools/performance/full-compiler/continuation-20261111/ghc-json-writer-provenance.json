@@ -1,0 +1,15 @@
+{
+  "source_url": "https://github.com/ghc/ghc/blob/902339d332fb4ce2b3c87dcac1ee6495d41ad886/rts/ProfilerReportJson.c",
+  "release_tag": "ghc-9.14.1-release",
+  "tag_object": "961b2ffcc02ea6c93df649fc8367458378fa7aa5",
+  "source_commit": "902339d332fb4ce2b3c87dcac1ee6495d41ad886",
+  "installed_ghc_project_git_commit": "902339d332fb4ce2b3c87dcac1ee6495d41ad886",
+  "installed_ghc_project_version": "9.14.1",
+  "installed_target_word_size_bytes": 8,
+  "installed_target_word_size_bits": 64,
+  "git_blob_sha1": "14a1a168dd54e3b3ba1c92c44dede33834aa5525",
+  "source_sha256": "e979f39bd392effb4e1289ac059da1276cac67446d49ac9256d0209bea599b1e",
+  "tag_signature": "GitHub reports unknown_key; no verified PGP signature claimed",
+  "observation": "Both node alloc and total_alloc are multiplied by sizeof(W_) in writer, so written JSON allocation fields are bytes, not raw words. Validate actual transport and accounting with real control before attribution.",
+  "external_source_executed": false
+}

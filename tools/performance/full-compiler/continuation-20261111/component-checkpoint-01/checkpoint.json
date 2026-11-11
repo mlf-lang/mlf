@@ -1,0 +1,37 @@
+{
+  "schema": "sparse-scc-source-checkpoint-v1",
+  "complete": true,
+  "complete_component_tests": {
+    "mirror": 13,
+    "profile": 27,
+    "runtime": 19,
+    "guard": 24
+  },
+  "tests_run": 83,
+  "tests_passed": 83,
+  "compiler_started": false,
+  "heavy_execution_admitted": false,
+  "controller_integration_complete": false,
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "test_command": "ASTRA_FROZEN_SOURCE=<frozen-source> python3 -B -m unittest discover -s <checkpoint> -p test_*.py",
+  "files": {
+    "fixtures/DeferredDemand.hs": "dde05507f1d8bf63433f4b954bcbf6503ca48f8ae32c75e8d9eef4ae8e82cac1",
+    "fixtures/IgnoredRTS.hs": "6c685bf6ee35606533abf6db1ff4ec1aa9d791ca49297fa3fb1d46086c0da053",
+    "fixtures/InventoryDemand.hs": "6714af5961b3e3f36267bc8de221817c8c451e7adb102d3597629579289cf54e",
+    "fixtures/README.md": "79ff8173337b4175362a111ebc0cc42204d24b10c5725e5720f4305ab6e490b1",
+    "fixtures/UnitAllocation.hs": "c5b4a5d5d19bf45c76690a9f17497045d113afd3367eb6296debe305afefa18d",
+    "foundation14-source.json": "e85b2776812a28fafd4074b5c4823f26a76ad2e0137492964ade76450f68d7fa",
+    "guard.py": "5bcc096974243537b33d91c58e412d22356ffb872a2158fa7351f44f38ee8222",
+    "insertion-map.json": "c6b7882730f55fb6b8239c6e6462de22eff97e13696018e8133ce1f7d547bcc6",
+    "mirror.py": "d0d945c960fc6359aa45d44d54539684b45a0efe95df35564e5f3c826a522116",
+    "oracles.py": "01688307e4b8d38936db4d1780db8c7ffe6ea00aa7afa5d6575fc4dd2df4dc46",
+    "profile.py": "ffbbb04831b682e9d0f76a19eae8e7e27c13cf41eee1ea3294aad3adbada67f8",
+    "runtime_pins.py": "8a893d291e3fece265d63b31ae8d6171fd05c6ab251e93ead566e7f9f3372803",
+    "test_guard.py": "1bb5586328c77038bff472e8923407ddc7e78fb91c37bf8779dd98c3f67dad7c",
+    "test_mirror.py": "03b634ad5dd4a2639763c682302aeb18f5cce30693eb736b8f5bbe54120a04d4",
+    "test_profile.py": "2113bc61639002d2bf007fcaed49be5c3e30d53806dad62596ac3937680f7980",
+    "test_runtime_pins.py": "cbd37ecf3d30792f4be9bb14c70da5c2c52f652d3919502aaa59538d79cccdad",
+    "tests.stderr": "ee117257cde62c5e5095e1a741355c3c700b4d9997e18d1df2a556a1ce5f14ec",
+    "tests.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

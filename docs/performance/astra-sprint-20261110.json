@@ -1,7 +1,7 @@
 {
   "schema": "mlf-astra-sprint-checkpoint-v1",
-  "revision": 22,
-  "observed_at_utc": "2026-11-10T22:08:36Z",
+  "revision": 23,
+  "observed_at_utc": "2026-11-11T09:42:31Z",
   "coordinator": "Astra",
   "start_date": "2026-11-10",
   "duration_goal_days": 3,
@@ -741,8 +741,8 @@
     {
       "id": "A7",
       "role": "Astra-owned allocation-source attribution design",
-      "status": "source-only design completed; implementation/review pending",
-      "next": "Implement and review source-only allocation-attribution design: invertible host-only sparse SCC mirror,95non-Main diagnostic union/twoMains, original137source check andactual builtin gates, fresh raw3/query qualification before one attribution run. No execution yet.",
+      "status": "actual implementation and lightweight component tests active",
+      "next": "Finish stage-controller integration, preserve tested checkpoint, independent review; no profile build or target admitted.",
       "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
       "no_heavy_execution_admitted": true,
       "report": "tools/performance/full-compiler/recovery-audit-20261110/allocation-attribution-design/DECISION.md",
@@ -760,9 +760,9 @@
   ],
   "persistence_caveat": "This file records evidence identities, not the raw large binaries or logs. Remote_commit null means that item was not yet verified as durable when this revision was written. Rebuild or remeasure missing artifacts honestly.",
   "resource_token_at_observation": {
-    "state": "free",
+    "state": "free after TOOLCHAIN_SETUP_2",
     "task": null,
-    "restart_caveat": "New shared workspace lock epoch must be reverified; no automatic next execution."
+    "restart_caveat": "New cloud lock epoch verified; old local files absent; never infer continued execution from this snapshot."
   },
   "next_diagnostic": {
     "status": "bounded_markers_run_complete_compiler_incomplete",
@@ -794,7 +794,7 @@
     "raw_remote": false,
     "no_automatic_rerun": true
   },
-  "next_priority": "Implement and review source-only allocation-attribution design: invertible host-only sparse SCC mirror,95non-Main diagnostic union/twoMains, original137source check andactual builtin gates, fresh raw3/query qualification before one attribution run. No execution yet.",
+  "next_priority": "Finish actual attribution implementation/review while restoring and qualifying new ordinary producer. Continue each authorized next stage rather than ending at design completion.",
   "next_real_compile_gate": {
     "status": "Q02 passed; C01 complete and does not support speedup",
     "target_source": "exact original f9 workload, not candidate-modified Graph",
@@ -819,7 +819,7 @@
     "remote_tip_verified": true
   },
   "recovery": {
-    "status": "toolchain and original producer qualified; separate foundation14 ordinary managed-heap diagnostic completed; no compiler speedup or full90/GHC ratio",
+    "status": "November11 continuation active: fresh source restored and official toolchain SETUP_2 passed; actual allocation-controller implementation and ordinary-producer preparation underway",
     "event_date": "2026-11-10",
     "name_caveat": "The branch and worktree labels ending20261111 are recovery labels, not UTC event dates.",
     "source_inventory": "tools/performance/full-compiler/recovery-audit-20261110/source-inventory.json",
@@ -860,9 +860,9 @@
       "toolchain": "Astra worker, official pinned toolchain restore only",
       "gc_diagnostic": "Astra worker, completed and independently verified; no further heavy task",
       "source_audit": "parent audit of checking/witness/serialization, no production edits",
-      "allocation_attribution": "Astra designer completed source-only protocol; implementation and independent review next, no build/target admitted"
+      "allocation_attribution": "Astra implementation team, concrete mirror/parser/guard/runtime/controller code and lightweight tests underway"
     },
-    "next_admission": "None. Implement/review sparse manual SCC diagnostic protocol first. Toolchain profiling-library presence and95module union are statically verified, not successful profiling build/link.",
+    "next_admission": "Review new original ordinary producer controller, then separately admit its bounded600s build. Profiling implementation/integration review continues; no target run yet.",
     "producer": {
       "status": "passed build and separately admitted focused postqualification",
       "summary": "tools/performance/full-compiler/recovery-audit-20261110/producer-summary.json",
@@ -899,6 +899,25 @@
       "gc_share_from_reported_times": 0.16794911573068572,
       "no_feature_attribution": true,
       "no_performance_claim": true
+    },
+    "continuation_20261111": {
+      "status": "active",
+      "report": "tools/performance/full-compiler/continuation-20261111/README.md",
+      "toolchain_report": "tools/performance/full-compiler/continuation-20261111/toolchain-summary.json",
+      "previous_local_artifacts_absent": true,
+      "previous_execution_after_revision22": false,
+      "new_lock_epoch_verified": true,
+      "actual_implementation_started": true,
+      "ordinary_producer_rebuild_admitted": false,
+      "profile_build_admitted": false,
+      "no_budget_reset": true,
+      "component_checkpoint": {
+        "path": "tools/performance/full-compiler/continuation-20261111/component-checkpoint-01",
+        "tests_passed": 83,
+        "compiler_started": false,
+        "controller_complete": false,
+        "snapshot_manifest_sha256": "f1f3904c34b5b6de296812243ffa89b4021ce59af6ea5151655d88979a1f9994"
+      }
     }
   }
 }
