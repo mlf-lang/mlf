@@ -1,0 +1,23 @@
+-- SOURCE-ONLY PROPOSAL, NOT INSTALLED IN Bootstrap.X.Type.
+-- Uncompiled/unrun. Finite fully-defined XType equivalence only.
+-- Keep kind/type validation and every independent checker unchanged.
+-- Uses existing S and L aliases and compareTyVar from Bootstrap.X.Type.
+  isClosed :: XType -> Bool;
+  isClosed ty = closedIn S.empty ty;
+  closedIn :: Set XTyVar -> XType -> Bool;
+  closedIn scope ty = case ty of {
+    XVar a -> S.member compareTyVar a scope;
+    XBot -> True;
+    XBotKind _ -> True;
+    XArrow a b -> closedIn scope a && closedIn scope b;
+    XCon _ arguments -> L.all (closedIn scope) arguments;
+    XApply f a -> closedIn scope f && closedIn scope a;
+    XForall a bound body ->
+      closedIn scope bound && closedIn (S.insert compareTyVar a scope) body
+  };
+-- Candidate consumers ONLY, after their existing type checks:
+-- Check.closedBindingInventory: S.null (T.freeVars (L.snd entry))
+-- Open.check:                  S.null (T.freeVars (snd p))
+-- could become T.isClosed ... after separately admitted real qualification.
+-- Do not replace freeVars where the actual variable set is consumed.
+-- Do not install before demand/retention gates and measured cost attribution.

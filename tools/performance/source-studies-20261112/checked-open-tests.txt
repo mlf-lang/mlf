@@ -1,0 +1,20 @@
+test_actual_alpha_annotation_is_not_replaced (test_projection_model.ProjectionModelTests.test_actual_alpha_annotation_is_not_replaced) ... ok
+test_bounded_structural_differential (test_projection_model.ProjectionModelTests.test_bounded_structural_differential) ... ok
+test_discarded_early_inventory_is_observable (test_projection_model.ProjectionModelTests.test_discarded_early_inventory_is_observable) ... ok
+test_exact_cut_is_not_name_filter (test_projection_model.ProjectionModelTests.test_exact_cut_is_not_name_filter) ... ok
+test_mutant_eager_inventory_is_killed (test_projection_model.ProjectionModelTests.test_mutant_eager_inventory_is_killed) ... ok
+test_mutant_lambda_peeling_is_killed (test_projection_model.ProjectionModelTests.test_mutant_lambda_peeling_is_killed) ... ok
+test_mutant_name_filter_is_killed (test_projection_model.ProjectionModelTests.test_mutant_name_filter_is_killed) ... ok
+test_mutant_partial_prefix_drop_is_killed (test_projection_model.ProjectionModelTests.test_mutant_partial_prefix_drop_is_killed) ... ok
+test_mutant_unconditional_rec_cut_is_killed (test_projection_model.ProjectionModelTests.test_mutant_unconditional_rec_cut_is_killed) ... ok
+test_pending_projection_does_not_demand_inventory (test_projection_model.ProjectionModelTests.test_pending_projection_does_not_demand_inventory) ... ok
+test_r2_negative_adapter_blindspot_counterexample (test_projection_model.ProjectionModelTests.test_r2_negative_adapter_blindspot_counterexample) ... ok
+test_reject_leading_lambda_without_demanding_raw_receipt (test_projection_model.ProjectionModelTests.test_reject_leading_lambda_without_demanding_raw_receipt) ... ok
+test_short_prefix_is_not_silently_truncated (test_projection_model.ProjectionModelTests.test_short_prefix_is_not_silently_truncated) ... ok
+test_wrapper_errors_precede_inventory_even_when_tail_invalid (test_projection_model.ProjectionModelTests.test_wrapper_errors_precede_inventory_even_when_tail_invalid) ... ok
+test_wrong_receipt_prefix_is_detected (test_projection_model.ProjectionModelTests.test_wrong_receipt_prefix_is_detected) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.015s
+
+OK

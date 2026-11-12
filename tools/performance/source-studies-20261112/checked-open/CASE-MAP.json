@@ -1,0 +1,322 @@
+{
+  "compiled": false,
+  "declared_total_checks": 43,
+  "design_obligation_count": 26,
+  "obligations": [
+    {
+      "cases": [
+        "p1-plain",
+        "p1-data-empty"
+      ],
+      "execution": "unrun",
+      "id": "P1",
+      "limits_or_pending": "No additional P1 seam cases planned; compile/run remains pending.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "p2-external-used",
+        "p2-external-unused"
+      ],
+      "execution": "unrun",
+      "id": "P2",
+      "limits_or_pending": "Actual production lowering remains outside this fixture.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "p3-two-ordered",
+        "p3-alpha-annotation-retained"
+      ],
+      "execution": "unrun",
+      "id": "P3",
+      "limits_or_pending": "Managed evidence, compileOpenGroup and compileOpenGroupIndexed end-to-end are unimplemented.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "p4-owned-mutual-then-let",
+        "p4-rhs-local-let",
+        "p4-rhs-local-lambda",
+        "p4-rhs-local-rec",
+        "p3-two-ordered"
+      ],
+      "execution": "unrun",
+      "id": "P4",
+      "limits_or_pending": "Finite syntax only; no runtime/bottom equivalence claim.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "p5-owned-root-rec",
+        "p5-empty-owned-rec"
+      ],
+      "execution": "unrun",
+      "id": "P5",
+      "limits_or_pending": "No external cut is allowed in these cases.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "p6-quantified-field-negative-id",
+        "p6-spaced-ids"
+      ],
+      "execution": "unrun",
+      "id": "P6",
+      "limits_or_pending": "Higher-kinded datatype and actual indexed-lowering slots unimplemented.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "p7-integer-nonfragment",
+        "p7-function-nonfragment",
+        "p7-external-nonfragment",
+        "deferred-projection-integer",
+        "deferred-projection-leading-lambda"
+      ],
+      "execution": "unrun",
+      "id": "P7",
+      "limits_or_pending": "Only finite fresh Checked.check receipts; composed receipts remain pending.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "n1-no-external-leading-lambda",
+        "n1-lambda-after-owned-let",
+        "n1-lambda-after-cut"
+      ],
+      "execution": "unrun",
+      "id": "N1",
+      "limits_or_pending": "Checks declaration-body rejection, not fromChecked compatibility behavior.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "n2-missing-root",
+        "n2-leading-lambda",
+        "n2-leading-type-lambda",
+        "n2-leading-type-application"
+      ],
+      "execution": "unrun",
+      "id": "N2",
+      "limits_or_pending": "Exact required-wrapper failure at synthetic seam.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "n3-count",
+        "n3-order-before-tail",
+        "n3-hint",
+        "n3-same-hints-distinct-ids"
+      ],
+      "execution": "unrun",
+      "id": "N3",
+      "limits_or_pending": "Exact order/hint/count rejection before deferred inventory at seam.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "n4-scheme-before-tail"
+      ],
+      "execution": "unrun",
+      "id": "N4",
+      "limits_or_pending": "Actual production phase order still pending.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "n5-duplicate-id-different-hints",
+        "n5-body-shadows-external"
+      ],
+      "execution": "unrun",
+      "id": "N5",
+      "limits_or_pending": "Same-hint duplicate ID and all priority combinations remain in original maintained suite, not newly duplicated here.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "n6-invalid-unused-rhs-before-wrapper",
+        "n6-unbound-unused-rhs"
+      ],
+      "execution": "unrun",
+      "id": "N6",
+      "limits_or_pending": "Full production compiler witnesses are not exercised.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [
+        "n7-unbound-annotation",
+        "raw-bad-type-before-shape"
+      ],
+      "execution": "unrun",
+      "id": "N7",
+      "limits_or_pending": "Non-Star kind and outer-bound-only parameter cases unimplemented.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "n8-nested-data"
+      ],
+      "execution": "unrun",
+      "id": "N8",
+      "limits_or_pending": "Duplicate/ill-kinded datatype, unknown constructor and arity cases not newly implemented; retain original suites.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [],
+      "execution": "unrun",
+      "id": "N9",
+      "limits_or_pending": "Public constructor-opacity compile negatives and private context/body/inventory injection negatives unimplemented. This fixture exposes only main and never forges receipts.",
+      "source_coverage": "unimplemented"
+    },
+    {
+      "cases": [
+        "n10-missing-member",
+        "n10-extra-member",
+        "n10-renamed-member",
+        "p3-two-ordered"
+      ],
+      "execution": "unrun",
+      "id": "N10",
+      "limits_or_pending": "Reordered expected members are positive; actual owned order is compared exactly.",
+      "source_coverage": "implemented-seam"
+    },
+    {
+      "cases": [],
+      "execution": "unrun",
+      "id": "N11",
+      "limits_or_pending": "Fallback datatype-kind versus declared-context differential unimplemented.",
+      "source_coverage": "unimplemented"
+    },
+    {
+      "cases": [
+        "n6-invalid-unused-rhs-before-wrapper"
+      ],
+      "execution": "unrun",
+      "id": "E1",
+      "limits_or_pending": "Real CompilerCore Verification-vs-wrapper phase precedence UNIMPLEMENTED. Compiler.prettyError formatting on synthetic Checked.check errors is not production phase evidence.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "n3-order-before-tail"
+      ],
+      "execution": "unrun",
+      "id": "E2",
+      "limits_or_pending": "Synthetic extraction priority only; real compileOpenGroup production order unimplemented.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "e3-shape-before-ownership"
+      ],
+      "execution": "unrun",
+      "id": "E3",
+      "limits_or_pending": "Synthetic Open admission before membership only; real production route unimplemented.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "deferred-projection-integer",
+        "deferred-projection-leading-lambda",
+        "p7-integer-nonfragment"
+      ],
+      "execution": "unrun",
+      "id": "D1",
+      "limits_or_pending": "Existing full CheckedBindings and InventoryDemand suites remain unrun and mandatory.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "deferred-projection-integer",
+        "deferred-projection-leading-lambda"
+      ],
+      "execution": "unrun",
+      "id": "D2",
+      "limits_or_pending": "Outer projection/body/parameters/type observed in finite cases; bounded host exception/bottom tests and public composed-receipt demand controls unimplemented.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "raw-duplicate-before-type",
+        "raw-bad-type-before-shape",
+        "n5-duplicate-id-different-hints"
+      ],
+      "execution": "unrun",
+      "id": "D3",
+      "limits_or_pending": "Raw Open path is unchanged. Retain full original duplicate-binding priority coverage.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [
+        "all positive cases"
+      ],
+      "execution": "unrun",
+      "id": "B1",
+      "limits_or_pending": "Exact seven snapshot fields plus per-field Wire bytes specified. Complete safe adapter now has exact first-error assertions on every rejected case and owns positive output comparisons. It still calls unchanged Open.check: NOT proof of replacing that check. Downstream real interface/object/query bytes unimplemented.",
+      "source_coverage": "partial-seam"
+    },
+    {
+      "cases": [],
+      "execution": "unrun",
+      "id": "B2",
+      "limits_or_pending": "Fresh real foundation14 endpoint unrun/unimplemented here: 173594 bytes, 475 fresh/0 reuse, all owner/builtin/full ordered query and three raw artifact oracles remain mandatory.",
+      "source_coverage": "unimplemented"
+    }
+  ],
+  "other_case_count": 4,
+  "other_cases": [
+    "deferred-projection-integer",
+    "deferred-projection-leading-lambda",
+    "raw-duplicate-before-type",
+    "raw-bad-type-before-shape"
+  ],
+  "run": false,
+  "schema": "checked-open-projection-fixture-cases-v1",
+  "status": "source-only; all Haskell cases uncompiled and unrun; negative safe-adapter route now asserted in source",
+  "synthetic_term_case_count": 39,
+  "synthetic_term_cases": [
+    "p1-plain",
+    "p1-data-empty",
+    "p2-external-used",
+    "p2-external-unused",
+    "p3-two-ordered",
+    "p3-alpha-annotation-retained",
+    "p4-owned-mutual-then-let",
+    "p4-rhs-local-let",
+    "p4-rhs-local-lambda",
+    "p4-rhs-local-rec",
+    "p5-owned-root-rec",
+    "p5-empty-owned-rec",
+    "p6-quantified-field-negative-id",
+    "p6-spaced-ids",
+    "p7-integer-nonfragment",
+    "p7-function-nonfragment",
+    "p7-external-nonfragment",
+    "n1-no-external-leading-lambda",
+    "n1-lambda-after-owned-let",
+    "n1-lambda-after-cut",
+    "n2-missing-root",
+    "n2-leading-lambda",
+    "n2-leading-type-lambda",
+    "n2-leading-type-application",
+    "n3-same-hints-distinct-ids",
+    "n3-count",
+    "n3-order-before-tail",
+    "n3-hint",
+    "n4-scheme-before-tail",
+    "n5-duplicate-id-different-hints",
+    "n5-body-shadows-external",
+    "n6-invalid-unused-rhs-before-wrapper",
+    "n6-unbound-unused-rhs",
+    "n7-unbound-annotation",
+    "n8-nested-data",
+    "n10-missing-member",
+    "n10-extra-member",
+    "n10-renamed-member",
+    "e3-shape-before-ownership"
+  ],
+  "revision": "r3",
+  "negative_safe_adapter_assertion_added": true,
+  "safe_adapter_execution": "unrun"
+}

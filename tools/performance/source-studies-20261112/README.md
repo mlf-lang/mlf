@@ -1,0 +1,69 @@
+# Checked open projection and closedness studies
+
+These are **source-only experiments and small Python specification models**
+for the MLF compiler. They do not modify compiler code, remove an independent
+checker, establish Haskell compilation success, or demonstrate a speedup.
+Source analysis is pinned to `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`.
+
+## Checked open projection fixture
+
+`checked-open/CheckedOpenProjection.hs` is the r3 standalone fixture.
+The previous r2 negative cases compared a baseline with an inventory
+observation but did not check the complete safe adapter. A faulty extraction
+could replace an invalid integer body with unit, while the original receipt's
+inventory error masked the corruption. R3 asserts the full adapter's first
+error on negative cases, including unchanged `Open.check` and ownership.
+
+The exact-root inventory observation is still separate from the real Fragment.
+The safe adapter continues to call `Open.check`. The 39 synthetic Haskell terms
+plus 4 demand/raw controls are **uncompiled and unrun**. `CASE-MAP.json` preserves
+the missing production, demand, and artifact qualification gates.
+
+The separate Python model passed 15 tests, including 810 finite structural
+cases. It demonstrates that test blind spot and checks extraction/cut/demand
+properties in the model only, not real xMLF typing or Haskell strictness.
+
+## Boolean closedness candidate
+
+`closedness/ClosednessCandidate.hs.txt` asks whether the two consumers that
+only need `null (freeVars type)` can avoid constructing a complete result set.
+The finite-tree invariant is `closedIn scope ty == (freeVars ty subsetOf scope)`.
+For `forall a bound body`, test `bound` in the old scope and `body` in scope
+extended with `a`. The draft uses an immutable Set, not a linear binder list.
+Kind validation and the independent checker must remain unchanged; a closed
+type need not have kind `*` or be otherwise valid.
+
+The Python model passed 12 tests and 7,104 type/scope comparisons in a bounded
+grammar. These are not complete MLF types, a Haskell proof, or a benchmark.
+The draft is **not a general Haskell drop-in replacement**: a short-circuiting
+Boolean traversal with empty scope and defined `a` can return False on
+`XArrow (XVar a) undefined`, whereas the original strict set construction must
+inspect the undefined subtree. A bound Set can also introduce *more* demand:
+an unused undefined outer binder ID may be forced by insertion/comparison even
+when the original free-variable result deletes it from an empty set without
+inspecting it. Real call-site demand/retention and profiling evidence are
+required before adoption. A linear binder-list alternative can be quadratic
+on deep closed types; even the Set version can lose to the baseline on sparse
+variable-use families. Neither alternative is selected for production.
+
+No production optimization is installed here. Operation counts in a symbolic
+model are not allocated bytes, native timings, or end-to-end compiler gains.
+Native generation A/B and fixed-point measurements remain outside this work.
+
+## Tiny model checks
+
+Run each suite from its own directory with ordinary Python standard library:
+
+```text
+cd checked-open
+python3 -B -m unittest -v test_projection_model
+
+cd ../closedness
+python3 -B -m unittest -v test_closedness_model
+```
+
+No compiler invocation or CI workflow is added. `VERIFICATION.json` records
+exact published source hashes and limited evidence. `SOURCE-PINS.json` records
+the original repository files inspected, without machine-specific locations or
+private recovery links. Further source-only experiments should retain the
+independent baseline and distinguish modeled results from real compiler tests.

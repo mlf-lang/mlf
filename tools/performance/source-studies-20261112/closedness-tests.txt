@@ -1,0 +1,17 @@
+test_all_constructor_arguments_are_considered (test_closedness_model.ClosednessTests.test_all_constructor_arguments_are_considered) ... ok
+test_alpha_renaming_keeps_closedness (test_closedness_model.ClosednessTests.test_alpha_renaming_keeps_closedness) ... ok
+test_bottom_kind_is_closed_not_necessarily_star (test_closedness_model.ClosednessTests.test_bottom_kind_is_closed_not_necessarily_star) ... ok
+test_closed_predicate_is_not_type_validity (test_closedness_model.ClosednessTests.test_closed_predicate_is_not_type_validity) ... ok
+test_counter_model_avoids_free_variable_result_sets (test_closedness_model.ClosednessTests.test_counter_model_avoids_free_variable_result_sets) ... ok
+test_exhaustive_small_grammar_and_scopes (test_closedness_model.ClosednessTests.test_exhaustive_small_grammar_and_scopes) ... ok
+test_forall_bound_can_reference_outer_same_id (test_closedness_model.ClosednessTests.test_forall_bound_can_reference_outer_same_id) ... ok
+test_forall_bound_does_not_bind_itself (test_closedness_model.ClosednessTests.test_forall_bound_does_not_bind_itself) ... ok
+test_large_negative_and_positive_ids_preserved (test_closedness_model.ClosednessTests.test_large_negative_and_positive_ids_preserved) ... ok
+test_shadowing_does_not_remove_outer_scope (test_closedness_model.ClosednessTests.test_shadowing_does_not_remove_outer_scope) ... ok
+test_short_circuit_is_not_a_bottom_equivalence_proof (test_closedness_model.ClosednessTests.test_short_circuit_is_not_a_bottom_equivalence_proof) ... ok
+test_sibling_scope_does_not_leak (test_closedness_model.ClosednessTests.test_sibling_scope_does_not_leak) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.017s
+
+OK
