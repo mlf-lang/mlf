@@ -1,0 +1,14 @@
+test_duplicate_and_signed_keys (test_scope_cost_model.ScopeCostTests.test_duplicate_and_signed_keys) ... ok
+test_insert_invariants_all_six_key_orders (test_scope_cost_model.ScopeCostTests.test_insert_invariants_all_six_key_orders) ... ok
+test_invalid_family_inputs (test_scope_cost_model.ScopeCostTests.test_invalid_family_inputs) ... ok
+test_one_innermost_use_materializes_all_ancestors (test_scope_cost_model.ScopeCostTests.test_one_innermost_use_materializes_all_ancestors) ... ok
+test_open_bound_does_not_extend_scope (test_scope_cost_model.ScopeCostTests.test_open_bound_does_not_extend_scope) ... ok
+test_outer_repeated_list_requires_depth_squared_comparisons (test_scope_cost_model.ScopeCostTests.test_outer_repeated_list_requires_depth_squared_comparisons) ... ok
+test_scope_force_memoizes_shared_recipe (test_scope_cost_model.ScopeCostTests.test_scope_force_memoizes_shared_recipe) ... ok
+test_small_grammar_agrees_with_independent_fv (test_scope_cost_model.ScopeCostTests.test_small_grammar_agrees_with_independent_fv) ... ok
+test_unused_binders_do_not_materialize_scope (test_scope_cost_model.ScopeCostTests.test_unused_binders_do_not_materialize_scope) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.042s
+
+OK

@@ -50,6 +50,17 @@ No production optimization is installed here. Operation counts in a symbolic
 model are not allocated bytes, native timings, or end-to-end compiler gains.
 Native generation A/B and fixed-point measurements remain outside this work.
 
+## Follow-up: demand and adverse families
+
+The follow-up static call-site review and `scope_cost_model.py` narrow the next
+qualification questions. The new model distinguishes a lazy scope-extension
+expression from a membership-forced Set construction. Sixty-four unused
+binders need zero materialized scope inserts in that model, whereas one use of
+the innermost binder forces the entire chain. A rejected linear-list variant
+needs 4,096 equality comparisons for 64 uses of the outermost binder under 64
+nested binders. These are modeled events, not measured compiler costs.
+See `closedness/SCOPE-COST-NOTES.md` and `closedness/CALLSITE-REVIEW.md`.
+
 ## Tiny model checks
 
 Run each suite from its own directory with ordinary Python standard library:
@@ -60,6 +71,7 @@ python3 -B -m unittest -v test_projection_model
 
 cd ../closedness
 python3 -B -m unittest -v test_closedness_model
+python3 -B -m unittest -v test_scope_cost_model
 ```
 
 No compiler invocation or CI workflow is added. `VERIFICATION.json` records

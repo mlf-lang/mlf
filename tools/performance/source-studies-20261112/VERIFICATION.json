@@ -1,6 +1,6 @@
 {
   "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
-  "recorded_utc": "2026-11-12T11:28:48.002270+00:00",
+  "recorded_utc": "2026-11-12T12:25:47.570709+00:00",
   "checked_open": {
     "model_tests": 15,
     "finite_structure_cases": 810,
@@ -21,12 +21,12 @@
   "native_ab_or_fixed_point_run": false,
   "files": {
     "README.md": {
-      "bytes": 3698,
-      "sha256": "cadae3b96b5a70f3482776ee80edcd742b16aa9fcd723a130ad470c60c9ecfe3"
+      "bytes": 4397,
+      "sha256": "ad776c1439f7938f1a23f7f60fe5acdf2ad5254fa35eb71daa135d93f2c1579d"
     },
     "SOURCE-PINS.json": {
-      "bytes": 1714,
-      "sha256": "ec6c16ea8cf712592ec1c21a7b670ac31e5809e03ac1e3d1445796e347285695"
+      "bytes": 2043,
+      "sha256": "a429f2eaf9bc5ff038934017eb412c9aff1ab27161a96201c378518716281354"
     },
     "checked-open/CASE-MAP.json": {
       "bytes": 10201,
@@ -48,21 +48,64 @@
       "bytes": 2191,
       "sha256": "a072002f1a1b3ca9781c8e68cfd9bf3df5eab03ba1ff65f5a9f7207bf35d02ae"
     },
+    "closedness/CALLSITE-REVIEW.md": {
+      "bytes": 12676,
+      "sha256": "c0ca246c239b1fc1431effe829fa9c9cc6f01eb74fce37c768ddce82944854fe"
+    },
     "closedness/ClosednessCandidate.hs.txt": {
       "bytes": 1195,
       "sha256": "00056c9940ae0c40e468e2ac01ecf875c199b60dea7b7c58758ddf67fc026dfc"
+    },
+    "closedness/SCOPE-COST-NOTES.md": {
+      "bytes": 3891,
+      "sha256": "039d32ad14ee5b7e6c5d8718247cfeea7ad388b889b668713907119d5ab51d4b"
     },
     "closedness/closedness_model.py": {
       "bytes": 3364,
       "sha256": "04ad1b8e22f027c8abb23e95bb4331ff0b12f02b90f533ca8e00feebc27bf710"
     },
+    "closedness/scope_cost_model.py": {
+      "bytes": 5474,
+      "sha256": "d37e30d0fd2d7e666eed9d6604b9e892dea8e38e9178d34cbdbffe611981ea73"
+    },
     "closedness/test_closedness_model.py": {
       "bytes": 3768,
       "sha256": "b8d37dd36f2ced61f580ac6459a2c7fdf2ca99388ddc0ac1e925030e24403a74"
     },
+    "closedness/test_scope_cost_model.py": {
+      "bytes": 3698,
+      "sha256": "1b083f681ea6e99595c76e70205bc2ae4025e6ef9742d9869ab4f70fc2f9aa46"
+    },
+    "closedness-followup-tests.txt": {
+      "bytes": 2891,
+      "sha256": "b2487e02c82b41fdc567cf9d02b59f0a5ef936758805c5e2b475758cc311e7fe"
+    },
     "closedness-tests.txt": {
       "bytes": 1719,
       "sha256": "1abab5b3a339fc72459605782327b67c5a5f9bf6cb1dc64d1acb7dc04399f27f"
+    },
+    "scope-cost-events.json": {
+      "bytes": 8406,
+      "sha256": "bbb5641b279a062b274f65cc433a1db88f61a4f7ca0e8b60a6fd7b8cf75a8d20"
+    },
+    "scope-cost-tests.txt": {
+      "bytes": 1270,
+      "sha256": "16162cda43c6686fa49d68c1d2601f278a650fc0c22156e381d2a7aaa6550f9a"
     }
+  },
+  "previous_public_commit": "5a92f971623d48f132d4b09dd118ac7c177db6d1",
+  "scope_cost_followup": {
+    "new_pure_model_tests": 9,
+    "independent_rerun_passed": true,
+    "six_key_permutations": 720,
+    "type_grammar_at_empty_scope": 888,
+    "combined_closedness_tests": 21,
+    "finite_symbolic_events_not_allocations_or_benchmarks": true
+  },
+  "callsite_review": {
+    "method": "Static source reduction and source induction, not Haskell execution",
+    "partial_host_counterexample": "documented, not shown reachable from source text",
+    "stronger_domain": "Successful exact-type termType at empty type scope; or separately justified finite defined-ID input domain",
+    "narrower_followup": "Study only duplicated Open.check closure predicate, keep first inventory guards and independent checker"
   }
 }

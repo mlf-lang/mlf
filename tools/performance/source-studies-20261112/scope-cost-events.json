@@ -1,0 +1,392 @@
+[
+  {
+    "depth": 1,
+    "family": "unused",
+    "reference_symbolic_events": {
+      "node": 3,
+      "delete": 1,
+      "union": 1
+    },
+    "set_recipe_events": {
+      "visited-type-node": 3,
+      "scope-extension-expression": 1
+    },
+    "list_events": {}
+  },
+  {
+    "depth": 1,
+    "family": "innermost-once",
+    "reference_symbolic_events": {
+      "node": 3,
+      "singleton": 1,
+      "delete": 1,
+      "union": 1
+    },
+    "set_recipe_events": {
+      "visited-type-node": 3,
+      "scope-extension-expression": 1,
+      "scope-materialized-insert": 1,
+      "tree-node-equation": 1,
+      "member-key-compare": 1
+    },
+    "list_events": {
+      "list-key-compare": 1
+    }
+  },
+  {
+    "depth": 1,
+    "family": "outer-repeated",
+    "reference_symbolic_events": {
+      "node": 4,
+      "singleton": 1,
+      "union": 2,
+      "delete": 1
+    },
+    "set_recipe_events": {
+      "visited-type-node": 4,
+      "scope-extension-expression": 1,
+      "scope-materialized-insert": 1,
+      "tree-node-equation": 1,
+      "member-key-compare": 1
+    },
+    "list_events": {
+      "list-key-compare": 1
+    }
+  },
+  {
+    "depth": 2,
+    "family": "unused",
+    "reference_symbolic_events": {
+      "node": 5,
+      "delete": 2,
+      "union": 2
+    },
+    "set_recipe_events": {
+      "visited-type-node": 5,
+      "scope-extension-expression": 2
+    },
+    "list_events": {}
+  },
+  {
+    "depth": 2,
+    "family": "innermost-once",
+    "reference_symbolic_events": {
+      "node": 5,
+      "singleton": 1,
+      "delete": 2,
+      "union": 2
+    },
+    "set_recipe_events": {
+      "visited-type-node": 5,
+      "scope-extension-expression": 2,
+      "scope-materialized-insert": 2,
+      "tree-node-equation": 3,
+      "insert-key-compare": 1,
+      "member-key-compare": 2
+    },
+    "list_events": {
+      "list-key-compare": 1
+    }
+  },
+  {
+    "depth": 2,
+    "family": "outer-repeated",
+    "reference_symbolic_events": {
+      "node": 7,
+      "singleton": 2,
+      "union": 4,
+      "delete": 2
+    },
+    "set_recipe_events": {
+      "visited-type-node": 7,
+      "scope-extension-expression": 2,
+      "scope-materialized-insert": 2,
+      "tree-node-equation": 3,
+      "insert-key-compare": 1,
+      "member-key-compare": 2
+    },
+    "list_events": {
+      "list-key-compare": 4
+    }
+  },
+  {
+    "depth": 4,
+    "family": "unused",
+    "reference_symbolic_events": {
+      "node": 9,
+      "delete": 4,
+      "union": 4
+    },
+    "set_recipe_events": {
+      "visited-type-node": 9,
+      "scope-extension-expression": 4
+    },
+    "list_events": {}
+  },
+  {
+    "depth": 4,
+    "family": "innermost-once",
+    "reference_symbolic_events": {
+      "node": 9,
+      "singleton": 1,
+      "delete": 4,
+      "union": 4
+    },
+    "set_recipe_events": {
+      "visited-type-node": 9,
+      "scope-extension-expression": 4,
+      "scope-materialized-insert": 4,
+      "tree-node-equation": 10,
+      "insert-key-compare": 5,
+      "member-key-compare": 3
+    },
+    "list_events": {
+      "list-key-compare": 1
+    }
+  },
+  {
+    "depth": 4,
+    "family": "outer-repeated",
+    "reference_symbolic_events": {
+      "node": 13,
+      "singleton": 4,
+      "union": 8,
+      "delete": 4
+    },
+    "set_recipe_events": {
+      "visited-type-node": 13,
+      "scope-extension-expression": 4,
+      "scope-materialized-insert": 4,
+      "tree-node-equation": 10,
+      "insert-key-compare": 5,
+      "member-key-compare": 8
+    },
+    "list_events": {
+      "list-key-compare": 16
+    }
+  },
+  {
+    "depth": 8,
+    "family": "unused",
+    "reference_symbolic_events": {
+      "node": 17,
+      "delete": 8,
+      "union": 8
+    },
+    "set_recipe_events": {
+      "visited-type-node": 17,
+      "scope-extension-expression": 8
+    },
+    "list_events": {}
+  },
+  {
+    "depth": 8,
+    "family": "innermost-once",
+    "reference_symbolic_events": {
+      "node": 17,
+      "singleton": 1,
+      "delete": 8,
+      "union": 8
+    },
+    "set_recipe_events": {
+      "visited-type-node": 17,
+      "scope-extension-expression": 8,
+      "scope-materialized-insert": 8,
+      "tree-node-equation": 29,
+      "insert-key-compare": 17,
+      "member-key-compare": 4
+    },
+    "list_events": {
+      "list-key-compare": 1
+    }
+  },
+  {
+    "depth": 8,
+    "family": "outer-repeated",
+    "reference_symbolic_events": {
+      "node": 25,
+      "singleton": 8,
+      "union": 16,
+      "delete": 8
+    },
+    "set_recipe_events": {
+      "visited-type-node": 25,
+      "scope-extension-expression": 8,
+      "scope-materialized-insert": 8,
+      "tree-node-equation": 29,
+      "insert-key-compare": 17,
+      "member-key-compare": 24
+    },
+    "list_events": {
+      "list-key-compare": 64
+    }
+  },
+  {
+    "depth": 16,
+    "family": "unused",
+    "reference_symbolic_events": {
+      "node": 33,
+      "delete": 16,
+      "union": 16
+    },
+    "set_recipe_events": {
+      "visited-type-node": 33,
+      "scope-extension-expression": 16
+    },
+    "list_events": {}
+  },
+  {
+    "depth": 16,
+    "family": "innermost-once",
+    "reference_symbolic_events": {
+      "node": 33,
+      "singleton": 1,
+      "delete": 16,
+      "union": 16
+    },
+    "set_recipe_events": {
+      "visited-type-node": 33,
+      "scope-extension-expression": 16,
+      "scope-materialized-insert": 16,
+      "tree-node-equation": 78,
+      "insert-key-compare": 51,
+      "member-key-compare": 5
+    },
+    "list_events": {
+      "list-key-compare": 1
+    }
+  },
+  {
+    "depth": 16,
+    "family": "outer-repeated",
+    "reference_symbolic_events": {
+      "node": 49,
+      "singleton": 16,
+      "union": 32,
+      "delete": 16
+    },
+    "set_recipe_events": {
+      "visited-type-node": 49,
+      "scope-extension-expression": 16,
+      "scope-materialized-insert": 16,
+      "tree-node-equation": 78,
+      "insert-key-compare": 51,
+      "member-key-compare": 64
+    },
+    "list_events": {
+      "list-key-compare": 256
+    }
+  },
+  {
+    "depth": 32,
+    "family": "unused",
+    "reference_symbolic_events": {
+      "node": 65,
+      "delete": 32,
+      "union": 32
+    },
+    "set_recipe_events": {
+      "visited-type-node": 65,
+      "scope-extension-expression": 32
+    },
+    "list_events": {}
+  },
+  {
+    "depth": 32,
+    "family": "innermost-once",
+    "reference_symbolic_events": {
+      "node": 65,
+      "singleton": 1,
+      "delete": 32,
+      "union": 32
+    },
+    "set_recipe_events": {
+      "visited-type-node": 65,
+      "scope-extension-expression": 32,
+      "scope-materialized-insert": 32,
+      "tree-node-equation": 199,
+      "insert-key-compare": 141,
+      "member-key-compare": 6
+    },
+    "list_events": {
+      "list-key-compare": 1
+    }
+  },
+  {
+    "depth": 32,
+    "family": "outer-repeated",
+    "reference_symbolic_events": {
+      "node": 97,
+      "singleton": 32,
+      "union": 64,
+      "delete": 32
+    },
+    "set_recipe_events": {
+      "visited-type-node": 97,
+      "scope-extension-expression": 32,
+      "scope-materialized-insert": 32,
+      "tree-node-equation": 199,
+      "insert-key-compare": 141,
+      "member-key-compare": 160
+    },
+    "list_events": {
+      "list-key-compare": 1024
+    }
+  },
+  {
+    "depth": 64,
+    "family": "unused",
+    "reference_symbolic_events": {
+      "node": 129,
+      "delete": 64,
+      "union": 64
+    },
+    "set_recipe_events": {
+      "visited-type-node": 129,
+      "scope-extension-expression": 64
+    },
+    "list_events": {}
+  },
+  {
+    "depth": 64,
+    "family": "innermost-once",
+    "reference_symbolic_events": {
+      "node": 129,
+      "singleton": 1,
+      "delete": 64,
+      "union": 64
+    },
+    "set_recipe_events": {
+      "visited-type-node": 129,
+      "scope-extension-expression": 64,
+      "scope-materialized-insert": 64,
+      "tree-node-equation": 488,
+      "insert-key-compare": 367,
+      "member-key-compare": 7
+    },
+    "list_events": {
+      "list-key-compare": 1
+    }
+  },
+  {
+    "depth": 64,
+    "family": "outer-repeated",
+    "reference_symbolic_events": {
+      "node": 193,
+      "singleton": 64,
+      "union": 128,
+      "delete": 64
+    },
+    "set_recipe_events": {
+      "visited-type-node": 193,
+      "scope-extension-expression": 64,
+      "scope-materialized-insert": 64,
+      "tree-node-equation": 488,
+      "insert-key-compare": 367,
+      "member-key-compare": 384
+    },
+    "list_events": {
+      "list-key-compare": 4096
+    }
+  }
+]

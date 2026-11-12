@@ -1,0 +1,26 @@
+test_all_constructor_arguments_are_considered (test_closedness_model.ClosednessTests.test_all_constructor_arguments_are_considered) ... ok
+test_alpha_renaming_keeps_closedness (test_closedness_model.ClosednessTests.test_alpha_renaming_keeps_closedness) ... ok
+test_bottom_kind_is_closed_not_necessarily_star (test_closedness_model.ClosednessTests.test_bottom_kind_is_closed_not_necessarily_star) ... ok
+test_closed_predicate_is_not_type_validity (test_closedness_model.ClosednessTests.test_closed_predicate_is_not_type_validity) ... ok
+test_counter_model_avoids_free_variable_result_sets (test_closedness_model.ClosednessTests.test_counter_model_avoids_free_variable_result_sets) ... ok
+test_exhaustive_small_grammar_and_scopes (test_closedness_model.ClosednessTests.test_exhaustive_small_grammar_and_scopes) ... ok
+test_forall_bound_can_reference_outer_same_id (test_closedness_model.ClosednessTests.test_forall_bound_can_reference_outer_same_id) ... ok
+test_forall_bound_does_not_bind_itself (test_closedness_model.ClosednessTests.test_forall_bound_does_not_bind_itself) ... ok
+test_large_negative_and_positive_ids_preserved (test_closedness_model.ClosednessTests.test_large_negative_and_positive_ids_preserved) ... ok
+test_shadowing_does_not_remove_outer_scope (test_closedness_model.ClosednessTests.test_shadowing_does_not_remove_outer_scope) ... ok
+test_short_circuit_is_not_a_bottom_equivalence_proof (test_closedness_model.ClosednessTests.test_short_circuit_is_not_a_bottom_equivalence_proof) ... ok
+test_sibling_scope_does_not_leak (test_closedness_model.ClosednessTests.test_sibling_scope_does_not_leak) ... ok
+test_duplicate_and_signed_keys (test_scope_cost_model.ScopeCostTests.test_duplicate_and_signed_keys) ... ok
+test_insert_invariants_all_six_key_orders (test_scope_cost_model.ScopeCostTests.test_insert_invariants_all_six_key_orders) ... ok
+test_invalid_family_inputs (test_scope_cost_model.ScopeCostTests.test_invalid_family_inputs) ... ok
+test_one_innermost_use_materializes_all_ancestors (test_scope_cost_model.ScopeCostTests.test_one_innermost_use_materializes_all_ancestors) ... ok
+test_open_bound_does_not_extend_scope (test_scope_cost_model.ScopeCostTests.test_open_bound_does_not_extend_scope) ... ok
+test_outer_repeated_list_requires_depth_squared_comparisons (test_scope_cost_model.ScopeCostTests.test_outer_repeated_list_requires_depth_squared_comparisons) ... ok
+test_scope_force_memoizes_shared_recipe (test_scope_cost_model.ScopeCostTests.test_scope_force_memoizes_shared_recipe) ... ok
+test_small_grammar_agrees_with_independent_fv (test_scope_cost_model.ScopeCostTests.test_small_grammar_agrees_with_independent_fv) ... ok
+test_unused_binders_do_not_materialize_scope (test_scope_cost_model.ScopeCostTests.test_unused_binders_do_not_materialize_scope) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.060s
+
+OK

@@ -47,5 +47,11 @@
       "path": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
       "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d"
     }
-  ]
+  ],
+  "current_main_comparison": {
+    "commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "checked_utc": "2026-11-12T12:22:42.779673+00:00",
+    "all_nine_files_identical_to_source_pin": true,
+    "method": "Full UTF-8 file content read at exact main commit and SHA-256 compared with pinned source digest. No execution."
+  }
 }
