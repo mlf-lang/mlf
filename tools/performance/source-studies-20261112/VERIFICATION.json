@@ -1,6 +1,6 @@
 {
   "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
-  "recorded_utc": "2026-11-12T12:56:52.415197+00:00",
+  "recorded_utc": "2026-11-12T14:26:30.790213+00:00",
   "checked_open": {
     "model_tests": 15,
     "finite_structure_cases": 810,
@@ -21,8 +21,8 @@
   "native_ab_or_fixed_point_run": false,
   "files": {
     "README.md": {
-      "bytes": 4990,
-      "sha256": "f4aab36adcf25976c74f88216b55bdbb63687cb50969ead1c59d623a65ac045d"
+      "bytes": 5402,
+      "sha256": "ea1359d68365e679200b6a2bc3883f5cedca8dac62700ede1d98acb971c833e4"
     },
     "SOURCE-PINS.json": {
       "bytes": 2043,
@@ -92,29 +92,57 @@
       "bytes": 540,
       "sha256": "0a829d5e2dc2439e410e72e13c322f8796903f19376d9eacb37c16f64202fdd7"
     },
+    "duplicate-guard/OpenFragment-spine-only.patch": {
+      "bytes": 762,
+      "sha256": "c6031fa96b0e2ecdfdcf51b2731efac3476a1f7db80239a921404f7214d195a4"
+    },
     "duplicate-guard/PATCH-CHECK.json": {
       "bytes": 629,
       "sha256": "3a978afd42a08610fbcf7afe3fa629c4e3f3a492501f2f36dac10f05e26e9120"
     },
     "duplicate-guard/README.md": {
-      "bytes": 3540,
-      "sha256": "757fd075361bab75c63d75796583716103d8aa9362b2f2400087f2f4b6fc2d19"
+      "bytes": 4009,
+      "sha256": "361098ed88215bda6f758c47237d9935b47ee4a66995828db0d56ecd2eb1ca2d"
     },
     "duplicate-guard/REVIEW.md": {
       "bytes": 16131,
       "sha256": "06cb35d7d150b088ce6d94e9d38cf1cfa3b86c4a2f2be0a7243d09354213e2bc"
     },
+    "duplicate-guard/SPINE-MODEL-NOTES.md": {
+      "bytes": 3859,
+      "sha256": "7dc8d6f09c486a10c90a444faeb62ec01f31c1ac2846b793d05c95f7f0204e6f"
+    },
+    "duplicate-guard/SPINE-PATCH-CHECK.json": {
+      "bytes": 642,
+      "sha256": "8a7b9bd47cc8fbc901bfeb57cdef989f552134ad79fb9049ae4e2fe6b18dba90"
+    },
+    "duplicate-guard/SPINE-REVIEW.md": {
+      "bytes": 15233,
+      "sha256": "acdd8165cdd80d0b28a081ffc1dd0f2b7b362ec559babcbe914d600fad9a8626"
+    },
     "duplicate-guard/admission_model.py": {
       "bytes": 5031,
       "sha256": "0b3516a6e7d1c5e43e4ef9829f99b0408d5224c479798708cf3fa0c2c62b8da0"
+    },
+    "duplicate-guard/lazy_spine_model.py": {
+      "bytes": 6030,
+      "sha256": "ea732ed48b4a899434cf1d44caf589abec34e823c7a091f8f2280158dd2f22b8"
     },
     "duplicate-guard/test_admission_model.py": {
       "bytes": 4068,
       "sha256": "f2778c0fd6106ff0dc4cc9f4a8ab3b51eb2586468636f620e16e4d04c2d297ae"
     },
+    "duplicate-guard/test_lazy_spine_model.py": {
+      "bytes": 5585,
+      "sha256": "02cf238d93a47e9e33735151ba2f45691a77fe1c9a1ad6e013be0b53b17660a4"
+    },
     "duplicate-guard/verify_candidate_patch.py": {
       "bytes": 2495,
       "sha256": "6b1993419d5399e9bd0fd94adb82fefcb8976ea29b4351ee02ca215e59745c48"
+    },
+    "lazy-spine-tests.txt": {
+      "bytes": 1857,
+      "sha256": "977524107ae9f1b3d26c527a5ddb589cba10b95ca8483a681a4f6d0cedacf3ce"
     },
     "scope-cost-events.json": {
       "bytes": 8406,
@@ -125,7 +153,7 @@
       "sha256": "16162cda43c6686fa49d68c1d2601f278a650fc0c22156e381d2a7aaa6550f9a"
     }
   },
-  "previous_public_commit": "5dfe9328811f9baa5cfa92b068b8b1d3d4510678",
+  "previous_public_commit": "69388d1bb27d9be8fae4fca1a31a473442464b99",
   "scope_cost_followup": {
     "new_pure_model_tests": 9,
     "independent_rerun_passed": true,
@@ -154,5 +182,20 @@
       "forged exports after admission"
     ],
     "patch_byte_check": "Pinned originals and exact one-line diff matched in memory; no production source written"
+  },
+  "spine_only_followup": {
+    "patch_applied": false,
+    "new_pure_lazy_list_tests": 12,
+    "bounded_chunk_protocols": 259,
+    "independent_rerun_passed": true,
+    "haskell_executed": false,
+    "comparison": "Original, delete-only and spine-only variants at Either WHNF, Fragment WHNF, list/head and full-spine observations",
+    "source_boundary": "Finite inventories already admitted by all unchanged first guards; patch alternatives are not cumulative",
+    "not_claimed": [
+      "actual Haskell compilation",
+      "arbitrary host observational equivalence",
+      "heap or stack equivalence",
+      "compiler speedup"
+    ]
   }
 }

@@ -41,6 +41,13 @@ The model uses eager Python tuple concatenation and does **not** model this
 Haskell allocation/retention difference. Same modeled protocol traces do not
 prove identical host demand, heap behavior or performance.
 
+A separate follow-up, `OpenFragment-spine-only.patch`, retains full owned-spine
+demand using `seq (all (\_ -> True) owned)` without repeating `freeVars`. It is
+also unapplied. `SPINE-REVIEW.md` explains its restricted source argument;
+`SPINE-MODEL-NOTES.md` and the 12-test lazy-list model distinguish Either WHNF,
+Fragment WHNF, shared pair demand and delayed name payloads. Neither candidate
+is chosen for production without genuine host and artifact qualification.
+
 ## Patch byte check
 
 `verify_candidate_patch.py` reads two pinned original files and the patch,

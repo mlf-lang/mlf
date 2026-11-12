@@ -1,0 +1,13 @@
+{
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "source_path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+  "source_bytes": 35625,
+  "source_sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+  "patch_sha256": "c6031fa96b0e2ecdfdcf51b2731efac3476a1f7db80239a921404f7214d195a4",
+  "candidate_bytes": 35712,
+  "candidate_sha256": "76539b0c774841050c591d258ec3ed34b050bcf8bb727ca018cea50d2118671c",
+  "validation": "Exact original hunk matched once and replaced in memory; no compiler file written.",
+  "patch_applied_to_compiler": false,
+  "haskell_compiled": false,
+  "haskell_run": false
+}

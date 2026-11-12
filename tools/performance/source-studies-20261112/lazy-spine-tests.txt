@@ -1,0 +1,17 @@
+test_259_group_protocols_preserve_results (test_lazy_spine_model.LazySpineTests.test_259_group_protocols_preserve_results) ... ok
+test_bad_source_chunk_tail_is_not_hidden_by_variant (test_lazy_spine_model.LazySpineTests.test_bad_source_chunk_tail_is_not_hidden_by_variant) ... ok
+test_construction_without_observation_is_lazy (test_lazy_spine_model.LazySpineTests.test_construction_without_observation_is_lazy) ... ok
+test_delete_defers_flattening_until_consumer_demand (test_lazy_spine_model.LazySpineTests.test_delete_defers_flattening_until_consumer_demand) ... ok
+test_either_whnf_and_fragment_whnf_are_distinct (test_lazy_spine_model.LazySpineTests.test_either_whnf_and_fragment_whnf_are_distinct) ... ok
+test_first_admission_already_forces_shared_entry_pairs (test_lazy_spine_model.LazySpineTests.test_first_admission_already_forces_shared_entry_pairs) ... ok
+test_name_payload_can_remain_partial_after_all_spine_forcing (test_lazy_spine_model.LazySpineTests.test_name_payload_can_remain_partial_after_all_spine_forcing) ... ok
+test_partial_raw_tail_requires_more_than_whnf (test_lazy_spine_model.LazySpineTests.test_partial_raw_tail_requires_more_than_whnf) ... ok
+test_seq_owned_control_does_not_force_full_spine (test_lazy_spine_model.LazySpineTests.test_seq_owned_control_does_not_force_full_spine) ... ok
+test_shared_flattened_spine_is_not_rebuilt (test_lazy_spine_model.LazySpineTests.test_shared_flattened_spine_is_not_rebuilt) ... ok
+test_spine_candidate_matches_original_nonrepeat_events (test_lazy_spine_model.LazySpineTests.test_spine_candidate_matches_original_nonrepeat_events) ... ok
+test_spine_only_does_not_validate_unadmitted_bad_head (test_lazy_spine_model.LazySpineTests.test_spine_only_does_not_validate_unadmitted_bad_head) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.023s
+
+OK

@@ -70,6 +70,12 @@ non-repeated observation traces agree. Fault injection also demonstrates the
 required producer invariant: removing or bypassing the first guards would make
 the proposed removal unsafe. This is not a production edit or measured speedup.
 
+A second unapplied patch preserves complete owned-list-spine demand before
+returning Right, without rerunning the type predicate. Twelve additional pure
+lazy-list tests cover 259 bounded chunk protocols and distinguish Either WHNF,
+Fragment WHNF, shared pairs and lazy names. They do not establish actual
+Haskell heap/stack behavior or a performance improvement.
+
 ## Tiny model checks
 
 Run each suite from its own directory with ordinary Python standard library:
@@ -84,6 +90,7 @@ python3 -B -m unittest -v test_scope_cost_model
 
 cd ../duplicate-guard
 python3 -B -m unittest -v test_admission_model
+python3 -B -m unittest -v test_lazy_spine_model
 ```
 
 No compiler invocation or CI workflow is added. `VERIFICATION.json` records

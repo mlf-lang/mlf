@@ -1,0 +1,14 @@
+diff --git a/libraries/mlf-crates/Bootstrap/OpenFragment.hs b/libraries/mlf-crates/Bootstrap/OpenFragment.hs
+--- a/libraries/mlf-crates/Bootstrap/OpenFragment.hs
++++ b/libraries/mlf-crates/Bootstrap/OpenFragment.hs
+@@ -76,7 +76,8 @@
+     mapM_ (Check.termType ds M.empty) (map snd ps);
+     answer <- Check.inferDeclarationSpine ds scope term;
+     owned <- snd answer;
+-    ensure (all (\p -> S.null (T.freeVars (snd p))) owned) "open fragment exports an open type";
+-    Right (make env ps term owned)
++    -- Inventory admission already checked each type; retain only the old
++    -- guard's demand on the complete owned list spine before returning Right.
++    seq (all (\_ -> True) owned) (Right (make env ps term owned))
+   };
+   fromChecked checked = do {
