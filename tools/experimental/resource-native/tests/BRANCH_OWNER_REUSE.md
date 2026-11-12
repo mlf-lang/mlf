@@ -52,3 +52,30 @@ or peak-memory improvement, elapsed-time speedup, RSS reduction, general leak
 freedom, or full no-GC claim follows. A failed evaluation retains the existing
 explicit terminal-surrender contract; the optimization does not make it
 resumable or automatically roll it back.
+
+## Maintained native regression
+
+The separate native job now compiles and executes generated C at O2:
+
+```sh
+timeout --signal=INT --kill-after=10s 600s \
+  python3 -B -S tools/experimental/resource-native/tests/test_branch_owner_reuse_native.py \
+  --output /tmp/ir8-owner-reuse-new-run --cc gcc
+```
+
+Choose a fresh output directory outside the checkout. Six fixtures cover
+same-owner true/false selection, mixed variable/expression arms, pending
+values, an unselected recursive branch, and a nested conditional. Each runs
+with both `data_groups=False/True`, before and after reuse, for one entry:
+24 native executions. Both IRs pass the resource and metadata checkers, and
+the optimized source-map rows are independently audited. Every execution
+must return the independent Int result 42 with no fault, balanced group,
+node, owner, loan and RC counts, zero live bytes/blocks in all seven memory
+categories, and empty terminal retirement.
+
+This is a maintained subset following the previously completed 48-execution
+native research campaign, not a claim of first native validation. It does
+not repeat that whole historical matrix: multiple entries and sanitizers
+are not covered by this O2 job. Raw plans, generated C, command logs and
+terminal reports are retained, including failures. It does not establish
+source qualification, general no-GC correctness, or performance benefits.

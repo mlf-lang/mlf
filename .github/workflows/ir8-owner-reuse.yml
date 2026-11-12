@@ -48,3 +48,30 @@ jobs:
           path: ${{ runner.temp }}/ir8-owner-reuse/
           if-no-files-found: warn
           retention-days: 14
+  native:
+    name: Native branch reuse in both group placements (O2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check six fragments before and after opt-in reuse
+        env:
+          PYTHONHASHSEED: '0'
+        run: |
+          set -euo pipefail
+          timeout --signal=INT --kill-after=10s 600s \
+            python3 -B -S tools/experimental/resource-native/tests/test_branch_owner_reuse_native.py \
+            --output "$RUNNER_TEMP/ir8-owner-reuse-native" --cc gcc \
+            2>&1 | tee "$RUNNER_TEMP/ir8-owner-reuse-native.log"
+      - name: Retain native results, including failures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ir8-owner-reuse-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ir8-owner-reuse-native/
+            ${{ runner.temp }}/ir8-owner-reuse-native.log
+          if-no-files-found: warn
+          retention-days: 14
