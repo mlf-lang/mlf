@@ -1,0 +1,21 @@
+test_boolean_is_not_a_schema_version (test_validate_host_outputs.OutputValidationTests.test_boolean_is_not_a_schema_version) ... ok
+test_changed_actual_payload_rejected_even_if_all_pass (test_validate_host_outputs.OutputValidationTests.test_changed_actual_payload_rejected_even_if_all_pass) ... ok
+test_complete_matching_synthetic_records_pass_content_only (test_validate_host_outputs.OutputValidationTests.test_complete_matching_synthetic_records_pass_content_only) ... ok
+test_duplicate_json_keys_rejected (test_validate_host_outputs.OutputValidationTests.test_duplicate_json_keys_rejected) ... ok
+test_duplicate_or_reordered_case_rejected (test_validate_host_outputs.OutputValidationTests.test_duplicate_or_reordered_case_rejected) ... ok
+test_empty_or_duplicate_case_map_rejected (test_validate_host_outputs.OutputValidationTests.test_empty_or_duplicate_case_map_rejected) ... ok
+test_fail_and_extra_diagnostic_lines_rejected (test_validate_host_outputs.OutputValidationTests.test_fail_and_extra_diagnostic_lines_rejected) ... ok
+test_fixture_or_case_map_digest_mismatch_rejected (test_validate_host_outputs.OutputValidationTests.test_fixture_or_case_map_digest_mismatch_rejected) ... ok
+test_missing_case_not_hidden_by_intersection (test_validate_host_outputs.OutputValidationTests.test_missing_case_not_hidden_by_intersection) ... ok
+test_missing_variant_and_bad_source_pin_rejected (test_validate_host_outputs.OutputValidationTests.test_missing_variant_and_bad_source_pin_rejected) ... ok
+test_profiled_or_different_build_inputs_rejected (test_validate_host_outputs.OutputValidationTests.test_profiled_or_different_build_inputs_rejected) ... ok
+test_reported_records_do_not_authenticate_haskell_execution (test_validate_host_outputs.OutputValidationTests.test_reported_records_do_not_authenticate_haskell_execution) ... ok
+test_stale_stdout_hash_rejected (test_validate_host_outputs.OutputValidationTests.test_stale_stdout_hash_rejected) ... ok
+test_truncated_output_and_bad_summary_rejected (test_validate_host_outputs.OutputValidationTests.test_truncated_output_and_bad_summary_rejected) ... ok
+test_unknown_or_mixed_evidence_kind_rejected (test_validate_host_outputs.OutputValidationTests.test_unknown_or_mixed_evidence_kind_rejected) ... ok
+test_wrong_variant_hash_or_label_rejected (test_validate_host_outputs.OutputValidationTests.test_wrong_variant_hash_or_label_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.001s
+
+OK

@@ -1,0 +1,431 @@
+{
+  "schema": "open-fragment-guard-public-api-fixture-v1",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "fixture_file": "OpenFragmentGuardPublicApi.hs",
+  "fixture_sha256": "d33cc56c63e97da961b25877e58b8d5b803ce4398e457a4d9840c2e33a99fc93",
+  "compiled": false,
+  "run": false,
+  "status": "source-only; all 24 real Haskell cases uncompiled and unrun",
+  "case_count": 24,
+  "variant_inputs": [
+    "baseline",
+    "delete-only",
+    "spine-only"
+  ],
+  "stdout_contract": {
+    "case_line": "PASS or FAIL, case ID, Haskell show String payload: exactly three TAB-separated columns",
+    "summary_line": "SUMMARY, total, passed: exactly three TAB-separated columns",
+    "line_termination": "LF",
+    "case_order": "exact order of cases array",
+    "actual_run_records_included": false
+  },
+  "cases": [
+    {
+      "id": "p-empty",
+      "category": "total-open-fragment",
+      "purpose": "unit; empty owned inventory",
+      "execution": "unrun",
+      "expected": "public Open.check, normalize and audit succeed; exact prescribed fields and seven encoded field values observed",
+      "observations": [
+        "Open.check Either WHNF",
+        "Fragment WHNF",
+        "body root WHNF",
+        "parameter list WHNF",
+        "owned list WHNF",
+        "head pair WHNF or empty",
+        "explicit owned full-spine traversal via length",
+        "exact parameter/body/owned/use assertions",
+        "seven actual Wire-encoded field byte strings",
+        "normalize and audit exact snapshots"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:positiveCase"
+    },
+    {
+      "id": "p-let",
+      "category": "total-open-fragment",
+      "purpose": "one nonrecursive integer declaration",
+      "execution": "unrun",
+      "expected": "public Open.check, normalize and audit succeed; exact prescribed fields and seven encoded field values observed",
+      "observations": [
+        "Open.check Either WHNF",
+        "Fragment WHNF",
+        "body root WHNF",
+        "parameter list WHNF",
+        "owned list WHNF",
+        "head pair WHNF or empty",
+        "explicit owned full-spine traversal via length",
+        "exact parameter/body/owned/use assertions",
+        "seven actual Wire-encoded field byte strings",
+        "normalize and audit exact snapshots"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:positiveCase"
+    },
+    {
+      "id": "p-external-used",
+      "category": "total-open-fragment",
+      "purpose": "one explicit closed parameter used by one owned declaration",
+      "execution": "unrun",
+      "expected": "public Open.check, normalize and audit succeed; exact prescribed fields and seven encoded field values observed",
+      "observations": [
+        "Open.check Either WHNF",
+        "Fragment WHNF",
+        "body root WHNF",
+        "parameter list WHNF",
+        "owned list WHNF",
+        "head pair WHNF or empty",
+        "explicit owned full-spine traversal via length",
+        "exact parameter/body/owned/use assertions",
+        "seven actual Wire-encoded field byte strings",
+        "normalize and audit exact snapshots"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:positiveCase"
+    },
+    {
+      "id": "p-mixed-empty-rec",
+      "category": "total-open-fragment",
+      "purpose": "owned mutual recursion followed by an empty recursive chunk and a let",
+      "execution": "unrun",
+      "expected": "public Open.check, normalize and audit succeed; exact prescribed fields and seven encoded field values observed",
+      "observations": [
+        "Open.check Either WHNF",
+        "Fragment WHNF",
+        "body root WHNF",
+        "parameter list WHNF",
+        "owned list WHNF",
+        "head pair WHNF or empty",
+        "explicit owned full-spine traversal via length",
+        "exact parameter/body/owned/use assertions",
+        "seven actual Wire-encoded field byte strings",
+        "normalize and audit exact snapshots"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:positiveCase"
+    },
+    {
+      "id": "p-rhs-local",
+      "category": "total-open-fragment",
+      "purpose": "RHS-local binding must not escape into owned inventory",
+      "execution": "unrun",
+      "expected": "public Open.check, normalize and audit succeed; exact prescribed fields and seven encoded field values observed",
+      "observations": [
+        "Open.check Either WHNF",
+        "Fragment WHNF",
+        "body root WHNF",
+        "parameter list WHNF",
+        "owned list WHNF",
+        "head pair WHNF or empty",
+        "explicit owned full-spine traversal via length",
+        "exact parameter/body/owned/use assertions",
+        "seven actual Wire-encoded field byte strings",
+        "normalize and audit exact snapshots"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:positiveCase"
+    },
+    {
+      "id": "p-polymorphic-rhs",
+      "category": "total-open-fragment",
+      "purpose": "closed polymorphic inferred RHS type with exact binder syntax",
+      "execution": "unrun",
+      "expected": "public Open.check, normalize and audit succeed; exact prescribed fields and seven encoded field values observed",
+      "observations": [
+        "Open.check Either WHNF",
+        "Fragment WHNF",
+        "body root WHNF",
+        "parameter list WHNF",
+        "owned list WHNF",
+        "head pair WHNF or empty",
+        "explicit owned full-spine traversal via length",
+        "exact parameter/body/owned/use assertions",
+        "seven actual Wire-encoded field byte strings",
+        "normalize and audit exact snapshots"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:positiveCase"
+    },
+    {
+      "id": "n-duplicate-parameter-before-type",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "duplicate open-fragment parameter",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-parameter-type-before-body",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "unbound type variable 99",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-unbound-body",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "unbound term variable absent",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-duplicate-recursive-before-annotation",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "duplicate recursive binder",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-recursive-rhs-before-shape",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "recursive definition does not have its declared type",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-integer-nonfragment",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "invalid inference fragment: expected declarations ending in ()",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-leading-lambda-nonfragment",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "invalid inference fragment: expected declarations ending in ()",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-lambda-after-let",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "invalid inference fragment: expected declarations ending in ()",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-let-shadows-parameter",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "term binder already in scope",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "n-recursive-shadows-parameter",
+      "category": "raw-open-first-error",
+      "execution": "unrun",
+      "expected_error": "recursive binder already in scope",
+      "expected_phase": "open",
+      "observations": [
+        "Open.environment succeeds",
+        "Open.check Either WHNF",
+        "complete exact first error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:negativeCase"
+    },
+    {
+      "id": "r-body-type-before-outer-open-inventory",
+      "category": "public-raw-checker-two-layer-control",
+      "execution": "unrun",
+      "expected_error": "unbound term variable absent",
+      "expected_phase": "raw-inference",
+      "context": "Public XEnv with type variable 91 bounded by XBot and parameter a:XVar 91; validated with Check.inferWithData before test. Not an opaque receipt and not Open.check empty-type-scope input.",
+      "observations": [
+        "validated raw context",
+        "outer inference Either separately from deferred inventory",
+        "successful answer/type observation and encoding only when outer inference succeeds",
+        "complete exact first error at prescribed layer"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:rawCases"
+    },
+    {
+      "id": "r-outer-open-before-terminal-shape",
+      "category": "public-raw-checker-two-layer-control",
+      "execution": "unrun",
+      "expected_error": "inference binding has an open type",
+      "expected_phase": "raw-inventory",
+      "context": "Public XEnv with type variable 91 bounded by XBot and parameter a:XVar 91; validated with Check.inferWithData before test. Not an opaque receipt and not Open.check empty-type-scope input.",
+      "observations": [
+        "validated raw context",
+        "outer inference Either separately from deferred inventory",
+        "successful answer/type observation and encoding only when outer inference succeeds",
+        "complete exact first error at prescribed layer"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:rawCases"
+    },
+    {
+      "id": "r-closed-prefix-then-shape",
+      "category": "public-raw-checker-two-layer-control",
+      "execution": "unrun",
+      "expected_error": "invalid inference fragment: expected declarations ending in ()",
+      "expected_phase": "raw-inventory",
+      "context": "Public XEnv with type variable 91 bounded by XBot and parameter a:XVar 91; validated with Check.inferWithData before test. Not an opaque receipt and not Open.check empty-type-scope input.",
+      "observations": [
+        "validated raw context",
+        "outer inference Either separately from deferred inventory",
+        "successful answer/type observation and encoding only when outer inference succeeds",
+        "complete exact first error at prescribed layer"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:rawCases"
+    },
+    {
+      "id": "r-closed-prefix-then-inner-open",
+      "category": "public-raw-checker-two-layer-control",
+      "execution": "unrun",
+      "expected_error": "inference binding has an open type",
+      "expected_phase": "raw-inventory",
+      "context": "Public XEnv with type variable 91 bounded by XBot and parameter a:XVar 91; validated with Check.inferWithData before test. Not an opaque receipt and not Open.check empty-type-scope input.",
+      "observations": [
+        "validated raw context",
+        "outer inference Either separately from deferred inventory",
+        "successful answer/type observation and encoding only when outer inference succeeds",
+        "complete exact first error at prescribed layer"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:rawCases"
+    },
+    {
+      "id": "c-integer-type-before-inventory",
+      "category": "genuine-checked-nonfragment",
+      "execution": "unrun",
+      "expected": "Checked.check/type access succeeds; declarationBindings and raw Open.check reject exact fragment-shape error",
+      "observations": [
+        "Checked.check Either WHNF",
+        "opaque receipt WHNF",
+        "term/type WHNF",
+        "exact total inferred type bytes",
+        "separate raw inventory error",
+        "unpeeled Open.check error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:checkedNonfragment"
+    },
+    {
+      "id": "c-lambda-raw-inventory-vs-open",
+      "category": "genuine-checked-nonfragment",
+      "execution": "unrun",
+      "expected": "Checked.check/type access succeeds; declarationBindings is Right []; unpeeled Open.check rejects exact fragment-shape error",
+      "observations": [
+        "Checked.check Either WHNF",
+        "opaque receipt WHNF",
+        "term/type WHNF",
+        "exact total inferred type bytes",
+        "separate empty raw inventory",
+        "unpeeled Open.check error"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:checkedNonfragment"
+    },
+    {
+      "id": "h-partial-unused-binder-checked",
+      "category": "partial-host-public-receipt",
+      "execution": "unrun",
+      "expected": "genuine Checked.check and inventory observations remain successful; final intentional output-binder-ID probe alone catches checked-unused-binder-id sentinel",
+      "observations": [
+        "Checked.check Either WHNF",
+        "opaque receipt WHNF",
+        "term root WHNF",
+        "total program type unit and its bytes",
+        "separate inventory Either WHNF",
+        "owned list/head-pair/explicit full-spine observations",
+        "safe outer forall/total poly children shape",
+        "binder constructor WHNF",
+        "final deliberate sentinel on exact output binder ID"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:partialChecked",
+      "not_claimed": "No real source-text reachability, full partial AST encoding, hidden return-boundary spine timing, or heap result."
+    },
+    {
+      "id": "h-partial-unused-binder-open",
+      "category": "partial-host-public-open",
+      "execution": "unrun",
+      "expected": "Open.check and safe Fragment observations remain successful; final intentional output-binder-ID probe alone catches open-unused-binder-id sentinel",
+      "observations": [
+        "Open.check Either WHNF",
+        "Fragment WHNF",
+        "body root WHNF",
+        "empty parameter list WHNF",
+        "owned list/head-pair/explicit full-spine observations",
+        "safe outer forall/total poly children shape",
+        "binder constructor WHNF",
+        "final deliberate sentinel on exact output binder ID"
+      ],
+      "source": "OpenFragmentGuardPublicApi.hs:partialOpen",
+      "not_claimed": "No full partial body/type/stamp encoding, usedParameters, normalize/audit demand, return-boundary flattening measurement, or heap result."
+    }
+  ],
+  "deferred": [
+    {
+      "id": "D-return-boundary-spine-timing",
+      "reason": "Pure value observations do not establish when total append-spine forcing occurred. Needs separately admitted real demand/retention instrumentation, not fake PASS."
+    },
+    {
+      "id": "D-heap-stack-performance",
+      "reason": "No allocation, residency, stack, native timing or end-to-end speed claim; no build/run occurred."
+    },
+    {
+      "id": "D-partial-full-output",
+      "reason": "Partial case deliberately avoids type/body/stamp encoding and extra consumers whose safety was not established."
+    },
+    {
+      "id": "D-production-and-artifacts",
+      "reason": "No CompilerCore phase, compileOpenGroup/Indexed, full interface/object/query artifact or native/fixed-point qualification."
+    },
+    {
+      "id": "D-broader-regressions",
+      "reason": "Existing complete CheckedBindings/context/source-scope/demand suites remain required; these 24 cases do not replace them."
+    },
+    {
+      "id": "D-composed-receipts",
+      "reason": "No new public composition demand controls implemented in this narrow fixture."
+    },
+    {
+      "id": "D-internal-payload-completeness",
+      "reason": "Output comparator enforces complete ordered cases and exact aggregate payload equality, not completeness of each internal observation list."
+    }
+  ]
+}

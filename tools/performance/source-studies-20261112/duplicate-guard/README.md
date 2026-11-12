@@ -48,6 +48,11 @@ also unapplied. `SPINE-REVIEW.md` explains its restricted source argument;
 Fragment WHNF, shared pair demand and delayed name payloads. Neither candidate
 is chosen for production without genuine host and artifact qualification.
 
+`host-fixture/` supplies a future 24-case public-API Haskell regression source
+and a strict complete-output comparison tool. The Haskell source has not been
+compiled or run. Only the comparator's 16 synthetic-record tests have run;
+they do not establish compiler correctness, actual execution or performance.
+
 ## Patch byte check
 
 `verify_candidate_patch.py` reads two pinned original files and the patch,

@@ -1,6 +1,6 @@
 {
   "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
-  "recorded_utc": "2026-11-12T14:26:30.790213+00:00",
+  "recorded_utc": "2026-11-12T15:24:28.338212+00:00",
   "checked_open": {
     "model_tests": 15,
     "finite_structure_cases": 810,
@@ -21,8 +21,8 @@
   "native_ab_or_fixed_point_run": false,
   "files": {
     "README.md": {
-      "bytes": 5402,
-      "sha256": "ea1359d68365e679200b6a2bc3883f5cedca8dac62700ede1d98acb971c833e4"
+      "bytes": 6064,
+      "sha256": "0883866ba39e68450f57b3509de583b150736299aeea0ea86cab3e8a1f077827"
     },
     "SOURCE-PINS.json": {
       "bytes": 2043,
@@ -101,8 +101,8 @@
       "sha256": "3a978afd42a08610fbcf7afe3fa629c4e3f3a492501f2f36dac10f05e26e9120"
     },
     "duplicate-guard/README.md": {
-      "bytes": 4009,
-      "sha256": "361098ed88215bda6f758c47237d9935b47ee4a66995828db0d56ecd2eb1ca2d"
+      "bytes": 4319,
+      "sha256": "ddfaeb55a437fc1f2b497c2b74f97bd50784adcbf64077cd9780e9dcdc056349"
     },
     "duplicate-guard/REVIEW.md": {
       "bytes": 16131,
@@ -124,6 +124,30 @@
       "bytes": 5031,
       "sha256": "0b3516a6e7d1c5e43e4ef9829f99b0408d5224c479798708cf3fa0c2c62b8da0"
     },
+    "duplicate-guard/host-fixture/CASE-MAP.json": {
+      "bytes": 17511,
+      "sha256": "b4ef7e418b33946764771fb4ae30fc95d365e60b812fbe7a7ea4b99df14523cf"
+    },
+    "duplicate-guard/host-fixture/OUTPUT-CONTRACT.md": {
+      "bytes": 3816,
+      "sha256": "4353fa93de523a9f5cfb3c284c5326f4efd007da78d827313b85da1b03e6086d"
+    },
+    "duplicate-guard/host-fixture/OpenFragmentGuardPublicApi.hs": {
+      "bytes": 19750,
+      "sha256": "d33cc56c63e97da961b25877e58b8d5b803ce4398e457a4d9840c2e33a99fc93"
+    },
+    "duplicate-guard/host-fixture/README.md": {
+      "bytes": 8479,
+      "sha256": "8c755ddfe9e5e2c534652bf95610d9d271d7e955e7602d2062be404016e0ddfb"
+    },
+    "duplicate-guard/host-fixture/test_validate_host_outputs.py": {
+      "bytes": 5152,
+      "sha256": "2eb9fc54b1a1ca684c0611107d0f80da2f0ac3feb581d108a24b85b2d5fe53e4"
+    },
+    "duplicate-guard/host-fixture/validate_host_outputs.py": {
+      "bytes": 6418,
+      "sha256": "4016078063da0539cb9f6e9087fe013a0440f15fe8ecfe62a4cf15419d0f96d3"
+    },
     "duplicate-guard/lazy_spine_model.py": {
       "bytes": 6030,
       "sha256": "ea732ed48b4a899434cf1d44caf589abec34e823c7a091f8f2280158dd2f22b8"
@@ -140,6 +164,10 @@
       "bytes": 2495,
       "sha256": "6b1993419d5399e9bd0fd94adb82fefcb8976ea29b4351ee02ca215e59745c48"
     },
+    "host-output-validator-tests.txt": {
+      "bytes": 2493,
+      "sha256": "1c5a20ca0932148d94cd62a8e6c8f8ca479eb0e1dcffff5583bc0bcca69e55c6"
+    },
     "lazy-spine-tests.txt": {
       "bytes": 1857,
       "sha256": "977524107ae9f1b3d26c527a5ddb589cba10b95ca8483a681a4f6d0cedacf3ce"
@@ -153,7 +181,7 @@
       "sha256": "16162cda43c6686fa49d68c1d2601f278a650fc0c22156e381d2a7aaa6550f9a"
     }
   },
-  "previous_public_commit": "69388d1bb27d9be8fae4fca1a31a473442464b99",
+  "previous_public_commit": "7227968fe8cfca044925a7e96bd8e9cd92bdb722",
   "scope_cost_followup": {
     "new_pure_model_tests": 9,
     "independent_rerun_passed": true,
@@ -196,6 +224,21 @@
       "arbitrary host observational equivalence",
       "heap or stack equivalence",
       "compiler speedup"
+    ]
+  },
+  "public_api_host_fixture": {
+    "planned_cases": 24,
+    "haskell_compiled": false,
+    "haskell_run": false,
+    "fixture_sha256": "d33cc56c63e97da961b25877e58b8d5b803ce4398e457a4d9840c2e33a99fc93",
+    "actual_host_outputs_included": false,
+    "source_and_case_map_labels_verified": true,
+    "output_validator_synthetic_tests": 16,
+    "output_validator_independent_rerun": true,
+    "limits": [
+      "No heap or return-boundary spine timing validation",
+      "No full CompilerCore/interface/object/query/native qualification",
+      "No authentication of reported build or execution metadata"
     ]
   }
 }

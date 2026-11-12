@@ -76,6 +76,16 @@ lazy-list tests cover 259 bounded chunk protocols and distinguish Either WHNF,
 Fragment WHNF, shared pairs and lazy names. They do not establish actual
 Haskell heap/stack behavior or a performance improvement.
 
+## Prepared real-host qualification source, not execution results
+
+`duplicate-guard/host-fixture/` now contains one public-API Haskell Main with
+24 planned cases for future baseline/delete/spine builds. All 24 are uncompiled
+and unrun. It includes exact error-priority controls, total-fragment encoded
+observations and narrowly scoped partial-host probes, with unimplemented
+heap/spine-timing/full-artifact coverage explicitly deferred.
+The separate output comparison utility passed 16 synthetic-record tests; it
+does not run Haskell or authenticate an execution just because records agree.
+
 ## Tiny model checks
 
 Run each suite from its own directory with ordinary Python standard library:
@@ -91,6 +101,9 @@ python3 -B -m unittest -v test_scope_cost_model
 cd ../duplicate-guard
 python3 -B -m unittest -v test_admission_model
 python3 -B -m unittest -v test_lazy_spine_model
+
+cd host-fixture
+python3 -B -m unittest -v test_validate_host_outputs
 ```
 
 No compiler invocation or CI workflow is added. `VERIFICATION.json` records
