@@ -61,6 +61,15 @@ needs 4,096 equality comparisons for 64 uses of the outermost binder under 64
 nested binders. These are modeled events, not measured compiler costs.
 See `closedness/SCOPE-COST-NOTES.md` and `closedness/CALLSITE-REVIEW.md`.
 
+## Narrow candidate: remove only the duplicate guard
+
+`duplicate-guard/` contains an unapplied one-line patch, static review, and a
+10-test pure admission-protocol model. It keeps all first inventory guards and
+independent inference. In 6,342 bounded protocols, modeled results and all
+non-repeated observation traces agree. Fault injection also demonstrates the
+required producer invariant: removing or bypassing the first guards would make
+the proposed removal unsafe. This is not a production edit or measured speedup.
+
 ## Tiny model checks
 
 Run each suite from its own directory with ordinary Python standard library:
@@ -72,6 +81,9 @@ python3 -B -m unittest -v test_projection_model
 cd ../closedness
 python3 -B -m unittest -v test_closedness_model
 python3 -B -m unittest -v test_scope_cost_model
+
+cd ../duplicate-guard
+python3 -B -m unittest -v test_admission_model
 ```
 
 No compiler invocation or CI workflow is added. `VERIFICATION.json` records

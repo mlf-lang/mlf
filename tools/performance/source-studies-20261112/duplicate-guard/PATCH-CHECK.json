@@ -1,0 +1,12 @@
+{
+  "source_path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+  "source_sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+  "checker_source_sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+  "candidate_text_sha256": "2fce9e0bc418994b321ea453034b5e2ee69b3ca2b4e5b929f0f826fea62c09ae",
+  "patch_sha256": "0a829d5e2dc2439e410e72e13c322f8796903f19376d9eacb37c16f64202fdd7",
+  "removed_executable_lines": 1,
+  "added_executable_lines": 0,
+  "source_files_written": false,
+  "haskell_executed": false,
+  "test_scope": "Exact source-byte and unified-diff comparison only"
+}

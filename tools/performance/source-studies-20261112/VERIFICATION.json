@@ -1,6 +1,6 @@
 {
   "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
-  "recorded_utc": "2026-11-12T12:25:47.570709+00:00",
+  "recorded_utc": "2026-11-12T12:56:52.415197+00:00",
   "checked_open": {
     "model_tests": 15,
     "finite_structure_cases": 810,
@@ -21,12 +21,16 @@
   "native_ab_or_fixed_point_run": false,
   "files": {
     "README.md": {
-      "bytes": 4397,
-      "sha256": "ad776c1439f7938f1a23f7f60fe5acdf2ad5254fa35eb71daa135d93f2c1579d"
+      "bytes": 4990,
+      "sha256": "f4aab36adcf25976c74f88216b55bdbb63687cb50969ead1c59d623a65ac045d"
     },
     "SOURCE-PINS.json": {
       "bytes": 2043,
       "sha256": "a429f2eaf9bc5ff038934017eb412c9aff1ab27161a96201c378518716281354"
+    },
+    "admission-model-tests.txt": {
+      "bytes": 1523,
+      "sha256": "9c102daf50b75a02248299cdf8bbc71d5fe36de51bbe85d2f60a8207c11669f5"
     },
     "checked-open/CASE-MAP.json": {
       "bytes": 10201,
@@ -84,6 +88,34 @@
       "bytes": 1719,
       "sha256": "1abab5b3a339fc72459605782327b67c5a5f9bf6cb1dc64d1acb7dc04399f27f"
     },
+    "duplicate-guard/OpenFragment-remove-duplicate-guard.patch": {
+      "bytes": 540,
+      "sha256": "0a829d5e2dc2439e410e72e13c322f8796903f19376d9eacb37c16f64202fdd7"
+    },
+    "duplicate-guard/PATCH-CHECK.json": {
+      "bytes": 629,
+      "sha256": "3a978afd42a08610fbcf7afe3fa629c4e3f3a492501f2f36dac10f05e26e9120"
+    },
+    "duplicate-guard/README.md": {
+      "bytes": 3540,
+      "sha256": "757fd075361bab75c63d75796583716103d8aa9362b2f2400087f2f4b6fc2d19"
+    },
+    "duplicate-guard/REVIEW.md": {
+      "bytes": 16131,
+      "sha256": "06cb35d7d150b088ce6d94e9d38cf1cfa3b86c4a2f2be0a7243d09354213e2bc"
+    },
+    "duplicate-guard/admission_model.py": {
+      "bytes": 5031,
+      "sha256": "0b3516a6e7d1c5e43e4ef9829f99b0408d5224c479798708cf3fa0c2c62b8da0"
+    },
+    "duplicate-guard/test_admission_model.py": {
+      "bytes": 4068,
+      "sha256": "f2778c0fd6106ff0dc4cc9f4a8ab3b51eb2586468636f620e16e4d04c2d297ae"
+    },
+    "duplicate-guard/verify_candidate_patch.py": {
+      "bytes": 2495,
+      "sha256": "6b1993419d5399e9bd0fd94adb82fefcb8976ea29b4351ee02ca215e59745c48"
+    },
     "scope-cost-events.json": {
       "bytes": 8406,
       "sha256": "bbb5641b279a062b274f65cc433a1db88f61a4f7ca0e8b60a6fd7b8cf75a8d20"
@@ -93,7 +125,7 @@
       "sha256": "16162cda43c6686fa49d68c1d2601f278a650fc0c22156e381d2a7aaa6550f9a"
     }
   },
-  "previous_public_commit": "5a92f971623d48f132d4b09dd118ac7c177db6d1",
+  "previous_public_commit": "5dfe9328811f9baa5cfa92b068b8b1d3d4510678",
   "scope_cost_followup": {
     "new_pure_model_tests": 9,
     "independent_rerun_passed": true,
@@ -107,5 +139,20 @@
     "partial_host_counterexample": "documented, not shown reachable from source text",
     "stronger_domain": "Successful exact-type termType at empty type scope; or separately justified finite defined-ID input domain",
     "narrower_followup": "Study only duplicated Open.check closure predicate, keep first inventory guards and independent checker"
+  },
+  "duplicate_guard_candidate": {
+    "patch_applied": false,
+    "removed_executable_lines": 1,
+    "new_protocol_model_tests": 10,
+    "protocols": 6342,
+    "independent_rerun_passed": true,
+    "haskell_executed": false,
+    "proof_scope": "Current producer admits identical immutable type predicate first; second closure guard is logically repeated",
+    "retained_caveat": "Lazy flattened owned-list spine may be forced later; Python tuple model does not validate heap/demand equivalence",
+    "negative_controls": [
+      "bypassed first guards",
+      "forged exports after admission"
+    ],
+    "patch_byte_check": "Pinned originals and exact one-line diff matched in memory; no production source written"
   }
 }
