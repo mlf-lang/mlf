@@ -1,0 +1,1008 @@
+{
+  "schema_version": 1,
+  "kind": "read-only-source-import-inventory",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "fixture_path": "tools/performance/source-studies-20261112/duplicate-guard/host-fixture/OpenFragmentGuardPublicApi.hs",
+  "fixture_sha256": "d33cc56c63e97da961b25877e58b8d5b803ce4398e457a4d9840c2e33a99fc93",
+  "direct_project_modules": [
+    "Bootstrap.Types",
+    "Bootstrap.Map",
+    "Bootstrap.X.Check",
+    "Bootstrap.X.Checked",
+    "Bootstrap.X.Syntax",
+    "Bootstrap.X.Type",
+    "Bootstrap.OpenFragment",
+    "Bootstrap.ArtifactStructure",
+    "Bootstrap.Bitstream",
+    "MLF.Host.Base",
+    "MLF.Primitive"
+  ],
+  "project_module_count": 47,
+  "project_source_bytes": 1318860,
+  "method": "Recursive source import-header scan at pinned Git tree; module declarations checked, all returned source byte counts and Git blob SHA-1 recomputed; ordinary import names deduplicated. CPP alternatives are a union, not a GHC-preprocessed graph. External package import closure not expanded.",
+  "modules": [
+    {
+      "module": "Bootstrap.ArtifactStorage",
+      "path": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+      "bytes": 55963,
+      "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7",
+      "git_blob_sha": "2bb41983eb3c6aebc879dc0ca246e971c7d42005",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Bitstream",
+        "Bootstrap.Host",
+        "Bootstrap.Separate",
+        "Bootstrap.Module",
+        "Bootstrap.Data",
+        "Bootstrap.Parser",
+        "Bootstrap.Lexer",
+        "Bootstrap.Unicode",
+        "Bootstrap.X.Parser",
+        "Bootstrap.Set",
+        "Bootstrap.X.Type",
+        "Bootstrap.X.Checked",
+        "Bootstrap.X.Pretty",
+        "Bootstrap.Map",
+        "Bootstrap.Primitive"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.ArtifactStructure",
+      "path": "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs",
+      "bytes": 141700,
+      "sha256": "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23",
+      "git_blob_sha": "2b300eaba0848c366f23c992f3ec794c61391bf2",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.IntMap",
+        "Bootstrap.Module",
+        "Bootstrap.Separate",
+        "Bootstrap.Bitstream"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Bitstream",
+      "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "bytes": 82558,
+      "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8",
+      "git_blob_sha": "699f1c5d354e0077869b6955f00a7299c0eca4df",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.IntMap",
+        "Bootstrap.IndexVec"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.ClassDemand",
+      "path": "libraries/mlf-inference/Bootstrap/ClassDemand.hs",
+      "bytes": 17441,
+      "sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+      "git_blob_sha": "3e5c20e47928ef9f7676d85ab01f40b33ccd1b13",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntSet"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Classes",
+      "path": "libraries/mlf-inference/Bootstrap/Classes.hs",
+      "bytes": 120915,
+      "sha256": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
+      "git_blob_sha": "058b4f99aeffb530b137cd5d4dde8a467bbdac29",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Fresh",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntMap",
+        "Bootstrap.ClassDemand",
+        "Bootstrap.Dependency",
+        "Bootstrap.IndexVec",
+        "Bootstrap.ST",
+        "Bootstrap.Data",
+        "Bootstrap.Kinding",
+        "Bootstrap.Desugar",
+        "Bootstrap.Surface",
+        "Bootstrap.X.Pretty"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Data",
+      "path": "libraries/mlf-language-core/Bootstrap/Data.hs",
+      "bytes": 18847,
+      "sha256": "80545c6378de8e846d3a13df8b5418b8fd7854d011346f12dbfd4c99c47c7558",
+      "git_blob_sha": "5a56d522e503d05051466be1ffbb0d99300a2dca",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.Kind",
+        "Bootstrap.Unicode"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Dependency",
+      "path": "libraries/mlf-frontend/Bootstrap/Dependency.hs",
+      "bytes": 32565,
+      "sha256": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2",
+      "git_blob_sha": "164df39c54551e2a53e2d2b2de3b23f61220dcd3",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.IndexVec",
+        "Bootstrap.Resolved",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntMap",
+        "Bootstrap.ST",
+        "Bootstrap.Desugar"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Desugar",
+      "path": "libraries/mlf-frontend/Bootstrap/Desugar.hs",
+      "bytes": 10638,
+      "sha256": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37",
+      "git_blob_sha": "900c5752cf9d0847143cf783dbcac18aec60e301",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Fresh",
+        "Bootstrap.Data"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Evidence",
+      "path": "libraries/mlf-inference/Bootstrap/Evidence.hs",
+      "bytes": 14164,
+      "sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+      "git_blob_sha": "9cd87f1aacccdc047a188313277d2697c4d15a59",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.Kind",
+        "Bootstrap.X.Type",
+        "Bootstrap.X.Syntax",
+        "Bootstrap.X.Check",
+        "Bootstrap.X.Pretty"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.EvidenceBoundary",
+      "path": "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs",
+      "bytes": 20210,
+      "sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
+      "git_blob_sha": "a74a2cdb9ec6972030368c04045cc47dd365fc17",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Data",
+        "Bootstrap.Map",
+        "Bootstrap.Evidence",
+        "Bootstrap.X.Check",
+        "Bootstrap.X.Checked",
+        "Bootstrap.X.Type",
+        "Bootstrap.X.Syntax"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Fresh",
+      "path": "libraries/mlf-foundation/Bootstrap/Fresh.hs",
+      "bytes": 2592,
+      "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
+      "git_blob_sha": "fd476cc986c7b4cfaf5eec3548cb8f8e13c8b323",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Set"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Host",
+      "path": "libraries/mlf-foundation/Bootstrap/Host.hs",
+      "bytes": 3246,
+      "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+      "git_blob_sha": "88e81372802f51c5388dbe1da2ba78b59a9d3c5a",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.IndexVec",
+      "path": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+      "bytes": 5573,
+      "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e",
+      "git_blob_sha": "33a339e71ad7dede8c866a1903bf85bad1034d13",
+      "imports": [
+        "MLF.Primitive"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.IntMap",
+      "path": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "bytes": 21811,
+      "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+      "git_blob_sha": "c8eca50ec22c4bbc7fb71111d60a2091ec74bb2e",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.IntTree",
+        "Bootstrap.IntRank",
+        "Bootstrap.IntSet"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.IntRank",
+      "path": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+      "bytes": 6684,
+      "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
+      "git_blob_sha": "7828fd523cc6ebb5b15f38a1004a07053dcd5381",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.IntTree"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.IntSet",
+      "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "bytes": 17405,
+      "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+      "git_blob_sha": "41b09cdd43193899ec46e15df57906012b3f3098",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.IntTree",
+        "Bootstrap.IntRank"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.IntTree",
+      "path": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+      "bytes": 3727,
+      "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
+      "git_blob_sha": "6f2f11050e974bf23578e4aa0a4762013d29074e",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Kind",
+      "path": "libraries/mlf-language-core/Bootstrap/Kind.hs",
+      "bytes": 1161,
+      "sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+      "git_blob_sha": "dbbd46ca5ae674adc78b49cae098455be65e626a",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Kinding",
+      "path": "libraries/mlf-language-core/Bootstrap/Kinding.hs",
+      "bytes": 1950,
+      "sha256": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
+      "git_blob_sha": "0b6be55b725ca9f363f5c3beb446327ce2b11dbd",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Kind",
+        "Bootstrap.Data"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Layout",
+      "path": "libraries/mlf-frontend/Bootstrap/Layout.hs",
+      "bytes": 20056,
+      "sha256": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8",
+      "git_blob_sha": "e57405d9a43eca043a9b578b40f020d3625a60f5",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Lexer"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Lexer",
+      "path": "libraries/mlf-frontend/Bootstrap/Lexer.hs",
+      "bytes": 44635,
+      "sha256": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
+      "git_blob_sha": "15b0ecd64ca74e34eb612abfdc41c016ee22909d",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Unicode"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Map",
+      "path": "libraries/mlf-foundation/Bootstrap/Map.hs",
+      "bytes": 17218,
+      "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+      "git_blob_sha": "7a96f912d4a5bbd7e8291c0df4042bd56a9c8c65",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Module",
+      "path": "libraries/mlf-frontend/Bootstrap/Module.hs",
+      "bytes": 79471,
+      "sha256": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
+      "git_blob_sha": "503f1dcbb3ba8cabe70e601daa472d291947b61e",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.IntSet",
+        "Bootstrap.Data",
+        "Bootstrap.Primitive",
+        "Bootstrap.Parser",
+        "Bootstrap.Surface",
+        "Bootstrap.Desugar",
+        "Bootstrap.Prelude",
+        "Bootstrap.Unicode",
+        "Bootstrap.Lexer",
+        "Bootstrap.Dependency",
+        "Bootstrap.Resolved",
+        "Bootstrap.IndexVec"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.OpenFragment",
+      "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+      "bytes": 35625,
+      "sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+      "git_blob_sha": "137b9dd2e14e6035d1a7c86e809dfa01cc052d82",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntMap",
+        "Bootstrap.IndexVec",
+        "Bootstrap.Data",
+        "Bootstrap.X.Check",
+        "Bootstrap.X.Checked",
+        "Bootstrap.X.Syntax",
+        "Bootstrap.X.Type",
+        "Bootstrap.X.Pretty",
+        "Bootstrap.Separate",
+        "Bootstrap.EvidenceBoundary",
+        "Bootstrap.Bitstream",
+        "Bootstrap.ArtifactStructure",
+        "Bootstrap.ArtifactStorage"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Parsec",
+      "path": "libraries/mlf-frontend/Bootstrap/Parsec.hs",
+      "bytes": 11604,
+      "sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
+      "git_blob_sha": "3d7a1defa4d8cc4dfbc88800a9465935fef6617c",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Lexer"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Parser",
+      "path": "libraries/mlf-frontend/Bootstrap/Parser.hs",
+      "bytes": 70221,
+      "sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c",
+      "git_blob_sha": "a00451dddd0e1404397ed23c5a2771c423d1c866",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Lexer",
+        "Bootstrap.Parsec",
+        "Bootstrap.Layout",
+        "Bootstrap.Unicode",
+        "Bootstrap.Surface",
+        "Bootstrap.Desugar",
+        "Bootstrap.Fresh"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Prelude",
+      "path": "libraries/mlf-frontend/Bootstrap/Prelude.hs",
+      "bytes": 29247,
+      "sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2",
+      "git_blob_sha": "84ea0e7dc521657ddc8e4e9b94f95bf6ee841f8c",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Set",
+        "Bootstrap.Surface"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Primitive",
+      "path": "libraries/mlf-language-core/Bootstrap/Primitive.hs",
+      "bytes": 64524,
+      "sha256": "53a7d3b4c605cd15071a528185ab7252099027feb8c40db23d5dd40ac42e2726",
+      "git_blob_sha": "7f755d9dc50091f67ac6251ec91d7144c1e9df9e",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Resolved",
+      "path": "libraries/mlf-frontend/Bootstrap/Resolved.hs",
+      "bytes": 5990,
+      "sha256": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052",
+      "git_blob_sha": "965b6587d00ea709111fb93969c9db940d1c90be",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.IndexVec"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.ST",
+      "path": "libraries/mlf-foundation/Bootstrap/ST.hs",
+      "bytes": 2539,
+      "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
+      "git_blob_sha": "b43fae22feb61da83bf75b487a06583f3c190822",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Separate",
+      "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "bytes": 68595,
+      "sha256": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
+      "git_blob_sha": "06b31f175b6335ca3b0b03dba013002de34bc878",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Lexer",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Fresh",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntSet",
+        "Bootstrap.Module",
+        "Bootstrap.Classes",
+        "Bootstrap.Parser",
+        "Bootstrap.Primitive",
+        "Bootstrap.Desugar",
+        "Bootstrap.Surface",
+        "Bootstrap.Data",
+        "Bootstrap.SourceEquality",
+        "Bootstrap.Kind",
+        "Bootstrap.X.Type",
+        "Bootstrap.X.Syntax",
+        "Bootstrap.X.Check",
+        "Bootstrap.X.Checked",
+        "Bootstrap.X.Parser",
+        "Bootstrap.X.Pretty"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Set",
+      "path": "libraries/mlf-foundation/Bootstrap/Set.hs",
+      "bytes": 4093,
+      "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+      "git_blob_sha": "72ffaf8f5c3f47468cb3365f4e31734c0390e1f4",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.SourceEquality",
+      "path": "libraries/mlf-crates/Bootstrap/SourceEquality.hs",
+      "bytes": 16511,
+      "sha256": "806297f22ce1d35a02b6db393ecc18771e571a08f13665f981e509358525c6f8",
+      "git_blob_sha": "df47fc4920a57519cdea83018ca595e365b5f3dd",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.IndexVec",
+        "Bootstrap.Std",
+        "Bootstrap.Primitive"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Std",
+      "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "bytes": 20088,
+      "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca",
+      "git_blob_sha": "8e7a513d336815f313ab63be975ce4af3303554c",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.IndexVec"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Surface",
+      "path": "libraries/mlf-frontend/Bootstrap/Surface.hs",
+      "bytes": 36496,
+      "sha256": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa",
+      "git_blob_sha": "3e8082684587d25915d7f209bbf74d32e7c3dcc7",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Fresh",
+        "Bootstrap.Desugar",
+        "Bootstrap.Dependency",
+        "Bootstrap.Resolved",
+        "Bootstrap.IndexVec",
+        "Bootstrap.IntSet",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.Data"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Types",
+      "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "bytes": 12757,
+      "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596",
+      "git_blob_sha": "4acbd097fe227d6f01f9d8b728fd5cc22cce6500",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.IndexVec"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.Unicode",
+      "path": "libraries/mlf-foundation/Bootstrap/Unicode.hs",
+      "bytes": 55534,
+      "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077",
+      "git_blob_sha": "cc8cc7591f54f41204728ede66d5700d3907a3bc",
+      "imports": [
+        "MLF.Primitive"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.X.Check",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Check.hs",
+      "bytes": 17179,
+      "sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+      "git_blob_sha": "2082ce9c7424191854d3ce17e7aecfdff1f2a94e",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Kind",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.Data",
+        "Bootstrap.Primitive",
+        "Bootstrap.X.Type",
+        "Bootstrap.X.Syntax"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.X.Checked",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Checked.hs",
+      "bytes": 26092,
+      "sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
+      "git_blob_sha": "5c1d50962268e852020e0a7490b9982a885fd72e",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.X.Check",
+        "Bootstrap.Data",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.IntSet",
+        "Bootstrap.IntMap",
+        "Bootstrap.X.Syntax",
+        "Bootstrap.X.Type"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.X.Parser",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Parser.hs",
+      "bytes": 16487,
+      "sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209",
+      "git_blob_sha": "b5f4eef9f956b23f015937b809e2e4314246bfd6",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Lexer",
+        "Bootstrap.Parsec",
+        "Bootstrap.Unicode",
+        "Bootstrap.Primitive",
+        "Bootstrap.X.Type",
+        "Bootstrap.Kind"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.X.Pretty",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+      "bytes": 12549,
+      "sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
+      "git_blob_sha": "afeed293d0a8d0f4683daf7189a2c024149b173c",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Data",
+        "Bootstrap.Primitive",
+        "Bootstrap.Kind"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.X.Syntax",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs",
+      "bytes": 4813,
+      "sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
+      "git_blob_sha": "855324dc13d9ab46511a89b7f7460da07948ecac",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Primitive",
+        "Bootstrap.Kind"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "Bootstrap.X.Type",
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Type.hs",
+      "bytes": 9309,
+      "sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+      "git_blob_sha": "4147d9e8c3db9ca42459fa9c46ace1c9a1660d04",
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.Map",
+        "Bootstrap.Set",
+        "Bootstrap.Data",
+        "Bootstrap.Kind"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "MLF.Host.Async",
+      "path": "host/ghc/MLF/Host/Async.hs",
+      "bytes": 8881,
+      "sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5",
+      "git_blob_sha": "601bb2e08f7be500646d9cae520b068c83640686",
+      "imports": [
+        "Prelude",
+        "MLF.Host.Base",
+        "Data.IORef",
+        "Data.Sequence",
+        "Data.Foldable",
+        "Control.Monad",
+        "Control.Exception",
+        "Control.Concurrent",
+        "GHC.Clock"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "MLF.Host.Base",
+      "path": "host/ghc/MLF/Host/Base.hs",
+      "bytes": 19364,
+      "sha256": "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116",
+      "git_blob_sha": "09e0873d0ecf95c7b393ca1e33e160d6b0e3454f",
+      "imports": [
+        "Prelude",
+        "Data.Text",
+        "Data.Text.Internal",
+        "Data.Text.Array",
+        "Data.Text.Encoding",
+        "Data.ByteString",
+        "Data.Char",
+        "Data.String",
+        "GHC.Stack",
+        "Data.Array.Unboxed",
+        "Data.Bits",
+        "Data.Int",
+        "Data.Word",
+        "Data.Typeable",
+        "Control.Exception",
+        "Control.Monad.ST",
+        "Data.Array",
+        "Data.Array.ST",
+        "Data.Array.Base",
+        "GHC.Float",
+        "GHC.Conc",
+        "GHC.Exts",
+        "GHC.Num.Integer",
+        "Foreign.C",
+        "Foreign.Marshal.Alloc",
+        "System.IO.Unsafe",
+        "Text.Read"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "MLF.Host.IO",
+      "path": "host/ghc/MLF/Host/IO.hs",
+      "bytes": 15420,
+      "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a",
+      "git_blob_sha": "79aab068e3d323b6b4192834d33cb4177eeadc4d",
+      "imports": [
+        "Prelude",
+        "MLF.Host.Base",
+        "Data.ByteString",
+        "Data.Array.IO",
+        "Data.Array.Base",
+        "Data.IntMap.Lazy",
+        "Data.Map.Lazy",
+        "Data.IORef",
+        "Data.Int",
+        "Data.Word",
+        "Foreign.Marshal.Alloc",
+        "Foreign.ForeignPtr",
+        "Foreign.Marshal.Utils",
+        "Foreign",
+        "Foreign.C",
+        "Control.Concurrent.MVar",
+        "Control.Exception",
+        "System.IO.Unsafe",
+        "System.IO.Error",
+        "GHC.Stack",
+        "System.IO",
+        "System.Exit"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    },
+    {
+      "module": "MLF.Primitive",
+      "path": "host/ghc/MLF/Primitive.hs",
+      "bytes": 14412,
+      "sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb",
+      "git_blob_sha": "1cf4ac81319bf8fa0491e6fd8614055fc67cca95",
+      "imports": [
+        "Prelude",
+        "Control.Monad.Fail",
+        "Control.Monad.ST",
+        "GHC.Exts",
+        "Data.String",
+        "GHC.Stack",
+        "System.IO.Error",
+        "MLF.Host.Base",
+        "MLF.Host.IO",
+        "MLF.Host.Async"
+      ],
+      "declared_module_verified": true,
+      "git_blob_verified": true
+    }
+  ],
+  "external_import_names": [
+    "Control.Concurrent",
+    "Control.Concurrent.MVar",
+    "Control.Exception",
+    "Control.Monad",
+    "Control.Monad.Fail",
+    "Control.Monad.ST",
+    "Data.Array",
+    "Data.Array.Base",
+    "Data.Array.IO",
+    "Data.Array.ST",
+    "Data.Array.Unboxed",
+    "Data.Bits",
+    "Data.ByteString",
+    "Data.Char",
+    "Data.Foldable",
+    "Data.IORef",
+    "Data.Int",
+    "Data.IntMap.Lazy",
+    "Data.Map.Lazy",
+    "Data.Sequence",
+    "Data.String",
+    "Data.Text",
+    "Data.Text.Array",
+    "Data.Text.Encoding",
+    "Data.Text.Internal",
+    "Data.Typeable",
+    "Data.Word",
+    "Foreign",
+    "Foreign.C",
+    "Foreign.ForeignPtr",
+    "Foreign.Marshal.Alloc",
+    "Foreign.Marshal.Utils",
+    "GHC.Clock",
+    "GHC.Conc",
+    "GHC.Exts",
+    "GHC.Float",
+    "GHC.Num.Integer",
+    "GHC.Stack",
+    "Prelude",
+    "System.Exit",
+    "System.IO",
+    "System.IO.Error",
+    "System.IO.Unsafe",
+    "Text.Read"
+  ],
+  "foreign_import_declarations": [
+    {
+      "module": "MLF.Host.Base",
+      "path": "host/ghc/MLF/Host/Base.hs",
+      "declarations": [
+        "foreign import ccall unsafe \"mlf_ghc_format\" c_format :: CInt -> CDouble -> CString -> IO CInt"
+      ]
+    },
+    {
+      "module": "MLF.Host.IO",
+      "path": "host/ghc/MLF/Host/IO.hs",
+      "declarations": [
+        "foreign import ccall safe \"mlf_ghc_host\" c_host :: CInt -> CString -> CSize -> CString -> CSize -> Int64 -> Ptr CString -> Ptr CSize -> Ptr Int64 -> IO CInt",
+        "foreign import ccall safe \"mlf_ghc_shutdown\" c_shutdown :: IO ()",
+        "foreign import ccall unsafe \"getProgArgv\" c_args :: Ptr CInt -> Ptr (Ptr CString) -> IO ()",
+        "foreign import ccall safe \"mlf_ghc_read_byte_file\" c_readByteFile :: CString -> CSize -> Int64 -> Ptr (Ptr Word8) -> Ptr CSize -> IO CString",
+        "foreign import ccall safe \"mlf_ghc_write_byte_file\" c_writeByteFile :: CString -> CSize -> Ptr Word8 -> CSize -> IO CString",
+        "foreign import ccall safe \"mlf_ghc_byte_array_digest\" c_byteArrayDigest :: Ptr Word8 -> CSize -> CString -> IO ()"
+      ]
+    }
+  ],
+  "cabal": {
+    "path": "mlf-shared.cabal",
+    "bytes": 7135,
+    "sha256": "b2abd4810918a0b5cc96257d636b0f3a4aea853d0b2296e2ebcf7932bef43ec3",
+    "git_blob_sha": "0397f69284b324a06de58ba2cee733c622967b71",
+    "host_other_modules": [
+      "MLF.Primitive",
+      "MLF.Host.Base",
+      "MLF.Host.Async"
+    ],
+    "c_sources": [
+      "host/ghc/cbits/host.c",
+      "runtime/mlf_process_supervisor.c"
+    ],
+    "ghc_options": [
+      "-fpedantic-bottoms",
+      "-fno-state-hack"
+    ],
+    "base_bounds": ">= 4.22 && < 4.23"
+  },
+  "claims": {
+    "haskell_compiled": false,
+    "haskell_executed": false,
+    "actual_ghc_dependency_graph_established": false,
+    "build_time_established": false,
+    "runtime_speedup_established": false,
+    "resume_authorized": false
+  }
+}

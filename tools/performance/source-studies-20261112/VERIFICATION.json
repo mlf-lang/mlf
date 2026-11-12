@@ -1,6 +1,6 @@
 {
   "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
-  "recorded_utc": "2026-11-12T15:24:28.338212+00:00",
+  "recorded_utc": "2026-11-12T16:36:31.319436+00:00",
   "checked_open": {
     "model_tests": 15,
     "finite_structure_cases": 810,
@@ -21,8 +21,8 @@
   "native_ab_or_fixed_point_run": false,
   "files": {
     "README.md": {
-      "bytes": 6064,
-      "sha256": "0883866ba39e68450f57b3509de583b150736299aeea0ea86cab3e8a1f077827"
+      "bytes": 6778,
+      "sha256": "45b4b5b18e685667da146e6aa3179e855893a2f00c90611cdf368cac41e8b14d"
     },
     "SOURCE-PINS.json": {
       "bytes": 2043,
@@ -124,9 +124,17 @@
       "bytes": 5031,
       "sha256": "0b3516a6e7d1c5e43e4ef9829f99b0408d5224c479798708cf3fa0c2c62b8da0"
     },
+    "duplicate-guard/host-fixture/BUILD-FEASIBILITY.md": {
+      "bytes": 9106,
+      "sha256": "914a4df760ed1eb2b4cbbe5aa6e5c559f760cff08259418b16dbb465e96b7e50"
+    },
     "duplicate-guard/host-fixture/CASE-MAP.json": {
       "bytes": 17511,
       "sha256": "b4ef7e418b33946764771fb4ae30fc95d365e60b812fbe7a7ea4b99df14523cf"
+    },
+    "duplicate-guard/host-fixture/IMPORT-INVENTORY.json": {
+      "bytes": 31770,
+      "sha256": "da9e20b25cc2f80e54eb840397582f2a7748b7f33efe215b5e0be8da07820589"
     },
     "duplicate-guard/host-fixture/OUTPUT-CONTRACT.md": {
       "bytes": 3816,
@@ -181,7 +189,7 @@
       "sha256": "16162cda43c6686fa49d68c1d2601f278a650fc0c22156e381d2a7aaa6550f9a"
     }
   },
-  "previous_public_commit": "7227968fe8cfca044925a7e96bd8e9cd92bdb722",
+  "previous_public_commit": "70112baa18fb69a692a534233ca34d731b40e036",
   "scope_cost_followup": {
     "new_pure_model_tests": 9,
     "independent_rerun_passed": true,
@@ -240,5 +248,19 @@
       "No full CompilerCore/interface/object/query/native qualification",
       "No authentication of reported build or execution metadata"
     ]
+  },
+  "host_build_feasibility": {
+    "project_direct_imports": 11,
+    "project_module_header_closure": 47,
+    "project_source_bytes": 1318860,
+    "source_git_blobs_verified": 47,
+    "independent_source_scan_matches": true,
+    "haskell_compiled": false,
+    "haskell_run": false,
+    "new_abstract_model_tests": 0,
+    "actual_build_time_measured": false,
+    "source_closure_excludes_compiler_core_llvm_graph": true,
+    "requires_coherent_host_toolchain_and_ffi_link": true,
+    "status": "Read-only source inspection, not build admission or an actual GHC dependency graph"
   }
 }

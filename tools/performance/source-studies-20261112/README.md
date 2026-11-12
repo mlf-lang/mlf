@@ -111,3 +111,7 @@ exact published source hashes and limited evidence. `SOURCE-PINS.json` records
 the original repository files inspected, without machine-specific locations or
 private recovery links. Further source-only experiments should retain the
 independent baseline and distinguish modeled results from real compiler tests.
+
+## Real host build boundary
+
+`duplicate-guard/host-fixture/BUILD-FEASIBILITY.md` and `IMPORT-INVENTORY.json` record the pinned source import closure and ordinary-host requirements. The planned 24-case fixture imports 11 project modules directly and reaches 47 project modules (1,318,860 source bytes) in a static header scan, including C/FFI host support. This is not a base-only microprogram, a completed build, or a timing measurement. A separately admitted source-closure build could avoid the monolithic package component, but requires the real toolchain and host link dependencies; substituting stubs or copied model types would not test the same public APIs. No Haskell was compiled or run for this review.
