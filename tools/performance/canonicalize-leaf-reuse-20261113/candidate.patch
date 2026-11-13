@@ -1,0 +1,22 @@
+--- a/libraries/mlf-inference/Bootstrap/Graph.hs
++++ b/libraries/mlf-inference/Bootstrap/Graph.hs
+@@ -1138,7 +1138,18 @@
+   canonicalize :: Graph -> Graph;
+   canonicalize graph =
+     mkGraph
+-      (mapNodes (\node -> mkNode (mapTag (resolve graph) (tag node)) (binder node) (flag node))
++      (mapNodes
++         (\node ->
++            -- Childless tags need no alias rewrite. mapNodes still applies
++            -- strictNode, preserving tag, binder and flag demand while keeping
++            -- these nodes and their lazy kind/name payloads intact.
++            case tag node of {
++              GBot -> node;
++              GBotK kind -> node;
++              GTyCon name kind -> node;
++              GSkolem identity kind -> node;
++              _ -> mkNode (mapTag (resolve graph) (tag node)) (binder node) (flag node)
++            })
+          (nodes graph))
+       (links graph)
+       (nextId graph);

@@ -1,0 +1,12 @@
+{
+  "status": "static source checks passed; no Haskell compilation/execution",
+  "baseline_source_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "candidate_source_sha256": "2ac72b7697b7f22ee33844c58556bdb673d1fd73fefb1c2d14e8c2eed8ecc380",
+  "only_changed_definition": "canonicalize",
+  "existing_type_signatures_preserved": true,
+  "reference_body_matches_frozen_expression_after_qualification": true,
+  "patch_exactly_reproduces_source_difference": true,
+  "compiler_tests_run": false,
+  "runtime_tests_run": false,
+  "performance_tests_run": false
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "mlf-canonicalize-leaf-reuse-source-v1",
+  "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "changed_source": "libraries/mlf-inference/Bootstrap/Graph.hs",
+  "baseline_source_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "candidate_source_sha256": "2ac72b7697b7f22ee33844c58556bdb673d1fd73fefb1c2d14e8c2eed8ecc380",
+  "patch_sha256": "c739556ec1116e2097a6e8888982866effce4ba4f51c9affee1f626e27a2da54",
+  "status": "source-only; no compiler or runtime test executed; no performance result",
+  "implementation": "canonicalize leaf Node reuse only",
+  "unchanged": "All bytes outside canonicalize; existing signature; dense/sparse rebinding; input/output validation; firstOrder; permissions; primitives; public data types"
+}
