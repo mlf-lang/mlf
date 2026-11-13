@@ -1,0 +1,51 @@
+{
+  "schema": "r18-first-producer-failure-v1",
+  "complete_as_failure_report": true,
+  "producer_qualified": false,
+  "candidate_source_commit": "768227fd023b3231eb7d8ce8cde43661b7bfef28",
+  "candidate_public_commit": "35da5dd5e1bd10544734b0de97640e855f985ded",
+  "guard_elapsed_seconds": 201.66240534299868,
+  "exit_code": 1,
+  "cleanup": true,
+  "lock_reacquired": true,
+  "lease_cleared": true,
+  "cause": "prepared Prelude build source identity is stale",
+  "failed_gate": "builtin verification check-candidate",
+  "all_recorded_producer_commands_before_gate_succeeded": true,
+  "recorded_producer_commands": 18,
+  "reached_implementation_identity": true,
+  "not_a_timeout": true,
+  "native_ab_fixed_point_paused": true,
+  "ordinary_benchmark_executed": false,
+  "correction_plan": "Regenerate canonical builtin using the current nongenerated candidate generator, verify its complete exact source diff, preserve this failed source/producer unchanged, and rebuild a new isolated producer from the new clean commit. Do not bypass freshness or retroactively qualify this producer.",
+  "evidence": {
+    "controller.json": {
+      "bytes": 6216,
+      "sha256": "a84014d613b1ed7017b9f2a0e303721c13e59b82cca9339efe3c4c46f0d96824"
+    },
+    "outer/guard.json": {
+      "bytes": 8986,
+      "sha256": "3766ce50919cc80caccf50e6c48b05e805528c5de9bdc343304df61a99778388"
+    },
+    "bounded-receipt.json": {
+      "bytes": 176729,
+      "sha256": "81a3296d8c58160e64dd3472fc747d58cc7c9c439efe2a0dd2498e41d32b5866"
+    },
+    "producer/receipt.json": {
+      "bytes": 1176383,
+      "sha256": "2a85547d776ff80f23055f128dcb95b511de679f985d5c6fec330769adf18636"
+    },
+    "producer/builtin-verification/receipt.json": {
+      "bytes": 29504,
+      "sha256": "dda47c79b09aa022ad38425545d749e5fac3a9c8879d7e684570a727cba815ce"
+    },
+    "producer/builtin-verification/check-candidate.stderr": {
+      "bytes": 48,
+      "sha256": "8cf0a9cc3518aee07852f29b97a216bfe18fefe058c62e4710b35a8a809e700c"
+    },
+    "build.log": {
+      "bytes": 73517,
+      "sha256": "bf0e5199d402855b67f86da184b5834103185e8b5219b9132610620faeeb74fd"
+    }
+  }
+}

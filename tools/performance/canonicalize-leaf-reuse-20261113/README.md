@@ -1,9 +1,15 @@
 # Candidate: reuse childless nodes during canonicalization
 
 Experimental, not merged. Against fixed source `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`.
-The source and demand review is complete; the new ordinary producer BUILD has
-started but is not yet reported complete. Candidate Haskell correctness and
-performance are not yet established.
+The source and demand review is complete. The first ordinary producer completed
+GHC compilation/linking but was correctly rejected by the final builtin freshness
+gate: `prepared Prelude build source identity is stale`. Graph is in the builtin
+generator source closure, so its change requires exact canonical regeneration.
+The 201.662-second failed run was cleaned up with both locks and lease cleared.
+See [the failure record](results/first-build-failure.json). Its source and outputs
+remain unchanged; a new isolated regenerated-builtin producer is being prepared.
+No gate is skipped or failure retroactively marked successful. Candidate Haskell
+correctness and performance are not yet established.
 
 The qualified r17 experiment identifies canonicalize/rebind as 8,830,980,432
 profiled allocation bytes, 52.46% of local unify and 14.48% of the total.
