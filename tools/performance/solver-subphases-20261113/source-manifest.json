@@ -1,0 +1,140 @@
+{
+  "schema": "r16-published-source-manifest-v1",
+  "base": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "runtime_complete": false,
+  "files": {
+    "implementation/controller.py": {
+      "bytes": 34282,
+      "sha256": "5a08da162499d570d957af839df3bba89b68d148f397105ce0c5a0261630e659"
+    },
+    "implementation/controls.py": {
+      "bytes": 18993,
+      "sha256": "0d7aa0cb9bea2fa9c85bdc0e63dd1bd6f57ff4c7891951f82cd78af0f3d2dd53"
+    },
+    "implementation/fine_profile.py": {
+      "bytes": 14427,
+      "sha256": "0812d86adde280a0a474805ed4e73abeb5a5bcb4e12c2480901195e5847685e9"
+    },
+    "implementation/fixtures/CheckedBindings.stdout": {
+      "bytes": 871,
+      "sha256": "443acba38c8c39a463e266c4add970f6c5df78b7a2329deea4a67682746c68e5"
+    },
+    "implementation/fixtures/DeferredDemand.hs": {
+      "bytes": 806,
+      "sha256": "e9d80cb72dc3e384178e7a55713f013bf993ed89b778ffc4f634a52c980736ae"
+    },
+    "implementation/fixtures/IgnoredRTS.hs": {
+      "bytes": 79,
+      "sha256": "6c685bf6ee35606533abf6db1ff4ec1aa9d791ca49297fa3fb1d46086c0da053"
+    },
+    "implementation/fixtures/InventoryDemand.hs": {
+      "bytes": 1619,
+      "sha256": "6714af5961b3e3f36267bc8de221817c8c451e7adb102d3597629579289cf54e"
+    },
+    "implementation/fixtures/README.md": {
+      "bytes": 4687,
+      "sha256": "2edfb8da9e073a6befd71b2e4ee7df2623996784dda20c8f46c5f71c1a3e5ba3"
+    },
+    "implementation/fixtures/SourceValueScope.stdout": {
+      "bytes": 823,
+      "sha256": "743bf5ff79d2937eef00bf1f138f6d0fe97fcb15e84df642278cb9e299c02983"
+    },
+    "implementation/fixtures/UnitAllocation.hs": {
+      "bytes": 498,
+      "sha256": "6a141b5fe420a69825643e8e57e326190f031de60723eaee665d4904eda7249e"
+    },
+    "implementation/fixtures/maintained-contract.json": {
+      "bytes": 970,
+      "sha256": "10e75a38229775ff040026d8f25fcfb39b0665cb1de208f9f77b30c927efa30c"
+    },
+    "implementation/foundation14-source.json": {
+      "bytes": 2884,
+      "sha256": "e85b2776812a28fafd4074b5c4823f26a76ad2e0137492964ade76450f68d7fa"
+    },
+    "implementation/guard.py": {
+      "bytes": 24833,
+      "sha256": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e"
+    },
+    "implementation/insertion-map.json": {
+      "bytes": 87646,
+      "sha256": "48ed0fc11c01af2dcd5095ece9755eb3d66a2994a321982eed7bb0e76d9ed041"
+    },
+    "implementation/mirror.py": {
+      "bytes": 9099,
+      "sha256": "8dfb2f794a04fb35b13f37c188e5daa2c4e24b08bce2169e7266595033799a82"
+    },
+    "implementation/oracles.py": {
+      "bytes": 7753,
+      "sha256": "9a9bc72aef6bfe7cf3853620b8b4dc055b12d5ab50df1f53dd95247775d8777f"
+    },
+    "implementation/profile.py": {
+      "bytes": 9086,
+      "sha256": "f31b0d9569dc7328198e92e5e439183f9cd1f5a4365407041c7739a095cb0c96"
+    },
+    "implementation/runtime_pins.py": {
+      "bytes": 11663,
+      "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+    },
+    "implementation/stats.py": {
+      "bytes": 4888,
+      "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+    },
+    "implementation/test_controller.py": {
+      "bytes": 13721,
+      "sha256": "299dd8c91a8c4f8d621a235e3e7be62105af2a6859962e38388b64055c4419b6"
+    },
+    "implementation/test_controls.py": {
+      "bytes": 13701,
+      "sha256": "7b834659598336849e227137bc90ca020a56e7c5e0c2dae2e01b500c7c64ac5c"
+    },
+    "implementation/test_fine_profile.py": {
+      "bytes": 9819,
+      "sha256": "8bf0647e7df36eb3c9278081ecbcf43daf22ddfb2195fbf3245435e767f1d2ae"
+    },
+    "implementation/test_guard.py": {
+      "bytes": 17422,
+      "sha256": "0f87f21a5055c4f017954d10c8be9d36eb0b5ddc7f5f3132aa912e3995108a2a"
+    },
+    "implementation/test_mirror.py": {
+      "bytes": 7442,
+      "sha256": "e41ce48b20a555e9d4d0451c278ba047c6cf0cd4b051d083b849468de18c3a82"
+    },
+    "implementation/test_profile.py": {
+      "bytes": 7960,
+      "sha256": "5e3462bc4bc098bf772d41fdd1168e6a806317aac378a583f3873e40dc322d66"
+    },
+    "implementation/test_runtime_pins.py": {
+      "bytes": 8682,
+      "sha256": "0d77c6b965a46a6e4d1c4486f683064001b28e545e6f10c7eff74455956aeeb4"
+    },
+    "implementation/test_solver_overlay.py": {
+      "bytes": 5704,
+      "sha256": "a5045a08cb961996e4f64233a1d771d8662416a42b2d9b6b4c6d6add91aca221"
+    },
+    "implementation/test_stats.py": {
+      "bytes": 3101,
+      "sha256": "f8fccc3bb78436726eae365d9fe6400f6058d0315d9fad60e802aba1a34f475a"
+    },
+    "COARSE-TO-FINE.patch": {
+      "bytes": 3233,
+      "sha256": "6313cf08eb4c9474af362cd73a67ce382c6e6a92a3e564896fd3f4bb253da9da"
+    },
+    "REUSE-MANIFEST.json": {
+      "bytes": 2577,
+      "sha256": "5718f3972b941608f061c747c90a7f216ab5fffc280b8a898597a0020b23b83f"
+    },
+    "coarse-insertion-map.json": {
+      "bytes": 33855,
+      "sha256": "c6b7882730f55fb6b8239c6e6462de22eff97e13696018e8133ce1f7d547bcc6"
+    },
+    "overlay-proof.json": {
+      "bytes": 41829,
+      "sha256": "2fdfedad5cd6f7c79ad9e08f900b51937470b4ebff80240ba5a73af04d250059"
+    },
+    "README.md": {
+      "bytes": 10352,
+      "sha256": "055f3049d42e60e100bff47ff3418c75fccd885725cb20b0d6e3b9f433f5acfe"
+    }
+  },
+  "native_fixed_point_ab": false
+}

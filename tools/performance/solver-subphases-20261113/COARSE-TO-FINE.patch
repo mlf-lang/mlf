@@ -1,0 +1,69 @@
+--- coarse/libraries/mlf-inference/Bootstrap/Constraint.hs
++++ fine/libraries/mlf-inference/Bootstrap/Constraint.hs
+@@ -182,7 +182,7 @@
+       ProjectCase fields -> Solver.projectCaseFields fields solver
+     };
+   evaluatePreparedSteps :: Solver -> [] SolveStep -> Either String Solver;
+-  evaluatePreparedSteps initial steps = foldM evaluatePreparedStep initial steps;
++  evaluatePreparedSteps initial steps = {-# SCC "SOLVER_STEPS" #-} foldM evaluatePreparedStep initial steps;
+   generalization (Typed gen _) = gen;
+   form (Typed _ f) = f;
+   fromGen (Edge gen _) = gen;
+--- coarse/libraries/mlf-inference/Bootstrap/Graph.hs
++++ fine/libraries/mlf-inference/Bootstrap/Graph.hs
+@@ -1254,7 +1254,7 @@
+            (\kinds -> foldE (firstOrder kinds) before equations);
+   unify :: [] ((,) Int Int) -> Graph -> Either String Graph;
+   unify equations before =
+-    bindE (validateGraph before)
++    {-# SCC "SOLVER_LOCAL_UNIFY" #-} bindE (validateGraph before)
+       (\ignored ->
+          bindE (checkedFirstOrder equations before)
+            (\skeleton ->
+@@ -2256,7 +2256,7 @@
+                       Graph ->
+                       Either String ((,) ((,,) Int (IntMap Int) ([] ((,) Int Int))) Graph);
+   expandWithScopes intervals generalization destination graph =
+-    let {
++    {-# SCC "SOLVER_EXPANSION" #-} let {
+       source = genRoot graph generalization
+     } in
+     case expansionVisitCached graph generalization intervals ((,) IS.empty IM.empty)
+--- coarse/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
++++ fine/libraries/mlf-inference/Bootstrap/Graph/Solver.hs
+@@ -239,7 +239,7 @@
+     seq parent (G.strictPair ((:) n enclosing) (IM.insert n parent parents));
+   prepare :: Graph -> Either String Solver;
+   prepare input =
+-    G.bindE (G.validateGraph input)
++    {-# SCC "SOLVER_PREPARE" #-} G.bindE (G.validateGraph input)
+       (\ignored ->
+          if L.any (\n -> IM.member n (G.links input)) (IM.keys (G.nodes input))
+          then Left "live graph identities cannot also be aliases"
+@@ -535,7 +535,7 @@
+     };
+   finish :: Solver -> Either String Graph;
+   finish solver =
+-    G.bindE (G.validateGraph (graph solver))
++    {-# SCC "SOLVER_FINISH_AUDIT" #-} G.bindE (G.validateGraph (graph solver))
+       (\ignored ->
+          let {
+            current = graph solver
+@@ -972,7 +972,7 @@
+   unifyDistinct :: [] ((,) Int Int) -> Solver -> Either String Solver;
+   -- Original positions precede the fresh placeholder positions.
+   unifyDistinct equations solver =
+-    G.bindE
++    {-# SCC "SOLVER_TRANSACTION" #-} G.bindE
+       (componentCanonicalNodesVisit solver IM.empty IS.empty
+          (L.map (G.resolve (graph solver)) (L.concatMap G.equationNodes equations)))
+       (\((,) connected boundaries) ->
+@@ -2132,7 +2132,7 @@
+   unifyPreparedFallback :: [] ((,) Int Int) -> Solver -> Graph -> Int ->
+                            [] ((,) Int Node) -> Either String Solver;
+   unifyPreparedFallback equations solver current first fresh =
+-    let { canonical = L.map
++    {-# SCC "SOLVER_TRANSACTION" #-} let { canonical = L.map
+       (\((,) a b) -> (,) (G.resolve current a) (G.resolve current b)) equations } in
+     G.bindE
+       (G.mapE_ (\n -> G.check (IM.member n (G.nodes current))
