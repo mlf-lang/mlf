@@ -1,12 +1,25 @@
 # r17: four Graph.unify allocation intervals
 
-Diagnostic-only extension of the completed r16 solver study, against unchanged
-source `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`. **No production optimization is
-selected or applied.** The coordinator has now passed all 217 Python tests
-(185 unchanged protocol tests plus 32 overlay/report tests), independently
-reviewed the package, and launched its fresh real GHC profiling BUILD. No
-completed Haskell diagnostic or allocation result is claimed yet. The original
-five-stage admission, resource, cleanup, semantic and artifact checks remain.
+Diagnostic-only extension against unchanged source `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`.
+**All five actual stages completed with final cleanup/lease clearance.**
+All 217 static/protocol tests passed, and all eleven fine source sites were
+verified in a real GHC profile. See [the checked result](results/unify-summary.json).
+No production optimization or native-generation A/B/fixed-point test is claimed.
+
+The local-unify family accounts for 27.59% of total source-demand allocation.
+Its disjoint components in this run are:
+
+| Component | Allocated bytes | Share of local unify | Share of total |
+| --- | ---: | ---: | ---: |
+| SOLVER_UNIFY_REBIND | 8830980432 | 52.46% | 14.48% |
+| SOLVER_UNIFY_INPUT_VALIDATION | 3789266920 | 22.51% | 6.21% |
+| SOLVER_UNIFY_OUTPUT_VALIDATION | 3598422640 | 21.38% | 5.90% |
+| SOLVER_UNIFY_FIRST_ORDER | 615404440 | 3.66% | 1.01% |
+| SOLVER_LOCAL_UNIFY | 329808 | 0.00% | 0.00% |
+
+These are profiling allocation shares, not ordinary CPU or predicted savings.
+All three raw artifacts matched the same-batch ordinary reference exactly;
+cross-batch interface equality is not claimed because builtin paths can differ.
 
 The completed r16 report assigns 16,834,404,240 bytes to
 `(SOLVE, SOLVER_LOCAL_UNIFY)`: 47.289800% of SOLVE and 27.595320% of all reported
@@ -18,7 +31,7 @@ validation or caches.
 ## Four prefixes, one file, unchanged expression order
 
 `R16-TO-R17.patch` modifies only the following **existing parenthesized arguments**
-in `libraries/mlf-inference/Bootstrap/Graph.hs:1258–1262`:
+in `libraries/mlf-inference/Bootstrap/Graph.hs:1257–1262`:
 
 | Label | Existing complete expression |
 | --- | --- |
@@ -96,8 +109,8 @@ other coarse contexts are retained rather than attributed to SOLVE.
 All eleven sites must be declared with matching label, module, exact mirror
 path and reviewed RHS line extent; some may be unobserved. Missing declarations,
 unknown `SOLVER_` labels, mismatched source/module, CAF fine centres and malformed
-raw reports still fail closed. Actual GHC source-location/declaration behaviour
-for the four new sites remains to be qualified, not fabricated if absent.
+raw reports still fail closed. Actual GHC source locations/declarations for all eleven sites were
+verified in this completed batch; missing declarations still fail closed.
 
 The fine CLI checks mirror source hashes, exact file/directory inventory and
 symlink rejection, and reconstructs the exact original qualified summary from
@@ -106,21 +119,22 @@ manifest/patch. Supplied expected hashes must come from authenticated stage
 evidence. The fine CLI does not authenticate or rerun a real unit control,
 certify cleanup, grant admission, or establish actual execution by itself.
 
-## What was tested here
+## Historical author-stage source tests
 
 **32 new static/synthetic tests passed in 0.439 seconds**, with the resolved
 `/usr/bin/python3` executable and `-B`. The original r16 29 test methods remain,
 with explicit expected inventory/span adaptations. Three additional methods
 cover four-child disjoint conservation/rollup, generation plus coarse-context
-reset, and exact r17-to-r16 inversion. No GHC, Haskell fixture, heavyweight
-runner, subprocess workload or lock experiment was started.
+reset, and exact r17-to-r16 inversion. At that historical source-only checkpoint, no GHC, Haskell fixture, heavyweight
+runner, subprocess workload or lock experiment had started. The later coordinator
+ran all 217 tests and the complete five-stage experiment reported above.
 
 `tests/new-static-tests.json` explicitly has `complete: false` and
 `full_protocol_admission_qualified: false`. It is a receipt for these 32 tests,
 not a substitute for fresh completion of the original 185 protocol tests and
 new tests bound to current code pins, independent review and separate admissions.
 
-## Coordinator commands and remaining gates
+## Reproduction commands and mandatory gates
 
 With `PACKAGE` naming this directory and `SOURCE` the unchanged source checkout:
 
@@ -161,5 +175,6 @@ qualified `allocation-raw-partition.json` with independently verified hashes:
 ```
 
 The output must not exist. Failure or missing centres requires investigation,
-not synthetic profile repair. This package neither enables native A/B or
-fixed-point work nor claims a semantic/performance pass for its Haskell mirror.
+not synthetic profile repair. This package does not enable native A/B or fixed-point work. The completed
+focused semantic/artifact controls are reported above, not a full compiler90
+regression, production runtime speedup or latest-main integration pass.
