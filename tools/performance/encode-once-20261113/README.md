@@ -1,10 +1,14 @@
 # One fresh encoding for initial input and derived query nodes
 
-Status: source-only candidate against `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`. The author has **not compiled or run** the patch or Haskell fixture. The frozen source tree is unchanged. `git apply --check` succeeded against it; this is not a compilation check.
+Status (2026-11-13): **real GHC 9.14.1 build, focused semantic validation, and 12 ordinary cold-build samples completed** against frozen `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`. See [ordinary results](results/ordinary-summary.json). No native-generation A/B or fixed-point run was started. This experimental candidate is not merged and has not passed latest-main integration or CI.
+
+The one-encoding helper passed the same real fixture on both producers (18 in-memory cases and 4 real publication/reopen cases each), 3 maintained codec/query modes each, 2 candidate first-error controls, and 5 CLI controls per relink. Across 12 fresh foundation14 samples (ABBA × 3, 6 per side), all 475 queries were fresh and all 3 artifacts plus ordered queries matched exactly. Ordinary allocation was stable at 60,564,698,920 baseline versus 60,385,303,368 candidate bytes, **179,395,552 bytes / 0.2962% less**. Wall medians were 21.229 versus 20.870 seconds (observed -1.69%), but the candidate was slower in 2 of 6 adjacent pairs: **no reliable runtime speedup established**. This narrow reuse does not remove the whole ENCODE bucket.
+
+The source and demand review below predates execution; its semantic limits still apply. Original recorded code/fixture/runner inputs remain immutable.
 
 ## Patch scope and demand review
 
-The candidate commit changes only `libraries/mlf-crates/Bootstrap/CrateGraph.hs`. A local `recordInputAndDerived` helper calls unchanged `QueryGraph.encodeHashed` once, then unchanged `recordDigest` twice. Only `recordInitialBindings` and `recordDatatypes` use it; `input`, all other query recording, verification/audit rehashes, the codec, and publication are unchanged.
+`candidate-encode-source.patch` changes only `libraries/mlf-crates/Bootstrap/CrateGraph.hs`. A local `recordInputAndDerived` helper calls unchanged `QueryGraph.encodeHashed` once, then unchanged `recordDigest` twice. Only `recordInitialBindings` and `recordDatatypes` use it; `input`, all other query recording, verification/audit rehashes, the codec, and publication are unchanged.
 
 The input update still precedes the derived update. The first call uses `inputKey wanted`, empty reads, no location, and no pending payload. Its returned pair is pattern matched before the derived call. The second uses the original `wanted`, exactly `[edge leaf]`, and the fresh digest/bytes with a persistent location. Neither call trusts an old digest; `recordDigest` retains its existing full `sameNode` comparison. Both updates use a digest freshly computed from the exact value by the unchanged schema-6 encoding. No checking or value field is dropped.
 
@@ -32,4 +36,4 @@ Build this fixture separately against the frozen and candidate module products w
 
 The fixture does not introduce a runner or automatic compilation entry point. Existing query-generation/index/codec tests and semantic controls remain necessary, including publisher failpoints, checksum/corruption rejection and codec bounds. A representative large real artifact must retain its existing resource-limit behavior; the fixture intentionally does not create multi-million-element values just to trigger default limits. Repeated IO failure injection and arbitrary partial sessions remain separate work, not reported passes.
 
-After semantic gates, run the same fresh foundation14 target and exact `.mlfci`/`.mlfco`/`.queries` plus ordered-query oracles. Measure the paired-site encoding contribution rather than assigning the whole ENCODE bucket to this change. Any speed claim requires paired ordinary measurements under the existing user authorization; native-generation A/B and fixed-point remain paused.
+After semantic gates, run the same fresh foundation14 target and exact `.mlfci`/`.mlfco`/`.queries` plus ordered-query oracles. Measure the paired-site encoding contribution rather than assigning the whole ENCODE bucket to this change. Any speed claim requires ordinary measurement under explicit authorization; native A/B and fixed-point remain paused.
