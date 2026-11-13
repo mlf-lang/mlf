@@ -1,0 +1,1004 @@
+{
+  "artifact_checks": {
+    "attribution-P": {
+      ".mlfci": {
+        "bytes": 338125,
+        "sha256": "1659f62af9088f0d6de0e74cf3274794c07a42c9830ac7b285121aa2584d82e1"
+      },
+      ".mlfco": {
+        "bytes": 1016252,
+        "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+      },
+      ".queries": {
+        "bytes": 685363,
+        "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+      }
+    },
+    "ordinary-Q": {
+      ".mlfci": {
+        "bytes": 338125,
+        "sha256": "1659f62af9088f0d6de0e74cf3274794c07a42c9830ac7b285121aa2584d82e1"
+      },
+      ".mlfco": {
+        "bytes": 1016252,
+        "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+      },
+      ".queries": {
+        "bytes": 685363,
+        "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+      }
+    },
+    "qualification-P": {
+      ".mlfci": {
+        "bytes": 338125,
+        "sha256": "1659f62af9088f0d6de0e74cf3274794c07a42c9830ac7b285121aa2584d82e1"
+      },
+      ".mlfco": {
+        "bytes": 1016252,
+        "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+      },
+      ".queries": {
+        "bytes": 685363,
+        "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+      }
+    },
+    "same_batch_all_three_raw_equal": true
+  },
+  "complete": true,
+  "cross_r14_comparison": {
+    "builtin_fingerprint_equal": "176345931-850545563",
+    "complete": true,
+    "cross_r14_interface_raw_equal": false,
+    "cross_r14_object_raw_equal": true,
+    "cross_r14_ordered_query_raw_equal": true,
+    "explanation": "An additional convenience cross-batch raw-interface assertion failed because r16 deliberately recreates builtin under a different root, recorded in .mlfci. No protocol check was weakened. The original phase compares all three raw artifacts against its own fresh ordinary reference and passed; source/compiler metadata are pinned independently. The r15 ordinary paired experiment reused r14 builtin paths and retains its separate exact cross-r14 comparison.",
+    "interface_fingerprint_equal": "1158649513-1523669299",
+    "original_three_raw_within_r16_gate_passed": true,
+    "schema": "r16-cross-batch-check-v1",
+    "whole_show_crate_bytes_differ_only_in_fresh_builtin_dependency_path": true
+  },
+  "date_utc": "2026-11-13",
+  "diagnostic_source_commit": "00ebd454d9bbda3d4ef4ec8b4086bc6674082a8f",
+  "evidence": {
+    "ATTRIBUTION/guard.json": {
+      "bytes": 2766,
+      "sha256": "7592d2a2a3cf896072bbed9c3a575b851cca467df1607aafa5fcfd73736ba4ef"
+    },
+    "ATTRIBUTION/receipt.json": {
+      "bytes": 2104586,
+      "sha256": "0104fc3e549c2747af39320f2355f1cc4485bd4256afb4db500e1191981d28f3"
+    },
+    "BUILD/guard.json": {
+      "bytes": 11306,
+      "sha256": "d03c34715ce701d4dbdf943e4d72430688dfa45bd52a0455190e884d2d5800f1"
+    },
+    "BUILD/receipt.json": {
+      "bytes": 3250574,
+      "sha256": "7fab8c016af42353a6dd7209918329d62de039dcbf1dbdfbb5eb3270d25d6ac9"
+    },
+    "PROBE-CONTROLS/guard.json": {
+      "bytes": 5105,
+      "sha256": "258005fd40dfa66672a7ae8fdb5f1469ca29ea9ceadc0cf80bc2c4c101aa62d9"
+    },
+    "PROBE-CONTROLS/receipt.json": {
+      "bytes": 6723714,
+      "sha256": "80ef75d0657091df3777920bdfdefa2d45176ec7e7317713eae6178fdf50256b"
+    },
+    "QUALIFY/guard.json": {
+      "bytes": 3389,
+      "sha256": "4cd97ec738d0f8d12bf37323d10b0c3f5d1d81f28b19e59fd7f3de7d534632b3"
+    },
+    "QUALIFY/receipt.json": {
+      "bytes": 2058462,
+      "sha256": "f3349c1771dddcebb891ca0be02f1219aa4df0bc92bfa3129caa038e469b9310"
+    },
+    "TARGET-QUALIFICATION/guard.json": {
+      "bytes": 3012,
+      "sha256": "a92109b875a9a8d318fd804f2539d236027b0d02d5bfd7093ab1cce6441ede48"
+    },
+    "TARGET-QUALIFICATION/receipt.json": {
+      "bytes": 2093116,
+      "sha256": "c81f6b02c5a065519b18d38e9aa63bdca1ac9766cb17df92700d7a7fd0643366"
+    },
+    "fine_reader": {
+      "bytes": 14427,
+      "sha256": "0812d86adde280a0a474805ed4e73abeb5a5bcb4e12c2480901195e5847685e9"
+    },
+    "full_214_test_receipt": {
+      "bytes": 5722,
+      "sha256": "868a174db5a4fa61f76d853e7aacca958b2cd36984fe4e46c7807588ca71745a"
+    },
+    "stages/ATTRIBUTION/allocation-raw-partition.json": {
+      "bytes": 692497,
+      "sha256": "776aed1e45c87071ddbee567752a8c7e02ec479674f2d12033fcf85ea266930c"
+    },
+    "stages/ATTRIBUTION/fine-partition.json": {
+      "bytes": 13792,
+      "sha256": "2dac87e2e40424f4833aa04157c988c27cdf154bdc9e7903ab615deaa333092a"
+    }
+  },
+  "fine_partition": {
+    "actual_execution_established_by_this_tool": false,
+    "all_coarse_rows_conserved": true,
+    "byte_control_reexecuted": false,
+    "coarse_partition": {
+      "CANONICAL_PLAN": {
+        "alloc": 305448392,
+        "nodes": 2,
+        "ticks": 140
+      },
+      "CANONICAL_REALIZE": {
+        "alloc": 82279688,
+        "nodes": 1,
+        "ticks": 39
+      },
+      "CANONICAL_RESULT": {
+        "alloc": 7744,
+        "nodes": 1,
+        "ticks": 0
+      },
+      "CANONICAL_SYNTAX": {
+        "alloc": 167822024,
+        "nodes": 1,
+        "ticks": 120
+      },
+      "CLOSED_CHECK": {
+        "alloc": 557779336,
+        "nodes": 7,
+        "ticks": 364
+      },
+      "CONSTRAINT_GENERATION": {
+        "alloc": 4503896112,
+        "nodes": 11,
+        "ticks": 1931
+      },
+      "CONTENT_SHA": {
+        "alloc": 2829704,
+        "nodes": 18,
+        "ticks": 66
+      },
+      "ELABORATE": {
+        "alloc": 977975040,
+        "nodes": 6,
+        "ticks": 758
+      },
+      "ENCODE": {
+        "alloc": 10496368840,
+        "nodes": 6,
+        "ticks": 2957
+      },
+      "ERASURE_AGREEMENT": {
+        "alloc": 6375440,
+        "nodes": 2,
+        "ticks": 4
+      },
+      "FREE_NAMES": {
+        "alloc": 2985672,
+        "nodes": 6,
+        "ticks": 1
+      },
+      "INVENTORY/OPEN_INITIAL": {
+        "alloc": 664816,
+        "nodes": 3,
+        "ticks": 0
+      },
+      "INVENTORY/OPEN_NORMALIZE": {
+        "alloc": 282752,
+        "nodes": 3,
+        "ticks": 0
+      },
+      "INVENTORY/UNRESOLVED": {
+        "alloc": 2864,
+        "nodes": 6,
+        "ticks": 0
+      },
+      "OPEN_ENV": {
+        "alloc": 74865672,
+        "nodes": 6,
+        "ticks": 31
+      },
+      "OPEN_INITIAL": {
+        "alloc": 237395328,
+        "nodes": 7,
+        "ticks": 166
+      },
+      "OPEN_NORMALIZE": {
+        "alloc": 131802104,
+        "nodes": 7,
+        "ticks": 84
+      },
+      "OPEN_OWNERSHIP": {
+        "alloc": 117504,
+        "nodes": 2,
+        "ticks": 2
+      },
+      "PREPARED_TYPES": {
+        "alloc": 944137832,
+        "nodes": 1,
+        "ticks": 934
+      },
+      "PUBLISH": {
+        "alloc": 110173584,
+        "nodes": 33,
+        "ticks": 352
+      },
+      "RESIDUAL/CAF": {
+        "alloc": 13073920,
+        "nodes": 464,
+        "ticks": 6
+      },
+      "RESIDUAL/RTS": {
+        "alloc": 467370712,
+        "nodes": 6,
+        "ticks": 5750
+      },
+      "RESIDUAL/UNKNOWN": {
+        "alloc": 4195063576,
+        "nodes": 69,
+        "ticks": 2332
+      },
+      "RESOLVE_EVIDENCE": {
+        "alloc": 324622672,
+        "nodes": 6,
+        "ticks": 173
+      },
+      "SCHEME_TYPE": {
+        "alloc": 136800,
+        "nodes": 1,
+        "ticks": 0
+      },
+      "SOLVE": {
+        "alloc": 35598383104,
+        "nodes": 31,
+        "ticks": 17939
+      },
+      "STAMP": {
+        "alloc": 1802694432,
+        "nodes": 48,
+        "ticks": 395
+      },
+      "TYPE_AGREEMENT": {
+        "alloc": 7600,
+        "nodes": 1,
+        "ticks": 0
+      }
+    },
+    "defined_sites": [
+      "expansion",
+      "finish-audit",
+      "local-unify",
+      "prepare",
+      "steps",
+      "transaction-distinct",
+      "transaction-prepared"
+    ],
+    "global_totals_conserved": true,
+    "input_pins": {
+      "coarse_reader": "f31b0d9569dc7328198e92e5e439183f9cd1f5a4365407041c7739a095cb0c96",
+      "coarse_summary": "776aed1e45c87071ddbee567752a8c7e02ec479674f2d12033fcf85ea266930c",
+      "fine_reader": "0812d86adde280a0a474805ed4e73abeb5a5bcb4e12c2480901195e5847685e9",
+      "insertion_map": "48ed0fc11c01af2dcd5095ece9755eb3d66a2994a321982eed7bb0e76d9ed041",
+      "mirror_manifest": "80a67cb375e6387f16209069e901f0b82d05a3f2e529e9ecad1176fb6b2ac77d",
+      "raw_profile": "3b778ba03115d42aa1f3b8551d77a512f52625de766228d0d6562a00240b5f8d"
+    },
+    "interpretation": "profiled source-demand allocation; not ordinary exclusive CPU, heap or savings",
+    "matrix": [
+      {
+        "alloc": 305448392,
+        "coarse": "CANONICAL_PLAN",
+        "fine": "UNLABELLED",
+        "nodes": 2,
+        "ticks": 140
+      },
+      {
+        "alloc": 82279688,
+        "coarse": "CANONICAL_REALIZE",
+        "fine": "UNLABELLED",
+        "nodes": 1,
+        "ticks": 39
+      },
+      {
+        "alloc": 7744,
+        "coarse": "CANONICAL_RESULT",
+        "fine": "UNLABELLED",
+        "nodes": 1,
+        "ticks": 0
+      },
+      {
+        "alloc": 167822024,
+        "coarse": "CANONICAL_SYNTAX",
+        "fine": "UNLABELLED",
+        "nodes": 1,
+        "ticks": 120
+      },
+      {
+        "alloc": 557779336,
+        "coarse": "CLOSED_CHECK",
+        "fine": "UNLABELLED",
+        "nodes": 7,
+        "ticks": 364
+      },
+      {
+        "alloc": 4503896112,
+        "coarse": "CONSTRAINT_GENERATION",
+        "fine": "UNLABELLED",
+        "nodes": 11,
+        "ticks": 1931
+      },
+      {
+        "alloc": 2829704,
+        "coarse": "CONTENT_SHA",
+        "fine": "UNLABELLED",
+        "nodes": 18,
+        "ticks": 66
+      },
+      {
+        "alloc": 977975040,
+        "coarse": "ELABORATE",
+        "fine": "UNLABELLED",
+        "nodes": 6,
+        "ticks": 758
+      },
+      {
+        "alloc": 10496368840,
+        "coarse": "ENCODE",
+        "fine": "UNLABELLED",
+        "nodes": 6,
+        "ticks": 2957
+      },
+      {
+        "alloc": 6375440,
+        "coarse": "ERASURE_AGREEMENT",
+        "fine": "UNLABELLED",
+        "nodes": 2,
+        "ticks": 4
+      },
+      {
+        "alloc": 2985672,
+        "coarse": "FREE_NAMES",
+        "fine": "UNLABELLED",
+        "nodes": 6,
+        "ticks": 1
+      },
+      {
+        "alloc": 664816,
+        "coarse": "INVENTORY/OPEN_INITIAL",
+        "fine": "UNLABELLED",
+        "nodes": 3,
+        "ticks": 0
+      },
+      {
+        "alloc": 282752,
+        "coarse": "INVENTORY/OPEN_NORMALIZE",
+        "fine": "UNLABELLED",
+        "nodes": 3,
+        "ticks": 0
+      },
+      {
+        "alloc": 2864,
+        "coarse": "INVENTORY/UNRESOLVED",
+        "fine": "UNLABELLED",
+        "nodes": 6,
+        "ticks": 0
+      },
+      {
+        "alloc": 74865672,
+        "coarse": "OPEN_ENV",
+        "fine": "UNLABELLED",
+        "nodes": 6,
+        "ticks": 31
+      },
+      {
+        "alloc": 237395328,
+        "coarse": "OPEN_INITIAL",
+        "fine": "UNLABELLED",
+        "nodes": 7,
+        "ticks": 166
+      },
+      {
+        "alloc": 131802104,
+        "coarse": "OPEN_NORMALIZE",
+        "fine": "UNLABELLED",
+        "nodes": 7,
+        "ticks": 84
+      },
+      {
+        "alloc": 117504,
+        "coarse": "OPEN_OWNERSHIP",
+        "fine": "UNLABELLED",
+        "nodes": 2,
+        "ticks": 2
+      },
+      {
+        "alloc": 944137832,
+        "coarse": "PREPARED_TYPES",
+        "fine": "UNLABELLED",
+        "nodes": 1,
+        "ticks": 934
+      },
+      {
+        "alloc": 110173584,
+        "coarse": "PUBLISH",
+        "fine": "UNLABELLED",
+        "nodes": 33,
+        "ticks": 352
+      },
+      {
+        "alloc": 13073920,
+        "coarse": "RESIDUAL/CAF",
+        "fine": "UNLABELLED",
+        "nodes": 464,
+        "ticks": 6
+      },
+      {
+        "alloc": 467370712,
+        "coarse": "RESIDUAL/RTS",
+        "fine": "UNLABELLED",
+        "nodes": 6,
+        "ticks": 5750
+      },
+      {
+        "alloc": 4195063576,
+        "coarse": "RESIDUAL/UNKNOWN",
+        "fine": "UNLABELLED",
+        "nodes": 69,
+        "ticks": 2332
+      },
+      {
+        "alloc": 324622672,
+        "coarse": "RESOLVE_EVIDENCE",
+        "fine": "UNLABELLED",
+        "nodes": 6,
+        "ticks": 173
+      },
+      {
+        "alloc": 136800,
+        "coarse": "SCHEME_TYPE",
+        "fine": "UNLABELLED",
+        "nodes": 1,
+        "ticks": 0
+      },
+      {
+        "alloc": 1746039856,
+        "coarse": "SOLVE",
+        "fine": "SOLVER_EXPANSION",
+        "nodes": 2,
+        "ticks": 1303
+      },
+      {
+        "alloc": 2921392728,
+        "coarse": "SOLVE",
+        "fine": "SOLVER_FINISH_AUDIT",
+        "nodes": 3,
+        "ticks": 1716
+      },
+      {
+        "alloc": 16834404240,
+        "coarse": "SOLVE",
+        "fine": "SOLVER_LOCAL_UNIFY",
+        "nodes": 4,
+        "ticks": 6665
+      },
+      {
+        "alloc": 3044591512,
+        "coarse": "SOLVE",
+        "fine": "SOLVER_PREPARE",
+        "nodes": 2,
+        "ticks": 1162
+      },
+      {
+        "alloc": 2872388152,
+        "coarse": "SOLVE",
+        "fine": "SOLVER_STEPS",
+        "nodes": 6,
+        "ticks": 1943
+      },
+      {
+        "alloc": 7048200792,
+        "coarse": "SOLVE",
+        "fine": "SOLVER_TRANSACTION",
+        "nodes": 12,
+        "ticks": 4774
+      },
+      {
+        "alloc": 1131365824,
+        "coarse": "SOLVE",
+        "fine": "UNLABELLED",
+        "nodes": 2,
+        "ticks": 376
+      },
+      {
+        "alloc": 1802694432,
+        "coarse": "STAMP",
+        "fine": "UNLABELLED",
+        "nodes": 48,
+        "ticks": 395
+      },
+      {
+        "alloc": 7600,
+        "coarse": "TYPE_AGREEMENT",
+        "fine": "UNLABELLED",
+        "nodes": 1,
+        "ticks": 0
+      }
+    ],
+    "observed_sites": [
+      "expansion",
+      "finish-audit",
+      "local-unify",
+      "prepare",
+      "steps",
+      "transaction-distinct",
+      "transaction-prepared"
+    ],
+    "resume_authorized": false,
+    "schema": "solver-r16-fine-partition-v1",
+    "site_matrix": [
+      {
+        "alloc": 305448392,
+        "coarse": "CANONICAL_PLAN",
+        "nodes": 2,
+        "site": "UNLABELLED",
+        "ticks": 140
+      },
+      {
+        "alloc": 82279688,
+        "coarse": "CANONICAL_REALIZE",
+        "nodes": 1,
+        "site": "UNLABELLED",
+        "ticks": 39
+      },
+      {
+        "alloc": 7744,
+        "coarse": "CANONICAL_RESULT",
+        "nodes": 1,
+        "site": "UNLABELLED",
+        "ticks": 0
+      },
+      {
+        "alloc": 167822024,
+        "coarse": "CANONICAL_SYNTAX",
+        "nodes": 1,
+        "site": "UNLABELLED",
+        "ticks": 120
+      },
+      {
+        "alloc": 557779336,
+        "coarse": "CLOSED_CHECK",
+        "nodes": 7,
+        "site": "UNLABELLED",
+        "ticks": 364
+      },
+      {
+        "alloc": 4503896112,
+        "coarse": "CONSTRAINT_GENERATION",
+        "nodes": 11,
+        "site": "UNLABELLED",
+        "ticks": 1931
+      },
+      {
+        "alloc": 2829704,
+        "coarse": "CONTENT_SHA",
+        "nodes": 18,
+        "site": "UNLABELLED",
+        "ticks": 66
+      },
+      {
+        "alloc": 977975040,
+        "coarse": "ELABORATE",
+        "nodes": 6,
+        "site": "UNLABELLED",
+        "ticks": 758
+      },
+      {
+        "alloc": 10496368840,
+        "coarse": "ENCODE",
+        "nodes": 6,
+        "site": "UNLABELLED",
+        "ticks": 2957
+      },
+      {
+        "alloc": 6375440,
+        "coarse": "ERASURE_AGREEMENT",
+        "nodes": 2,
+        "site": "UNLABELLED",
+        "ticks": 4
+      },
+      {
+        "alloc": 2985672,
+        "coarse": "FREE_NAMES",
+        "nodes": 6,
+        "site": "UNLABELLED",
+        "ticks": 1
+      },
+      {
+        "alloc": 664816,
+        "coarse": "INVENTORY/OPEN_INITIAL",
+        "nodes": 3,
+        "site": "UNLABELLED",
+        "ticks": 0
+      },
+      {
+        "alloc": 282752,
+        "coarse": "INVENTORY/OPEN_NORMALIZE",
+        "nodes": 3,
+        "site": "UNLABELLED",
+        "ticks": 0
+      },
+      {
+        "alloc": 2864,
+        "coarse": "INVENTORY/UNRESOLVED",
+        "nodes": 6,
+        "site": "UNLABELLED",
+        "ticks": 0
+      },
+      {
+        "alloc": 74865672,
+        "coarse": "OPEN_ENV",
+        "nodes": 6,
+        "site": "UNLABELLED",
+        "ticks": 31
+      },
+      {
+        "alloc": 237395328,
+        "coarse": "OPEN_INITIAL",
+        "nodes": 7,
+        "site": "UNLABELLED",
+        "ticks": 166
+      },
+      {
+        "alloc": 131802104,
+        "coarse": "OPEN_NORMALIZE",
+        "nodes": 7,
+        "site": "UNLABELLED",
+        "ticks": 84
+      },
+      {
+        "alloc": 117504,
+        "coarse": "OPEN_OWNERSHIP",
+        "nodes": 2,
+        "site": "UNLABELLED",
+        "ticks": 2
+      },
+      {
+        "alloc": 944137832,
+        "coarse": "PREPARED_TYPES",
+        "nodes": 1,
+        "site": "UNLABELLED",
+        "ticks": 934
+      },
+      {
+        "alloc": 110173584,
+        "coarse": "PUBLISH",
+        "nodes": 33,
+        "site": "UNLABELLED",
+        "ticks": 352
+      },
+      {
+        "alloc": 13073920,
+        "coarse": "RESIDUAL/CAF",
+        "nodes": 464,
+        "site": "UNLABELLED",
+        "ticks": 6
+      },
+      {
+        "alloc": 467370712,
+        "coarse": "RESIDUAL/RTS",
+        "nodes": 6,
+        "site": "UNLABELLED",
+        "ticks": 5750
+      },
+      {
+        "alloc": 4195063576,
+        "coarse": "RESIDUAL/UNKNOWN",
+        "nodes": 69,
+        "site": "UNLABELLED",
+        "ticks": 2332
+      },
+      {
+        "alloc": 324622672,
+        "coarse": "RESOLVE_EVIDENCE",
+        "nodes": 6,
+        "site": "UNLABELLED",
+        "ticks": 173
+      },
+      {
+        "alloc": 136800,
+        "coarse": "SCHEME_TYPE",
+        "nodes": 1,
+        "site": "UNLABELLED",
+        "ticks": 0
+      },
+      {
+        "alloc": 1131365824,
+        "coarse": "SOLVE",
+        "nodes": 2,
+        "site": "UNLABELLED",
+        "ticks": 376
+      },
+      {
+        "alloc": 1746039856,
+        "coarse": "SOLVE",
+        "nodes": 2,
+        "site": "expansion",
+        "ticks": 1303
+      },
+      {
+        "alloc": 2921392728,
+        "coarse": "SOLVE",
+        "nodes": 3,
+        "site": "finish-audit",
+        "ticks": 1716
+      },
+      {
+        "alloc": 16834404240,
+        "coarse": "SOLVE",
+        "nodes": 4,
+        "site": "local-unify",
+        "ticks": 6665
+      },
+      {
+        "alloc": 3044591512,
+        "coarse": "SOLVE",
+        "nodes": 2,
+        "site": "prepare",
+        "ticks": 1162
+      },
+      {
+        "alloc": 2872388152,
+        "coarse": "SOLVE",
+        "nodes": 6,
+        "site": "steps",
+        "ticks": 1943
+      },
+      {
+        "alloc": 1741656016,
+        "coarse": "SOLVE",
+        "nodes": 6,
+        "site": "transaction-distinct",
+        "ticks": 1173
+      },
+      {
+        "alloc": 5306544776,
+        "coarse": "SOLVE",
+        "nodes": 6,
+        "site": "transaction-prepared",
+        "ticks": 3601
+      },
+      {
+        "alloc": 1802694432,
+        "coarse": "STAMP",
+        "nodes": 48,
+        "site": "UNLABELLED",
+        "ticks": 395
+      },
+      {
+        "alloc": 7600,
+        "coarse": "TYPE_AGREEMENT",
+        "nodes": 1,
+        "site": "UNLABELLED",
+        "ticks": 0
+      }
+    ],
+    "total_alloc": 61004563264,
+    "total_ticks": 34544,
+    "unit": "bytes",
+    "unit_evidence": {
+      "control_expected_bytes": 65536,
+      "control_observed_raw": 65536,
+      "control_passed": true,
+      "control_receipt_sha256": "80ef75d0657091df3777920bdfdefa2d45176ec7e7317713eae6178fdf50256b",
+      "installed_rts_definition_sha256": "e979f39bd392effb4e1289ac059da1276cac67446d49ac9256d0209bea599b1e",
+      "toolchain_sha256": "26628fcfe6f3f7176e5c8fc1766fe19b196e7922ff5d812e4c96bc146ae7dc92",
+      "writer_alloc_unit": "bytes"
+    },
+    "unobserved_sites": []
+  },
+  "limitations": [
+    "Profile self-allocation is source-demand attribution, not ordinary exclusive CPU, live heap, predicted savings or a production speedup.",
+    "Rows are disjoint self allocation, not inherited totals. Do not add the parallel fine and source-site matrices.",
+    "New SCCs may perturb optimization. Do not assume coarse total equality across instrumentation revisions.",
+    "The local-unify label still includes input validation, first-order unification, canonicalization/rebinding and final validation. This run does not split those costs or authorize removing checks.",
+    "The fixed source is not the latest main integration result. Native generation A/B, fixed-point and GHC parity are not established."
+  ],
+  "native_fixed_point_ab": false,
+  "next": "Measure or safely refactor Graph.unify subwork: entry validation, first-order solve, canonicalization/rebinding, output validation. Prefer reuse of already validated information over dropping validation; confirm changes with real semantic and ordinary fixed-schedule benchmarks.",
+  "ordinary_speedup_claimed": false,
+  "profile_total_allocated_bytes": 61004563264,
+  "rts_whole_process": {
+    "allocated_bytes": 96911930448,
+    "allocation_rate_bytes_per_mut_second": 3304935414,
+    "copied_bytes": 8250340128,
+    "gc_cpu_fraction_from_rounded_times": 0.16286505466898854,
+    "generations": [
+      {
+        "average_pause_seconds": 0.0001,
+        "collections": 23186,
+        "cpu_seconds": 3.448,
+        "elapsed_seconds": 3.45,
+        "generation": 0,
+        "maximum_pause_seconds": 0.0074,
+        "parallel_collections": 0
+      },
+      {
+        "average_pause_seconds": 0.0323,
+        "collections": 70,
+        "cpu_seconds": 2.257,
+        "elapsed_seconds": 2.261,
+        "generation": 1,
+        "maximum_pause_seconds": 0.1149,
+        "parallel_collections": 0
+      }
+    ],
+    "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+    "major_gc_residency_samples": 70,
+    "maximum_residency_bytes": 60150144,
+    "maximum_slop_bytes": 2743936,
+    "productivity_percent": {
+      "elapsed": 83.5,
+      "user": 83.7
+    },
+    "reported_gc_percent": {
+      "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+      "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+      "values": {
+        "cpu": 0.0,
+        "elapsed": 0.0
+      }
+    },
+    "rts_memory_in_use": {
+      "fragmentation": {
+        "unit": "MiB",
+        "value": 0.0
+      },
+      "raw_line": "             171 MiB total memory in use (0 MiB lost due to fragmentation)",
+      "unit": "MiB",
+      "value": 171.0
+    },
+    "schema": "ghc-rts-s-v1",
+    "times": {
+      "EXIT": {
+        "cpu_seconds": 0.0,
+        "elapsed_seconds": 0.0
+      },
+      "GC": {
+        "cpu_seconds": 5.705,
+        "elapsed_seconds": 5.711
+      },
+      "INIT": {
+        "cpu_seconds": 0.001,
+        "elapsed_seconds": 0.0
+      },
+      "MUT": {
+        "cpu_seconds": 29.323,
+        "elapsed_seconds": 28.914
+      },
+      "PROF": {
+        "cpu_seconds": 0.0,
+        "elapsed_seconds": 0.0
+      },
+      "RP": {
+        "cpu_seconds": 0.0,
+        "elapsed_seconds": 0.0
+      },
+      "Total": {
+        "cpu_seconds": 35.029,
+        "elapsed_seconds": 34.625
+      }
+    }
+  },
+  "schema": "solver-subphase-real-result-v1",
+  "solve_allocated_bytes": 35598383104,
+  "solve_breakdown": [
+    {
+      "alloc": 16834404240,
+      "coarse": "SOLVE",
+      "fine": "SOLVER_LOCAL_UNIFY",
+      "nodes": 4,
+      "solve_fraction": 0.47289800187886644,
+      "ticks": 6665,
+      "total_fraction": 0.27595319660184037
+    },
+    {
+      "alloc": 7048200792,
+      "coarse": "SOLVE",
+      "fine": "SOLVER_TRANSACTION",
+      "nodes": 12,
+      "solve_fraction": 0.19799216080710225,
+      "ticks": 4774,
+      "total_fraction": 0.11553563233456149
+    },
+    {
+      "alloc": 3044591512,
+      "coarse": "SOLVE",
+      "fine": "SOLVER_PREPARE",
+      "nodes": 2,
+      "solve_fraction": 0.08552611794488765,
+      "ticks": 1162,
+      "total_fraction": 0.04990760279398105
+    },
+    {
+      "alloc": 2921392728,
+      "coarse": "SOLVE",
+      "fine": "SOLVER_FINISH_AUDIT",
+      "nodes": 3,
+      "solve_fraction": 0.08206532076092352,
+      "ticks": 1716,
+      "total_fraction": 0.04788810167130517
+    },
+    {
+      "alloc": 2872388152,
+      "coarse": "SOLVE",
+      "fine": "SOLVER_STEPS",
+      "nodes": 6,
+      "solve_fraction": 0.08068872520441091,
+      "ticks": 1943,
+      "total_fraction": 0.04708480805885964
+    },
+    {
+      "alloc": 1746039856,
+      "coarse": "SOLVE",
+      "fine": "SOLVER_EXPANSION",
+      "nodes": 2,
+      "solve_fraction": 0.04904829106701217,
+      "ticks": 1303,
+      "total_fraction": 0.028621463093571112
+    },
+    {
+      "alloc": 1131365824,
+      "coarse": "SOLVE",
+      "fine": "UNLABELLED",
+      "nodes": 2,
+      "solve_fraction": 0.031781382336797045,
+      "ticks": 376,
+      "total_fraction": 0.01854559336985929
+    }
+  ],
+  "solve_fraction_total": 0.583536397923978,
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "stages": {
+    "ATTRIBUTION": {
+      "cleanup": true,
+      "commands": 15,
+      "complete": true,
+      "guard_elapsed_seconds": 126.09413216200119,
+      "lease_cleared": true
+    },
+    "BUILD": {
+      "cleanup": true,
+      "commands": 19,
+      "complete": true,
+      "guard_elapsed_seconds": 239.20483088600304,
+      "lease_cleared": true
+    },
+    "PROBE-CONTROLS": {
+      "cleanup": true,
+      "commands": 38,
+      "complete": true,
+      "guard_elapsed_seconds": 240.84149115699984,
+      "lease_cleared": true
+    },
+    "QUALIFY": {
+      "cleanup": true,
+      "commands": 22,
+      "complete": true,
+      "guard_elapsed_seconds": 146.1766842979996,
+      "lease_cleared": true
+    },
+    "TARGET-QUALIFICATION": {
+      "cleanup": true,
+      "commands": 17,
+      "complete": true,
+      "guard_elapsed_seconds": 152.79076659299972,
+      "lease_cleared": true
+    }
+  },
+  "workload": {
+    "complete_compiler90_claimed": false,
+    "fresh_queries": 475,
+    "label": "compiler-shapes/foundation14",
+    "modules": 14,
+    "reused_queries": 0,
+    "source_bytes": 173594
+  }
+}

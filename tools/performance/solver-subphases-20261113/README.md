@@ -1,12 +1,26 @@
 # r16 solver subphase diagnostics
 
 Source preparation against `f9bdb40a659bfdff4cbb782d438afbb0417dd2e1`.
-Status November 13: the complete 214-test Python suite (185 unchanged protocol
-tests plus 29 new static/report tests) passed in 9.985 seconds. Independent source
-review passed, and a fresh actual profiling BUILD has started. No completed
-Haskell diagnostic, final allocation split or speedup is reported yet. Runtime
-admissions and receipts are maintained separately; this is the reproducible source
-package, not a license to skip those gates.
+Status November 13: **all five real diagnostic stages completed**, with full
+semantic/artifact checks and final cleanup. The complete 214-test Python suite
+(185 unchanged protocol controls plus 29 new tests) also passed. See
+[the checked result](results/solver-summary.json). No native-generation A/B or
+fixed-point test was started.
+
+Within this fresh foundation14 profiled run, SOLVE accounts for 58.35% of
+self allocation. Its largest child is local unification: **16,834,404,240 bytes,
+47.29% of SOLVE and 27.60% of all profiled allocation**. Transaction residual
+adds 11.55% of the total. Entry preparation is 4.99%, finish/audit 4.79%, ordered
+step residual 4.71%, expansion 2.86%, and unlabelled SOLVE residual 1.85%. These
+are disjoint allocation shares, not ordinary CPU or predicted savings. Local
+unify still includes entry validation, first-order solving, rebinding and output
+validation; those are the next focused investigation, not checks to delete.
+
+All three output artifacts matched the new run's ordinary reference exactly.
+Compared with the older r14 reference, object and ordered query bytes are equal;
+the interface carries a new builtin dependency path, so cross-batch raw interface
+equality is deliberately **not** claimed. Complete decoded show-crate output
+differs only in that path; interface and builtin fingerprints match.
 The earlier diagnostic's 58.355229% SOLVE allocation motivates finer measurement;
 it does not identify a solver optimization or predict savings.
 
@@ -89,9 +103,9 @@ GHC's actual declaration/source-location behaviour is still untested for this
 overlay. If optimization removes a declaration, preserve the raw failure and
 review that fact; do not invent a centre or silently weaken the gate.
 
-The CLI also verifies all 97 actual mirror source hashes, exact file inventory
-and symlink rejection. Exact empty-directory inventory remains the unchanged
-stage mirror verifier's responsibility. It requires the SHA-bound original qualified coarse summary to match
+The CLI also verifies all 97 actual mirror source hashes, exact file and directory
+inventories, and symlink rejection. The original stage mirror verifier additionally
+regenerates the complete manifest and patch. It requires the SHA-bound original qualified coarse summary to match
 a fresh parse of the same raw profile, including every stack row. It validates
 the existing byte-evidence shape and toolchain binding but **does not independently
 authenticate or rerun the real byte-allocation control**. Its expected hashes
