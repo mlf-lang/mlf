@@ -1,0 +1,23 @@
+{
+  "schema": "unify-fixture-static-check-v1",
+  "complete_static_review": true,
+  "haskell_compiled": false,
+  "haskell_executed": false,
+  "actual_test_passes_established": false,
+  "case_count": 23,
+  "project_module_count": 13,
+  "checks": {
+    "case_map_exact_order_and_unique_ids": true,
+    "lexical_delimiters_only_not_Haskell_parsing": true,
+    "13_project_source_pins_match": true,
+    "13_modules_subset_of_ordinary_94_name_inventory": true,
+    "all_8_GTag_view_cases_present": true,
+    "no_fixture_process_launch_or_flag_override": true,
+    "payload_render_inside_sync_exception_boundary": true,
+    "async_exception_rethrow_branch_present": true
+  },
+  "source_sha256": "3d856410f66c9afc809d1edca752680d33b0010cd8f90551feee479295da049f",
+  "line_count": 234,
+  "duration_seconds": 0.004542,
+  "method": "Python text/JSON/file-byte checks only; no Haskell or model of unification executed. Source/API/error reasoning is in STATIC-REVIEW.md."
+}

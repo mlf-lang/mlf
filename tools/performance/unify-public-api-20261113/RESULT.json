@@ -1,0 +1,192 @@
+{
+  "actual_compilation": true,
+  "actual_fixture_execution": true,
+  "all_original_authored_expectations_passed": true,
+  "automatic_retry": false,
+  "candidate_executed": false,
+  "cases": [
+    {
+      "escaped_actual": "\"route=dense;Right GraphV [(0,NodeV (GenV 1) Nothing FlexibleV),(1,NodeV BotV (Just 0) FlexibleV),(2,NodeV (ConV \\\"Int\\\" []) (Just 0) FlexibleV)] [] 3\"",
+      "id": "dense-empty",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Right GraphV [(0,NodeV (GenV 1) Nothing FlexibleV),(1,NodeV BotV (Just 0) FlexibleV),(2,NodeV (ConV \\\"Int\\\" []) (Just 0) FlexibleV)] [] 3\"",
+      "id": "dense-self",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Right GraphV [(0,NodeV (GenV 1) Nothing FlexibleV),(1,NodeV (ConV \\\"Int\\\" []) (Just 0) FlexibleV)] [(2,1)] 3\"",
+      "id": "dense-merge",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"route=dense;Right GraphV [(-3,NodeV (GenV (-2)) Nothing FlexibleV),(-2,NodeV (ConV \\\"Int\\\" []) (Just (-3)) FlexibleV)] [(-1,-2)] 0\"",
+      "id": "signed-dense-merge",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"route=sparse;Right GraphV [(0,NodeV (GenV 100) Nothing FlexibleV),(100,NodeV (ConV \\\"Int\\\" []) (Just 0) FlexibleV)] [(10000,100)] 10001\"",
+      "id": "sparse-merge",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"route=sparse;Right GraphV [(-9223372036854775808,NodeV (GenV 0) Nothing FlexibleV),(0,NodeV (ConV \\\"Int\\\" []) (Just (-9223372036854775808)) FlexibleV)] [(9223372036854775807,0)] 9223372036854775807\"",
+      "id": "extreme-span-merge",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Right GraphV [(0,NodeV (GenV 1) Nothing FlexibleV),(1,NodeV BotV (Just 0) FlexibleV),(2,NodeV (ConV \\\"Int\\\" []) (Just 0) FlexibleV)] [(10,1)] 11\"",
+      "id": "alias-empty-canonicalization",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Right GraphV [(0,NodeV (GenV 1) Nothing FlexibleV),(1,NodeV (ConV \\\"Int\\\" []) (Just 0) FlexibleV)] [(2,1),(10,1)] 11\"",
+      "id": "alias-merge",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Right GraphV [(0,NodeV (GenV 3) Nothing FlexibleV),(1,NodeV (TyConV \\\"F\\\" (ArrowV StarV StarV)) (Just 0) FlexibleV),(2,NodeV (ConV \\\"Int\\\" []) (Just 0) FlexibleV),(3,NodeV (AppV 1 2) (Just 0) FlexibleV)] [(4,3)] 5\"",
+      "id": "higher-app-merge",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"kind mismatch during unification: KArrow Star Star versus Star\\\"\"",
+      "id": "higher-kind-mismatch",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"type constructor mismatch: Con \\\\\\\"Int\\\\\\\" [] versus Con \\\\\\\"Bool\\\\\\\" []\\\"\"",
+      "id": "dense-constructor-mismatch",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"missing graph node 99\\\"\"",
+      "id": "late-endpoint-fast-priority",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"missing graph node 99\\\"\"",
+      "id": "late-endpoint-alias-priority",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"cannot instantiate a rigid or protected type variable\\\"\"",
+      "id": "rigid-bottom-rejection",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"cyclic binding tree\\\"\"",
+      "id": "disconnected-binding-cycle",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"infinite type (occurs check)\\\"\"",
+      "id": "structural-occurs-cycle",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"binding root must be a gen node\\\"\"",
+      "id": "non-gen-binding-root",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"missing binder\\\"\"",
+      "id": "dense-binder-before-kind",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"function types require kind * arguments\\\"\"",
+      "id": "sparse-kind-before-binder",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"invalid type constructor arity: a type of kind * cannot be applied\\\"\"",
+      "id": "invalid-application-arity",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Left \\\"missing binder\\\"\"",
+      "id": "invalid-input-before-poison-equations",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Either-WHNF=Sentinel equations\"",
+      "id": "valid-input-demands-poison-equations",
+      "status": "PASS"
+    },
+    {
+      "escaped_actual": "\"Either=Right;Graph=WHNF;nextId=2;full-view=Sentinel unused-name\"",
+      "id": "unused-name-demand-boundaries",
+      "status": "PASS"
+    }
+  ],
+  "commands": [
+    {
+      "elapsed_seconds": 1.265092312998604,
+      "exit_code": 0,
+      "label": "compile",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "elapsed_seconds": 1.887577482004417,
+      "exit_code": 0,
+      "label": "link",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "elapsed_seconds": 0.0041771360047277994,
+      "exit_code": 0,
+      "label": "fixture",
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 2694,
+      "stdout_sha256": "14eff8e4d92abf2f07cc15d0b5b425f23472e5623b6e808f4eb605ce54b8073a"
+    }
+  ],
+  "evidence": {
+    "admission.json": "bf0166a5631eca0c24d2049fdd7887b04885bdf5f386e6e80491bfff0549069c",
+    "claim.json": "e0140f87b57c20772356e4871b95196414ba2080e757ddeb1ce1b2953e6109ad",
+    "commands/compile/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "commands/compile/stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "commands/fixture/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "commands/fixture/stdout": "14eff8e4d92abf2f07cc15d0b5b425f23472e5623b6e808f4eb605ce54b8073a",
+    "commands/link/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "commands/link/stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard/guard-config.json": "133a5b19ef214432ed295a3af4a0f3426d5325edb352578bc0dce7945d022cae",
+    "guard/guard.json": "42254e341399f092e5e072d501cc068430a10363b85506d1b1f3cc4845bf8ccb",
+    "preflight.json": "bbfc8402668f69f52fcff9d84bc9f54b5a7a5cf66b66df3e8d071ca33795e661",
+    "receipt.json": "d6726d1666211ccdd22e573e56edb68d178b86d851402570198d4ba893cc36fb",
+    "worker.py": "39415226c2b089d5facc9ea84e08a10d932fab9a9ccf4844797a22caed3b3f34"
+  },
+  "expected_cases": 23,
+  "fixed_point": false,
+  "fixture_corrections_required": false,
+  "fixture_sha256": "3d856410f66c9afc809d1edca752680d33b0010cd8f90551feee479295da049f",
+  "full_compiler_rebuilt": false,
+  "guard": {
+    "cleanup": true,
+    "complete": true,
+    "elapsed_seconds": 6.467494971999258,
+    "exit_code": 0,
+    "lease_cleared": true,
+    "lock_reacquired": true,
+    "seconds": 180,
+    "test_only": false
+  },
+  "limits": "Finite baseline acceptance of this exact fixture only; no candidate, universal semantic proof, memory or ordinary speedup conclusion.",
+  "native_ab": false,
+  "passed_cases": 23,
+  "performance_comparison": false,
+  "producer_post_authentication": true,
+  "producer_pre_authentication": true,
+  "schema": "unify-fixture-baseline-result-v1",
+  "single_use": true,
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1"
+}

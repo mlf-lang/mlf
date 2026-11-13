@@ -1,0 +1,183 @@
+{
+  "schema": "unify-public-api-fixture-v1",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "cases": [
+    {
+      "id": "dense-empty",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted.",
+      "route_precondition": "dense"
+    },
+    {
+      "id": "dense-self",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted."
+    },
+    {
+      "id": "dense-merge",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted."
+    },
+    {
+      "id": "signed-dense-merge",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted.",
+      "route_precondition": "dense"
+    },
+    {
+      "id": "sparse-merge",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted.",
+      "route_precondition": "sparse"
+    },
+    {
+      "id": "extreme-span-merge",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted.",
+      "route_precondition": "sparse"
+    },
+    {
+      "id": "alias-empty-canonicalization",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted."
+    },
+    {
+      "id": "alias-merge",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted."
+    },
+    {
+      "id": "higher-app-merge",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right",
+      "observation": "Complete ordered node/tag/kind/binder/flag fields, ordered aliases and nextId compared with authored expected graph; same text is emitted."
+    },
+    {
+      "id": "higher-kind-mismatch",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "kind mismatch during unification: KArrow Star Star versus Star",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "dense-constructor-mismatch",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "type constructor mismatch: Con \"Int\" [] versus Con \"Bool\" []",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "late-endpoint-fast-priority",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "missing graph node 99",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "late-endpoint-alias-priority",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "missing graph node 99",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "rigid-bottom-rejection",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "cannot instantiate a rigid or protected type variable",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "disconnected-binding-cycle",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "cyclic binding tree",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "structural-occurs-cycle",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "infinite type (occurs check)",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "non-gen-binding-root",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "binding root must be a gen node",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "dense-binder-before-kind",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "missing binder",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "sparse-kind-before-binder",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "function types require kind * arguments",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "invalid-application-arity",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "invalid type constructor arity: a type of kind * cannot be applied",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "invalid-input-before-poison-equations",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Left",
+      "exact_error": "missing binder",
+      "observation": "Full error string compared and emitted."
+    },
+    {
+      "id": "valid-input-demands-poison-equations",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Sentinel equations at result Either WHNF",
+      "observation": "The expected custom synchronous exception is checked by constructor and payload; async exceptions are rethrown."
+    },
+    {
+      "id": "unused-name-demand-boundaries",
+      "status": "authored-expectation-not-compiled-not-run",
+      "expected": "Right Either WHNF, Graph WHNF, nextId=2; full graph rendering then Sentinel unused-name",
+      "observation": "Ordered probes precede final rendering; no early serialization."
+    }
+  ],
+  "case_count": 23,
+  "finite_full_graph_successes": 9,
+  "exact_left_cases": 12,
+  "partial_host_cases": [
+    "invalid-input-before-poison-equations",
+    "valid-input-demands-poison-equations",
+    "unused-name-demand-boundaries"
+  ],
+  "stdout_contract": {
+    "row": "PASS\\tcase-id\\t<show String payload> or FAIL\\tcase-id\\t<show String detail>",
+    "order": "cases array order; each exactly once",
+    "summary": "SUMMARY\\t23\\t23 required for success",
+    "exit_code": 0,
+    "payload_comparison": "All actual PASS payload bytes, not just labels; compare full baseline and candidate stdout."
+  },
+  "deferred": [
+    "No GHC syntax/typecheck or actual baseline/candidate execution yet.",
+    "No exhaustive forged IntMap tree/routing proof or alias-cycle termination probe.",
+    "No assertion of identical IntMap tree representation; observations are complete logical graph fields and ordered entries.",
+    "Representative rigid instantiation rejection only; Red-protection raising/weakening/merge matrix remains deferred.",
+    "No proof for all partial/cyclic/infinite host values, retained heap, total demand, or async exception timing.",
+    "No source-program reachability claim for malformed host graphs; no performance measurement."
+  ]
+}

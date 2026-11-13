@@ -1,0 +1,32 @@
+{
+  "files": {
+    "CASE-MAP.json": {
+      "bytes": 8003,
+      "sha256": "9f2f9664a9bf8f64eefaac313d57c272e346d15d7b1b56f3b8d754704f18a72b"
+    },
+    "IMPORT-INVENTORY.json": {
+      "bytes": 6923,
+      "sha256": "f0f4607877f8aa7faa5150198517572cd133737adceea3cdf999ddd14a799867"
+    },
+    "README.md": {
+      "bytes": 7374,
+      "sha256": "4aa9b68ad265b0887eeb237a32702ceb0cb7422975811574207452a1a5336475"
+    },
+    "STATIC-CHECK.json": {
+      "bytes": 961,
+      "sha256": "0dc927eb5d49a2fd3fcee5d85b33fe6f5193c38d2ea8c25c825a6667270bee6d"
+    },
+    "STATIC-REVIEW.md": {
+      "bytes": 5872,
+      "sha256": "a2dc2089b8a89231ecdf488a9ad03ecf113c0bf00a99bb56136661d9b4e05dfe"
+    },
+    "UnifyPublicApi.hs": {
+      "bytes": 11082,
+      "sha256": "3d856410f66c9afc809d1edca752680d33b0010cd8f90551feee479295da049f"
+    }
+  },
+  "fixture_compiled": false,
+  "fixture_executed": false,
+  "schema": "unify-fixture-source-package-v1",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1"
+}

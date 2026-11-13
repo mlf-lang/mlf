@@ -1,0 +1,250 @@
+{
+  "additional_packages_beyond_existing_ordinary_flags": [],
+  "all_in_existing_94_non_main_closure": true,
+  "external_imports": [
+    "Control.Concurrent",
+    "Control.Concurrent.MVar",
+    "Control.Exception",
+    "Control.Monad",
+    "Control.Monad.Fail",
+    "Control.Monad.ST",
+    "Data.Array",
+    "Data.Array.Base",
+    "Data.Array.IO",
+    "Data.Array.ST",
+    "Data.Array.Unboxed",
+    "Data.Bits",
+    "Data.ByteString",
+    "Data.Char",
+    "Data.Foldable",
+    "Data.IORef",
+    "Data.Int",
+    "Data.IntMap.Lazy",
+    "Data.Map.Lazy",
+    "Data.Sequence",
+    "Data.String",
+    "Data.Text",
+    "Data.Text.Array",
+    "Data.Text.Encoding",
+    "Data.Text.Internal",
+    "Data.Typeable",
+    "Data.Word",
+    "Foreign",
+    "Foreign.C",
+    "Foreign.ForeignPtr",
+    "Foreign.Marshal.Alloc",
+    "Foreign.Marshal.Utils",
+    "GHC.Clock",
+    "GHC.Conc",
+    "GHC.Exts",
+    "GHC.Float",
+    "GHC.Num.Integer",
+    "GHC.Stack",
+    "Prelude",
+    "System.Exit",
+    "System.IO",
+    "System.IO.Error",
+    "System.IO.Unsafe",
+    "Text.Read"
+  ],
+  "fixture_import_roots": [
+    "Bootstrap.Graph",
+    "Bootstrap.Types",
+    "Bootstrap.IntMap",
+    "MLF.Primitive",
+    "MLF.Host.Base"
+  ],
+  "method": "Static header import scan, CPP branches union, not GHC dependency/typecheck proof; producer artifacts still require runtime authenticity checks.",
+  "ordinary_94_module_manifest_sha256": "2cc8b30d98699986831d3f9c70a9cfc719b2f54246ab3463e29a916433bdd440",
+  "project_module_count": 13,
+  "project_modules": {
+    "Bootstrap.Graph": {
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.IntMap",
+        "Bootstrap.IntTree",
+        "Bootstrap.IntSet",
+        "Bootstrap.ST"
+      ],
+      "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f"
+    },
+    "Bootstrap.IndexVec": {
+      "imports": [
+        "MLF.Primitive"
+      ],
+      "path": "libraries/mlf-foundation/Bootstrap/IndexVec.hs",
+      "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+    },
+    "Bootstrap.IntMap": {
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.IntTree",
+        "Bootstrap.IntRank",
+        "Bootstrap.IntSet"
+      ],
+      "path": "libraries/mlf-foundation/Bootstrap/IntMap.hs",
+      "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+    },
+    "Bootstrap.IntRank": {
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.IntTree"
+      ],
+      "path": "libraries/mlf-foundation/Bootstrap/IntRank.hs",
+      "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+    },
+    "Bootstrap.IntSet": {
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.Std",
+        "Bootstrap.IntTree",
+        "Bootstrap.IntRank"
+      ],
+      "path": "libraries/mlf-foundation/Bootstrap/IntSet.hs",
+      "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+    },
+    "Bootstrap.IntTree": {
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types"
+      ],
+      "path": "libraries/mlf-foundation/Bootstrap/IntTree.hs",
+      "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+    },
+    "Bootstrap.ST": {
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types"
+      ],
+      "path": "libraries/mlf-foundation/Bootstrap/ST.hs",
+      "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+    },
+    "Bootstrap.Std": {
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.Types",
+        "Bootstrap.IndexVec"
+      ],
+      "path": "libraries/mlf-foundation/Bootstrap/Std.hs",
+      "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+    },
+    "Bootstrap.Types": {
+      "imports": [
+        "MLF.Primitive",
+        "Bootstrap.IndexVec"
+      ],
+      "path": "libraries/mlf-foundation/Bootstrap/Types.hs",
+      "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+    },
+    "MLF.Host.Async": {
+      "imports": [
+        "Prelude",
+        "Prelude",
+        "MLF.Host.Base",
+        "Data.IORef",
+        "Data.Sequence",
+        "Data.Foldable",
+        "Control.Monad",
+        "Control.Exception",
+        "Control.Concurrent",
+        "GHC.Clock"
+      ],
+      "path": "host/ghc/MLF/Host/Async.hs",
+      "sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5"
+    },
+    "MLF.Host.Base": {
+      "imports": [
+        "Prelude",
+        "Prelude",
+        "Data.Text",
+        "Data.Text.Internal",
+        "Data.Text.Array",
+        "Data.Text.Encoding",
+        "Data.ByteString",
+        "Data.Char",
+        "Data.String",
+        "GHC.Stack",
+        "Data.Array.Unboxed",
+        "Data.Bits",
+        "Data.Int",
+        "Data.Bits",
+        "Data.Word",
+        "Data.Typeable",
+        "Control.Exception",
+        "Control.Monad.ST",
+        "Data.Array",
+        "Data.Array.ST",
+        "Data.Array.Base",
+        "GHC.Float",
+        "GHC.Conc",
+        "GHC.Exts",
+        "GHC.Num.Integer",
+        "Foreign.C",
+        "Foreign.Marshal.Alloc",
+        "System.IO.Unsafe",
+        "Text.Read"
+      ],
+      "path": "host/ghc/MLF/Host/Base.hs",
+      "sha256": "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116"
+    },
+    "MLF.Host.IO": {
+      "imports": [
+        "Prelude",
+        "Prelude",
+        "MLF.Host.Base",
+        "Data.ByteString",
+        "Data.Array.IO",
+        "Data.Array.Base",
+        "Data.IntMap.Lazy",
+        "Data.Map.Lazy",
+        "Data.IORef",
+        "Data.Int",
+        "Data.Word",
+        "Foreign.Marshal.Alloc",
+        "Foreign.ForeignPtr",
+        "Foreign.Marshal.Utils",
+        "Foreign",
+        "Foreign.C",
+        "Control.Concurrent.MVar",
+        "Control.Exception",
+        "System.IO.Unsafe",
+        "System.IO.Error",
+        "GHC.Stack",
+        "System.IO",
+        "System.Exit"
+      ],
+      "path": "host/ghc/MLF/Host/IO.hs",
+      "sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a"
+    },
+    "MLF.Primitive": {
+      "imports": [
+        "Prelude",
+        "Prelude",
+        "Control.Monad.Fail",
+        "Control.Monad.ST",
+        "GHC.Exts",
+        "Data.String",
+        "GHC.Stack",
+        "System.IO.Error",
+        "MLF.Host.Base",
+        "MLF.Host.Base",
+        "MLF.Host.IO",
+        "MLF.Host.Async",
+        "MLF.Host.Base",
+        "MLF.Host.IO",
+        "MLF.Host.Async"
+      ],
+      "path": "host/ghc/MLF/Primitive.hs",
+      "sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb"
+    }
+  },
+  "schema": "unify-fixture-static-import-inventory-v1",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1"
+}
