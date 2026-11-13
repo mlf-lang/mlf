@@ -44,11 +44,25 @@ sys.stdout.buffer.write((root / file).read_bytes())
 '''
 
 
+MOCK_CURL = '''#!/usr/bin/env python3
+import json, os, pathlib, sys
+root = pathlib.Path(os.environ["TEST_SEED_FIXTURES"])
+args = sys.argv[1:]
+with (root / "curl-calls.jsonl").open("a") as log:
+    log.write(json.dumps(args) + "\\n")
+if os.environ.get("TEST_CURL_FAIL") == "1":
+    print("mock mirror unavailable", file=sys.stderr)
+    sys.exit(22)
+output = pathlib.Path(args[args.index("--output") + 1])
+output.write_bytes((root / "artifact.zip").read_bytes())
+'''
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-class ArtifactSeedTests(unittest.TestCase):
+class SeedFixture(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="mlf-seed-contract-")
         self.addCleanup(self.temp.cleanup)
@@ -57,6 +71,8 @@ class ArtifactSeedTests(unittest.TestCase):
         binary.mkdir()
         (binary / "gh").write_text(MOCK_GH)
         (binary / "gh").chmod(0o755)
+        (binary / "curl").write_text(MOCK_CURL)
+        (binary / "curl").chmod(0o755)
         self.env = {key: value for key, value in os.environ.items() if not key.startswith("MLF_SEED_")}
         self.env.update(PATH=f"{binary}:{os.environ['PATH']}", TEST_SEED_FIXTURES=str(self.root),
                         GITHUB_REPOSITORY="untrusted/fork", GH_HOST="example.invalid")
@@ -122,9 +138,12 @@ class ArtifactSeedTests(unittest.TestCase):
         (self.root / "artifact.zip").write_bytes(self.zipped)
         self.calls_file = self.root / "calls.jsonl"
         self.calls_file.write_text("")
+        self.curl_calls_file = self.root / "curl-calls.jsonl"
+        self.curl_calls_file.write_text("")
         result = subprocess.run([str(FETCH), str(output), str(pin)], cwd=ROOT,
                                 env={**self.env, "GITHUB_ENV": str(env_file)}, text=True, capture_output=True)
         self.calls = [json.loads(line) for line in self.calls_file.read_text().splitlines()]
+        self.curl_calls = [json.loads(line) for line in self.curl_calls_file.read_text().splitlines()]
         if success:
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.splitlines()[-1], str(output / self.package))
@@ -140,6 +159,8 @@ class ArtifactSeedTests(unittest.TestCase):
                 self.assertIn(error, result.stderr)
         return output, result
 
+
+class ArtifactSeedTests(SeedFixture):
     def test_original_bytes_both_platforms_and_default_macos(self):
         for platform in ("linux-x64", "macos-arm64"):
             with self.subTest(platform=platform):
@@ -301,6 +322,102 @@ class ArtifactSeedTests(unittest.TestCase):
                 del self.members[member]
                 self.repack()
                 self.invoke()
+
+
+class MirrorSeedTests(SeedFixture):
+    def prepare(self, platform="linux-x64"):
+        super().prepare(platform)
+        self.pins["MLF_SEED_TRANSPORT"] = "https-mirror"
+        self.pins["MLF_SEED_MIRROR_URL"] = "https://archive.example.invalid/mlf/original.zip"
+
+    def test_original_bytes_both_platforms_without_actions_dependency(self):
+        for platform in ("linux-x64", "macos-arm64"):
+            with self.subTest(platform=platform):
+                self.prepare(platform)
+                self.run = {}
+                self.artifact = {"expired": True, "expires_at": "2000-01-01T00:00:00Z"}
+                self.env["TEST_GH_FAIL"] = "run"
+                output, result = self.invoke(success=True)
+                self.assertEqual(self.calls, [])
+                self.assertEqual((output / self.archive).read_bytes(), self.original)
+                self.assertIn("via https-mirror", result.stderr)
+                self.assertEqual(list(output.glob(".seed-artifact-*")), [])
+                command = self.curl_calls[0]
+                self.assertEqual(len(self.curl_calls), 1)
+                self.assertEqual(command[:4], ["--disable", "--fail", "--silent", "--show-error"])
+                for option, value in (("--proto", "=https"), ("--proto-redir", "=https"),
+                                      ("--max-redirs", "3"), ("--connect-timeout", "15"),
+                                      ("--max-time", "120"), ("--max-filesize", "33554432"),
+                                      ("--url", self.pins["MLF_SEED_MIRROR_URL"])):
+                    self.assertEqual(command[command.index(option) + 1], value)
+                self.assertIn("--location", command)
+                self.assertIn("--globoff", command)
+
+    def test_unsafe_or_missing_url_never_downloads(self):
+        for url in (None, "", "http://archive.example.invalid/a.zip", "file:///a.zip",
+                    "https://user:password@archive.example.invalid/a.zip",
+                    "https://archive.example.invalid/a.zip?token=secret",
+                    "https://archive.example.invalid/a.zip#fragment",
+                    "https://archive.example.invalid:8443/a.zip",
+                    "https://archive.example.invalid", "https://archive.example.invalid/",
+                    "https://archive.example.invalid/a\n.zip", "https://[invalid/a.zip"):
+            with self.subTest(url=url):
+                if url is None:
+                    self.pins.pop("MLF_SEED_MIRROR_URL", None)
+                else:
+                    self.pins["MLF_SEED_MIRROR_URL"] = url
+                self.invoke()
+                self.assertEqual(self.calls, [])
+                self.assertEqual(self.curl_calls, [])
+
+    def test_missing_or_invalid_immutable_pins_never_download(self):
+        original = self.pins.copy()
+        for field in ("SOURCE_COMMIT", "ARCHIVE_SHA256", "COMPILER_SHA256", "MANAGER_SHA256",
+                      "ARTIFACT_RUN_ID", "ARTIFACT_ID", "ARTIFACT_NAME", "ARTIFACT_SHA256"):
+            with self.subTest(missing=field):
+                self.pins = original.copy()
+                del self.pins[f"MLF_SEED_{field}"]
+                self.invoke()
+                self.assertEqual(self.calls, [])
+                self.assertEqual(self.curl_calls, [])
+        for field in ("SOURCE_COMMIT", "ARCHIVE_SHA256", "ARTIFACT_RUN_ID", "ARTIFACT_ID",
+                      "ARTIFACT_NAME", "ARTIFACT_SHA256", "VERSION", "PLATFORM", "TRANSPORT"):
+            with self.subTest(invalid=field):
+                self.pins = {**original, f"MLF_SEED_{field}": "invalid"}
+                self.invoke()
+                self.assertEqual(self.calls, [])
+                self.assertEqual(self.curl_calls, [])
+
+    def test_mirror_failure_does_not_fall_back(self):
+        self.env["TEST_CURL_FAIL"] = "1"
+        output, _ = self.invoke(error="mock mirror unavailable")
+        self.assertEqual(self.calls, [])
+        self.assertEqual(len(self.curl_calls), 1)
+        self.assertFalse((output / self.archive).exists())
+        self.assertEqual(list(output.glob(".seed-artifact-*")), [])
+
+    def test_unused_mirror_setting_does_not_override_actions(self):
+        self.pins["MLF_SEED_TRANSPORT"] = "github-actions-artifact"
+        self.artifact["expired"] = True
+        self.invoke(error="seed artifact is expired")
+        self.assertEqual(len(self.calls), 2)
+        self.assertEqual(self.curl_calls, [])
+
+    def test_outer_digest_precedes_zip_parsing(self):
+        ArtifactSeedTests.test_outer_digest_precedes_zip_parsing(self)
+        self.assertEqual(self.calls, [])
+
+    def test_reject_unsafe_or_ambiguous_zip(self):
+        ArtifactSeedTests.test_reject_unsafe_or_ambiguous_zip(self)
+        self.assertEqual(self.calls, [])
+
+    def test_encrypted_zip_rejected(self):
+        ArtifactSeedTests.test_encrypted_zip_rejected(self)
+        self.assertEqual(self.calls, [])
+
+    def test_original_archive_bytes_and_remaining_pin_gates(self):
+        ArtifactSeedTests.test_original_archive_bytes_and_remaining_pin_gates(self)
+        self.assertEqual(self.calls, [])
 
 
 if __name__ == "__main__":

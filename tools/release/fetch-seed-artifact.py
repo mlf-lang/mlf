@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Fetch explicitly pinned original seed bytes from a temporary Actions artifact.
+"""Fetch explicitly pinned original seed bytes from a selected transport.
 
 This is a transport only: fetch-seed.sh retains the archive, COMMIT and executable
 checks. SHA256SUMS here is derived from the reviewed archive pin, not downloaded
 release metadata. There is deliberately no artifact discovery or fallback.
+An explicitly selected HTTPS mirror authenticates the identical original ZIP against its reviewed pin;
+it does not depend on the original Actions object remaining available.
 """
 import argparse
 from datetime import datetime, timezone
@@ -16,6 +18,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from urllib.parse import urlsplit
 import zipfile
 
 REPOSITORY = "mlf-lang/mlf"
@@ -42,16 +45,7 @@ def api(endpoint):
     return ["gh", "api", "--hostname", "github.com", f"repos/{REPOSITORY}/{endpoint}"]
 
 
-def fetch(args):
-    require(re.fullmatch(r"[1-9][0-9]*", args.run_id), "invalid artifact run pin")
-    require(re.fullmatch(r"[1-9][0-9]*", args.artifact_id), "invalid artifact ID pin")
-    require(re.fullmatch(r"[0-9a-f]{40}", args.source), "invalid source pin")
-    for value in (args.sha256, args.archive_sha256):
-        require(re.fullmatch(r"[0-9a-f]{64}", value), "invalid SHA-256 pin")
-    archive = re.fullmatch(r"mlf-[0-9]+\.[0-9]+\.[0-9]+-(macos-arm64|linux-x64)\.tar\.gz", args.archive)
-    require(archive is not None, "invalid seed archive name")
-    require(args.name == f"release-{archive[1]}", "artifact name does not match seed platform")
-
+def verify_actions_source(args):
     run = json.loads(subprocess.check_output(api(f"actions/runs/{args.run_id}")))
     require(run.get("id") == int(args.run_id), "workflow run ID mismatch")
     require(run.get("name") == WORKFLOW, "workflow name mismatch")
@@ -82,19 +76,52 @@ def fetch(args):
     require(expires.tzinfo is not None and expires > datetime.now(timezone.utc),
             "seed artifact has expired")
 
+
+def fetch(args):
+    require(re.fullmatch(r"[1-9][0-9]*", args.run_id), "invalid artifact run pin")
+    require(re.fullmatch(r"[1-9][0-9]*", args.artifact_id), "invalid artifact ID pin")
+    require(re.fullmatch(r"[0-9a-f]{40}", args.source), "invalid source pin")
+    for value in (args.sha256, args.archive_sha256):
+        require(re.fullmatch(r"[0-9a-f]{64}", value), "invalid SHA-256 pin")
+    archive = re.fullmatch(r"mlf-[0-9]+\.[0-9]+\.[0-9]+-(macos-arm64|linux-x64)\.tar\.gz", args.archive)
+    require(archive is not None, "invalid seed archive name")
+    require(args.name == f"release-{archive[1]}", "artifact name does not match seed platform")
+
+    if args.transport == "https-mirror":
+        url = urlsplit(args.url)
+        require(url.scheme == "https" and url.hostname is not None
+                and re.fullmatch(r"[A-Za-z0-9.-]+", url.hostname)
+                and url.port in (None, 443) and url.path not in ("", "/")
+                and url.username is None and url.password is None
+                and not url.query and not url.fragment
+                and not any(ord(char) <= 32 or ord(char) >= 127 for char in args.url),
+                "mirror requires an HTTPS object URL without credentials, query or fragment")
+    else:
+        require(not args.url, "mirror URL requires explicitly selected https-mirror transport")
+        verify_actions_source(args)
+
     destination = Path(args.destination)
     require(not (destination / args.archive).exists() and not (destination / "SHA256SUMS").exists(),
             "seed archive or SHA256SUMS already exists")
     with tempfile.TemporaryDirectory(prefix=".seed-artifact-", dir=destination) as work:
         work = Path(work)
         zipped = work / "artifact.zip"
-        command = api(f"actions/artifacts/{args.artifact_id}/zip")
-        # Recent gh versions sanitize binary output unless explicitly allowed.
-        help_text = subprocess.check_output(["gh", "api", "--help"], text=True)
-        if "--allow-escape-sequences" in help_text:
-            command.append("--allow-escape-sequences")
-        with zipped.open("wb") as output:
-            subprocess.run(command, stdout=output, check=True)
+        if args.transport == "https-mirror":
+            # Ignore user curl configuration; permit HTTPS for the initial URL and
+            # every redirect. No credentials or original Actions API are needed.
+            subprocess.run(["curl", "--disable", "--fail", "--silent", "--show-error",
+                            "--location", "--globoff", "--proto", "=https", "--proto-redir", "=https",
+                            "--max-redirs", "3", "--connect-timeout", "15", "--max-time", "120",
+                            "--max-filesize", "33554432", "--output", str(zipped), "--url", args.url],
+                           check=True)
+        else:
+            command = api(f"actions/artifacts/{args.artifact_id}/zip")
+            # Recent gh versions sanitize binary output unless explicitly allowed.
+            help_text = subprocess.check_output(["gh", "api", "--help"], text=True)
+            if "--allow-escape-sequences" in help_text:
+                command.append("--allow-escape-sequences")
+            with zipped.open("wb") as output:
+                subprocess.run(command, stdout=output, check=True)
         # Authenticate the outer ZIP before opening it or reading its directory.
         require(sha256(zipped) == args.sha256, "artifact ZIP digest mismatch")
         with zipfile.ZipFile(zipped) as bundle:
@@ -116,12 +143,16 @@ def fetch(args):
         with (destination / "SHA256SUMS").open("x") as output:
             output.write("# Derived from the reviewed MLF_SEED_ARCHIVE_SHA256 pin; not a release asset.\n")
             output.write(f"{args.archive_sha256}  {args.archive}\n")
-    print(f"Verified temporary Actions artifact {args.artifact_id} from run {args.run_id}; "
+    print(f"Verified original artifact {args.artifact_id} from run {args.run_id} "
+          f"via {args.transport}; "
           "SHA256SUMS is derived from the reviewed archive pin.", file=sys.stderr)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--transport", choices=("github-actions-artifact", "https-mirror"),
+                        default="github-actions-artifact")
+    parser.add_argument("--url", default="")
     for name in ("run-id", "artifact-id", "name", "sha256", "source", "archive", "archive-sha256", "destination"):
         parser.add_argument(f"--{name}", required=True)
     try:

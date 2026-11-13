@@ -97,3 +97,64 @@ runner token or real CLI network access.
 [Transport validation and captured controls](../tools/release/evidence/seed-artifact-20261106/validation.json)
 record the actual bytes and limits. The complete sealed-history and fresh-checkout
 results, followed by GitHub's new commit checks, are publication prerequisites.
+
+
+## Durable transport preparation (2026-11-13)
+
+The fetcher also supports an explicitly selected `https-mirror` of the **exact
+original artifact ZIP**, not a rebuilt compiler or a repacked archive. This
+prepares a migration but does not perform it: the five checked-in seed
+configurations still select the original Actions artifacts. Their expiry
+remains an unresolved CI/release dependency until a durable destination is
+approved, populated, downloaded and verified, and the configurations are
+reviewed and changed. Private backup copies are not accessible to Actions.
+
+Mirror mode authenticates the outer ZIP using the existing reviewed
+`MLF_SEED_ARTIFACT_SHA256`, then retains the unique regular member, original
+tarball, source COMMIT and executable checks above. The original artifact/run
+IDs remain provenance labels; mirror mode deliberately does not require their
+remote metadata to survive. It does not claim to revalidate live GitHub run
+metadata. Actions mode still performs every existing repository, run, source,
+digest and expiry check. Neither mode automatically discovers or falls back to
+another source, and a failed fetch never exports compiler/manager paths.
+
+A mirror requires a credential-free HTTPS object URL without query parameters
+or fragments. The fetcher ignores user curl configuration, requires HTTPS on
+all redirects, bounds redirect count, transfer time and ZIP size, and never
+opens the ZIP before checking its digest. Use a durable, repository-controlled
+object location, not an expiring signed URL. An approved GitHub release asset
+could be such a location, but this change creates no release, tag or public
+binary and does not restore removed historical source reachability.
+
+Activation checklist, requiring separate approval for any new public binary
+publication:
+
+1. Publish the two already verified original ZIPs unchanged to the approved
+   durable destination. Do not rebuild, recompress or substitute either seed.
+2. Download both objects from their actual consumer URLs and compare their
+   outer ZIP and inner archive hashes with this document. Verify COMMIT and
+   both executable hashes using `tools/release/fetch-seed.sh`; fetching and
+   hashing need not execute either compiler.
+3. In each of `.github/seed.env`, `.github/package-seed.env`,
+   `.github/smoke-seed.env`, `.github/smoke-seed-linux.env` and
+   `.github/benchmark-baseline-macos.env`, change only the transport selection
+   to `MLF_SEED_TRANSPORT=https-mirror` and add `MLF_SEED_MIRROR_URL` with the
+   reviewed platform's exact URL. Preserve all version, source and hash pins.
+4. Run the fetch contracts and the repository release checks. Treat any
+   further workflow dispatch or compiler qualification as a separate task;
+   no expensive native campaign is required merely to preserve the bytes.
+
+The benchmark baseline is independent of bootstrap policy. Moving bootstrap
+to authenticated GHC-origin tools does **not** authorize replacing that
+baseline. Mirroring its original bytes preserves the benchmark series;
+selecting another compiler remains a separately reviewed series change.
+
+Preparation validation (not activation or fresh native qualification):
+
+- The 20 offline transport contract tests pass under normal Python and
+  `PYTHONOPTIMIZE=1`; the 11 existing release-mode checks pass unchanged.
+- Temporary copies of all five checked-in configurations, selecting mirror
+  mode and a fixture URL, verify the retained original ZIP/tarball/COMMIT/tool
+  bytes through the real shell fetcher. No compiler is executed.
+- The download adapter is offline. These tests do not establish a live mirror,
+  real TLS/redirect behavior, or ongoing availability of a hosting service.
