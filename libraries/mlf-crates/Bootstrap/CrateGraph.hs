@@ -46,25 +46,29 @@ module Bootstrap.CrateGraph where {
   -- Each input is refreshed once from current source/checked metadata. Derived
   -- nodes have explicit edges back to that authority, including empty scopes.
   input identity value session = G.record (G.inputKey identity) [] False value session;
+  -- Refresh the authoritative input and its derived node from one fresh
+  -- immutable encoding. Keep both nodes, their order and the dependency edge;
+  -- neither an old digest nor hash equality is used to skip value admission.
+  recordInputAndDerived wanted value session = do {
+    encoded <- G.encodeHashed value;
+    ioReturn (mapEither (\((,) digest bytes) ->
+      case G.recordDigest (G.inputKey wanted) [] Nothing digest Nothing session of {
+        (,) leaf next -> G.recordDigest wanted [G.edge leaf] (Just digest) digest (Just bytes) next
+      }) encoded)
+  };
   recordInitialBindings scope values session = case values of {
     [] -> ioReturn (Right session);
     (:) ((,) i contract) rest -> do {
-      observed <- input (bindingKey scope i) (contractValue contract) session;
-      case observed of { Left e -> ioReturn (Left e); Right ((,) leaf next) -> do {
-        recorded <- G.record (bindingKey scope i) [G.edge leaf] True (contractValue contract) next;
-        case recorded of { Left e -> ioReturn (Left e); Right ((,) _ final) -> recordInitialBindings scope rest final }
-      } }
+      recorded <- recordInputAndDerived (bindingKey scope i) (contractValue contract) session;
+      case recorded of { Left e -> ioReturn (Left e); Right ((,) _ final) -> recordInitialBindings scope rest final }
     }
   };
   recordDatatypes values session = case values of {
     [] -> ioReturn (Right session);
     (:) declaration rest -> do {
       let { wanted = datatypeKey (D.datatypeName declaration); value = Open.declarationValue declaration };
-      observed <- input wanted value session;
-      case observed of { Left e -> ioReturn (Left e); Right ((,) leaf next) -> do {
-        recorded <- G.record wanted [G.edge leaf] True value next;
-        case recorded of { Left e -> ioReturn (Left e); Right ((,) _ final) -> recordDatatypes rest final }
-      } }
+      recorded <- recordInputAndDerived wanted value session;
+      case recorded of { Left e -> ioReturn (Left e); Right ((,) _ final) -> recordDatatypes rest final }
     }
   };
   requireNodes wanted session = traverseEither (\identity ->
