@@ -1,0 +1,16 @@
+BEGIN exact State standalone source
+PASS exact State standalone source
+BEGIN transitive source kernels close over instance
+PASS transitive source kernels close over instance
+BEGIN source helper shadows facade value
+PASS source helper shadows facade value
+BEGIN instance lambda shadow does not capture source helper
+PASS instance lambda shadow does not capture source helper
+BEGIN signed recursive source SCC remains supported
+PASS signed recursive source SCC remains supported
+BEGIN unsigned recursive source SCC infers and evaluates
+PASS unsigned recursive source SCC infers and evaluates
+BEGIN final-expression let is not instance source scope
+PASS final-expression let is not instance source scope
+PASS raw body-only let cannot supply instance scope
+PASS source-definition marker preserves ordinary MLF type and erasure

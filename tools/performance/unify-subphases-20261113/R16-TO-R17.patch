@@ -1,0 +1,19 @@
+--- r16/libraries/mlf-inference/Bootstrap/Graph.hs
++++ r17/libraries/mlf-inference/Bootstrap/Graph.hs
+@@ -1254,12 +1254,12 @@
+            (\kinds -> foldE (firstOrder kinds) before equations);
+   unify :: [] ((,) Int Int) -> Graph -> Either String Graph;
+   unify equations before =
+-    {-# SCC "SOLVER_LOCAL_UNIFY" #-} bindE (validateGraph before)
++    {-# SCC "SOLVER_LOCAL_UNIFY" #-} bindE ({-# SCC "SOLVER_UNIFY_INPUT_VALIDATION" #-} validateGraph before)
+       (\ignored ->
+-         bindE (checkedFirstOrder equations before)
++         bindE ({-# SCC "SOLVER_UNIFY_FIRST_ORDER" #-} checkedFirstOrder equations before)
+            (\skeleton ->
+-              bindE (rebind before (canonicalize skeleton))
+-                (\rebuilt -> bindE (validateGraph rebuilt) (\verified -> Right rebuilt))));
++              bindE ({-# SCC "SOLVER_UNIFY_REBIND" #-} rebind before (canonicalize skeleton))
++                (\rebuilt -> bindE ({-# SCC "SOLVER_UNIFY_OUTPUT_VALIDATION" #-} validateGraph rebuilt) (\verified -> Right rebuilt))));
+   graftedNodes :: Graph -> Graph -> IntSet;
+   graftedNodes old skeleton =
+     L.foldlStrict
