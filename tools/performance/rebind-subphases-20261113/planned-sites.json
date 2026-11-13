@@ -1,0 +1,80 @@
+{
+  "schema": "canonicalize-rebind-minimal-diagnostic-plan-v1",
+  "status": "data-only plan; not applied; no compiler/profile/guard run",
+  "baseline_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+  "baseline_graph_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+  "r17_preview_graph_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774",
+  "r17_insertion_map_sha256": "5582684fc0b65f93103784616ef03f714b3d60cf8dc5afc73462ba4fa4bce702",
+  "r17_fine_reader_sha256": "5f9865e229949937b5f54ec9289ec46d657c8251cfc7c10a2fe1a2efe209e5c1",
+  "r17_final_verification_sha256": "a818eeb129f0f6baa23b1bc0c0a3e4a90caa638fcbb2c1b30b88b34504d1b4b3",
+  "sites": [
+    {
+      "site_id": "unify-canonicalize",
+      "label": "SOLVER_UNIFY_CANONICALIZE",
+      "f9_line": 1261,
+      "before": "(canonicalize skeleton)",
+      "after": "({-# SCC \"SOLVER_UNIFY_CANONICALIZE\" #-} canonicalize skeleton)",
+      "module": "Bootstrap.Graph",
+      "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "inserted_token": "{-# SCC \"SOLVER_UNIFY_CANONICALIZE\" #-} ",
+      "f9_anchor_line_range": [
+        1261,
+        1261
+      ]
+    },
+    {
+      "site_id": "unify-rebind-sparse",
+      "label": "SOLVER_UNIFY_REBIND_SPARSE",
+      "f9_line": 1476,
+      "before": "Nothing -> rebindSparse old skeleton;",
+      "after": "Nothing -> {-# SCC \"SOLVER_UNIFY_REBIND_SPARSE\" #-} rebindSparse old skeleton;",
+      "module": "Bootstrap.Graph",
+      "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "inserted_token": "{-# SCC \"SOLVER_UNIFY_REBIND_SPARSE\" #-} ",
+      "f9_anchor_line_range": [
+        1476,
+        1476
+      ]
+    },
+    {
+      "site_id": "unify-rebind-dense",
+      "label": "SOLVER_UNIFY_REBIND_DENSE",
+      "f9_line": 1477,
+      "before": "Just ((,) low high) -> rebindDense old skeleton low high",
+      "after": "Just ((,) low high) -> {-# SCC \"SOLVER_UNIFY_REBIND_DENSE\" #-} rebindDense old skeleton low high",
+      "module": "Bootstrap.Graph",
+      "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "inserted_token": "{-# SCC \"SOLVER_UNIFY_REBIND_DENSE\" #-} ",
+      "f9_anchor_line_range": [
+        1477,
+        1477
+      ]
+    }
+  ],
+  "new_fine_sites": 3,
+  "new_fine_labels": 3,
+  "expected_combined_counts": {
+    "source_edits": 41,
+    "fine_sites": 14,
+    "fine_labels": 13
+  },
+  "rebind_family_labels": [
+    "SOLVER_UNIFY_REBIND",
+    "SOLVER_UNIFY_CANONICALIZE",
+    "SOLVER_UNIFY_REBIND_DENSE",
+    "SOLVER_UNIFY_REBIND_SPARSE"
+  ],
+  "expected_local_unify_family_label_count": 8,
+  "no_change": [
+    "production source",
+    "frozen r17 source/evidence",
+    "r19 source/fixtures/benchmark",
+    "argument evaluation order",
+    "validation",
+    "sharing boundaries",
+    "ST structure",
+    "APIs",
+    "primitives"
+  ]
+}

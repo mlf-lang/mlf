@@ -1,0 +1,1598 @@
+--- r17/implementation/fine_profile.py
++++ r21/implementation/fine_profile.py
+@@ -1,4 +1,4 @@
+-"""Read-only r17 extension; original r13 profile.py and coarse labels stay fixed.
++"""Read-only r21 extension; original r13 profile.py and coarse labels stay fixed.
+ 
+ This tool does not run a compiler, control, benchmark, cleanup, or stage admission.
+ Caller-supplied hashes must come from separately authenticated stage evidence.
+@@ -28,10 +28,15 @@
+     'unify-first-order': ('SOLVER_UNIFY_FIRST_ORDER', 'Bootstrap.Graph', PREFIX + 'Graph.hs'),
+     'unify-rebind': ('SOLVER_UNIFY_REBIND', 'Bootstrap.Graph', PREFIX + 'Graph.hs'),
+     'unify-output-validation': ('SOLVER_UNIFY_OUTPUT_VALIDATION', 'Bootstrap.Graph', PREFIX + 'Graph.hs'),
++    'unify-canonicalize': ('SOLVER_UNIFY_CANONICALIZE', 'Bootstrap.Graph', PREFIX + 'Graph.hs'),
++    'unify-rebind-sparse': ('SOLVER_UNIFY_REBIND_SPARSE', 'Bootstrap.Graph', PREFIX + 'Graph.hs'),
++    'unify-rebind-dense': ('SOLVER_UNIFY_REBIND_DENSE', 'Bootstrap.Graph', PREFIX + 'Graph.hs'),
+ }
+ FINE_LABELS = frozenset(x[0] for x in EXPECTED.values())
+ LOCAL_UNIFY_FAMILY = frozenset(['SOLVER_LOCAL_UNIFY',
+                               *(label for label in FINE_LABELS if label.startswith('SOLVER_UNIFY_'))])
++REBIND_FAMILY = frozenset(['SOLVER_UNIFY_REBIND', 'SOLVER_UNIFY_CANONICALIZE',
++                         'SOLVER_UNIFY_REBIND_DENSE', 'SOLVER_UNIFY_REBIND_SPARSE'])
+ 
+ 
+ class FineProfileError(ValueError):
+@@ -96,7 +101,7 @@
+     require(fine.get('coarse_profile_sha256') == COARSE_READER_SHA256, 'coarse reader pin mismatch')
+     require(fine.get('labels') == sorted(FINE_LABELS), 'exact fine label inventory required')
+     sites = fine.get('sites')
+-    require(type(sites) is list and len(sites) == 11, 'eleven fine sites required')
++    require(type(sites) is list and len(sites) == 14, 'fourteen fine sites required')
+     require({s.get('site_id') for s in sites} == set(EXPECTED), 'fine site IDs differ')
+     for site in sites:
+         require((site.get('label'), site.get('module'), site.get('path')) == EXPECTED[site['site_id']],
+@@ -149,7 +154,7 @@
+                 matches.append(site['site_id'])
+         require(len(matches) == 1, 'fine cost centre does not uniquely match a reviewed site')
+         by_id[cc['id']] = matches[0]
+-    require(set(by_id.values()) == set(EXPECTED), 'not all eleven fine sites are declared in raw profile')
++    require(set(by_id.values()) == set(EXPECTED), 'not all fourteen fine sites are declared in raw profile')
+     return by_id
+ 
+ 
+@@ -188,9 +193,13 @@
+         actual = {field: sum(v[field] for (owner, _), v in matrix.items() if owner == bucket)
+                   for field in ('alloc', 'ticks', 'nodes')}
+         require(actual == expected, 'coarse row conservation failed')
++        actual_sites = {field: sum(v[field] for (owner, _), v in site_matrix.items() if owner == bucket)
++                        for field in ('alloc', 'ticks', 'nodes')}
++        require(actual_sites == expected, 'coarse site row conservation failed')
+     require(sum(v['alloc'] for v in matrix.values()) == coarse['total_alloc'], 'global allocation conservation failed')
+     require(sum(v['ticks'] for v in matrix.values()) == coarse['total_ticks'], 'global tick conservation failed')
+     require(sum(v['alloc'] for v in site_matrix.values()) == coarse['total_alloc'], 'site allocation conservation failed')
++    require(sum(v['ticks'] for v in site_matrix.values()) == coarse['total_ticks'], 'site tick conservation failed')
+     rows = [dict(coarse=owner, fine=label, **values) for (owner, label), values in sorted(matrix.items())]
+     per_site = [dict(coarse=owner, site=site, **values) for (owner, site), values in sorted(site_matrix.items())]
+     # A parallel presentation of disjoint family cells, not extra allocation.
+@@ -200,9 +209,18 @@
+                    if coarse_owner == owner and label in LOCAL_UNIFY_FAMILY)
+         for field in ('alloc', 'ticks', 'nodes')})
+         for owner in sorted({owner for owner, label in matrix if label in LOCAL_UNIFY_FAMILY})]
++    # C/D/S/REBIND residual are the same disjoint nearest-label cells, not
++    # inherited subtotals. Canonicalize need not retain a forcing-route parent.
++    rebind_cells = [row for row in rows if row['fine'] in REBIND_FAMILY]
++    rebind_family = [dict(coarse=owner, **{
++        field: sum(row[field] for row in rebind_cells if row['coarse'] == owner)
++        for field in ('alloc', 'ticks', 'nodes')})
++        for owner in sorted({row['coarse'] for row in rebind_cells})]
+     result = dict(schema='solver-r16-fine-partition-v1',
+-                  extension='unify-r17', local_unify_family_labels=sorted(LOCAL_UNIFY_FAMILY),
++                  extension='rebind-subphases-r21', local_unify_family_labels=sorted(LOCAL_UNIFY_FAMILY),
+                   local_unify_family_by_coarse=family,
++                  rebind_family_labels=sorted(REBIND_FAMILY),
++                  rebind_family_cells=rebind_cells, rebind_family_by_coarse=rebind_family,
+                   interpretation='profiled source-demand allocation; not ordinary exclusive CPU, heap or savings',
+                   unit=coarse['unit'], total_alloc=coarse['total_alloc'], total_ticks=coarse['total_ticks'],
+                   coarse_partition=coarse['partition'], matrix=rows, site_matrix=per_site,
+--- r17/implementation/insertion-map.json
++++ r21/implementation/insertion-map.json
+@@ -561,6 +561,18 @@
+       {
+         "before": "(validateGraph rebuilt)",
+         "after": "({-# SCC \"SOLVER_UNIFY_OUTPUT_VALIDATION\" #-} validateGraph rebuilt)"
++      },
++      {
++        "before": "(canonicalize skeleton)",
++        "after": "({-# SCC \"SOLVER_UNIFY_CANONICALIZE\" #-} canonicalize skeleton)"
++      },
++      {
++        "before": "Nothing -> rebindSparse old skeleton;",
++        "after": "Nothing -> {-# SCC \"SOLVER_UNIFY_REBIND_SPARSE\" #-} rebindSparse old skeleton;"
++      },
++      {
++        "before": "Just ((,) low high) -> rebindDense old skeleton low high",
++        "after": "Just ((,) low high) -> {-# SCC \"SOLVER_UNIFY_REBIND_DENSE\" #-} rebindDense old skeleton low high"
+       }
+     ]
+   },
+@@ -575,10 +587,13 @@
+       "SOLVER_PREPARE",
+       "SOLVER_STEPS",
+       "SOLVER_TRANSACTION",
++      "SOLVER_UNIFY_CANONICALIZE",
+       "SOLVER_UNIFY_FIRST_ORDER",
+       "SOLVER_UNIFY_INPUT_VALIDATION",
+       "SOLVER_UNIFY_OUTPUT_VALIDATION",
+-      "SOLVER_UNIFY_REBIND"
++      "SOLVER_UNIFY_REBIND",
++      "SOLVER_UNIFY_REBIND_DENSE",
++      "SOLVER_UNIFY_REBIND_SPARSE"
+     ],
+     "sites": [
+       {
+@@ -679,8 +694,8 @@
+         "end_marker": ";\n  -- Freeze one solved recursive member",
+         "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+         "fine_rhs_span": {
+-          "start_byte": 103333,
+-          "end_byte_exclusive": 104665,
++          "start_byte": 103454,
++          "end_byte_exclusive": 104786,
+           "start": [
+             2259,
+             36
+@@ -690,7 +705,7 @@
+             6
+           ]
+         },
+-        "fine_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774"
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
+       },
+       {
+         "site_id": "transaction-distinct",
+@@ -791,7 +806,7 @@
+         "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+         "fine_rhs_span": {
+           "start_byte": 49790,
+-          "end_byte_exclusive": 50227,
++          "end_byte_exclusive": 50267,
+           "start": [
+             1257,
+             38
+@@ -801,7 +816,7 @@
+             136
+           ]
+         },
+-        "fine_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774"
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
+       },
+       {
+         "site_id": "finish-audit",
+@@ -877,7 +892,7 @@
+           ]
+         },
+         "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+-        "fine_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774"
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
+       },
+       {
+         "site_id": "unify-first-order",
+@@ -916,7 +931,7 @@
+           ]
+         },
+         "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+-        "fine_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774"
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
+       },
+       {
+         "site_id": "unify-rebind",
+@@ -944,18 +959,18 @@
+         },
+         "fine_rhs_span": {
+           "start_byte": 50053,
+-          "end_byte_exclusive": 50090,
++          "end_byte_exclusive": 50130,
+           "start": [
+             1261,
+             56
+           ],
+           "end_exclusive": [
+             1261,
+-            93
++            133
+           ]
+         },
+         "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+-        "fine_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774"
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
+       },
+       {
+         "site_id": "unify-output-validation",
+@@ -982,8 +997,8 @@
+           ]
+         },
+         "fine_rhs_span": {
+-          "start_byte": 50173,
+-          "end_byte_exclusive": 50194,
++          "start_byte": 50213,
++          "end_byte_exclusive": 50234,
+           "start": [
+             1262,
+             82
+@@ -994,7 +1009,124 @@
+           ]
+         },
+         "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+-        "fine_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774"
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
++      },
++      {
++        "site_id": "unify-canonicalize",
++        "label": "SOLVER_UNIFY_CANONICALIZE",
++        "module": "Bootstrap.Graph",
++        "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
++        "anchor_before": "(canonicalize skeleton)",
++        "anchor_after": "({-# SCC \"SOLVER_UNIFY_CANONICALIZE\" #-} canonicalize skeleton)",
++        "inserted_token": "{-# SCC \"SOLVER_UNIFY_CANONICALIZE\" #-} ",
++        "expected_anchor_occurrences": 1,
++        "end_marker": ")",
++        "anchor_form": "parenthesized-expression",
++        "expression": "canonicalize skeleton",
++        "coarse_rhs_span": {
++          "start_byte": 49918,
++          "end_byte_exclusive": 49939,
++          "start": [
++            1261,
++            37
++          ],
++          "end_exclusive": [
++            1261,
++            58
++          ]
++        },
++        "fine_rhs_span": {
++          "start_byte": 50108,
++          "end_byte_exclusive": 50129,
++          "start": [
++            1261,
++            111
++          ],
++          "end_exclusive": [
++            1261,
++            132
++          ]
++        },
++        "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
++      },
++      {
++        "site_id": "unify-rebind-sparse",
++        "label": "SOLVER_UNIFY_REBIND_SPARSE",
++        "module": "Bootstrap.Graph",
++        "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
++        "anchor_before": "Nothing -> rebindSparse old skeleton;",
++        "anchor_after": "Nothing -> {-# SCC \"SOLVER_UNIFY_REBIND_SPARSE\" #-} rebindSparse old skeleton;",
++        "inserted_token": "{-# SCC \"SOLVER_UNIFY_REBIND_SPARSE\" #-} ",
++        "expected_anchor_occurrences": 1,
++        "end_marker": ";\n      Just",
++        "anchor_form": "case-arm-expression",
++        "expression": "rebindSparse old skeleton",
++        "coarse_rhs_span": {
++          "start_byte": 58348,
++          "end_byte_exclusive": 58373,
++          "start": [
++            1476,
++            18
++          ],
++          "end_exclusive": [
++            1476,
++            43
++          ]
++        },
++        "fine_rhs_span": {
++          "start_byte": 58624,
++          "end_byte_exclusive": 58649,
++          "start": [
++            1476,
++            59
++          ],
++          "end_exclusive": [
++            1476,
++            84
++          ]
++        },
++        "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
++      },
++      {
++        "site_id": "unify-rebind-dense",
++        "label": "SOLVER_UNIFY_REBIND_DENSE",
++        "module": "Bootstrap.Graph",
++        "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
++        "anchor_before": "Just ((,) low high) -> rebindDense old skeleton low high",
++        "anchor_after": "Just ((,) low high) -> {-# SCC \"SOLVER_UNIFY_REBIND_DENSE\" #-} rebindDense old skeleton low high",
++        "inserted_token": "{-# SCC \"SOLVER_UNIFY_REBIND_DENSE\" #-} ",
++        "expected_anchor_occurrences": 1,
++        "end_marker": "\n    };",
++        "anchor_form": "case-arm-expression",
++        "expression": "rebindDense old skeleton low high",
++        "coarse_rhs_span": {
++          "start_byte": 58404,
++          "end_byte_exclusive": 58437,
++          "start": [
++            1477,
++            30
++          ],
++          "end_exclusive": [
++            1477,
++            63
++          ]
++        },
++        "fine_rhs_span": {
++          "start_byte": 58720,
++          "end_byte_exclusive": 58753,
++          "start": [
++            1477,
++            70
++          ],
++          "end_exclusive": [
++            1477,
++            103
++          ]
++        },
++        "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7"
+       }
+     ],
+     "files": {
+@@ -1006,7 +1138,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/ArtifactStructure.hs": {
+         "source_sha256": "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23",
+@@ -1016,7 +1150,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "2b4a215dad741f09fa9e9026d15ad44f96fa1a2f0c260c9f030d7c0a2cc5ac23",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/Bitstream.hs": {
+         "source_sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8",
+@@ -1026,7 +1162,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs": {
+         "source_sha256": "e8f69d41475c332991f122c765f79cc11cddf708044db859846818dc26ade920",
+@@ -1036,7 +1174,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "e8f69d41475c332991f122c765f79cc11cddf708044db859846818dc26ade920",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/BuiltinPreludeLiteral.hs": {
+         "source_sha256": "f3bad10172df0e35b36fc5926cbbfe688e2c6e6603761823d96baee5769e6357",
+@@ -1046,7 +1186,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "f3bad10172df0e35b36fc5926cbbfe688e2c6e6603761823d96baee5769e6357",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/ClassDemand.hs": {
+         "source_sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
+@@ -1056,7 +1198,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "ca2aa895dcea3310d931e204975d55409a4d6a6a06b23e1dd8f6888f1e413379",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/Classes.hs": {
+         "source_sha256": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
+@@ -1066,7 +1210,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "d39189aa3fbac77083d9eed274f8595c5b6cb59967499c99ea8b579ea88a869b",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/Compiler.hs": {
+         "source_sha256": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e",
+@@ -1076,7 +1222,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "ac6683d3b2148bfd1de17b1d39e0bcb4184278f92bdfd139c52f062df024315e",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/CompilerCore.hs": {
+         "source_sha256": "00b0274c05dc10f65e5fd2c1df13acdf0382d352c2dd07aa74e79f7c2cdcb8e2",
+@@ -1086,7 +1234,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "e65bc44ae73ce0970103f70f83c0510ffd1bbc0dbb13df6a66ee0e0e89acbb88",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/Constraint.hs": {
+         "source_sha256": "eb54d03e146e30a8f2aea53de92357155bb448dacee4161df19aab9648477c0c",
+@@ -1096,7 +1246,9 @@
+         "fine_insertions": 1,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "21806d8fbd2d48b345017300803597a63edc64f9c5ef2051989b2ff1a91e4a64",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/Crate.hs": {
+         "source_sha256": "169a65e03680313755c0bcfe25b462cc96c9b260e077891771785a43a3d7c063",
+@@ -1106,7 +1258,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "169a65e03680313755c0bcfe25b462cc96c9b260e077891771785a43a3d7c063",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/CrateArtifact.hs": {
+         "source_sha256": "da416111adcfafa18eb473ae611379fc1ef521c84d1dab3d2d5a4dc3eb51c6f0",
+@@ -1116,7 +1270,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "da416111adcfafa18eb473ae611379fc1ef521c84d1dab3d2d5a4dc3eb51c6f0",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/CrateCodegen.hs": {
+         "source_sha256": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
+@@ -1126,7 +1282,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "3b965481dec681849dbc2fb5172a31fc2b703609a7d379195a2c3338e92011ad",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/CrateGraph.hs": {
+         "source_sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
+@@ -1136,7 +1294,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/CrateQuery.hs": {
+         "source_sha256": "504c1da39204fa87c67c2ba1c9ab8e0914b3c41f81f170b85dd7076e0ead9748",
+@@ -1146,7 +1306,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "504c1da39204fa87c67c2ba1c9ab8e0914b3c41f81f170b85dd7076e0ead9748",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/CrateSession.hs": {
+         "source_sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
+@@ -1156,7 +1318,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "a13c01632001643b683e54c10775eb9a262faf0d6766c52209a3ec0704fd9bdd",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-language-core/Bootstrap/Data.hs": {
+         "source_sha256": "80545c6378de8e846d3a13df8b5418b8fd7854d011346f12dbfd4c99c47c7558",
+@@ -1166,7 +1330,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "80545c6378de8e846d3a13df8b5418b8fd7854d011346f12dbfd4c99c47c7558",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Dependency.hs": {
+         "source_sha256": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2",
+@@ -1176,7 +1342,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "c525a88ad424e0e79c30209f646a0f270f54cc7109d3096cf6953a5d9b93baa2",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Desugar.hs": {
+         "source_sha256": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37",
+@@ -1186,7 +1354,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "6ea33b5a1c642f984bc8c22be951be774863fe5bb4ea44d5066a8df59e073a37",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/Elaborate.hs": {
+         "source_sha256": "c061b8a6ff668acd5f362c180d8c6ad24c9bb54c219108ea793d968ee4f43c58",
+@@ -1196,7 +1366,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "9b22cd1e4f280de4af8f474df308adf7d122ed5404898e41436a6c04fb8e8edc",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/Evidence.hs": {
+         "source_sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
+@@ -1206,7 +1378,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "c533ce20b23c9580f2bddf7e340cb3e8fb813a197e46cc4ea173f705177a9bcd",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/EvidenceBoundary.hs": {
+         "source_sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
+@@ -1216,7 +1390,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "df2a050309ad10b4770cae1defcc87f1d56bedca87e1d4c5d4feb21b975f93b2",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/Fresh.hs": {
+         "source_sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
+@@ -1226,17 +1402,21 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/Graph.hs": {
+         "source_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+         "coarse_sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f",
+         "r16_sha256": "4650674593ef1c1ac6dc615f0d28c16feceeb5abc5743fc4ad82b1136d816a44",
+-        "fine_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774",
+-        "fine_insertions": 6,
+-        "fine_inverse_exact": true,
+-        "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "fine_sha256": "573ce2134d296791574f025943536d6d8c012ca54149ad5e584b6c9ecad906c7",
++        "fine_insertions": 9,
++        "fine_inverse_exact": true,
++        "coarse_inverse_exact": true,
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "62887dfea6689a9a7cee7ffebdd7dd2114cd4e5ca2be48974c2cc7d9290d8774",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/Graph/IndexStore.hs": {
+         "source_sha256": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41",
+@@ -1246,7 +1426,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "34bd191f60df38d6bd0229d360d6afbba5e32652f5a43de58b7ec912d5c3be41",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-inference/Bootstrap/Graph/Solver.hs": {
+         "source_sha256": "58a248754171308509dd0752461c3e22c107973b6fa73b97931d5b74d2389612",
+@@ -1256,7 +1438,9 @@
+         "fine_insertions": 4,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "bfeb67b8b215573d1550e100c3b9ee6c8182133f3816e8f73a979d2eca800607",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/Host.hs": {
+         "source_sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
+@@ -1266,7 +1450,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/ImportParameters.hs": {
+         "source_sha256": "e6f840d764e3f07f74fa532b151f8cfb890b7ddb0d1035e062cac299da460954",
+@@ -1276,7 +1462,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "e6f840d764e3f07f74fa532b151f8cfb890b7ddb0d1035e062cac299da460954",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/ImportedRoot.hs": {
+         "source_sha256": "101b25c1acd5a6af94081b1364b16f2461bbd19b50f9df90d6fb9f50c9140dd1",
+@@ -1286,7 +1474,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "101b25c1acd5a6af94081b1364b16f2461bbd19b50f9df90d6fb9f50c9140dd1",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/IndexVec.hs": {
+         "source_sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e",
+@@ -1296,7 +1486,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/InferenceUnit.hs": {
+         "source_sha256": "ab3bf4aa00ac0c2eea90b4bfc7d35b5430b1ac959187f3e2d99850f1bd35e46e",
+@@ -1306,7 +1498,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "d0d820f1f5c8de143d311ccfa1f9be104aa428180b476b0c31f0c39804080ad7",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/IntMap.hs": {
+         "source_sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
+@@ -1316,7 +1510,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/IntRank.hs": {
+         "source_sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
+@@ -1326,7 +1522,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/IntSet.hs": {
+         "source_sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
+@@ -1336,7 +1534,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/IntTree.hs": {
+         "source_sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
+@@ -1346,7 +1546,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-language-core/Bootstrap/Kind.hs": {
+         "source_sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
+@@ -1356,7 +1558,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "453aebe46c80250d50a32ae84b9f5d1bb56f2effbe94018d0e67742fbffb4f3b",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-language-core/Bootstrap/Kinding.hs": {
+         "source_sha256": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
+@@ -1366,7 +1570,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "c0188208294013e2c2645e01bc1dedf6a8dcf10f4a35b1a128b82bb485cc960c",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM.hs": {
+         "source_sha256": "4ca4c87e0a32932b4d2227b9ff55bd73d34e4f1c5570f027b7e7677fc86d2750",
+@@ -1376,7 +1582,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "4ca4c87e0a32932b4d2227b9ff55bd73d34e4f1c5570f027b7e7677fc86d2750",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Analysis.hs": {
+         "source_sha256": "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e",
+@@ -1386,7 +1594,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "b10dbe9ea529646a375f50144ffb4dbac5b2c3ac5453e02170334f78fd57e65e",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Argument.hs": {
+         "source_sha256": "8d8a897eb4019ad40fe5cb756a30fd8c789e4c745205e654254bbf702d12710b",
+@@ -1396,7 +1606,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "8d8a897eb4019ad40fe5cb756a30fd8c789e4c745205e654254bbf702d12710b",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Build.hs": {
+         "source_sha256": "e78bf81269ae16b493f3170d91cd2c451891479aca184a2fa302194b95679e86",
+@@ -1406,7 +1618,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "e78bf81269ae16b493f3170d91cd2c451891479aca184a2fa302194b95679e86",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Codegen.hs": {
+         "source_sha256": "d4c94567ae188538e107306e6730206547261aa8c461e87fdb564bcdad7e11db",
+@@ -1416,7 +1630,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "d4c94567ae188538e107306e6730206547261aa8c461e87fdb564bcdad7e11db",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Kernel.hs": {
+         "source_sha256": "46ae5be45d9c6f58a61a1c52856bd11befeb3b6fa4ed7c7b09118a9226948642",
+@@ -1426,7 +1642,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "46ae5be45d9c6f58a61a1c52856bd11befeb3b6fa4ed7c7b09118a9226948642",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/LazyProducer.hs": {
+         "source_sha256": "88d750f0671a228da67403a555a43b71054dee8307da88e5070752474e1cf7c8",
+@@ -1436,7 +1654,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "88d750f0671a228da67403a555a43b71054dee8307da88e5070752474e1cf7c8",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Library.hs": {
+         "source_sha256": "03eac45b9fd31cf625e37cf0e7d245429ca500c19d5717db1eb01b93cadf293d",
+@@ -1446,7 +1666,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "03eac45b9fd31cf625e37cf0e7d245429ca500c19d5717db1eb01b93cadf293d",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Native.hs": {
+         "source_sha256": "dd5c283b74aa407a7555ad7c5c1793d5b1e8e72bf7bdc61bb946c96aef0ac242",
+@@ -1456,7 +1678,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "dd5c283b74aa407a7555ad7c5c1793d5b1e8e72bf7bdc61bb946c96aef0ac242",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Optimize.hs": {
+         "source_sha256": "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f",
+@@ -1466,7 +1690,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "4cc34c817a9e12dd77e2f27ebae98aa4d977c5247d741668bad1a86b898bba1f",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/Result.hs": {
+         "source_sha256": "792da71fe323dee4b2497b552c090e38e98f6f51d6997ee9da07286420f1396e",
+@@ -1476,7 +1702,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "792da71fe323dee4b2497b552c090e38e98f6f51d6997ee9da07286420f1396e",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/StrictFields.hs": {
+         "source_sha256": "50c76597138b9fe9c7a4eeba22976f096b513038450c830f4e204059c2a91d9e",
+@@ -1486,7 +1714,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "50c76597138b9fe9c7a4eeba22976f096b513038450c830f4e204059c2a91d9e",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-llvm/Bootstrap/LLVM/StrictWrappers.hs": {
+         "source_sha256": "b8e09c8fe3af9f14c7e7b6f6deae008ada04fc84923a41fa5c29d1e16857ed13",
+@@ -1496,7 +1726,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "b8e09c8fe3af9f14c7e7b6f6deae008ada04fc84923a41fa5c29d1e16857ed13",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Layout.hs": {
+         "source_sha256": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8",
+@@ -1506,7 +1738,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "b64c7f09bdf23a9652baa1fbd74729287dac243fd5a3801fbbc83e6abe5f58c8",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Lexer.hs": {
+         "source_sha256": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
+@@ -1516,7 +1750,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "d053db12391324d4305a78ac5dad24b3fe81c449007e318e14183c4e464adb43",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/Map.hs": {
+         "source_sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
+@@ -1526,7 +1762,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Module.hs": {
+         "source_sha256": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
+@@ -1536,7 +1774,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "1f7ea629418456d898ad30227abd9aab444494199425b489d4330319ca9b42ca",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/OpenFragment.hs": {
+         "source_sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+@@ -1546,7 +1786,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "66b481ddb620bc36b3d4126b9f63e6adcdbfbffb258df1658b3b2664fab6fb85",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Parsec.hs": {
+         "source_sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
+@@ -1556,7 +1798,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "38cce5767b935e27292b0c0fb35f1750e3d02ff5ef5ef111c615b04001ebce90",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Parser.hs": {
+         "source_sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c",
+@@ -1566,7 +1810,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "02e9eecfdf3460bdb3b0fdd83a7f96963202c1c58052c220f238ccb73779e16c",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Prelude.hs": {
+         "source_sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2",
+@@ -1576,7 +1822,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "aa15cd106e481e569545d0a224ad9baf7cb03c69b5493b002e03edb2626fbed2",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/PreparedLibraries.hs": {
+         "source_sha256": "0b158d893dab7ac0e5037c1b4ead43fa80f03207c597fc1bf5a4498fec249ada",
+@@ -1586,7 +1834,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "0b158d893dab7ac0e5037c1b4ead43fa80f03207c597fc1bf5a4498fec249ada",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-language-core/Bootstrap/Primitive.hs": {
+         "source_sha256": "53a7d3b4c605cd15071a528185ab7252099027feb8c40db23d5dd40ac42e2726",
+@@ -1596,7 +1846,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "53a7d3b4c605cd15071a528185ab7252099027feb8c40db23d5dd40ac42e2726",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-interpreter/Bootstrap/ProcessHost.hs": {
+         "source_sha256": "2fcd44e92c3b0a889e7ed16316ed68209f940f357fdb68b049c596f6d3a3dc24",
+@@ -1606,7 +1858,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "2fcd44e92c3b0a889e7ed16316ed68209f940f357fdb68b049c596f6d3a3dc24",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/QueryGraph.hs": {
+         "source_sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71",
+@@ -1616,7 +1870,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "bdb0c29b3dff43af95dce3d2cbf63c41b8c9d4a85439646f349510287c36479f",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Resolved.hs": {
+         "source_sha256": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052",
+@@ -1626,7 +1882,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "1ebcc702cfb7ade22dad92d870dda79d57788420ef60627acb6522d54a509052",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-interpreter/Bootstrap/Runtime.hs": {
+         "source_sha256": "a764518838cc7ca32b58a5b13901e542d30b269b50cdcd67bf4a23f5ac4d11f6",
+@@ -1636,7 +1894,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "a764518838cc7ca32b58a5b13901e542d30b269b50cdcd67bf4a23f5ac4d11f6",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/ST.hs": {
+         "source_sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
+@@ -1646,7 +1906,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/Separate.hs": {
+         "source_sha256": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
+@@ -1656,7 +1918,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/Set.hs": {
+         "source_sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
+@@ -1666,7 +1930,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/SourceEquality.hs": {
+         "source_sha256": "806297f22ce1d35a02b6db393ecc18771e571a08f13665f981e509358525c6f8",
+@@ -1676,7 +1942,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "806297f22ce1d35a02b6db393ecc18771e571a08f13665f981e509358525c6f8",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/SourceInference.hs": {
+         "source_sha256": "f62f60fdee8d63541f326572d791b7d2c0cb492603bacefd8cd61d4e5b437f3b",
+@@ -1686,7 +1954,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "56584cdd50342db5be8874409cafa1ecfc7d33bb204e07365fe66d14e353bca3",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-crates/Bootstrap/SourceUnit.hs": {
+         "source_sha256": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f",
+@@ -1696,7 +1966,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "0986afe240f8e8624e9f289cf65a0b18a90676fc58819d362faef97bc1cac82f",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Standalone.hs": {
+         "source_sha256": "31ee00d6ba44ca91b613176f20cc1726b8ff4348b9ac3a101c2e81e96af8e9f5",
+@@ -1706,7 +1978,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "31ee00d6ba44ca91b613176f20cc1726b8ff4348b9ac3a101c2e81e96af8e9f5",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/Std.hs": {
+         "source_sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca",
+@@ -1716,7 +1990,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-frontend/Bootstrap/Surface.hs": {
+         "source_sha256": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa",
+@@ -1726,7 +2002,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "eac10f8d5981fe36b9b5f8b141b1efdf0da2512dc717b1c588451a6aa9b980aa",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/Types.hs": {
+         "source_sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596",
+@@ -1736,7 +2014,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/Unicode.hs": {
+         "source_sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077",
+@@ -1746,7 +2026,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-foundation/Bootstrap/Version.hs": {
+         "source_sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
+@@ -1756,7 +2038,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-xmlf/Bootstrap/X/Check.hs": {
+         "source_sha256": "5c299a3617d07a9d7fe89f88039134491630eee256dbdd57ebe8270e41f78f1c",
+@@ -1766,7 +2050,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "d9bbd83a24205b8032e5b87ee86b31f695f492e255ff54583054f07035120bd5",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-xmlf/Bootstrap/X/Checked.hs": {
+         "source_sha256": "825ce97070f081c11ff316979004eb8dfcffa3ac0e885f25c7cff2381082ab7a",
+@@ -1776,7 +2062,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "acaf731de3aa551f94e7af65271d5336e10aacd90e4f4fcdf5a9ef2f113e6df2",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-xmlf/Bootstrap/X/Parser.hs": {
+         "source_sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209",
+@@ -1786,7 +2074,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "094d226d36b65d09a75b6f7feeee2997c49de792dd81242fba9db0b87c829209",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs": {
+         "source_sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
+@@ -1796,7 +2086,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-xmlf/Bootstrap/X/Syntax.hs": {
+         "source_sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
+@@ -1806,7 +2098,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "654d43b2739219704757cd3a3ee0e9f8106ae07ec931eb1a399dd004af1c0a9d",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-xmlf/Bootstrap/X/Type.hs": {
+         "source_sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
+@@ -1816,7 +2110,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "5ae7191adc5df556b83901682ee17e3de889a99e9fe35e97d7370ec2443d0d3d",
++        "r21_to_r17_inverse_exact": true
+       },
+       "bootstrap/MLF/BuiltinPreludeData.hs": {
+         "source_sha256": "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692",
+@@ -1826,7 +2122,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692",
++        "r21_to_r17_inverse_exact": true
+       },
+       "bootstrap/MLF/Entry/BuiltinPrelude.hs": {
+         "source_sha256": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
+@@ -1836,7 +2134,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "66a9f4ccbdac21123fb721f0e2aa13b506e4b55d6c25642e829d2c6ec1b4fd2a",
++        "r21_to_r17_inverse_exact": true
+       },
+       "bootstrap/MLF/Entry/Emlf.hs": {
+         "source_sha256": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
+@@ -1846,7 +2146,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "171273f182ff3b4b2b65f1eb03bb8db002ee07a5b57b77cee96e5a8c5f6ba480",
++        "r21_to_r17_inverse_exact": true
+       },
+       "host/ghc/MLF/Host/Async.hs": {
+         "source_sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5",
+@@ -1856,7 +2158,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "13e23c116edb65b36be54f78b477d080da62010651f76984c7c9cf895d03d1e5",
++        "r21_to_r17_inverse_exact": true
+       },
+       "host/ghc/MLF/Host/Base.hs": {
+         "source_sha256": "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116",
+@@ -1866,7 +2170,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "b324805ea2d62b3aaccf3c49e973b7839f952b164bcbe4cc37bf483b07518116",
++        "r21_to_r17_inverse_exact": true
+       },
+       "host/ghc/MLF/Host/IO.hs": {
+         "source_sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a",
+@@ -1876,7 +2182,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "042164a571c9b60c9fc1abe984ccc687400a01602b3a980cff61342941bfe22a",
++        "r21_to_r17_inverse_exact": true
+       },
+       "bootstrap/MLF/NativeBuild.hs": {
+         "source_sha256": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
+@@ -1886,7 +2194,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "33a8f7b6e141ee318a0fb0b4d3979873c53301a2b0916bd2fdee7f1d21840143",
++        "r21_to_r17_inverse_exact": true
+       },
+       "bootstrap/MLF/PreparedCompiler.hs": {
+         "source_sha256": "2812caad746141ddb82c21a5dfdc779f1c33ae383ccd08aaa496ebecf8046a51",
+@@ -1896,7 +2206,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "2812caad746141ddb82c21a5dfdc779f1c33ae383ccd08aaa496ebecf8046a51",
++        "r21_to_r17_inverse_exact": true
+       },
+       "bootstrap/MLF/PreparedLibraryData.hs": {
+         "source_sha256": "eececfa9f5b0ef2901e749b4a1798ac2cf78bea3378d9e33fcbc0a0ded94c6b1",
+@@ -1906,7 +2218,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "eececfa9f5b0ef2901e749b4a1798ac2cf78bea3378d9e33fcbc0a0ded94c6b1",
++        "r21_to_r17_inverse_exact": true
+       },
+       "bootstrap/MLF/PreparedNativeData.hs": {
+         "source_sha256": "908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33",
+@@ -1916,7 +2230,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "908d33b2f9a5c74067684be01b0aecfb1a3ab802bfeda18b8f02608d0dc7de33",
++        "r21_to_r17_inverse_exact": true
+       },
+       "host/ghc/MLF/Primitive.hs": {
+         "source_sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb",
+@@ -1926,7 +2242,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "d5a66475293578650a975172ae14d5a6e5506668859fd559d1a18eb08d2160cb",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-package-core/Package/Json.hs": {
+         "source_sha256": "90c6e3ad566b92c01bf58106c27a5d467a52f11586ddad9fa1e44c2a62165604",
+@@ -1936,7 +2254,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "90c6e3ad566b92c01bf58106c27a5d467a52f11586ddad9fa1e44c2a62165604",
++        "r21_to_r17_inverse_exact": true
+       },
+       "libraries/mlf-package-core/Package/OS.hs": {
+         "source_sha256": "ff025ef05b6cb63c5591b756a78b898f50497cc5349bdc5d19812f47a6dadda2",
+@@ -1946,7 +2266,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "ff025ef05b6cb63c5591b756a78b898f50497cc5349bdc5d19812f47a6dadda2",
++        "r21_to_r17_inverse_exact": true
+       },
+       "host/ghc/app/emlf/Main.hs": {
+         "source_sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79",
+@@ -1956,7 +2278,9 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "72d926eedd4e5abc40b8f0bc925a39d20995397f0d4144b4abd932ef2aaa6d79",
++        "r21_to_r17_inverse_exact": true
+       },
+       "host/ghc/app/builtin-prelude/Main.hs": {
+         "source_sha256": "c913ad11f0d2a945b33b924e346fa2afdcad157faf6e3e9424b6c5194915d496",
+@@ -1966,11 +2290,14 @@
+         "fine_insertions": 0,
+         "fine_inverse_exact": true,
+         "coarse_inverse_exact": true,
+-        "r17_to_r16_inverse_exact": true
++        "r17_to_r16_inverse_exact": true,
++        "r17_sha256": "c913ad11f0d2a945b33b924e346fa2afdcad157faf6e3e9424b6c5194915d496",
++        "r21_to_r17_inverse_exact": true
+       }
+     },
+     "interpretation": "profiled source-demand allocation only; source-only instrumentation",
+-    "extension": "unify-r17",
+-    "parent_r16_map_sha256": "48ed0fc11c01af2dcd5095ece9755eb3d66a2994a321982eed7bb0e76d9ed041"
++    "extension": "rebind-subphases-r21",
++    "parent_r16_map_sha256": "48ed0fc11c01af2dcd5095ece9755eb3d66a2994a321982eed7bb0e76d9ed041",
++    "parent_r17_map_sha256": "5582684fc0b65f93103784616ef03f714b3d60cf8dc5afc73462ba4fa4bce702"
+   }
+ }
+--- r17/implementation/test_fine_profile.py
++++ r21/implementation/test_fine_profile.py
+@@ -47,6 +47,15 @@
+     return {(row['coarse'], row['fine']): row for row in result['matrix']}
+ 
+ 
++def with_tree(tree):
++    data = fixture(); data['profile'] = tree
++    pending, alloc, ticks = [tree], 0, 0
++    while pending:
++        item = pending.pop(); alloc += item['alloc']; ticks += item['ticks']; pending.extend(item['children'])
++    data['total_alloc'], data['total_ticks'] = alloc, ticks
++    return data
++
++
+ def synthetic_unit_evidence():
+     # Shape-only data for a unit test, never exported as a real control receipt.
+     return dict(toolchain_sha256='a' * 64, installed_rts_definition_sha256='b' * 64,
+@@ -123,7 +132,7 @@
+ 
+     def test_missing_unused_site_declaration_rejected(self):
+         data = fixture(); data['profile'] = node(1, data['total_alloc'], data['total_ticks']); data['cost_centres'].pop()
+-        with self.assertRaisesRegex(ValueError, 'eleven fine sites'): self.parse(data)
++        with self.assertRaisesRegex(ValueError, 'fourteen fine sites'): self.parse(data)
+ 
+     def test_single_line_source_locations_supported(self):
+         data = fixture()
+@@ -210,5 +219,65 @@
+         self.assertEqual(matrix(result)['ENCODE', 'UNLABELLED']['alloc'], 5)
+         self.assertNotIn('ENCODE', family)
+ 
++    def test_rebind_c_d_s_residual_are_disjoint_not_inclusive_totals(self):
++        # Canonicalize is seen below both routes and as an escaped sibling;
++        # its creation stack is not guessed from a forcing-route label.
++        data = with_tree(node(1, 1, 1, [node(2, 2, 1, [node(IDS['local-unify'], 11, 1, [
++            node(IDS['unify-rebind'], 17, 1, [
++                node(IDS['unify-rebind-dense'], 19, 1, [node(IDS['unify-canonicalize'], 23, 1)]),
++                node(IDS['unify-rebind-sparse'], 29, 1, [node(IDS['unify-canonicalize'], 31, 1)])]),
++            node(IDS['unify-canonicalize'], 37, 1)])])]))
++        result, coarse = self.parse(data); cells = matrix(result)
++        expected = {'SOLVER_UNIFY_REBIND': 17, 'SOLVER_UNIFY_REBIND_DENSE': 19,
++                    'SOLVER_UNIFY_REBIND_SPARSE': 29, 'SOLVER_UNIFY_CANONICALIZE': 91}
++        for label, amount in expected.items():
++            self.assertEqual(cells['SOLVE', label]['alloc'], amount)
++        self.assertEqual(result['rebind_family_by_coarse'],
++                         [dict(coarse='SOLVE', alloc=156, ticks=6, nodes=6)])
++        self.assertEqual(result['local_unify_family_by_coarse'],
++                         [dict(coarse='SOLVE', alloc=167, ticks=7, nodes=7)])
++        self.assertEqual(sum(r['alloc'] for r in result['rebind_family_cells']), 156)
++        self.assertTrue(all(r in result['matrix'] for r in result['rebind_family_cells']))
++        self.assertEqual(sum(r['alloc'] for r in result['matrix']), coarse['total_alloc'])
++        self.assertGreater(sum(r['inherited_alloc'] for r in coarse['stacks']), coarse['total_alloc'])
++        for bucket, totals in coarse['partition'].items():
++            for field in ('alloc', 'ticks', 'nodes'):
++                self.assertEqual(sum(r[field] for r in result['site_matrix'] if r['coarse'] == bucket), totals[field])
++
++    def test_rebind_family_retains_generation_and_resets_at_nested_coarse(self):
++        data = with_tree(node(1, 1, 1, [node(3, 29, 1, [node(IDS['unify-rebind'], 3, 1, [
++            node(IDS['unify-rebind-dense'], 5, 1, [node(IDS['unify-canonicalize'], 7, 1, [
++                node(4, 11, 1, [node(IDS['unify-rebind-sparse'], 13, 1)])])])])])]))
++        result, coarse = self.parse(data); cells = matrix(result)
++        self.assertEqual(cells['ENCODE', 'UNLABELLED']['alloc'], 11)
++        self.assertNotIn(('ENCODE', 'SOLVER_UNIFY_CANONICALIZE'), cells)
++        self.assertEqual(cells['ENCODE', 'SOLVER_UNIFY_REBIND_SPARSE']['alloc'], 13)
++        self.assertEqual({r['coarse']:r['alloc'] for r in result['rebind_family_by_coarse']},
++                         {'CONSTRAINT_GENERATION': 15, 'ENCODE': 13})
++        self.assertEqual(sum(r['alloc'] for r in result['matrix']), coarse['total_alloc'])
++
++    def test_declared_sparse_route_can_remain_unobserved(self):
++        data = with_tree(node(1, 1, 1, [node(2, 2, 1, [node(IDS['unify-rebind-dense'], 3, 1)])]))
++        result, _ = self.parse(data)
++        self.assertEqual(len(result['defined_sites']), 14)
++        self.assertIn('unify-rebind-sparse', result['unobserved_sites'])
++        self.assertNotIn('unify-rebind-sparse', result['observed_sites'])
++        self.assertEqual(result['rebind_family_cells'],
++                         [dict(coarse='SOLVE', fine='SOLVER_UNIFY_REBIND_DENSE', alloc=3, ticks=1, nodes=1)])
++        self.assertEqual(len(result['rebind_family_labels']), 4)
++        self.assertEqual(len(result['local_unify_family_labels']), 8)
++
++    def test_each_new_site_keeps_exact_declaration_gates(self):
++        for site in ['unify-canonicalize', 'unify-rebind-dense', 'unify-rebind-sparse']:
++            for problem in ['missing', 'module', 'path', 'caf']:
++                with self.subTest(site=site, problem=problem):
++                    data = fixture()
++                    centre = next(c for c in data['cost_centres'] if c['id'] == IDS[site])
++                    if problem == 'missing': data['cost_centres'].remove(centre)
++                    elif problem == 'module': centre['module'] = 'Bootstrap.Fake'
++                    elif problem == 'path': centre['src_loc'] = '/foreign/Graph.hs:1476:1-20'
++                    else: centre['is_caf'] = True
++                    with self.assertRaises(ValueError): self.parse(data)
++
+ 
+ if __name__ == '__main__': unittest.main()
+--- r17/implementation/test_solver_overlay.py
++++ r21/implementation/test_solver_overlay.py
+@@ -43,16 +43,18 @@
+             self.assertEqual(SPEC[key], COARSE[key])
+         self.assertEqual([len(SPEC[k]) for k in ['pins', 'union', 'emlf_modules', 'generator_modules']], [97, 95, 94, 60])
+         self.assertEqual(sum(map(len, COARSE['edits'].values())), 27)
+-        self.assertEqual(sum(map(len, SPEC['edits'].values())), 38)
+-        self.assertEqual(len(SPEC['r16_fine']['sites']), 11)
+-        self.assertEqual(len(SPEC['r16_fine']['labels']), 10)
++        self.assertEqual(sum(map(len, SPEC['edits'].values())), 41)
++        self.assertEqual(len(SPEC['r16_fine']['sites']), 14)
++        self.assertEqual(len(SPEC['r16_fine']['labels']), 13)
++        self.assertEqual(len(F.LOCAL_UNIFY_FAMILY), 8)
++        self.assertEqual(len(F.REBIND_FAMILY), 4)
+         self.assertEqual(len(F.COARSE.LABELS), 24)
+         self.assertFalse(F.FINE_LABELS & F.COARSE.LABELS)
+         self.assertEqual(sha((PACKAGE / 'coarse-insertion-map.json').read_bytes()), SPEC['r16_fine']['coarse_map_sha256'])
+ 
+     def test_full_original_mirror_verifier_accepts_static_preview(self):
+         verified = mirror.verify_mirror(SOURCE, PREVIEW)
+-        self.assertEqual(sum(r['occurrences'] for r in verified['files'].values()), 38)
++        self.assertEqual(sum(r['occurrences'] for r in verified['files'].values()), 41)
+ 
+     def test_fine_then_coarse_inverse_restores_every_original_source_byte(self):
+         for rel, original_sha in SPEC['pins'].items():
+@@ -76,7 +78,13 @@
+                 coarse = transform(original, COARSE['edits'].get(rel, []))
+                 fine = (PREVIEW / rel).read_text()
+                 self.assertEqual(coarse.count(site['anchor_before']), 1)
+-                self.assertEqual(fine.count(site['anchor_after']), 1)
++                # A reviewed child prefix can sit inside its parent's anchor.
++                # Strip only other fine tokens, retaining this exact own token.
++                own = fine
++                for other in SPEC['r16_fine']['sites']:
++                    if other['label'] != site['label']:
++                        own = own.replace(other['inserted_token'], '')
++                self.assertEqual(own.count(site['anchor_after']), 1)
+                 self.assertEqual(site['anchor_after'].replace(site['inserted_token'], '', 1), site['anchor_before'])
+                 self.assertEqual(site['inserted_token'], '{-# SCC "' + site['label'] + '" #-} ')
+                 self.assertNotIn('\n', site['inserted_token'])
+@@ -88,7 +96,7 @@
+                         self.assertEqual([prefix.count('\n') + 1, len(prefix.rsplit('\n', 1)[-1]) + 1], span[position])
+                     slices.append(raw[span['start_byte']:span['end_byte_exclusive']])
+                     self.assertTrue(raw[span['end_byte_exclusive']:].startswith(site['end_marker'].encode()))
+-                # The parent LOCAL_UNIFY RHS now contains four nested SCCs.
++                # Parent RHS slices can contain nested fine SCC prefixes.
+                 stripped = slices[1]
+                 for child in SPEC['r16_fine']['sites']:
+                     stripped = stripped.replace(child['inserted_token'].encode(), b'')
+@@ -98,14 +106,46 @@
+         previous = json.loads((PACKAGE / 'r16-insertion-map.json').read_text())
+         self.assertEqual(sha((PACKAGE / 'r16-insertion-map.json').read_bytes()),
+                          SPEC['r16_fine']['parent_r16_map_sha256'])
+-        added = [s for s in SPEC['r16_fine']['sites'] if s['site_id'].startswith('unify-')]
++        parent = json.loads((PACKAGE / 'r17-insertion-map.json').read_text())
++        added = [s for s in parent['r16_fine']['sites'] if s['site_id'].startswith('unify-')]
+         self.assertEqual(len(added), 4)
+         for rel in SPEC['pins']:
+             with self.subTest(rel=rel):
+                 original = (SOURCE / rel).read_text()
+                 old = transform(original, previous['edits'].get(rel, []))
+                 edits = [dict(before=s['anchor_before'], after=s['anchor_after']) for s in added if s['path'] == rel]
+-                self.assertEqual(transform((PREVIEW / rel).read_text(), edits, reverse=True), old)
++                r17 = transform(original, parent['edits'].get(rel, []))
++                self.assertEqual(transform(r17, edits, reverse=True), old)
++
++    def test_r21_three_token_inverse_restores_exact_r17_and_preserves_edits(self):
++        parent = json.loads((PACKAGE / 'r17-insertion-map.json').read_text())
++        self.assertEqual(sha((PACKAGE / 'r17-insertion-map.json').read_bytes()),
++                         SPEC['r16_fine']['parent_r17_map_sha256'])
++        ids = {'unify-canonicalize', 'unify-rebind-sparse', 'unify-rebind-dense'}
++        added = [s for s in SPEC['r16_fine']['sites'] if s['site_id'] in ids]
++        self.assertEqual(len(added), 3)
++        self.assertEqual(sum(map(len, parent['edits'].values())), 38)
++        self.assertEqual(len(parent['r16_fine']['sites']), 11)
++        self.assertEqual(len(parent['r16_fine']['labels']), 10)
++        for rel in SPEC['pins']:
++            with self.subTest(rel=rel):
++                original = (SOURCE / rel).read_text()
++                old_edits = parent['edits'].get(rel, [])
++                self.assertEqual(SPEC['edits'].get(rel, [])[:len(old_edits)], old_edits)
++                r17 = transform(original, old_edits)
++                edits = [dict(before=s['anchor_before'], after=s['anchor_after']) for s in added if s['path'] == rel]
++                self.assertEqual(transform((PREVIEW / rel).read_text(), edits, reverse=True), r17)
++
++    def test_new_sites_match_fixed_plan_and_remain_prefix_only(self):
++        plan = json.loads((PACKAGE / 'planned-sites.json').read_text())
++        sites = {s['site_id']: s for s in SPEC['r16_fine']['sites']}
++        for item in plan['sites']:
++            site = sites[item['site_id']]
++            self.assertEqual(site['anchor_before'], item['before'])
++            self.assertEqual(site['anchor_after'], item['after'])
++            self.assertEqual(site['inserted_token'], item['inserted_token'])
++            self.assertEqual(site['coarse_rhs_span']['start'][0], item['f9_line'])
++            self.assertEqual(site['coarse_rhs_span']['end_exclusive'][0], item['f9_line'])
+ 
+     def test_source_and_annotation_corruption_rejected(self):
+         site = SPEC['r16_fine']['sites'][0]; rel = site['path']

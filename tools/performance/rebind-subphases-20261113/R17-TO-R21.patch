@@ -1,0 +1,22 @@
+--- r17/libraries/mlf-inference/Bootstrap/Graph.hs
++++ r21/libraries/mlf-inference/Bootstrap/Graph.hs
+@@ -1258,7 +1258,7 @@
+       (\ignored ->
+          bindE ({-# SCC "SOLVER_UNIFY_FIRST_ORDER" #-} checkedFirstOrder equations before)
+            (\skeleton ->
+-              bindE ({-# SCC "SOLVER_UNIFY_REBIND" #-} rebind before (canonicalize skeleton))
++              bindE ({-# SCC "SOLVER_UNIFY_REBIND" #-} rebind before ({-# SCC "SOLVER_UNIFY_CANONICALIZE" #-} canonicalize skeleton))
+                 (\rebuilt -> bindE ({-# SCC "SOLVER_UNIFY_OUTPUT_VALIDATION" #-} validateGraph rebuilt) (\verified -> Right rebuilt))));
+   graftedNodes :: Graph -> Graph -> IntSet;
+   graftedNodes old skeleton =
+@@ -1473,8 +1473,8 @@
+   rebind :: Graph -> Graph -> Either String Graph;
+   rebind old skeleton =
+     case denseBounds old of {
+-      Nothing -> rebindSparse old skeleton;
+-      Just ((,) low high) -> rebindDense old skeleton low high
++      Nothing -> {-# SCC "SOLVER_UNIFY_REBIND_SPARSE" #-} rebindSparse old skeleton;
++      Just ((,) low high) -> {-# SCC "SOLVER_UNIFY_REBIND_DENSE" #-} rebindDense old skeleton low high
+     };
+   -- All tables share an offset. Graph identities themselves remain arbitrary
+   -- precision; the dense guard limits only the number of allocated cells.

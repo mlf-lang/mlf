@@ -1,0 +1,24 @@
+{
+  "CheckedBindings": {
+    "source": {
+      "path": "tools/shared/fixtures/CheckedBindings.hs",
+      "sha256": "a0f93d15981d574a9a7453e34753686bbbd2ad3417feb64570fa02f8202b00b2"
+    },
+    "stdout": {
+      "path": "fixtures/CheckedBindings.stdout",
+      "sha256": "443acba38c8c39a463e266c4add970f6c5df78b7a2329deea4a67682746c68e5"
+    },
+    "expected_output_basis": "Exact complete successful harness path, derived read-only from frozen source; not execution evidence"
+  },
+  "SourceValueScope": {
+    "source": {
+      "path": "tools/shared/fixtures/item4/SourceValueScope.hs",
+      "sha256": "714494cd3336cded082f92440bf0027fcfa8cea170b395ea316ab145c12f0567"
+    },
+    "stdout": {
+      "path": "fixtures/SourceValueScope.stdout",
+      "sha256": "743bf5ff79d2937eef00bf1f138f6d0fe97fcb15e84df642278cb9e299c02983"
+    },
+    "expected_output_basis": "Exact complete successful harness path, derived read-only from frozen source; not execution evidence"
+  }
+}

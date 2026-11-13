@@ -1,0 +1,32 @@
+{
+  "schema": "solver-r16-reused-r13-code-v1",
+  "upstream_source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "reused_unchanged": {
+    "controller.py": "5a08da162499d570d957af839df3bba89b68d148f397105ce0c5a0261630e659",
+    "controls.py": "0d7aa0cb9bea2fa9c85bdc0e63dd1bd6f57ff4c7891951f82cd78af0f3d2dd53",
+    "guard.py": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e",
+    "mirror.py": "8dfb2f794a04fb35b13f37c188e5daa2c4e24b08bce2169e7266595033799a82",
+    "oracles.py": "9a9bc72aef6bfe7cf3853620b8b4dc055b12d5ab50df1f53dd95247775d8777f",
+    "profile.py": "f31b0d9569dc7328198e92e5e439183f9cd1f5a4365407041c7739a095cb0c96",
+    "runtime_pins.py": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b",
+    "stats.py": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c",
+    "test_controller.py": "299dd8c91a8c4f8d621a235e3e7be62105af2a6859962e38388b64055c4419b6",
+    "test_controls.py": "7b834659598336849e227137bc90ca020a56e7c5e0c2dae2e01b500c7c64ac5c",
+    "test_guard.py": "0f87f21a5055c4f017954d10c8be9d36eb0b5ddc7f5f3132aa912e3995108a2a",
+    "test_mirror.py": "e41ce48b20a555e9d4d0451c278ba047c6cf0cd4b051d083b849468de18c3a82",
+    "test_profile.py": "5e3462bc4bc098bf772d41fdd1168e6a806317aac378a583f3873e40dc322d66",
+    "test_runtime_pins.py": "0d77c6b965a46a6e4d1c4486f683064001b28e545e6f10c7eff74455956aeeb4",
+    "test_stats.py": "f8fccc3bb78436726eae365d9fe6400f6058d0315d9fad60e802aba1a34f475a",
+    "fixtures/CheckedBindings.stdout": "443acba38c8c39a463e266c4add970f6c5df78b7a2329deea4a67682746c68e5",
+    "fixtures/DeferredDemand.hs": "e9d80cb72dc3e384178e7a55713f013bf993ed89b778ffc4f634a52c980736ae",
+    "fixtures/IgnoredRTS.hs": "6c685bf6ee35606533abf6db1ff4ec1aa9d791ca49297fa3fb1d46086c0da053",
+    "fixtures/InventoryDemand.hs": "6714af5961b3e3f36267bc8de221817c8c451e7adb102d3597629579289cf54e",
+    "fixtures/README.md": "2edfb8da9e073a6befd71b2e4ee7df2623996784dda20c8f46c5f71c1a3e5ba3",
+    "fixtures/SourceValueScope.stdout": "743bf5ff79d2937eef00bf1f138f6d0fe97fcb15e84df642278cb9e299c02983",
+    "fixtures/UnitAllocation.hs": "6a141b5fe420a69825643e8e57e326190f031de60723eaee665d4904eda7249e",
+    "fixtures/maintained-contract.json": "10e75a38229775ff040026d8f25fcfb39b0665cb1de208f9f77b30c927efa30c",
+    "foundation14-source.json": "e85b2776812a28fafd4074b5c4823f26a76ad2e0137492964ade76450f68d7fa"
+  },
+  "excluded": "old admissions, old static-test receipts, old stage outputs and obsolete generator are not copied",
+  "controller_guard_oracles_and_profile_unchanged": true
+}
