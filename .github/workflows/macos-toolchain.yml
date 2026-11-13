@@ -1,6 +1,7 @@
 name: macOS toolchain provenance
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - .github/workflows/macos-toolchain.yml
       - .github/workflows/ci.yml
@@ -10,6 +11,8 @@ on:
       - tools/shared/build.py
       - tools/shared/test_darwin_toolchain.py
       - tools/release/test-macos-toolchain-workflow.mjs
+      - tools/release/async-change-scope.py
+      - tools/release/test-async-change-scope.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,6 +32,9 @@ jobs:
         run: |
           mkdir -p .mlf-build/macos-toolchain
           git rev-parse HEAD > .mlf-build/macos-toolchain/checkout.txt
+      - name: Decide whether expensive async parity was explicitly requested
+        id: scope
+        run: python3 tools/release/async-change-scope.py --output .mlf-build/macos-toolchain/async-scope.json
       - name: Install ordinary async native dependencies
         run: |
           set -euo pipefail
@@ -56,6 +62,7 @@ jobs:
             test ! -s "$output/$native.execute.stderr"
           done
       - name: Install pinned official GHC 9.14.1
+        if: steps.scope.outputs.required == 'true'
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/ghc-9.14.1.tar.xz"
@@ -74,6 +81,7 @@ jobs:
           python3 -B tools/shared/test_prepare_async_ghc.py
           python3 -O -B tools/shared/test_prepare_async_ghc.py
       - name: Build and authenticate actual GHC-origin async tools
+        if: steps.scope.outputs.required == 'true'
         run: |
           set -euo pipefail
           python3 -B tools/shared/prepare_async_ghc.py --build-dir .mlf-build/async-ghc --clang clang
@@ -81,6 +89,7 @@ jobs:
           jq -e '.toolchain.files | keys | any(test("/libclang-cpp(\\.[0-9]+)*\\.dylib$"))' .mlf-build/async-ghc/receipt.json
           jq -e '.complete == true and .producer_host == "GHC" and .runner_protocol_version == 1' .mlf-build/async-ghc/async-tools.json
       - name: Qualify typed completions and structured process tasks
+        if: steps.scope.outputs.required == 'true'
         run: |
           set -euo pipefail
           compiler="$PWD/.mlf-build/async-ghc/bin/emlf"
@@ -92,6 +101,7 @@ jobs:
             jq -e '.complete == true and .backends == ["interpreter", "llvm"]' ".mlf-build/$suite/result.json"
           done
       - name: Qualify checked async package interfaces and cache replay
+        if: steps.scope.outputs.required == 'true'
         run: |
           set -euo pipefail
           compiler="$PWD/.mlf-build/async-ghc/bin/emlf"

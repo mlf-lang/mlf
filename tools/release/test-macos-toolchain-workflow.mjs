@@ -1,4 +1,4 @@
-// The path-filtered PR job checks actual macOS provenance without self-hosting.
+// PRs keep cheap native link checks; expensive GHC parity requires explicit opt-in.
 // actionlint separately validates complete GitHub Actions syntax.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,6 +8,16 @@ const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
 const parityStart = ci.indexOf('      - name: Qualify typed completions and structured process tasks');
 const parityEnd = ci.indexOf('      - uses: actions/upload-artifact@', parityStart);
 const paritySteps = ci.slice(parityStart, parityEnd).replaceAll("        if: steps.scope.outputs.required != 'false'\n", '');
+const scopeGuard = "steps.scope.outputs.required == 'true'";
+const scopeStep = '      - name: Decide whether expensive async parity was explicitly requested\n' +
+  '        id: scope\n' +
+  '        run: python3 tools/release/async-change-scope.py --output .mlf-build/macos-toolchain/async-scope.json\n';
+const expensiveSteps = [
+  'Install pinned official GHC 9.14.1',
+  'Build and authenticate actual GHC-origin async tools',
+  'Qualify typed completions and structured process tasks',
+  'Qualify checked async package interfaces and cache replay',
+];
 const parityArtifacts = [...ci.slice(parityEnd).matchAll(/^            (\.mlf-build\/async-(?:completion-gate|process-parity|task-parity|package-parity)\/[^\n]+)$/gm)].map(match => match[0]);
 const clangLibraryProof = String.raw`.toolchain.files | keys | any(test("/libclang-cpp(\\.[0-9]+)*\\.dylib$"))`;
 const probeName = '      - name: Verify diagnostic-free native completion links\n';
@@ -18,7 +28,14 @@ const probeCommands = [
   '"$output/$native" > "$output/$native.execute.stdout" 2> "$output/$native.execute.stderr"',
 ];
 const verify = text => {
-  assert.ok(text.includes(paritySteps), 'Run the same ordinary async parity commands and assertions as main');
+  assert.ok(text.replaceAll(`        if: ${scopeGuard}\n`, '').includes(paritySteps), 'Run the same ordinary async parity commands and assertions as main');
+  assert.ok(text.includes(scopeStep), 'Reuse the ordinary async opt-in selector and preserve its decision receipt');
+  assert.ok(text.indexOf(scopeStep) < text.indexOf(ghcName), 'Decide opt-in before installing or building GHC tools');
+  for (const name of expensiveSteps) {
+    const step = text.split(`      - name: ${name}\n`)[1]?.split(/\n      - (?:name|uses):/)[0];
+    assert.ok(step, name);
+    assert.equal(step.match(/^        if: (.*)$/m)?.[1], scopeGuard, `${name} must fail closed without explicit opt-in`);
+  }
   assert.ok(text.indexOf('      - name: Build and authenticate actual GHC-origin async tools') < text.indexOf('      - name: Qualify typed completions'), 'Authenticate before parity');
   assert.ok(parityArtifacts.length > 0);
   for (const artifact of parityArtifacts) assert.ok(text.includes(artifact), artifact);
@@ -26,11 +43,13 @@ const verify = text => {
   assert.ok(probe, 'Native completion probe must be present');
   for (const command of probeCommands) assert.ok(probe.includes(command), command);
   assert.ok(text.indexOf(probeName) < text.indexOf(ghcName), 'Probe must precede expensive GHC installation');
-  assert.match(text, /^  pull_request:\n    paths:\n/m);
+  assert.match(text, /^  pull_request:\n    types: \[opened, synchronize, reopened, labeled, unlabeled\]\n    paths:\n/m);
+  assert.match(text, /^  workflow_dispatch:$/m, 'Manual dispatch retains full parity');
   for (const path of ['.github/workflows/macos-toolchain.yml', 'tools/shared/build.py',
     '.github/workflows/ci.yml', 'tests/native/completion_cell_tests.c',
     'tests/native/async_completion_primitives.c', 'runtime/mlf_runtime.c',
-    'tools/shared/test_darwin_toolchain.py', 'tools/release/test-macos-toolchain-workflow.mjs']) {
+    'tools/shared/test_darwin_toolchain.py', 'tools/release/test-macos-toolchain-workflow.mjs',
+    'tools/release/async-change-scope.py', 'tools/release/test-async-change-scope.py']) {
     assert.ok(text.includes('      - ' + path + '\n'));
   }
   assert.match(text, /^  contents: read$/m);
@@ -52,7 +71,7 @@ const verify = text => {
   assert.ok(text.includes(clangLibraryProof));
   assert.ok(text.includes('.runner_protocol_version == 1'));
   assert.ok(text.includes('        if: always()\n'));
-  assert.equal((text.match(/^\s+if:/gm) || []).length, 1, 'Only artifact upload may be conditional');
+  assert.equal((text.match(/^\s+if:/gm) || []).length, expensiveSteps.length + 1, 'Only expensive opt-in steps and artifact upload may be conditional');
   for (const path of ['macos-toolchain/', 'async-ghc/async-tools.json', 'async-ghc/receipt.json',
     'async-ghc/*.stderr', 'async-ghc/*.stdout', 'async-ghc/*.log', 'async-ghc/builtin-verification/']) {
     assert.ok(text.includes('            .mlf-build/' + path + '\n'));
@@ -60,6 +79,22 @@ const verify = text => {
   assert.doesNotMatch(text, /self_host|self-host|full_validation|continue-on-error|pull_request_target|secrets\.|set \+e|\|\| true/);
 };
 verify(workflow);
+// Evaluate the actual guarded expression, including a missing selector output.
+const evaluateScopeGuard = Function('steps', `return (${scopeGuard});`);
+for (const [required, expected] of [['true', true], ['false', false], ['', false], [undefined, false]]) {
+  assert.equal(evaluateScopeGuard({scope: {outputs: {required}}}), expected);
+}
+for (const name of expensiveSteps) {
+  for (const replacement of ['', '        if: true\n', "        if: steps.scope.outputs.required != 'false'\n"]) {
+    const original = `      - name: ${name}\n        if: ${scopeGuard}\n`;
+    assert.throws(() => verify(workflow.replace(original, `      - name: ${name}\n${replacement}`)), name);
+  }
+}
+for (const required of [scopeStep, 'labeled, unlabeled', '  workflow_dispatch:\n',
+  '      - tools/release/async-change-scope.py\n', '      - tools/release/test-async-change-scope.py\n']) {
+  assert.throws(() => verify(workflow.replace(required, 'removed')));
+}
+assert.throws(() => verify(workflow.replace(scopeStep, '').replace(ghcName, ghcName + scopeStep)));
 for (const required of ['runs-on: macos-26', 'contents: read', 'timeout-minutes: 360',
   'MACOSX_DEPLOYMENT_TARGET=26.0', 'test ! -s "$output/$native.link.stderr"',
   'test ! -s "$output/$native.execute.stderr"', 'libs+=("$MLF_GC_PREFIX/lib/libgc.a" -lm -lpthread)',
@@ -92,4 +127,4 @@ for (const basename of ['libclang-cpp.dylib', 'libclang-cpp.19.dylib', 'libclang
   assert.equal(result.error, undefined);
   assert.equal(result.status, /^libclang-cpp(?:\.[0-9]+)*\.dylib$/.test(basename) ? 0 : 1, basename);
 }
-console.log('PASS macOS toolchain workflow: path scope, actual authenticated build, pinned GHC, bounded execution, failure evidence and no self-hosting.');
+console.log('PASS macOS toolchain workflow: cheap PR probes, explicit expensive-parity opt-in, manual coverage, pinned GHC, bounded execution, failure evidence and no self-hosting.');
