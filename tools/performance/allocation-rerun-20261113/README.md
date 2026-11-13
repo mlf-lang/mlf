@@ -10,8 +10,14 @@ All original 185 r13 lightweight tests passed in 8.800 seconds. The original con
 
 `ordinary/` is a new statically reviewed recovery adapter for the original producer build and five focused controls. It uses the original watchdog and subreaper guard with fresh, SHA-bound admissions and real epoch locks. Start it with the canonical resolved Python path, not a differing symlink spelling. It was not previously qualified before this batch. A launch rejected an adapter pin during preparation, before any claim or compiler; that failed preflight is retained privately.
 
-## Execution status
+## Completed experiment
 
-A new ordinary producer BUILD has started, but at this checkpoint has not yet completed. This is a time-stamped observation, not proof of a still-live process after restart. Its original 137 shared modules, four host modules, 13 programs and independent builtin generation checks remain required. Focused ordinary controls then precede the r13 stages: BUILD (600s), QUALIFY (180s), PROBE-CONTROLS (420s), TARGET-QUALIFICATION (420s; each target compile 180s), ATTRIBUTION (240s; target compile 180s). Each new stage needs its actual previous receipts and a fresh review/admission.
+All five fresh stages completed with clean final guards and cleared leases: BUILD 242.831s, QUALIFY 150.513s, PROBE-CONTROLS 239.303s, TARGET-QUALIFICATION 152.350s and ATTRIBUTION 121.860s. The prerequisite ordinary build completed all 137 shared modules, four host modules and 13 programs (208.776s); all five focused controls passed. These phase durations include setup/validation overhead and are not optimization gains.
 
-No target attribution, compiler speedup, full90 comparison, checked/open prototype execution, production source change, or native fixed-point result is claimed here. GHC installation and diagnostic producer builds are preparation, not a compiler performance improvement. Runtime/source/package identities and resource interference must be rechecked on a new machine. Do not mix current samples with historical ones.
+The real allocation-unit control measured the expected 65,536-byte delta. Foundation14 completed 475 fresh queries, zero reuse, all owner/builtin checks, ordered-query equality and exact equality of all three artifacts between the ordinary reference and the instrumented compiler.
+
+The final disjoint profile attributes 61,002,882,600 bytes. SOLVE accounts for 58.355229% and ENCODE for 17.206349%, together 75.561578%. The three INVENTORY buckets total only 950,432 bytes. These are profiled source-demand allocation shares, not ordinary exclusive CPU, live heap, expected savings or GHC parity. RTS process allocation is a different accounting domain.
+
+See [machine-readable results](results/allocation-summary.json) and [allocation-guided next steps](results/next-steps.md). The next candidate removes a concrete duplicate encode/hash in initial binding/datatype recording while preserving authoritative input refresh and dependency order. It is not yet implemented or benchmarked in this checkpoint. No production source change, full90 speedup, checked/open prototype execution, or native fixed-point result is claimed.
+
+Exact raw receipts/reports and recovery data are retained privately; their hashes are recorded in the public summary. All old execution records remain untouched. Check current live tasks before restarting work; a saved snapshot is not a live-process guarantee.

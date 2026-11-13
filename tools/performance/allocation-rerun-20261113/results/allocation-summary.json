@@ -1,0 +1,338 @@
+{
+  "schema": "mlf-sparse-allocation-r14-summary-v1",
+  "completed_at_utc": "2026-11-13T12:10:07.795992+00:00",
+  "source_commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "ghc_version": "9.14.1",
+  "profile_unit": "bytes",
+  "allocation_unit_control": {
+    "expected": 65536,
+    "actual": 65536,
+    "passed": true
+  },
+  "interpretation": "profiled source-demand allocation; not ordinary exclusive CPU or savings",
+  "target": {
+    "name": "Foundation14",
+    "source_bytes": 173594,
+    "modules": 14,
+    "fresh_queries": 475,
+    "reused_queries": 0,
+    "all_owner_and_builtin_checks": true,
+    "ordered_queries_equal": true,
+    "all_three_artifacts_byte_equal": true
+  },
+  "profile_total_allocation_bytes": 61002882600,
+  "partition": [
+    {
+      "bucket": "SOLVE",
+      "allocation_bytes": 35598371704,
+      "allocation_percent": 58.35522878061503,
+      "nodes": 9
+    },
+    {
+      "bucket": "ENCODE",
+      "allocation_bytes": 10496368840,
+      "allocation_percent": 17.206348934074796,
+      "nodes": 6
+    },
+    {
+      "bucket": "CONSTRAINT_GENERATION",
+      "allocation_bytes": 4503896112,
+      "allocation_percent": 7.383087355940783,
+      "nodes": 11
+    },
+    {
+      "bucket": "RESIDUAL/UNKNOWN",
+      "allocation_bytes": 4195053096,
+      "allocation_percent": 6.876811254161947,
+      "nodes": 69
+    },
+    {
+      "bucket": "STAMP",
+      "allocation_bytes": 1802694432,
+      "allocation_percent": 2.955097128475696,
+      "nodes": 48
+    },
+    {
+      "bucket": "ELABORATE",
+      "allocation_bytes": 977975040,
+      "allocation_percent": 1.603162011888271,
+      "nodes": 6
+    },
+    {
+      "bucket": "PREPARED_TYPES",
+      "allocation_bytes": 944137832,
+      "allocation_percent": 1.547693800292644,
+      "nodes": 1
+    },
+    {
+      "bucket": "CLOSED_CHECK",
+      "allocation_bytes": 557779336,
+      "allocation_percent": 0.9143491458549533,
+      "nodes": 7
+    },
+    {
+      "bucket": "RESIDUAL/RTS",
+      "allocation_bytes": 467013616,
+      "allocation_percent": 0.765559914704752,
+      "nodes": 6
+    },
+    {
+      "bucket": "RESOLVE_EVIDENCE",
+      "allocation_bytes": 324622672,
+      "allocation_percent": 0.5321431679361329,
+      "nodes": 6
+    },
+    {
+      "bucket": "CANONICAL_PLAN",
+      "allocation_bytes": 305448392,
+      "allocation_percent": 0.5007114073655267,
+      "nodes": 2
+    },
+    {
+      "bucket": "OPEN_INITIAL",
+      "allocation_bytes": 237395328,
+      "allocation_percent": 0.38915427907992006,
+      "nodes": 7
+    },
+    {
+      "bucket": "CANONICAL_SYNTAX",
+      "allocation_bytes": 167822024,
+      "allocation_percent": 0.27510507183803146,
+      "nodes": 1
+    },
+    {
+      "bucket": "OPEN_NORMALIZE",
+      "allocation_bytes": 131802104,
+      "allocation_percent": 0.21605881293222692,
+      "nodes": 7
+    },
+    {
+      "bucket": "PUBLISH",
+      "allocation_bytes": 108871896,
+      "allocation_percent": 0.17847008429729516,
+      "nodes": 33
+    },
+    {
+      "bucket": "CANONICAL_REALIZE",
+      "allocation_bytes": 82279688,
+      "allocation_percent": 0.13487836064979658,
+      "nodes": 1
+    },
+    {
+      "bucket": "OPEN_ENV",
+      "allocation_bytes": 74865672,
+      "allocation_percent": 0.12272481038461615,
+      "nodes": 6
+    },
+    {
+      "bucket": "RESIDUAL/CAF",
+      "allocation_bytes": 13073920,
+      "allocation_percent": 0.02143164296960616,
+      "nodes": 464
+    },
+    {
+      "bucket": "ERASURE_AGREEMENT",
+      "allocation_bytes": 6375440,
+      "allocation_percent": 0.010451047111665508,
+      "nodes": 2
+    },
+    {
+      "bucket": "FREE_NAMES",
+      "allocation_bytes": 2985672,
+      "allocation_percent": 0.004894312977924751,
+      "nodes": 6
+    },
+    {
+      "bucket": "CONTENT_SHA",
+      "allocation_bytes": 2829704,
+      "allocation_percent": 0.004638639814047083,
+      "nodes": 18
+    },
+    {
+      "bucket": "INVENTORY/OPEN_INITIAL",
+      "allocation_bytes": 664816,
+      "allocation_percent": 0.001089810795268878,
+      "nodes": 3
+    },
+    {
+      "bucket": "INVENTORY/OPEN_NORMALIZE",
+      "allocation_bytes": 282752,
+      "allocation_percent": 0.0004635059655361269,
+      "nodes": 3
+    },
+    {
+      "bucket": "SCHEME_TYPE",
+      "allocation_bytes": 136800,
+      "allocation_percent": 0.00022425169790255125,
+      "nodes": 1
+    },
+    {
+      "bucket": "OPEN_OWNERSHIP",
+      "allocation_bytes": 117504,
+      "allocation_percent": 0.00019262040577734928,
+      "nodes": 2
+    },
+    {
+      "bucket": "CANONICAL_RESULT",
+      "allocation_bytes": 7744,
+      "allocation_percent": 1.2694482080097639e-05,
+      "nodes": 1
+    },
+    {
+      "bucket": "TYPE_AGREEMENT",
+      "allocation_bytes": 7600,
+      "allocation_percent": 1.2458427661252848e-05,
+      "nodes": 1
+    },
+    {
+      "bucket": "INVENTORY/UNRESOLVED",
+      "allocation_bytes": 2864,
+      "allocation_percent": 4.694860108135283e-06,
+      "nodes": 6
+    }
+  ],
+  "inventory_total_bytes": 950432,
+  "two_largest_total_percent": 75.56157771468983,
+  "rts_statistics": {
+    "allocated_bytes": 96909275560,
+    "allocation_rate_bytes_per_mut_second": 3103384426,
+    "copied_bytes": 8266505208,
+    "gc_cpu_fraction_from_rounded_times": 0.16319202529610377,
+    "generations": [
+      {
+        "average_pause_seconds": 0.0002,
+        "collections": 23185,
+        "cpu_seconds": 3.772,
+        "elapsed_seconds": 3.788,
+        "generation": 0,
+        "maximum_pause_seconds": 0.0323,
+        "parallel_collections": 0
+      },
+      {
+        "average_pause_seconds": 0.0331,
+        "collections": 70,
+        "cpu_seconds": 2.318,
+        "elapsed_seconds": 2.319,
+        "generation": 1,
+        "maximum_pause_seconds": 0.1273,
+        "parallel_collections": 0
+      }
+    ],
+    "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+    "major_gc_residency_samples": 70,
+    "maximum_residency_bytes": 58915744,
+    "maximum_slop_bytes": 2714024,
+    "productivity_percent": {
+      "elapsed": 83.4,
+      "user": 83.7
+    },
+    "reported_gc_percent": {
+      "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+      "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+      "values": {
+        "cpu": 0.0,
+        "elapsed": 0.0
+      }
+    },
+    "rts_memory_in_use": {
+      "fragmentation": {
+        "unit": "MiB",
+        "value": 0.0
+      },
+      "raw_line": "             166 MiB total memory in use (0 MiB lost due to fragmentation)",
+      "unit": "MiB",
+      "value": 166.0
+    },
+    "schema": "ghc-rts-s-v1",
+    "times": {
+      "EXIT": {
+        "cpu_seconds": 0.0,
+        "elapsed_seconds": 0.0
+      },
+      "GC": {
+        "cpu_seconds": 6.09,
+        "elapsed_seconds": 6.106
+      },
+      "INIT": {
+        "cpu_seconds": 0.001,
+        "elapsed_seconds": 0.0
+      },
+      "MUT": {
+        "cpu_seconds": 31.227,
+        "elapsed_seconds": 30.745
+      },
+      "PROF": {
+        "cpu_seconds": 0.0,
+        "elapsed_seconds": 0.0
+      },
+      "RP": {
+        "cpu_seconds": 0.0,
+        "elapsed_seconds": 0.0
+      },
+      "Total": {
+        "cpu_seconds": 37.318,
+        "elapsed_seconds": 36.852
+      }
+    }
+  },
+  "stages": [
+    {
+      "phase": "BUILD",
+      "complete": true,
+      "worker_elapsed_seconds": 242.83066871999836,
+      "cleanup": true,
+      "lease_cleared": true,
+      "receipt_sha256": "949b9326cb88830ce00d78e605e766b3aa285f24c6321d56915abe3de5ae60de",
+      "outer_sha256": "3c6ecca7ce37aea71b02c1a557ceda7448930a513744fcc2ae92e6caefc39d79"
+    },
+    {
+      "phase": "QUALIFY",
+      "complete": true,
+      "worker_elapsed_seconds": 150.51330524500008,
+      "cleanup": true,
+      "lease_cleared": true,
+      "receipt_sha256": "ebc2d1006990541760e71e89250adc6fe214e9d590dc80ac5567c014841dfd1a",
+      "outer_sha256": "7f35fa185a0e8c3a16d19dbd8088ff5ec0215755c03ee7614dc4a8d33c30cee8"
+    },
+    {
+      "phase": "PROBE-CONTROLS",
+      "complete": true,
+      "worker_elapsed_seconds": 239.30326818699905,
+      "cleanup": true,
+      "lease_cleared": true,
+      "receipt_sha256": "8bafc81a44761b1d132cf7fa17ca8b06e14a0c39986463a49e5459cf0573dfc2",
+      "outer_sha256": "9267cfe7503746107f0fc1a8cda32d2c333e484a926d8dc0ab566f4c90166858"
+    },
+    {
+      "phase": "TARGET-QUALIFICATION",
+      "complete": true,
+      "worker_elapsed_seconds": 152.35003988000244,
+      "cleanup": true,
+      "lease_cleared": true,
+      "receipt_sha256": "d6bbfc0c44e3ff9d59bd4cf9b04b51b87c770655748715550ca073b69aa5cdf0",
+      "outer_sha256": "37bc99ec85d23bc98bb5c767c204664b1e6dc1e7a960def8a772a90116f11bf6"
+    },
+    {
+      "phase": "ATTRIBUTION",
+      "complete": true,
+      "worker_elapsed_seconds": 121.8598959560004,
+      "cleanup": true,
+      "lease_cleared": true,
+      "receipt_sha256": "74db85f6595207a92e266bbbf8f66ce2cca3452e3d54fd6ad06ebe7c19394e79",
+      "outer_sha256": "9d2ffa05179d63bdc8401aba6e2b7d140652f4dd2288dd547236998981501610"
+    }
+  ],
+  "allocation_partition_sha256": "dd3a856ef284452f7c122b3105498cdd66ec3d3b5cdda0cee465f8d9697b9d58",
+  "validation_target_wall_seconds": {
+    "ordinary_Q": 23.172781215002033,
+    "profiled_attribution_P": 36.92854580399944
+  },
+  "limitations": [
+    "This is profiled source-demand allocation, not ordinary exclusive CPU attribution or expected savings.",
+    "RTS process allocation and profile self allocation are different accounting domains; equality is not asserted.",
+    "Single frozen Foundation14 workload; no full90 speedup or GHC parity is established.",
+    "Old interrupted execution is neither reused nor claimed cleaned; this is a new owner-authorized isolated epoch.",
+    "Native-generation A/B and fixed-point remain paused."
+  ],
+  "production_source_changed": false
+}
