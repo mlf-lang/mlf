@@ -1,0 +1,32 @@
+{
+  "controls_stdout": {
+    "bytes": 68,
+    "sha256": "ddf097972f12ba456b9814fffcfa0c6764a6088520a66331261641793f0a240b"
+  },
+  "fixed_indices": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "format": "unchanged tab-separated index/stage/signed current-thread-counter bytes/nonnegative nanoseconds",
+  "interpretation": "Observed explicitly segmented public-function actions with newly forced returned positions/CRC; no sums or subtraction are an identity for original encodeTables cost.",
+  "numeric_rows": 40,
+  "observer_stages": [
+    "empty-before",
+    "whole-writer-reference",
+    "buffer-new-zero",
+    "header",
+    "symbols",
+    "entries",
+    "roots",
+    "crc",
+    "crc-write",
+    "empty-after"
+  ],
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "terminal_line": "PASS codec-writer-segments\n"
+}

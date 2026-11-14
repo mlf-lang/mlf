@@ -1,0 +1,272 @@
+{
+  "review_status": "actual and limited segment action/forcing boundaries passed",
+  "production_changed": false,
+  "performance_result": false,
+  "observations": [
+    {
+      "index": 0,
+      "stage": "empty-before",
+      "current_thread_counter_bytes": 0,
+      "nanoseconds": 181
+    },
+    {
+      "index": 0,
+      "stage": "whole-writer-reference",
+      "current_thread_counter_bytes": 87920,
+      "nanoseconds": 42293
+    },
+    {
+      "index": 0,
+      "stage": "buffer-new-zero",
+      "current_thread_counter_bytes": 288,
+      "nanoseconds": 150
+    },
+    {
+      "index": 0,
+      "stage": "header",
+      "current_thread_counter_bytes": 45088,
+      "nanoseconds": 16926
+    },
+    {
+      "index": 0,
+      "stage": "symbols",
+      "current_thread_counter_bytes": 16,
+      "nanoseconds": 80
+    },
+    {
+      "index": 0,
+      "stage": "entries",
+      "current_thread_counter_bytes": 16496,
+      "nanoseconds": 5929
+    },
+    {
+      "index": 0,
+      "stage": "roots",
+      "current_thread_counter_bytes": 784,
+      "nanoseconds": 240
+    },
+    {
+      "index": 0,
+      "stage": "crc",
+      "current_thread_counter_bytes": 22992,
+      "nanoseconds": 10045
+    },
+    {
+      "index": 0,
+      "stage": "crc-write",
+      "current_thread_counter_bytes": 2096,
+      "nanoseconds": 1412
+    },
+    {
+      "index": 0,
+      "stage": "empty-after",
+      "current_thread_counter_bytes": 0,
+      "nanoseconds": 40
+    },
+    {
+      "index": 1,
+      "stage": "empty-before",
+      "current_thread_counter_bytes": 0,
+      "nanoseconds": 50
+    },
+    {
+      "index": 1,
+      "stage": "whole-writer-reference",
+      "current_thread_counter_bytes": 912760,
+      "nanoseconds": 368095
+    },
+    {
+      "index": 1,
+      "stage": "buffer-new-zero",
+      "current_thread_counter_bytes": 1712,
+      "nanoseconds": 390
+    },
+    {
+      "index": 1,
+      "stage": "header",
+      "current_thread_counter_bytes": 45088,
+      "nanoseconds": 17846
+    },
+    {
+      "index": 1,
+      "stage": "symbols",
+      "current_thread_counter_bytes": 400376,
+      "nanoseconds": 190908
+    },
+    {
+      "index": 1,
+      "stage": "entries",
+      "current_thread_counter_bytes": 24856,
+      "nanoseconds": 31508
+    },
+    {
+      "index": 1,
+      "stage": "roots",
+      "current_thread_counter_bytes": 784,
+      "nanoseconds": 390
+    },
+    {
+      "index": 1,
+      "stage": "crc",
+      "current_thread_counter_bytes": 437696,
+      "nanoseconds": 396658
+    },
+    {
+      "index": 1,
+      "stage": "crc-write",
+      "current_thread_counter_bytes": 2096,
+      "nanoseconds": 2073
+    },
+    {
+      "index": 1,
+      "stage": "empty-after",
+      "current_thread_counter_bytes": 0,
+      "nanoseconds": 40
+    },
+    {
+      "index": 2,
+      "stage": "empty-before",
+      "current_thread_counter_bytes": 0,
+      "nanoseconds": 171
+    },
+    {
+      "index": 2,
+      "stage": "whole-writer-reference",
+      "current_thread_counter_bytes": 46704696,
+      "nanoseconds": 8116151
+    },
+    {
+      "index": 2,
+      "stage": "buffer-new-zero",
+      "current_thread_counter_bytes": 56392,
+      "nanoseconds": 1903
+    },
+    {
+      "index": 2,
+      "stage": "header",
+      "current_thread_counter_bytes": 45088,
+      "nanoseconds": 8593
+    },
+    {
+      "index": 2,
+      "stage": "symbols",
+      "current_thread_counter_bytes": 11465592,
+      "nanoseconds": 1179297
+    },
+    {
+      "index": 2,
+      "stage": "entries",
+      "current_thread_counter_bytes": 20698992,
+      "nanoseconds": 2973722
+    },
+    {
+      "index": 2,
+      "stage": "roots",
+      "current_thread_counter_bytes": 1368,
+      "nanoseconds": 391
+    },
+    {
+      "index": 2,
+      "stage": "crc",
+      "current_thread_counter_bytes": 14435008,
+      "nanoseconds": 2225945
+    },
+    {
+      "index": 2,
+      "stage": "crc-write",
+      "current_thread_counter_bytes": 2096,
+      "nanoseconds": 1542
+    },
+    {
+      "index": 2,
+      "stage": "empty-after",
+      "current_thread_counter_bytes": 0,
+      "nanoseconds": 60
+    },
+    {
+      "index": 3,
+      "stage": "empty-before",
+      "current_thread_counter_bytes": 0,
+      "nanoseconds": 321
+    },
+    {
+      "index": 3,
+      "stage": "whole-writer-reference",
+      "current_thread_counter_bytes": 307142432,
+      "nanoseconds": 44018979
+    },
+    {
+      "index": 3,
+      "stage": "buffer-new-zero",
+      "current_thread_counter_bytes": 407176,
+      "nanoseconds": 22814
+    },
+    {
+      "index": 3,
+      "stage": "header",
+      "current_thread_counter_bytes": 45088,
+      "nanoseconds": 10727
+    },
+    {
+      "index": 3,
+      "stage": "symbols",
+      "current_thread_counter_bytes": 87711232,
+      "nanoseconds": 9337932
+    },
+    {
+      "index": 3,
+      "stage": "entries",
+      "current_thread_counter_bytes": 114738576,
+      "nanoseconds": 18024394
+    },
+    {
+      "index": 3,
+      "stage": "roots",
+      "current_thread_counter_bytes": 1368,
+      "nanoseconds": 331
+    },
+    {
+      "index": 3,
+      "stage": "crc",
+      "current_thread_counter_bytes": 104236736,
+      "nanoseconds": 16079052
+    },
+    {
+      "index": 3,
+      "stage": "crc-write",
+      "current_thread_counter_bytes": 2096,
+      "nanoseconds": 2264
+    },
+    {
+      "index": 3,
+      "stage": "empty-after",
+      "current_thread_counter_bytes": 0,
+      "nanoseconds": 171
+    }
+  ],
+  "review_hashes": {
+    "actual": "bc224d68baedd0d37b096fa062a6d7b8c9399f899f389df93c46744523a28427",
+    "emitted": "03d2e3d81471b7cdf311a7f42df81db7f30b8fb2d7d8f3f58b09e1f216bef992"
+  },
+  "manual_emitted_review": {
+    "ByteArray_position_and_crc_return_forcing_inside_windows": true,
+    "action_closure_construction_and_outer_setup_excluded": true,
+    "all_seven_segment_operations_entered_inside_their_windows": true,
+    "byte_and_checksum_validation_outside_windows": true,
+    "counter_time_action_time_counter_order": true,
+    "decode_values_tables_layout_forced_before_windows": true,
+    "primary_segment_work_precomputed_or_floated_outside_found": false,
+    "returned_statistics_and_printing_after_windows": true,
+    "size_checks_order_before_crc_retained": true,
+    "whole_writer_first_inside_its_window": true
+  },
+  "qualification_scope": "Single fixed-order baseline diagnostic segmented composition, including explicit returned-value forcing. Not unsplit encoder exclusive costs.",
+  "next_optimization_evidence": {
+    "crc": "104236736 bytes /16079052 ns at406975, unchanged original CRC; prior fused candidate regressed, not rehabilitated by this screen.",
+    "entries": "114738576 bytes /18024394 ns at406975-byte payload;20698992 bytes /2973722 ns at56187. Investigate putEntries/putEntry, its bit/varint and child-reference paths; exact inner ownership not measured.",
+    "small_stages": "Top-level roots/header/CRC-write and buffer observation are small in these samples; roots excludes child references inside entries. Not enough to rank repeated-artifact whole-pipeline weight.",
+    "symbols": "87711232 bytes /9337932 ns at406975;11465592 bytes /1179297 ns at56187;400376 bytes /190908 ns at1510. Existing putAlignedText ASCII path already present; segment includes length-prefix and text work."
+  },
+  "exclusive_or_additive_phase_costs_qualified": false,
+  "ordinary_speedup_qualified": false
+}

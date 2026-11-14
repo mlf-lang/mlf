@@ -1,0 +1,40 @@
+{
+  "review_pending": false,
+  "files": [
+    {
+      "file": "Main.hs",
+      "bytes": 17317,
+      "sha256": "55f606b7187c54d4288c9d3943cd5a16f2cfe936294e9bd59dcc116ef2c98090"
+    },
+    {
+      "file": "README.md",
+      "bytes": 3539,
+      "sha256": "957e4d7d57ce5037c9a5b9a1456e4dfe0df98fb62a01626a1254a80331d3e60c"
+    },
+    {
+      "file": "controls.stdout",
+      "bytes": 68,
+      "sha256": "ddf097972f12ba456b9814fffcfa0c6764a6088520a66331261641793f0a240b"
+    },
+    {
+      "file": "observations.json",
+      "bytes": 7335,
+      "sha256": "97cab74f407e5baafe781e5584618612be1bd66f2422292046f8d53eb2fdd430"
+    },
+    {
+      "file": "observer-contract.json",
+      "bytes": 876,
+      "sha256": "dac235357058266b07dddb599398d5dd3e392b74994cb4a35b121696e313e010"
+    },
+    {
+      "file": "segments.stdout",
+      "bytes": 978,
+      "sha256": "6b0c7eb95d5f76bc517d1b845f65fafad3b962c95be69a979e0511333603c677"
+    },
+    {
+      "file": "source-pins.json",
+      "bytes": 1741,
+      "sha256": "8af48196e2cfdebf6f0754b5316904198bcb4a3620dbe3ca1ebc0c5c69173cb9"
+    }
+  ]
+}

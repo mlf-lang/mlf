@@ -1,0 +1,55 @@
+{
+  "production_sources": [
+    {
+      "file": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "bytes": 82558,
+      "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+    },
+    {
+      "file": "libraries/mlf-crates/Bootstrap/CrateGraph.hs",
+      "bytes": 28172,
+      "sha256": "52b0fcf312aec770515980f78d0ee44e1f29e248c496468536f44f20495880ee"
+    },
+    {
+      "file": "libraries/mlf-crates/Bootstrap/QueryGraph.hs",
+      "bytes": 44928,
+      "sha256": "f66d6ff37a13558ec54e4aa3d5243dde63a75ad77d0fd5f614b93195632cdd71"
+    },
+    {
+      "file": "libraries/mlf-crates/Bootstrap/ArtifactStorage.hs",
+      "bytes": 55963,
+      "sha256": "9333997ad7146a32bf99e4dfce79826ed5b68b622492f212b7895f68f7d9b7d7"
+    }
+  ],
+  "payloads": {
+    "selection": "one existing fixed sample; smallest/median/largest result by byte size then filename, plus generation index; not workload-weighted estimate",
+    "available_result_count": 1478,
+    "payloads": [
+      {
+        "index": 0,
+        "bytes": 91,
+        "sha256": "8eaf20dd6413d531919d116f1abe49040d550e002b014b65621a6dbbb9f8e3b2"
+      },
+      {
+        "index": 1,
+        "bytes": 1510,
+        "sha256": "dd99703e6016b3dd276ba46e251d0a28b48044c8606f78603a279b59839bd242"
+      },
+      {
+        "index": 2,
+        "bytes": 56187,
+        "sha256": "3aeadffde86e259c20cba46f9bc63ed9aa6c8a266c456aa9a7b939074968f420"
+      },
+      {
+        "index": 3,
+        "bytes": 406975,
+        "sha256": "4d3413140c61f886804351b99fb1f0f621864eaafd9df181e3f17ba75720f077"
+      }
+    ],
+    "payload_bytes_not_bundled": true
+  },
+  "fixture": {
+    "file": "Main.hs",
+    "sha256": "55f606b7187c54d4288c9d3943cd5a16f2cfe936294e9bd59dcc116ef2c98090"
+  }
+}
