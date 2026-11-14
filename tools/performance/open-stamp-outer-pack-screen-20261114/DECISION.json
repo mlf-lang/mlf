@@ -1,0 +1,141 @@
+{
+  "actual_single_shot_complete": true,
+  "complete": true,
+  "decided_at_utc": "2026-11-14T08:51:03.262731+00:00",
+  "decision": "archive_do_not_promote_or_run_full_producer",
+  "emitted_review": {
+    "bytes": 12624,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/report.json",
+    "sha256": "5e96048105b37ff381d85e77913f3b6976f3317a6ccfce93e5335fe62b886226"
+  },
+  "final": {
+    "bytes": 729,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/final.json",
+    "sha256": "b9f8c823dc95a48c6b7def0a8df995d594b62685d84d5e644f015a05894ca396"
+  },
+  "historical_postcheck": {
+    "bytes": 3537,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/coordination/postcheck.json",
+    "sha256": "f42db1955502b72008684634ae61c59d1ee6e6f66bb2dea7ffbcbbbf88b78567"
+  },
+  "native_fixedpoint_AB_paused": true,
+  "next_work": "Independent source-only feasibility of replaying existing real serialized query payloads to separate ENCODE planning/interning from writing/checksum; no new target admission here.",
+  "outer": {
+    "bytes": 3767,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/guard/guard.json",
+    "sha256": "20bc668180013774444564ed801734d072950e73f4fd06623fa0e11c7a0ed6c2"
+  },
+  "production_source_modified": false,
+  "public_publication_completed": false,
+  "raw_review": {
+    "bytes": 16768,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/report.json",
+    "sha256": "ade08544bf7d9c8cb2b9a04286176b7cdf629634588308d3b0aaf556d6fdfecd"
+  },
+  "reason": [
+    "Largest selected workload reduces local stamp allocation only 0.350887%; smallest two sizes regress.",
+    "Both 58-case control sets and all 12 digests match; explicit string-size guard and first-error behavior are retained by bounded proof plus original fallback.",
+    "No stable wall claim: each side is a separate sequential process, raw first observations and empty windows are retained, no cross-process stable wall benchmark.",
+    "No measured Foundation-wide savings, compiler qualification, builtin freshness qualification, current-main integration or GHC parity."
+  ],
+  "samples": [
+    {
+      "A_allocation_bytes": 396088,
+      "B_allocation_bytes": 399984,
+      "B_minus_A_bytes": 3896,
+      "reduction_percent": -0.9836198016602371,
+      "repetition": 1,
+      "size": 8
+    },
+    {
+      "A_allocation_bytes": 348824,
+      "B_allocation_bytes": 352720,
+      "B_minus_A_bytes": 3896,
+      "reduction_percent": -1.1168956264477214,
+      "repetition": 2,
+      "size": 8
+    },
+    {
+      "A_allocation_bytes": 348784,
+      "B_allocation_bytes": 352680,
+      "B_minus_A_bytes": 3896,
+      "reduction_percent": -1.1170237166842516,
+      "repetition": 3,
+      "size": 8
+    },
+    {
+      "A_allocation_bytes": 1383616,
+      "B_allocation_bytes": 1383832,
+      "B_minus_A_bytes": 216,
+      "reduction_percent": -0.01561126786622878,
+      "repetition": 1,
+      "size": 32
+    },
+    {
+      "A_allocation_bytes": 1383048,
+      "B_allocation_bytes": 1383264,
+      "B_minus_A_bytes": 216,
+      "reduction_percent": -0.015617679212868968,
+      "repetition": 2,
+      "size": 32
+    },
+    {
+      "A_allocation_bytes": 1383048,
+      "B_allocation_bytes": 1383264,
+      "B_minus_A_bytes": 216,
+      "reduction_percent": -0.015617679212868968,
+      "repetition": 3,
+      "size": 32
+    },
+    {
+      "A_allocation_bytes": 5545408,
+      "B_allocation_bytes": 5530024,
+      "B_minus_A_bytes": -15384,
+      "reduction_percent": 0.27741872194074807,
+      "repetition": 1,
+      "size": 128
+    },
+    {
+      "A_allocation_bytes": 5544840,
+      "B_allocation_bytes": 5529456,
+      "B_minus_A_bytes": -15384,
+      "reduction_percent": 0.27744714004371634,
+      "repetition": 2,
+      "size": 128
+    },
+    {
+      "A_allocation_bytes": 5544880,
+      "B_allocation_bytes": 5529496,
+      "B_minus_A_bytes": -15384,
+      "reduction_percent": 0.27744513857829206,
+      "repetition": 3,
+      "size": 128
+    },
+    {
+      "A_allocation_bytes": 22404920,
+      "B_allocation_bytes": 22326304,
+      "B_minus_A_bytes": -78616,
+      "reduction_percent": 0.3508872158436629,
+      "repetition": 1,
+      "size": 512
+    },
+    {
+      "A_allocation_bytes": 22404920,
+      "B_allocation_bytes": 22326304,
+      "B_minus_A_bytes": -78616,
+      "reduction_percent": 0.3508872158436629,
+      "repetition": 2,
+      "size": 512
+    },
+    {
+      "A_allocation_bytes": 22404920,
+      "B_allocation_bytes": 22326304,
+      "B_minus_A_bytes": -78616,
+      "reduction_percent": 0.3508872158436629,
+      "repetition": 3,
+      "size": 512
+    }
+  ],
+  "schema": "open-stamp-narrow-experiment-decision-v1",
+  "scope": "F25 GHC-host ordinary local production OpenFragment stamp forcing, not whole compiler or matching GHC workload"
+}

@@ -1,0 +1,54 @@
+{
+  "files": {
+    "BASIS.json": {
+      "bytes": 1845,
+      "sha256": "48206c644432c87661bcfab18ab48be99c087ab591a7144e53e9a3466eff1393"
+    },
+    "candidate.patch": {
+      "bytes": 2025,
+      "sha256": "616d44af71632762c2fcfa7ce40ee3508d1a53fa396604de60cbd30c8393929d"
+    },
+    "fixture/A/StampProbe.hs": {
+      "bytes": 36192,
+      "sha256": "9185e2ab27849a48e56d8a6b571a0d195bc84c6c482760e55d00536536b3dde7"
+    },
+    "fixture/B/StampProbe.hs": {
+      "bytes": 36192,
+      "sha256": "9185e2ab27849a48e56d8a6b571a0d195bc84c6c482760e55d00536536b3dde7"
+    },
+    "fixture/Cases.hs": {
+      "bytes": 5869,
+      "sha256": "fe4d93fbbb581d10da596fe1a3d93ee41bfdf5cdb805bd930d70aa169edf1190"
+    },
+    "fixture/Main.hs": {
+      "bytes": 10898,
+      "sha256": "cf4004fdafbb2768a9e9a1c9918902baec5624bb378adbfbe287a0fac0079d69"
+    },
+    "fixture/StampReference.hs": {
+      "bytes": 35275,
+      "sha256": "2e600eb74595accb08f236948e1417c7411edeae85b20fe63bcb2409bbe2c751"
+    },
+    "fixture/controls.expected.stdout": {
+      "bytes": 1335,
+      "sha256": "9b977456f223e714772e62c2057cb8da6449a04c5b625d81544a748daf9b4981"
+    },
+    "insertion-map.json": {
+      "bytes": 2312,
+      "sha256": "865bf6325c4751ad22433dc92bd864ff37dc6960883cba71d775a662f3771b2f"
+    },
+    "mirror/libraries/mlf-crates/Bootstrap/OpenFragment.hs": {
+      "bytes": 36517,
+      "sha256": "1f955484b9a9f44324c114a7cf52aa6d856a19f403ecbd81e62118c62836974c"
+    },
+    "output-contract.json": {
+      "bytes": 22,
+      "sha256": "4f614e1960bc36c0d9d9721021add1bc1efbae79cbfddab53a5f5214e51194a8"
+    },
+    "reference/OpenFragment.hs": {
+      "bytes": 35625,
+      "sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b"
+    }
+  },
+  "schema": "open-stamp-source-files-v2",
+  "status": "source-only, no independent gate or execution"
+}

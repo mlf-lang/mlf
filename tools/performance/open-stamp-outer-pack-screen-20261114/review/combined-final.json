@@ -1,0 +1,323 @@
+{
+  "actual_completion": {
+    "admission": {
+      "bytes": 3610,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/admission.json",
+      "sha256": "cdb6aa209429a09d921bacf2cf8f2f01a7eee40c6fff4aab389bb15615b9cdb0"
+    },
+    "claim": {
+      "bytes": 315,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/claim.json",
+      "sha256": "965726eef38b129fb39001f4cbc5ce71b0f3a1ba36072bc21004eb30f28df943"
+    },
+    "epoch": {
+      "bytes": 1563,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/coordination/lock-epoch.json",
+      "sha256": "c433fc35e8afd9c9c9f14d8a99e71295e748e24e3b0495dd695b19ca3c071939"
+    },
+    "execution_review": {
+      "bytes": 16317,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/execution-review.json",
+      "sha256": "91d19aa523b19d5e3428a713709b018fb17087db75a7ae48a3ca14aa2788c6fd"
+    },
+    "final": {
+      "bytes": 729,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/final.json",
+      "sha256": "b9f8c823dc95a48c6b7def0a8df995d594b62685d84d5e644f015a05894ca396"
+    },
+    "outer": {
+      "bytes": 3767,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/guard/guard.json",
+      "sha256": "20bc668180013774444564ed801734d072950e73f4fd06623fa0e11c7a0ed6c2"
+    },
+    "outer_config": {
+      "bytes": 1240,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/guard/guard-config.json",
+      "sha256": "21b46edec366ed799393769136f2f77827659b9c84f9b2f7cbdea7bb51cf58d1"
+    },
+    "plan": {
+      "bytes": 162978,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/plan.json",
+      "sha256": "858361e2524dfa3371be3723845bce950e696899efd559ac2a313bda414415d2"
+    },
+    "postcheck": {
+      "bytes": 3537,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/coordination/postcheck.json",
+      "sha256": "f42db1955502b72008684634ae61c59d1ee6e6f66bb2dea7ffbcbbbf88b78567"
+    },
+    "receipt": {
+      "bytes": 748138,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/receipt.json",
+      "sha256": "f91555a4549159264f39763724c15e889f743e8a3bf0d7c0fd8eb69c72c9f471"
+    },
+    "source_review": {
+      "bytes": 6205,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-full-source-review/report.json",
+      "sha256": "9a5d4bd71463df5e5b9dd3f344ed909c0e4daa642e8ab82cefce14c47b1ccc83"
+    }
+  },
+  "allocation_comparison_by_size": [
+    {
+      "A_median_allocated_bytes": 348824,
+      "B_median_allocated_bytes": 352720,
+      "B_minus_A_median_bytes": 3896,
+      "B_minus_A_median_percent": 1.1168956264477214,
+      "all_three_repetitions": [
+        {
+          "A_allocated_bytes": 396088,
+          "A_elapsed_ns": 174543,
+          "B_allocated_bytes": 399984,
+          "B_elapsed_ns": 178840,
+          "B_minus_A_bytes": 3896,
+          "B_minus_A_percent": 0.9836198016602371,
+          "digest": "1564504106-780348924",
+          "repetition": 1
+        },
+        {
+          "A_allocated_bytes": 348824,
+          "A_elapsed_ns": 275685,
+          "B_allocated_bytes": 352720,
+          "B_elapsed_ns": 125169,
+          "B_minus_A_bytes": 3896,
+          "B_minus_A_percent": 1.1168956264477214,
+          "digest": "1044679645-1999687986",
+          "repetition": 2
+        },
+        {
+          "A_allocated_bytes": 348784,
+          "A_elapsed_ns": 600114,
+          "B_allocated_bytes": 352680,
+          "B_elapsed_ns": 123426,
+          "B_minus_A_bytes": 3896,
+          "B_minus_A_percent": 1.1170237166842516,
+          "digest": "524855184-1071543419",
+          "repetition": 3
+        }
+      ],
+      "empty_observer_subtraction": false,
+      "first_sample_included": true,
+      "size": 8
+    },
+    {
+      "A_median_allocated_bytes": 1383048,
+      "B_median_allocated_bytes": 1383264,
+      "B_minus_A_median_bytes": 216,
+      "B_minus_A_median_percent": 0.015617679212868968,
+      "all_three_repetitions": [
+        {
+          "A_allocated_bytes": 1383616,
+          "A_elapsed_ns": 2186134,
+          "B_allocated_bytes": 1383832,
+          "B_elapsed_ns": 567896,
+          "B_minus_A_bytes": 216,
+          "B_minus_A_percent": 0.01561126786622878,
+          "digest": "1595282840-2045744658",
+          "repetition": 1
+        },
+        {
+          "A_allocated_bytes": 1383048,
+          "A_elapsed_ns": 309806,
+          "B_allocated_bytes": 1383264,
+          "B_elapsed_ns": 255906,
+          "B_minus_A_bytes": 216,
+          "B_minus_A_percent": 0.015617679212868968,
+          "digest": "926781550-1835858036",
+          "repetition": 2
+        },
+        {
+          "A_allocated_bytes": 1383048,
+          "A_elapsed_ns": 236877,
+          "B_allocated_bytes": 1383264,
+          "B_elapsed_ns": 200142,
+          "B_minus_A_bytes": 216,
+          "B_minus_A_percent": 0.015617679212868968,
+          "digest": "258280260-1625971414",
+          "repetition": 3
+        }
+      ],
+      "empty_observer_subtraction": false,
+      "first_sample_included": true,
+      "size": 32
+    },
+    {
+      "A_median_allocated_bytes": 5544880,
+      "B_median_allocated_bytes": 5529496,
+      "B_minus_A_median_bytes": -15384,
+      "B_minus_A_median_percent": -0.27744513857829206,
+      "all_three_repetitions": [
+        {
+          "A_allocated_bytes": 5545408,
+          "A_elapsed_ns": 1162492,
+          "B_allocated_bytes": 5530024,
+          "B_elapsed_ns": 1073608,
+          "B_minus_A_bytes": -15384,
+          "B_minus_A_percent": -0.27741872194074807,
+          "digest": "1641545187-483687685",
+          "repetition": 1
+        },
+        {
+          "A_allocated_bytes": 5544840,
+          "A_elapsed_ns": 967077,
+          "B_allocated_bytes": 5529456,
+          "B_elapsed_ns": 789390,
+          "B_minus_A_bytes": -15384,
+          "B_minus_A_percent": -0.27744714004371634,
+          "digest": "779259794-399746121",
+          "repetition": 2
+        },
+        {
+          "A_allocated_bytes": 5544880,
+          "A_elapsed_ns": 1037344,
+          "B_allocated_bytes": 5529496,
+          "B_elapsed_ns": 790571,
+          "B_minus_A_bytes": -15384,
+          "B_minus_A_percent": -0.27744513857829206,
+          "digest": "2064458048-315804557",
+          "repetition": 3
+        }
+      ],
+      "empty_observer_subtraction": false,
+      "first_sample_included": true,
+      "size": 128
+    },
+    {
+      "A_median_allocated_bytes": 22404920,
+      "B_median_allocated_bytes": 22326304,
+      "B_minus_A_median_bytes": -78616,
+      "B_minus_A_median_percent": -0.3508872158436629,
+      "all_three_repetitions": [
+        {
+          "A_allocated_bytes": 22404920,
+          "A_elapsed_ns": 4100439,
+          "B_allocated_bytes": 22326304,
+          "B_elapsed_ns": 3331150,
+          "B_minus_A_bytes": -78616,
+          "B_minus_A_percent": -0.3508872158436629,
+          "digest": "1588320008-827358141",
+          "repetition": 1
+        },
+        {
+          "A_allocated_bytes": 22404920,
+          "A_elapsed_ns": 3613876,
+          "B_allocated_bytes": 22326304,
+          "B_elapsed_ns": 3874499,
+          "B_minus_A_bytes": -78616,
+          "B_minus_A_percent": -0.3508872158436629,
+          "digest": "512559586-1790479843",
+          "repetition": 2
+        },
+        {
+          "A_allocated_bytes": 22404920,
+          "A_elapsed_ns": 3582028,
+          "B_allocated_bytes": 22326304,
+          "B_elapsed_ns": 3461827,
+          "B_minus_A_bytes": -78616,
+          "B_minus_A_percent": -0.3508872158436629,
+          "digest": "1584282811-606117916",
+          "repetition": 3
+        }
+      ],
+      "empty_observer_subtraction": false,
+      "first_sample_included": true,
+      "size": 512
+    }
+  ],
+  "blockers": [],
+  "complete": true,
+  "composition_readback": {
+    "bytes": 28595,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/composition-readback.json",
+    "sha256": "6dbb0cff18b620a931376f3fe1e59dbdf704bf8566741f4d586be506f4937b3f"
+  },
+  "disposition": "Archive this valid but very small and size-dependent focused result; no promotion or immediate full-producer follow-up authorized or performed here.",
+  "emitted_review_pending": false,
+  "execution_authorized": false,
+  "full_actual_review_passed": true,
+  "full_emitted_manifest": {
+    "bytes": 8846,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/MANIFEST.json",
+    "sha256": "f27697ba50aa7387dd5cb11d27d7196749771312c0a6f7f75fda99bb446dfc59"
+  },
+  "full_emitted_review": {
+    "bytes": 12624,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/report.json",
+    "sha256": "5e96048105b37ff381d85e77913f3b6976f3317a6ccfce93e5335fe62b886226"
+  },
+  "full_emitted_review_passed": true,
+  "history": {
+    "new_scope_final_cleanup_confirmed": true,
+    "old8_pins_preserved": true,
+    "r13_r19_cleanup_or_termination_claimed": false
+  },
+  "interpretation": {
+    "all_inner_pretty_pack_and_field_hashing_and_new_summary_power_overhead_remain": true,
+    "empty_windows_subtracted": false,
+    "first_sample_dropped": false,
+    "performance_qualification": false,
+    "size128_reduction_bytes_each_repetition": 15384,
+    "size32_regression_bytes_each_repetition": 216,
+    "size512_local_reduction_percent": 0.3508872158436629,
+    "size512_reduction_bytes_each_repetition": 78616,
+    "size8_regression_bytes_each_repetition": 3896,
+    "stable_wall_speedup_established": false,
+    "whole_compiler_or_Foundation_gain_established": false
+  },
+  "lifecycle_review_passed": true,
+  "limitations": [
+    "One ordinary-host focused fixed batch only; no rerun or additional samples.",
+    "No stable wall-time, CPU-speed, whole-compiler, full-producer, Foundation-distribution or native performance claim.",
+    "No attribution of tiny net savings to another hotspot. All inner pretty/pack work remains.",
+    "The literal reconstruction is evidence for these fixed actual inputs and digests, not replacement Haskell semantic execution or dynamic branch observation.",
+    "No candidate promotion or full-producer follow-up is authorized or performed by this review.",
+    "Native generation A/B and fixed-point work remain paused."
+  ],
+  "native_generation_AB_paused": true,
+  "new_task_or_sample_started": false,
+  "original_sources_receipts_and_frozen_reviews_modified": false,
+  "raw_manifest": {
+    "bytes": 3037,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/MANIFEST.json",
+    "sha256": "7ac61b94af55461eebb36d61ad7fd57a95798a3151db85a2bf3a1af03d3b3b77"
+  },
+  "raw_only_report_intentionally_retains_earlier_emitted_pending": true,
+  "raw_review": {
+    "bytes": 16768,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/report.json",
+    "sha256": "ade08544bf7d9c8cb2b9a04286176b7cdf629634588308d3b0aaf556d6fdfecd"
+  },
+  "raw_review_passed": true,
+  "reviewer_executions": {
+    "compiler": 0,
+    "guard": 0,
+    "lock_probe_or_flock": 0,
+    "original_helper": 0,
+    "runtime_loader": 0,
+    "target": 0
+  },
+  "schema": "open-stamp-combined-final-independent-review-v1",
+  "scope": "This single completed ordinary-host focused OpenFragment stamp experiment only.",
+  "verdict": "PASS for the authentic completed focused experiment, semantic controls, actual local observer window and narrow allocation interpretation. Small mixed effects do not justify production/full-compiler promotion or a stable wall-time claim.",
+  "verified": {
+    "actual_Main_preparation_does_not_force_stamp": true,
+    "actual_commands": 30,
+    "actual_production_check_lazy_sixth_stamp_slot": true,
+    "actual_stamp_String_and_count_forced_inside_allocation_and_time_window": true,
+    "all_stamp_digests_equal": true,
+    "controls_each_side": 58,
+    "fixed_input_domain_proven_not_dynamic_branch_counter": true,
+    "fixed_twelve_input_guard_costs": [
+      5116,
+      20176,
+      80812,
+      326572
+    ],
+    "guard_threshold": 1048576,
+    "measurement_rows_each_side": 36,
+    "own_side_link_objects": 53,
+    "printing_and_unpack_outside_local_window": true,
+    "raw_evidence_files": 2915,
+    "same_invocation_target_Main_capture_records": 4,
+    "source_input_pins": 316,
+    "stamp_inputs_each_side": 12
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "schema": "open-stamp-source-review-v1",
+  "complete": true,
+  "whole_package_review_complete": true,
+  "whole_package_source_gate_passed": true,
+  "source_gate_status": "PASS_SOURCE_ONLY",
+  "blockers": [],
+  "execution_authorized": false,
+  "candidate_semantically_qualified": false,
+  "source_files_manifest_sha256": "c16d8be69be9506d49325327ee320872f78d93a2556d3ea8cd646dffbb4851af",
+  "candidate_target_sha256": "1f955484b9a9f44324c114a7cf52aa6d856a19f403ecbd81e62118c62836974c",
+  "source_package_manifest": {
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-source/MANIFEST.json",
+    "bytes": 4364,
+    "sha256": "c595394b9bb6cc8d759938ea971b749ad80c962792b0783dc1936e57417ddd86"
+  },
+  "runner": {
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-source/runner.py",
+    "bytes": 39868,
+    "sha256": "ddb8c73a87de12a073adb53430001466534d5cfd5ffebd6106c0138bfca770dd"
+  },
+  "plan": {
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-source/plan.draft.json",
+    "bytes": 162737,
+    "sha256": "ee6da9bda900ba9a7f6ddce11c9bdd94317da0898142dfeaefd6e342fce502e7"
+  },
+  "author_report": {
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-source/report.json",
+    "bytes": 5440,
+    "sha256": "0cd515b0e1c7af2bd72f28323789f5b975057e08faae77d97563bc9c4afdaa72"
+  },
+  "closure_reuse_safe": true,
+  "fixture_semantic_review_complete": true,
+  "file_flow_review_complete": true,
+  "measurement_source_boundary_review_complete": true,
+  "measurement_emitted_capture_source_gate_passed": true,
+  "measurement_emitted_capture_available_in_actual_run": null,
+  "prior_full_review": {
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-full-source-review/report.json",
+    "bytes": 6295,
+    "sha256": "83b16403f54f041fbab496385294d6a74f1e211396cd3c057bbe8defe4c9db55"
+  },
+  "prior_full_review_manifest": {
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-full-source-review/MANIFEST.json",
+    "bytes": 1869,
+    "sha256": "c8702dcf9719d72fdf6fd649ff42a65780cbfaf3f838dfdfe241c4c17cca90ee"
+  },
+  "inherited_scope": "All complete v2 source/closure/fixture/protocol checks; production and fixtures byte-identical, full plan exact relocation only. Prior blocked packages remain blocked.",
+  "closed_blockers": [
+    {
+      "id": "missing_same_invocation_Main_Core_STG",
+      "resolution": "Same existing Main compile now emits complete Core/STG with its object/interface; separately retained fixture_builds records cannot overwrite production target_builds. Both same-shot linked object identities and all four archives are verified after link and before execution.",
+      "actual_emitted_placement_not_yet_reviewed": true
+    }
+  ],
+  "verified": {
+    "manifest_files": 30,
+    "plan_input_pins": 316,
+    "unique_files_rehashed_in_delta": 371,
+    "source_files_byte_identical_to_v2": true,
+    "source_files_manifest_entries": 12,
+    "candidate_target_sha256": "1f955484b9a9f44324c114a7cf52aa6d856a19f403ecbd81e62118c62836974c",
+    "authored_real_controls": 58,
+    "actual_controls_executed": 0,
+    "fresh_modules_per_side": 5,
+    "borrowed_modules": 46,
+    "link_objects_per_side": 53,
+    "unchanged_top_level_runner_AST_functions": 28,
+    "changed_top_level_runner_AST_functions": [
+      "compile_argv",
+      "emitted_binding",
+      "work"
+    ],
+    "independent_delta_checks": 60,
+    "independent_delta_negative_cases": 12,
+    "inherited_independent_checks": 52,
+    "inherited_negative_output_contract_cases": 23,
+    "outer_seconds": 180,
+    "shared_controls_measure_seconds_per_side": 30,
+    "retries": 0,
+    "additional_compilations": 0,
+    "additional_runtime_samples": 0
+  },
+  "evidence": {
+    "audit_delta.py": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-full-source-review/audit_delta.py",
+      "bytes": 8441,
+      "sha256": "309585887b38ee8a8e607a6d361742f63d5e4080e8c664bd8bb32df60a80aeb3"
+    },
+    "delta-checks.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-full-source-review/delta-checks.json",
+      "bytes": 4046,
+      "sha256": "529f3021d1a26827d4d476e7da62e70e99e83991ccc0395fffc77309703ce691"
+    },
+    "verified-pins.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-full-source-review/verified-pins.json",
+      "bytes": 96898,
+      "sha256": "8bc3933f7fa4ef9a1c4f1df102d91c64538dde9e2c124d74a979370e43d18522"
+    },
+    "REVIEW.md": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-full-source-review/REVIEW.md",
+      "bytes": 5444,
+      "sha256": "de0fb581a08c774b575f1b91c7ac0f2b0c50c0cb6505c4d6088f22c7adb0f71e"
+    }
+  },
+  "remaining_actual_bindings": [
+    "Exact enabled READY-only runner copy; new working path plan with this source report pin and unchanged logical inputs.",
+    "Independent actual execution-review with exact new runner/plan pins and mature source/closure/fileflow gates.",
+    "Coordinator fresh current-boot epoch, actual real shared/F25 dual-lock evidence, unknown-incumbent/resource check, historical preservation proofs and single-use approval.",
+    "Correct relocated TMPDIR, environment, claim and clean output namespace.",
+    "Actual ordinary compile/control/output/runtime/file-flow/cleanup and independent raw/emitted review, including Main observer placement and same linked production target."
+  ],
+  "limitations": [
+    "Source gate only, not execution approval or actual Haskell typecheck/behavior.",
+    "No target helper/controller/runtime loader/original parser/guard/lock/compiler executed or imported.",
+    "No performance, current-main/full-compiler/builtin-freshness/Foundation qualification; native generation A/B/fixed-point remain paused."
+  ],
+  "author_files_modified": false
+}

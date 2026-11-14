@@ -1,0 +1,33 @@
+--- a/libraries/mlf-crates/Bootstrap/OpenFragment.hs
++++ b/libraries/mlf-crates/Bootstrap/OpenFragment.hs
+@@ -61,11 +61,28 @@
+   bindings (Fragment _ _ _ bs _ _) = bs;
+   usedParameters (Fragment _ _ _ _ used _) = used;
+   fingerprint (Fragment _ _ _ _ _ stamp) = stamp;
+-  stamp env ps term bs = Separate.fingerprint (Separate.pack
++  -- Only the small, proven-safe framing domain avoids the original outer
++  -- concat. Unknown/large inputs retain its byte/scalar checks and first error.
++  stamp env ps term bs = stampFields
+     [Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env)),
+      Separate.pack (map (\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps),
+      Pretty.prettyTerm term,
+-     Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs)]);
++     Separate.pack (map (\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs)];
++  stampFields fields =
++    if stampFieldsFit 1048576 fields
++    then Separate.encodingFingerprint (Separate.encodingPack (map Separate.encodingText fields))
++    else Separate.fingerprint (Separate.pack fields);
++  -- A nonnegative Int64 decimal prefix plus colon takes at most 20 bytes.
++  -- UTF-8 takes at most four bytes per scalar. Compare before multiplying;
++  -- stop before the next field whenever the conservative bound is unknown.
++  stampFieldsFit remaining fields = case fields of {
++    [] -> True;
++    (:) field rest -> let { count = stringLength field } in
++      if count < 0 then False
++      else if remaining < 20 then False
++      else if count > quotInt (remaining - 20) 4 then False
++      else stampFieldsFit (remaining - 20 - 4 * count) rest
++  };
+   make env ps term bs = Fragment env ps term bs
+     (Boundary.nubNames (Boundary.freeNames term)) (stamp env ps term bs);
+   check :: Environment -> [] ((,) XName XType) -> XTerm -> Either String Fragment;

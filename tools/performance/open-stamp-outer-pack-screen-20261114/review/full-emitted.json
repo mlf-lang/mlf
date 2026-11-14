@@ -1,0 +1,235 @@
+{
+  "schema": "open-stamp-actual-full-emitted-independent-review-v1",
+  "complete": true,
+  "frozen": true,
+  "blockers": [],
+  "emitted_review_passed": true,
+  "full_emitted_review_passed": true,
+  "scope": "Actual A/B OpenFragment and Main complete same-invocation Core/STG; construction, stamp-demand window, guarded mechanism, exact fixed-input proof, and composition with authenticated raw/lifecycle evidence.",
+  "verdict": "PASS for this completed ordinary-host focused experiment and its narrow interpretation. Not a production/full-compiler qualification or promotion.",
+  "inputs": {
+    "final.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/final.json",
+      "bytes": 729,
+      "sha256": "b9f8c823dc95a48c6b7def0a8df995d594b62685d84d5e644f015a05894ca396"
+    },
+    "receipt.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/receipt.json",
+      "bytes": 748138,
+      "sha256": "f91555a4549159264f39763724c15e889f743e8a3bf0d7c0fd8eb69c72c9f471"
+    },
+    "admission.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/admission.json",
+      "bytes": 3610,
+      "sha256": "cdb6aa209429a09d921bacf2cf8f2f01a7eee40c6fff4aab389bb15615b9cdb0"
+    },
+    "plan.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/plan.json",
+      "bytes": 162978,
+      "sha256": "858361e2524dfa3371be3723845bce950e696899efd559ac2a313bda414415d2"
+    },
+    "execution-review.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/execution-review.json",
+      "bytes": 16317,
+      "sha256": "91d19aa523b19d5e3428a713709b018fb17087db75a7ae48a3ca14aa2788c6fd"
+    },
+    "guard/guard.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/guard/guard.json",
+      "bytes": 3767,
+      "sha256": "20bc668180013774444564ed801734d072950e73f4fd06623fa0e11c7a0ed6c2"
+    },
+    "coordination/postcheck.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/coordination/postcheck.json",
+      "bytes": 3537,
+      "sha256": "f42db1955502b72008684634ae61c59d1ee6e6f66bb2dea7ffbcbbbf88b78567"
+    }
+  },
+  "source_review": {
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-full-source-review/report.json",
+    "bytes": 6205,
+    "sha256": "9a5d4bd71463df5e5b9dd3f344ed909c0e4daa642e8ab82cefce14c47b1ccc83"
+  },
+  "composed_reviews": {
+    "Main_actual_emitted": {
+      "report": {
+        "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-main-emitted-review/report.json",
+        "bytes": 4535,
+        "sha256": "3fbd867982438c458ff4b16061dd81d3bf7adc1cec330bdd6a460ae15ba40a47"
+      },
+      "manifest": {
+        "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-main-emitted-review/MANIFEST.json",
+        "bytes": 6039,
+        "sha256": "21dd510257828a1de934cbcc4e1e17d7001ffbf2ada6d0fe5ad286c18bcb3946"
+      },
+      "scope": "Main-local analysis; its required production construction/full-digest composition is closed here."
+    },
+    "raw_lifecycle": {
+      "report": {
+        "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/report.json",
+        "bytes": 16768,
+        "sha256": "ade08544bf7d9c8cb2b9a04286176b7cdf629634588308d3b0aaf556d6fdfecd"
+      },
+      "manifest": {
+        "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/MANIFEST.json",
+        "bytes": 3037,
+        "sha256": "7ac61b94af55461eebb36d61ad7fd57a95798a3151db85a2bf3a1af03d3b3b77"
+      },
+      "scope": "Frozen raw review passes; its emitted_pending field is intentionally not edited. This new report supplies that missing layer."
+    }
+  },
+  "findings": [
+    {
+      "id": "SAME_SHOT",
+      "passed": true,
+      "detail": "Four actual successful A/B target/Main compile invocations each produced the complete archived Core/STG/object/interface. Source, command/config/guard, input interfaces, restores and 53 own-link objects per side are bound. Both actual targets are fresh; A uses exact F25 target, B uses the candidate. Private candidate probes are controls only, not the production measurement call path."
+    },
+    {
+      "id": "PREPARATION",
+      "passed": true,
+      "detail": "Actual A/B production check returns Fragment with sixth stamp slot stored as an unevaluated updatable closure. Actual Main preparation forces fixed input, production check, body and owned bindings, not that sixth slot. This closes the Main-only review dependency without relying on NOINLINE source annotations."
+    },
+    {
+      "id": "WINDOW",
+      "passed": true,
+      "detail": "Actual Main nests allocation-before, time-before, production stamp action, time-after, allocation-after. The action projects the sixth production Fragment slot and cases on strict Host String/count inside seq#. Actual stamp workers compute the canonical digest and strict Text result before returning that String. Printing/unpack occurs afterward, deliberately outside this local stamp window."
+    },
+    {
+      "id": "MECHANISM",
+      "passed": true,
+      "detail": "Actual B captures retain ordered scalar-count guard, early fallback and both joins. The safe join uses four-field encodingText/encodingPack composition rather than constructing the old outer concatenated Text. The fallback join retains original pack/fingerprint. Fixed summary plumbing is not a replacement whole outer character/Text carrier. All inner pretty/pack, per-field scalar hashing, and new summary/power overhead remain."
+    },
+    {
+      "id": "FIXED_INPUT_DOMAIN",
+      "passed": true,
+      "detail": "For all 12 actual fixed inputs, authenticated construction/pretty/inventory source plus actual production check and literal digest reconciliation establish conservative guard costs 5116, 20176, 80812 and 326572 by size, all below 1048576. This is a source/input proof of guard outcome, not an observed branch counter."
+    },
+    {
+      "id": "CONTROLS",
+      "passed": true,
+      "detail": "Actual raw controls on each side exactly equal all 58 frozen expected lines plus summary. Includes first-error/poison, Unicode/HostError, threshold below/at/above, early-stop and public production APIs. Candidate probe on both sides is intentional and not substituted for fresh production A. Finite controls are not a universal proof or a native execution result."
+    },
+    {
+      "id": "RESULT",
+      "passed": true,
+      "detail": "Both actual 36-row semantic summaries match. The single fixed 12-sample batch gives +3896, +216, -15384 and -78616 bytes B-minus-A per repetition at sizes 8,32,128,512. Largest median reduction is 0.3508872158436629% of local stamp allocation, not a material whole-producer gain."
+    }
+  ],
+  "checks": {
+    "complete": true,
+    "verified_pin_count": 793,
+    "commands": 30,
+    "captures": 4,
+    "full_Core_STG_files": 8,
+    "own_link_objects_per_side": 53,
+    "all_controls_match": true,
+    "all_measurement_semantics_match": true,
+    "outer_cleanup": true,
+    "runtime_receipt_identities_unchanged": true,
+    "target_tools_imported_or_run": false,
+    "actual_target_reruns": 0,
+    "benchmark_reruns": 0
+  },
+  "branch_dynamically_counted": false,
+  "actual_fixed_inputs_proven_within_fastpath_guard": true,
+  "allocation_summaries": [
+    {
+      "size": 8,
+      "A_median_allocation": 348824,
+      "B_median_allocation": 352720,
+      "B_minus_A": 3896,
+      "allocation_reduction_percent": -1.1168956264477214
+    },
+    {
+      "size": 32,
+      "A_median_allocation": 1383048,
+      "B_median_allocation": 1383264,
+      "B_minus_A": 216,
+      "allocation_reduction_percent": -0.015617679212868968
+    },
+    {
+      "size": 128,
+      "A_median_allocation": 5544880,
+      "B_median_allocation": 5529496,
+      "B_minus_A": -15384,
+      "allocation_reduction_percent": 0.27744513857829206
+    },
+    {
+      "size": 512,
+      "A_median_allocation": 22404920,
+      "B_median_allocation": 22326304,
+      "B_minus_A": -78616,
+      "allocation_reduction_percent": 0.3508872158436629
+    }
+  ],
+  "limits": [
+    "One ordinary-host focused fixed batch only; no rerun or additional samples.",
+    "No stable wall-time, CPU-speed, whole-compiler, full-producer, Foundation-distribution or native performance claim.",
+    "No attribution of tiny net savings to another hotspot. All inner pretty/pack work remains.",
+    "The literal reconstruction is evidence for these fixed actual inputs and digests, not replacement Haskell semantic execution or dynamic branch observation.",
+    "No candidate promotion or full-producer follow-up is authorized or performed by this review.",
+    "Native generation A/B and fixed-point work remain paused."
+  ],
+  "disposition": "Archive this valid but very small focused result; parent decided no immediate full-producer follow-up or promotion.",
+  "reviewer_executions": {
+    "target": 0,
+    "compiler": 0,
+    "original_helper_import_or_execution": 0,
+    "runtime_loader": 0,
+    "guard": 0,
+    "lock_probe_or_flock": 0,
+    "benchmark_reruns": 0
+  },
+  "existing_sources_and_receipts_modified": false,
+  "evidence": {
+    "REVIEW.md": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/REVIEW.md",
+      "bytes": 4494,
+      "sha256": "0d6666f0d2eab2c5b960fa88122f13938e0b8c509467c04064d005ab04737db6"
+    },
+    "artifact-audit.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/artifact-audit.json",
+      "bytes": 391,
+      "sha256": "7c5e91ad24f41395012ef56c917258cea861bde31e7ed252a78c0bd250491e51"
+    },
+    "audit_actual.py": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/audit_actual.py",
+      "bytes": 10875,
+      "sha256": "b9657236479e37d7920b8a37fcebf9958fb8e237e065a66946ab70923d9b8ebb"
+    },
+    "capture-bindings.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/capture-bindings.json",
+      "bytes": 8825,
+      "sha256": "6f8977a2915a6f2f1d74a1f83c4512ca7ee8f280a2de4762cdcc29c1f5731f72"
+    },
+    "composition-checks.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/composition-checks.json",
+      "bytes": 598,
+      "sha256": "43844082c53811daa1de7084aa7ebde93d7a2eb68b8db8532ed05bb092769fe2"
+    },
+    "excerpts.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/excerpts.json",
+      "bytes": 13795,
+      "sha256": "5f728b80928cd6affdecfc85fec98af2a512225675daf6e51061df096ed773fa"
+    },
+    "fastpath-input-proof.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/fastpath-input-proof.json",
+      "bytes": 3813,
+      "sha256": "1807ac5c5c087e0bd89ed7baeef8ba1aee48589ac76858786b9827f440483782"
+    },
+    "freeze_review.py": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/freeze_review.py",
+      "bytes": 10338,
+      "sha256": "8ed8edccd374181e5f173e095ff2e0e565437c7d25ddfc8f3e8dbb05f5d79618"
+    },
+    "raw-reduction.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/raw-reduction.json",
+      "bytes": 16374,
+      "sha256": "5c370010e6476987df953a9de807733c637a8e7c25f86d8ecf8e865b234bd205"
+    },
+    "verified-pins.json": {
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-emitted-review/verified-pins.json",
+      "bytes": 214196,
+      "sha256": "a8a7177c3dfe271e703c141d6e46733d998bc2161d8f0742e5f8c68f2d0eed55"
+    }
+  }
+}

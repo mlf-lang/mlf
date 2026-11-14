@@ -1,0 +1,40 @@
+{
+  "baseline_commit": "bda8f9807c8b13b5ce14753d0320fa54772e4bc4",
+  "known_main_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "current_remote_tip_checked": false,
+  "files": [
+    {
+      "path": "libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+      "F25": {
+        "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/rebind-r25-formal/source/libraries/mlf-crates/Bootstrap/OpenFragment.hs",
+        "bytes": 35625,
+        "sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b"
+      },
+      "known_main_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+      "known_main_sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+      "byte_identical": true
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/Separate.hs",
+      "F25": {
+        "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/rebind-r25-formal/source/libraries/mlf-crates/Bootstrap/Separate.hs",
+        "bytes": 68595,
+        "sha256": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba"
+      },
+      "known_main_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+      "known_main_sha256": "1b3d1d917d86ffa5fc9e8de8cfe9becb1a6faa7e115842b0b2286cc2907343ba",
+      "byte_identical": true
+    },
+    {
+      "path": "libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+      "F25": {
+        "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/rebind-r25-formal/source/libraries/mlf-xmlf/Bootstrap/X/Pretty.hs",
+        "bytes": 12549,
+        "sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f"
+      },
+      "known_main_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+      "known_main_sha256": "77a96c4912188d23b00fa95315038878b9a40ea683c5d9d4ed8baa893fa32d3f",
+      "byte_identical": true
+    }
+  ]
+}

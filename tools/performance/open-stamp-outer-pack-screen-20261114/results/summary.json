@@ -1,0 +1,66 @@
+{
+  "all_paired_digests_equal": true,
+  "complete": true,
+  "controls_per_side": 58,
+  "current_main_qualified": false,
+  "decision": "archive_do_not_promote_or_run_full_producer",
+  "empty_window_subtraction": false,
+  "first_repetitions_retained": true,
+  "native_fixedpoint_AB_paused": true,
+  "paired_stamp_samples": 12,
+  "raw_rows_per_side": 36,
+  "retained_empty_rows_total": 48,
+  "schema": "open-stamp-local-screen-summary-v1",
+  "sizes": [
+    {
+      "A_median_bytes": 348824,
+      "B_median_bytes": 352720,
+      "B_minus_A_bytes_by_repetition": [
+        3896,
+        3896,
+        3896
+      ],
+      "B_minus_A_median_percent": 1.1168956264477214,
+      "repetitions": 3,
+      "size": 8
+    },
+    {
+      "A_median_bytes": 1383048,
+      "B_median_bytes": 1383264,
+      "B_minus_A_bytes_by_repetition": [
+        216,
+        216,
+        216
+      ],
+      "B_minus_A_median_percent": 0.015617679212868968,
+      "repetitions": 3,
+      "size": 32
+    },
+    {
+      "A_median_bytes": 5544880,
+      "B_median_bytes": 5529496,
+      "B_minus_A_bytes_by_repetition": [
+        -15384,
+        -15384,
+        -15384
+      ],
+      "B_minus_A_median_percent": -0.27744513857829206,
+      "repetitions": 3,
+      "size": 128
+    },
+    {
+      "A_median_bytes": 22404920,
+      "B_median_bytes": 22326304,
+      "B_minus_A_bytes_by_repetition": [
+        -78616,
+        -78616,
+        -78616
+      ],
+      "B_minus_A_median_percent": -0.3508872158436629,
+      "repetitions": 3,
+      "size": 512
+    }
+  ],
+  "stable_wall_improvement_claimed": false,
+  "whole_compiler_improvement_claimed": false
+}

@@ -1,0 +1,408 @@
+{
+  "admission": {
+    "bytes": 3610,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/admission.json",
+    "sha256": "cdb6aa209429a09d921bacf2cf8f2f01a7eee40c6fff4aab389bb15615b9cdb0"
+  },
+  "blockers": [],
+  "checks": {
+    "actual_commands": 30,
+    "actual_ordinary_authentication_before_after_and_producer_receipt_byte_equal": true,
+    "all_copies_byte_equal_to_authenticated_sources": true,
+    "baseline_host_modules": 4,
+    "baseline_objects_interfaces": 284,
+    "baseline_outputs": 13,
+    "baseline_shared_modules": 137,
+    "command_guard_config_stdout_stderr_artifacts": 120,
+    "copied_dependencies": 234,
+    "immutable_archives": 32,
+    "installed_dependency_files": 1868,
+    "kernel_order_symlink_identity_and_contents_verified": true,
+    "loader_configuration_files_and_directories_unchanged": true,
+    "loader_raw_output_and_ELF_interpreter_bound": true,
+    "mode_preserving_restored_working_copies": 22,
+    "old_eight_files_unchanged": true,
+    "recorded_runtime_bindings": 51,
+    "runtime_snapshots": 12,
+    "source_and_preparation_pins_preserved": true,
+    "source_plan_input_pins": 316,
+    "unique_files_rehashed": 2915
+  },
+  "claim": {
+    "bytes": 315,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/claim.json",
+    "sha256": "965726eef38b129fb39001f4cbc5ce71b0f3a1ba36072bc21004eb30f28df943"
+  },
+  "complete": true,
+  "controls": {
+    "A_B_exact_bytes": true,
+    "case_ids_in_raw_measurement_artifact": true,
+    "each_side": 58,
+    "exact_golden_bytes": true,
+    "exit_code": 0,
+    "stderr_empty": true
+  },
+  "emitted_review": null,
+  "emitted_review_pending": true,
+  "epoch": {
+    "bytes": 1563,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/coordination/lock-epoch.json",
+    "sha256": "c433fc35e8afd9c9c9f14d8a99e71295e748e24e3b0495dd695b19ca3c071939"
+  },
+  "evidence": {
+    "audit_raw.py": {
+      "bytes": 25562,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/audit_raw.py",
+      "sha256": "776310db4d9dfea220ecb824ec7bd3fcbe5ffb4bee00aa657f5c7f35ed22a0aa"
+    },
+    "checks.json": {
+      "bytes": 5116,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/checks.json",
+      "sha256": "346cb3aa25f5fde53bb536506a45d15fa40731dd89804bf1653d8d482c92e841"
+    },
+    "commands.json": {
+      "bytes": 21489,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/commands.json",
+      "sha256": "8abb14db0018bdc93696d7c897ce088ceffaa9a61e37abfa76edc83f808c0f84"
+    },
+    "copy-provenance.json": {
+      "bytes": 149809,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/copy-provenance.json",
+      "sha256": "713f0e121ba39baa3406921ac0a80d26ed20f234a74619bc4b3361c04063d1fd"
+    },
+    "raw-measurements.json": {
+      "bytes": 37935,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/raw-measurements.json",
+      "sha256": "264c09a690d61e4c5dfd961523855adec7c0a7a4fc45cbf506b3ea0b1e43c571"
+    },
+    "same-invocation-bindings.json": {
+      "bytes": 11289,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/same-invocation-bindings.json",
+      "sha256": "76e8a570feb1e0e237ff03ca4c324ded07becfeaf1b9d39a9d12fc17a6ab219e"
+    },
+    "verified-pins.json": {
+      "bytes": 866803,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/verified-pins.json",
+      "sha256": "fd030790b5bacd1fca14c65e1dce409cc21294d71e72dbe08dc7b8566fffda2a"
+    },
+    "verify_copy_provenance.py": {
+      "bytes": 2362,
+      "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01-actual-review/verify_copy_provenance.py",
+      "sha256": "2f79ced2ed5828185ba30660827429518198e154c900b363221fca7126322abd"
+    }
+  },
+  "execution_review": {
+    "bytes": 16317,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/execution-review.json",
+    "sha256": "91d19aa523b19d5e3428a713709b018fb17087db75a7ae48a3ca14aa2788c6fd"
+  },
+  "final": {
+    "bytes": 729,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/final.json",
+    "sha256": "b9f8c823dc95a48c6b7def0a8df995d594b62685d84d5e644f015a05894ca396"
+  },
+  "history": {
+    "new_scope_only": true,
+    "old8_preserved_before_preparation_after_preparation_after_target_and_review": true,
+    "old_r13_r19_cleanup_claimed": false,
+    "old_r13_r19_termination_established": false,
+    "old_r19_lease_and_quarantine_unchanged": true
+  },
+  "interpretation": {
+    "largest_size_reduction_bytes_each_rep": 78616,
+    "largest_size_reduction_percent": 0.3508872158436629,
+    "no_Foundation_materiality_claim": true,
+    "no_full_candidate_compiler_or_builtin_freshness_qualification": true,
+    "no_stable_wall_speedup_claim": true,
+    "no_whole_compiler_speedup_or_allocation_claim": true,
+    "reason": "One bounded A-then-B fixture screen with three size-specific repetitions, not an interleaved full compiler benchmark. All first-sample costs and empty windows are retained. Actual emitted observer review remains pending.",
+    "size128_and_size512_small_local_allocation_reductions_observed": true,
+    "size8_and_size32_allocation_regressions_retained": true
+  },
+  "lifecycle": {
+    "duration_only_not_performance_result": true,
+    "exact_worker_supervisor_claim_config_epoch_admission_bound": true,
+    "fixture_budgets": {
+      "A": {
+        "elapsed_seconds": 1.660393460013438,
+        "includes_intervening_checks_and_parsing": true,
+        "seconds": 30,
+        "shared_modes": [
+          "controls",
+          "measure"
+        ]
+      },
+      "B": {
+        "elapsed_seconds": 1.6613730919925729,
+        "includes_intervening_checks_and_parsing": true,
+        "seconds": 30,
+        "shared_modes": [
+          "controls",
+          "measure"
+        ]
+      }
+    },
+    "new_epoch_specific_markers_absent_readonly": true,
+    "outer_cleanup": true,
+    "outer_complete": true,
+    "outer_exit_code": 0,
+    "outer_lease_cleared": true,
+    "outer_lock_reacquired": true,
+    "outer_reason": null,
+    "outer_seconds": 47.90869739900518,
+    "postcheck_bound": true,
+    "worker_seconds": 47.6943207430013
+  },
+  "lifecycle_review_passed": true,
+  "limits": [
+    "Session 90713 is coordinator-supplied context; archived files independently bind argv/claim/epoch/supervisor instead of that transport ID.",
+    "Only file contents, alias/config metadata and this completed epoch marker absence were read. Physical lock files were not opened or probed.",
+    "The archived worker emitted_diagnostic_review_complete remains false; a future separate emitted report may supply its own later conclusion without rewriting that receipt.",
+    "A structural full Core/STG archive and own-link binding is not a semantic emitted-observer-forcing conclusion. That review is owned separately."
+  ],
+  "measurement": {
+    "all_empty_window_allocations_zero": true,
+    "all_twelve_stamp_digests_equal": true,
+    "comparison_by_size": [
+      {
+        "A_median_allocated_bytes": 348824,
+        "B_median_allocated_bytes": 352720,
+        "B_minus_A_median_bytes": 3896,
+        "B_minus_A_median_percent": 1.1168956264477214,
+        "all_three_repetitions": [
+          {
+            "A_allocated_bytes": 396088,
+            "A_elapsed_ns": 174543,
+            "B_allocated_bytes": 399984,
+            "B_elapsed_ns": 178840,
+            "B_minus_A_bytes": 3896,
+            "B_minus_A_percent": 0.9836198016602371,
+            "digest": "1564504106-780348924",
+            "repetition": 1
+          },
+          {
+            "A_allocated_bytes": 348824,
+            "A_elapsed_ns": 275685,
+            "B_allocated_bytes": 352720,
+            "B_elapsed_ns": 125169,
+            "B_minus_A_bytes": 3896,
+            "B_minus_A_percent": 1.1168956264477214,
+            "digest": "1044679645-1999687986",
+            "repetition": 2
+          },
+          {
+            "A_allocated_bytes": 348784,
+            "A_elapsed_ns": 600114,
+            "B_allocated_bytes": 352680,
+            "B_elapsed_ns": 123426,
+            "B_minus_A_bytes": 3896,
+            "B_minus_A_percent": 1.1170237166842516,
+            "digest": "524855184-1071543419",
+            "repetition": 3
+          }
+        ],
+        "empty_observer_subtraction": false,
+        "first_sample_included": true,
+        "size": 8
+      },
+      {
+        "A_median_allocated_bytes": 1383048,
+        "B_median_allocated_bytes": 1383264,
+        "B_minus_A_median_bytes": 216,
+        "B_minus_A_median_percent": 0.015617679212868968,
+        "all_three_repetitions": [
+          {
+            "A_allocated_bytes": 1383616,
+            "A_elapsed_ns": 2186134,
+            "B_allocated_bytes": 1383832,
+            "B_elapsed_ns": 567896,
+            "B_minus_A_bytes": 216,
+            "B_minus_A_percent": 0.01561126786622878,
+            "digest": "1595282840-2045744658",
+            "repetition": 1
+          },
+          {
+            "A_allocated_bytes": 1383048,
+            "A_elapsed_ns": 309806,
+            "B_allocated_bytes": 1383264,
+            "B_elapsed_ns": 255906,
+            "B_minus_A_bytes": 216,
+            "B_minus_A_percent": 0.015617679212868968,
+            "digest": "926781550-1835858036",
+            "repetition": 2
+          },
+          {
+            "A_allocated_bytes": 1383048,
+            "A_elapsed_ns": 236877,
+            "B_allocated_bytes": 1383264,
+            "B_elapsed_ns": 200142,
+            "B_minus_A_bytes": 216,
+            "B_minus_A_percent": 0.015617679212868968,
+            "digest": "258280260-1625971414",
+            "repetition": 3
+          }
+        ],
+        "empty_observer_subtraction": false,
+        "first_sample_included": true,
+        "size": 32
+      },
+      {
+        "A_median_allocated_bytes": 5544880,
+        "B_median_allocated_bytes": 5529496,
+        "B_minus_A_median_bytes": -15384,
+        "B_minus_A_median_percent": -0.27744513857829206,
+        "all_three_repetitions": [
+          {
+            "A_allocated_bytes": 5545408,
+            "A_elapsed_ns": 1162492,
+            "B_allocated_bytes": 5530024,
+            "B_elapsed_ns": 1073608,
+            "B_minus_A_bytes": -15384,
+            "B_minus_A_percent": -0.27741872194074807,
+            "digest": "1641545187-483687685",
+            "repetition": 1
+          },
+          {
+            "A_allocated_bytes": 5544840,
+            "A_elapsed_ns": 967077,
+            "B_allocated_bytes": 5529456,
+            "B_elapsed_ns": 789390,
+            "B_minus_A_bytes": -15384,
+            "B_minus_A_percent": -0.27744714004371634,
+            "digest": "779259794-399746121",
+            "repetition": 2
+          },
+          {
+            "A_allocated_bytes": 5544880,
+            "A_elapsed_ns": 1037344,
+            "B_allocated_bytes": 5529496,
+            "B_elapsed_ns": 790571,
+            "B_minus_A_bytes": -15384,
+            "B_minus_A_percent": -0.27744513857829206,
+            "digest": "2064458048-315804557",
+            "repetition": 3
+          }
+        ],
+        "empty_observer_subtraction": false,
+        "first_sample_included": true,
+        "size": 128
+      },
+      {
+        "A_median_allocated_bytes": 22404920,
+        "B_median_allocated_bytes": 22326304,
+        "B_minus_A_median_bytes": -78616,
+        "B_minus_A_median_percent": -0.3508872158436629,
+        "all_three_repetitions": [
+          {
+            "A_allocated_bytes": 22404920,
+            "A_elapsed_ns": 4100439,
+            "B_allocated_bytes": 22326304,
+            "B_elapsed_ns": 3331150,
+            "B_minus_A_bytes": -78616,
+            "B_minus_A_percent": -0.3508872158436629,
+            "digest": "1588320008-827358141",
+            "repetition": 1
+          },
+          {
+            "A_allocated_bytes": 22404920,
+            "A_elapsed_ns": 3613876,
+            "B_allocated_bytes": 22326304,
+            "B_elapsed_ns": 3874499,
+            "B_minus_A_bytes": -78616,
+            "B_minus_A_percent": -0.3508872158436629,
+            "digest": "512559586-1790479843",
+            "repetition": 2
+          },
+          {
+            "A_allocated_bytes": 22404920,
+            "A_elapsed_ns": 3582028,
+            "B_allocated_bytes": 22326304,
+            "B_elapsed_ns": 3461827,
+            "B_minus_A_bytes": -78616,
+            "B_minus_A_percent": -0.3508872158436629,
+            "digest": "1584282811-606117916",
+            "repetition": 3
+          }
+        ],
+        "empty_observer_subtraction": false,
+        "first_sample_included": true,
+        "size": 512
+      }
+    ],
+    "domain": "local ordinary fixture observer allocation window; not whole process/whole compiler or source-demand profile totals",
+    "emitted_observer_boundary_independent_confirmation_pending": true,
+    "empty_observer_rows_per_side": 24,
+    "empty_observer_subtraction": false,
+    "every_size_has_all_three_original_repetitions": true,
+    "first_sample_exclusion": false,
+    "raw_elapsed_ns_retained": true,
+    "raw_rows_per_side": 36,
+    "stamp_rows_per_side": 12
+  },
+  "native_generation_AB_paused": true,
+  "no_existing_receipts_modified": true,
+  "outer": {
+    "bytes": 3767,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/guard/guard.json",
+    "sha256": "20bc668180013774444564ed801734d072950e73f4fd06623fa0e11c7a0ed6c2"
+  },
+  "outer_config": {
+    "bytes": 1240,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/guard/guard-config.json",
+    "sha256": "21b46edec366ed799393769136f2f77827659b9c84f9b2f7cbdea7bb51cf58d1"
+  },
+  "outer_result": {
+    "bytes": 3767,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/outer-result.json",
+    "sha256": "a578da7972fd25bd72d310b3cc8c5b8aaf6fee7f57e66882e80457ca7b920263"
+  },
+  "plan": {
+    "bytes": 162978,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/plan.json",
+    "sha256": "858361e2524dfa3371be3723845bce950e696899efd559ac2a313bda414415d2"
+  },
+  "postcheck": {
+    "bytes": 3537,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/coordination/postcheck.json",
+    "sha256": "f42db1955502b72008684634ae61c59d1ee6e6f66bb2dea7ffbcbbbf88b78567"
+  },
+  "raw_review_passed": true,
+  "receipt": {
+    "bytes": 748138,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-run01/receipt.json",
+    "sha256": "f91555a4549159264f39763724c15e889f743e8a3bf0d7c0fd8eb69c72c9f471"
+  },
+  "reviewer_executions": {
+    "compiler": 0,
+    "guard": 0,
+    "lock_probe_or_flock": 0,
+    "model_tests": 0,
+    "original_helper_import_or_execution": 0,
+    "runtime_loader": 0,
+    "target": 0
+  },
+  "same_invocation": {
+    "IR_semantic_analysis_not_duplicated": true,
+    "exact_source_argv_guard_config_stdout_stderr_object_interface_full_Core_STG_archives_verified": true,
+    "modules": [
+      "Bootstrap.OpenFragment",
+      "Main"
+    ],
+    "no_old_Main_no_cross_side_objects_no_producer_direct_objects": true,
+    "own_link_objects_per_side": 53,
+    "records": 4,
+    "sides": [
+      "A",
+      "B"
+    ],
+    "target_and_Main_linked_bytes_equal_their_own_same_compile_archives": true,
+    "ten_fresh_compilation_interface_inventories_verified": true
+  },
+  "schema": "open-stamp-actual-raw-lifecycle-independent-review-v1",
+  "source_review": {
+    "bytes": 6205,
+    "path": "/workspace/scratch/3f83e2ebe290/compiler-restart-20261113-r14/open-stamp-outer-pack-v2-capture-full-source-review/report.json",
+    "sha256": "9a5d4bd71463df5e5b9dd3f344ed909c0e4daa642e8ab82cefce14c47b1ccc83"
+  },
+  "verdict": "PASS for actual raw outputs, lifecycle, immutable inputs/runtime and same-invocation/link attribution. Emitted observer/target interpretation is pending a separate independent review. This is not a performance or full compiler qualification."
+}

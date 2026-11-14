@@ -1,0 +1,16 @@
+{
+  "base_commit": "bda8f9807c8b13b5ce14753d0320fa54772e4bc4",
+  "base_sha256": "e392aae043afc2c13cda16e00caa6a3562dc5180d78dce27f699da7046c57c8b",
+  "candidate_sha256": "1f955484b9a9f44324c114a7cf52aa6d856a19f403ecbd81e62118c62836974c",
+  "edits": [
+    {
+      "after": "  -- Only the small, proven-safe framing domain avoids the original outer\n  -- concat. Unknown/large inputs retain its byte/scalar checks and first error.\n  stamp env ps term bs = stampFields\n    [Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env)),\n     Separate.pack (map (\\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps),\n     Pretty.prettyTerm term,\n     Separate.pack (map (\\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs)];\n  stampFields fields =\n    if stampFieldsFit 1048576 fields\n    then Separate.encodingFingerprint (Separate.encodingPack (map Separate.encodingText fields))\n    else Separate.fingerprint (Separate.pack fields);\n  -- A nonnegative Int64 decimal prefix plus colon takes at most 20 bytes.\n  -- UTF-8 takes at most four bytes per scalar. Compare before multiplying;\n  -- stop before the next field whenever the conservative bound is unknown.\n  stampFieldsFit remaining fields = case fields of {\n    [] -> True;\n    (:) field rest -> let { count = stringLength field } in\n      if count < 0 then False\n      else if remaining < 20 then False\n      else if count > quotInt (remaining - 20) 4 then False\n      else stampFieldsFit (remaining - 20 - 4 * count) rest\n  };",
+      "before": "  stamp env ps term bs = Separate.fingerprint (Separate.pack\n    [Separate.pack (map (compose D.prettyDeclaration canonicalDeclaration) (declarations env)),\n     Separate.pack (map (\\((,) n ty) -> Separate.pack [showInt (X.nameId n), X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) ps),\n     Pretty.prettyTerm term,\n     Separate.pack (map (\\((,) n ty) -> Separate.pack [X.nameHint n, Pretty.prettyType (Separate.normalType ty)]) bs)]);",
+      "name": "guarded-outer-pack-only"
+    }
+  ],
+  "guard_threshold": 1048576,
+  "max_UTF8_bytes_per_scalar": 4,
+  "per_field_framing_upper_bound": 20,
+  "schema": "open-stamp-outer-pack-edits-v2"
+}
