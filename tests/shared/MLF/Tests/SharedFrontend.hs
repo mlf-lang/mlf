@@ -1544,9 +1544,11 @@ module MLF.Tests.SharedFrontend where {
         monomorphicErasure scope body rest;
     _ -> X.equalErased left right
   };
-  monomorphicGroupCase label expectedFast parameters members = do {
+  monomorphicGroupCase = inferenceGroupCase Inference.monomorphicIndexed;
+  groundGroupCase = inferenceGroupCase Inference.groundIndexed;
+  inferenceGroupCase route label expectedFast parameters members = do {
     prepared <- recursiveRight label (Inference.prepareIndexedGroup parameters [] members);
-    let { candidate = Inference.monomorphicIndexed parameters members (snd prepared) };
+    let { candidate = route parameters members (snd prepared) };
     check (label ++ " route") (isRight candidate == expectedFast);
     ordinary <- recursiveRight (label ++ " ordinary")
       (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared));
@@ -1561,6 +1563,91 @@ module MLF.Tests.SharedFrontend where {
     actualType <- recursiveRight (label ++ " frozen target") (Independent.checkClosed a);
     ordinaryType <- recursiveRight (label ++ " ordinary frozen target") (Independent.checkClosed b);
     check (label ++ " independent type") (XT.alphaEq actualType ordinaryType)
+  };
+  groundGroupChecks = do {
+    groundAliasChecks;
+    let { a = XTyVar 100; b = XTyVar 101; c = XTyVar 102;
+      xa = XVar a; xb = XVar b; xc = XVar c;
+      int = SCon "Int" []; arrow = SArrow int int;
+      identity = XForall a XBot (XArrow xa xa);
+      constant = XForall a XBot (XForall b (XForall c XBot (XArrow xc xa)) (XArrow xa xb));
+      apply = XForall a XBot (XForall b XBot (XArrow (XArrow xa xb) (XArrow xa xb)));
+      composeTy = XForall a XBot (XForall b XBot
+        (XForall c (XForall (XTyVar 103) XBot
+          (XArrow (XArrow (XVar (XTyVar 103)) xa) (XArrow (XVar (XTyVar 103)) xb)))
+          (XArrow (XArrow xa xb) xc)));
+      parameter = \ty -> [(,,) (Index.fromInt 3) "poly" ty];
+      use = SGlobal (Index.fromInt 3) "wrong-hint";
+      localIdentity = SLam "v" Nothing (SVar "v");
+      row = \ty body -> [(,) (Index.fromInt 10) ((,,) "function" (Just (SAnnotation [] ty)) body)];
+      conditional = \p yes no -> SApp (SApp (SApp (SPrimitive PIfThenElse) p) yes) no };
+    groundGroupCase "ground imported identity" True (parameter identity)
+      (row arrow (SLam "x" Nothing (SApp use (SVar "x"))));
+    groundGroupCase "ground independent Bool and Int instantiations" True (parameter identity)
+      (row int (conditional (SApp use (SBoolLit True)) (SApp use (SIntLit 7)) (SApp use (SIntLit 8))));
+    groundGroupCase "ground bounded constant scheme" True (parameter constant)
+      (row int (SApp (SApp use (SIntLit 7)) (SBoolLit True)));
+    groundGroupCase "ground function application" True (parameter apply)
+      (row int (SApp (SApp use localIdentity) (SIntLit 7)));
+    groundGroupCase "ground bounded composition scheme" True (parameter composeTy)
+      (row int (SApp (SApp (SApp use localIdentity) localIdentity) (SIntLit 7)));
+    groundGroupCase "ground resolved local identity" True (parameter identity)
+      (row arrow (SDeclScope [Index.fromInt 12]
+        (SLam "poly" Nothing (SApp use (SGlobal (Index.fromInt 12) "wrong-local")))));
+    groundGroupCase "ground specialization leaves polymorphic argument to solver" False (parameter constant)
+      (row int (SApp (SApp use (SIntLit 7)) localIdentity));
+    groundGroupCase "ground specialization leaves local generalization to solver" False []
+      (row int (SLet "id" localIdentity (SApp (SVar "id") (SIntLit 7))));
+    groundGroupCase "ground specialization never generalizes unsigned exports" False []
+      [(,) (Index.fromInt 10) ((,,) "function" Nothing localIdentity)];
+    groundGroupCase "ground specialization leaves higher-rank argument to solver" False
+      (parameter (XArrow identity (XCon "Int" [])))
+      (row int (SApp use (SAnn localIdentity
+        (SAnnotation [] (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a")))))));
+    let { bounded = parameter (XForall a (XCon "Int" []) (XArrow xa xa));
+      invalid = row (SCon "Bool" []) (SApp use (SBoolLit True)) };
+    boundedPrepared <- recursiveRight "bounded rejection preparation" (Inference.prepareIndexedGroup bounded [] invalid);
+    check "ground specialization respects non-bottom bound"
+      (isLeft (Inference.groundIndexed bounded invalid (snd boundedPrepared)));
+    check "ordinary solver rejects the same non-bottom bound"
+      (isLeft (Inference.finishOpenGroup (fst boundedPrepared) (map snd invalid) (snd boundedPrepared)));
+    check "combined route rejects the same non-bottom bound"
+      (isLeft (Inference.compileOpenGroupIndexed "control" bounded [] invalid));
+    let { bad = [row int (SApp (SApp use (SIntLit 7)) (SBoolLit True)),
+          row arrow (SLam "x" Nothing (SApp (SVar "x") (SVar "x"))),
+          row int (SGlobal (Index.fromInt 99) "poly")] };
+    mapM_ (\members -> do {
+      prepared <- recursiveRight "ground bad preparation" (Inference.prepareIndexedGroup (parameter identity) [] members);
+      check "ground invalid use rejects fast route"
+        (isLeft (Inference.groundIndexed (parameter identity) members (snd prepared)));
+      check "ground invalid use rejects ordinary route"
+        (isLeft (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared)));
+      check "ground invalid use rejects combined route"
+        (isLeft (Inference.compileOpenGroupIndexed "control" (parameter identity) [] members))
+    }) bad
+  };
+  groundAliasDepth known identity = case M.lookup compareInt identity known of {
+    Just (Inference.GroundVar next) -> 1 + groundAliasDepth known next;
+    _ -> 0
+  };
+  groundAliasChecks = do {
+    let { a = XTyVar 100; ty = XForall a XBot (XArrow (XVar a) (XVar a));
+      globals = M.singleton 3 (Inference.GroundImport (XName 0 "poly") ty);
+      call = \body -> SApp (SGlobal (Index.fromInt 3) "wrong") body;
+      body = SLam "x" Nothing (foldl (\body _ -> call body) (SVar "x") (range 0 255)) };
+    (,,) template actual inferred <- recursiveRight "nested ground uses"
+      (Inference.groundInfer globals M.empty (Inference.GroundState 0 M.empty M.empty 1) body);
+    wanted <- recursiveRight "nested ground target"
+      (Inference.groundType M.empty (XArrow (XCon "Int" []) (XCon "Int" [])));
+    solved <- recursiveRight "nested ground solve" (Inference.groundUnify inferred actual wanted);
+    case solved of { Inference.GroundState _ known _ _ ->
+      check "nested polymorphic uses do not build a linear type-alias chain"
+        (all (\identity -> groundAliasDepth known identity <= 16) (M.keys known))
+    };
+    sealed <- recursiveRight "nested ground seal" (Inference.groundSeal solved template);
+    checked <- recursiveRight "nested ground independent check" (Independent.checkClosed (XAbs (XName 0 "poly") ty sealed));
+    check "nested polymorphic uses preserve their closed type"
+      (XT.alphaEq checked (XArrow ty (XArrow (XCon "Int" []) (XCon "Int" []))))
   };
   monomorphicGroupChecks = do {
     let { int = SCon "Int" []; bool = SCon "Bool" []; arrow = SArrow int int;
@@ -1770,6 +1857,7 @@ module MLF.Tests.SharedFrontend where {
     do {
       formatterChecks;
       monomorphicGroupChecks;
+      groundGroupChecks;
       sourceCandidateChecks;
       rebuiltHashChecks;
       check "legacy malformed pragma comment"

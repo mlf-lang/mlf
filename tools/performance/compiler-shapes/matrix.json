@@ -6,6 +6,7 @@
   "families": {
     "flat_functions": {"label": "Independent annotated functions", "default": true, "work": "n annotated top-level functions summed in a balanced tree"},
     "inferred_functions": {"label": "Independent inferred functions (optional)", "default": false, "work": "the flat_functions family with no signatures on the n generated functions; opt in explicitly"},
+    "inferred_poly_functions": {"label": "Independent inferred polymorphic functions (optional)", "default": false, "work": "n unsigned independent identity/constant/application/composition functions, each used at Int and Bool with runtime-dependent branches"},
     "dependency_chain": {"label": "Annotated dependency chain", "default": true, "work": "n annotated functions in a strict chain"},
     "inferred_chain": {"label": "Inferred dependency chain", "default": true, "work": "the same chain with no signature on the generated functions"},
     "recursive_ring": {"label": "Mutually recursive ring", "default": true, "work": "n functions in a mutually recursive cycle"},

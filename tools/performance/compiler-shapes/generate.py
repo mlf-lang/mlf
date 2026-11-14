@@ -16,7 +16,7 @@ main :: IO ();
 main = ioBind (getArg 0) (\text -> printInt (entry (readInt text)))
 }
 '''
-FAMILIES = ('flat_functions', 'inferred_functions', 'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring',
+FAMILIES = ('flat_functions', 'inferred_functions', 'inferred_poly_functions', 'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring',
             'mono_calls', 'poly_calls', 'tree_chain', 'balanced_tree',
             'literal_table', 'higher_order_chain')
 
@@ -44,6 +44,19 @@ def program(family, n):
         if family == 'local_functions':
             expression = 'let {\n'+declarations+'} in '+expression
             declarations = ''
+    elif family == 'inferred_poly_functions':
+        bodies = ('y = y', 'y z = y', 'f y = f y', 'f g y = f (g y)')
+        declarations = ''.join(f'f{i} {bodies[i % 4]};\n' for i in range(n))
+        terms = []
+        for i in range(n):
+            integer, boolean = f'(addInt x {i})', f'(ltInt x {i})'
+            def call(value, ignored):
+                args = (value, f'{value} {ignored}', f'(\\v -> v) {value}',
+                        f'(\\v -> v) (\\v -> v) {value}')[i % 4]
+                return f'f{i} {args}'
+            integer_call = call(integer, boolean)
+            terms.append(f'if {call(boolean, integer)} then {integer_call} else subInt 0 ({integer_call})')
+        expression = balanced(terms, lambda a,b:f'addInt ({a}) ({b})')
     elif family == 'recursive_ring':
         declarations = ''.join(f'f{i} :: Int -> Int;\nf{i} x = if ltInt x 1 then {i} else f{(i+1)%n} (subInt x 1);\n' for i in range(n))
         expression = 'f0 x'
@@ -89,6 +102,9 @@ def expected(family, n, x):
         return n*x + n*(n-1)//2
     if family in ('dependency_chain', 'inferred_chain', 'higher_order_chain'):
         return x+n
+    if family == 'inferred_poly_functions':
+        negative = max(0, min(n, x + 1))
+        return n*x + n*(n-1)//2 - 2*(negative*x + negative*(negative-1)//2)
     if family == 'recursive_ring':
         return max(0,x) % n
     if family == 'literal_table':
@@ -101,7 +117,7 @@ def generate(out, sizes=(8,32,128), families=None):
     cases = []
     if families is None:
         # The default matrix keeps the ten shape families and one minimal baseline.
-        selected = [f for f in FAMILIES if f not in ('local_functions', 'inferred_functions')]
+        selected = [f for f in FAMILIES if f not in ('local_functions', 'inferred_functions', 'inferred_poly_functions')]
         pairs = [('baseline', 0)]
         for family in selected:
             pairs.extend((family, n) for n in sizes)

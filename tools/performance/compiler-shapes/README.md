@@ -76,12 +76,19 @@ python3 -B tools/performance/compiler-shapes/bench.py run --workdir W --cohort C
 python3 -B tools/performance/compiler-shapes/bench.py analyze --workdir W --cohort C
 ```
 
-`local_functions` and `inferred_functions` are opt-in and never part of the
-default matrix. `--family` and `--size` replace the matrix selection; they do not
-add to it. `inferred_functions` removes only the generated function signatures
+`local_functions`, `inferred_functions` and `inferred_poly_functions` are opt-in
+and never part of the default matrix. `--family` and `--size` replace the matrix
+selection; they do not add to it. `inferred_functions` removes only the generated function signatures
 from `flat_functions`; the entry/IO harness stays annotated. See the
 [inferred-function study](../../../docs/compiler-inferred-functions-2026-11-15.md)
 for the measured range and qualification.
+
+`inferred_poly_functions` rotates identity, constant, application and composition
+definitions without signatures. Every generated function is instantiated at both
+`Int` and `Bool`; runtime-dependent branches have an independent closed-form
+oracle. The entry/IO harness retains its annotations, as in the other families.
+See the [polymorphic-function study](../../../docs/compiler-polymorphic-functions-2026-11-15.md)
+for the before/after measurements and preserved type inventories.
 
 On a Mac whose shell cannot inspect processes (`/bin/ps` denied by a sandbox), the
 measurement harness cannot sample the process group and refuses to run. Use the
@@ -109,6 +116,7 @@ docker run --rm -v "$PWD:/work" -w /work mlf-compiler-shapes:9.14.1 \
 | --- | --- | --- |
 | `flat_functions` | `n` annotated top-level functions summed in a balanced tree | yes |
 | `inferred_functions` | identical independent functions with their `n` signatures removed; entry/IO harness unchanged | opt in |
+| `inferred_poly_functions` | unsigned independent identity/constant/application/composition functions; each used at `Int` and `Bool` with runtime-dependent branches | opt in |
 | `dependency_chain` | `n` annotated functions in a strict chain | yes |
 | `inferred_chain` | the same chain with no signature on the generated functions | yes |
 | `recursive_ring` | `n` functions in a mutually recursive cycle | yes |

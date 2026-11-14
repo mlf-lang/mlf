@@ -37,9 +37,16 @@ when known calls determine every lambda parameter. Unconstrained parameters,
 unknown callees and local generalization use the ordinary solver; no default
 type is invented. It checks exact argument and result types, preserves
 resolved declaration identities, and obtains its fragment from the independent
-xMLF checker. Polymorphic imports, unsupported syntax and failed attempts use the
-ordinary lowering and graph solver. The general path retains inferred-type and
-source-erasure agreement checks. Both paths produce closed normalized schemes
+xMLF checker. A signed monotype can additionally specialize polymorphic imports
+when all lambda types and instance arguments become closed monotypes. Fresh
+variables separate uses, an occurs check rejects recursive types, and non-bottom
+MLF bounds contribute constraints and explicit instance computations. Sealing
+resolves every required type before the independent checker admits a fragment.
+This route does not generalize unsigned exports, choose default types, or replace
+bounded MLF schemes with rank-1 schemes. Ambiguous arguments, local
+generalization, unsupported syntax and failed checks use the ordinary solver.
+The general path retains inferred-type and source-erasure agreement checks.
+All paths produce closed normalized schemes
 and independently checked implementations abstracted over their imports. Solver
 graphs are transient. A cached fragment is decoded and checked again, including
 its owned symbols, parameter schemes and datatype context.

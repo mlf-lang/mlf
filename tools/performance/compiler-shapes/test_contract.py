@@ -92,6 +92,30 @@ def edit(folder, mutate):
 
 
 class ScheduleTests(unittest.TestCase):
+    def test_inferred_poly_functions_are_unsigned_independent_and_used_at_two_types(self):
+        for size in [4, 32, 512]:
+            source = generate.program('inferred_poly_functions', size)
+            declarations = re.findall(r'^(f\d+) (.*);$', source, re.MULTILINE)
+            self.assertEqual(len(declarations), size)
+            self.assertNotRegex(source, r'f\d+ ::')
+            entry = next(line for line in source.splitlines() if line.startswith('entry x ='))
+            for i, (name, body) in enumerate(declarations):
+                self.assertEqual(name, 'f' + str(i))
+                self.assertEqual(body, ['y = y', 'y z = y', 'f y = f y', 'f g y = f (g y)'][i % 4])
+                self.assertNotRegex(body, r'\bf\d+\b')
+                self.assertEqual(len(re.findall(r'\b' + name + r'\b', entry)), 3)
+            self.assertEqual(entry.count('ltInt x '), size + 2 * (size // 4))
+            for value in [-1, 0, 7, size, size + 1]:
+                self.assertEqual(generate.expected('inferred_poly_functions', size, value),
+                                 sum(value + i if value < i else -(value + i) for i in range(size)))
+        self.assertEqual([generate.expected('inferred_poly_functions', 4, x) for x in [-1, 0, 7]], [2, 6, -34])
+
+    def test_inferred_poly_functions_is_opt_in(self):
+        _, families, _, _ = bench.resolve('default', None, None)
+        self.assertNotIn('inferred_poly_functions', families)
+        _, chosen, _, _ = bench.resolve('default', ['inferred_poly_functions'], [512])
+        self.assertEqual(chosen, ['inferred_poly_functions'])
+
     def test_inferred_functions_only_remove_generated_signatures(self):
         for size in [1, 32, 512]:
             annotated = generate.program('flat_functions', size)
