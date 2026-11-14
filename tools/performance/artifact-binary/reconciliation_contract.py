@@ -13,13 +13,26 @@ PREDECESSOR = '4fd6730d35b6ecaf8e169ad228ac3c7a3ed56160'
 PREDECESSOR_TREE = '1c60d3daca5162bd24658d295169f601593345ef'
 PREDECESSOR_MANIFEST = '69bc6cc39ec70a0209a6011f4ce7fef0aaf5039d903fa1b8477ee4a2bc46dcd8'
 MANIFEST = 'pr43-reconciliation-migration.json'
-MANIFEST_SHA256 = 'ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b'
+MANIFEST_SHA256 = 'fd94a0a3c984044f07f4dc129eb27090a71fde0ac530cfe76a067a5db2613369'
 PREDECESSOR_IMPLEMENTATION = '7cacadad979f3db29da9067b5fe0ca8e1634d960dbf978ad6d5cae39ba338794'
 LIVE_PREDECESSOR = 'f9bdb40a659bfdff4cbb782d438afbb0417dd2e1'
 LIVE_PREDECESSOR_TREE = '3148203097e7622ced1b272e606bfa892fad746b'
 LIVE_PREDECESSOR_MANIFEST = '63598306f049a050def3fd21ddf21878a7f4f882b59a48a86c53a3398624e9c5'
 LIVE_TRANSITION_PATH = 'tools/shared/build.py'
 LIVE_PREDECESSOR_SOURCE = 'eff291112f318206ce0f7ab85cb8a2e474be41489441204696630a395f4ca3df'
+PERFORMANCE_BASE = 'fc300bc9fdc389b585cbef0630fc8915d53e89c5'
+PERFORMANCE_TREE = '386f0b41ab5f9b39fca273f3040f51d73df924a1'
+PERFORMANCE_BASE_MANIFEST = 'ebe5671476447cd4b256784e7d898ed6095c7c54cc9286c6869ca4909b2b708b'
+PERFORMANCE_PATHS = {
+    'bootstrap/MLF/BuiltinPreludeData.hs', 'bootstrap/MLF/Entry/Emlf.hs',
+    'bootstrap/MLF/PreparedCompiler.hs',
+    'libraries/mlf-crates/Bootstrap/BuiltinPreludeContext.hs',
+    'libraries/mlf-crates/Bootstrap/Crate.hs', 'libraries/mlf-crates/Bootstrap/CrateArtifact.hs',
+    'libraries/mlf-crates/Bootstrap/CrateGraph.hs', 'libraries/mlf-crates/Bootstrap/CrateSession.hs',
+    'libraries/mlf-crates/Bootstrap/InferenceUnit.hs', 'libraries/mlf-crates/Bootstrap/QueryGraph.hs',
+    'libraries/mlf-crates/Bootstrap/Separate.hs', 'libraries/mlf-crates/Bootstrap/SourceInference.hs',
+    'mlf.lock', 'tests/shared/MLF/Tests/SharedFrontend.hs',
+}
 
 
 def require(condition, message):
@@ -80,7 +93,7 @@ def manifest_bytes(directory):
         os.close(descriptor)
 
 
-def validate_live_transition(spec, repository, core):
+def validate_macos_transition(spec, repository, core):
     """Admit only the declared build-driver repair after the fixed main endpoint."""
     git = ['git', '--no-replace-objects', '-C', str(repository)]
     tree = subprocess.check_output([*git, 'rev-parse', LIVE_PREDECESSOR + '^{tree}'], text=True).strip()
@@ -109,6 +122,36 @@ def validate_live_transition(spec, repository, core):
                                   [prior['changes'][LIVE_TRANSITION_PATH][0], row[1]]},
                 'live_transition': transition}
     require(spec == expected, 'only the declared live build endpoint may change')
+
+
+def validate_live_transition(spec, repository, core):
+    """Pin the performance follow-on while retaining the earlier exact transition."""
+    git = ['git', '--no-replace-objects', '-C', str(repository)]
+    tree = subprocess.check_output([*git, 'rev-parse', PERFORMANCE_BASE + '^{tree}'], text=True).strip()
+    require(tree == PERFORMANCE_TREE, 'pinned performance predecessor tree')
+    raw = subprocess.check_output([*git, 'show', PERFORMANCE_BASE +
+                                   ':tools/performance/artifact-binary/' + MANIFEST])
+    require(len(raw) <= core.MAX_METADATA_BYTES and sha(raw) == PERFORMANCE_BASE_MANIFEST,
+            'pinned performance predecessor manifest')
+    prior = core.strict_json(raw)
+    validate_macos_transition(prior, repository, core)
+    changes = spec.get('performance_transition', {}).get('changes', {})
+    require(set(changes) == PERFORMANCE_PATHS, 'exact performance source paths')
+    expected = {**prior, 'changes': dict(prior['changes'])}
+    for path in sorted(PERFORMANCE_PATHS):
+        old = subprocess.check_output([*git, 'show', PERFORMANCE_BASE + ':' + path])
+        require(len(old) <= core.MAX_SOURCE_BYTES, 'performance predecessor source bound')
+        row = changes[path]
+        require(type(row) is list and len(row) == 2 and row[0] == sha(old) and row[0] != row[1],
+                'performance transition ' + path)
+        previous = prior['changes'].get(path, [row[0], row[0]])
+        require(previous[1] == row[0], 'performance predecessor endpoint ' + path)
+        expected['changes'][path] = [previous[0], row[1]]
+    expected['performance_transition'] = {
+        'predecessor': PERFORMANCE_BASE, 'predecessor_tree': PERFORMANCE_TREE,
+        'predecessor_manifest_sha256': PERFORMANCE_BASE_MANIFEST, 'changes': changes,
+    }
+    require(spec == expected, 'only the declared performance endpoints may change')
 
 
 class Contract:
@@ -142,7 +185,7 @@ class Contract:
         raw = self.core.read_file(self.directory, MANIFEST, self.core.MAX_METADATA_BYTES)
         require(sha(raw) == manifest_sha256, 'successor manifest SHA')
         spec = self.core.strict_json(raw)
-        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance', 'live_transition'} and
+        require(set(spec) == {'format', 'predecessor', 'changes', 'additions', 'maintenance', 'live_transition', 'performance_transition'} and
                 spec['format'] == 'pr43-reconciliation-source-migration-v1' and spec['predecessor'] == PREDECESSOR,
                 'successor manifest schema')
         validate_live_transition(spec, location, self.core)
