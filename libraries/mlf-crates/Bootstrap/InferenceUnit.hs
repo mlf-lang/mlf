@@ -14,6 +14,7 @@ module Bootstrap.InferenceUnit where {
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.Classes as Classes;
   import qualified Bootstrap.CompilerCore as Compiler;
+  import qualified Bootstrap.Primitive as Primitive;
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.X.Type as T;
   import qualified Bootstrap.X.Syntax as X;
@@ -319,7 +320,150 @@ module Bootstrap.InferenceUnit where {
   };
   compileOpenGroupIndexed name parameters datatypes members = do {
     (,) externalTypes lowered <- prepareIndexedGroup parameters datatypes members;
-    finishOpenGroup externalTypes (map snd members) lowered
+    case monomorphicIndexed parameters members lowered of {
+      Right fragment -> Right fragment;
+      Left _ -> finishOpenGroup externalTypes (map snd members) lowered
+    }
+  };
+  -- Signed nonrecursive monotypes need checking, not generalization. This
+  -- deliberately partial elaborator accepts only exact monomorphic uses and
+  -- still obtains the opaque fragment proof from the independent xMLF checker.
+  -- Unsupported syntax/types and all failed checks take the ordinary path.
+  monomorphicType :: SType -> Either String XType;
+  monomorphicType ty = case ty of {
+    SArrow a b -> do { x <- monomorphicType a; y <- monomorphicType b; Right (XArrow x y) };
+    SCon n args -> mapEither (XCon n) (traverseEither monomorphicType args);
+    STypeApp f a -> do { x <- monomorphicType f; y <- monomorphicType a; Right (T.apply x y) };
+    _ -> Left "not a closed monotype"
+  };
+  monomorphicAnnotation (SAnnotation variables ty) = do {
+    ensure (null variables) "existential monomorphic annotation";
+    monomorphicType ty
+  };
+  monomorphicTarget ty = case ty of {
+    XArrow a b -> monomorphicTarget a && monomorphicTarget b;
+    XCon _ args -> all monomorphicTarget args;
+    XApply f a -> monomorphicTarget f && monomorphicTarget a;
+    _ -> False
+  };
+  monomorphicIndexed parameters members lowered = case (,) members lowered of {
+    (,) [(,) identity ((,,) name (Just annotation) _)] ((,) (SProgram declarations expression) _) -> do {
+      expected <- monomorphicAnnotation annotation;
+      ensure (all (\((,,) _ _ ty) -> monomorphicTarget ty) parameters)
+        "polymorphic import requires ordinary adaptation";
+      let { entries = zip parameters (range 0 (length parameters - 1));
+        pair = \((,,) _ hint ty) serial -> (,) (XName serial hint) ty;
+        globals = M.fromList compareInt (map (\((,) row@((,,) i _ _) serial) ->
+          (,) (V.toInt i) (pair row serial)) entries);
+        names = M.fromList compareString (map (\((,) row@((,,) _ n _) serial) ->
+          (,) n (pair row serial)) entries);
+        ps = map (\((,) row serial) -> pair row serial) entries;
+        core = if null parameters then expression else case expression of {
+          SDeclScope _ (SLetRec _ body) -> body;
+          _ -> expression
+        } };
+      rhs <- case core of {
+        SDeclScope [i] (SLet n value (SConstructor "()")) -> do {
+          ensure (V.toInt i == V.toInt identity && eqString n name) "monomorphic group identity";
+          Right value
+        };
+        _ -> Left "not a single nonrecursive binding"
+      };
+      result <- monomorphicCheck globals names (length parameters + 1) expected rhs;
+      env <- Open.environment declarations;
+      fragment <- Open.check env ps
+        (XLet (XName (length parameters) name) (fst result) (XConstructor "()" []));
+      ensure (case Open.bindings fragment of {
+        [(,) actual ty] -> eqString (X.nameHint actual) name && T.alphaEq expected ty;
+        _ -> False
+      }) "monomorphic fragment export mismatch";
+      Right fragment
+    };
+    _ -> Left "not a signed nonrecursive monotype"
+  };
+  monomorphicCheck globals names serial expected expression = case expression of {
+    SDeclScope [identity] (SLam name annotation body) ->
+      monomorphicLambda globals names serial expected (Just identity) name annotation body;
+    SLam name annotation body ->
+      monomorphicLambda globals names serial expected Nothing name annotation body;
+    SSignature body annotation -> monomorphicAnnotated globals names serial expected body annotation;
+    SAnn body annotation -> monomorphicAnnotated globals names serial expected body annotation;
+    SChecked ty body -> monomorphicAnnotated globals names serial expected body (SAnnotation [] ty);
+    SLet name rhs body -> do {
+      (,,) value ty next <- monomorphicInfer globals names serial rhs;
+      let { binder = XName next name };
+      result <- monomorphicCheck globals (M.insert compareString name ((,) binder ty) names)
+        (advanceIdentity next 1) expected body;
+      Right ((,) (XLet binder value (fst result)) (snd result))
+    };
+    _ -> do {
+      (,,) term actual next <- monomorphicInfer globals names serial expression;
+      ensure (T.alphaEq actual expected) "monomorphic type mismatch";
+      Right ((,) term next)
+    }
+  };
+  monomorphicAnnotated globals names serial expected body annotation = do {
+    actual <- monomorphicAnnotation annotation;
+    ensure (T.alphaEq actual expected) "monomorphic annotation mismatch";
+    monomorphicCheck globals names serial expected body
+  };
+  monomorphicLambda globals names serial expected identity name annotation body = case expected of {
+    XArrow argument result -> do {
+      _ <- case identity of { Nothing -> Right (); Just i ->
+        ensure (not (M.member compareInt (V.toInt i) globals)) "monomorphic declaration identity already bound" };
+      _ <- case annotation of { Nothing -> Right (); Just written -> do {
+        actual <- monomorphicAnnotation written;
+        ensure (T.alphaEq actual argument) "monomorphic lambda annotation mismatch"
+      } };
+      let { binder = XName serial name; binding = (,) binder argument;
+        scope = case identity of { Nothing -> globals; Just i -> M.insert compareInt (V.toInt i) binding globals } };
+      compiled <- monomorphicCheck scope (M.insert compareString name binding names)
+        (advanceIdentity serial 1) result body;
+      Right ((,) (XAbs binder argument (fst compiled)) (snd compiled))
+    };
+    _ -> Left "monomorphic lambda requires an arrow"
+  };
+  monomorphicUse serial binding = case binding of {
+    Nothing -> Left "unknown monomorphic variable";
+    Just ((,) name ty) -> do {
+      ensure (monomorphicTarget ty) "polymorphic variable requires instantiation";
+      Right ((,,) (XVarTerm name) ty serial)
+    }
+  };
+  monomorphicInfer globals names serial expression = case expression of {
+    SVar name -> monomorphicUse serial (M.lookup compareString name names);
+    SGlobal identity _ -> monomorphicUse serial (M.lookup compareInt (V.toInt identity) globals);
+    SIntLit value -> Right ((,,) (XIntTerm value) (XCon "Int" []) serial);
+    SDoubleLit value -> Right ((,,) (XDoubleTerm value) (XCon "Double" []) serial);
+    SBoolLit value -> Right ((,,) (XBoolTerm value) (XCon "Bool" []) serial);
+    SStringLit value -> Right ((,,) (XStringTerm value) (XCon "String" []) serial);
+    SPrimitive primitive -> case Primitive.primitiveSignature primitive of {
+      (,) [] signature -> do {
+        ty <- T.instantiateField M.empty signature;
+        ensure (monomorphicTarget ty) "polymorphic primitive";
+        Right ((,,) (XPrimitive primitive []) ty serial)
+      };
+      _ -> Left "polymorphic primitive requires instantiation"
+    };
+    SApp function argument -> do {
+      (,,) compiled ty next <- monomorphicInfer globals names serial function;
+      case ty of {
+        XArrow domain result -> do {
+          value <- monomorphicCheck globals names next domain argument;
+          Right ((,,) (XApp compiled (fst value)) result (snd value))
+        };
+        _ -> Left "monomorphic application requires an arrow"
+      }
+    };
+    SSignature body annotation -> monomorphicInferAnnotated globals names serial body annotation;
+    SAnn body annotation -> monomorphicInferAnnotated globals names serial body annotation;
+    SChecked ty body -> monomorphicInferAnnotated globals names serial body (SAnnotation [] ty);
+    _ -> Left "expression requires ordinary inference"
+  };
+  monomorphicInferAnnotated globals names serial body annotation = do {
+    ty <- monomorphicAnnotation annotation;
+    result <- monomorphicCheck globals names serial ty body;
+    Right ((,,) (fst result) ty (snd result))
   };
   prepareIndexedGroup parameters datatypes members = do {
     ensure (not (null members)) "cannot infer an empty declaration group";

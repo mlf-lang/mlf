@@ -620,7 +620,7 @@ module MLF.Entry.Emlf where {
     };
   crateCommand command args file =
     do {
-      result <- CrateArtifact.linkCheckedFile file;
+      result <- Prepared.linkCrateFile file;
       case result of {
         Left message -> fatal message;
         Right checked ->

@@ -31,12 +31,29 @@ nominal context needed by expressions, annotations, constructors and imported
 types. Candidate dictionary schemes are conservative dependencies because
 instance selection can depend on types still being inferred.
 
-Every fresh query uses the existing graph generation, solver, evidence,
-elaboration, inferred-type agreement, source-erasure agreement and independent
-xMLF checking pipeline. Its output has closed normalized schemes and an
-independently checked implementation abstracted over its imports. Solver graphs
-are transient. A cached fragment is decoded and checked again, including its
-owned symbols, parameter schemes and datatype context.
+Signed nonrecursive declarations with closed monomorphic types can use a partial
+type-directed checker. It checks exact argument and result types, preserves
+resolved declaration identities, and obtains its fragment from the independent
+xMLF checker. Polymorphic imports, unsupported syntax and failed attempts use the
+ordinary lowering and graph solver. The general path retains inferred-type and
+source-erasure agreement checks. Both paths produce closed normalized schemes
+and independently checked implementations abstracted over their imports. Solver
+graphs are transient. A cached fragment is decoded and checked again, including
+its owned symbols, parameter schemes and datatype context.
+
+Imported binding and datatype input nodes are recorded when a query actually
+observes them. The initial imported contracts remain separate from local results:
+a missing local producer cannot be manufactured as an input. Observed versions,
+candidate dictionary dependencies and publication validation remain mandatory.
+Only inference and evidence results need persistent payload files. Scope,
+finish and binding values are reconstructed from current checked inputs; their
+content hashes and dependency edges still enter the authenticated generation.
+Prepared source inputs and finish receipts hash their complete, domain-separated
+length-framed text after the ordinary wire planner validates all resource bounds.
+They do not encode an unused binary payload. A conservative framing-size bound
+keeps the temporary UTF-8 allocation within the existing byte limit; other shapes
+or larger frames use the ordinary binary hash. Persisted payloads keep their
+canonical binary encoding and checksum checks.
 
 A module import SCC does not require signatures. An actual recursive value
 SCC retains the compiler's existing requirement for closed signatures; this
@@ -59,6 +76,12 @@ source or implementation objects. The linker subsequently loads implementation
 objects, rejects crate cycles and ownership conflicts, freshens binders, compares
 actual consumed schemes and nominal layouts, resolves the entry dictionaries,
 and checks the closed program. Reexports retain the original defining identity.
+The command-line linker can reuse the compiler-owned Prelude after both installed
+binary images match its build-verified images byte for byte. Its entire literal
+is independently checked at runtime; only its declarations transitively needed
+by the continuation enter the final closed check and code generation. Changed or
+unrecognized images use ordinary artifact admission. Other crates retain their
+normal metadata, object and import-boundary checks.
 Recorded dependency semantic fingerprints must still match: removing an export
 or changing a type, class, instance or namespace contract requires fresh consumer
 metadata. Implementation and private value changes leave that contract stable.

@@ -10,7 +10,13 @@ module MLF.Tests.SharedFrontend where {
   import qualified Bootstrap.Separate as Separate;
   import qualified Bootstrap.CrateArtifact as Artifact;
   import qualified Bootstrap.CrateQuery as Query;
+  import qualified Bootstrap.CrateGraph as CrateGraph;
+  import qualified Bootstrap.QueryGraph as QueryGraph;
+  import qualified Bootstrap.Bitstream as Wire;
+  import qualified Bootstrap.ArtifactStructure as Structure;
   import qualified Bootstrap.InferenceUnit as Inference;
+  import qualified Bootstrap.OpenFragment as Open;
+  import qualified Bootstrap.IndexVec as Index;
   import qualified Bootstrap.Lexer as L;
   import qualified Bootstrap.Module as Modules;
   import qualified Bootstrap.Surface as Surface;
@@ -1496,10 +1502,169 @@ module MLF.Tests.SharedFrontend where {
       check "formatter same-indent operator rejected" (reject "main = 1 +\n2");
       check "formatter retains explicit boundary rejection" (reject "main = do { ioReturn 1; do\n  ioReturn 2 }")
   };
+  -- Compare the new partial checker with the retained general solver, then
+  -- ask the frozen target checker independently. Binder IDs may differ, so
+  -- erasure equality follows lexical binding rather than printed hints.
+  -- The general elaborator emits identity coercions and aliases. Compare
+  -- erasures modulo only those two administrative laws, not arbitrary beta
+  -- reduction or an optimizer supplied by the candidate.
+  monomorphicAdministrative names term = case term of {
+    XEVar name -> XEVar (M.findWithDefault X.compareName name name names);
+    XEAbs name body -> XEAbs name (monomorphicAdministrative (M.delete X.compareName name names) body);
+    XEApp function argument -> let { f = monomorphicAdministrative names function;
+      a = monomorphicAdministrative names argument } in case f of {
+        XEAbs x (XEVar y) -> if X.equalName x y then a else XEApp f a;
+        _ -> XEApp f a
+      };
+    XELet name rhs body -> case monomorphicAdministrative names rhs of {
+      XEVar original -> monomorphicAdministrative (M.insert X.compareName name original names) body;
+      value -> XELet name value (monomorphicAdministrative (M.delete X.compareName name names) body)
+    };
+    XELetRec bindings body -> let {
+      scope = foldl (\env binding -> M.delete X.compareName (fst binding) env) names bindings
+    } in XELetRec (map (\((,) name rhs) -> (,) name (monomorphicAdministrative scope rhs)) bindings)
+      (monomorphicAdministrative scope body);
+    _ -> term
+  };
+  monomorphicErasure names left right = case (,) left right of {
+    (,) (XEVar a) (XEVar b) -> case M.lookup X.compareName a names of {
+      Just actual -> X.equalName actual b; Nothing -> False
+    };
+    (,) (XEAbs a body) (XEAbs b other) ->
+      monomorphicErasure (M.insert X.compareName a b names) body other;
+    (,) (XEApp f a) (XEApp g b) -> monomorphicErasure names f g && monomorphicErasure names a b;
+    (,) (XELet a value body) (XELet b other rest) -> monomorphicErasure names value other &&
+      monomorphicErasure (M.insert X.compareName a b names) body rest;
+    (,) (XELetRec xs body) (XELetRec ys rest) ->
+      length xs == length ys && let {
+        scope = foldl (\env ((,) a b) -> M.insert X.compareName (fst a) (fst b) env) names (zip xs ys)
+      } in all (\((,) a b) -> monomorphicErasure scope (snd a) (snd b)) (zip xs ys) &&
+        monomorphicErasure scope body rest;
+    _ -> X.equalErased left right
+  };
+  monomorphicGroupCase label expectedFast parameters members = do {
+    prepared <- recursiveRight label (Inference.prepareIndexedGroup parameters [] members);
+    let { candidate = Inference.monomorphicIndexed parameters members (snd prepared) };
+    check (label ++ " route") (isRight candidate == expectedFast);
+    ordinary <- recursiveRight (label ++ " ordinary")
+      (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared));
+    actual <- recursiveRight (label ++ " indexed")
+      (Inference.compileOpenGroupIndexed "control" parameters [] members);
+    let { a = Open.closedTerm actual; b = Open.closedTerm ordinary };
+    check (label ++ " erasure") (monomorphicErasure M.empty (monomorphicAdministrative M.empty (X.erase a))
+      (monomorphicAdministrative M.empty (X.erase b)));
+    check (label ++ " exported type")
+      (eqList (\((,) n ty) ((,) m other) -> eqString (X.nameHint n) (X.nameHint m) && XT.alphaEq ty other)
+        (Open.bindings actual) (Open.bindings ordinary));
+    actualType <- recursiveRight (label ++ " frozen target") (Independent.checkClosed a);
+    ordinaryType <- recursiveRight (label ++ " ordinary frozen target") (Independent.checkClosed b);
+    check (label ++ " independent type") (XT.alphaEq actualType ordinaryType)
+  };
+  monomorphicGroupChecks = do {
+    let { int = SCon "Int" []; bool = SCon "Bool" []; arrow = SArrow int int;
+      row = \ty body -> [(,) (Index.fromInt 10) ((,,) "function" (Just (SAnnotation [] ty)) body)];
+      add = \a b -> SApp (SApp (SPrimitive PAddInt) a) b;
+      identity = SLam "x" Nothing (SVar "x") };
+    monomorphicGroupCase "signed primitive lambda" True []
+      (row arrow (SChecked arrow (SLam "x" Nothing (add (SVar "x") (SIntLit 7)))));
+    monomorphicGroupCase "signed boolean" True [] (row bool (SBoolLit True));
+    monomorphicGroupCase "signed Unicode text" True [] (row (SCon "String" []) (SStringLit "lambda λ"));
+    monomorphicGroupCase "signed floating value" True [] (row (SCon "Double" []) (SDoubleLit (doubleFromBits (-9223372036854775808))));
+    monomorphicGroupCase "signed higher order lambda" True []
+      (row (SArrow arrow arrow) (SLam "f" Nothing (SLam "x" Nothing (SApp (SVar "f") (SVar "x")))));
+    monomorphicGroupCase "signed application checks lambda argument" True []
+      (row int (SApp (SAnn (SLam "f" Nothing (SApp (SVar "f") (SIntLit 8)))
+        (SAnnotation [] (SArrow arrow int))) identity));
+    monomorphicGroupCase "signed local shadowing" True []
+      (row arrow (SLam "x" Nothing (SLet "x" (SIntLit 4) (SVar "x"))));
+    monomorphicGroupCase "signed resolved import ignores hint" True
+      [(,,) (Index.fromInt 3) "outside" (XCon "Int" [])]
+      (row arrow (SLam "x" Nothing (add (SVar "x") (SGlobal (Index.fromInt 3) "wrong-hint"))));
+    monomorphicGroupCase "signed named import is shadowed locally" True
+      [(,,) (Index.fromInt 3) "x" (XCon "Int" [])]
+      (row arrow identity);
+    monomorphicGroupCase "polymorphic annotation uses solver" False []
+      (row (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) identity);
+    monomorphicGroupCase "unsigned declaration uses solver" False []
+      [(,) (Index.fromInt 10) ((,,) "function" Nothing identity)];
+    monomorphicGroupCase "recursive declaration uses solver" False []
+      (row arrow (SLam "x" Nothing (SApp (SGlobal (Index.fromInt 10) "function") (SVar "x"))));
+    let { bad = [row int (SBoolLit True), row arrow (SLam "x" (Just (SAnnotation [] bool)) (SIntLit 1)),
+          row int (SGlobal (Index.fromInt 99) "outside"), row int (SVar "missing"),
+          row arrow (SChecked (SArrow bool bool) identity)] };
+    mapM_ (\members -> do {
+      check "bad monomorphic declaration rejects"
+        (isLeft (Inference.compileOpenGroupIndexed "control" [] [] members));
+      case Inference.prepareIndexedGroup [] [] members of {
+        Left _ -> ioReturn ();
+        Right prepared -> check "bad monomorphic declaration ordinary rejects"
+          (isLeft (Inference.finishOpenGroup (fst prepared) (map snd members) (snd prepared)))
+      }
+    }) bad;
+    let { entry = Artifact.definitionName "entry-control" (Modules.Entity "Main" "<crate-entry>" Modules.Value);
+      plain = XCon "Int" []; legacy = XForall (XTyVar 1) XBot plain;
+      iface = \bindings -> Artifact.CrateInterface "entry-control" [] ["Main"] [(,) "Main" []]
+        [(,) "Main" []] [] [] [] [] bindings entry "checked" (map (\binding -> (,) (fst binding) False) bindings);
+      bindings = [(,) entry plain, (,) "select_legacy" legacy];
+      available = M.fromList compareString [(,) entry ((,) (XName 0 "main") plain),
+        (,) "select_legacy" ((,) (XName 2 "legacy") legacy)];
+      root = iface bindings };
+    check "direct entry preserves legacy import adaptation rejection"
+      (isLeft (Artifact.linkEntry 3 [root] root available entry));
+    let { ordinary = iface [(,) entry plain]; value = M.fromList compareString [(,) entry ((,) (XName 0 "main") plain)] };
+    check "direct entry accepts checked closed monotype"
+      (case Artifact.linkEntry 3 [ordinary] ordinary value entry of { Right (XVarTerm n) -> X.nameId n == 0; _ -> False });
+    check "direct entry rejects import type mismatch"
+      (isLeft (Artifact.linkEntry 3 [ordinary] ordinary (M.fromList compareString [(,) entry ((,) (XName 0 "main") (XCon "Bool" []))]) entry))
+  };
+  rebuiltHashChecks = do {
+    let { prepared names original lowered metadata = Wire.VNode 421
+            [Wire.VText "v",Structure.toList Structure.toText names,Wire.VText original,
+             Wire.VText lowered,Structure.toList Structure.toText metadata];
+      finished group fragment bindings = Wire.VNode 427 [Wire.VText group,Wire.VText fragment,
+        Structure.toList (Structure.toPair Structure.toText Structure.toText) bindings];
+      preparedBase = prepared ["a"] "body" "lowered" ["metadata"];
+      finishBase = finished "g" "h" [(,) "a" "d"];
+      literal label value text = do {
+        bytes <- byteArrayFromString text;
+        expected <- byteArrayDigest bytes;
+        result <- CrateGraph.hashRebuiltValue value;
+        actual <- recursiveRight label result;
+        check label (eqString expected actual)
+      } };
+    literal "prepared input fixed framing" preparedBase
+      "25:MLF-PREPARED-INPUT-TEXT-11:v1:11:a4:body7:lowered1:18:metadata";
+    literal "finish receipt fixed framing" finishBase
+      "25:MLF-FINISH-RECEIPT-TEXT-11:g1:h1:11:a1:d";
+    let { variants = [preparedBase,prepared [] "body" "lowered" ["metadata"],
+          prepared [""] "body" "lowered" ["metadata"],
+          prepared ["a","b"] "body" "lowered" ["metadata"],
+          prepared ["a1:b"] "body" "lowered" ["metadata"],
+          prepared ["a"] "lowered" "body" ["metadata"],
+          prepared ["a"] "body" "lowered" ["meta","data"],
+          prepared ["a"] "body" "lowered" ["meta4:data"],
+          prepared ["a"] ("λ" ++ stringFromCode 0 ++ stringFromCode 128512) "lowered" ["metadata"],
+          finishBase,finished "h" "g" [(,) "a" "d"],finished "g" "h" [(,) "d" "a"]] };
+    hashes <- mapM (\value -> CrateGraph.hashRebuiltValue value >>= recursiveRight "rebuilt hash") variants;
+    check "rebuilt hashes retain domains, list boundaries, order and Unicode"
+      (length (nubBy eqString hashes) == length variants);
+    check "framed allocation bound accepts exact size"
+      (eqMaybe (\a b -> a == b) (CrateGraph.framedSize 6 0 ["a","b"]) (Just 6));
+    check "framed allocation bound rejects one byte short"
+      (isNothing (CrateGraph.framedSize 5 0 ["a","b"]));
+    let { ordinary = Wire.VNode 999 [Wire.VBits (-1)] };
+    expected <- QueryGraph.hashValue ordinary >>= recursiveRight "ordinary hash";
+    actual <- CrateGraph.hashRebuiltValue ordinary >>= recursiveRight "fallback hash";
+    check "unknown rebuilt shape retains ordinary encoding" (eqString expected actual);
+    invalid <- CrateGraph.hashRebuiltValue (Wire.VNode (-1) []);
+    check "rebuilt hash preserves wire admission rejection" (isLeft invalid)
+  };
   frontendChecks :: IO ();
   frontendChecks =
     do {
       formatterChecks;
+      monomorphicGroupChecks;
+      rebuiltHashChecks;
       check "legacy malformed pragma comment"
         (isRight
            (P.parseModule "Legacy.emlf" "{-# LANGUAGE X, #-}\nmodule Legacy where\nmain = 1\n"));

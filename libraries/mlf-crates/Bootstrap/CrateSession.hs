@@ -18,7 +18,7 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   import qualified Bootstrap.IntSet as IS;
   import qualified Bootstrap.IntRank as Rank;
   import qualified Bootstrap.BuiltinPreludeContext as Builtin;
-  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeUsing, ensureBuiltinWith, prepareCrate,
+  import Bootstrap.Crate (CrateSpec, PreparedCrate, withPreludeLoading, ensureBuiltinWith, prepareCrate,
     withDependencies, loadSourcesInPackage, decodeSpec, specIdentity, specSources,
     specDependencies, specCache, specMode, preparedLowered, preparedSourcePlan,
     preparedResolution, preparedNames, preparedLayouts, preparedReach, CrateEntry(..), preparedEntryId,
@@ -173,9 +173,10 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
   compileSourcesWithEncoding :: Bool -> Maybe ((,) Builtin.PreparedPrelude String) -> Bool -> CrateSpec -> [] SourceModule ->
     [] ((,) String Artifact.CrateInterface) -> String -> IO (Either String ());
   compileSourcesWithEncoding verifyAll witness = compileSourcesUsingInstaller verifyAll (ensureBuiltinWith witness);
-  compileSourcesUsingInstaller verifyAll install shareEncoding spec sources interfaces prefix =
+  compileSourcesUsingInstaller = compileSourcesLoading Artifact.loadInterfaces;
+  compileSourcesLoading load verifyAll install shareEncoding spec sources interfaces prefix =
     do {
-      dependencies <- withPreludeUsing install spec sources interfaces;
+      dependencies <- withPreludeLoading load install spec sources interfaces;
       case do {
              boundValueShared20 <- dependencies;
              case boundValueShared20 of {
@@ -344,7 +345,10 @@ module Bootstrap.CrateSession (compileSpecFile, compileSpecFileWithPrelude, comp
                      Right ((,) sources interfaces) ->
                        -- Both source and dependency values originate in the
                        -- parsers/decoders above, not caller-supplied lazy ASTs.
-                       compileSourcesUsingInstaller verifyAll install True normalized sources interfaces prefix
+                       -- Reuse this invocation's admitted dependency snapshot;
+                       -- the loader still admits any newly installed Prelude.
+                       compileSourcesLoading (Artifact.loadGraph [] interfaces)
+                         verifyAll install True normalized sources interfaces prefix
                    }
                  }
              }

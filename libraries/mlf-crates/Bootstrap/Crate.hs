@@ -624,7 +624,8 @@ module Bootstrap.Crate where {
     Nothing -> Artifact.builtinPrelude
   };
   withPrelude = withPreludeUsing ensureBuiltin;
-  withPreludeUsing install spec sources interfaces =
+  withPreludeUsing = withPreludeLoading Artifact.loadInterfaces;
+  withPreludeLoading load install spec sources interfaces =
     if any
          (\source ->
             (Lexer.isSharedSyntax (Modules.sourceSyntax source) || any (\entry -> Modules.isBuiltinModule (Modules.importedModule entry))
@@ -649,7 +650,7 @@ module Bootstrap.Crate where {
                    updated =
                      withDependencies spec (nubBy eqString ((:) metadata (specDependencies spec)))
                  };
-                 loaded <- Artifact.loadInterfaces (specDependencies updated);
+                 loaded <- load (specDependencies updated);
                  ioReturn (mapEither ((,) updated) loaded)
                }
            }

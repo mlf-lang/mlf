@@ -1626,7 +1626,11 @@ module Bootstrap.SourceInference where {
       }
     }
   };
-  canonicalOpen object = do {
+  canonicalOpen object = case smallFinalValue (Structure.toXTerm (Open.body object)) of {
+    Just False -> Right object;
+    _ -> canonicalOpenPlanned object
+  };
+  canonicalOpenPlanned object = do {
     plan <- Wire.prepareGraphPlan Wire.defaultLimits [Structure.toXTerm (Open.body object)];
     graph <- Wire.realizeGraphPlan plan;
     identity <- case Wire.graphRoots graph of { [root] -> Right root; _ -> Left "open raw root count" };
