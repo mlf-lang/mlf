@@ -1,0 +1,74 @@
+{
+  "reviews": [
+    {
+      "original_manifest": {
+        "bytes": 2558,
+        "sha256": "7e0bb6a307d7d75ebe1acf94586504df2d763190dd8124d6b6bbf69fba5c2a95",
+        "source_artifact": "main-gap-semantic-qualification-v1-source-review/MANIFEST.json"
+      },
+      "original_report": {
+        "bytes": 18425,
+        "sha256": "70427781b1f19c3fcef496408fc733e8dcbce9bee106d9888066930fe98831b9",
+        "source_artifact": "main-gap-semantic-qualification-v1-source-review/report.json"
+      },
+      "summary": {
+        "actual_semantic_qualification_passed": false,
+        "blockers": [],
+        "complete": true,
+        "limitations": [
+          "No actual twelve-cell route, query count, owner observation, successful Foundation or GHC interface result is predicted or fabricated.",
+          "Current format legality does not prove which dynamic compiler branch ran; future actual original execution provenance plus immutable pre-B commitment supply that link.",
+          "The101/28/etc author counts were reviewed as author evidence, not used as this independent check count. Previous v5 source/actual evidence is inherited only with exact pins and verified unchanged decoder AST.",
+          "Statistics qualification is not performance sampling. Fresh query state is not cold OS cache. Later two observations per endpoint cannot establish stable speedup, asymptotic complexity, or GHC semantic parity.",
+          "Native generation/fixed-point remains paused; no production promotion or whole CI qualification."
+        ],
+        "schema": "main-gap-semantic-source-review-v1",
+        "source_gate_passed": true,
+        "source_package_manifest": {
+          "bytes": 7627,
+          "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/MANIFEST.json",
+          "sha256": "0e1537a67c1ebdc3405c104d7c99771f8853ae9a459843f497cb23cd430371b8"
+        }
+      }
+    },
+    {
+      "original_manifest": {
+        "bytes": 1208,
+        "sha256": "9b4c9883e9776962f420c7ca2db3452f6d6a1717d50c32c3da5fc88c06e08c3e",
+        "source_artifact": "main-gap-semantic-qualification-01-activation-review/MANIFEST.json"
+      },
+      "original_report": {
+        "bytes": 4137,
+        "sha256": "69dad57be6774edfcb15d862207f04c1486553bc8197a9dc294a073c85b85475",
+        "source_artifact": "main-gap-semantic-qualification-01-activation-review/report.json"
+      },
+      "summary": {
+        "actual_semantic_qualification_passed": false,
+        "blockers": [],
+        "complete": true,
+        "exact_READY_only_delta": true,
+        "inverse_AST_exact": true,
+        "inverse_bytes_exact": true,
+        "limitations": [
+          "This is an activation identity and existing file-boundary review only, not admission or target execution.",
+          "The completed full source gate remains separately pinned; it is not rerun or altered.",
+          "Filesystem observations are current snapshots, not a substitute for the controller fresh admission and live checks.",
+          "Old historical scope termination is not inferred from current processes or locks."
+        ],
+        "mechanical_activation_review_passed": true,
+        "schema": "main-gap-semantic-mechanical-activation-review-v1",
+        "source_package_manifest": {
+          "bytes": 7627,
+          "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/MANIFEST.json",
+          "sha256": "0e1537a67c1ebdc3405c104d7c99771f8853ae9a459843f497cb23cd430371b8"
+        },
+        "source_review": {
+          "bytes": 18425,
+          "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source-review/report.json",
+          "sha256": "70427781b1f19c3fcef496408fc733e8dcbce9bee106d9888066930fe98831b9"
+        }
+      }
+    }
+  ],
+  "source_gate_not_actual_success": true
+}

@@ -1,0 +1,24 @@
+{
+  "activated": false,
+  "actual_source_review": null,
+  "admission_created": false,
+  "delta": "unique READY False to True only",
+  "destination": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/controller.py",
+  "disabled_controller": {
+    "bytes": 45238,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/controller.py",
+    "sha256": "8ca5f3bea50dc814fcbd1e904828dcfeeac18baa95242806b831e962f75bde25"
+  },
+  "disabled_snapshot": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/controller.disabled.py",
+  "enabled_bytes": 45237,
+  "enabled_sha256": "e2804f157e92faeddd58d2e024f1f9d57a213e684b88d15b00dcbd9043ddd3dc",
+  "schema": "main-gap-semantic-mechanical-activation-v1",
+  "scope_created": false,
+  "source_review_required_fields": [
+    "complete=true",
+    "source_gate_passed=true",
+    "blockers=[]",
+    "source_package_manifest exact fullpin"
+  ],
+  "source_review_schema": "main-gap-semantic-source-review-v1"
+}

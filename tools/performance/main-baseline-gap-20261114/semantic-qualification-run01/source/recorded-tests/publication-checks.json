@@ -1,0 +1,458 @@
+{
+  "actual_executable_pins": [
+    {
+      "bytes": 20192216,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+      "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+    },
+    {
+      "bytes": 20205400,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run03/setup/stats-emlf",
+      "sha256": "98b247203372ce26775f6665e6ccc272970d180afcab618aa60369de11baa23e"
+    }
+  ],
+  "actual_fixture_bytes_unchanged": true,
+  "actual_run03_wire_test_projection_positive": {
+    "all_other_raw_bytes_equal": true,
+    "allowed_differences": [
+      "configuration field1 actual executable SHA",
+      "derived container CRC32",
+      "derived generation filename SHA256",
+      "CURRENT exact derived digest and CRC32"
+    ],
+    "artifact_normalization_or_rewrite": false,
+    "compiler_sha_span": [
+      135,
+      199
+    ],
+    "complete": true,
+    "containers_fully_decoded": true,
+    "files_each": 85,
+    "full_cross_compiler_raw_equality_claimed": false,
+    "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+    "ordinary_generation": "queries/query-graph-v2/generations/2ded228ffc947405a39aac13c98efaedb2fe6ceab4bf73d27bc52fe698c2b155.mlfqg",
+    "result_closure_exact": true,
+    "result_files": 78,
+    "rows": 172,
+    "same_binary_future_raw_identity_required": true,
+    "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+    "stats_compiler_sha256": "98b247203372ce26775f6665e6ccc272970d180afcab618aa60369de11baa23e",
+    "stats_generation": "queries/query-graph-v2/generations/6058d9fda611944fcb1bfcd888687b492333de542d57e1b409e321aa04cb6e19.mlfqg"
+  },
+  "check_count": 101,
+  "checks": [
+    {
+      "name": "actual run03 wire bytes in pure generic field-name projection accepted; not cell execution",
+      "passed": true
+    },
+    {
+      "name": "old raw comparison remains false",
+      "passed": true
+    },
+    {
+      "name": "same actual ordinary bytes self compare strictly identical",
+      "passed": true
+    },
+    {
+      "name": "same actual stats bytes self compare strictly identical",
+      "passed": true
+    },
+    {
+      "name": "wrong ordinary expected exe SHA",
+      "passed": true
+    },
+    {
+      "name": "wrong stats expected exe SHA",
+      "passed": true
+    },
+    {
+      "name": "swapped actual executable binding",
+      "passed": true
+    },
+    {
+      "name": "one SHA assigned both sides",
+      "passed": true
+    },
+    {
+      "name": "missing key",
+      "passed": true
+    },
+    {
+      "name": "extra lifecycle file",
+      "passed": true
+    },
+    {
+      "name": "extra stale generation",
+      "passed": true
+    },
+    {
+      "name": "extra arbitrary blob",
+      "passed": true
+    },
+    {
+      "name": "missing referenced result file",
+      "passed": true
+    },
+    {
+      "name": "extra correctly content addressed blob",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file unit.mlfci",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file unit.mlfco",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file crate.spec",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file crate.spec",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file unit.mlfci",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file unit.mlfco",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file unit.queries",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file queries/.lock",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file queries/.lock",
+      "passed": true
+    },
+    {
+      "name": "changed raw semantic file queries/query-graph-v2/results/a46ac335b9a29a75e7d268ecbd433b285ddd12c35bb652ebda7a623186495c37.mlfqr",
+      "passed": true
+    },
+    {
+      "name": "forged embedded compiler SHA with complete CRC/name/CURRENT reseal",
+      "passed": true
+    },
+    {
+      "name": "unrelated crate config with complete CRC/name/CURRENT reseal",
+      "passed": true
+    },
+    {
+      "name": "unrelated source version with complete CRC/name/CURRENT reseal",
+      "passed": true
+    },
+    {
+      "name": "unrelated checker version with complete CRC/name/CURRENT reseal",
+      "passed": true
+    },
+    {
+      "name": "unrelated flavor with complete CRC/name/CURRENT reseal",
+      "passed": true
+    },
+    {
+      "name": "header version with reseal",
+      "passed": true
+    },
+    {
+      "name": "header flags with reseal",
+      "passed": true
+    },
+    {
+      "name": "header schema with reseal",
+      "passed": true
+    },
+    {
+      "name": "header header_bytes with reseal",
+      "passed": true
+    },
+    {
+      "name": "header total_bytes with reseal",
+      "passed": true
+    },
+    {
+      "name": "header symbol_offset with reseal",
+      "passed": true
+    },
+    {
+      "name": "header symbol_bytes with reseal",
+      "passed": true
+    },
+    {
+      "name": "header node_offset with reseal",
+      "passed": true
+    },
+    {
+      "name": "header node_bytes with reseal",
+      "passed": true
+    },
+    {
+      "name": "header edges with reseal",
+      "passed": true
+    },
+    {
+      "name": "header roots with reseal",
+      "passed": true
+    },
+    {
+      "name": "header root_offset with reseal",
+      "passed": true
+    },
+    {
+      "name": "header root_bytes with reseal",
+      "passed": true
+    },
+    {
+      "name": "header node_width with reseal",
+      "passed": true
+    },
+    {
+      "name": "header symbol_width with reseal",
+      "passed": true
+    },
+    {
+      "name": "trailing bytes with reseal",
+      "passed": true
+    },
+    {
+      "name": "truncated root section with reseal",
+      "passed": true
+    },
+    {
+      "name": "invalid UTF8 with reseal",
+      "passed": true
+    },
+    {
+      "name": "node bit change with reseal",
+      "passed": true
+    },
+    {
+      "name": "root bit change with reseal",
+      "passed": true
+    },
+    {
+      "name": "bad generation CRC",
+      "passed": true
+    },
+    {
+      "name": "wrong generation filename",
+      "passed": true
+    },
+    {
+      "name": "CURRENT bad CRC",
+      "passed": true
+    },
+    {
+      "name": "CURRENT wrong digest",
+      "passed": true
+    },
+    {
+      "name": "CURRENT trailing data",
+      "passed": true
+    },
+    {
+      "name": "CURRENT wrong schema",
+      "passed": true
+    },
+    {
+      "name": "literal parsed config alias",
+      "passed": true
+    },
+    {
+      "name": "literal parsed root extra field",
+      "passed": true
+    },
+    {
+      "name": "literal parsed negative descriptor",
+      "passed": true
+    },
+    {
+      "name": "invalid packed 01:a",
+      "passed": true
+    },
+    {
+      "name": "invalid packed -1:x",
+      "passed": true
+    },
+    {
+      "name": "invalid packed 1",
+      "passed": true
+    },
+    {
+      "name": "invalid packed 2:a",
+      "passed": true
+    },
+    {
+      "name": "invalid packed 1:a0:x",
+      "passed": true
+    },
+    {
+      "name": "invalid packed 999999999999999999999:a",
+      "passed": true
+    },
+    {
+      "name": "raw before compiler field changed rejects direct span predicate",
+      "passed": true
+    },
+    {
+      "name": "raw after compiler field changed rejects direct span predicate",
+      "passed": true
+    },
+    {
+      "name": "overlapping allowance rejects",
+      "passed": true
+    },
+    {
+      "name": "overlong varint",
+      "passed": true
+    },
+    {
+      "name": "uint64 overflow",
+      "passed": true
+    },
+    {
+      "name": "unterminated varint",
+      "passed": true
+    },
+    {
+      "name": "nonzero bit padding",
+      "passed": true
+    },
+    {
+      "name": "same stats binary never grants changed raw file exception",
+      "passed": true
+    },
+    {
+      "name": "exact DFS accepts diamond sharing",
+      "passed": true
+    },
+    {
+      "name": "exact DFS preserves repeated reads without false cycle",
+      "passed": true
+    },
+    {
+      "name": "exact DFS accepts dependency roots before users",
+      "passed": true
+    },
+    {
+      "name": "exact DFS rejects back edge",
+      "passed": true
+    },
+    {
+      "name": "exact DFS rejects self edge",
+      "passed": true
+    },
+    {
+      "name": "symbol size exact limit accepted",
+      "passed": true
+    },
+    {
+      "name": "symbol size over limit rejected",
+      "passed": true
+    },
+    {
+      "name": "total symbol exact limit accepted",
+      "passed": true
+    },
+    {
+      "name": "total symbol over limit rejected",
+      "passed": true
+    },
+    {
+      "name": "constructor tag max accepted",
+      "passed": true
+    },
+    {
+      "name": "constructor tag overflow rejected",
+      "passed": true
+    },
+    {
+      "name": "node depth exact limit accepted",
+      "passed": true
+    },
+    {
+      "name": "node depth over limit rejected",
+      "passed": true
+    },
+    {
+      "name": "node work exact limit accepted",
+      "passed": true
+    },
+    {
+      "name": "node work repeated child over limit rejected",
+      "passed": true
+    },
+    {
+      "name": "text work over limit rejected",
+      "passed": true
+    },
+    {
+      "name": "identity table exact budget accepted",
+      "passed": true
+    },
+    {
+      "name": "identity table over budget rejected",
+      "passed": true
+    },
+    {
+      "name": "empty individual identity rejected",
+      "passed": true
+    },
+    {
+      "name": "packed identity framing charged",
+      "passed": true
+    },
+    {
+      "name": "packed identity over budget rejected",
+      "passed": true
+    },
+    {
+      "name": "query longest path4096 accepted",
+      "passed": true
+    },
+    {
+      "name": "query longest path4097 rejected",
+      "passed": true
+    },
+    {
+      "name": "aggregate repeated root exact limit accepted",
+      "passed": true
+    },
+    {
+      "name": "aggregate repeated root overflow rejected",
+      "passed": true
+    },
+    {
+      "name": "unsorted valid group members accepted in original order",
+      "passed": true
+    },
+    {
+      "name": "duplicate group members rejected",
+      "passed": true
+    },
+    {
+      "name": "empty evidence goal rejected",
+      "passed": true
+    },
+    {
+      "name": "nonempty Unicode evidence goal accepted",
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "old_run03_qualification_changed": false,
+  "oracle": {
+    "bytes": 18398,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/publication_oracle.py",
+    "sha256": "df9d3ad4ef1dd23d888a7089efcf365e0939922a5c1f63cc6c04c6c775579be1"
+  },
+  "schema": "main-gap-cross-compiler-pure-checks-v1",
+  "target_or_helper_executed": false
+}

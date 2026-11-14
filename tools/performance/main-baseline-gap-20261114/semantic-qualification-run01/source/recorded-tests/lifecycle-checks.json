@@ -1,0 +1,158 @@
+{
+  "actual_semantic_run": false,
+  "checks": [
+    {
+      "name": "genuine actual SETUP serialized full chain and inventories",
+      "passed": true
+    },
+    {
+      "name": "load accepts actual serialized path string",
+      "passed": true
+    },
+    {
+      "name": "load accepts identical Path",
+      "passed": true
+    },
+    {
+      "name": "reject config different actual stats binary",
+      "passed": true
+    },
+    {
+      "name": "reject wrong setup_review pin",
+      "passed": true
+    },
+    {
+      "name": "reject wrong setup_configuration pin",
+      "passed": true
+    },
+    {
+      "name": "exact integer returned duration",
+      "passed": true
+    },
+    {
+      "name": "bad envelope start_nsTrue",
+      "passed": true
+    },
+    {
+      "name": "bad envelope return_nsFalse",
+      "passed": true
+    },
+    {
+      "name": "bad envelope elapsed_ns11.0",
+      "passed": true
+    },
+    {
+      "name": "bad envelope guard_call_returnedFalse",
+      "passed": true
+    },
+    {
+      "name": "bad envelope return_ns8",
+      "passed": true
+    },
+    {
+      "name": "bad envelope elapsed_ns12",
+      "passed": true
+    },
+    {
+      "name": "first600 cap fits explicit postsetup1800",
+      "passed": true
+    },
+    {
+      "name": "reject wrong prior True",
+      "passed": true
+    },
+    {
+      "name": "reject wrong prior -1",
+      "passed": true
+    },
+    {
+      "name": "reject wrong prior 1",
+      "passed": true
+    },
+    {
+      "name": "reject wrong prior 0.0",
+      "passed": true
+    },
+    {
+      "name": "plain data immutable deadline linkage",
+      "passed": true
+    },
+    {
+      "name": "deadline reject start_nsTrue",
+      "passed": true
+    },
+    {
+      "name": "deadline reject deadline_nsFalse",
+      "passed": true
+    },
+    {
+      "name": "deadline reject deadline_ns100",
+      "passed": true
+    },
+    {
+      "name": "deadline reject deadline_ns596000000100",
+      "passed": true
+    },
+    {
+      "name": "deadline reject scope'<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source'",
+      "passed": true
+    },
+    {
+      "name": "deadline reject epoch{'wrong': 1}",
+      "passed": true
+    },
+    {
+      "name": "deadline reject command_without_binding['wrong']",
+      "passed": true
+    },
+    {
+      "name": "deadline reject claim{'wrong': 1}",
+      "passed": true
+    },
+    {
+      "name": "deadline future start rejected",
+      "passed": true
+    },
+    {
+      "name": "deadline exhausted rejected",
+      "passed": true
+    },
+    {
+      "name": "missing launch field rejected",
+      "passed": true
+    },
+    {
+      "name": "exclusive repeat binding rejected",
+      "passed": true
+    },
+    {
+      "name": "changed immutable binding rejected",
+      "passed": true
+    },
+    {
+      "name": "real temporary parent exists and child absent",
+      "passed": true
+    },
+    {
+      "name": "guard remains600 bounded at accepted SETUP root",
+      "passed": true
+    },
+    {
+      "name": "binding same original locks and exclusive files",
+      "passed": true
+    },
+    {
+      "name": "returned ns saved before outer acceptance",
+      "passed": true
+    },
+    {
+      "name": "entry call is final AST node only",
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "count": 37,
+  "schema": "main-gap-semantic-lifecycle-pure-checks-v1",
+  "scope": "Own read-only AST whitelist over genuine SETUP JSON; ordinary temporary-directory data; no controller top level, runtime, guard, lock or payload executed.",
+  "source_gate_passed": null
+}

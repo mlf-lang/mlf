@@ -1,0 +1,188 @@
+{
+  "checks": [
+    {
+      "name": "actual setup review exactly frozen independent PASS pin",
+      "passed": true
+    },
+    {
+      "name": "frozen91 plan identity",
+      "passed": true
+    },
+    {
+      "name": "complete actual serialized runtime/argv resolution91",
+      "passed": true
+    },
+    {
+      "name": "exact12+12+33+12+12+10 ledger counts",
+      "passed": true
+    },
+    {
+      "name": "exact24 mandatory reports, none original-reference",
+      "passed": true
+    },
+    {
+      "name": "RTS sinks remain exact parent SETUP active tree",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-python-before",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-shell-before",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-ghc-before",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-producer-before",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-stats-emlf-before",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces baseline-0",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces flat_functions-16",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces flat_functions-32",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces flat_functions-64",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces flat_functions-128",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces flat_functions-256",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces higher_order_chain-16",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces higher_order_chain-32",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces higher_order_chain-64",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces higher_order_chain-128",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces higher_order_chain-256",
+      "passed": true
+    },
+    {
+      "name": "exact declared GHC inputs/interfaces foundation14",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-python-after",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-shell-after",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-ghc-after",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-producer-after",
+      "passed": true
+    },
+    {
+      "name": "actual runtime argv runtime-stats-emlf-after",
+      "passed": true
+    },
+    {
+      "name": "no unresolved controller globals",
+      "passed": true
+    },
+    {
+      "name": "all worker-controller API methods present",
+      "passed": true
+    },
+    {
+      "name": "disabled controller exact single READY declaration",
+      "passed": true
+    },
+    {
+      "name": "entry strictly follows all definitions",
+      "passed": true
+    },
+    {
+      "name": "original immutable guard pin retained",
+      "passed": true
+    },
+    {
+      "name": "no semantic scope or actual admission created",
+      "passed": true
+    },
+    {
+      "name": "all actual12 counts and owners remain unknown",
+      "passed": true
+    },
+    {
+      "name": "no48-leg/native/performance worker implemented",
+      "passed": true
+    },
+    {
+      "name": "mature pure/helper functions exact AST ancestry",
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "controller_top_level_imported": false,
+  "count": 37,
+  "genuine_setup_worker": {
+    "bytes": 581055,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/setup-receipt.json",
+    "sha256": "ed016dcadc8a20b6c533ac9373a2fd5bc0b22f2eb8fdebb79c534eb682ff5840"
+  },
+  "guard_runtime_loader_lock_target_executed": false,
+  "raw_semantic_oracles_do_not_include_RTS_or_guard_logs": true,
+  "resolved_kind_counts": {
+    "ghc_typed": 12,
+    "reference_compile": 12,
+    "reference_formula": 33,
+    "reference_metadata": 12,
+    "runtime": 10,
+    "stats_compile": 12
+  },
+  "resolved_row_count": 91,
+  "schema": "main-gap-semantic-protocol-pure-checks-v1",
+  "source_gate_passed": null,
+  "unchanged_mature_function_AST": [
+    "completed_epoch_identity",
+    "interface",
+    "load",
+    "module",
+    "pin",
+    "require",
+    "row_sha",
+    "runtime_module",
+    "safe",
+    "save",
+    "sha",
+    "source_check",
+    "verify_pin"
+  ]
+}

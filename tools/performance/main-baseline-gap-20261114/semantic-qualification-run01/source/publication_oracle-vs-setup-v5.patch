@@ -1,0 +1,118 @@
+--- <EXPERIMENT_ROOT>/main-gap-setup-v5-source/publication_oracle.py
++++ <EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/publication_oracle.py
+@@ -1,4 +1,4 @@
+-"""Pure byte-level cross-compiler Fixture publication qualification.
++"""Pure byte-level cross-compiler per-cell publication qualification.
+ No filesystem, imports of repository code, execution, cache edits or normalization.
+ The caller supplies complete raw maps and independently authenticated executable SHAs.
+ """
+@@ -11,10 +11,8 @@
+ MAX_TOTAL_SYMBOL_BYTES = 134217728
+ MAX_DEPTH = 16384
+ MAX_WORK = 67108864
+-PREFIX = 'builtin-work/queries/query-graph-v2/'
+-STATIC = {'builtin.mlfci','builtin.mlfco','builtin.lock','builtin-work/Fixture.emlf',
+-          'builtin-work/fixture.spec','builtin-work/fixture.mlfci','builtin-work/fixture.mlfco',
+-          'builtin-work/fixture.queries','builtin-work/queries/.lock'}
++PREFIX = 'queries/query-graph-v2/'
++STATIC = {'crate.spec','unit.mlfci','unit.mlfco','unit.queries','queries/.lock'}
+ 
+ 
+ def need(ok, message):
+@@ -156,13 +154,13 @@
+     return fields,spans
+ 
+ 
+-def snapshot(g,compiler):
++def snapshot(g,compiler,expected_config):
+     digest(compiler);need(len(g['roots'])==1,'one snapshot root')
+     root=g['roots'][0];ids=node(g,root,412);need(len(ids)==7,'exact snapshot fields')
+     fmt,config,declarations,groups,evidence,types,entries=ids
+     need(scalar(g,fmt,'text')=='MLF-CRATE-QUERY-GRAPH-2','snapshot format')
+     text=scalar(g,config,'text');fields,spans=packed(text)
+-    need(fields==['compiler-shapes/builtin',compiler,'MLF-SOURCE-CRATE-QUERY-7','open-fragment-checker-1/finish-receipt-1','source'],'exact configuration including actual compiler SHA')
++    need(type(expected_config) is list and len(expected_config)==5 and expected_config[1]==compiler and fields==expected_config,'exact configuration including actual compiler SHA')
+     incoming=[(i,j) for i,n in enumerate(g['nodes']) if n[0]=='node' for j,v in enumerate(n[2]) if v==config]
+     need(incoming==[(root,1)] and config not in g['roots'],'configuration confined to its one field')
+     ds=[scalar(g,i,'text') for i in node(g,declarations,1)];ts=[scalar(g,i,'text') for i in node(g,types,1)]
+@@ -226,24 +224,25 @@
+     return {'config_symbol':g['nodes'][config][1],'compiler_span':(start,end),'configuration':fields,'declarations':ds,'groups':gs,'evidence':es,'types':ts,'rows':rows}
+ 
+ 
+-def publication(files,compiler):
+-    need(type(files) is dict and files and len(files)<=4096 and all(type(k) is str and type(v) is bytes for k,v in files.items()),'raw map')
++def publication(files,compiler,expected_config,checked_schema):
++    need(type(files) is dict and files and len(files)<=MAX_NODES and all(type(k) is str and type(v) is bytes for k,v in files.items()),'raw map')
+     need(sum(map(len,files.values()))<=MAX_BYTES,'aggregate fixture byte bound')
+     need(STATIC<=files.keys(),'missing fixed fixture files')
+-    need(files['builtin.lock']==files['builtin-work/queries/.lock']==b'','empty lock artifacts')
++    need(files['queries/.lock']==b'','empty lock artifacts')
+     current=PREFIX+'CURRENT';need(current in files,'missing CURRENT')
+     cg=decode(files[current],6)
+     need(cg['header']['symbols']==cg['header']['nodes']==cg['header']['roots']==1 and cg['header']['edges']==0,'single text CURRENT container')
+     address=digest(scalar(cg,cg['roots'][0],'text'));generation=PREFIX+'generations/'+address+'.mlfqg'
+     need(generation in files and sha(files[generation])==address,'generation filename/content SHA')
+-    g=decode(files[generation],6);s=snapshot(g,compiler)
++    g=decode(files[generation],6);s=snapshot(g,compiler,expected_config)
+     results={PREFIX+'results/'+r['payload']+'.mlfqr' for r in s['rows'] if r['payload'] is not None}
+     need(set(files)==STATIC|{current,generation}|results,'exact complete fixture inventory, no missing/extra results or files')
+     for rel in sorted(results):
+         need(sha(files[rel])==rel.rsplit('/',1)[1][:-6],'result content address')
+         decode(files[rel],6)
+     # Checked/interface container bytes are identical across sides, and independently structurally decoded.
+-    for rel,schema in [('builtin.mlfci',3),('builtin.mlfco',4),('builtin-work/fixture.mlfci',3),('builtin-work/fixture.mlfco',8)]:decode(files[rel],schema)
++    need(checked_schema in (4,8),'reviewed supported checked artifact schema required')
++    for rel,schema in [('unit.mlfci',3),('unit.mlfco',checked_schema)]:decode(files[rel],schema)
+     return {'generation':generation,'current':current,'graph':g,'snapshot':s,'current_graph':cg,'result_count':len(results),'files':len(files)}
+ 
+ 
+@@ -257,8 +256,10 @@
+     need(left[cursor:]==right[cursor:],'unallowed raw byte tail difference')
+ 
+ 
+-def compare_fixture(ordinary,stats,ordinary_sha,stats_sha):
+-    a=publication(ordinary,ordinary_sha);b=publication(stats,stats_sha)
++def compare_cell(ordinary,stats,ordinary_sha,stats_sha,expected_config,checked_schema):
++    need(type(expected_config) is list and len(expected_config)==5 and expected_config[1] is None,'reviewed nonproducer config template required')
++    ac=[*expected_config];ac[1]=ordinary_sha;bc=[*expected_config];bc[1]=stats_sha
++    a=publication(ordinary,ordinary_sha,ac,checked_schema);b=publication(stats,stats_sha,bc,checked_schema)
+     ag,bg=a['generation'],b['generation'];current=a['current']
+     need(set(ordinary)-{ag}==set(stats)-{bg},'relative inventory equality except authenticated generation names')
+     for rel in ordinary:
+@@ -277,7 +278,7 @@
+     need({k:v for k,v in x.items() if k!='text'}=={k:v for k,v in y.items() if k!='text'} and x['bytes']==64,'CURRENT framing')
+     exact_except(ordinary[current],stats[current],[(76,80),(x['start'],x['start']+64)])
+     if ordinary_sha==stats_sha:need(ordinary==stats,'same compiler requires complete raw identity')
+-    return {'schema':'main-gap-cross-compiler-fixture-equivalence-v1','complete':True,
++    return {'schema':'main-gap-cross-compiler-cell-equivalence-v1','complete':True,
+         'ordinary_compiler_sha256':ordinary_sha,'stats_compiler_sha256':stats_sha,
+         'ordinary_generation':ag,'stats_generation':bg,'files_each':a['files'],'result_files':a['result_count'],
+         'rows':len(sa['rows']),'compiler_sha_span':list(sa['compiler_span']),
+@@ -285,3 +286,27 @@
+         'all_other_raw_bytes_equal':True,'containers_fully_decoded':True,'result_closure_exact':True,
+         'full_cross_compiler_raw_equality_claimed':ordinary==stats,'same_binary_future_raw_identity_required':True,
+         'artifact_normalization_or_rewrite':False}
++
++
++def reference_cell(files,compiler,config_template):
++    """Authenticate the original producer before freezing its observed route.
++    This accepts the two source-proved production formats, not a claimed actual
++    branch. Actual child provenance and the immutable reference contract bind
++    the observed bytes; later B acceptance never selects a fresh route.
++    """
++    need(type(config_template) is list and len(config_template)==5
++         and config_template[1] is None and config_template[4] is None,'reference configuration template')
++    current=decode(files[PREFIX+'CURRENT'],6)
++    need(len(current['roots'])==1,'single reference CURRENT root')
++    address=digest(scalar(current,current['roots'][0],'text'))
++    generation=PREFIX+'generations/'+address+'.mlfqg'
++    g=decode(files[generation],6);need(len(g['roots'])==1,'single reference snapshot root')
++    root=node(g,g['roots'][0],412);need(len(root)==7,'reference snapshot arity')
++    fields,_=packed(scalar(g,root[1],'text'))
++    need(len(fields)==5 and fields[4] in ('source','lowered'),'supported main production route')
++    expected=[*config_template];expected[1]=compiler;expected[4]=fields[4]
++    result=publication(files,compiler,expected,8)
++    frozen=[*expected];frozen[1]=None
++    return {'configuration_template':frozen,'observed_route':fields[4],
++            'generation':result['generation'],'query_rows':len(result['snapshot']['rows']),
++            'result_files':result['result_count'],'checked_schema':8,'interface_schema':3}

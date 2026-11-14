@@ -1,0 +1,75 @@
+{
+  "actual_summary": {
+    "child_commands": 84,
+    "child_exit_zero": 84,
+    "child_guard_elapsed_seconds_sum": 60.66947757793241,
+    "complete_cells": 11,
+    "failure": "RuntimeError('whole-stage deadline including prechecks')",
+    "final_precheck_source_line": 156,
+    "foundation": {
+      "GHC_not_invoked": true,
+      "active_cells_empty": true,
+      "actual_inferred_groups": 475,
+      "actual_reused_groups": 0,
+      "query_rows": 3221,
+      "result_files": 1478,
+      "route": "source",
+      "stats_not_invoked": true
+    },
+    "full_returned_call_ns": 596647140326,
+    "outer_guard_elapsed_seconds": 596.5397585629835,
+    "outer_minus_child_guard_seconds": 535.8702809850511,
+    "qualification_RTS": 22,
+    "reference_contracts": 12,
+    "residual_is_not_function_profile": true,
+    "worker_final_outputs_is_empty": true
+  },
+  "not_an_actual_qualification_gate": true,
+  "not_measured_IO_CPU_function_time_or_MLF_speed": true,
+  "original_manifest": {
+    "bytes": 831,
+    "sha256": "165406623488e8c0d7e5c2e3f84402ca96f2cc94886f338dbad9a5006bae7bc8",
+    "source_artifact": "main-gap-semantic-precheck-diagnosis-source/MANIFEST.json"
+  },
+  "original_report": {
+    "bytes": 7039,
+    "sha256": "a58ff8477f4ba2521bed8c3da82ac1119b2ab124cc84ecbd8d258c61071a79d3",
+    "source_artifact": "main-gap-semantic-precheck-diagnosis-source/report.json"
+  },
+  "original_stage_remains_failed": true,
+  "proposed_completion_deliberately_not_exported": "Outside this failure archive; no continuation implied.",
+  "source_control_flow_accounting": {
+    "additional_unquantified": "growing outputs rehashed once in self.outputs and once in archives tree_pins; runtime command helper, raw decoding/archive checks, controller pre/post checks, metadata traversals",
+    "complete_recheck_calls": 181,
+    "derivation": "one initial + before/after each 84 returned children + one after each 12 reference freezes; final call failed only final deadline predicate",
+    "known_combined_logical_hash_input_bytes": 288239113671,
+    "not_measured_disk_IO_or_CPU_time": true,
+    "runtime_hash_input_bytes": 43434088178,
+    "runtime_hash_input_bytes_per_recheck": 239967338,
+    "runtime_per_role": {
+      "ghc": {
+        "binding_read_bytes": 175928986,
+        "binding_read_count": 48
+      },
+      "producer": {
+        "binding_read_bytes": 24463826,
+        "binding_read_count": 14
+      },
+      "python": {
+        "binding_read_bytes": 10850218,
+        "binding_read_count": 15
+      },
+      "shell": {
+        "binding_read_bytes": 4247298,
+        "binding_read_count": 13
+      },
+      "stats-emlf": {
+        "binding_read_bytes": 24477010,
+        "binding_read_count": 14
+      }
+    },
+    "static_hash_input_bytes": 244805025493,
+    "static_pin_bytes_per_recheck": 1352513953,
+    "unique_static_pins_per_recheck": 6839
+  }
+}

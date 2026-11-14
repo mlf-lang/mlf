@@ -1,0 +1,261 @@
+{
+  "all_passed": true,
+  "checks": [
+    {
+      "name": "final independent failure review and all member hashes verified",
+      "passed": true
+    },
+    {
+      "name": "review PASS never replaces failed semantic stage",
+      "passed": true
+    },
+    {
+      "name": "missing Foundation B/GHC and five runtime after preserved",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/controller.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/lifecycle_checks.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/ownership_checks.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/protocol_checks.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/publication_checks.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/publication_oracle.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/pure_checks.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/reference_checks.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/semantic_parsers.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/worker.py",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/environment.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/ROUTE-CONTRACT-v3.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/ACTIVATION-CONTRACT.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/publication_oracle-vs-setup-v5.patch",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/DESIGN-AT-SOURCE-FREEZE.md",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/recorded-tests/pure-checks.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/recorded-tests/publication-checks.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/recorded-tests/reference-checks.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/recorded-tests/ownership-checks.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/recorded-tests/protocol-checks.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/recorded-tests/lifecycle-checks.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping source/BINDINGS.json",
+      "passed": true
+    },
+    {
+      "name": "original/export mapping evidence/deadline-trace.redacted.txt",
+      "passed": true
+    },
+    {
+      "name": "privacy README.md",
+      "passed": true
+    },
+    {
+      "name": "privacy REPRODUCTION.md",
+      "passed": true
+    },
+    {
+      "name": "privacy REUSED-PUBLIC-FILES.json",
+      "passed": true
+    },
+    {
+      "name": "privacy SOURCE-MAP.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/completed-cell-observations.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/completed-commands.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/deadline-trace.redacted.txt",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/failure-summary.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/final-cleanup.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/formula-controls-raw.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/independent-failure-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/missing-commands.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/precheck-source-diagnosis.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/rts-redacted.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/source-and-activation-reviews.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/ACTIVATION-CONTRACT.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/BINDINGS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/DESIGN-AT-SOURCE-FREEZE.md",
+      "passed": true
+    },
+    {
+      "name": "privacy source/ROUTE-CONTRACT-v3.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/controller.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/environment.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/lifecycle_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/ownership_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/protocol_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/publication_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/publication_oracle-vs-setup-v5.patch",
+      "passed": true
+    },
+    {
+      "name": "privacy source/publication_oracle.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/pure_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/recorded-tests/lifecycle-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/recorded-tests/ownership-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/recorded-tests/protocol-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/recorded-tests/publication-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/recorded-tests/pure-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/recorded-tests/reference-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/reference_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/semantic_parsers.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/worker.py",
+      "passed": true
+    }
+  ],
+  "compiler_loader_helper_guard_target_or_exported_code_executed": false,
+  "count": 63,
+  "original_actual_review_not_replaced": true,
+  "recorded_source_tests_not_rerun": true
+}

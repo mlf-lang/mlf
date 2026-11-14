@@ -1,0 +1,141 @@
+{
+  "RTS_records": 22,
+  "actual_error": "RuntimeError('whole-stage deadline including prechecks')",
+  "actual_stage_passed": false,
+  "archive_contains_all_raw": false,
+  "budget": {
+    "budget_passed": true,
+    "cumulative_ns": 596647140326,
+    "elapsed_ns": 596647140326,
+    "elapsed_valid": true,
+    "includes_outer_cleanup_time": true,
+    "original_guard_elapsed_seconds_excludes_cleanup": 596.5397585629835,
+    "post_setup_maximum_ns": 1800000000000,
+    "prior_ns": 0,
+    "stage_maximum_ns": 600000000000
+  },
+  "cleanup_claim_status": "Independent final actual failure review verified authentic cleanup, both lock identities/reacquisition, lease clearance, complete returned envelope and unchanged prior scope.",
+  "complete_cells": 11,
+  "complete_commands": 84,
+  "controller_error": "RuntimeError('outer not clean/successful')",
+  "counts": {
+    "ghc_typed": 11,
+    "reference_compile": 12,
+    "reference_formula": 33,
+    "reference_metadata": 12,
+    "runtime": 5,
+    "stats_compile": 11
+  },
+  "dynamic_oracles_accepted": false,
+  "expected_RTS_records": 24,
+  "expected_cells": 12,
+  "expected_commands": 91,
+  "failure_review_passed": true,
+  "final_independent_failure_review": {
+    "bytes": 14887,
+    "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8",
+    "source_artifact": "main-gap-semantic-qualification-01-failure-review/report.json"
+  },
+  "final_independent_failure_review_manifest": {
+    "bytes": 4463,
+    "sha256": "3c9f9c54777bed842f8f9c66c0e6b76262d12fcceea2e187099699abf5402927",
+    "source_artifact": "main-gap-semantic-qualification-01-failure-review/MANIFEST.json"
+  },
+  "foundation_boundary": "Original compile and show completed; original reference contract frozen; stats compile and GHC typed command not invoked.",
+  "full_raw_evidence_privately_retained": true,
+  "native_execution": false,
+  "original_receipts": [
+    {
+      "bytes": 8349,
+      "sha256": "ccf42ceaae3eaee9b3a6ae949593db5631cfeed831b79079c06189eff356e8c1",
+      "source_artifact": "main-gap-setup-run04/semantic-qualification-01/controller.json"
+    },
+    {
+      "bytes": 2594123,
+      "sha256": "c4fb48a94c1f254c373600b1094c5bea1cd65108900f43c24c1c77c44188dd42",
+      "source_artifact": "main-gap-setup-run04/semantic-qualification-01/semantic-receipt.json"
+    },
+    {
+      "bytes": 7383,
+      "sha256": "f9dfa4d5743326340c512ee069a36cbe484961b3d54dafc321afc1fb23e79f6a",
+      "source_artifact": "main-gap-setup-run04/semantic-qualification-01/outer/guard.json"
+    },
+    {
+      "bytes": 1676,
+      "sha256": "eecdd3ea660419f5f48969689e344919ec80f0aa78f164d47da2f64001e7117a",
+      "source_artifact": "main-gap-setup-run04/semantic-qualification-01/build.log"
+    }
+  ],
+  "original_worker_receipt_not_rewritten": true,
+  "outer_status": {
+    "cleanup": true,
+    "complete": false,
+    "elapsed_seconds": 596.5397585629835,
+    "exit_code": 1,
+    "lease_cleared": true,
+    "limits": {
+      "address_space": 6442450944,
+      "free_disk": 5368709120,
+      "host_available": 3221225472,
+      "output": 4294967296,
+      "tree_rss": 5368709120
+    },
+    "lock_reacquired": true,
+    "reason": "unexpected child exit (124 is not timeout)",
+    "seconds": 600
+  },
+  "partial_output_files_independently_inventoried": 5910,
+  "performance_samples": 0,
+  "remaining_commands": [
+    {
+      "kind": "stats_compile",
+      "label": "foundation14/stats-compile",
+      "maximum_seconds": 90,
+      "ordinal": 85
+    },
+    {
+      "kind": "ghc_typed",
+      "label": "foundation14/ghc-typed",
+      "maximum_seconds": 30,
+      "ordinal": 86
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-python-after",
+      "maximum_seconds": 10,
+      "ordinal": 87
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-shell-after",
+      "maximum_seconds": 10,
+      "ordinal": 88
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-ghc-after",
+      "maximum_seconds": 10,
+      "ordinal": 89
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-producer-after",
+      "maximum_seconds": 10,
+      "ordinal": 90
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-after",
+      "maximum_seconds": 10,
+      "ordinal": 91
+    }
+  ],
+  "sampling_authorized": false,
+  "schema": "main12-semantic-run01-provisional-failure-export-v1",
+  "scope_files_privately_retained": 5925,
+  "semantic_mismatch_interpretation": "No semantic mismatch was reported by the completed prefix. Unexecuted suffix and whole-stage qualification remain unknown/failed; do not claim global semantic equivalence.",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "status": "ACTUAL_STAGE_FAILED_INDEPENDENT_FAILURE_AND_CLEANUP_REVIEW_PASSED",
+  "unique_verified_pins": 12801,
+  "worker_original_outputs_array_empty": true
+}

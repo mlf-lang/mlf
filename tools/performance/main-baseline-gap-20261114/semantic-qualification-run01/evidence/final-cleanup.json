@@ -1,0 +1,86 @@
+{
+  "actual_review_original": {
+    "bytes": 14887,
+    "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8",
+    "source_artifact": "main-gap-semantic-qualification-01-failure-review/report.json"
+  },
+  "budget": {
+    "budget_passed": true,
+    "cumulative_ns": 596647140326,
+    "elapsed_ns": 596647140326,
+    "elapsed_valid": true,
+    "includes_outer_cleanup_time": true,
+    "original_guard_elapsed_seconds_excludes_cleanup": 596.5397585629835,
+    "post_setup_maximum_ns": 1800000000000,
+    "prior_ns": 0,
+    "stage_maximum_ns": 600000000000
+  },
+  "budget_or_cleanup_success_not_qualification_PASS": true,
+  "independent_verified": {
+    "cleanup_lease_locks": true,
+    "complete_actual_guard_binding_verified": true,
+    "current_runtime_bindings_rechecked_read_only": true,
+    "elapsed_includes_cleanup": true,
+    "failed_scope_preserved": true,
+    "new_epoch_active_and_quarantine_absent": true,
+    "no_original_scope_or_receipt_modified": true,
+    "old_SETUP_boundary": {
+      "active_cells_empty": true,
+      "directories": 109,
+      "exact_unchanged": true,
+      "files": 379,
+      "inventory": {
+        "bytes": 157955,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/SETUP-SCOPE-BASELINE.json",
+        "sha256": "d0f5b00978dc1075076b9ddcad98fa18c23c7e4536d824dbad8048901e52d6cb"
+      },
+      "old8_pins_unchanged": true,
+      "old_epoch_termination_not_inferred": true,
+      "only_new_subtrees": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells"
+      ]
+    },
+    "original_runtime_after_count": 0,
+    "returned_guard_row_and_file_sha_verified": true
+  },
+  "missing_runtime_after_not_retroactively_executed": true,
+  "original_controller": {
+    "bytes": 8349,
+    "sha256": "ccf42ceaae3eaee9b3a6ae949593db5631cfeed831b79079c06189eff356e8c1",
+    "source_artifact": "main-gap-setup-run04/semantic-qualification-01/controller.json"
+  },
+  "original_guard": {
+    "bytes": 7383,
+    "sha256": "f9dfa4d5743326340c512ee069a36cbe484961b3d54dafc321afc1fb23e79f6a",
+    "source_artifact": "main-gap-setup-run04/semantic-qualification-01/outer/guard.json"
+  },
+  "original_watchdog": {
+    "bytes": 451521,
+    "sha256": "cb9ec0418c3a9b2d92d68c298e372bde069c2aa6ddec9e20506bbf9f13396012",
+    "source_artifact": "main-gap-setup-run04/semantic-qualification-01/bounded-receipt.json"
+  },
+  "original_worker": {
+    "bytes": 2594123,
+    "sha256": "c4fb48a94c1f254c373600b1094c5bea1cd65108900f43c24c1c77c44188dd42",
+    "source_artifact": "main-gap-setup-run04/semantic-qualification-01/semantic-receipt.json"
+  },
+  "outer": {
+    "cleanup": true,
+    "complete": false,
+    "elapsed_seconds": 596.5397585629835,
+    "exit_code": 1,
+    "lease_cleared": true,
+    "limits": {
+      "address_space": 6442450944,
+      "free_disk": 5368709120,
+      "host_available": 3221225472,
+      "output": 4294967296,
+      "tree_rss": 5368709120
+    },
+    "lock_reacquired": true,
+    "reason": "unexpected child exit (124 is not timeout)",
+    "seconds": 600
+  },
+  "representation": "selected original cleanup/budget fields plus independent actual checks; not full raw receipt"
+}

@@ -1,0 +1,49 @@
+{
+  "missing_RTS": 2,
+  "no_substitute_or_later_outputs_admitted": true,
+  "not_executed": [
+    {
+      "kind": "stats_compile",
+      "label": "foundation14/stats-compile",
+      "maximum_seconds": 90,
+      "ordinal": 85
+    },
+    {
+      "kind": "ghc_typed",
+      "label": "foundation14/ghc-typed",
+      "maximum_seconds": 30,
+      "ordinal": 86
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-python-after",
+      "maximum_seconds": 10,
+      "ordinal": 87
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-shell-after",
+      "maximum_seconds": 10,
+      "ordinal": 88
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-ghc-after",
+      "maximum_seconds": 10,
+      "ordinal": 89
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-producer-after",
+      "maximum_seconds": 10,
+      "ordinal": 90
+    },
+    {
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-after",
+      "maximum_seconds": 10,
+      "ordinal": 91
+    }
+  ],
+  "runtime_after_not_executed": 5
+}

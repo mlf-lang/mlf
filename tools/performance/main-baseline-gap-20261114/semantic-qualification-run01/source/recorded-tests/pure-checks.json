@@ -1,0 +1,103 @@
+{
+  "check_count": 23,
+  "checks": [
+    {
+      "name": "actual unmodified fixture JSON strict grammar accepted, not future cell oracle",
+      "passed": true
+    },
+    {
+      "name": "fresh query rejects format",
+      "passed": true
+    },
+    {
+      "name": "fresh query rejects inferred_groups",
+      "passed": true
+    },
+    {
+      "name": "fresh query rejects reused_groups",
+      "passed": true
+    },
+    {
+      "name": "fresh query rejects groups",
+      "passed": true
+    },
+    {
+      "name": "fresh query rejects crate",
+      "passed": true
+    },
+    {
+      "name": "unknown JSON field rejected",
+      "passed": true
+    },
+    {
+      "name": "duplicate JSON key rejected",
+      "passed": true
+    },
+    {
+      "name": "duplicate group rejected",
+      "passed": true
+    },
+    {
+      "name": "actual full four-module GHC compilation event bytes parse, not typed-cell qualification",
+      "passed": true
+    },
+    {
+      "name": "hidden extra Main expected fails",
+      "passed": true
+    },
+    {
+      "name": "duplicate actual Compiling event fails",
+      "passed": true
+    },
+    {
+      "name": "unparsed Compiling line fails",
+      "passed": true
+    },
+    {
+      "name": "parameterized snapshot parser accepts exact actual generation",
+      "passed": true
+    },
+    {
+      "name": "independently expected config mismatch field0",
+      "passed": true
+    },
+    {
+      "name": "independently expected config mismatch field1",
+      "passed": true
+    },
+    {
+      "name": "independently expected config mismatch field2",
+      "passed": true
+    },
+    {
+      "name": "independently expected config mismatch field3",
+      "passed": true
+    },
+    {
+      "name": "independently expected config mismatch field4",
+      "passed": true
+    },
+    {
+      "name": "actual SETUP genuine review bound, source still disabled",
+      "passed": true
+    },
+    {
+      "name": "no guessed12cell query counts",
+      "passed": true
+    },
+    {
+      "name": "reference route remains unobserved, successful object schema8 source-proved",
+      "passed": true
+    },
+    {
+      "name": "unbound setup path rejected by resolver",
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "schema": "main-gap-semantic-initial-pure-checks-v1",
+  "scope": "Pure parsers/AST only; worker/coordinator not executed or accepted. Actual run03 raw input reused read-only, not12cell qualification.",
+  "setup_gate_bound": true,
+  "source_gate_passed": null,
+  "target_helper_guard_lock_executed": false
+}

@@ -1,0 +1,125 @@
+{
+  "actual_run04_bytes_read_only": true,
+  "checks": [
+    {
+      "name": "unmodified actual run04 wire projection reference source observed",
+      "passed": true
+    },
+    {
+      "name": "actual run04 bytes cross-producer strictly match frozen observed route",
+      "passed": true
+    },
+    {
+      "name": "legal lowered syntax accepted as pre-freeze pure data, not claimed actual branch",
+      "passed": true
+    },
+    {
+      "name": "candidate legal but different route rejected against source reference",
+      "passed": true
+    },
+    {
+      "name": "same binary changed route never grants raw exemption",
+      "passed": true
+    },
+    {
+      "name": "coherently resealed wrong reference field 0",
+      "passed": true
+    },
+    {
+      "name": "coherently resealed wrong reference field 1",
+      "passed": true
+    },
+    {
+      "name": "coherently resealed wrong reference field 2",
+      "passed": true
+    },
+    {
+      "name": "coherently resealed wrong reference field 3",
+      "passed": true
+    },
+    {
+      "name": "coherently resealed wrong reference field 4",
+      "passed": true
+    },
+    {
+      "name": "coherently resealed wrong config arity 4",
+      "passed": true
+    },
+    {
+      "name": "coherently resealed wrong config arity 6",
+      "passed": true
+    },
+    {
+      "name": "plain immutable full reference contract accepted",
+      "passed": true
+    },
+    {
+      "name": "duplicate freeze fails exclusive create",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects cell",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects source_commit",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects source_inputs",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects original_binary",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects spec_sha256",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects original_active_path",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects reference_commands",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects observed",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects candidate_invoked",
+      "passed": true
+    },
+    {
+      "name": "frozen provenance rejects retry_allowed",
+      "passed": true
+    },
+    {
+      "name": "missing frozen reference rejected",
+      "passed": true
+    },
+    {
+      "name": "reference route rewritten after B failure cannot rebind original pin",
+      "passed": true
+    },
+    {
+      "name": "worker freeze and pin occur before B compile",
+      "passed": true
+    },
+    {
+      "name": "worker has no reference restart or alternate route after B failure",
+      "passed": true
+    }
+  ],
+  "claims_actual_branch_from_syntax": false,
+  "complete": true,
+  "controller_guard_helper_target_executed": false,
+  "count": 28,
+  "legitimate_lowered_mutation_is_only_synthetic_syntax": true,
+  "projection_is_not_actual_cell_evidence": true,
+  "schema": "main-gap-reference-freeze-pure-checks-v1",
+  "source_gate_passed": null
+}

@@ -1,0 +1,123 @@
+{
+  "actual_scope_read_only": true,
+  "checks": [
+    {
+      "name": "actual entire completed SETUP379files109dirs unchanged; no semantic scope",
+      "passed": true
+    },
+    {
+      "name": "fresh unique regular file accepted",
+      "passed": true
+    },
+    {
+      "name": "new hardlink alias rejected",
+      "passed": true
+    },
+    {
+      "name": "new directory symlink rejected",
+      "passed": true
+    },
+    {
+      "name": "FIFO never silently omitted",
+      "passed": true
+    },
+    {
+      "name": "new file symlink rejected",
+      "passed": true
+    },
+    {
+      "name": "exact old scope accepts before child",
+      "passed": true
+    },
+    {
+      "name": "single appended child root allowed",
+      "passed": true
+    },
+    {
+      "name": "empty exact active/child layout accepted",
+      "passed": true
+    },
+    {
+      "name": "unexpected old-parent file junk",
+      "passed": true
+    },
+    {
+      "name": "unexpected old-parent file setup/junk",
+      "passed": true
+    },
+    {
+      "name": "unexpected old-parent file active/junk",
+      "passed": true
+    },
+    {
+      "name": "unknown old-parent empty directory rejected",
+      "passed": true
+    },
+    {
+      "name": "old file bytes changed rejected",
+      "passed": true
+    },
+    {
+      "name": "active ancestor symlink rejected before creation",
+      "passed": true
+    },
+    {
+      "name": "safe forbids writing through active ancestor",
+      "passed": true
+    },
+    {
+      "name": "only declared live cell allowed",
+      "passed": true
+    },
+    {
+      "name": "stale active cell rejected at empty boundary",
+      "passed": true
+    },
+    {
+      "name": "second simultaneous cell rejected",
+      "passed": true
+    },
+    {
+      "name": "unarchived shared RTS sink rejected",
+      "passed": true
+    },
+    {
+      "name": "unknown child-root file rejected",
+      "passed": true
+    },
+    {
+      "name": "completed-child leftover tmp rejected",
+      "passed": true
+    },
+    {
+      "name": "exact live lifecycle owner files accepted independently of worker bytes",
+      "passed": true
+    },
+    {
+      "name": "live watchdog atomic temporary allowed",
+      "passed": true
+    },
+    {
+      "name": "final watchdog temporary rejected",
+      "passed": true
+    },
+    {
+      "name": "unknown outer lifecycle file rejected",
+      "passed": true
+    },
+    {
+      "name": "live log content is not premature worker immutable oracle",
+      "passed": true
+    },
+    {
+      "name": "final exact typed lifecycle inventory accepted",
+      "passed": true
+    }
+  ],
+  "complete": true,
+  "count": 28,
+  "guard_loader_lock_target_executed": false,
+  "schema": "main-gap-semantic-ownership-pure-checks-v1",
+  "source_gate_passed": null,
+  "temporary_plain_files_only": true
+}

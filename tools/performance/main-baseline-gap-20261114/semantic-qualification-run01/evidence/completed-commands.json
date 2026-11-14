@@ -1,0 +1,3133 @@
+{
+  "all_child_exit_zero": true,
+  "full_stage_remains_failed": true,
+  "independent_actual_failure_review": {
+    "bytes": 14887,
+    "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8",
+    "source_artifact": "main-gap-semantic-qualification-01-failure-review/report.json"
+  },
+  "independent_failure_review_pending": false,
+  "representation": "complete actual 84-command ledger, paths redacted, raw pins exact",
+  "rows": [
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 592,
+        "sha256": "40a2eece45ada6259262370deee1051937c6e7431e38cb8a031fd0cce595512d"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.020622003998141736,
+      "guard_original": {
+        "bytes": 1164,
+        "sha256": "af8b8e4a690d61bb32d18d0067232cbabe4f86998fa859970ecef6433686e93b"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-before",
+      "ordinal": 1,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 414,
+        "sha256": "5ad66c9c96b2183869e9f254fb7207e55970017d704b4086b378ade8659916db"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 585,
+        "sha256": "04002f9a972c82a4666abedb0bfecf11b3fa5d04a7859faddf5d8428a28a9abe"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.007978572000865825,
+      "guard_original": {
+        "bytes": 1157,
+        "sha256": "8d145f73bef6d3c43c7ee838376e82d2e5460e5caf22f785c05fe448be24f9e9"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-before",
+      "ordinal": 2,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 280,
+        "sha256": "13bc924e1104f9f7dbbfd8ff6c7348a342d13ae06f19ce3a1c5af2951ec1be08"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 667,
+        "sha256": "a17420a479e219b04f2bd6691b1117d9de327388e08cc82e184181791ace22b6"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.010111744006280787,
+      "guard_original": {
+        "bytes": 1239,
+        "sha256": "cb21ee52c84a6cb2a1e4396cf7c959f29578e73a06f527782c7dcc934270face"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-before",
+      "ordinal": 3,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 7830,
+        "sha256": "c24e3e15028f6371be5bb27f0e34c8ffd4f40ab0b1b5a250a6353203f1d92958"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 689,
+        "sha256": "d0f0ff0f6c3696ced4cb1d201cbc44223eab89dd9c99243cdd5ba2a3b0740696"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.009216816004482098,
+      "guard_original": {
+        "bytes": 1261,
+        "sha256": "19689c99c285abf0b3471c5686730baa4e9937190397bf6ec89828055b83cd99"
+      },
+      "kind": "runtime",
+      "label": "runtime-producer-before",
+      "ordinal": 4,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 345,
+        "sha256": "9304b47470001a425d441a7a42d77d43c3cbc02a92d852e07de24c6c4d48fea0"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 676,
+        "sha256": "221af1cc678dfc99e8d76b5e2e722a92bc33548c46fb9704be748b51c89732bf"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.009073120992979966,
+      "guard_original": {
+        "bytes": 1248,
+        "sha256": "44967051282a4cf565c6e4cd67b9546cf57cf89107fd4d2a85dfd5066fc51ff7"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-before",
+      "ordinal": 5,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 345,
+        "sha256": "9d92b9215a782b0f243a913ce7198fc876cab978131250649956a76c07ac97ea"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 895,
+        "sha256": "1517e568a6fda54bb7ff237784c9b797a36c9f7094b574899cbf01146d5f3fc6"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.24434736599505413,
+      "guard_original": {
+        "bytes": 1474,
+        "sha256": "b9fab9d343b7a33bc9685b6cf82ffb5ca2c46b42b7cbb4bab59b296fb3a5db7a"
+      },
+      "kind": "reference_compile",
+      "label": "baseline-0/reference-compile",
+      "ordinal": 6,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 768,
+        "sha256": "64d4d614fcd63ba65cbd939860ae6434bba52576318193587b04b70724738f60"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.013517732004402205,
+      "guard_original": {
+        "bytes": 1340,
+        "sha256": "746228a3039e6d5fe7c9b753bea06ec7bba01dfa9fa77733bfff0c6b76b03d34"
+      },
+      "kind": "reference_metadata",
+      "label": "baseline-0/reference-show",
+      "ordinal": 7,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 262,
+        "sha256": "660d62e12eff5f9bcbc0a0a23be54bfd455c9c73db1e52b61a7462864b18ba70"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 784,
+        "sha256": "c0f9c1a4efa672ae6989ee62aab6dda2f50e466e7b30696cd70461506ed11935"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.5900058830011403,
+      "guard_original": {
+        "bytes": 1362,
+        "sha256": "55281571732843e8b9cb862f136976b7e9683d62c6e761d2c3c810375d3d4dd1"
+      },
+      "kind": "reference_formula",
+      "label": "baseline-0/reference-formula--1",
+      "ordinal": 8,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "ee3aa64bb94a50845d5024cd4bd20202a4567aed5cd5328c0d97e9920775fc28"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 782,
+        "sha256": "384e3d41945a86ca4d71d7b6d9efc1794404f81eff24c31d51f3ee438c74b5f8"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6918257639918011,
+      "guard_original": {
+        "bytes": 1360,
+        "sha256": "a9ceaa039eec08734ce82f993da94aa785835eea6b6c750717fbac16b92f88a9"
+      },
+      "kind": "reference_formula",
+      "label": "baseline-0/reference-formula-0",
+      "ordinal": 9,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 2,
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 782,
+        "sha256": "c04ed218dab9a0de3ccd9f22efcdd624172b85f542d66a6e5895553040f19790"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7042741559998831,
+      "guard_original": {
+        "bytes": 1360,
+        "sha256": "5063a78c74a99a3d5bb20c9dea0659b35acf51f2e5b4c41600c8e02838c9ff20"
+      },
+      "kind": "reference_formula",
+      "label": "baseline-0/reference-formula-7",
+      "ordinal": 10,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 2,
+        "sha256": "10159baf262b43a92d95db59dae1f72c645127301661e0a3ce4e38b295a97c58"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 977,
+        "sha256": "f51b8d356b369feab99a4dbd04be42372d2e7b7700c811d594c2597683f6466f"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.3190401829924667,
+      "guard_original": {
+        "bytes": 1860,
+        "sha256": "1193d07ed49b5102fa6bec01d010365d90266e715e77b13ad3c5cd4d3c2e6ff6"
+      },
+      "kind": "stats_compile",
+      "label": "baseline-0/stats-compile",
+      "ordinal": 11,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1662,
+        "sha256": "9c7b9f8120657b884631c9a90be46f52eab7d466904b2be407310c7817c24ff5"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.15793856499658432,
+      "guard_original": {
+        "bytes": 2650,
+        "sha256": "cad4c3ba023dc7aa33460b783067915d46f97d89700493764837d7d2823ccf36"
+      },
+      "kind": "ghc_typed",
+      "label": "baseline-0/ghc-typed",
+      "ordinal": 12,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3378,
+        "sha256": "e374af7d878f78bc2ebbef1e735a57cbb7558d8f567752ee7ad7e3cfec8a2055"
+      },
+      "stdout_original": {
+        "bytes": 166,
+        "sha256": "bbb9c99f36391ed62cffb978772b07bd8d38bbbbe099363eeb775b8df452044e"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 916,
+        "sha256": "1b6141c660c8392af9609b297c8c9278c5a22dcac8de29c1f5233a3f867cc982"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.5921296890010126,
+      "guard_original": {
+        "bytes": 1494,
+        "sha256": "cd55733136f8b8258d47f3fa3ca95c27f93107f6345a01f7ffcffac1e7737d74"
+      },
+      "kind": "reference_compile",
+      "label": "flat_functions-16/reference-compile",
+      "ordinal": 13,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 782,
+        "sha256": "dac460f844bff248d0384ed2d4c695018c4154c989ecb90c68d2bee18f9e910c"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.012740153993945569,
+      "guard_original": {
+        "bytes": 1356,
+        "sha256": "def10eb23db8d1c54cba1685db946c0792a7c24e80a46506a9ab8c2378b89154"
+      },
+      "kind": "reference_metadata",
+      "label": "flat_functions-16/reference-show",
+      "ordinal": 14,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 268,
+        "sha256": "c2eaadfc83faba0b4be28516d8d141cb02e11af5befd193542c5b6417812726d"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 798,
+        "sha256": "3acdccfb544792ddd79c7060ffaea60e84f9b1830ade143ff1acd85f737b0744"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7646592239907477,
+      "guard_original": {
+        "bytes": 1378,
+        "sha256": "b5303d85500d8e6fd12ecf3254c98f68fbe0188eb50fbfb8ce08e70106b1a85f"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-16/reference-formula--1",
+      "ordinal": 15,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "77a60c200656e08ac5403f38b58657ecec155293323bd5313290399b75cf1c3d"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 796,
+        "sha256": "b652fb76a50713a54e9394801aa17e4292a562203d630f56fa715ba881355478"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7110987049964024,
+      "guard_original": {
+        "bytes": 1376,
+        "sha256": "262e6e0e518260bb73c24bb352f3bf18b409f05822e282183fedef68c9d477f2"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-16/reference-formula-0",
+      "ordinal": 16,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "97b912eb4a61df5f806ca6239dde3e1a4f51ad20aced1642cbb83dc510a5fa6b"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 796,
+        "sha256": "f18df2cd69cc6c670359202e41284a89a7a83689dea6fc14a8ebd29d6f430842"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.641719702995033,
+      "guard_original": {
+        "bytes": 1375,
+        "sha256": "817eafcb04fbe0d10bddf9f68189b70b5cdaafd8dabb0849bd32a90ce5a98f36"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-16/reference-formula-7",
+      "ordinal": 17,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "d11a628c403b4dcd9fc5395b7f5b0a4f2f97428d98311217332f873266da9cee"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 998,
+        "sha256": "a4c70726e7ed5bfd062e52b60110aa2657e29c927299c83991063d8c51ee6d46"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.30970451299799606,
+      "guard_original": {
+        "bytes": 1891,
+        "sha256": "39ecb6435285c14a080ad0b331a8ed977432db08e4aa73a3f61e06d5e4456669"
+      },
+      "kind": "stats_compile",
+      "label": "flat_functions-16/stats-compile",
+      "ordinal": 18,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1704,
+        "sha256": "dac6816c1f02031c25f2d75a429be8ee0b10c38ac23089a77de416da258c0357"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.20228681300068274,
+      "guard_original": {
+        "bytes": 2701,
+        "sha256": "2ed151cae592782f68b699b2c92497fea8007223e1b7242f467a8049642d8b50"
+      },
+      "kind": "ghc_typed",
+      "label": "flat_functions-16/ghc-typed",
+      "ordinal": 19,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3409,
+        "sha256": "6cd7fbba20a6a7e47a2d33fed1481570bb0a69c859a647d0177f2f37da0cbb53"
+      },
+      "stdout_original": {
+        "bytes": 173,
+        "sha256": "b62bea71f008dfa2d6dc777acc3cda58aa18cf8c801f4670014d553793e6bacd"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 916,
+        "sha256": "20054541d225b25d31120b073ef9b89da147518c049cb2f19e754c83bafa4f57"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.37934467899322044,
+      "guard_original": {
+        "bytes": 1497,
+        "sha256": "883115d9c4fdbfd9806da75807e61c3d7bff7c16626f272418cf1cecc1d49dd8"
+      },
+      "kind": "reference_compile",
+      "label": "flat_functions-32/reference-compile",
+      "ordinal": 20,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 782,
+        "sha256": "c5d2be205eb70fe4ede382806898c999d36d5316afa00785f1c516bdc76982c2"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.014711865005665459,
+      "guard_original": {
+        "bytes": 1356,
+        "sha256": "715a9456374d33950408c270f964fcea5c72bd5d56d545f5d7222f6beebba14e"
+      },
+      "kind": "reference_metadata",
+      "label": "flat_functions-32/reference-show",
+      "ordinal": 21,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 270,
+        "sha256": "f0918ab38a5f9f1cf5105360e9b2ee15932bbc1b07a8287b6ea299e4f1ce1a2a"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 798,
+        "sha256": "4b3c2f2c648bfa89ad4198745c8fab9d54181e272d22fec8ef696209fbbf3337"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7327076939982362,
+      "guard_original": {
+        "bytes": 1378,
+        "sha256": "3967ca80a39d33e5838b0e4007df925344b9681c50d53196f928bb7344a92527"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-32/reference-formula--1",
+      "ordinal": 22,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "37aeed46a172d08e210fed9c4ad8922aeaa0d7a52faaee0fada64760d1741dd0"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 796,
+        "sha256": "5897f34247095577f35c89d52660a3f8105999644521d6d905409c1423789afe"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6254192779888399,
+      "guard_original": {
+        "bytes": 1376,
+        "sha256": "de1b491a693d0abcfd1e37f84e60573089c6d71c3edfda48f1cd88e0b3103825"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-32/reference-formula-0",
+      "ordinal": 23,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "ef73453a27cf6aa972f7aa1b0745f920a129c6ab5288cb005cb7c4e083d1d604"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 796,
+        "sha256": "cd9fa6776da9bdae9ac0ca715de150a242f70734874a1aec030da2b0b77b8244"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6046981669933302,
+      "guard_original": {
+        "bytes": 1376,
+        "sha256": "ea1f63714d92ed5b31d4191faa79cc5f4c698377577def6393354057a309c265"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-32/reference-formula-7",
+      "ordinal": 24,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "140154083d726867f5e43282aeaf021f9300ec6287d4d2c874493ee655a766e7"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 998,
+        "sha256": "336d58a96400f3701a39ae2bca457fb4b0140391acb991f78961eb7452534956"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.40926411299733445,
+      "guard_original": {
+        "bytes": 1891,
+        "sha256": "54bfec705fe9e20fc64baa66c29c08193ac41facf540f734eb36f308c5c3675b"
+      },
+      "kind": "stats_compile",
+      "label": "flat_functions-32/stats-compile",
+      "ordinal": 25,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1704,
+        "sha256": "8164b1b80c2ade23c2232296774685953b0ced9472fe03ced344c682ba15d107"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.1865273739967961,
+      "guard_original": {
+        "bytes": 2700,
+        "sha256": "bfbd14e617e7fc15bf1d365e30089be2290103e40aaadb33595cb722f019161f"
+      },
+      "kind": "ghc_typed",
+      "label": "flat_functions-32/ghc-typed",
+      "ordinal": 26,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3410,
+        "sha256": "c57d1bff81cf78645004c35f307cca4a4e4eafe078e6f751586bad63496d7c45"
+      },
+      "stdout_original": {
+        "bytes": 173,
+        "sha256": "17afa0d2270a080abd7ce1a80e9413cb3680343ccaa47056559a4d0040b974c5"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 916,
+        "sha256": "cd7acaddcacf019e7a5b24458bd79f7f23d09495bc0921eb2dbaa99b777aa5f4"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.5073137650033459,
+      "guard_original": {
+        "bytes": 1496,
+        "sha256": "941a7d0375663df152a082ac209d564c427a568fe5bccf0630d94f33110c2371"
+      },
+      "kind": "reference_compile",
+      "label": "flat_functions-64/reference-compile",
+      "ordinal": 27,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 782,
+        "sha256": "b00d322cda3a9a02b6f3c4e09154b32dbc04ee97debf07d3708a598ec8e5f64c"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.01986900701012928,
+      "guard_original": {
+        "bytes": 1355,
+        "sha256": "18e672cf3c79e41c6b6caf07361ce0d7830e9d1209c5bb01539879538152326f"
+      },
+      "kind": "reference_metadata",
+      "label": "flat_functions-64/reference-show",
+      "ordinal": 28,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 270,
+        "sha256": "c3717f4a73fce201cb5a87e7a0ed249855454a1d494bbf4c14fe6bd4417406be"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 798,
+        "sha256": "10001bcf85b739bb0a15ea988de149687d53eb3ebcc4cc3c7bd1efa20bc8ed49"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6521060220111394,
+      "guard_original": {
+        "bytes": 1378,
+        "sha256": "018587538de77a258674a9f1aa8c2e583f395f061a5aa7b587876c16bc5db4a3"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-64/reference-formula--1",
+      "ordinal": 29,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 5,
+        "sha256": "a3ef55d2e6f868251b1fe5ab068fc61dcbeb108f0ccc18d2bfbb2529a1ee471d"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 796,
+        "sha256": "1bb45bdab49b91f77aaaa01c572508f3185c386d4dff5d96d09fa4ea2f41a9f7"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7222949310089462,
+      "guard_original": {
+        "bytes": 1376,
+        "sha256": "6808081c616cb2798beed5b324598f3eb2579a479bd29433cc01640150639983"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-64/reference-formula-0",
+      "ordinal": 30,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 5,
+        "sha256": "efa943ab4845310e8eee3c84caf4c74dee20fc3340a205d1d51bfb077840be1b"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 796,
+        "sha256": "f175137e8758121538743d16ec703c9223f9bfd8551d99a93de3d1e087fb4802"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7168482350098202,
+      "guard_original": {
+        "bytes": 1376,
+        "sha256": "fd7ab20f5ce8380bee9505fc2dd34fbb04d875c27c51c4e6113214e9170b68a0"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-64/reference-formula-7",
+      "ordinal": 31,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 5,
+        "sha256": "1de1853f8d828a6a581bcaeebe0c0a2a538d1fdc14aa24392d353549281b7360"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 998,
+        "sha256": "e185a3be16c2617ccdc2c1cc3dc0ade45e5d6e1beccd4710567f66ebf1aca9a4"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.5056163980043493,
+      "guard_original": {
+        "bytes": 1890,
+        "sha256": "438a4b19a6a9f67549b850d0fec5f39f007aa7652310778ea7544ab6bdf26c59"
+      },
+      "kind": "stats_compile",
+      "label": "flat_functions-64/stats-compile",
+      "ordinal": 32,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1704,
+        "sha256": "9cac06d2cc75064254ce6a2bbaa85b2798297a68008fd2136b1926eac25eda51"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.16390652699919883,
+      "guard_original": {
+        "bytes": 2701,
+        "sha256": "7601b8b1cc2aaedd3fa1577edc2b76c7d07cee7b1e7cfa876ada02865e359e5a"
+      },
+      "kind": "ghc_typed",
+      "label": "flat_functions-64/ghc-typed",
+      "ordinal": 33,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3410,
+        "sha256": "e44d73a8066be770e6f9ee522f7bb4c57e5f24ca72ecaeb577aec7e8facc9bc6"
+      },
+      "stdout_original": {
+        "bytes": 173,
+        "sha256": "6f3abfb12e8459392c615e67eb06501f1665141e25230851f11bd4cf0ccaec5d"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 919,
+        "sha256": "42abcb241e7770e1fce9abfcfa12f2651ff2d8881a33f7001a56fe8d8139a4d9"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.8392327490000753,
+      "guard_original": {
+        "bytes": 1522,
+        "sha256": "efe838a5802854a3bd17a5b1dab2d7c4403311e7c9243c8dbd338616a2bb7d6e"
+      },
+      "kind": "reference_compile",
+      "label": "flat_functions-128/reference-compile",
+      "ordinal": 34,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 784,
+        "sha256": "7b60353845cdff447b93676939d56ab7ed1abd013780bb3b6d60a0e407945d32"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.029853678002837114,
+      "guard_original": {
+        "bytes": 1358,
+        "sha256": "72d992f294a1484a7f73d00538e37ac211e52bf8c0899805038969fe4b58c164"
+      },
+      "kind": "reference_metadata",
+      "label": "flat_functions-128/reference-show",
+      "ordinal": 35,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 271,
+        "sha256": "ddfba851561bd1246e43fbd607451265c45758a5955157e87e4bce51d9fdcad3"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 800,
+        "sha256": "2d57c4a73fc0b921bb5612971688af1fddd6dafc9a8de2468a77ae4edb70a474"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6296831789950375,
+      "guard_original": {
+        "bytes": 1380,
+        "sha256": "8a30d173b42e4db42844361646efdcfd2bd5af0d4f14435c2e6a756cf943e58f"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-128/reference-formula--1",
+      "ordinal": 36,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 5,
+        "sha256": "06516f7a6e849dd3bbe5e3cd905cbaf7dab8f059572d2586adde4eb88ceabdd3"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 798,
+        "sha256": "673735a02dfdd6ff115fa75b52d07eb83f0d3fe01765d88dc3ca244737f60228"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6545913370064227,
+      "guard_original": {
+        "bytes": 1378,
+        "sha256": "1c07a4188dcc3d01f38e1fb12c5fefbab0d969348c405cd7006e197dda56eff8"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-128/reference-formula-0",
+      "ordinal": 37,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 5,
+        "sha256": "fd458e29108a6107679314c191538fb361cfbf7c6317f6c24950263fae8b9daa"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 798,
+        "sha256": "af1d76f7b1b52f6842782a0f9e5e99221ba4f76486c585bf349c7b645998a880"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6650557469984051,
+      "guard_original": {
+        "bytes": 1378,
+        "sha256": "501ced0ac3c765543b47f6861bef62d7c79567a9ef1c4148ccbb79a440589a02"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-128/reference-formula-7",
+      "ordinal": 38,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 5,
+        "sha256": "698c32f495d958562fa5a5d17a66efa4d1ad28805b7f79f6d8fb0a58a9821cc3"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1001,
+        "sha256": "3fece9b12856db8b5fc6296920153638aae862741eb03e11d41742cec1998cd7"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.9281049559940584,
+      "guard_original": {
+        "bytes": 1917,
+        "sha256": "760194145d1cc97df5557df0b4968be54fab266ef54bb6b1956db459fe6c73ea"
+      },
+      "kind": "stats_compile",
+      "label": "flat_functions-128/stats-compile",
+      "ordinal": 39,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1710,
+        "sha256": "01bd1e2675a5b517e4669339fdc5465be4e6fb7c5a67eeb920632a6ac42cf419"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.4079850909911329,
+      "guard_original": {
+        "bytes": 2707,
+        "sha256": "a260e7fd415e26f849688086fe2dad6ba2592ce7d442eecd7ba411f6c141fd37"
+      },
+      "kind": "ghc_typed",
+      "label": "flat_functions-128/ghc-typed",
+      "ordinal": 40,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3419,
+        "sha256": "a6dfe2e3c985ca8ce8a4d85ca6d586cbb0c3258fac1635f6609378510d232987"
+      },
+      "stdout_original": {
+        "bytes": 174,
+        "sha256": "a2956cac60e5ba505f71f8d7557a514a5ead3b00086495c881b57f7006c8b8b6"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 919,
+        "sha256": "6f769c170ee04f5ef2a6b2160b1ab68ef7fa581b2ad033e592ec1b3ae5111686"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 1.8184125059924554,
+      "guard_original": {
+        "bytes": 1545,
+        "sha256": "57c8170113c7f87889d57f6ee714c9679a0717cb53ee8528c0e5d556cdc87e0e"
+      },
+      "kind": "reference_compile",
+      "label": "flat_functions-256/reference-compile",
+      "ordinal": 41,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 784,
+        "sha256": "3d56033a32c3f280aee4f1d6ddd5f3ab43393fe914ee60b59dae4f838b814098"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.0369095380010549,
+      "guard_original": {
+        "bytes": 1356,
+        "sha256": "abfea514e828933285469f1f28aab9601535127413abb0f27c555cc5cd1d994a"
+      },
+      "kind": "reference_metadata",
+      "label": "flat_functions-256/reference-show",
+      "ordinal": 42,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 268,
+        "sha256": "dbe0e36daf7e81670197e92cb61967be6dedccb3f8140b4bc7090880bd8e033c"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 800,
+        "sha256": "483a37107ead13330472771309c792d5f25967f9ad75c713610d82d9db67e054"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.8608532369980821,
+      "guard_original": {
+        "bytes": 1380,
+        "sha256": "7bd6afe244938aecde0d6a2a31000fb373292e403f5bad5da080c9d3949f3039"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-256/reference-formula--1",
+      "ordinal": 43,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 6,
+        "sha256": "d50f8d7c9e23c85816b6932338e2da133bf25a3d4615304aa7d09f37aa354b97"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 798,
+        "sha256": "31d67546349a59b5ab9174444a32153b116a14f2e1aa5c8cda66021de09732a8"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7713331059931079,
+      "guard_original": {
+        "bytes": 1378,
+        "sha256": "a403494a7fb9284ab0d97ef78142e09887cf804cf4167e5dda90bcda274789d6"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-256/reference-formula-0",
+      "ordinal": 44,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 6,
+        "sha256": "762f4631523bb1bcc15d4617a61806fc7130be62e5891484a53cec1c980fe17c"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 798,
+        "sha256": "52b84a1b1ad576f6372b0fb8061f50eaf03a2e216d6b545276d95ca7e7dc2712"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7981117110030027,
+      "guard_original": {
+        "bytes": 1378,
+        "sha256": "f97af1fafbf6adda479fd1061896fb677f80b14120253b17093e6cb4ad633cbf"
+      },
+      "kind": "reference_formula",
+      "label": "flat_functions-256/reference-formula-7",
+      "ordinal": 45,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 6,
+        "sha256": "d2e93e0d082a0297d72ab32d12eb8ad4345965eb2b3f526ec6980ad72f56df80"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1001,
+        "sha256": "0904170f90c9a9217bd8c8df2aab328e96c71a6eea62f0f7656ddfc0a41fe1a2"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 1.5943437880050624,
+      "guard_original": {
+        "bytes": 1894,
+        "sha256": "9903101a6a89751b9f1556697112ffe3e820669ee881c60ba6350c6f04a24b36"
+      },
+      "kind": "stats_compile",
+      "label": "flat_functions-256/stats-compile",
+      "ordinal": 46,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1710,
+        "sha256": "f6b2e75a4b566098dff87465ecfda80b1458651f5b3ed3969e9c5f5611183726"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.3289551249908982,
+      "guard_original": {
+        "bytes": 2707,
+        "sha256": "0c69c777f88a5347b56d69096dd316384eaf9dc90a80b4951038f1f96dc592d7"
+      },
+      "kind": "ghc_typed",
+      "label": "flat_functions-256/ghc-typed",
+      "ordinal": 47,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3426,
+        "sha256": "69158de9d2037f1ddb2e32b023d884af07eeab718d370eaedc7efd78e742e9c4"
+      },
+      "stdout_original": {
+        "bytes": 174,
+        "sha256": "ae14ff98c9b46e5133ae86f34ef99a364bbaf89a1d7c52fa266c26bdedc7a3e5"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 928,
+        "sha256": "80295d51addc2a087073a13cbadde05605f3807199af569e1da43c21f82770bb"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.30138546400121413,
+      "guard_original": {
+        "bytes": 1509,
+        "sha256": "d845f29191cda6636d01c7a95b9f9570a9197d76877d2a6786eb3bb31fc47761"
+      },
+      "kind": "reference_compile",
+      "label": "higher_order_chain-16/reference-compile",
+      "ordinal": 48,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 790,
+        "sha256": "c220a8a2c74e2a9e97985bbb84051e40858d1ebb38c5b3a64fcb8466268fb9f3"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.042466701997909695,
+      "guard_original": {
+        "bytes": 1364,
+        "sha256": "98cd01b0d82ed5c97b80bcecbdfa6f70e795ec117f590c95d4392caf128425b7"
+      },
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-16/reference-show",
+      "ordinal": 49,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 273,
+        "sha256": "18aa079f49ed93259ce7d67b84f15f6645e1144f61b0a7241270dce78fe50f2a"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 806,
+        "sha256": "6ad4436e87003353081c04e5c2abbff6e0dffd0d6da92669e09fb680e446a41d"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7000303210079437,
+      "guard_original": {
+        "bytes": 1386,
+        "sha256": "af10c38a78870e2368d2db73a5822ade61df34d86d0bd4d05df3048d4d473f48"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-16/reference-formula--1",
+      "ordinal": 50,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "238903180cc104ec2c5d8b3f20c5bc61b389ec0a967df8cc208cdc7cd454174f"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 804,
+        "sha256": "027ed340f5edab9db863c8937244d7a6558b18f2ce6c75cf701ffef45e39b312"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6327139060012996,
+      "guard_original": {
+        "bytes": 1384,
+        "sha256": "3a2d466d5070e108a224e49ba4b1febcc730c59fd8144c520f069b1cd3230b01"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-16/reference-formula-0",
+      "ordinal": 51,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "e6c21e8d260fe71882debdb339d2402a2ca7648529bc2303f48649bce0380017"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 804,
+        "sha256": "34cbd40a7a111682b75dc48846368116e384b4187fa5d8ce6ef2524cc0b73bb0"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6617646960075945,
+      "guard_original": {
+        "bytes": 1384,
+        "sha256": "98b36ad633d37945828b034dfa3aae1f34eaf02d43f48069db8769dfead86f88"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-16/reference-formula-7",
+      "ordinal": 52,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "076320a2a08267b4c026d06573bba408ea68841e73cdc20e62cce59de165ece3"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1010,
+        "sha256": "3faf71f294d9f2045e280f898c08d7f90c329ea460b3d20987e4d959fc37e6d7"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.3073550639965106,
+      "guard_original": {
+        "bytes": 1906,
+        "sha256": "06f88335427da810e9b21cebaec9347d8dbd5ec7e8214f7721bb2f26cc2916c7"
+      },
+      "kind": "stats_compile",
+      "label": "higher_order_chain-16/stats-compile",
+      "ordinal": 53,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1728,
+        "sha256": "a40d567fc2595bc566915dfc4c3d23b1fb7e0136aff31fa44a2ede751b761704"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.17716876800113823,
+      "guard_original": {
+        "bytes": 2729,
+        "sha256": "c25405c338c92ef2ee5337cc014e35ca33d7d1a1b87b562c307e0f3d8e98ae2a"
+      },
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-16/ghc-typed",
+      "ordinal": 54,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3422,
+        "sha256": "b66f7711655d706992d723f5f0d530bc8ed876b6b84c55af67d839b80923e4bc"
+      },
+      "stdout_original": {
+        "bytes": 177,
+        "sha256": "42fbc82a0e17aba000815588cdafe8fe69f5587107d926f29b57d1444a1f1750"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 928,
+        "sha256": "a3aaf281f6992c1fc114702cbf42a93920c86b25ff4b751647b593c69c51115f"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.3147361989977071,
+      "guard_original": {
+        "bytes": 1531,
+        "sha256": "ed08ac241ca4846e93673bd42f2cf4ef99ba28f6731e057e4939c4f77e8b2f41"
+      },
+      "kind": "reference_compile",
+      "label": "higher_order_chain-32/reference-compile",
+      "ordinal": 55,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 790,
+        "sha256": "414c1df97dd35b2d608af6cc853cd564d0f4aabfec6b12b074d7de383a568d5b"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.04428765700140502,
+      "guard_original": {
+        "bytes": 1363,
+        "sha256": "e12d528a3b207e41c8d6e9b2ab9f2a52a9b30d0c6b58a55f8ea435a4a465d3c4"
+      },
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-32/reference-show",
+      "ordinal": 56,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 274,
+        "sha256": "2b2b8809f847377542faa91cd691d82f2bc59b59154ae75c9500113b16377a17"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 806,
+        "sha256": "f7ab2e9f8f43ceedec6ef1a1603b0321949fd3a030bc6433add359ad49e04cd9"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6752743289980572,
+      "guard_original": {
+        "bytes": 1386,
+        "sha256": "ed6416876d6e68a59b9bddd2326afa6b0a45777f7dac8178627cc3bc922a08dd"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-32/reference-formula--1",
+      "ordinal": 57,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "32c2643e0dc65524c9f1f6f9f00937322fd68d59986bc381d9ff2285d23e353d"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 804,
+        "sha256": "cd136f2f54be1acbe87948aec1e772c54cd2cd332d7e9c8fe2f8e5dd2bc6be6b"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7155820409971057,
+      "guard_original": {
+        "bytes": 1384,
+        "sha256": "e6576150a2db9d86e67fac48fd47d6ff54898f608ea213529f11158a99647d79"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-32/reference-formula-0",
+      "ordinal": 58,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "2115cdb6bfcfb008eb2bab2bb79347cb064a48e4e7c4115ccbe4469c787bb6c4"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 804,
+        "sha256": "c028b589f83d94ea52d8acbb8eae0b3d4e0d520ba6e0c7b8abf13579382cddc6"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7798651659977622,
+      "guard_original": {
+        "bytes": 1384,
+        "sha256": "80f4007a188a5845b2281e79569206c508bb9707accc649ea333be204cb704f0"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-32/reference-formula-7",
+      "ordinal": 59,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "eedb85ab90d324a555a45560d75c88cecf23721990c3b6353697d707e6465c74"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1010,
+        "sha256": "bf20041b6f455751484635cdfb3b7fa049aa003d454ad3e22fdfebc2e3168140"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.3076849099888932,
+      "guard_original": {
+        "bytes": 1906,
+        "sha256": "026792d6bcfc3e82052a3d6f4ef4da47515074a9199d3420c7338253406378cd"
+      },
+      "kind": "stats_compile",
+      "label": "higher_order_chain-32/stats-compile",
+      "ordinal": 60,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1728,
+        "sha256": "df14155dfb73f17ffee2c5d53357cd806f81ada9f1a800663168a0c96487d77e"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.18809229400358163,
+      "guard_original": {
+        "bytes": 2729,
+        "sha256": "fece0a081e4a161d6d7810953b3b0843d9ae65b142ff17d738c9623f8e90fb49"
+      },
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-32/ghc-typed",
+      "ordinal": 61,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3426,
+        "sha256": "397746d6cd2a305ae5740cb0aa7b850664c2720958fde52eb9e9c73a15782cde"
+      },
+      "stdout_original": {
+        "bytes": 177,
+        "sha256": "e575616087d52e6da20c4bfb162a3709506b40eeb39346be909803d6818dcd2a"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 928,
+        "sha256": "7b17164ad7cfcd28f91eb39e6e9c407e815464a0d097aab40e7225e443ed02a3"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.32773972299764864,
+      "guard_original": {
+        "bytes": 1509,
+        "sha256": "05dba2712ae81d08e0109577a63ec97bacba73d5d69d3635287b15d5b7700d48"
+      },
+      "kind": "reference_compile",
+      "label": "higher_order_chain-64/reference-compile",
+      "ordinal": 62,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 790,
+        "sha256": "f4fa474549ca9d915404e0eb7a8d44d1bd94da3609dae115c5c7b0f46652d786"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.04760781199729536,
+      "guard_original": {
+        "bytes": 1363,
+        "sha256": "925e4e7428f6eef932c8159622a885b45a6f93c178b99e30705a475aab6a1d5d"
+      },
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-64/reference-show",
+      "ordinal": 63,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 272,
+        "sha256": "64bc4618a3211f9fe229a170b7285eb30a7c9603eacd47a9085f13deb3709019"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 806,
+        "sha256": "e0c4b74f66a38162e587269880e7a18f6d1f5b358589f787053f8c48271415b9"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.9066982340009417,
+      "guard_original": {
+        "bytes": 1386,
+        "sha256": "0f89faf094ba1dd58bea6526a3d841bf1feb61a66de3e7a49905408b21ba15d4"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-64/reference-formula--1",
+      "ordinal": 64,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "eecd262c3ecab667b61ebb70835f3b181a1d1530d3ebc0ef99a3a8dc3d5b193f"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 804,
+        "sha256": "f078e953b3a81a8590f8146dedf8b5faf6bc549ea8fd7c29bb6cb101af85f518"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6449091270042118,
+      "guard_original": {
+        "bytes": 1384,
+        "sha256": "04f09f051a8cd377df5d694525e372a63cbc6f696465ffc28c0550f46388373a"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-64/reference-formula-0",
+      "ordinal": 65,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "913f5d1da2feaf4deeccc9e55cbb350a20f12b3f507e87be85dbb77fdd3cb9bc"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 804,
+        "sha256": "db7e8a06fdfbf498a5ea830e5a9e39c7ac06ab08a460ce82fc1cc481a23345f7"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6189746010059025,
+      "guard_original": {
+        "bytes": 1384,
+        "sha256": "a2d72a9e387a67566513be05d9dcbf42609505b9a81ba97ec2ff413160daee4a"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-64/reference-formula-7",
+      "ordinal": 66,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 3,
+        "sha256": "826b6832e45ba17d625debc95ae8554e148550b00c05b47fa8f7be1c555bc83c"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1010,
+        "sha256": "c78cbbe9fb69730ce26d25f93518ecee2b7fb4c3facb01c59260af872b38a560"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.40813218599942047,
+      "guard_original": {
+        "bytes": 1907,
+        "sha256": "91664b18569c94157012ea79dacf6c05a9f3780272c4ba361578b105101aa402"
+      },
+      "kind": "stats_compile",
+      "label": "higher_order_chain-64/stats-compile",
+      "ordinal": 67,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1728,
+        "sha256": "5f94337359d6b4bf3e68abde54e4684a9066047f47ed598f4129a69e0aee3a44"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.2062502650078386,
+      "guard_original": {
+        "bytes": 2728,
+        "sha256": "8280acfbce019e271b2c9bcbe20605660296640c20b60987e3ad4f2b82921d7a"
+      },
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-64/ghc-typed",
+      "ordinal": 68,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3426,
+        "sha256": "22644fd45dc61b1c309a2a0a03d1227be629008f98273cce64d9261802a566b8"
+      },
+      "stdout_original": {
+        "bytes": 177,
+        "sha256": "2a7cd9f82b1c8dc95239d52790197780ece8b566b1e04b169d31f5a2bd1637c9"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 931,
+        "sha256": "082a07ec84f0f77d77b73b4b931d22f327838b39b3ef907fd92df233cc9bb67c"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.4273480190022383,
+      "guard_original": {
+        "bytes": 1511,
+        "sha256": "6ff5ae7617be0fd836b095883a068d937f6b7eaec929dc7e1cbf0f27575620b5"
+      },
+      "kind": "reference_compile",
+      "label": "higher_order_chain-128/reference-compile",
+      "ordinal": 69,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 792,
+        "sha256": "c5ba1a626b4ac266ea106c5f184b8359e8e55d4c8b675871b8467ceb75cbbdd1"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.11063798599934671,
+      "guard_original": {
+        "bytes": 1365,
+        "sha256": "3065bbb221a91f76155beef2b1b16b7c49c700c8e033b0187ac3b5405bc6edc4"
+      },
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-128/reference-show",
+      "ordinal": 70,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 275,
+        "sha256": "c048a733aa01a5dfe2643dce9f649cc54ddccde50c2aab05aff59a66fbc5a2ca"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 808,
+        "sha256": "f6d2255775ea42f6a7a6f7c0cb154f23be843b08213309fbd93cb04e6998752e"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.812160635003238,
+      "guard_original": {
+        "bytes": 1387,
+        "sha256": "3820990f0ea3fc97bcbc20d714172c4048303fa28dda7117a86a1e6ba097ca16"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-128/reference-formula--1",
+      "ordinal": 71,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "743c7850cccfba5e53a9002663ec1ddd1079315a98bdbfdde10e6044f56abefe"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 806,
+        "sha256": "fc632bd213090ce0f81296544155da31b32acfd512061850d9fd3d6b706a3413"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.6503533429931849,
+      "guard_original": {
+        "bytes": 1386,
+        "sha256": "49f8e2ce4d55895bc88a0e33b90763326475ad9186b8a1f8042a440f2505549d"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-128/reference-formula-0",
+      "ordinal": 72,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "56292515f7d3a7110811eb8de26b3f75f82a0766aa5a1fd66ebcfcb84fe6d5ff"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 806,
+        "sha256": "b727c99667d56fa622f6db58d71e3b3550822432fcc696abb0778ee265f3429a"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7210187999880873,
+      "guard_original": {
+        "bytes": 1386,
+        "sha256": "e0d89be0738004f58a6f631ac797010b5eb58db7088772fbc5f86ecbf30ef91d"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-128/reference-formula-7",
+      "ordinal": 73,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "35696336da00b304d91bb78c4be84c0e975baa9ee85d1b26d4a0168203c19288"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1013,
+        "sha256": "8240ad6573f2c01ae18e3b3111711b994c59fa4e04671f26308e8cf7862e220f"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.4847165009996388,
+      "guard_original": {
+        "bytes": 1910,
+        "sha256": "696ffafa87f282311b4e0c22db38bf0e6df7b310c8d6917d0c771f9d185b90a2"
+      },
+      "kind": "stats_compile",
+      "label": "higher_order_chain-128/stats-compile",
+      "ordinal": 74,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1734,
+        "sha256": "c152a82d05058d1b5e21d62693a6196a7412ca1d4878513454ca302eec5a534e"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.26716065098298714,
+      "guard_original": {
+        "bytes": 2736,
+        "sha256": "b2e754fecaeb1d0cefcb5642db9a81c786e60ffe4f73e5720a20205e506dad78"
+      },
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-128/ghc-typed",
+      "ordinal": 75,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3430,
+        "sha256": "defe61c877288e06c6f533eb9114c41d84815d9f6c34ed71f0eb166805a688e7"
+      },
+      "stdout_original": {
+        "bytes": 178,
+        "sha256": "13074268084aa505332a08281411f43184ff38163ca7092ba7376314977f996f"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 931,
+        "sha256": "41fb4c0f26e699af900bf0a7b5dac71b6185994fe6e1b7ffa20ce97da83fe90e"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.5771891199983656,
+      "guard_original": {
+        "bytes": 1511,
+        "sha256": "486727920f0c4aeb71ba383d9bdda2ec5932678f514e0cd0759a340abf98c782"
+      },
+      "kind": "reference_compile",
+      "label": "higher_order_chain-256/reference-compile",
+      "ordinal": 76,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 792,
+        "sha256": "bd86737df0e6f9e5ad88fa39c2952861cc0095a8db5a631a4e1fee0ae67fc238"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.054074749001301825,
+      "guard_original": {
+        "bytes": 1366,
+        "sha256": "91150e0eb2b54bcd7a63298bcc0cba5cde7c55681a3bdfb5c4be2b505241c898"
+      },
+      "kind": "reference_metadata",
+      "label": "higher_order_chain-256/reference-show",
+      "ordinal": 77,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 275,
+        "sha256": "689f91b90ca07eaa6fcabcf31744f748a193e9706ff6376fa6e6b2f3c1a37e22"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/unit.mlfci",
+        "--",
+        "-1"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 808,
+        "sha256": "641ac02cbff611b38b7da5834de74165db1940f18afc00e32b7978b112e7a355"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7338830060034525,
+      "guard_original": {
+        "bytes": 1388,
+        "sha256": "42f11f2c3edd22059d6950bb68ba0462ff062d2dd836a0a5fb47a55f5d4905c6"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-256/reference-formula--1",
+      "ordinal": 78,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "ce8bafb38615aeb5d44ebbabe78ec14ac35a5de87bdc5ad5ea82a72656024ce4"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/unit.mlfci",
+        "--",
+        "0"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 806,
+        "sha256": "67830b6a75a07e69bc700722435febdecfbf364c5c75b2396709e620b381bc98"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7613208260154352,
+      "guard_original": {
+        "bytes": 1386,
+        "sha256": "ca58f9cef1b39ade3df68688d89a920af62ee7f8b3274f6d80dd91acb5d41dc8"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-256/reference-formula-0",
+      "ordinal": 79,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "f16c302d5d30e1d3fbe955cf4f637f58a871adeba597922e3baad0aeeb13f656"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--run-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/unit.mlfci",
+        "--",
+        "7"
+      ],
+      "cap_seconds": 5,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 806,
+        "sha256": "47f5af57ff359a0f46b81240b9ca8715021fa9b6d91eaa114ad92fb1afdbd509"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7127325579931494,
+      "guard_original": {
+        "bytes": 1386,
+        "sha256": "7be1e0b7ee626282205daa8a27542fbe8effb743b7fa1f234c65d5735925b14a"
+      },
+      "kind": "reference_formula",
+      "label": "higher_order_chain-256/reference-formula-7",
+      "ordinal": 80,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 4,
+        "sha256": "d90d04a5b890e6422528e44b9b30aebc34389e7b470584e87ad9de08cf31faf9"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/unit"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1013,
+        "sha256": "fcdda80e4d99e9e3b33ed8a6b6ec3729ee1fcf83afdca24aded940bd7a4242f9"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.7274159230000805,
+      "guard_original": {
+        "bytes": 1933,
+        "sha256": "7657dbda143e637b107fecf75911c9a8937b6df667f8e104d3508afb274964b6"
+      },
+      "kind": "stats_compile",
+      "label": "higher_order_chain-256/stats-compile",
+      "ordinal": 81,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 15,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 1734,
+        "sha256": "922aef7a2d3ee1f2f7e69686f6a09f5b65522fe044b36efae9f0fce2e4bc5d86"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.25114712299546227,
+      "guard_original": {
+        "bytes": 2736,
+        "sha256": "668c7289ffb72d23fa815026b9e65fc88745eec62a613beea14599b9e2016974"
+      },
+      "kind": "ghc_typed",
+      "label": "higher_order_chain-256/ghc-typed",
+      "ordinal": 82,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 3430,
+        "sha256": "cc8ee88d452c39300dc991e6e77d3243be5a9b0da9598ea48f5c7f1a2671c726"
+      },
+      "stdout_original": {
+        "bytes": 178,
+        "sha256": "ff14d0c33e1dedc71b582df30db47c9ff0cafbe5cd7e353b948efe2ca54c8fd7"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/unit"
+      ],
+      "cap_seconds": 52,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 901,
+        "sha256": "b1fcc87137e3c2b6933ff6857912c6898a8df097f05a4dd406e678241d8bdff8"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 21.58056499599479,
+      "guard_original": {
+        "bytes": 1549,
+        "sha256": "95b5e0562e9cc8a0c6d0cabef600cf7a36b7ab3fef68fbe05db23a8bb55ac72f"
+      },
+      "kind": "reference_compile",
+      "label": "foundation14/reference-compile",
+      "ordinal": 83,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+        "--show-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/unit.mlfci"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "config_original": {
+        "bytes": 772,
+        "sha256": "5669ee73c760efe945729d85f058712f6ef3a4c83a826f1c9432eb024645b24c"
+      },
+      "exit_code": 0,
+      "guard_elapsed_seconds": 0.17268936699838378,
+      "guard_original": {
+        "bytes": 1345,
+        "sha256": "d512bdbacdedc7f9fe1a01e2573c1775406540489563ce288f7fd4fec7667634"
+      },
+      "kind": "reference_metadata",
+      "label": "foundation14/reference-show",
+      "ordinal": 84,
+      "reason": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 32746,
+        "sha256": "280d8008def4c52d38432a4d4f2b9317a7896e7d2c8a31ae36727bb81557f3ef"
+      }
+    }
+  ],
+  "stage_failed": true
+}

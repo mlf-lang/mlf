@@ -1,0 +1,215 @@
+{
+  "GHC11actual_interfaces_only_verified": true,
+  "activation_review": {
+    "bytes": 4137,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-activation-review/report.json",
+    "sha256": "69dad57be6774edfcb15d862207f04c1486553bc8197a9dc294a073c85b85475"
+  },
+  "actual_RTS_count": 22,
+  "actual_SEMANTIC_passed": false,
+  "actual_commands": {
+    "bytes": 127504,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/actual-commands.json",
+    "sha256": "0a5049b73bfc24acb6f1333205df004921d899f284a5a15da1e7cdf4d554d352"
+  },
+  "actual_statistics": {
+    "bytes": 57371,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/actual-statistics.json",
+    "sha256": "c52d62b145533836bc548f2dde5535e9b73ff2df5564611522b2d3cc5c255108"
+  },
+  "all12_observed_original_routes": "source",
+  "all12_original_references_authenticated": true,
+  "blockers": [],
+  "budget_passed": true,
+  "cell_evidence_inventory": {
+    "bytes": 1422890,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/actual-cells.json",
+    "sha256": "350a510154194b3d61d2538dbae61a00bcfcb0fea2342d9bbbdaa9e8e7c13ed6"
+  },
+  "checks": {
+    "bytes": 1200,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/checks.json",
+    "sha256": "2091b3b81431243de73fed49428b55726b2f7f2e31e8187ca042243bf8fc3189"
+  },
+  "child_config_argv_caps_and_archive_sets_verified": true,
+  "child_guards_all_exit0_complete_cleanup": true,
+  "cleanup_lease_locks": true,
+  "command_prefix_count": 84,
+  "complete": true,
+  "complete_actual_guard_binding_verified": true,
+  "complete_cell_count": 11,
+  "complete_means_review_complete_not_stage_PASS": true,
+  "configuration": {
+    "bytes": 33183,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/BINDINGS.json",
+    "sha256": "5523077a043c3bd130ec2f2fcfc20c1acb4afd125b31fb7472d644db521a15fb"
+  },
+  "cost_observation": {
+    "actual_child_guard_elapsed_seconds_sum": 60.66947757793241,
+    "difference_seconds": 535.8702809850511,
+    "outer_guard_elapsed_seconds_excludes_cleanup": 596.5397585629835,
+    "performance_samples": 0,
+    "specific_function_attribution_proved": false
+  },
+  "cross_binary_structural_identity_exception_only": true,
+  "cumulative_ns": 596647140326,
+  "current_runtime_bindings_rechecked_read_only": true,
+  "deadline_failure_only": true,
+  "elapsed_includes_cleanup": true,
+  "elapsed_ns": 596647140326,
+  "failed_scope_preserved": true,
+  "failure_review_passed": true,
+  "failure_trace": {
+    "consequence": "All checks earlier in that recheck returned; no Foundation B command or final runtime-after callback was reached.",
+    "location": "frozen worker.py line156 self.recheck -> line52 shared deadline",
+    "outer_reason_is_generic_not_exit124": true,
+    "raw": {
+      "bytes": 1676,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/build.log",
+      "sha256": "eecdd3ea660419f5f48969689e344919ec80f0aa78f164d47da2f64001e7117a"
+    }
+  },
+  "foundation_B_executed": false,
+  "foundation_GHC_executed": false,
+  "foundation_reference_contract": {
+    "bytes": 1326359,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/reference-contracts/foundation14.json",
+    "sha256": "a867efe09b8fba5be093a4dfcb8be632354ab3c7077ad140e1e3ffbf09e2538c"
+  },
+  "foundation_reference_query_rows": 3221,
+  "foundation_reference_result_files": 1478,
+  "foundation_reference_verified": true,
+  "full_raw_private_originals_not_all_in_this_archive": true,
+  "guard_elapsed_seconds_excludes_cleanup": 596.5397585629835,
+  "immutable_input_count": 6839,
+  "immutable_inputs": {
+    "bytes": 1942174,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/reusable-input-inventory.json",
+    "sha256": "0aa6dc44108822e593a24134d62fc40bca0a5d4e83a8d1de538674704dfe27b9"
+  },
+  "inventory_format": "json-array-of-full-pins-v1",
+  "limitations": [
+    "Complete=true describes this independent failure review, not the failed SEMANTIC stage. No consumer may interpret this as a completed91command qualification.",
+    "The original worker outputs array was empty because finalization was never reached. Independent complete scope/output inventories preserve the partial evidence without rewriting that receipt.",
+    "All11 completed cells and the12th original reference are established evidence; missing Foundation B/GHC and five old runtime-after callbacks are not established.",
+    "Current read-only file/runtime checks and the executed immutable source support provenance; they do not retrospectively execute missing callbacks or guarantee against external malicious file restoration.",
+    "Per-child actual caps and same-scope launch binding are verified. Exact pre-child monotonic sampling instants were not separately logged; the clamp follows the authenticated executed source, not an invented timestamp.",
+    "No allocation/wall speedup, whole compiler parity, allCI or native-generation conclusion follows from qualification controls."
+  ],
+  "main_source_files_verified": 3876,
+  "native_generation_AB_fixedpoint": false,
+  "no_helper_or_module_top_level_executed": true,
+  "no_loader_compiler_target_guard_lock_executed": true,
+  "no_original_scope_or_receipt_modified": true,
+  "original_A_byte_oracles_and_formulas_verified": true,
+  "original_binary": {
+    "bytes": 20192216,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+    "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+  },
+  "original_guard_not_modified": true,
+  "original_manifest": {
+    "bytes": 4463,
+    "sha256": "3c9f9c54777bed842f8f9c66c0e6b76262d12fcceea2e187099699abf5402927",
+    "source_artifact": "main-gap-semantic-qualification-01-failure-review/MANIFEST.json"
+  },
+  "original_report": {
+    "bytes": 14887,
+    "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8",
+    "source_artifact": "main-gap-semantic-qualification-01-failure-review/report.json"
+  },
+  "original_runtime_after_count": 0,
+  "original_runtime_before_count": 5,
+  "partial_output_file_count": 5910,
+  "partial_outputs_inventory": {
+    "bytes": 2093078,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/partial-output-inventory.json",
+    "sha256": "e48def3e1106fc8c8ba8f0e18d7b6ed483a7f39f5f0bfde5bbcc9aaf0babe918"
+  },
+  "performance_qualified": false,
+  "planned_RTS_count": 24,
+  "planned_cell_count": 12,
+  "planned_command_count": 91,
+  "post_setup_maximum_ns": 1800000000000,
+  "prior_ns": 0,
+  "proposed_continuation_not_exported_or_authorized": true,
+  "raw22RTS_reparsed": true,
+  "remaining_original_commands": {
+    "bytes": 9775,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/missing-commands.json",
+    "sha256": "05fb9d80188f86c26957fcc2399caaccadefe82a89cfe6a20a8540de70aaada4"
+  },
+  "remaining_post_setup_ns": 1203352859674,
+  "representation": "path-redacted selected independent failure review; original report pin below; not original report bytes",
+  "returned_guard_row_and_file_sha_verified": true,
+  "reusable_cells": [
+    "baseline-0",
+    "flat_functions-16",
+    "flat_functions-32",
+    "flat_functions-64",
+    "flat_functions-128",
+    "flat_functions-256",
+    "higher_order_chain-16",
+    "higher_order_chain-32",
+    "higher_order_chain-64",
+    "higher_order_chain-128",
+    "higher_order_chain-256"
+  ],
+  "reusable_cells_evidence_verified": true,
+  "review_program": {
+    "bytes": 26139,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/review.py",
+    "sha256": "470364aaa7e6d0edbd26e382dda9e94adeb7757525bb756c5ed6a32d10a965fb"
+  },
+  "runtime_after_missing": true,
+  "sampling_authorized": false,
+  "schema": "main-gap-semantic-failure-actual-review-v1",
+  "scope_directories": {
+    "bytes": 17895,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/scope-directories.json",
+    "sha256": "67b8254960191458c35b78fb980780215aba52abace3887c00fe1f1a2197c3fa"
+  },
+  "scope_directory_count": 337,
+  "scope_file_count": 5925,
+  "scope_inventory": {
+    "bytes": 2096901,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/scope-files.json",
+    "sha256": "a627ef17f517b2433e11c3e088c24e1c057818bd12ac275cc70a3068ed84ce5a"
+  },
+  "semantic_qualified": false,
+  "setup_review": {
+    "bytes": 33473,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/report.json",
+    "sha256": "1b5addd5f3ce1821f43ef02f568df5552781f4e41ec1569284bb7554c83bec59"
+  },
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_package_manifest": {
+    "bytes": 7627,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/MANIFEST.json",
+    "sha256": "0e1537a67c1ebdc3405c104d7c99771f8853ae9a459843f497cb23cd430371b8"
+  },
+  "source_review": {
+    "bytes": 18425,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source-review/report.json",
+    "sha256": "70427781b1f19c3fcef496408fc733e8dcbce9bee106d9888066930fe98831b9"
+  },
+  "stage_maximum_ns": 600000000000,
+  "stage_outcome": "FAILED: shared595s deadline after Foundation original reference freeze, before Foundation stats invocation",
+  "stats_binary": {
+    "bytes": 20205400,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+    "sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347"
+  },
+  "summary": {
+    "bytes": 2084,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/summary.json",
+    "sha256": "79f25ff3d1d86d011998e0500028b640e913f7dea70e560663831735e6a554ed"
+  },
+  "unique_verified_pin_count": 12801,
+  "unique_verified_pins": {
+    "bytes": 4048186,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/verified-pins.json",
+    "sha256": "2e9ecddb3dc08907c98be210a827a19f85356ee343d3a5ae77bdf3f248758747"
+  },
+  "worker_outputs_empty_because_not_finalized": true
+}

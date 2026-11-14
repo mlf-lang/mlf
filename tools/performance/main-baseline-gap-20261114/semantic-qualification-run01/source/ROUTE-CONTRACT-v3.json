@@ -1,0 +1,31 @@
+{
+  "schema": "main12-reference-first-route-contract-v3",
+  "status": "pre-execution contract revision; no actual cell has run",
+  "supersedes_only": "v2 WIRE-CONTRACT.per_producer_authentication requirement to establish every cell source/lowered route statically before admission",
+  "preserved_plan_manifest_sha256": "d231f096285925b2e30323f54fd26b4356c180e9c1f0164336e0033b95a2d1d8",
+  "preserved_commands_sha256": "33e482c315e80efb9c70fe051fd72ce78e43e989da4f0f7e1d5f4a3609c75f9f",
+  "commands": 91,
+  "qualification_rts_reports": 24,
+  "outer_seconds": 600,
+  "performance_samples": 0,
+  "allowed_reference_routes": ["source", "lowered"],
+  "source_format": "MLF-SOURCE-CRATE-QUERY-7",
+  "checker_format": "open-fragment-checker-1/finish-receipt-1",
+  "checked_schema": 8,
+  "interface_schema": 3,
+  "procedure": [
+    "Authenticate the already-qualified original main producer, source, toolchain, setup private unit, fixed builtin and exact cell input/spec/argv before the existing original compile command.",
+    "Require original compile, full owner/dependency metadata and existing three formula checks (shapes only) to succeed; require complete fresh .queries with zero reuse. No query/group count is predetermined.",
+    "Validate every original publication byte and container against the full production format and source-proved supported route enum. Exactly five config fields: crate, actual original executable SHA, source format, checker format, route. The other fields are fixed before execution.",
+    "Archive the exact original outputs and independently pin all completed original child provenance. Exclusively write one immutable per-cell reference contract before the first stats command. Bind cell, source/input/spec, original executable and setup provenance, actual route, complete raw inventory and checked schemas.",
+    "Run the single planned stats compile fresh at the identical active path. Its route must equal the frozen original route. No new choice between routes is made from candidate output, failure, time or allocation.",
+    "Reject any changed/missing/duplicate/rebound reference contract, changed original bytes, unknown route, unsupported format, invalid provenance, failed command or exceeded budget. Stop the entire stage; never rerun, select a preferred route, amend or regenerate reference after B failure.",
+    "Only after full independent actual review may the stage establish accepted dynamic cell oracles. Future same-stats-binary samples require every raw file name/byte to equal that cell's accepted stats publication without SHA/CRC/CURRENT exceptions."
+  ],
+  "interpretation": "The qualification tests each production compiler's behavior on the exact same input, not a preselected internal route. A decoder cannot prove that a legal route value was the branch taken; actual child argv/executable/source provenance and immutable reference files supply that binding.",
+  "preserved_semantics": "All fields other than each actual compiler SHA and its explicitly validated CRC/content-address/CURRENT derivations remain raw-exact. Ordered duplicate reads and unsorted unique group members remain legal. No normalization or cache-identity change.",
+  "endpoint_limits": "Fresh application/query caches are not OS-page-cache cold. No drop-caches operation. GHC typed-only and MLF checked frontend outputs differ in scope. Future two samples per endpoint/cell are exploratory scale/CPU-GC observations, not asymptotic proof, stable speedup or proof of reaching GHC speed.",
+  "raw_oracle_scope": "Semantic publication and typed-interface artifacts only; RTS/guard/timing logs remain independently archived but are not expected raw-equality artifacts.",
+  "no_new_payload_command_or_probe": true,
+  "no_performance_or_native_execution": true
+}

@@ -1,0 +1,576 @@
+{
+  "cells": [
+    {
+      "actual_fresh_groups": 3,
+      "actual_query_group_entries": 3,
+      "actual_reused_groups": 0,
+      "cell": "baseline-0",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          138,
+          202
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 90,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/809e5947a4d9182c24efa780229955a032af2bad5f26f35b59fe818206a84179.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 83,
+        "rows": 184,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/54cfc3dd0682c64fd3c2b5de45392c4f03ab3d277a5db18c4a6de6e22a27abf6.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 63954,
+        "sha256": "e7cd8fb6c092e936c4fcba88b637f432e8e3a3fba9fd6224007e15d285354ef4"
+      },
+      "show_stdout_original": {
+        "bytes": 262,
+        "sha256": "660d62e12eff5f9bcbc0a0a23be54bfd455c9c73db1e52b61a7462864b18ba70"
+      }
+    },
+    {
+      "actual_fresh_groups": 131,
+      "actual_query_group_entries": 131,
+      "actual_reused_groups": 0,
+      "cell": "flat_functions-128",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          146,
+          210
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 346,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/d65701c575c6fe6a9d4a0214a3861cb011cd122e90891943ceb95b8f035bb329.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 339,
+        "rows": 952,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/850e8cc51b5eba96a432de6c96f75247db1977a9d3f32c82ed41f0a75cfec2d5.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 314045,
+        "sha256": "7df7dd08d7aa8b5ba7cb6d4d17c4b9ead5133ef772b90e4ce1658e1fce7f5301"
+      },
+      "show_stdout_original": {
+        "bytes": 271,
+        "sha256": "ddfba851561bd1246e43fbd607451265c45758a5955157e87e4bce51d9fdcad3"
+      }
+    },
+    {
+      "actual_fresh_groups": 19,
+      "actual_query_group_entries": 19,
+      "actual_reused_groups": 0,
+      "cell": "flat_functions-16",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          145,
+          209
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 122,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/f7fa4cd0a0b10d5226af260564c2bceadbfd3e09d7755e034693f72715ea8826.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 115,
+        "rows": 280,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/c98cac27c6f20bf894d1f808026a4d2ddc95751d2a1e9b048e737bcfd9602eff.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 95832,
+        "sha256": "232de57a35172128e3446ec713136a8175eb3ae44a994198038d358880e1c18f"
+      },
+      "show_stdout_original": {
+        "bytes": 268,
+        "sha256": "c2eaadfc83faba0b4be28516d8d141cb02e11af5befd193542c5b6417812726d"
+      }
+    },
+    {
+      "actual_fresh_groups": 259,
+      "actual_query_group_entries": 259,
+      "actual_reused_groups": 0,
+      "cell": "flat_functions-256",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          146,
+          210
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 602,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/79c88aef19d1a1152a730d8968dca660150c2d6bcb2037c2a8bfc99f33915c3c.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 595,
+        "rows": 1720,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/ddf4529612fc8b04a0eef24f5c03910dfae5fb68af6cf59bef74e18b0e6fc9c5.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 564061,
+        "sha256": "6ab897c8aecd32da777413803450e070220509523664561c505a54575e98af79"
+      },
+      "show_stdout_original": {
+        "bytes": 268,
+        "sha256": "dbe0e36daf7e81670197e92cb61967be6dedccb3f8140b4bc7090880bd8e033c"
+      }
+    },
+    {
+      "actual_fresh_groups": 35,
+      "actual_query_group_entries": 35,
+      "actual_reused_groups": 0,
+      "cell": "flat_functions-32",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          145,
+          209
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 154,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/23781e9e53ee6a3b70a4e23bcb366fd724b4e443c928e842a30dcab6d2fb83a8.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 147,
+        "rows": 376,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/74cd08347661ce3d20d1c1af46c874af2b0a2fa1c50ad76b458f852c7e2fc4fe.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 126624,
+        "sha256": "c18172dc7d98783e70466d3f875f55bee3a94c321c8c6c3d03011b25aa135a21"
+      },
+      "show_stdout_original": {
+        "bytes": 270,
+        "sha256": "f0918ab38a5f9f1cf5105360e9b2ee15932bbc1b07a8287b6ea299e4f1ce1a2a"
+      }
+    },
+    {
+      "actual_fresh_groups": 67,
+      "actual_query_group_entries": 67,
+      "actual_reused_groups": 0,
+      "cell": "flat_functions-64",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          145,
+          209
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 218,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/824a5cf5a69dcb69eb26d332e20958182e0d0b8c0d66efb2d887b1c7523e538b.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 211,
+        "rows": 568,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/fa1879f0388a877f054839c222105f7b83e4bbcb4774690d6cfd857443aff560.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 188174,
+        "sha256": "4b0d9288aa7b57b6be169f48f9b61e755a99df0e385503b6676af9a3b02792d0"
+      },
+      "show_stdout_original": {
+        "bytes": 270,
+        "sha256": "c3717f4a73fce201cb5a87e7a0ed249855454a1d494bbf4c14fe6bd4417406be"
+      }
+    },
+    {
+      "actual_fresh_groups": 6,
+      "actual_query_group_entries": 6,
+      "actual_reused_groups": 0,
+      "cell": "higher_order_chain-128",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          150,
+          214
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 98,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/6ba29bd5381063c7ce776e19a2b8030e64cf5d5fa103d990d89caf7e8a3f3d0f.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 91,
+        "rows": 202,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/928596ed4203ed529986ed53b3d5a87befae0451c94cfa5a05496614a4129d7b.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 73027,
+        "sha256": "30e56278c06919bacd792d9281c4e77112cda74cfebe84fe3be54968eb22e93c"
+      },
+      "show_stdout_original": {
+        "bytes": 275,
+        "sha256": "c048a733aa01a5dfe2643dce9f649cc54ddccde50c2aab05aff59a66fbc5a2ca"
+      }
+    },
+    {
+      "actual_fresh_groups": 6,
+      "actual_query_group_entries": 6,
+      "actual_reused_groups": 0,
+      "cell": "higher_order_chain-16",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          149,
+          213
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 98,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/1154d5f01979892c3481c8ef361e451e6dbc2dcbe4cadd328c69c483485edb7f.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 91,
+        "rows": 202,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/84c52b12b16dc12ea83eda6306701086af5fc8f15f1c744568e8eed6eaa19769.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 72810,
+        "sha256": "c92926ef032a87f71c5df54ee9cc14cffe224c495a26f2dc7a905c10ebf9b4a1"
+      },
+      "show_stdout_original": {
+        "bytes": 273,
+        "sha256": "18aa079f49ed93259ce7d67b84f15f6645e1144f61b0a7241270dce78fe50f2a"
+      }
+    },
+    {
+      "actual_fresh_groups": 6,
+      "actual_query_group_entries": 6,
+      "actual_reused_groups": 0,
+      "cell": "higher_order_chain-256",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          150,
+          214
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 98,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/83d6c67e31bc7c1bd5134139c5ee67c491450e08b380455b79add2d6ce866e2c.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 91,
+        "rows": 202,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/4bbe650951bd991703b06aa9bf8fe6e5ca7a03f8206b30258e57aa9bb4fc4583.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 73027,
+        "sha256": "020d95b2b1c9ec5b0d9641e3842cf391faf5d798f9c6ffb8a3a5aff5fdce72b7"
+      },
+      "show_stdout_original": {
+        "bytes": 275,
+        "sha256": "689f91b90ca07eaa6fcabcf31744f748a193e9706ff6376fa6e6b2f3c1a37e22"
+      }
+    },
+    {
+      "actual_fresh_groups": 6,
+      "actual_query_group_entries": 6,
+      "actual_reused_groups": 0,
+      "cell": "higher_order_chain-32",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          149,
+          213
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 98,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/55630c0fc60803d61d4c15223c2bb25dd79a8ab686e70d7b0cdf4735fb373c12.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 91,
+        "rows": 202,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/40065aec351ccc5b4111706f4d01333f293d8942700660f0b558c383a88ba29a.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 72838,
+        "sha256": "994f58205efbbe7a3212f5bfbb995acb8e733d74f7b806f0920610aca695ebac"
+      },
+      "show_stdout_original": {
+        "bytes": 274,
+        "sha256": "2b2b8809f847377542faa91cd691d82f2bc59b59154ae75c9500113b16377a17"
+      }
+    },
+    {
+      "actual_fresh_groups": 6,
+      "actual_query_group_entries": 6,
+      "actual_reused_groups": 0,
+      "cell": "higher_order_chain-64",
+      "cross_producer": {
+        "all_other_raw_bytes_equal": true,
+        "allowed_differences": [
+          "configuration field1 actual executable SHA",
+          "derived container CRC32",
+          "derived generation filename SHA256",
+          "CURRENT exact derived digest and CRC32"
+        ],
+        "artifact_normalization_or_rewrite": false,
+        "compiler_sha_span": [
+          149,
+          213
+        ],
+        "complete": true,
+        "containers_fully_decoded": true,
+        "files_each": 98,
+        "full_cross_compiler_raw_equality_claimed": false,
+        "ordinary_compiler_sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f",
+        "ordinary_generation": "queries/query-graph-v2/generations/db45052de38dcdd26c875c764d25a7cb651528ba99df8e007dd14fe7ddedcb62.mlfqg",
+        "result_closure_exact": true,
+        "result_files": 91,
+        "rows": 202,
+        "same_binary_future_raw_identity_required": true,
+        "schema": "main-gap-cross-compiler-cell-equivalence-v1",
+        "stats_compiler_sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347",
+        "stats_generation": "queries/query-graph-v2/generations/fe73a050ef666072fe6a0140bd1ad04251987e2aa7f105352177b27fa9a83b64.mlfqg"
+      },
+      "dynamic_oracles_accepted": false,
+      "ghc_compiling": [
+        {
+          "index": 1,
+          "module": "Main",
+          "source": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+          "total": 1
+        }
+      ],
+      "receipt_completed": true,
+      "reference_contract_original": {
+        "bytes": 72803,
+        "sha256": "5838d490919768a04be141d07064db922597f5f5a5d33b408aa08a80469aa047"
+      },
+      "show_stdout_original": {
+        "bytes": 272,
+        "sha256": "64bc4618a3211f9fe229a170b7285eb30a7c9603eacd47a9085f13deb3709019"
+      }
+    }
+  ],
+  "complete_stage_qualification": false,
+  "full_raw_products_privately_retained_not_reproduced_here": true,
+  "full_stage_remains_failed": true,
+  "independent_actual_failure_review": {
+    "bytes": 14887,
+    "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8",
+    "source_artifact": "main-gap-semantic-qualification-01-failure-review/report.json"
+  },
+  "independent_actual_review_pending": false,
+  "scope": "receipt observations for completed eleven cells, not benchmark or accepted all-cell oracle",
+  "stage_dynamic_oracles_accepted": false
+}

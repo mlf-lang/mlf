@@ -1,0 +1,19 @@
+Traceback (most recent call last):
+  File "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/controller.py", line 705, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/controller.py", line 560, in main
+    elif args.command=='_semantic':semantic(args.admission,args.sha256,args.launch_binding_sha256)
+                                   ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/controller.py", line 542, in semantic
+    worker.run();validate(path,digest,'SEMANTIC');verify_qualifier_scope(a,c,guard,path,digest,binding_sha)
+    ~~~~~~~~~~^^
+  File "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/worker.py", line 156, in run
+    self.recheck()
+    ~~~~~~~~~~~~^^
+  File "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/worker.py", line 52, in recheck
+    self.C.require(time.monotonic_ns()<self.deadline['deadline_ns'],'whole-stage deadline including prechecks')
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/controller.py", line 27, in require
+    raise RuntimeError(message)
+RuntimeError: whole-stage deadline including prechecks
