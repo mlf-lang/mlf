@@ -1,0 +1,40 @@
+{
+  "actual_completion_claim_created": false,
+  "actual_historical_binding_read_only": {
+    "bytes": 2531,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-qualification-01/launch-binding.json",
+    "sha256": "7d6d321cb7b58bd12e11aadb92d4edd62e0f0708673eeb9bc1c7e0fb719d5539"
+  },
+  "checks": [
+    "exact worker inverse",
+    "identity implementation byte identical",
+    "three nodes only",
+    "no new pin call",
+    "uses binding original object",
+    "valid unchanged claim full/light/full",
+    "same bytes rewritten after entry metadata change",
+    "same-name content rewrite light failure",
+    "same-name content rewrite full exit failure",
+    "changed before entry uses original SHA not fresh current",
+    "same-content inode replacement after entry",
+    "same-content inode replacement full exit",
+    "missing claim",
+    "wrong scope",
+    "wrong phase path",
+    "extra field",
+    "missing hash",
+    "not dict",
+    "missing binding claim",
+    "claim symlink",
+    "claim FIFO before read",
+    "actual historical claim path cannot become future completion claim",
+    "old source manifest unchanged",
+    "new scope remains absent",
+    "controller exact two-value mechanical delta"
+  ],
+  "complete": true,
+  "count": 25,
+  "no_original_helper_module_guard_loader_compiler_lock_or_target_execution": true,
+  "schema": "completion-original-claim-pin-pure-checks-v1",
+  "temporary_models_only": true
+}

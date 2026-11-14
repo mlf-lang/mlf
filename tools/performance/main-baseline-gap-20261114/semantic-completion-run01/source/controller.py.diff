@@ -1,0 +1,17 @@
+--- <EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source/controller.py
++++ <EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py
+@@ -7,12 +7,12 @@
+ from pathlib import Path
+ import argparse, datetime, fcntl, hashlib, json, os, re, shutil, stat, subprocess, sys, time, types
+ R = Path('<EXPERIMENT_ROOT>')
+-PB = R/'main-gap-semantic-completion-v1-source'
++PB = R/'main-gap-semantic-completion-v2-source'
+ E = R/'main-gap-setup-run04'
+ WORK = E/'semantic-completion-01'
+ FAILED = E/'semantic-qualification-01'
+ READY = False
+-CONFIG_SHA = 'c8fd8e063b0fd526ed87157a2ffaab127a297406924d5bca6852fa8f6d5dea44'
++CONFIG_SHA = '671ea34137976bb255aad7ca4ea88b3a84aac20bd5b538520dd9bfbcdda3ed5b'
+ BUDGETS = {'COMPLETION':180}
+ MAX_NS = 180 * 10**9
+ POST_SETUP_MAX_NS = 1800 * 10**9

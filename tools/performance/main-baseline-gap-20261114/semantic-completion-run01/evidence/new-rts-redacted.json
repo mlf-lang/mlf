@@ -1,0 +1,174 @@
+{
+  "comparative_performance_claim": false,
+  "count": 2,
+  "original_full_raw_privately_retained": true,
+  "records": [
+    {
+      "command": "foundation14/stats-compile",
+      "not_original_raw": true,
+      "original": {
+        "artifact": "main-gap-setup-run04/semantic-completion-01/commands/006-foundation14-stats-compile/reports/0-mlf.stats",
+        "bytes": 1343,
+        "sha256": "779e11955f0d9f2dca8674cf5b1343ad7fdb5e56f0ca35fd37c985e42c725adf"
+      },
+      "parsed_recorded_receipt": {
+        "allocated_bytes": 60608900384,
+        "allocation_rate_bytes_per_mut_second": 3210755346,
+        "copied_bytes": 4330429808,
+        "gc_cpu_fraction_from_rounded_times": 0.18153045740299154,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14415,
+            "cpu_seconds": 2.636,
+            "elapsed_seconds": 2.643,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0074,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0264,
+            "collections": 59,
+            "cpu_seconds": 1.551,
+            "elapsed_seconds": 1.556,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0854,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 59,
+        "maximum_residency_bytes": 39439824,
+        "maximum_slop_bytes": 1659440,
+        "productivity_percent": {
+          "elapsed": 81.9,
+          "user": 81.8
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             104 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 104.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 4.187,
+            "elapsed_seconds": 4.198
+          },
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.001
+          },
+          "MUT": {
+            "cpu_seconds": 18.877,
+            "elapsed_seconds": 18.987
+          },
+          "Total": {
+            "cpu_seconds": 23.065,
+            "elapsed_seconds": 23.187
+          }
+        }
+      },
+      "public_utf8": "'<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf' '--compile-crate' '<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/crate.spec' '-o' '<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/unit' +RTS '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/mlf.stats' \n  60,608,900,384 bytes allocated in the heap\n   4,330,429,808 bytes copied during GC\n      39,439,824 bytes maximum residency (59 sample(s))\n       1,659,440 bytes maximum slop\n             104 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0     14415 colls,     0 par    2.636s   2.643s     0.0002s    0.0074s\n  Gen  1        59 colls,     0 par    1.551s   1.556s     0.0264s    0.0854s\n\n  INIT    time    0.001s  (  0.001s elapsed)\n  MUT     time   18.877s  ( 18.987s elapsed)\n  GC      time    4.187s  (  4.198s elapsed)\n  EXIT    time    0.000s  (  0.000s elapsed)\n  Total   time   23.065s  ( 23.187s elapsed)\n\n  %GC     time       0.0%  (0.0% elapsed)\n\n  Alloc rate    3,210,755,346 bytes per MUT second\n\n  Productivity  81.8% of total user, 81.9% of total elapsed\n\n",
+      "public_utf8_sha256": "91e71446dabe9f79bf7f5d9399c4848525510cb5d299ffe341eccf0c3795401c",
+      "qualification_only_not_performance_sample": true,
+      "transformation": "literal roots in first invocation header only; every subsequent numeric-body byte exact"
+    },
+    {
+      "command": "foundation14/ghc-typed",
+      "not_original_raw": true,
+      "original": {
+        "artifact": "main-gap-setup-run04/semantic-completion-01/commands/007-foundation14-ghc-typed/reports/0-ghc.stats",
+        "bytes": 3934,
+        "sha256": "8b50c53276a325bbc9cc8f65f881cb1bbff5c0f24095dc4769acba7e39cb4768"
+      },
+      "parsed_recorded_receipt": {
+        "allocated_bytes": 511551488,
+        "allocation_rate_bytes_per_mut_second": 2206548715,
+        "copied_bytes": 116526280,
+        "gc_cpu_fraction_from_rounded_times": 0.5584415584415584,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0013,
+            "collections": 77,
+            "cpu_seconds": 0.103,
+            "elapsed_seconds": 0.103,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0072,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0399,
+            "collections": 5,
+            "cpu_seconds": 0.199,
+            "elapsed_seconds": 0.2,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0589,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 5,
+        "maximum_residency_bytes": 16193776,
+        "maximum_slop_bytes": 235280,
+        "productivity_percent": {
+          "elapsed": 43.2,
+          "user": 43.0
+        },
+        "reported_gc_percent": null,
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "              46 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 46.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.001
+          },
+          "GC": {
+            "cpu_seconds": 0.301,
+            "elapsed_seconds": 0.302
+          },
+          "INIT": {
+            "cpu_seconds": 0.005,
+            "elapsed_seconds": 0.001
+          },
+          "MUT": {
+            "cpu_seconds": 0.232,
+            "elapsed_seconds": 0.231
+          },
+          "Total": {
+            "cpu_seconds": 0.539,
+            "elapsed_seconds": 0.536
+          }
+        }
+      },
+      "public_utf8": "'<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/./ghc-9.14.1' '-B<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/lib' '--make' '-j1' '-O2' '-fforce-recomp' '-fpedantic-bottoms' '-fno-state-hack' '-v' '-package-env' '-' '-clear-package-db' '-global-package-db' '-package-db' '<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db' '-no-user-package-db' '-hide-all-packages' '-package' 'base' '-package' 'mlf-shape-primitives' '-i' '-i<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14' '-odir' '<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/objects' '-hidir' '<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/objects' '-fno-code' '-fwrite-interface' '-no-link' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs' '<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs' +RTS '-K512M' '-H' '-I5' '-T' '-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/ghc.stats' \n     511,551,488 bytes allocated in the heap\n     116,526,280 bytes copied during GC\n      16,193,776 bytes maximum residency (5 sample(s))\n         235,280 bytes maximum slop\n              46 MiB total memory in use (0 MiB lost due to fragmentation)\n\n                                     Tot time (elapsed)  Avg pause  Max pause\n  Gen  0        77 colls,     0 par    0.103s   0.103s     0.0013s    0.0072s\n  Gen  1         5 colls,     0 par    0.199s   0.200s     0.0399s    0.0589s\n\n  TASKS: 5 (1 bound, 4 peak workers (4 total), using -N1)\n\n  SPARKS: 0 (0 converted, 0 overflowed, 0 dud, 0 GC'd, 0 fizzled)\n\n  INIT    time    0.005s  (  0.001s elapsed)\n  MUT     time    0.232s  (  0.231s elapsed)\n  GC      time    0.301s  (  0.302s elapsed)\n  EXIT    time    0.001s  (  0.001s elapsed)\n  Total   time    0.539s  (  0.536s elapsed)\n\n  Alloc rate    2,206,548,715 bytes per MUT second\n\n  Productivity  43.0% of total user, 43.2% of total elapsed\n\n",
+      "public_utf8_sha256": "f331eb40b5af9ee34116273b302069f0576a25ce056a1d4113557754f089c3b9",
+      "qualification_only_not_performance_sample": true,
+      "transformation": "literal roots in first invocation header only; every subsequent numeric-body byte exact"
+    }
+  ]
+}

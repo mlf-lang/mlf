@@ -1,0 +1,68 @@
+{
+  "actual_controller": {
+    "artifact": "main-gap-setup-run04/semantic-completion-01/controller.json",
+    "bytes": 9178,
+    "sha256": "f720fe0b07ba2b058cf1ccbdd5a613ece12cf47cd8376f68b063334360de8c88"
+  },
+  "actual_outer": {
+    "artifact": "main-gap-setup-run04/semantic-completion-01/outer/guard.json",
+    "bytes": 3615,
+    "sha256": "3bf1eaf1e94b0cca1ac0ec449ae480e2f06417109475ad391c227eae40ff3e8b"
+  },
+  "actual_watchdog": {
+    "artifact": "main-gap-setup-run04/semantic-completion-01/bounded-receipt.json",
+    "bytes": 104383,
+    "sha256": "8128a639c50238cf43d89dbaa9d4b2b4696deea568195ed8aeed140f4008d364"
+  },
+  "actual_worker": {
+    "artifact": "main-gap-setup-run04/semantic-completion-01/completion-receipt.json",
+    "bytes": 2622064,
+    "sha256": "376aa64d1f3655f31a4d4a9ac09d514a42b8a8c4dd01b5212a3101b6ddb13079"
+  },
+  "budget": {
+    "budget_passed": true,
+    "cumulative_ns": 717873335365,
+    "elapsed_ns": 121226195039,
+    "elapsed_valid": true,
+    "includes_outer_cleanup_time": true,
+    "original_guard_elapsed_seconds_excludes_cleanup": 121.05155203401227,
+    "post_setup_maximum_ns": 1800000000000,
+    "prior_ns": 596647140326,
+    "stage_maximum_ns": 180000000000
+  },
+  "combined_RTS": 24,
+  "combined_actual_commands_including_extra_before": 96,
+  "combined_cells": 12,
+  "combined_original_plan_commands": 91,
+  "fixed48legs_executed": 0,
+  "immutable_entry_files": 12783,
+  "immutable_exit_union_files": 14332,
+  "independent_review_verified": true,
+  "new_RTS_count": 2,
+  "new_command_count": 12,
+  "new_outputs": 1549,
+  "new_scope_directories": 41,
+  "new_scope_files": 1564,
+  "no_lease_epoch_process_ids_exported": true,
+  "no_native_execution": true,
+  "no_speedup_interpretation": true,
+  "original_scope_bytes_and_directory_set_unchanged": true,
+  "outer": {
+    "cleanup": true,
+    "complete": true,
+    "elapsed_seconds": 121.05155203401227,
+    "exit_code": 0,
+    "lease_cleared": true,
+    "limits": {
+      "address_space": 6442450944,
+      "free_disk": 5368709120,
+      "host_available": 3221225472,
+      "output": 4294967296,
+      "tree_rss": 5368709120
+    },
+    "lock_reacquired": true,
+    "reason": null,
+    "seconds": 180
+  },
+  "performance_samples": 0
+}

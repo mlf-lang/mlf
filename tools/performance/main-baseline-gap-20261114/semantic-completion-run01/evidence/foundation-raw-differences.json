@@ -1,0 +1,30 @@
+[
+  {
+    "A": {
+      "bytes": 147,
+      "sha256": "335ec57a34552d2803b24ca45c9d668bfd1c93288073e0305cf767df2621f711"
+    },
+    "B": {
+      "bytes": 147,
+      "sha256": "58115c4fa5759ade0da833ddd8a6c7d2ccd1e2ddea19832bfa6f7eae244109bf"
+    },
+    "first_difference": 76,
+    "relative_path": "queries/query-graph-v2/CURRENT"
+  },
+  {
+    "A": null,
+    "B": {
+      "bytes": 406975,
+      "sha256": "687b76d6dd4d67ba5c1059f70ba8eca2ca89c058d9dd80a1e88ad94b4de30d5f"
+    },
+    "relative_path": "queries/query-graph-v2/generations/687b76d6dd4d67ba5c1059f70ba8eca2ca89c058d9dd80a1e88ad94b4de30d5f.mlfqg"
+  },
+  {
+    "A": {
+      "bytes": 406975,
+      "sha256": "6f33c12d85591165b5074800a7b374e0c1a783399eaab51c6045c69ca16adb8a"
+    },
+    "B": null,
+    "relative_path": "queries/query-graph-v2/generations/6f33c12d85591165b5074800a7b374e0c1a783399eaab51c6045c69ca16adb8a.mlfqg"
+  }
+]

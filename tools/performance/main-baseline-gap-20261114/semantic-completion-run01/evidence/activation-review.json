@@ -1,0 +1,92 @@
+{
+  "original": {
+    "artifact": "main-gap-semantic-completion-01-activation-review/report.json",
+    "bytes": 3971,
+    "sha256": "8c7ee360c481d561befe1e1a6a0b9b51e0aa92ebd2d356b23b1c0a11a9cf89dd"
+  },
+  "original_manifest": {
+    "artifact": "main-gap-semantic-completion-01-activation-review/MANIFEST.json",
+    "bytes": 1955,
+    "sha256": "70a09fbfd982a3e86d9632118f1e9e51b1d850d519687d55869eb0734ebfa701"
+  },
+  "report": {
+    "actual_COMPLETION_passed": false,
+    "admission_epoch_claim_created": false,
+    "blockers": [],
+    "checked_pins": {
+      "bytes": 2214608,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-activation-review/checked-pins.json",
+      "sha256": "bcab7da64fd3350ce1af1d543f244e9464b75e082a4419cf0494cdac7f256c43"
+    },
+    "combined12cell_qualified": false,
+    "complete": true,
+    "diff": {
+      "bytes": 324,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-activation-review/READY-only.diff",
+      "sha256": "1b929fe732f71ae269bec28f94781a80f2a871e5cb68bbd16d13621d65f19489"
+    },
+    "disabled_controller": {
+      "bytes": 51811,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.disabled.py",
+      "sha256": "0757afd670d4e63e246562dbccbcdded843ff8917cffad26824d8c1fc827a715"
+    },
+    "enabled_controller": {
+      "bytes": 51810,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.py",
+      "sha256": "e805e1669907f531105a00bc83d78b7a2618c00f0e8f3d63cf6b63d4cbf2b62c"
+    },
+    "exact_READY_only_delta": true,
+    "inverse_AST_exact": true,
+    "inverse_bytes_exact": true,
+    "limitations": [
+      "Mechanical activation only; not admission, completion, composite qualification or sampling approval.",
+      "Old failed stage remains failed. No historical lease termination is inferred.",
+      "Scope files are hashed once by exact path; source qualification is inherited from the pinned complete source review, not rerun."
+    ],
+    "mechanical_activation_review_passed": true,
+    "observed_activation": {
+      "bytes": 862,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-activation-review/observed-activation.json",
+      "sha256": "3a18df88c66a38778e60e379aa0607d7ccc3b2bbd37a577afc8a369b7e4e7eca"
+    },
+    "old_scope_boundary": {
+      "bytes": 1265,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-activation-review/old-scope-boundary.json",
+      "sha256": "d702232cf785651aee9ee91e0388f82476c63ff6cb9dc869519cf41c3d26bb83"
+    },
+    "old_scope_unchanged": true,
+    "only_two_activation_files_present": true,
+    "prepare_guard_lock_loader_compiler_target_or_original_module_executed": false,
+    "program": {
+      "bytes": 8004,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-activation-review/review.py",
+      "sha256": "a0871fb7c28925f1b0513c6b7d370839db2c03e14de8f6d7f5bacd265cb8e57b"
+    },
+    "read_only_original_scope": true,
+    "sampling_authorized": false,
+    "schema": "main-gap-completion-activation-review-v1",
+    "source_controller": {
+      "bytes": 51811,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py",
+      "sha256": "0757afd670d4e63e246562dbccbcdded843ff8917cffad26824d8c1fc827a715"
+    },
+    "source_manifest_members_rehashed": 17,
+    "source_package_manifest": {
+      "bytes": 4409,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/MANIFEST.json",
+      "sha256": "2beaafaf998da6e3e7b5b3b9e284831eebd53062e1b7610aeca6ff05160f1c57"
+    },
+    "source_review": {
+      "bytes": 13444,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/report.json",
+      "sha256": "483e491550640505ab48f49c8c821a46a374af555c653e485f1f5b6ac3af7d15"
+    },
+    "source_review_manifest": {
+      "bytes": 2542,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/MANIFEST.json",
+      "sha256": "2619c67591ab408d9e07bbdb557b25c4188a819baa4d276bf74516a0f518ce12"
+    },
+    "source_review_members_rehashed": 9
+  },
+  "representation": "complete historical report with literal local-root substitutions, not original bytes"
+}

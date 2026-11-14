@@ -1,0 +1,35 @@
+{
+  "claim_in_entry_and_exit_union": true,
+  "current_claim_pin": {
+    "bytes": 311,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/claims/COMPLETION.json",
+    "sha256": "abb086f35770299badf1920e0ed942626c8de74543c2ab429fd308db2ed22c01"
+  },
+  "exact_claim_contents": {
+    "admission": {
+      "bytes": 2552,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/coordination/COMPLETION-admission.json",
+      "sha256": "0c08a7e13ee3075d66591d24267a2cd7e3b0c00e3e6b954f6563dfa87f73ef39"
+    },
+    "phase": "COMPLETION",
+    "retry_allowed": false
+  },
+  "immutable_entry_inventory": {
+    "bytes": 4043738,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/immutable-inputs.json",
+    "sha256": "03c44505594af2933bcdc93a5e3939a8237a583f4fd8c74534dbbcc5a4e6da4e"
+  },
+  "limitation": "No separate per-file historic snapshot was emitted; evidence is the pinned executed enforcement code, its bound successful receipt and original/current claim pin equality, not continuous external attestation.",
+  "original_claim_pin": {
+    "bytes": 311,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/claims/COMPLETION.json",
+    "sha256": "abb086f35770299badf1920e0ed942626c8de74543c2ab429fd308db2ed22c01"
+  },
+  "same_original_pin_not_repinning_replacement": true,
+  "source_mechanism": "Original authenticated deadline claim fullpin joins input union before identity.capture; every middle identity.check covers it; identity.finish full SHA+same metadata completes before worker complete. Actual exact entry12783/exit14332 inventory counts and successful completion support that enforced path.",
+  "v2_C1_source_gate": {
+    "bytes": 13444,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/report.json",
+    "sha256": "483e491550640505ab48f49c8c821a46a374af555c653e485f1f5b6ac3af7d15"
+  }
+}

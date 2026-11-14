@@ -1,0 +1,273 @@
+{
+  "original": {
+    "artifact": "main-gap-semantic-completion-v2-source-review/report.json",
+    "bytes": 13444,
+    "sha256": "483e491550640505ab48f49c8c821a46a374af555c653e485f1f5b6ac3af7d15"
+  },
+  "original_manifest": {
+    "artifact": "main-gap-semantic-completion-v2-source-review/MANIFEST.json",
+    "bytes": 2542,
+    "sha256": "2619c67591ab408d9e07bbdb557b25c4188a819baa4d276bf74516a0f518ce12"
+  },
+  "report": {
+    "activation": {
+      "contract": {
+        "bytes": 1100,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/ACTIVATION-CONTRACT.json",
+        "sha256": "d282de1ab3afa53f231546fbbf9e010cecb35bcd1df3364e451889f5bb8b3121"
+      },
+      "destination": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.py",
+      "disabled_controller": {
+        "bytes": 51811,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py",
+        "sha256": "0757afd670d4e63e246562dbccbcdded843ff8917cffad26824d8c1fc827a715"
+      },
+      "disabled_snapshot": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.disabled.py",
+      "expected_enabled_bytes": 51810,
+      "expected_enabled_sha256": "e805e1669907f531105a00bc83d78b7a2618c00f0e8f3d63cf6b63d4cbf2b62c",
+      "inner_watchdog_direct_execution_allowed": false,
+      "mechanical_copy_created": false,
+      "mechanical_copy_independent_review_required": true,
+      "permitted_source_delta_only": "unique READY = False line becomes READY = True",
+      "sole_prepare_argv": [
+        "/usr/bin/python3.13",
+        "-B",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.py",
+        "prepare",
+        "COMPLETION",
+        "--source-review",
+        "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/report.json",
+        "--source-review-sha256",
+        "<SHA256 of this frozen report>"
+      ],
+      "sole_run_form": [
+        "/usr/bin/python3.13",
+        "-B",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.py",
+        "run",
+        "COMPLETION",
+        "--admission",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/coordination/COMPLETION-admission.json",
+        "--sha256",
+        "<actual admission SHA>"
+      ]
+    },
+    "actual_COMPLETION_passed": false,
+    "actual_existing_unique_inputs": 12778,
+    "actual_scope_created": false,
+    "admission_or_epoch_created": false,
+    "all_actual_inherited_input_shapes_unchanged_from_full_hash_review": true,
+    "author_counts_not_used_as_independent_pass": true,
+    "author_report": {
+      "bytes": 6989,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/report.json",
+      "sha256": "b28ff3c9923547c3670f2b9dddd24665a7b7f5c8e1b5a8ad003094d11f8bad32"
+    },
+    "blockers": [],
+    "budget": {
+      "entry_prefix_plus_fullcap_ns": 776647140326,
+      "full_guard_call_includes_cleanup": true,
+      "new_outer_cap_ns": 180000000000,
+      "new_shared_deadline_ns": 175000000000,
+      "nominal_childcap_sum_is_not_execution_guarantee": true,
+      "original_failed_elapsed_ns": 596647140326,
+      "sampling_not_preapproved": true,
+      "total_ceiling_ns": 1800000000000
+    },
+    "claim_provenance": {
+      "claim_path": "main-gap-setup-run04/semantic-completion-01/claims/COMPLETION.json",
+      "cooperative_writer_and_TOCTOU_limit_unchanged": true,
+      "deadline_fields_original_claim_pin_equality_retained": true,
+      "entry_actual_claim_phase_admission_retry_false_equality_retained": true,
+      "input_pin_not_resampled": true,
+      "origin": "same actual launch-binding carried by immutable outer/worker argv SHA",
+      "same_deadline_passed_to_worker": true
+    },
+    "closed_blockers": [
+      {
+        "closed": true,
+        "enforced_boundaries": [
+          "entry exact full SHA",
+          "each intermediate metadata identity check",
+          "exit full SHA and same identity before completion"
+        ],
+        "evidence": {
+          "bytes": 1648,
+          "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/claim-source-evidence.json",
+          "sha256": "0bb3d50e97ee9b35b06055e2ba03b0659128a3e93489c27fdb9d9985dc2e6767"
+        },
+        "id": "C1",
+        "repair": "Original authenticated deadline[claim] fullpin, with exact new Q claim path and fullpin keys, is appended before input dedup/capture. No pin of possibly replaced current claim contents."
+      }
+    ],
+    "code_pins": {
+      "controller.py": {
+        "bytes": 51811,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py",
+        "sha256": "0757afd670d4e63e246562dbccbcdded843ff8917cffad26824d8c1fc827a715"
+      },
+      "identity.py": {
+        "bytes": 3827,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/identity.py",
+        "sha256": "b2caf9e4c4c65782b5cc003d68d60794357cc40a014e0e53364c7cb660dead8a"
+      },
+      "worker.py": {
+        "bytes": 17470,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/worker.py",
+        "sha256": "44f7b4568e8e6677c485e42057fd0f956ab6eba980b6748491f5b1dc2016c891"
+      }
+    },
+    "combined12cell_qualified": false,
+    "complete": true,
+    "complete_old_E_names_dirs_and_empty_scratch_rechecked": true,
+    "configuration": {
+      "bytes": 33908,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/BINDINGS.json",
+      "sha256": "671ea34137976bb255aad7ca4ea88b3a84aac20bd5b538520dd9bfbcdda3ed5b"
+    },
+    "delta": {
+      "configuration_changed_only_three_file_pins": [
+        "worker",
+        "identity_helper",
+        "environment"
+      ],
+      "controller_inverse_PB_and_CONFIG_SHA_recovers_v1_bytes": true,
+      "environment_bytes_unchanged": true,
+      "identity_helper_bytes_unchanged": true,
+      "original_commands_budget_oracle_guard_runtime_unchanged": true,
+      "worker_added_bytes": 308,
+      "worker_remove_exact_block_recovers_v1_bytes": true
+    },
+    "failure_review": {
+      "bytes": 14887,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/report.json",
+      "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8"
+    },
+    "hashing_method": "Full current v2 package and inherited frozen manifests/reports rehashed. Unchanged actual closure reuses v1 full SHA evidence only after exact canonical aggregate of all12778 current pin+device/inode/mode/owner/nlink/size/mtime/ctime rows matches; no repeated1.35GB sweep. /usr/bin/bash resolved supplement rehashed once.",
+    "independent_checks": {
+      "bytes": 3271,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/checks.json",
+      "sha256": "cf199a8572644f8f57ad52c5dee9c5de3feabb33cdafdf484751d4d7d24eec69"
+    },
+    "independent_negative_cases": 20,
+    "independent_positive_groups": 22,
+    "inherited_current_input_continuity": {
+      "bytes": 1555,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/inherited-input-continuity.json",
+      "sha256": "e1093a2fa4df3cbc4ee634ba38cecbbf41f2009aaac1e710d507a2485c586265"
+    },
+    "inherited_full_review": {
+      "bytes": 12152,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source-review/report.json",
+      "sha256": "cf7b0af7777cbe1045c3bc0448f8a04832fc95a9a9d50c240340e427b064a07e"
+    },
+    "inherited_review_manifest": {
+      "bytes": 3346,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source-review/MANIFEST.json",
+      "sha256": "c39981c7d9c005114633104b42b79eced40307dcbc167d46b50a99dea3408930"
+    },
+    "inherited_verified_scope": {
+      "GHC_expected14_interfaces_only_noobject_orlink": true,
+      "actual_serialized_setup_and_deadline_failure_consumption": true,
+      "all_seven_suffix_argv_caps_sinks_exact": true,
+      "cleanup_and_return_files_required": true,
+      "commands": 12,
+      "commands_parent_created_before_runtime": true,
+      "cross_binary_exception_unchanged": true,
+      "expected_composite_RTS_after_actual_success": 24,
+      "extra_performance_samples": 0,
+      "foundation_reference_immutable_source_route_reauthenticated_before_B": true,
+      "foundation_spec_path_and_bytes_unchanged": true,
+      "future_same_stats_fullraw_required": true,
+      "guard_child_output_left_absent": true,
+      "new_RTS": 2,
+      "new_before_runtime_count": 5,
+      "new_target_count": 2,
+      "old84_actual_argv_rebound": true,
+      "old8_history_unchanged": true,
+      "old_actual_input_inventory6839_preserved": true,
+      "old_elapsed_ns_exact": 596647140326,
+      "old_scope_fullpins_5925_and337dirs_preserved": true,
+      "old_whole_main_source_file_count": 3876,
+      "only_new_named_scope_and_original_foundation_scratch": true,
+      "original_guard_runtime_oracle_parser_bytes_unchanged": true,
+      "original_outer_and_current_boot_epoch_lock_protocol_retained": true,
+      "original_suffix_ordinals": [
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91
+      ],
+      "whole_ns_return_binding_and_old_cumulative_included": true,
+      "worker_only_positive_output_roots": true
+    },
+    "limitations": [
+      "Pure temporary claim data are not actual admissions or approvals. No future claim was fabricated.",
+      "Boundary SHA plus intermediate metadata is not continuous content attestation or defense against privileged malicious write/restore.",
+      "The resource budget is a stop condition, not a promise that all prospective commands finish.",
+      "No GHC speed parity, stable wall result, production promotion or whole-CI conclusion is authorized."
+    ],
+    "metadata_program": {
+      "bytes": 4276,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/metadata_continuity.py",
+      "sha256": "97161eb4b8e04e8b5becbef7106d49f3cf50a3993756b08cf10de0c1eacb5f01"
+    },
+    "native_generation_AB_fixedpoint": false,
+    "negative_scope": [
+      "malformed/missing/extra/wrong-scope/old-phase claim pin",
+      "before-entry content replacement against original pinned SHA",
+      "post-entry same-size write and full exit content mismatch",
+      "content restored but original metadata changed",
+      "inode replacement, mode changes, deletion",
+      "original pin retained without current-content resampling"
+    ],
+    "new_source_files_rehashed": 17,
+    "no_original_helper_module_entrypoint_loader_guard_lock_compiler_target_executed": true,
+    "old_failed_scope_never_relabeled": true,
+    "prior_blocked_report_preserved": true,
+    "prior_source_package_manifest": {
+      "bytes": 3653,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source/MANIFEST.json",
+      "sha256": "32a731107594df0fdd50f1a2e2b7650235d750886d227857a92d3012fcfc3272"
+    },
+    "review_program": {
+      "bytes": 12353,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/review.py",
+      "sha256": "4e98f0545bf46fa469bb99c893269fe72e7dac4bf2b4e20f2e035457d5ce2eab"
+    },
+    "review_scope": "Complete inherited v1 source qualification plus exact v2 C1 repair; unchanged content reviewed by exact inverse bytes and pinned complete prior evidence, not author assertions.",
+    "reviewer_corrections": {
+      "bytes": 255,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/reviewer-corrections.json",
+      "sha256": "73f175354eade384da3d485aa4ad0c9340d28d36d7a45bf66f4558a4c84b7291"
+    },
+    "runtime_obligations": [
+      "Fresh original current-resource/dual-lock peer checks, epoch, one-use claim, admission and original guard remain required, owned by parent.",
+      "Exactly five runtime-before support commands plus original ordinals85\u201391; no11cell rerun, no new A reference, no additional performance sample.",
+      "Original absolute Foundation scratch/spec paths and frozen A reference remain unchanged; B/GHC fresh then archived into new scope and scratch emptied.",
+      "Raw Foundation route/compiler/content-address/CRC/CURRENT/semantic byte oracles and14 GHC interfaces must actually pass; two fresh RTS retained.",
+      "180-second cleanup-inclusive guard-call integer ns and175-second shared deadline; actual elapsed added to596647140326ns under unchanged1800-second cumulative cap.",
+      "Actual old84+new7 and22+2 RTS composite qualification requires independent final evidence review. The old FAIL is preserved; a new source PASS is not completion success."
+    ],
+    "runtime_resolved_unique": 49,
+    "sampling_authorized": false,
+    "schema": "main-gap-completion-source-review-v1",
+    "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "source_gate_passed": true,
+    "source_only": true,
+    "source_package_manifest": {
+      "bytes": 4409,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/MANIFEST.json",
+      "sha256": "2beaafaf998da6e3e7b5b3b9e284831eebd53062e1b7610aeca6ff05160f1c57"
+    },
+    "verified_source_pins": {
+      "bytes": 11251,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/verified-source-pins.json",
+      "sha256": "a6ecf2a1db6914758162df2977769e7de0b9ceec5a16a3ab381f3aed7a6a5d1c"
+    }
+  },
+  "representation": "complete historical report with literal local-root substitutions, not original bytes"
+}

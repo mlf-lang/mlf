@@ -1,0 +1,450 @@
+{
+  "additional_runtime_before": 5,
+  "count": 12,
+  "original_suffix_85_through_91_exact_mapping": true,
+  "raw_stdout_stderr_privately_retained": true,
+  "rows": [
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 1,
+      "config_original": {
+        "bytes": 589,
+        "sha256": "81ff2d6d017b4c9277da74441f7479a102375cdf5626acacbaa02168c27569f6"
+      },
+      "exit_code": 0,
+      "extra_freshness": true,
+      "guard_elapsed_seconds": 0.0680086929933168,
+      "guard_original": {
+        "bytes": 1159,
+        "sha256": "d7f3415862745d6ee34a9489cd6b79f108a0dbf30a7675fefe690497bf8f6e7d"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-before",
+      "original_ordinal": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 414,
+        "sha256": "7450c1b958de9b6a18c46e3c26c9d64155d288e50c1916a3e049098442d1fa07"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 2,
+      "config_original": {
+        "bytes": 582,
+        "sha256": "0429cd19de9f1e4923c218e9b81454f07e3d6d179cdb00a95d14073e67cb5217"
+      },
+      "exit_code": 0,
+      "extra_freshness": true,
+      "guard_elapsed_seconds": 0.06832047901116312,
+      "guard_original": {
+        "bytes": 1153,
+        "sha256": "9edfcc5b8d8fcb0a3b46d0a2c6ecfa9a21957581986ec6de3f8277fa8d5134c7"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-before",
+      "original_ordinal": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 280,
+        "sha256": "50532049b4dd1483b2fca4a662cd92d1a5b7b0918c9dee467b1b2373380e21da"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 3,
+      "config_original": {
+        "bytes": 664,
+        "sha256": "57193209fad55be728757fac4d5b13a305b91d8d7f7ba4c7991f78de5e93fabc"
+      },
+      "exit_code": 0,
+      "extra_freshness": true,
+      "guard_elapsed_seconds": 0.06920710401027463,
+      "guard_original": {
+        "bytes": 1235,
+        "sha256": "7b831bf8e27ec0c019df05f8a8212da70bbd5b7cb264ea3a3315553da90715b7"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-before",
+      "original_ordinal": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 7830,
+        "sha256": "0cce320bbdb92fbc2aef936a13a871a5a27aeec1082465a8c07ea0bcc0f05355"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 4,
+      "config_original": {
+        "bytes": 686,
+        "sha256": "2726900f59e1c4bdd8eaa29954df54646bfcfe3c7358a79638048ee7e6605a67"
+      },
+      "exit_code": 0,
+      "extra_freshness": true,
+      "guard_elapsed_seconds": 0.08881626100628637,
+      "guard_original": {
+        "bytes": 1257,
+        "sha256": "666de7ecce98b554ef3371157cb23855a5daba181fff8898652900ccd83fd034"
+      },
+      "kind": "runtime",
+      "label": "runtime-producer-before",
+      "original_ordinal": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 345,
+        "sha256": "325c2362f9c398c7941838548dedda6108a33d5cdd463cb8cc63632d9453ea11"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 5,
+      "config_original": {
+        "bytes": 673,
+        "sha256": "f5e2e24af898dfa5871e8ae04aa54092141f036304104da6487b5b1f8d58b72e"
+      },
+      "exit_code": 0,
+      "extra_freshness": true,
+      "guard_elapsed_seconds": 0.06357901700539514,
+      "guard_original": {
+        "bytes": 1244,
+        "sha256": "0dff07fc563d256fbc3303346de5095a892ca34125c3d924134cf6cc5200be61"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-before",
+      "original_ordinal": null,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 345,
+        "sha256": "4fea60575461752a5855cec5913c046fdb0a96631c04583b77c4c7729baca805"
+      }
+    },
+    {
+      "argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/unit"
+      ],
+      "cap_seconds": 90,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 6,
+      "config_original": {
+        "bytes": 980,
+        "sha256": "1d2777d4241299bf18f57d5d943e821ce1ebbf73adbc11306fa24f92abeda762"
+      },
+      "exit_code": 0,
+      "extra_freshness": false,
+      "guard_elapsed_seconds": 23.276795413985383,
+      "guard_original": {
+        "bytes": 1884,
+        "sha256": "8325194efea5c6603ebbcc472926abcf1dc389460e3680504204707a66dbcc66"
+      },
+      "kind": "stats_compile",
+      "label": "foundation14/stats-compile",
+      "original_ordinal": 85,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/ghc.stats",
+        "-RTS"
+      ],
+      "cap_seconds": 30,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 7,
+      "config_original": {
+        "bytes": 3530,
+        "sha256": "ff6daa0da5b9418bca190582474ee6c442f9fe16915a360a8544f447cfcade3c"
+      },
+      "exit_code": 0,
+      "extra_freshness": false,
+      "guard_elapsed_seconds": 0.6374198390112724,
+      "guard_original": {
+        "bytes": 4572,
+        "sha256": "2529c1136714528bf730aab81f090f324f940ac4e18c75ac606abc5ff0c305a7"
+      },
+      "kind": "ghc_typed",
+      "label": "foundation14/ghc-typed",
+      "original_ordinal": 86,
+      "stderr_original": {
+        "bytes": 35278,
+        "sha256": "29d4afb1c3752170c6dc2209e487805275dae6ce3db07abf56aa3eafbeb65b82"
+      },
+      "stdout_original": {
+        "bytes": 2543,
+        "sha256": "9c18cf3e1eb7ad3e8e5405a40ac82d36511fd3f6b717386bf7faacbd015f976a"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 8,
+      "config_original": {
+        "bytes": 588,
+        "sha256": "907cee491815e1ac770d7b9a6e39d888c168a6351966780d51a42a76cf38692f"
+      },
+      "exit_code": 0,
+      "extra_freshness": false,
+      "guard_elapsed_seconds": 0.08982414999627508,
+      "guard_original": {
+        "bytes": 1161,
+        "sha256": "84d4a509474c9bb90271986738056ce9bc91c158512bb70b7d6bcbda85a019dd"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-after",
+      "original_ordinal": 87,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 414,
+        "sha256": "a244a9f60bcb278a6753ce56ba0c85b71d17feec41177790be6d76acb040c636"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 9,
+      "config_original": {
+        "bytes": 581,
+        "sha256": "6b5b8e35976044133880c3917c85407a168b382c397d7a32e1683abfce591190"
+      },
+      "exit_code": 0,
+      "extra_freshness": false,
+      "guard_elapsed_seconds": 0.08434863897855394,
+      "guard_original": {
+        "bytes": 1154,
+        "sha256": "38e2aea63d01ea3833a6a193eb7236f4280b70d09579a73342d004ac4423788b"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-after",
+      "original_ordinal": 88,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 280,
+        "sha256": "a9f99e0316ff12f024fe60765e15420ee9e73ab4801b6b305f7686bdd82a75a2"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 10,
+      "config_original": {
+        "bytes": 663,
+        "sha256": "4846106598a4ba9bb17a675126ac5dd740488608c03ca054dc6974bb801a99da"
+      },
+      "exit_code": 0,
+      "extra_freshness": false,
+      "guard_elapsed_seconds": 0.08134286900167353,
+      "guard_original": {
+        "bytes": 1236,
+        "sha256": "82542ac4b6ab3beb279d884365b4d88fb729c486dc3c572c49c45b1d621e927a"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-after",
+      "original_ordinal": 89,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 7830,
+        "sha256": "956a2c792a6a046eb3af08be556a16bae523b07994237a8325142ec32288a9d4"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 11,
+      "config_original": {
+        "bytes": 685,
+        "sha256": "dd3e0500e3181703aee583637e8e6ba59936846eced161708ae95005aff6c227"
+      },
+      "exit_code": 0,
+      "extra_freshness": false,
+      "guard_elapsed_seconds": 0.08325594099005684,
+      "guard_original": {
+        "bytes": 1258,
+        "sha256": "fd644576c63f4a8d61cbe575002ad2706cb92630960718f4ec1fa8c54439bfb7"
+      },
+      "kind": "runtime",
+      "label": "runtime-producer-after",
+      "original_ordinal": 90,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 345,
+        "sha256": "2af2e81525045abab12040750a94b8b53ea774063e42e770bdde66b5e29ab048"
+      }
+    },
+    {
+      "argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "cap_seconds": 10,
+      "cleanup": true,
+      "complete": true,
+      "completion_ordinal": 12,
+      "config_original": {
+        "bytes": 672,
+        "sha256": "36dbaae728b3b2303aba84e49afdf7909bca56d216569ef26d350c4a05375cd4"
+      },
+      "exit_code": 0,
+      "extra_freshness": false,
+      "guard_elapsed_seconds": 0.08783739700447768,
+      "guard_original": {
+        "bytes": 1245,
+        "sha256": "394e971e8c82037d0e2c982ee13013d8fdb4d74e8875faddbe96c643e52b66dc"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-after",
+      "original_ordinal": 91,
+      "stderr_original": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout_original": {
+        "bytes": 345,
+        "sha256": "9b27c1768dcb8ac56e9d7a452fb9a6a4d92499e0afabd5a6d2fa565281ce1d43"
+      }
+    }
+  ],
+  "runtime_address_and_process_identifiers_not_exported": true
+}

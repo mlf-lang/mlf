@@ -1,0 +1,27 @@
+{
+  "blocked_review": {
+    "bytes": 12152,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source-review/report.json",
+    "sha256": "cf7b0af7777cbe1045c3bc0448f8a04832fc95a9a9d50c240340e427b064a07e"
+  },
+  "blocked_review_manifest": {
+    "bytes": 3346,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source-review/MANIFEST.json",
+    "sha256": "c39981c7d9c005114633104b42b79eced40307dcbc167d46b50a99dea3408930"
+  },
+  "budgets_commands_oracles_unchanged": true,
+  "claim_insertion_exact": "        claim = deadline['claim']\n        C.require(type(claim) is dict and set(claim)=={'path','bytes','sha256'}\n                  and claim['path']==str(self.Q/'claims/COMPLETION.json'),\n                  'original launch-binding claim pin at exact completion path required')\n        all_inputs += [claim]\n",
+  "controller_delta": [
+    "PB package directory",
+    "CONFIG_SHA matching relocated same-content worker/environment/identity helper pins"
+  ],
+  "original_source": {
+    "bytes": 3653,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source/MANIFEST.json",
+    "sha256": "32a731107594df0fdd50f1a2e2b7650235d750886d227857a92d3012fcfc3272"
+  },
+  "same_future_scope_not_created": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01",
+  "schema": "main-gap-completion-claim-only-revision-v1",
+  "sole_protocol_delta": "original launch-binding claim fullpin + exact claim path into existing immutable snapshot",
+  "worker_inverse_exact": true
+}

@@ -1,0 +1,357 @@
+{
+  "original": {
+    "artifact": "main-gap-semantic-completion-01-actual-review/report.json",
+    "bytes": 18702,
+    "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+  },
+  "original_manifest": {
+    "artifact": "main-gap-semantic-completion-01-actual-review/MANIFEST.json",
+    "bytes": 5088,
+    "sha256": "495205f35150d5d00cfe15f373eab1c4619af2551baf0b0c972584d8479426e5"
+  },
+  "report": {
+    "activation_review": {
+      "bytes": 3971,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-activation-review/report.json",
+      "sha256": "8c7ee360c481d561befe1e1a6a0b9b51e0aa92ebd2d356b23b1c0a11a9cf89dd"
+    },
+    "activation_review_manifest": {
+      "bytes": 1955,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-activation-review/MANIFEST.json",
+      "sha256": "70a09fbfd982a3e86d9632118f1e9e51b1d850d519687d55869eb0734ebfa701"
+    },
+    "actual_COMPLETION_passed": true,
+    "actual_commands": {
+      "bytes": 17975,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/actual-commands.json",
+      "sha256": "bd1591cf04a9a8c2d4c10b66c364834ce04e5a876019b98ebe40ebc8a41f8193"
+    },
+    "actual_pins": {
+      "admission": {
+        "bytes": 2552,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/coordination/COMPLETION-admission.json",
+        "sha256": "0c08a7e13ee3075d66591d24267a2cd7e3b0c00e3e6b954f6563dfa87f73ef39"
+      },
+      "build_log": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/build.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "claim": {
+        "bytes": 311,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/claims/COMPLETION.json",
+        "sha256": "abb086f35770299badf1920e0ed942626c8de74543c2ab429fd308db2ed22c01"
+      },
+      "config": {
+        "bytes": 1950,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/outer/guard-config.json",
+        "sha256": "d9abc313d90563073a9ea9fe09cff3b77611eb1bc52bb565c8d52622eab9543c"
+      },
+      "controller": {
+        "bytes": 9178,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.json",
+        "sha256": "f720fe0b07ba2b058cf1ccbdd5a613ece12cf47cd8376f68b063334360de8c88"
+      },
+      "epoch": {
+        "bytes": 1567,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/coordination/COMPLETION-epoch.json",
+        "sha256": "1ce57f364e0cb2c76cac52a6efd9ca15d3e666f2a9c437e902f840b597f9a32a"
+      },
+      "launch_binding": {
+        "bytes": 2522,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/launch-binding.json",
+        "sha256": "2fa66a70b971d329c5a7c155a68d58fd9545d84e9ed940958a25188a78a4c288"
+      },
+      "outer": {
+        "bytes": 3615,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/outer/guard.json",
+        "sha256": "3bf1eaf1e94b0cca1ac0ec449ae480e2f06417109475ad391c227eae40ff3e8b"
+      },
+      "prepare_attempt": {
+        "bytes": 526,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/coordination/COMPLETION-prepare-attempt.json",
+        "sha256": "8d370945d02fddff09fc07e2724354da3e7c824dc6bb5f3b8fef57ff3ae63512"
+      },
+      "watchdog": {
+        "bytes": 104383,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/bounded-receipt.json",
+        "sha256": "8128a639c50238cf43d89dbaa9d4b2b4696deea568195ed8aeed140f4008d364"
+      },
+      "worker": {
+        "bytes": 2622064,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/completion-receipt.json",
+        "sha256": "376aa64d1f3655f31a4d4a9ac09d514a42b8a8c4dd01b5212a3101b6ddb13079"
+      }
+    },
+    "actual_statistics": {
+      "bytes": 5208,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/actual-statistics.json",
+      "sha256": "7d36d91fa2314aab394ccd5ec1996b7a1aecb2abeafcf9a4d31612ca0d95682f"
+    },
+    "all_recorded_prechecks_ns": 40949578103,
+    "blockers": [],
+    "cell_evidence_inventory": {
+      "bytes": 4327822,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/combined-cells.json",
+      "sha256": "35288fb0241111a89f7cc446edff00e6e5532a0a7b25d7b51d856055e44f2024"
+    },
+    "checks": {
+      "bytes": 626,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/checks.json",
+      "sha256": "4651ae894f1fe7487b37061b34e202174998fa562dc0a0058f17cda3ab8a65d2"
+    },
+    "child_guard_seconds_sum": 24.69875580299413,
+    "claim_lifecycle": {
+      "bytes": 2136,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/claim-lifecycle.json",
+      "sha256": "416ff7123e3710a361bfc03e3dca71830b88a18b80f1eb5fbca85ae62b0ee744"
+    },
+    "cleanup_inclusive_ns_verified": true,
+    "cleanup_lease_locks": true,
+    "combined_12cell_qualification_passed": true,
+    "complete": true,
+    "configuration": {
+      "bytes": 33908,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/BINDINGS.json",
+      "sha256": "671ea34137976bb255aad7ca4ea88b3a84aac20bd5b538520dd9bfbcdda3ed5b"
+    },
+    "cumulative_ns": 717873335365,
+    "elapsed_ns": 121226195039,
+    "failed_review": {
+      "bytes": 14887,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/report.json",
+      "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8"
+    },
+    "failed_review_manifest": {
+      "bytes": 4463,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/MANIFEST.json",
+      "sha256": "3c9f9c54777bed842f8f9c66c0e6b76262d12fcceea2e187099699abf5402927"
+    },
+    "finalization_program": {
+      "bytes": 12295,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/finalize.py",
+      "sha256": "a136a414fea118bc69289d1af1541076d696ff0935d47db56aa8e8aecd58505a"
+    },
+    "foundation_raw_differences": {
+      "bytes": 890,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/foundation-raw-differences.json",
+      "sha256": "4b1b2c07dc2bca3cf3b0593eaf8b55cff25ef814806a036ddfa96136c93fb84d"
+    },
+    "full_sweeps_total_ns": 5376929915,
+    "immutable_input_count": 12783,
+    "immutable_inputs": {
+      "bytes": 4043738,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/immutable-inputs.json",
+      "sha256": "03c44505594af2933bcdc93a5e3939a8237a583f4fd8c74534dbbcc5a4e6da4e"
+    },
+    "immutable_output_count": 1549,
+    "immutable_outputs": {
+      "bytes": 537995,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/immutable-outputs.json",
+      "sha256": "b941cfaf4153fcefdb3b50b922afa071525860c84773420652886a59b20575f8"
+    },
+    "inventory_format": "json-array-of-full-pins-v1",
+    "limitations": [
+      "Composite qualification joins original84 actual successful commands with fixed7 completion suffix and5 explicitly additional runtime-before checks. It does not retroactively turn the original deadline-failed stage into PASS.",
+      "Boundary full SHA and intermediate metadata assume cooperating writers under advisory locks; no continuous or privileged adversarial write/restore protection is claimed.",
+      "All12 actual A route observations are source for this fixed data; this is not proof that arbitrary compiler routes are source or dynamic branch coverage.",
+      "Different original/stats compiler binaries intentionally yield different generation identity/CURRENT bytes. Only the predeclared strict structural exception is accepted. Same-stats future samples have no such exception.",
+      "RTS are qualification evidence, not48 performance samples; no MLF/GHC speed parity, stable wall benefit, whole CI or production result is asserted.",
+      "Source-only sampling drafts and remaining budget are not admission. Any later execution remains a separate reviewed scope."
+    ],
+    "maximum_cumulative_ns": 1800000000000,
+    "maximum_stage_ns": 180000000000,
+    "method": {
+      "budget": "Actual same guard return row/file, admission, command, claim, epoch and envelope strict integer ns; old596647140326 charged, new121226195039, total717873335365.",
+      "claim": "Original launch-binding claim pin present in reconstructed12783 entry inputs; exact source C1 enforcement covers entry fullSHA, middle identity, exit fullSHA; current content unchanged.",
+      "commands": "Real receipt/config/argv/raw output/report archive/limits/cleanup checked for all12 new children; original84 exact plan mapping and frozen prior independent evidence preserved.",
+      "input_hashing": "Path/content pin deduplication; each unique input hashed once with unchanged metadata checks through review. No per-child repeated whole-library sweep.",
+      "new_foundation": "Independently redecoded actual original A and new B complete containers, CRC, content address, CURRENT, query/config closure and semantic raw equality except predeclared compiler identity; new GHC stdout parsed and exact14 interfaces/no object/link verified.",
+      "old11cell_qualification": "Inherited from exact pinned independent failure-review completed-cell evidence; all underlying old scope bytes/directories reverified unchanged and every cell archive/command/reference pin rebound. The old stage remains FAIL.",
+      "runtime": "All10 real runtime before/after child identities compared to qualified SETUP, current resolved executable/loader/lib/config pins and directory sets read-only verified.",
+      "scope": "Complete old6304 files448 directories unchanged; new1564files41dirs; whole E7868files490dirs and empty active/cells/tmp inventoried."
+    },
+    "native_generation_AB_fixedpoint": false,
+    "original_SEMANTIC_passed": false,
+    "original_binary": {
+      "bytes": 20192216,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+      "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+    },
+    "original_failed_stage_preserved": true,
+    "original_helper_loader_guard_lock_compiler_or_target_executed_by_reviewer": false,
+    "performance_sample_count": 0,
+    "precheck_interpretation": "Worker-measured sequential wall intervals only. 2 full sweeps total5.376929915s;26 light checks35.572648188s. These are not compiler CPU attribution, performance samples or optimization speedup.",
+    "precheck_metrics": {
+      "full_sweeps": [
+        {
+          "elapsed_ns": 2578773650,
+          "phase": "entry",
+          "unique_bytes": 1385285589,
+          "unique_files": 12783
+        },
+        {
+          "elapsed_ns": 2798156265,
+          "phase": "exit",
+          "unique_bytes": 1394056914,
+          "unique_files": 14332
+        }
+      ],
+      "light_check_count": 26,
+      "light_elapsed_ns": 35572648188,
+      "new_archive_hash_checks": 14,
+      "scope": "worker precheck intervals only, not controller checks or compiler RTS; sequential wall intervals not CPU attribution"
+    },
+    "preserved_scope_directories": {
+      "bytes": 34234,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/preserved-E-directories.json",
+      "sha256": "a932d9cf5d107de817334b38ea2a909c0ef63a5224f21ea303775117c9c67eaa"
+    },
+    "preserved_scope_directory_count": 490,
+    "preserved_scope_directory_format": "sorted-unique-relative-to-E-path-strings-v1",
+    "preserved_scope_file_count": 7868,
+    "preserved_scope_files": {
+      "bytes": 2748006,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/preserved-E-files.json",
+      "sha256": "19b8bca89190c77d07e8ba7eff9ae8e9f3b5a5a7672eddf4fbb04268d97c0ef7"
+    },
+    "preserved_scope_root": "<EXPERIMENT_ROOT>/main-gap-setup-run04",
+    "prior_ns": 596647140326,
+    "production_promotion": false,
+    "qualification": {
+      "Foundation_GHC_interfaces": 14,
+      "Foundation_fresh_groups": 475,
+      "Foundation_query_rows": 3221,
+      "Foundation_result_files": 1478,
+      "Foundation_reused_groups": 0,
+      "actual_command_count": 96,
+      "all_children_exit0_complete_cleanup": true,
+      "artifact_normalization_or_field_dropping": false,
+      "combined_RTS_count": 24,
+      "combined_cells": 12,
+      "cross_binary_full_raw_equal": false,
+      "cross_binary_only_real_compiler_identity_and_derived_CRC_SHA_CURRENT_differences": true,
+      "dynamic_oracles_accepted": false,
+      "exact_original_argv_source_package_and_flags": true,
+      "extra_before_runtime_support": 5,
+      "future_same_stats_full_raw_exact_required": true,
+      "new_A_reference_runs": 0,
+      "new_RTS_count": 2,
+      "new_command_count": 12,
+      "new_suffix_original_ordinals": [
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91
+      ],
+      "observed_A_routes": {
+        "lowered": 0,
+        "source": 12
+      },
+      "old_prefix_count": 84,
+      "original_A_frozen_before_B": true,
+      "original_command_count": 91,
+      "other11_cells_rerun": false
+    },
+    "remaining_cumulative_budget_ns": 1082126664635,
+    "review_program": {
+      "bytes": 31603,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/review.py",
+      "sha256": "5437dc614bf3cb1d0bf3ef932292d338fe5458fd999ed34f814dd5a904e4f594"
+    },
+    "review_read_only_original_scope": true,
+    "sampling_authorized": false,
+    "schema": "main-gap-semantic-completion-actual-review-v1",
+    "scope_directories": {
+      "bytes": 1536,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/scope-directories.json",
+      "sha256": "065fe7218dcf27be42d9f8739ad43fdc8e6c49084265398dff05ce269d009ae6"
+    },
+    "scope_directory_format": "sorted-unique-relative-path-strings-v1",
+    "scope_inventory": {
+      "bytes": 541780,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/scope-files.json",
+      "sha256": "e8aff13c26d7a78ef7a6b7fc3a1802d349a0a0ae7d7121de652b2c827305f862"
+    },
+    "scope_root": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01",
+    "setup_actual_pins": {
+      "admission": {
+        "bytes": 2704,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/coordination/SETUP-admission.json",
+        "sha256": "d015b2e22b04ca4416254fdba966dd192547321f8f37f8362117739b51b954f9"
+      },
+      "claim": {
+        "bytes": 278,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/claims/SETUP.json",
+        "sha256": "353f6385e40e35c5c5c5dc735d9bcfa1cf3e75951752eb28eabd7f33d4afec95"
+      },
+      "config": {
+        "bytes": 1737,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/outer/guard-config.json",
+        "sha256": "b8c0af8f25d9fd79abc8a3f5ec97223143940cab761b5dd37dae15ebe8e582bd"
+      },
+      "controller": {
+        "bytes": 6291,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/controller.json",
+        "sha256": "0c478590f823262856b7e3ec7f5ec0567a051d5c29127802b733c762512c80b7"
+      },
+      "outer": {
+        "bytes": 4773,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/outer/guard.json",
+        "sha256": "fd9939356e8566abb915f1952dcc258ed12d16e42c42643afa16e0f231297d40"
+      },
+      "worker": {
+        "bytes": 581055,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/setup-receipt.json",
+        "sha256": "ed016dcadc8a20b6c533ac9373a2fd5bc0b22f2eb8fdebb79c534eb682ff5840"
+      }
+    },
+    "setup_review": {
+      "bytes": 33473,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/report.json",
+      "sha256": "1b5addd5f3ce1821f43ef02f568df5552781f4e41ec1569284bb7554c83bec59"
+    },
+    "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "source_package_manifest": {
+      "bytes": 4409,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/MANIFEST.json",
+      "sha256": "2beaafaf998da6e3e7b5b3b9e284831eebd53062e1b7610aeca6ff05160f1c57"
+    },
+    "source_review": {
+      "bytes": 13444,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/report.json",
+      "sha256": "483e491550640505ab48f49c8c821a46a374af555c653e485f1f5b6ac3af7d15"
+    },
+    "source_review_manifest": {
+      "bytes": 2542,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/MANIFEST.json",
+      "sha256": "2619c67591ab408d9e07bbdb557b25c4188a819baa4d276bf74516a0f518ce12"
+    },
+    "statistics_inventory": {
+      "bytes": 62576,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/combined-statistics.json",
+      "sha256": "6bb26f0da4c24783339bbb45823c0f986207071382751bb0ff1a367784d46d3a"
+    },
+    "stats_binary": {
+      "bytes": 20205400,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+      "sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347"
+    },
+    "summary": {
+      "bytes": 2350,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/summary.json",
+      "sha256": "a08a77d25247ee0ba5b8248b571b4a21009fd75b8c95139aa526454bc6a36fb4"
+    },
+    "verified_pins": {
+      "bytes": 4594746,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/verified-pins.json",
+      "sha256": "009a664d1af40eb079d8a8530d55b91068c125e1655ba7079c5d2ab4741c776e"
+    },
+    "verified_unique_pin_count": 14384,
+    "whole_CI_claimed": false
+  },
+  "representation": "full report fields except local roots replaced and absolute monotonic clock coordinates omitted; all durations retained"
+}

@@ -1,0 +1,321 @@
+{
+  "files": [
+    {
+      "bytes": 6340,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "d8fbcc201dd100b4ad9db75db741a842acd78cb0",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/EXPORT-CHECKS.json",
+      "sha256": "6aadf288c3b028209e1a9897b38af96e3edf2a3306a3872afdaed59973c524e8",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/EXPORT-CHECKS.json"
+    },
+    {
+      "bytes": 5323,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "71fde2f346af38f6c876e2b0bbe76d2d1b658e5a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/README.md",
+      "sha256": "a96bbafdb6149636cf82f2e5824002ef2abcecd4a58a0572e452370b7e2575cb",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/README.md"
+    },
+    {
+      "bytes": 1749,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "3d214ba6ec15b0161b0cdca9c3692fb3f8abdbe3",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/REPRODUCTION.md",
+      "sha256": "4650f4ea27092c4ab45500a8b59bd44aee2fd79b292202ac90a8943dffb87a34",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/REPRODUCTION.md"
+    },
+    {
+      "bytes": 31162,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "4f4e252a7a32e129e68df379ae8d3b5a92ea8074",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/REUSED-PUBLIC-FILES.json",
+      "sha256": "ab934a62a247dd8b4cbd94cc1de40662d3e359d84624f3fd83df0258fccc3acd",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/REUSED-PUBLIC-FILES.json"
+    },
+    {
+      "bytes": 18834,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "928fbb46a5829c1f3651843fc1f57b1e5408baf1",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/SOURCE-MAP.json",
+      "sha256": "cb3de4d1844dac24c1bb2f9f52d7d8a724ba4e146cbd670ced0d5f4c662a2544",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/SOURCE-MAP.json"
+    },
+    {
+      "bytes": 23087,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "0eff1829bcb56c8b49050557eb38fe562447e46e",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/completed-cell-observations.json",
+      "sha256": "d660704f256437f41e4fe24e91b55d690fd4c5acffb6b810384f58681cc20409",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/completed-cell-observations.json"
+    },
+    {
+      "bytes": 103316,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "fa12afb510cb5844d0ee38d5fc4368084d77053a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/completed-commands.json",
+      "sha256": "6352cc157f6d46154ddaecc9c3bb1cb20495231ae0730b89198adbfcff33dae5",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/completed-commands.json"
+    },
+    {
+      "bytes": 1412,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "7d6a574223e144d7b0b2c53c12696bae67f275ff",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/deadline-trace.redacted.txt",
+      "sha256": "fdecc658ff115a4cc8b14520451bb3882bb666853e0cd35ddd850b10acf76fb7",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/deadline-trace.redacted.txt"
+    },
+    {
+      "bytes": 4831,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "a08ecc7912ddd9806b6477094dbffae20d455ed5",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/failure-summary.json",
+      "sha256": "6df640d7f966dbecfd57e1b948839e33f0c5ad066076222d3cad36fe86c00801",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/failure-summary.json"
+    },
+    {
+      "bytes": 3245,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "6d1c80cbfd7218be2d4917ba7728ad17b68b5b78",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/final-cleanup.json",
+      "sha256": "b872151e232a31840ad9ffba945bab3c64e29e92d0e587b95e1bd0377aa7d6de",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/final-cleanup.json"
+    },
+    {
+      "bytes": 16019,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "9d2bef8c149024aaf8d0cb108913424bef53ee94",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/formula-controls-raw.json",
+      "sha256": "228a3044a04af6fdebcbad9d9aff5096420e928d05ae234f292c2b231cbe2ce9",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/formula-controls-raw.json"
+    },
+    {
+      "bytes": 10086,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "7beae396dbf4523614d86055d4e939e2f6ecec29",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/independent-failure-review.json",
+      "sha256": "78edcc2080f7b100a66e705109abee298360f4140d7121132dc6b3129e1d2ccc",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/independent-failure-review.json"
+    },
+    {
+      "bytes": 1033,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "0d608871f9aea0442ad0997ac54469a5b0098f93",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/missing-commands.json",
+      "sha256": "540afab8ec3a504a3751727ebd83b6c54003a5a18324e8db979f3985db0707ce",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/missing-commands.json"
+    },
+    {
+      "bytes": 2861,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "b85c466a7235364fcdfcabea26c924fdb8e28939",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/precheck-source-diagnosis.json",
+      "sha256": "9b6d132afe1495c6c8a72183e2148ca28702e52299f226e12bb8e64e222271b6",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/precheck-source-diagnosis.json"
+    },
+    {
+      "bytes": 97051,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "6689a5064c69a3feb907e73978b5c825240e4f98",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/rts-redacted.json",
+      "sha256": "60aa768b8c6fd7d63975ae593c0ace28216a076bacb4335a2c92d1e6a90b4bd6",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/rts-redacted.json"
+    },
+    {
+      "bytes": 3794,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "bd9a6c8187e97db1faf537e144925f19bfbe2b81",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/source-and-activation-reviews.json",
+      "sha256": "5fcc748e3e1612bbb0c533225910f3a6fd7af4da48bfba72055430d19cf392af",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/evidence/source-and-activation-reviews.json"
+    },
+    {
+      "bytes": 6760,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "f81401a67493fbc7afcfb146d999d5a5e4661702",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/manifest.json",
+      "sha256": "8c2d6092c67b4091989d87dace12a6e2ae17eeac6e933d464535088f2896d122",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/manifest.json"
+    },
+    {
+      "bytes": 987,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "0e49adb0446df4d530c8ba1ea54f7edfcbe9b24a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/ACTIVATION-CONTRACT.json",
+      "sha256": "0fbf801c1de5997155f67d6289d9db321672a2abf536a5ffc910f89262864b75",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/ACTIVATION-CONTRACT.json"
+    },
+    {
+      "bytes": 28190,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "4f485d6984075c218c4c76f09305c304915a167b",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/BINDINGS.json",
+      "sha256": "b2f0ced6f333d4bd9cf8c35b3dd63662e198de7aabfc13891a4e14de5c447f75",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/BINDINGS.json"
+    },
+    {
+      "bytes": 5577,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "e83746d1ff02e1e58cd1127ca6cf047bc55d6871",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/DESIGN-AT-SOURCE-FREEZE.md",
+      "sha256": "d204811b5fcea4629de8b8454bd1ef2826f06ae2435c334a2e9bdd43367bc556",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/DESIGN-AT-SOURCE-FREEZE.md"
+    },
+    {
+      "bytes": 3791,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "4de5ecf450efc26d133881b7e0c2ecb23709875d",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/ROUTE-CONTRACT-v3.json",
+      "sha256": "cd0f2e700b9e6a7a0d33f0d29caa6c47f6c10af5ec0420c57d23dd39745e21f8",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/ROUTE-CONTRACT-v3.json"
+    },
+    {
+      "bytes": 45194,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "8ee81b59b5d08d3a1ecd21c3c89838fe0efa9253",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/controller.py",
+      "sha256": "6295d6beeefa7d6ac87dfe6efde321fe791e5d839dc0b099ea7dec6387874b5d",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/controller.py"
+    },
+    {
+      "bytes": 639,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "16cb0c1713cb3d9cd2218e67ea0ebfda543710af",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/environment.json",
+      "sha256": "581cb4646d9f6dd9a5459d22eed8b22e520921157da91ccd70720a4e79b561b2",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/environment.json"
+    },
+    {
+      "bytes": 6913,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "50e416dd6ab4f6a2745c885c2441bdee1789d6d3",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/lifecycle_checks.py",
+      "sha256": "fc7a9b97ef860adef048d4c4ed9d364467abd589066afaf44ffe5a2df4af7921",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/lifecycle_checks.py"
+    },
+    {
+      "bytes": 6762,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "f8c377dad69c5e8e8cecf997d884c9a56d58df47",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/ownership_checks.py",
+      "sha256": "38ab227b7e721a39b53a014f6a3358b4182095729f5d2a3b97d734d2a4db1c8f",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/ownership_checks.py"
+    },
+    {
+      "bytes": 5627,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "507ff18e14fe6cdaebd6a557b31512450de30eb8",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/protocol_checks.py",
+      "sha256": "87228d9d51597641e5eb9836cd370b9f76c55f0dac179f3ba931f1f0bcc77a76",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/protocol_checks.py"
+    },
+    {
+      "bytes": 15673,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "724bd0860867bab0a067fcbc085f3c0ecf2871f9",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/publication_checks.py",
+      "sha256": "cc8af71bf64c2ac9065f05d811680a4c3870760a80314d7ce54739ca07a5a5ed",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/publication_checks.py"
+    },
+    {
+      "bytes": 8144,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "255be7395fa92a6f292163a3f2e0a0fcc654381a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/publication_oracle-vs-setup-v5.patch",
+      "sha256": "90fce8728aa789032e9b6fba82e3bc4394e87631faa57c78894677ef0e5486dc",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/publication_oracle-vs-setup-v5.patch"
+    },
+    {
+      "bytes": 18398,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "007f97e59df191855ac723ce0519c20d3dae84fe",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/publication_oracle.py",
+      "sha256": "df9d3ad4ef1dd23d888a7089efcf365e0939922a5c1f63cc6c04c6c775579be1",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/publication_oracle.py"
+    },
+    {
+      "bytes": 5400,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "37876cf56f4b92fe19203bc3ac0a81c5781f6820",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/pure_checks.py",
+      "sha256": "6d87c57acfc4b74015a4e099f079c52844d506d4ad7fd0f6ec01beb1229093b5",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/pure_checks.py"
+    },
+    {
+      "bytes": 3553,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "48209b656f3f52200f708719507d5657f6ee7423",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/lifecycle-checks.json",
+      "sha256": "29d5dd60da85417f864412bc21ba52308cb5bdc60210f36358cb454ad586eaa9",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/lifecycle-checks.json"
+    },
+    {
+      "bytes": 2810,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "623b9687506f583a4d003fb56a9d03fcb52b7cf3",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/ownership-checks.json",
+      "sha256": "ec815fbd36828735fd3e9bdd131d02e76a6700318e62f28f06d2782896b8e72b",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/ownership-checks.json"
+    },
+    {
+      "bytes": 4619,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "46820e05459af2b63204443b391a18780a15c9df",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/protocol-checks.json",
+      "sha256": "105c3c716b8852a9330eea7ee4f753e1007462994c9d87dd78df78266dfc70aa",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/protocol-checks.json"
+    },
+    {
+      "bytes": 10805,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "f7d2ce3982efeb9e6f5ba520e2e79e22e41b016e",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/publication-checks.json",
+      "sha256": "4e1d342afec706ddd108f20a3d236f1ccae75e36211a5f4a990401f41c97d6d2",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/publication-checks.json"
+    },
+    {
+      "bytes": 2538,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "3a2dd0f9a0aadda450ae34f13c1eed4f7ac057cf",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/pure-checks.json",
+      "sha256": "a9a9631917cce52377461e40ab91f9a48dbfb73e570112bebf23a532f6bf288c",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/pure-checks.json"
+    },
+    {
+      "bytes": 3170,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "c5cdce69a7348b52b1eb22a77202596275362545",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/reference-checks.json",
+      "sha256": "455061d0b8501df2ac68fe5ea2f80cbe340999af6711c290217de63c1187852f",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/recorded-tests/reference-checks.json"
+    },
+    {
+      "bytes": 8538,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "f88329fee545aff77877d7b7cbb8ca04c273f9df",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/reference_checks.py",
+      "sha256": "fe5ad01079f61b1a900e2880b7c809307aa850dd0a5ca36d4a5df0dac2d10bb4",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/reference_checks.py"
+    },
+    {
+      "bytes": 4580,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "2b20c8ba09be6dad37588637251ff8ec5aecfff1",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/semantic_parsers.py",
+      "sha256": "359060abe291cdd0f5e038577985732603aabf6a652381475cdb2c6b44e125cc",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/semantic_parsers.py"
+    },
+    {
+      "bytes": 15962,
+      "commit": "30308546023a95d22296ada7bfcb12864ebad9ad",
+      "git_blob": "18d6999aad2b0067612ec50d1d3ca614fddd6f64",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/worker.py",
+      "sha256": "402e76c9d93c54b1ba1c0826ccd662c49d3734e5c718d38a5f5e1f7413f4df0d",
+      "url": "https://github.com/mlf-lang/mlf/blob/30308546023a95d22296ada7bfcb12864ebad9ad/tools/performance/main-baseline-gap-20261114/semantic-qualification-run01/source/worker.py"
+    }
+  ],
+  "follow_previous_REUSED_PUBLIC_FILES_for_25_fixed_inputs_and_support": true,
+  "no_qualification_transfer_to_future_samples": true,
+  "prior_archive_39_files_preserved": true,
+  "reused_binaries_not_transferred_or_publicly_reproduced": true,
+  "reused_production_source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5"
+}

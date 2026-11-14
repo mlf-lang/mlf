@@ -1,0 +1,146 @@
+{
+  "READY": false,
+  "RTS": 2,
+  "actual_COMPLETION_passed": false,
+  "actual_prefix": {
+    "bytes": 14887,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/report.json",
+    "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8"
+  },
+  "actual_prior_ns": 596647140326,
+  "checks": 73,
+  "claim_checks": {
+    "bytes": 1480,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/claim-check-report.json",
+    "sha256": "908011e8c0b9be71784ac15b57cce674e6f1f79e97d3e0ab37588b9f8fdd55f3"
+  },
+  "combined_12cell_qualification_passed": false,
+  "commands": 12,
+  "complete": true,
+  "configuration": {
+    "bytes": 33908,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/BINDINGS.json",
+    "sha256": "671ea34137976bb255aad7ca4ea88b3a84aac20bd5b538520dd9bfbcdda3ed5b"
+  },
+  "controller": {
+    "bytes": 51811,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py",
+    "sha256": "0757afd670d4e63e246562dbccbcdded843ff8917cffad26824d8c1fc827a715"
+  },
+  "controller_inverse_only_package_and_config": true,
+  "diagnosis": {
+    "bytes": 7039,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-precheck-diagnosis-source/report.json",
+    "sha256": "a58ff8477f4ba2521bed8c3da82ac1119b2ab124cc84ecbd8d258c61071a79d3"
+  },
+  "entry_with_complete_cap_ns": 776647140326,
+  "extra_freshness": 5,
+  "identity_helper": {
+    "bytes": 3827,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/identity.py",
+    "sha256": "b2caf9e4c4c65782b5cc003d68d60794357cc40a014e0e53364c7cb660dead8a"
+  },
+  "immutable_guard": {
+    "bytes": 24833,
+    "path": "<EXPERIMENT_ROOT>/recovery/tools/performance/full-compiler/continuation-20261111/sparse-attribution-r13/guard.py",
+    "sha256": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e"
+  },
+  "immutable_runtime_helper": {
+    "bytes": 11663,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/runtime_pins.py",
+    "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+  },
+  "independent_source_gate_passed": false,
+  "limitations": [
+    "Metadata middle checks are not continuous content attestation or defense against hostile privileged write/restore races.",
+    "Worker precheck intervals are not compiler CPU and exclude controller checks and raw decoding.",
+    "Original failed stage consumes real cumulative budget and is never relabeled PASS.",
+    "No future outcome, query count or sampling oracle is guessed."
+  ],
+  "no_new_scope_created": true,
+  "no_original_helper_guard_runtime_loader_target_or_lock_execution": true,
+  "original_SEMANTIC_remains_failed": true,
+  "original_suffix": [
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91
+  ],
+  "performance_samples": 0,
+  "prior_blocked_manifest": {
+    "bytes": 3346,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source-review/MANIFEST.json",
+    "sha256": "c39981c7d9c005114633104b42b79eced40307dcbc167d46b50a99dea3408930"
+  },
+  "prior_blocked_review": {
+    "bytes": 12152,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source-review/report.json",
+    "sha256": "cf7b0af7777cbe1045c3bc0448f8a04832fc95a9a9d50c240340e427b064a07e"
+  },
+  "prior_frozen_source": {
+    "bytes": 3653,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source/MANIFEST.json",
+    "sha256": "32a731107594df0fdd50f1a2e2b7650235d750886d227857a92d3012fcfc3272"
+  },
+  "publication_oracle": {
+    "bytes": 18398,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/publication_oracle.py",
+    "sha256": "df9d3ad4ef1dd23d888a7089efcf365e0939922a5c1f63cc6c04c6c775579be1"
+  },
+  "read_only_actual_prefix_verified": true,
+  "remaining_gates": [
+    "independent complete source review",
+    "exact READY-only materialization and activation review",
+    "new current resource/epoch/dual-lock admission",
+    "one actual 12-child completion with full boundary SHA and immutable old scope",
+    "actual independent suffix and combined old84+new7 review",
+    "future sampling source and actual per-block budget admission"
+  ],
+  "revision": {
+    "bytes": 1685,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/REVISION.json",
+    "sha256": "a0355bd52c65212ce2455b9b928e0ccbab51575c96fb40e4c1bb1ed9fe6935c0"
+  },
+  "schema": "main-gap-completion-source-preparation-v2",
+  "semantic_parsers": {
+    "bytes": 4580,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/semantic_parsers.py",
+    "sha256": "359060abe291cdd0f5e038577985732603aabf6a652381475cdb2c6b44e125cc"
+  },
+  "sole_protocol_repair": "original launch-binding claim fullpin at exact Q path participates in existing immutable input snapshot",
+  "source_ancestry": {
+    "bytes": 7627,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/MANIFEST.json",
+    "sha256": "0e1537a67c1ebdc3405c104d7c99771f8853ae9a459843f497cb23cd430371b8"
+  },
+  "source_ancestry_review": {
+    "bytes": 18425,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source-review/report.json",
+    "sha256": "70427781b1f19c3fcef496408fc733e8dcbce9bee106d9888066930fe98831b9"
+  },
+  "source_checks": {
+    "bytes": 1884,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/source-check-report.json",
+    "sha256": "a2651fbcc4f374056339f8bf873d79c0fbae56ec9d63ea48ad81fa0834acaf53"
+  },
+  "source_only": true,
+  "source_snapshot_and_old_scope_not_modified": true,
+  "stage_cap_ns": 180000000000,
+  "stats_parser": {
+    "bytes": 4888,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/stats.py",
+    "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+  },
+  "unchanged_identity_helper_bytes": true,
+  "unchanged_post_setup_max_ns": 1800000000000,
+  "worker": {
+    "bytes": 17470,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/worker.py",
+    "sha256": "44f7b4568e8e6677c485e42057fd0f956ab6eba980b6748491f5b1dc2016c891"
+  },
+  "worker_deadline_ns": 175000000000,
+  "worker_inverse_exact": true
+}

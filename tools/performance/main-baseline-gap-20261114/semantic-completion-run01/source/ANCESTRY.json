@@ -1,0 +1,50 @@
+{
+  "controller_after": {
+    "bytes": 51811,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py",
+    "sha256": "0757afd670d4e63e246562dbccbcdded843ff8917cffad26824d8c1fc827a715"
+  },
+  "controller_before": {
+    "bytes": 51811,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source/controller.py",
+    "sha256": "6376ef047e13eebbc855f057563d15ab3cb49641cc74bd45bd078a32223f7565"
+  },
+  "controller_inverse_only_PB_and_CONFIG_SHA": true,
+  "diffs": [
+    {
+      "bytes": 924,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py.diff",
+      "sha256": "6e3b1d02a8a917934a213f521acfaba36f4682bc18e13e4a252c7b32722f21b9"
+    },
+    {
+      "bytes": 1603,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/worker.py.diff",
+      "sha256": "8288447a7328f8b14aeaebcc31e838ece5663475e3d0039f7d851ec4ec52d088"
+    }
+  ],
+  "guard_runtime_oracles_unchanged": true,
+  "identity_bytes_unchanged": true,
+  "original_blocked_review": {
+    "bytes": 12152,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source-review/report.json",
+    "sha256": "cf7b0af7777cbe1045c3bc0448f8a04832fc95a9a9d50c240340e427b064a07e"
+  },
+  "original_source": {
+    "bytes": 3653,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source/MANIFEST.json",
+    "sha256": "32a731107594df0fdd50f1a2e2b7650235d750886d227857a92d3012fcfc3272"
+  },
+  "schema": "main-gap-completion-claim-only-source-ancestry-v2",
+  "scope_created": false,
+  "worker_after": {
+    "bytes": 17470,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/worker.py",
+    "sha256": "44f7b4568e8e6677c485e42057fd0f956ab6eba980b6748491f5b1dc2016c891"
+  },
+  "worker_before": {
+    "bytes": 17162,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source/worker.py",
+    "sha256": "ce970b52b59259e6ca96ccb446ea01a6a4a93ca56882b069125d768f2c9d878d"
+  },
+  "worker_inverse_remove_only_claim_insertion": true
+}

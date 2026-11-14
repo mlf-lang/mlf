@@ -1,0 +1,39 @@
+{
+  "C1": "Original authenticated launch-binding claim fullpin was missing from intermediate immutable identity coverage. V2 adds that original pin before dedup/capture with exact claim path/fullpin shape. It never pins possibly replaced current content as the baseline.",
+  "budgets_commands_oracles_unchanged": true,
+  "new_review_closes_C1": [
+    {
+      "closed": true,
+      "enforced_boundaries": [
+        "entry exact full SHA",
+        "each intermediate metadata identity check",
+        "exit full SHA and same identity before completion"
+      ],
+      "evidence": {
+        "bytes": 1648,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/claim-source-evidence.json",
+        "sha256": "0bb3d50e97ee9b35b06055e2ba03b0659128a3e93489c27fdb9d9985dc2e6767"
+      },
+      "id": "C1",
+      "repair": "Original authenticated deadline[claim] fullpin, with exact new Q claim path and fullpin keys, is appended before input dedup/capture. No pin of possibly replaced current claim contents."
+    }
+  ],
+  "sole_worker_protocol_delta": "        claim = deadline['claim']\n        C.require(type(claim) is dict and set(claim)=={'path','bytes','sha256'}\n                  and claim['path']==str(self.Q/'claims/COMPLETION.json'),\n                  'original launch-binding claim pin at exact completion path required')\n        all_inputs += [claim]\n",
+  "v1_remains_blocked": true,
+  "v1_review": {
+    "artifact": "main-gap-semantic-completion-v1-source-review/report.json",
+    "bytes": 12152,
+    "sha256": "cf7b0af7777cbe1045c3bc0448f8a04832fc95a9a9d50c240340e427b064a07e"
+  },
+  "v1_review_manifest": {
+    "artifact": "main-gap-semantic-completion-v1-source-review/MANIFEST.json",
+    "bytes": 3346,
+    "sha256": "c39981c7d9c005114633104b42b79eced40307dcbc167d46b50a99dea3408930"
+  },
+  "v1_source_manifest": {
+    "artifact": "main-gap-semantic-completion-v1-source/MANIFEST.json",
+    "bytes": 3653,
+    "sha256": "32a731107594df0fdd50f1a2e2b7650235d750886d227857a92d3012fcfc3272"
+  },
+  "worker_inverse_exact": true
+}

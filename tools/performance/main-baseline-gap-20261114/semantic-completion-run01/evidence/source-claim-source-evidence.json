@@ -1,0 +1,33 @@
+{
+  "controller": {
+    "bytes": 51811,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py",
+    "sha256": "0757afd670d4e63e246562dbccbcdded843ff8917cffad26824d8c1fc827a715"
+  },
+  "identity": {
+    "bytes": 3827,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/identity.py",
+    "sha256": "b2caf9e4c4c65782b5cc003d68d60794357cc40a014e0e53364c7cb660dead8a"
+  },
+  "insert": "        claim = deadline['claim']\n        C.require(type(claim) is dict and set(claim)=={'path','bytes','sha256'}\n                  and claim['path']==str(self.Q/'claims/COMPLETION.json'),\n                  'original launch-binding claim pin at exact completion path required')\n        all_inputs += [claim]\n",
+  "insert_bytes": 308,
+  "inverse_controller_PB_CONFIG_only": true,
+  "inverse_worker_exact": true,
+  "original_claim_fullpin_chain": [
+    "actual argv-bound launch-binding",
+    "entry deadline_fields claim equality",
+    "worker receives same deadline dict",
+    "exact scoped original claim pin appended",
+    "dedup same input union",
+    "entry full SHA",
+    "all intermediate metadata checks",
+    "exit full SHA and unchanged identity",
+    "worker complete only after exit attestation",
+    "outer success and independent actual review still required"
+  ],
+  "worker": {
+    "bytes": 17470,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/worker.py",
+    "sha256": "44f7b4568e8e6677c485e42057fd0f956ab6eba980b6748491f5b1dc2016c891"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "activated": false,
+  "admission_created": false,
+  "delta": "unique READY False to True only",
+  "destination": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.py",
+  "disabled_controller": {
+    "bytes": 51811,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/controller.py",
+    "sha256": "0757afd670d4e63e246562dbccbcdded843ff8917cffad26824d8c1fc827a715"
+  },
+  "disabled_snapshot": "<EXPERIMENT_ROOT>/main-gap-setup-run04/semantic-completion-01/controller.disabled.py",
+  "enabled_bytes": 51810,
+  "enabled_sha256": "e805e1669907f531105a00bc83d78b7a2618c00f0e8f3d63cf6b63d4cbf2b62c",
+  "schema": "main-gap-completion-mechanical-activation-v1",
+  "scope_created": false,
+  "source_review": null,
+  "source_review_required": [
+    "complete=true",
+    "source_gate_passed=true",
+    "blockers=[]",
+    "source_package_manifest exact fullpin"
+  ],
+  "source_review_schema": "main-gap-completion-source-review-v1"
+}

@@ -1,0 +1,14 @@
+--- <EXPERIMENT_ROOT>/main-gap-semantic-completion-v1-source/worker.py
++++ <EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/worker.py
+@@ -18,6 +18,11 @@
+         all_inputs=accepted['immutable_inputs']+accepted['immutable_outputs']+previous['immutable_inputs']+previous['pins']+c['source_inputs']+C.verify_setup_scope(c)
+         all_inputs += [c[k] for k in ['worker','publication_oracle','semantic_parsers','environment','route_contract','identity_helper','failure_review']]
+         all_inputs += [C.pin(C.PB/'BINDINGS.json'),C.pin(C.PB/'controller.py'),C.pin(self.Q/'controller.py'),C.pin(self.Q/'controller.disabled.py'),C.pin(path),C.pin(self.Q/'launch-binding.json')]
++        claim = deadline['claim']
++        C.require(type(claim) is dict and set(claim)=={'path','bytes','sha256'}
++                  and claim['path']==str(self.Q/'claims/COMPLETION.json'),
++                  'original launch-binding claim pin at exact completion path required')
++        all_inputs += [claim]
+         all_inputs += [previous['review'][key] for key in ['scope_inventory','scope_directories','immutable_inputs','partial_outputs_inventory','cell_evidence_inventory','foundation_reference_contract','remaining_original_commands','configuration']]
+         all_inputs += list(accepted['actual_pins'].values())+[c['setup_review'],accepted['review']['configuration'],accepted['review']['immutable_inputs'],accepted['review']['immutable_outputs']]
+         for role in ['python','shell','ghc','producer','stats-emlf']:

@@ -1,0 +1,164 @@
+{
+  "all_passed": true,
+  "checks": [
+    {
+      "name": "prior write complete and all39 leaves present unchanged",
+      "passed": true
+    },
+    {
+      "name": "actual source and final review pins",
+      "passed": true
+    },
+    {
+      "name": "fixed5plus7 child mapping",
+      "passed": true
+    },
+    {
+      "name": "new2 combined24RTS combined12cells",
+      "passed": true
+    },
+    {
+      "name": "disabled source",
+      "passed": true
+    },
+    {
+      "name": "privacy README.md",
+      "passed": true
+    },
+    {
+      "name": "privacy REPRODUCTION.md",
+      "passed": true
+    },
+    {
+      "name": "privacy REUSED-PUBLIC-FILES.json",
+      "passed": true
+    },
+    {
+      "name": "privacy SOURCE-MAP.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/activation-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/actual-claim-lifecycle.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/combined-12-cell-summary.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/combined-24-rts-index.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/completion-commands.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/final-cleanup-and-budget.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/foundation-raw-differences.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/independent-actual-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/new-rts-redacted.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/source-checks.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/source-claim-source-evidence.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/source-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/v1-blocked-and-C1-repair.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/ACTIVATION-CONTRACT.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/ANCESTRY.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/BINDINGS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/COMMAND-MAPPING.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/DESIGN-AT-SOURCE-FREEZE.md",
+      "passed": true
+    },
+    {
+      "name": "privacy source/REVISION.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/claim_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/controller.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/controller.py.diff",
+      "passed": true
+    },
+    {
+      "name": "privacy source/environment.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/identity.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/recorded-tests/claim-check-report.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/recorded-tests/source-check-report.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/report.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/source_checks.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/worker.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/worker.py.diff",
+      "passed": true
+    }
+  ],
+  "count": 39,
+  "only_own_export_read_hash_AST_serialization": true,
+  "project_source_helper_controller_worker_or_tests_executed": false
+}
