@@ -1,0 +1,40 @@
+diff --git a/libraries/mlf-crates/Bootstrap/Bitstream.hs b/libraries/mlf-crates/Bootstrap/Bitstream.hs
+index 699f1c5..2314299 100644
+--- a/libraries/mlf-crates/Bootstrap/Bitstream.hs
++++ b/libraries/mlf-crates/Bootstrap/Bitstream.hs
+@@ -378,10 +378,34 @@ module Bootstrap.Bitstream (
+       };
+       putBits bytes (position + take) (width - take) (unsignedShiftRInt bits take)
+     };
++  -- Private fixed-width specialization for putVar's defined byte in 0..255.
++  -- Keep the public generic writer for negative/overflow positions. Partial
++  -- writes retain both reads and the original read/write/error ordering.
++  putVarByte :: ByteArray -> Int -> Int -> IO Int;
++  putVarByte bytes position byte =
++    if position < 0 || position > 9223372036854775799
++    then putBits bytes position 8 byte
++    else let {
++      offset = position % 8;
++      byteIndex = position / 8;
++      lowWidth = 8 - offset
++    } in
++    if offset == 0 then do {
++      writeByteArray bytes byteIndex byte;
++      ioReturn (position + 8)
++    } else do {
++      previous <- readByteArray bytes byteIndex;
++      writeByteArray bytes byteIndex
++        (orInt previous (shiftLInt (andInt byte (shiftLInt 1 lowWidth - 1)) offset));
++      following <- readByteArray bytes (byteIndex + 1);
++      writeByteArray bytes (byteIndex + 1)
++        (orInt following (unsignedShiftRInt byte lowWidth));
++      ioReturn (position + 8)
++    };
+   putVar :: ByteArray -> Int -> Int -> IO Int;
+   putVar bytes position bits = do {
+     let { final = unsignedLtInt bits 128; byte = orInt (andInt bits 127) (if final then 0 else 128) };
+-    next <- putBits bytes position 8 byte;
++    next <- putVarByte bytes position byte;
+     if final then ioReturn next else putVar bytes next (unsignedShiftRInt bits 7)
+   };
+   putScalar :: ByteArray -> Int -> Int -> IO Int;

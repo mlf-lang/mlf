@@ -1,0 +1,23 @@
+'${B_COMPILER}' '--compile-crate' '${SAMPLE_DIR}/crate.spec' '-o' '${SAMPLE_DIR}/unit' +RTS '-s${RTS_OUTPUT}' 
+  59,767,241,312 bytes allocated in the heap
+   4,267,591,640 bytes copied during GC
+      35,126,400 bytes maximum residency (59 sample(s))
+       1,581,456 bytes maximum slop
+             103 MiB total memory in use (0 MiB lost due to fragmentation)
+
+                                     Tot time (elapsed)  Avg pause  Max pause
+  Gen  0     14211 colls,     0 par    2.319s   2.323s     0.0002s    0.0079s
+  Gen  1        59 colls,     0 par    1.291s   1.292s     0.0219s    0.0513s
+
+  INIT    time    0.001s  (  0.001s elapsed)
+  MUT     time   16.762s  ( 16.935s elapsed)
+  GC      time    3.610s  (  3.615s elapsed)
+  EXIT    time    0.000s  (  0.000s elapsed)
+  Total   time   20.373s  ( 20.551s elapsed)
+
+  %GC     time       0.0%  (0.0% elapsed)
+
+  Alloc rate    3,565,649,712 bytes per MUT second
+
+  Productivity  82.3% of total user, 82.4% of total elapsed
+

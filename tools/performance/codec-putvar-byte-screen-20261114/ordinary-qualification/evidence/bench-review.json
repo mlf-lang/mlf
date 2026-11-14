@@ -1,0 +1,49 @@
+{
+  "actual_BENCH_review_passed": true,
+  "actual_commands_and_guards_verified": 44,
+  "additional_experiments_or_resampling": 0,
+  "adjacent_wall_pairs_B_faster": 2,
+  "adjacent_wall_pairs_B_slower": 4,
+  "all14_owners_order_verified": true,
+  "allocation_bytes_reduced_per_sample": 273950488.0,
+  "allocation_reduction_percent": 0.4562709030036305,
+  "cleanup_lease_locks": true,
+  "complete_ordered_queries_equal": true,
+  "elapsed_outer_seconds": 324.9344644649973,
+  "exclusive_putvar_attribution_claimed": false,
+  "fixed_batch_count": 1,
+  "fresh_groups_each": 475,
+  "independent_statistics": {
+    "bytes": 9956,
+    "sha256": "508cf896cde66e876fb3eb2d5295f1b7431b106a7e1bbf9439e82501501d7e92"
+  },
+  "interpretation": "One fixed ordinary batch: reproducible within-batch whole-process RTS allocation reduction, but no stable wall-time speedup. Current F25 A and current formal putVar B only; historical r14 provides immutable semantic bytes, not timing. No statistical significance, exclusive mechanism attribution, profile-self-allocation equality, peak-RSS reduction, general workload speedup, native/fixed-point result or merge qualification is inferred.",
+  "native_fixed_point_ab": false,
+  "original_report": {
+    "bytes": 10316,
+    "sha256": "e7fc7fc367713f80ad32a8a11364d7fb32fef95a9ab6d3e0d19d6b416c8b416a"
+  },
+  "original_review_manifest": {
+    "bytes": 1505,
+    "sha256": "3e6d2b0f5805fd83127c460cea3c58d5a22efd6411e2fa7eb870a5cca12e8b67"
+  },
+  "peak_RSS_measured": false,
+  "raw_artifacts_compared_exact": 36,
+  "reused_groups_each": 0,
+  "runtime": {
+    "VALIDATE_inheritance_exact": true,
+    "actual_loader_stdout_ELF_interpreter_config_symlink_inode_hash_checked": true,
+    "before_after_roles_each": 9,
+    "binding_occurrences": 310,
+    "observations": 18,
+    "unique_raw_bindings": 52
+  },
+  "sample_count": 12,
+  "scope": "Completed ordinary full-producer correctness and one fixed workload comparison only; no production promotion, stable wall speedup or GHC parity.",
+  "sequence": "ABBAABBAABBA",
+  "stable_wall_speedup_established": false,
+  "unique_file_pins_verified": 3961,
+  "wall_median_candidate_relative_change_percent": -0.5331734552780576,
+  "worker_input_pins_verified": 3448,
+  "worker_output_pins_verified": 236
+}

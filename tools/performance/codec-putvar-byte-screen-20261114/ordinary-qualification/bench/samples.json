@@ -1,0 +1,1814 @@
+{
+  "additional_samples": 0,
+  "independent_review": {
+    "bytes": 10316,
+    "sha256": "e7fc7fc367713f80ad32a8a11364d7fb32fef95a9ab6d3e0d19d6b416c8b416a"
+  },
+  "measurement_domains": "Guard wall duration and whole-process RTS totals are separate domains; neither is the focused thread allocation window.",
+  "per_side": 6,
+  "sample_count": 12,
+  "samples": [
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20209696,
+        "sha256": "f0f043ae540c72c1c12fe091eddbaa28d845126dc55a94208a1dc864033278cc"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 21.419515503992443,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 21.419515503992443,
+      "index": 1,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.12792259598791134,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "69c4f56a5bc7b1c2ac358d2f7cf523d5084f0e5e54d93f23c1546afe48ef1718"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "924f17e21b39132fd1ba4a7d2166d9eca248e476e512842e1ff8757391d6a279"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "3877c91eaf129488829b51880a0225cf4b638db703faf708e3655cd8995b83b4"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/01-A.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "A",
+      "rts_allocated_bytes": 60041191800,
+      "rts_statistics": {
+        "allocated_bytes": 60041191800,
+        "allocation_rate_bytes_per_mut_second": 3484039987,
+        "copied_bytes": 4273300680,
+        "gc_cpu_fraction_from_rounded_times": 0.18612449230187966,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14279,
+            "cpu_seconds": 2.555,
+            "elapsed_seconds": 2.57,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0504,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0239,
+            "collections": 58,
+            "cpu_seconds": 1.386,
+            "elapsed_seconds": 1.388,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0601,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 58,
+        "maximum_residency_bytes": 36234232,
+        "maximum_slop_bytes": 1616904,
+        "productivity_percent": {
+          "elapsed": 81.5,
+          "user": 81.4
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             105 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 105.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.941,
+            "elapsed_seconds": 3.958
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 17.233,
+            "elapsed_seconds": 17.412
+          },
+          "Total": {
+            "cpu_seconds": 21.174,
+            "elapsed_seconds": 21.371
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20214112,
+        "sha256": "d4e5dbba2b27fbd0efb84aa2b1941ef5364758500cf0952baa2957d946c88f53"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 20.418045097001595,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 20.418045097001595,
+      "index": 2,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.162772434996441,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "5d7fd3b37c9b5beba7ed402348c152d70d37c3e5153a002d9a7dfd18b7fd1ae1"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "279a200ba3b4e41e3424c8a7f18f67b5dda967b2b5b911e96fcf843efb091b21"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "eaa8fd30791143355b8a67e2915d4b226734618f7d8505c5f2e39958e4ae5309"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/02-B.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "B",
+      "rts_allocated_bytes": 59767241312,
+      "rts_statistics": {
+        "allocated_bytes": 59767241312,
+        "allocation_rate_bytes_per_mut_second": 3590941239,
+        "copied_bytes": 4267590776,
+        "gc_cpu_fraction_from_rounded_times": 0.17920899496991816,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14211,
+            "cpu_seconds": 2.293,
+            "elapsed_seconds": 2.295,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0058,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0228,
+            "collections": 59,
+            "cpu_seconds": 1.341,
+            "elapsed_seconds": 1.348,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0856,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 59,
+        "maximum_residency_bytes": 35126400,
+        "maximum_slop_bytes": 1581456,
+        "productivity_percent": {
+          "elapsed": 82.1,
+          "user": 82.1
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             103 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 103.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.634,
+            "elapsed_seconds": 3.644
+          },
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 16.644,
+            "elapsed_seconds": 16.74
+          },
+          "Total": {
+            "cpu_seconds": 20.278,
+            "elapsed_seconds": 20.384
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20214112,
+        "sha256": "d4e5dbba2b27fbd0efb84aa2b1941ef5364758500cf0952baa2957d946c88f53"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 20.615686069999356,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 20.615686069999356,
+      "index": 3,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.13074412501009647,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "08408fe94a3c6c280b4081bf3117ef3df1485ed99f70f5427afd9c8dd70f274a"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "b9719a7ecb0c148ec301fae2b12e356d53ec552fc9315eb423190c02f699b32c"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "b283014a51fd930cb69908003baba3bceee7060739263341e251cdc511f9052e"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/03-B.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "B",
+      "rts_allocated_bytes": 59767241312,
+      "rts_statistics": {
+        "allocated_bytes": 59767241312,
+        "allocation_rate_bytes_per_mut_second": 3565649712,
+        "copied_bytes": 4267591640,
+        "gc_cpu_fraction_from_rounded_times": 0.17719530751484808,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14211,
+            "cpu_seconds": 2.319,
+            "elapsed_seconds": 2.323,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0079,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0219,
+            "collections": 59,
+            "cpu_seconds": 1.291,
+            "elapsed_seconds": 1.292,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0513,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 59,
+        "maximum_residency_bytes": 35126400,
+        "maximum_slop_bytes": 1581456,
+        "productivity_percent": {
+          "elapsed": 82.4,
+          "user": 82.3
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             103 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 103.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.61,
+            "elapsed_seconds": 3.615
+          },
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.001
+          },
+          "MUT": {
+            "cpu_seconds": 16.762,
+            "elapsed_seconds": 16.935
+          },
+          "Total": {
+            "cpu_seconds": 20.373,
+            "elapsed_seconds": 20.551
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20209696,
+        "sha256": "f0f043ae540c72c1c12fe091eddbaa28d845126dc55a94208a1dc864033278cc"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 20.988521463004872,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 20.988521463004872,
+      "index": 4,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.17745963300694712,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "2bdcb6667f9395ac7e1f2ac1b852a7c64c754481b86a2efc02892c93fa99ad06"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "e03597ba5a3f7159b286d2368e3af21996462374bb341f3d03684bcc015e6835"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "b4fb4fabac03578b2aef45fa94015a93f2aaf2b53d8610806ae8b276761c717a"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/04-A.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "A",
+      "rts_allocated_bytes": 60041191800,
+      "rts_statistics": {
+        "allocated_bytes": 60041191800,
+        "allocation_rate_bytes_per_mut_second": 3521597940,
+        "copied_bytes": 4273302488,
+        "gc_cpu_fraction_from_rounded_times": 0.18103655314856623,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14279,
+            "cpu_seconds": 2.469,
+            "elapsed_seconds": 2.474,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0188,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0225,
+            "collections": 58,
+            "cpu_seconds": 1.3,
+            "elapsed_seconds": 1.303,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0586,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 58,
+        "maximum_residency_bytes": 36234232,
+        "maximum_slop_bytes": 1616904,
+        "productivity_percent": {
+          "elapsed": 82.0,
+          "user": 81.9
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             105 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 105.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.769,
+            "elapsed_seconds": 3.777
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 17.049,
+            "elapsed_seconds": 17.199
+          },
+          "Total": {
+            "cpu_seconds": 20.819,
+            "elapsed_seconds": 20.977
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20209696,
+        "sha256": "f0f043ae540c72c1c12fe091eddbaa28d845126dc55a94208a1dc864033278cc"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 21.198167590991943,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 21.198167590991943,
+      "index": 5,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.18251302199496422,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "f2b3d607165b07b3feea69af779d7fdadea6f8dcb4cddb3b4359c9699898362b"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "d2b484365eb7bbee2d71521a181d715d744c09cfa4b24b8f5eee314a9570ace5"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "daa8cfaff996b63b293cc18678d20b77d951d7397dd8ab787e44071be91e5a46"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/05-A.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "A",
+      "rts_allocated_bytes": 60041191800,
+      "rts_statistics": {
+        "allocated_bytes": 60041191800,
+        "allocation_rate_bytes_per_mut_second": 3480259611,
+        "copied_bytes": 4273300280,
+        "gc_cpu_fraction_from_rounded_times": 0.17772376322562197,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14279,
+            "cpu_seconds": 2.421,
+            "elapsed_seconds": 2.426,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0097,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0226,
+            "collections": 58,
+            "cpu_seconds": 1.308,
+            "elapsed_seconds": 1.308,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0433,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 58,
+        "maximum_residency_bytes": 36234232,
+        "maximum_slop_bytes": 1616904,
+        "productivity_percent": {
+          "elapsed": 82.3,
+          "user": 82.2
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             105 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 105.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.729,
+            "elapsed_seconds": 3.734
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 17.252,
+            "elapsed_seconds": 17.389
+          },
+          "Total": {
+            "cpu_seconds": 20.982,
+            "elapsed_seconds": 21.123
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20214112,
+        "sha256": "d4e5dbba2b27fbd0efb84aa2b1941ef5364758500cf0952baa2957d946c88f53"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 21.835877491001156,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 21.835877491001156,
+      "index": 6,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.1997745889966609,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "676a332b3a2ffbdcf5b5de2a8be0830450026df6c129ffffb8e218d701d124a1"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "c28acaa7eddc92c0799e6bcff6d749c001544eec3c479cd9c037142d82de4df7"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "655166b964b6af64cc2d8aae1585abbce22652ae6cb5484ac2ca985dbd45dfa7"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/06-B.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "B",
+      "rts_allocated_bytes": 59767241312,
+      "rts_statistics": {
+        "allocated_bytes": 59767241312,
+        "allocation_rate_bytes_per_mut_second": 3433475962,
+        "copied_bytes": 4271293280,
+        "gc_cpu_fraction_from_rounded_times": 0.19295317570700046,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14211,
+            "cpu_seconds": 2.562,
+            "elapsed_seconds": 2.572,
+            "generation": 0,
+            "maximum_pause_seconds": 0.024,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0273,
+            "collections": 59,
+            "cpu_seconds": 1.6,
+            "elapsed_seconds": 1.613,
+            "generation": 1,
+            "maximum_pause_seconds": 0.1576,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 59,
+        "maximum_residency_bytes": 35126448,
+        "maximum_slop_bytes": 1581408,
+        "productivity_percent": {
+          "elapsed": 80.7,
+          "user": 80.7
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             103 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 103.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 4.162,
+            "elapsed_seconds": 4.185
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 17.407,
+            "elapsed_seconds": 17.555
+          },
+          "Total": {
+            "cpu_seconds": 21.57,
+            "elapsed_seconds": 21.74
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20214112,
+        "sha256": "d4e5dbba2b27fbd0efb84aa2b1941ef5364758500cf0952baa2957d946c88f53"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 20.607308651000494,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 20.607308651000494,
+      "index": 7,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.10088189800444525,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "51dfb0f9bc1239c667f59b3f60f5587227ca5b7b905cd455ea783e5c7818aa87"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "615549cd360bc136c24e9d04585b7bcf373ddd53cf1a9ca4dfca163db13bb46e"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "79dfd6d4d45fa6212a6a181a9cfaad2953e2e01a7ec07147ff2d9e58915d7d7c"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/07-B.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "B",
+      "rts_allocated_bytes": 59767241312,
+      "rts_statistics": {
+        "allocated_bytes": 59767241312,
+        "allocation_rate_bytes_per_mut_second": 3566901223,
+        "copied_bytes": 4267591064,
+        "gc_cpu_fraction_from_rounded_times": 0.178819954915221,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14211,
+            "cpu_seconds": 2.347,
+            "elapsed_seconds": 2.346,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0133,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0221,
+            "collections": 59,
+            "cpu_seconds": 1.303,
+            "elapsed_seconds": 1.303,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0525,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 59,
+        "maximum_residency_bytes": 35126400,
+        "maximum_slop_bytes": 1581456,
+        "productivity_percent": {
+          "elapsed": 82.2,
+          "user": 82.1
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             103 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 103.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.649,
+            "elapsed_seconds": 3.649
+          },
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 16.756,
+            "elapsed_seconds": 16.837
+          },
+          "Total": {
+            "cpu_seconds": 20.406,
+            "elapsed_seconds": 20.487
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20209696,
+        "sha256": "f0f043ae540c72c1c12fe091eddbaa28d845126dc55a94208a1dc864033278cc"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 20.06791525799781,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 20.06791525799781,
+      "index": 8,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.11474311299389228,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "e9689c4afc92e64d8035d5d3dac5d097d727fc2184482efcc394f1bb0b50c767"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "35351032536332a9b73e4b45b69065652456bdee9ac52c21415a32f99317cfa1"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "4b9eddd1f1c1d8b9932d19594f060f713e02e1d1614b10325da398e3662391df"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/08-A.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "A",
+      "rts_allocated_bytes": 60041191800,
+      "rts_statistics": {
+        "allocated_bytes": 60041191800,
+        "allocation_rate_bytes_per_mut_second": 3689958583,
+        "copied_bytes": 4273300280,
+        "gc_cpu_fraction_from_rounded_times": 0.17796524550414225,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14279,
+            "cpu_seconds": 2.289,
+            "elapsed_seconds": 2.299,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0354,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0213,
+            "collections": 58,
+            "cpu_seconds": 1.235,
+            "elapsed_seconds": 1.236,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0567,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 58,
+        "maximum_residency_bytes": 36234232,
+        "maximum_slop_bytes": 1616904,
+        "productivity_percent": {
+          "elapsed": 82.3,
+          "user": 82.2
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             105 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 105.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.523,
+            "elapsed_seconds": 3.535
+          },
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 16.272,
+            "elapsed_seconds": 16.414
+          },
+          "Total": {
+            "cpu_seconds": 19.796,
+            "elapsed_seconds": 19.949
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20209696,
+        "sha256": "f0f043ae540c72c1c12fe091eddbaa28d845126dc55a94208a1dc864033278cc"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 20.57244539000385,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 20.57244539000385,
+      "index": 9,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.1282744729978731,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "db467746b2f5fa12e12d9392a1548e4b9016e78bdab407480476bfb606f0a30a"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "a70135d8f52be4bde9948475a87370ca561365a586245402ebe9ca0c970d5601"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "db6a2c2ec570e2201ff3f0b4bf62b0dca4c9f8e54eda83fc831ab7c0ef295b5e"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/09-A.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "A",
+      "rts_allocated_bytes": 60041191800,
+      "rts_statistics": {
+        "allocated_bytes": 60041191800,
+        "allocation_rate_bytes_per_mut_second": 3573015995,
+        "copied_bytes": 4273302488,
+        "gc_cpu_fraction_from_rounded_times": 0.17614472007059515,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14279,
+            "cpu_seconds": 2.334,
+            "elapsed_seconds": 2.337,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0041,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0217,
+            "collections": 58,
+            "cpu_seconds": 1.259,
+            "elapsed_seconds": 1.261,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0588,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 58,
+        "maximum_residency_bytes": 36234232,
+        "maximum_slop_bytes": 1616904,
+        "productivity_percent": {
+          "elapsed": 82.5,
+          "user": 82.4
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             105 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 105.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.593,
+            "elapsed_seconds": 3.597
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 16.804,
+            "elapsed_seconds": 16.93
+          },
+          "Total": {
+            "cpu_seconds": 20.398,
+            "elapsed_seconds": 20.528
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20214112,
+        "sha256": "d4e5dbba2b27fbd0efb84aa2b1941ef5364758500cf0952baa2957d946c88f53"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 20.723688739992213,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 20.723688739992213,
+      "index": 10,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.14699696900788695,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "369f5f0437cf1e30d6ceed563736e8a0a43f05f5069fefbf62b82a320a645163"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "761e4e0f62ab96fadeec79f283ad8cf35fdcadf88ad7ccbc800b571256253f5f"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "25a3e63420b183da8fee919f7408a38e3ab57c1def973ae29018204d1bb603c2"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/10-B.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "B",
+      "rts_allocated_bytes": 59767241312,
+      "rts_statistics": {
+        "allocated_bytes": 59767241312,
+        "allocation_rate_bytes_per_mut_second": 3536854465,
+        "copied_bytes": 4271392240,
+        "gc_cpu_fraction_from_rounded_times": 0.17205565353713503,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14211,
+            "cpu_seconds": 2.298,
+            "elapsed_seconds": 2.299,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0033,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0206,
+            "collections": 59,
+            "cpu_seconds": 1.215,
+            "elapsed_seconds": 1.215,
+            "generation": 1,
+            "maximum_pause_seconds": 0.0552,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 59,
+        "maximum_residency_bytes": 35126400,
+        "maximum_slop_bytes": 1581456,
+        "productivity_percent": {
+          "elapsed": 82.9,
+          "user": 82.8
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             103 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 103.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.512,
+            "elapsed_seconds": 3.514
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 16.898,
+            "elapsed_seconds": 17.074
+          },
+          "Total": {
+            "cpu_seconds": 20.412,
+            "elapsed_seconds": 20.589
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20214112,
+        "sha256": "d4e5dbba2b27fbd0efb84aa2b1941ef5364758500cf0952baa2957d946c88f53"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 21.511498325999128,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 21.511498325999128,
+      "index": 11,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.15391936400556006,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "ea5f5d9bff5efaf705a8694610cf3392ad48b47a20c84318647ed3f2fae3d330"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "87997a5bbbf2359b8da517509d68b476fc590ce944542bcf5c477600571e9d75"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "bfaee50b1e2ed9e799f6058fc5e192c866df8b548862b9a936c3ce67eec8c485"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/11-B.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "B",
+      "rts_allocated_bytes": 59767241312,
+      "rts_statistics": {
+        "allocated_bytes": 59767241312,
+        "allocation_rate_bytes_per_mut_second": 3421473865,
+        "copied_bytes": 4267592888,
+        "gc_cpu_fraction_from_rounded_times": 0.18132820921404136,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14211,
+            "cpu_seconds": 2.46,
+            "elapsed_seconds": 2.46,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0181,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0239,
+            "collections": 59,
+            "cpu_seconds": 1.409,
+            "elapsed_seconds": 1.409,
+            "generation": 1,
+            "maximum_pause_seconds": 0.1183,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 59,
+        "maximum_residency_bytes": 35126400,
+        "maximum_slop_bytes": 1581456,
+        "productivity_percent": {
+          "elapsed": 81.9,
+          "user": 81.9
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             103 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 103.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.869,
+            "elapsed_seconds": 3.869
+          },
+          "INIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 17.468,
+            "elapsed_seconds": 17.558
+          },
+          "Total": {
+            "cpu_seconds": 21.337,
+            "elapsed_seconds": 21.427
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    },
+    {
+      "all_14_owners_checked": true,
+      "all_numeric_RTS_lines_byte_identical": true,
+      "artifacts": {
+        "unit.mlfci": {
+          "bytes": 338115,
+          "sha256": "cd11e31ce105c2d1d6796a991a450efda00b42b1d2961642816919fb9437549d"
+        },
+        "unit.mlfco": {
+          "bytes": 1016252,
+          "sha256": "5a1fecc12a9348108929f79975a1160b24d5e7dba4b9e44ab44f9033e12e9c52"
+        },
+        "unit.queries": {
+          "bytes": 685363,
+          "sha256": "791401589111776fc5caa83642c43ea012c5808392c5b7a82f19021e9864c96e"
+        }
+      },
+      "binary": {
+        "bytes": 20209696,
+        "sha256": "f0f043ae540c72c1c12fe091eddbaa28d845126dc55a94208a1dc864033278cc"
+      },
+      "compile_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 20.48242753399245,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 180,
+        "test_only": false
+      },
+      "fresh_queries": 475,
+      "full_ordered_query_sequence_checked": true,
+      "guard_wall_seconds": 20.48242753399245,
+      "index": 12,
+      "interface_guard": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 0.17501556599745527,
+        "exit_code": 0,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "reason": null,
+        "seconds": 30,
+        "test_only": false
+      },
+      "original_raw_rts": {
+        "bytes": 1416,
+        "sha256": "b1e80cf050d9ae8290887e3faba1b0c9cae70db15eed254ae852cd331fe6c063"
+      },
+      "original_spec": {
+        "bytes": 2335,
+        "sha256": "9c411802f197e841253941f1a26aae76f45fba840b27aaa72d117ae3d80ceb06"
+      },
+      "published_rts": {
+        "bytes": 981,
+        "sha256": "f65e020e704b9386ed000683a265833f73683778048ea4b07cdd6603f10cde5d"
+      },
+      "raw_RTS_sanitization": "Only the command-header line replaced with logical path placeholders; every following byte retained.",
+      "raw_rts_file": "bench/raw-rts/12-A.sanitized.rts.txt",
+      "reused_queries": 0,
+      "role": "A",
+      "rts_allocated_bytes": 60041191800,
+      "rts_statistics": {
+        "allocated_bytes": 60041191800,
+        "allocation_rate_bytes_per_mut_second": 3638840227,
+        "copied_bytes": 4273302000,
+        "gc_cpu_fraction_from_rounded_times": 0.18141680722293876,
+        "generations": [
+          {
+            "average_pause_seconds": 0.0002,
+            "collections": 14279,
+            "cpu_seconds": 2.304,
+            "elapsed_seconds": 2.309,
+            "generation": 0,
+            "maximum_pause_seconds": 0.0096,
+            "parallel_collections": 0
+          },
+          {
+            "average_pause_seconds": 0.0233,
+            "collections": 58,
+            "cpu_seconds": 1.354,
+            "elapsed_seconds": 1.354,
+            "generation": 1,
+            "maximum_pause_seconds": 0.1043,
+            "parallel_collections": 0
+          }
+        ],
+        "limitations": "Rounded RTS process totals. Residency is sampled major-GC liveness, not peak RSS. Raw %GC may be inconsistent. Profile self-allocation and RTS allocation are different accounting domains; no equality or ordinary exclusive attribution inferred.",
+        "major_gc_residency_samples": 58,
+        "maximum_residency_bytes": 36234232,
+        "maximum_slop_bytes": 1616904,
+        "productivity_percent": {
+          "elapsed": 82.0,
+          "user": 81.9
+        },
+        "reported_gc_percent": {
+          "interpretation": "raw reported field only; may be inconsistent; not measured GC share",
+          "raw_line": "\n  %GC     time       0.0%  (0.0% elapsed)",
+          "values": {
+            "cpu": 0.0,
+            "elapsed": 0.0
+          }
+        },
+        "rts_memory_in_use": {
+          "fragmentation": {
+            "unit": "MiB",
+            "value": 0.0
+          },
+          "raw_line": "             105 MiB total memory in use (0 MiB lost due to fragmentation)",
+          "unit": "MiB",
+          "value": 105.0
+        },
+        "schema": "ghc-rts-s-v1",
+        "times": {
+          "EXIT": {
+            "cpu_seconds": 0.0,
+            "elapsed_seconds": 0.0
+          },
+          "GC": {
+            "cpu_seconds": 3.657,
+            "elapsed_seconds": 3.663
+          },
+          "INIT": {
+            "cpu_seconds": 0.001,
+            "elapsed_seconds": 0.0
+          },
+          "MUT": {
+            "cpu_seconds": 16.5,
+            "elapsed_seconds": 16.648
+          },
+          "Total": {
+            "cpu_seconds": 20.158,
+            "elapsed_seconds": 20.311
+          }
+        }
+      },
+      "three_artifacts_equal_historical_oracle": true
+    }
+  ],
+  "sequence": "ABBAABBAABBA",
+  "status": "Completed single fixed batch; final independent review passed"
+}

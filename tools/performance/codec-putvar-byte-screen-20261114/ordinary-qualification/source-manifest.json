@@ -1,0 +1,107 @@
+{
+  "actual_regenerated_B_builtin": {
+    "bytes": 2220407,
+    "equal_to_actual_generation_stdout": true,
+    "file": "source/B/bootstrap/MLF/BuiltinPreludeData.hs",
+    "not_recreated_by_token_substitution": true,
+    "sha256": "59e86f76049a60b50602533037b42246ce5f8d403d44b07f9f53c95ec4c9d050"
+  },
+  "archive_parent": "fcccbe7d01584ab897694b5f35734770eacb11b5",
+  "archive_parent_is_not_measured_source_base": true,
+  "changed_paths": [
+    {
+      "path": "libraries/mlf-inference/Bootstrap/Graph.hs",
+      "variants": {
+        "A": {
+          "bytes": 152996,
+          "git_blob": "1af237ff2df16dfed44291832814ef13094cac7c",
+          "mode": "100644",
+          "sha256": "d1b9b9552b6b9fbc48e6091d259caf7d96349686eb486443722ec4b04061d5e0"
+        },
+        "B": {
+          "bytes": 152996,
+          "git_blob": "1af237ff2df16dfed44291832814ef13094cac7c",
+          "mode": "100644",
+          "sha256": "d1b9b9552b6b9fbc48e6091d259caf7d96349686eb486443722ec4b04061d5e0"
+        },
+        "public_base": {
+          "bytes": 137874,
+          "git_blob": "380d29e7b951da022b49517237d74df2ecd3ee3a",
+          "mode": "100644",
+          "sha256": "9df4833f55f0826181f8e1e974dc0672753e9462de0d134f64fc3f8c6f6e8a7f"
+        }
+      }
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "variants": {
+        "A": {
+          "bytes": 82558,
+          "git_blob": "699f1c5d354e0077869b6955f00a7299c0eca4df",
+          "mode": "100644",
+          "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+        },
+        "B": {
+          "bytes": 83566,
+          "git_blob": "2314299e431ab9d97da0e425335d57c3f816ed84",
+          "mode": "100644",
+          "sha256": "9fc2fe7f8d8e38bb7209233980a6d6b05b529acce8152502df31b84637ba7c2b"
+        },
+        "public_base": {
+          "bytes": 82558,
+          "git_blob": "699f1c5d354e0077869b6955f00a7299c0eca4df",
+          "mode": "100644",
+          "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+        }
+      }
+    },
+    {
+      "path": "bootstrap/MLF/BuiltinPreludeData.hs",
+      "variants": {
+        "A": {
+          "bytes": 2220407,
+          "git_blob": "755e0a9df1275e40164a76faab787b7d06e6514c",
+          "mode": "100644",
+          "sha256": "5d0aea520a32ee8f1111943cf7d7288678bcd02666ea22aceea9c56ddb84878b"
+        },
+        "B": {
+          "bytes": 2220407,
+          "git_blob": "c59d175b40e207db90e7ce147cc2c22086bf7f0e",
+          "mode": "100644",
+          "sha256": "59e86f76049a60b50602533037b42246ce5f8d403d44b07f9f53c95ec4c9d050"
+        },
+        "public_base": {
+          "bytes": 2220407,
+          "git_blob": "cc19e39bcc2faa6e82cee77bfafb3591c69d79ac",
+          "mode": "100644",
+          "sha256": "4b9d52fa6fa2108cc3dc1a6d04e06f18486abff4f2e682f633bddeb674c03692"
+        }
+      }
+    }
+  ],
+  "other_tracked_paths_and_modes": "Byte identity established by reconstructed full Git tree equality from the verified public base.",
+  "provenance_commits_not_assumed_remotely_available": true,
+  "public_base": {
+    "commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+    "repository": "https://github.com/mlf-lang/mlf",
+    "tree": "3148203097e7622ced1b272e606bfa892fad746b"
+  },
+  "schema": "putvar-ordinary-source-reconstruction-v1",
+  "source_identities": {
+    "A": "builtin-source-v1:36904de805a28a986b02871d5295a36e15053a70b494bad0030b23ba62e598e6",
+    "B": "builtin-source-v1:f5fa252821b0bb4721939319118b9553626e6ee6ac1ffba6f600b3f4c2b83de1"
+  },
+  "tracked_source_file_count_each": 3872,
+  "variants": {
+    "A": {
+      "label": "ordinary F25 baseline",
+      "provenance_commit": "bda8f9807c8b13b5ce14753d0320fa54772e4bc4",
+      "source_tree": "4d2f8e37b1cc3eb2497cf17b62917009af3e6c25"
+    },
+    "B": {
+      "label": "ordinary putVar formal",
+      "provenance_commit": "250e495d93de5fad975fb61c6e23a1ad1a964640",
+      "source_tree": "703052cd990d7f8e7d68cef856f6417cafbf0ffc"
+    }
+  }
+}

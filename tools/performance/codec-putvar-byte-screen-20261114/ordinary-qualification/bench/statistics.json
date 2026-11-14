@@ -1,0 +1,227 @@
+{
+  "allocation_delta_bytes_B_minus_A": -273950488,
+  "comparison": {
+    "domain": "ordinary non-profiled relinks, compiled-in RTS -s, fresh foundation14",
+    "limitations": "Guard wall and whole-process RTS allocated bytes are separate domains. No exclusive attribution, native-generation result, profiled allocation equality, statistical significance, or general workload speedup is inferred.",
+    "metrics": {
+      "guard_wall_seconds": {
+        "A_median": 20.78048342650436,
+        "A_values": [
+          21.419515503992443,
+          20.988521463004872,
+          21.198167590991943,
+          20.06791525799781,
+          20.57244539000385,
+          20.48242753399245
+        ],
+        "B_median": 20.669687404995784,
+        "B_values": [
+          20.418045097001595,
+          20.615686069999356,
+          21.835877491001156,
+          20.607308651000494,
+          20.723688739992213,
+          21.511498325999128
+        ],
+        "adjacent_pairs": [
+          {
+            "A": 21.419515503992443,
+            "B": 20.418045097001595,
+            "baseline_over_candidate": 1.0490483002771853,
+            "candidate_relative_change": -0.04675504480034487,
+            "indices": [
+              1,
+              2
+            ],
+            "order": "AB"
+          },
+          {
+            "A": 20.988521463004872,
+            "B": 20.615686069999356,
+            "baseline_over_candidate": 1.0180850344606323,
+            "candidate_relative_change": -0.01776377596024048,
+            "indices": [
+              3,
+              4
+            ],
+            "order": "BA"
+          },
+          {
+            "A": 21.198167590991943,
+            "B": 21.835877491001156,
+            "baseline_over_candidate": 0.9707953160905936,
+            "candidate_relative_change": 0.030083255888598837,
+            "indices": [
+              5,
+              6
+            ],
+            "order": "AB"
+          },
+          {
+            "A": 20.06791525799781,
+            "B": 20.607308651000494,
+            "baseline_over_candidate": 0.9738251412575171,
+            "candidate_relative_change": 0.026878396986837805,
+            "indices": [
+              7,
+              8
+            ],
+            "order": "BA"
+          },
+          {
+            "A": 20.57244539000385,
+            "B": 20.723688739992213,
+            "baseline_over_candidate": 0.9927019097861427,
+            "candidate_relative_change": 0.007351743904098651,
+            "indices": [
+              9,
+              10
+            ],
+            "order": "AB"
+          },
+          {
+            "A": 20.48242753399245,
+            "B": 21.511498325999128,
+            "baseline_over_candidate": 0.9521618263678581,
+            "candidate_relative_change": 0.050241642026993105,
+            "indices": [
+              11,
+              12
+            ],
+            "order": "BA"
+          }
+        ],
+        "adjacent_ratio_median": 0.9832635255218298,
+        "candidate_median_relative_change": -0.005331734552780576,
+        "median_ratio_A_over_B": 1.0053603143258856
+      },
+      "rts_allocated_bytes": {
+        "A_median": 60041191800.0,
+        "A_values": [
+          60041191800,
+          60041191800,
+          60041191800,
+          60041191800,
+          60041191800,
+          60041191800
+        ],
+        "B_median": 59767241312.0,
+        "B_values": [
+          59767241312,
+          59767241312,
+          59767241312,
+          59767241312,
+          59767241312,
+          59767241312
+        ],
+        "adjacent_pairs": [
+          {
+            "A": 60041191800,
+            "B": 59767241312,
+            "baseline_over_candidate": 1.0045836227670257,
+            "candidate_relative_change": -0.004562709030036305,
+            "indices": [
+              1,
+              2
+            ],
+            "order": "AB"
+          },
+          {
+            "A": 60041191800,
+            "B": 59767241312,
+            "baseline_over_candidate": 1.0045836227670257,
+            "candidate_relative_change": -0.004562709030036305,
+            "indices": [
+              3,
+              4
+            ],
+            "order": "BA"
+          },
+          {
+            "A": 60041191800,
+            "B": 59767241312,
+            "baseline_over_candidate": 1.0045836227670257,
+            "candidate_relative_change": -0.004562709030036305,
+            "indices": [
+              5,
+              6
+            ],
+            "order": "AB"
+          },
+          {
+            "A": 60041191800,
+            "B": 59767241312,
+            "baseline_over_candidate": 1.0045836227670257,
+            "candidate_relative_change": -0.004562709030036305,
+            "indices": [
+              7,
+              8
+            ],
+            "order": "BA"
+          },
+          {
+            "A": 60041191800,
+            "B": 59767241312,
+            "baseline_over_candidate": 1.0045836227670257,
+            "candidate_relative_change": -0.004562709030036305,
+            "indices": [
+              9,
+              10
+            ],
+            "order": "AB"
+          },
+          {
+            "A": 60041191800,
+            "B": 59767241312,
+            "baseline_over_candidate": 1.0045836227670257,
+            "candidate_relative_change": -0.004562709030036305,
+            "indices": [
+              11,
+              12
+            ],
+            "order": "BA"
+          }
+        ],
+        "adjacent_ratio_median": 1.0045836227670257,
+        "candidate_median_relative_change": -0.004562709030036305,
+        "median_ratio_A_over_B": 1.0045836227670257
+      }
+    }
+  },
+  "conclusion": "Consistent allocation reduction across the six observations per side in this single fixed batch. Wall medians differ slightly, but two adjacent pairs improve and four regress; no stable wall-time speedup demonstrated.",
+  "independent_review": {
+    "bytes": 10316,
+    "sha256": "e7fc7fc367713f80ad32a8a11364d7fb32fef95a9ab6d3e0d19d6b416c8b416a"
+  },
+  "limitations": [
+    "One fixed-order ABBAABBAABBA batch, six samples per side, one foundation14 workload; no retries or resampling.",
+    "Whole-process RTS allocation is not the focused current-thread counter and cannot be equated with profiled self-allocation.",
+    "Guard wall time is not RTS CPU or elapsed totals; compare each accounting domain separately.",
+    "RTS times are rounded. The raw printed %GC field is retained even when inconsistent; it is not interpreted as measured GC share.",
+    "Maximum residency samples major-GC live data; it is not peak RSS. RTS memory-in-use is not full process memory.",
+    "No exclusive closure or stage attribution, statistical significance, general workload speedup, native-generation qualification or parity-to-GHC conclusion."
+  ],
+  "native_fixed_point_qualification": false,
+  "no_GHC_parity_claim": true,
+  "outer_seconds": 324.9344644649973,
+  "source_evidence": {
+    "final": {
+      "bytes": 6457,
+      "sha256": "21079ffbdef7cae27cb08b85afc2caed483f30fb1a890e4a60cc886bda1b7a36"
+    },
+    "outer": {
+      "bytes": 4509,
+      "sha256": "c685ea86668a7be6802bd369cc8547895cb4ba1ceddd9f47068ba97ab0c103c3"
+    },
+    "receipt": {
+      "bytes": 1380944,
+      "sha256": "6f3d0e2280ba089ba1eecd6e2994d92da2579fe21d1251e505b196428cc13b83"
+    }
+  },
+  "status": "Completed single fixed batch; final independent review passed",
+  "wall_adjacent_pairs": {
+    "candidate_faster": 2,
+    "candidate_slower": 4,
+    "ties": 0
+  }
+}

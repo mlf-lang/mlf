@@ -1,0 +1,18 @@
+{
+  "complete": true,
+  "public_base": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "source_trees": {
+    "A": {
+      "tree": "4d2f8e37b1cc3eb2497cf17b62917009af3e6c25",
+      "tracked_files": 3872,
+      "exact_tree_match": true
+    },
+    "B": {
+      "tree": "703052cd990d7f8e7d68cef856f6417cafbf0ffc",
+      "tracked_files": 3872,
+      "exact_tree_match": true
+    }
+  },
+  "working_tree_changed": false,
+  "compiler_or_generator_run": false
+}

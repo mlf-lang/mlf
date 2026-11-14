@@ -1,0 +1,131 @@
+{
+  "files": [
+    {
+      "bytes": 7355,
+      "path": "README.md",
+      "sha256": "6a222b37dcbf980bee493f7f5e29cb183cb50699bd0eeb54ae3db2b51bda26e6"
+    },
+    {
+      "bytes": 25788,
+      "path": "bench/guards.json",
+      "sha256": "a2694c65c633c0ec59c84154728100e0074584d93e292ee701c9918bc86caab1"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/01-A.sanitized.rts.txt",
+      "sha256": "3877c91eaf129488829b51880a0225cf4b638db703faf708e3655cd8995b83b4"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/02-B.sanitized.rts.txt",
+      "sha256": "eaa8fd30791143355b8a67e2915d4b226734618f7d8505c5f2e39958e4ae5309"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/03-B.sanitized.rts.txt",
+      "sha256": "b283014a51fd930cb69908003baba3bceee7060739263341e251cdc511f9052e"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/04-A.sanitized.rts.txt",
+      "sha256": "b4fb4fabac03578b2aef45fa94015a93f2aaf2b53d8610806ae8b276761c717a"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/05-A.sanitized.rts.txt",
+      "sha256": "daa8cfaff996b63b293cc18678d20b77d951d7397dd8ab787e44071be91e5a46"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/06-B.sanitized.rts.txt",
+      "sha256": "655166b964b6af64cc2d8aae1585abbce22652ae6cb5484ac2ca985dbd45dfa7"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/07-B.sanitized.rts.txt",
+      "sha256": "79dfd6d4d45fa6212a6a181a9cfaad2953e2e01a7ec07147ff2d9e58915d7d7c"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/08-A.sanitized.rts.txt",
+      "sha256": "4b9eddd1f1c1d8b9932d19594f060f713e02e1d1614b10325da398e3662391df"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/09-A.sanitized.rts.txt",
+      "sha256": "db6a2c2ec570e2201ff3f0b4bf62b0dca4c9f8e54eda83fc831ab7c0ef295b5e"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/10-B.sanitized.rts.txt",
+      "sha256": "25a3e63420b183da8fee919f7408a38e3ab57c1def973ae29018204d1bb603c2"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/11-B.sanitized.rts.txt",
+      "sha256": "bfaee50b1e2ed9e799f6058fc5e192c866df8b548862b9a936c3ce67eec8c485"
+    },
+    {
+      "bytes": 981,
+      "path": "bench/raw-rts/12-A.sanitized.rts.txt",
+      "sha256": "f65e020e704b9386ed000683a265833f73683778048ea4b07cdd6603f10cde5d"
+    },
+    {
+      "bytes": 60595,
+      "path": "bench/samples.json",
+      "sha256": "73fc98b3f4084520785c63bf0c2b8bc3554bf57fcc7190599d61a07e533e183a"
+    },
+    {
+      "bytes": 7461,
+      "path": "bench/statistics.json",
+      "sha256": "b96c4be0d3efd93ee366f798464e38bcd8ae2ef6ecd3cba44cf6a3755b40275b"
+    },
+    {
+      "bytes": 2270,
+      "path": "evidence/bench-review.json",
+      "sha256": "1f23b92090543de52fb86d387093cc1da6820d95d4041aafbed7540c2459447f"
+    },
+    {
+      "bytes": 451,
+      "path": "evidence/source-reconstruction.json",
+      "sha256": "c5851ed85ddd93762aae7a2615a1789ad1f46329ad16a2decf746f2870ed6b1a"
+    },
+    {
+      "bytes": 7317,
+      "path": "evidence/stages.json",
+      "sha256": "2100932d96928a09d4782a27389d7c762172c54a494775ad7de232b08b732c4f"
+    },
+    {
+      "bytes": 16423,
+      "path": "source/01-public-to-F25-Graph.patch",
+      "sha256": "45300140af3cba182dfb0dfbe1faa25bf277cacc7398350d2871d07d645ddd7a"
+    },
+    {
+      "bytes": 1835,
+      "path": "source/02-F25-to-putVar-Bitstream.patch",
+      "sha256": "bf0448ab61b022d8a49af7b3c0d2386210e4c6c74ad9bc73b02ca6e1dc8aff9b"
+    },
+    {
+      "bytes": 2220407,
+      "path": "source/A/bootstrap/MLF/BuiltinPreludeData.hs",
+      "sha256": "5d0aea520a32ee8f1111943cf7d7288678bcd02666ea22aceea9c56ddb84878b"
+    },
+    {
+      "bytes": 2220407,
+      "path": "source/B/bootstrap/MLF/BuiltinPreludeData.hs",
+      "sha256": "59e86f76049a60b50602533037b42246ce5f8d403d44b07f9f53c95ec4c9d050"
+    },
+    {
+      "bytes": 3986,
+      "path": "source-manifest.json",
+      "sha256": "55ad35740f49ef9c95cdc0ab42abba3660cf2c3212468b4bffb9b408c44ec90d"
+    },
+    {
+      "bytes": 2884,
+      "path": "verify-source-reconstruction.py",
+      "sha256": "ad208682414d4d8c2069d1b94f732673e4a9aff2254bd3cd2883d60a7387f1dd"
+    }
+  ],
+  "manifest_self_excluded": true,
+  "schema": "putvar-ordinary-public-content-manifest-v1"
+}

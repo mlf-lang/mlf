@@ -1,0 +1,212 @@
+{
+  "BENCH": {
+    "cleanup_complete": true,
+    "command_count": 44,
+    "final": {
+      "bytes": 6457,
+      "sha256": "21079ffbdef7cae27cb08b85afc2caed483f30fb1a890e4a60cc886bda1b7a36"
+    },
+    "independent_review": {
+      "bytes": 10316,
+      "sha256": "e7fc7fc367713f80ad32a8a11364d7fb32fef95a9ab6d3e0d19d6b416c8b416a"
+    },
+    "order": "ABBAABBAABBA",
+    "outer": {
+      "bytes": 4509,
+      "sha256": "c685ea86668a7be6802bd369cc8547895cb4ba1ceddd9f47068ba97ab0c103c3"
+    },
+    "outer_seconds": 324.9344644649973,
+    "receipt": {
+      "bytes": 1380944,
+      "sha256": "6f3d0e2280ba089ba1eecd6e2994d92da2579fe21d1251e505b196428cc13b83"
+    },
+    "samples": 12,
+    "status": "PASS: completed fixed twelve-sample batch and final independent review",
+    "unique_pins_verified": 3961
+  },
+  "VALIDATE": {
+    "commands": 64,
+    "final_sha256": "6a04ec700bc1f16aa64461e5eaae450d37f1f6d8a2a64d2689c757b6041186ea",
+    "fresh_links": 8,
+    "historical_oracle_reexecuted": false,
+    "outer_sha256": "a9f369977c21703be0b40a43fa20a6f3594510f40aebbcd1ff54c6974551fb81",
+    "receipt_sha256": "df8aba737f5f83a5345b3259cbe2df10ce6cf3f042c45fbace353ad8fe3518fa",
+    "review": {
+      "bytes": 4762,
+      "sha256": "68735a148ab9da0211fa73dbb407ffee0310047662888d9ae5201a690afe2b56"
+    },
+    "runtime": {
+      "actual_guarded_observations": 30,
+      "actual_loader_stdout_and_ELF_interpreters_checked": true,
+      "before_after_roles_each": 7,
+      "binding_occurrences_verified": 430,
+      "current_read_hash_config_inode_symlink_rechecked": true,
+      "linked_before_after_pairs": 8,
+      "unique_raw_bindings_verified": 58
+    },
+    "seconds": 109.70629546300916,
+    "semantics_each_side": {
+      "CLI": 5,
+      "codec_controls_exact_bytes": 89,
+      "codec_stderr_bytes": 0,
+      "current_public_unify_cases": 23,
+      "direct_cases": 39,
+      "direct_public_unify_calls": 41
+    },
+    "status": "PASS, finite current A/B semantic qualification",
+    "unique_pins_verified": 3710
+  },
+  "actual_regeneration": {
+    "comparison": {
+      "bytes": 2833,
+      "sha256": "54f64a1d89b7f6e3a6db7b8845846eafd4f022be8da337c3420de88ee721e737"
+    },
+    "comparison_result": "Exactly one builtin source-identity token differs from original A canonical; all other bytes equal.",
+    "equal_to_generation_stdout": true,
+    "exit_code": 0,
+    "generated_bytes": 2220407,
+    "generated_sha256": "59e86f76049a60b50602533037b42246ce5f8d403d44b07f9f53c95ec4c9d050",
+    "original_failed_producer_still_unqualified": true,
+    "review": {
+      "bytes": 6591,
+      "sha256": "1eecdb191ce9c7c8dccfadd201824975e9d255a284fe80382bdc0621486a4ec9"
+    },
+    "seconds": 8.39959670699318,
+    "status": "Actual generator completed; no substitution-based reconstruction",
+    "stderr_bytes": 0,
+    "whole_file_compared": true
+  },
+  "common_host_toolchain": {
+    "build_root_placeholder": "${BUILD}",
+    "compiler": "GHC 9.14.1",
+    "flags_source_and_build_paths_parameterized": [
+      "-XHaskell2010",
+      "-package-env",
+      "-",
+      "-clear-package-db",
+      "-global-package-db",
+      "-no-user-package-db",
+      "-hide-all-packages",
+      "-O2",
+      "-fpedantic-bottoms",
+      "-fno-state-hack",
+      "-i",
+      "-i${SOURCE}/libraries/mlf-async",
+      "-i${SOURCE}/libraries/mlf-crates",
+      "-i${SOURCE}/libraries/mlf-developer-tools",
+      "-i${SOURCE}/libraries/mlf-foundation",
+      "-i${SOURCE}/libraries/mlf-frontend",
+      "-i${SOURCE}/libraries/mlf-inference",
+      "-i${SOURCE}/libraries/mlf-interpreter",
+      "-i${SOURCE}/libraries/mlf-language-core",
+      "-i${SOURCE}/libraries/mlf-llvm",
+      "-i${SOURCE}/libraries/mlf-package-core",
+      "-i${SOURCE}/libraries/mlf-xmlf",
+      "-i${SOURCE}/bootstrap",
+      "-i${SOURCE}/package",
+      "-i${SOURCE}/tests",
+      "-i${SOURCE}/tests/shared",
+      "-i${SOURCE}/testing",
+      "-i${SOURCE}/host/ghc",
+      "-odir",
+      "${BUILD}/objects",
+      "-hidir",
+      "${BUILD}/objects",
+      "-package",
+      "base",
+      "-package",
+      "array",
+      "-package",
+      "bytestring",
+      "-package",
+      "text",
+      "-package",
+      "containers",
+      "-package",
+      "directory"
+    ],
+    "optimization": "-O2",
+    "source_root_placeholder": "${SOURCE}"
+  },
+  "formal_BUILD": {
+    "actual_builtin_commands": 2,
+    "actual_canonical_builtin_exact_regeneration": true,
+    "builtin_verification_receipt": {
+      "bytes": 31476,
+      "sha256": "c646f3ee7bb711dbe6eb66ff3e4dfe1c4218d0c229e0a155244098c34e03d979"
+    },
+    "compiled_modules": 141,
+    "host_modules": 4,
+    "links": 13,
+    "object_interface_inputs": 284,
+    "producer_commands": 18,
+    "producer_receipt": {
+      "bytes": 1216679,
+      "sha256": "8d0dc9d552501e6c0efa641de8811a48109efcb08e6e96b7b0f1aef1ba7caa2d"
+    },
+    "review": {
+      "bytes": 4127,
+      "sha256": "d26866965d58efbac4bf9d653491cbabf90d54164de0f4214504aae30aa0e7e6"
+    },
+    "reviewed_pins": 6153,
+    "seconds": 231.64245378600026,
+    "shared_modules": 137,
+    "status": "PASS, ordinary producer qualified"
+  },
+  "formal_CONTROLS": {
+    "BUILD_and_CONTROLS_review": {
+      "bytes": 4099,
+      "sha256": "cb9bfb8d6a69066f45a61efb130828b02f142677cc3caa97a1f212bdd727c95d"
+    },
+    "five_exact_cases": true,
+    "non_Main_relink_modules": 94,
+    "receipt": {
+      "bytes": 42556,
+      "sha256": "03c417697edaf8baa2e94a3d5ec588f9140b4e957b7fd2e1182b070272095078"
+    },
+    "reviewed_pins": 6175,
+    "runtime_C_objects": 2,
+    "seconds": 3.923025830008555,
+    "status": "PASS"
+  },
+  "formal_source_commit_provenance": "250e495d93de5fad975fb61c6e23a1ad1a964640",
+  "formal_source_materialization": {
+    "actual_generated_B_literal_installed": true,
+    "exact_production_delta_paths": [
+      "bootstrap/MLF/BuiltinPreludeData.hs",
+      "libraries/mlf-crates/Bootstrap/Bitstream.hs"
+    ],
+    "review": {
+      "bytes": 3919,
+      "sha256": "163de8119ecd9ce768baadf28b1dd77721f86e90bebce75f3da1e22a279312c8"
+    },
+    "tracked_files_verified": 3872
+  },
+  "limitations": [
+    "Source reconstruction is complete, but installed toolchain/packages, objects, machine state and complete historical oracle are not bundled.",
+    "Finite semantic checks are not universal equivalence or full native-generation/fixed-point qualification.",
+    "The common GHC host is not a competing timed GHC compiler baseline; no GHC-parity result.",
+    "Only the completed fixed BENCH batch is summarized; no stable-time, general-workload or GHC-parity claim.",
+    "Publication preparation executes no compiler, generator, target test, runtime loader or benchmark."
+  ],
+  "preliminary_BUILD": {
+    "cleanup_complete": true,
+    "compiled_modules": 141,
+    "error": "prepared Prelude build source identity is stale\n",
+    "links": 13,
+    "not_run": [
+      "fresh-literal check",
+      "build-driver final authentication/success tail",
+      "CONTROLS"
+    ],
+    "qualified": false,
+    "review": {
+      "bytes": 10973,
+      "sha256": "ffec4799121641df4f1fb4b5c18553968eb0db1bfd944eba6944fe37fdb75a0b"
+    },
+    "seconds": 187.2529880439979,
+    "status": "Expected stale-source-identity failure, not a qualified producer",
+    "successful_precheck_commands": 18
+  },
+  "schema": "putvar-ordinary-completed-stage-evidence-v1"
+}
