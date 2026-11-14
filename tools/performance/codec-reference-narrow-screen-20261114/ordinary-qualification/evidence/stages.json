@@ -1,0 +1,146 @@
+{
+  "current_main_qualification": false,
+  "native_fixed_point_qualification": false,
+  "production_promotion": false,
+  "publication_target_runs": 0,
+  "stages": {
+    "BENCH": {
+      "cleanup": true,
+      "commands": 44,
+      "cumulative_guarded_elapsed_ns": 872840906664,
+      "elapsed_ns": 331359806755,
+      "fresh_queries_each": 475,
+      "original_review": {
+        "bytes": 16694,
+        "sha256": "f45253d691cb5ee3b59d9363cf010d0fa48eb5ce234933481ad5f48894446ac3"
+      },
+      "owners_each": 14,
+      "raw_artifacts_exact": 36,
+      "reused_queries_each": 0,
+      "runtime": {
+        "VALIDATE_inheritance_exact": true,
+        "actual_loader_stdout_ELF_interpreter_config_symlink_inode_hash_checked": true,
+        "before_after_roles_each": 9,
+        "binding_occurrences": 310,
+        "observations": 18,
+        "unique_raw_bindings": 52
+      },
+      "samples": 12,
+      "status": "single fixed twelve-sample BENCH PASS",
+      "unique_file_pins_verified": 4123
+    },
+    "BUILD": {
+      "counts": {
+        "actual_builtin_commands": 2,
+        "fresh_compiled_modules": 141,
+        "host_modules": 4,
+        "links": 13,
+        "objects_and_interfaces": 284,
+        "producer_commands": 18,
+        "shared_modules": 137
+      },
+      "cumulative_guarded_elapsed_ns": 406794767008,
+      "elapsed_ns": 210779587016,
+      "original_review": {
+        "bytes": 19311,
+        "sha256": "150f6799eb0e20785a2532eddefa3f147b60d3425884416e00f9f8c34af6efa5"
+      },
+      "source_commit": "9f2a1b16b9a997e78ea80912e1e4b55baa8264b5",
+      "status": "formal ordinary BUILD PASS",
+      "verified_unique_pin_count": 6210
+    },
+    "CONTROLS": {
+      "cases": 5,
+      "cumulative_guarded_elapsed_ns": 410790990560,
+      "elapsed_ns": 3996223552,
+      "ordinary_producer_qualified": true,
+      "original_review": {
+        "bytes": 12264,
+        "sha256": "913b3cea5f33e7bba05ee59fda67d61fd7f9a4829ffa656e9082179ebece98bd"
+      },
+      "source_commit": "9f2a1b16b9a997e78ea80912e1e4b55baa8264b5",
+      "status": "five exact CLI CONTROLS PASS",
+      "verified_unique_pin_count": 6270
+    },
+    "VALIDATE": {
+      "cleanup": true,
+      "commands": 74,
+      "cumulative_guarded_elapsed_ns": 541481099909,
+      "elapsed_ns": 130690109349,
+      "fresh_links": 10,
+      "original_final_sha256": "c35a5d78b8243062a34ba79927d74fc610324a2604f8f8dff0346f73136367b8",
+      "original_outer_sha256": "70a0da3599a3f8875d24e6d6321af81d5ced75ce3a527ada46ff38dff2feb5c9",
+      "original_receipt_sha256": "2e032b700840fe6754bd585ee65bade717aa3c6f50abd9c3c4846b4c8fc40ef4",
+      "original_review": {
+        "bytes": 12553,
+        "sha256": "41f94db8b3b31c1d125ede0df1d90bfdf64cf21a85bf0d8bd39822def25450c3"
+      },
+      "runtime": {
+        "actual_guarded_observations": 34,
+        "actual_loader_stdout_and_ELF_interpreters_checked": true,
+        "before_after_roles_each": 7,
+        "binding_occurrences_verified": 470,
+        "current_read_hash_config_inode_symlink_rechecked": true,
+        "linked_before_after_pairs": 10,
+        "unique_raw_bindings_verified": 60
+      },
+      "semantics_each": {
+        "CLI": 5,
+        "codec_controls_exact_bytes": 89,
+        "codec_stderr_bytes": 0,
+        "current_public_unify_cases": 23,
+        "direct_cases": 39,
+        "direct_public_unify_calls": 41,
+        "reference_allocation_rescreen": false,
+        "reference_control_groups": 8,
+        "reference_controls_exact_bytes": 173,
+        "reference_stderr_bytes": 0
+      },
+      "source_commit": "9f2a1b16b9a997e78ea80912e1e4b55baa8264b5",
+      "status": "finite A/B VALIDATE PASS",
+      "unique_file_pins_verified": 3828
+    },
+    "materialization": {
+      "original_review": {
+        "bytes": 14253,
+        "sha256": "dc0e7e411e340ad46c5522f1246385e87376cc46583c7c66dc859c48a94833da"
+      },
+      "production_delta_paths": [
+        "bootstrap/MLF/BuiltinPreludeData.hs",
+        "libraries/mlf-crates/Bootstrap/Bitstream.hs"
+      ],
+      "source_commit": "9f2a1b16b9a997e78ea80912e1e4b55baa8264b5",
+      "status": "source materialization PASS",
+      "tracked_files_each": 3872,
+      "verified_unique_pin_count": 9955
+    },
+    "preliminary": {
+      "cleanup": true,
+      "cumulative_guarded_elapsed_ns": 187174471207,
+      "elapsed_ns": 187174471207,
+      "error": "prepared Prelude build source identity is stale",
+      "original_review": {
+        "bytes": 26715,
+        "sha256": "83f826692d142447afc21146ab82f1e43a034f84c740d1df4d053ff50e1ecefe"
+      },
+      "status": "expected stale-source-identity failure; remains unqualified"
+    },
+    "regeneration": {
+      "cumulative_guarded_elapsed_ns": 196015179992,
+      "elapsed_ns": 8840708785,
+      "full_stdout_exact": true,
+      "generated": {
+        "bytes": 2220407,
+        "sha256": "b1dc97803cc6c43efc623ed08640ca8c6896f8db121b389997285af13f816ad3"
+      },
+      "original_review": {
+        "bytes": 30308,
+        "sha256": "620c987d98625dfd8a48319a58966623fa2fae7765da114cc50b03987fec8e57"
+      },
+      "source_commit": "8ac464e2c505d3450d6c5a9907dd46cbf2c79367",
+      "status": "actual generator PASS",
+      "synthetic_token_substitution": false
+    }
+  },
+  "timing_authority": "strict integer monotonic guard-call envelope including cleanup; inner elapsed_seconds fields are retained separately and are not summed as chain time"
+}

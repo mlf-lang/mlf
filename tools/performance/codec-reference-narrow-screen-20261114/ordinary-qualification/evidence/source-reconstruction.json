@@ -1,0 +1,21 @@
+{
+  "complete": true,
+  "public_base": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+  "source_trees": {
+    "A": {
+      "tree": "703052cd990d7f8e7d68cef856f6417cafbf0ffc",
+      "tracked_files": 3872,
+      "exact_tree_match": true
+    },
+    "B": {
+      "tree": "f768e86abbaba0a11bdcd66d3a7829943bd67b00",
+      "tracked_files": 3872,
+      "exact_tree_match": true
+    }
+  },
+  "reused_public_files_verified": 3,
+  "working_tree_changed": false,
+  "compiler_or_generator_run": false,
+  "benchmark_or_test_run": false,
+  "external_writes": 0
+}

@@ -1,0 +1,948 @@
+{
+  "commands": [
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.012445156011381187,
+      "exit_code": 0,
+      "label": "runtime-before-python",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1183,
+        "sha256": "7f33ec7efdc57f409c243fe4ef804031b3efddcb9a46b01756d48536c107d855"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.011462815004051663,
+      "exit_code": 0,
+      "label": "runtime-before-A-ghc",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1260,
+        "sha256": "ccd703d4eb8ae2635ede1a5186cb0176ef78d998ce35a35fba245dd4551acb06"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.010744583007181063,
+      "exit_code": 0,
+      "label": "runtime-before-A-cc",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1194,
+        "sha256": "e7228e51fd77ba9e4f9d6fdc37b034d2dab4e94756b53ce3e4de697fac8e792f"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.010760375997051597,
+      "exit_code": 0,
+      "label": "runtime-before-A-producer",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1283,
+        "sha256": "7515680f5c3fb3e8a400fbe46e8841ebca8bafcb89ee7604c7ebb97eb82d570d"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.012724155996693298,
+      "exit_code": 0,
+      "label": "runtime-before-B-ghc",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1260,
+        "sha256": "b1ab0cca98e1fa5ac16f8ccfdd8cd2767da389a9ca1ca7dc363a6002103a9127"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.010946858004899696,
+      "exit_code": 0,
+      "label": "runtime-before-B-cc",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1194,
+        "sha256": "5621453e7dd5feed6de2086968ae41e5c5a5482374d928af08ed3eca492f9cb9"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.01058232800278347,
+      "exit_code": 0,
+      "label": "runtime-before-B-producer",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1285,
+        "sha256": "858238a1fba1b24ad7420c754db93db3a28cde467c3c0b6dfa8e4a7190cca655"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.014903194998623803,
+      "exit_code": 0,
+      "label": "runtime-before-A-measured",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1310,
+        "sha256": "5ea3f9d33d374e750f00f9b438f5b96eeda96aa4c6b8c90c50f0237bbab8e24b"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.013337561002117582,
+      "exit_code": 0,
+      "label": "runtime-before-B-measured",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1310,
+        "sha256": "852b5fe6f99485baf8329065f642ba0763bbe9903658a4fb4f99ab0d366040b6"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.04545026099367533,
+      "exit_code": 0,
+      "label": "A-fixed-builtin",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1302,
+        "sha256": "74a8020d84448cb97255100a93f977cd8706cce76b41478f9d1ad8dffd323cfe"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.045474401995306835,
+      "exit_code": 0,
+      "label": "B-fixed-builtin",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1306,
+        "sha256": "59e48155590882ce8874b40fe380e0cec8a82e36fe0c1ee52dccc67b3169ede9"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 21.40379823600233,
+      "exit_code": 0,
+      "label": "sample-01-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1964,
+        "sha256": "d8eec7f3767988365fbcf274be8edd5d334002635a88fd4584f966ee510b6afe"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.12672831398958806,
+      "exit_code": 0,
+      "label": "owners-01-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1333,
+        "sha256": "f182b1a395dcd403df9ec34ab5e3344da712ecfcbf51405cb163fa615d9ab6e0"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 21.83176058199024,
+      "exit_code": 0,
+      "label": "sample-02-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1944,
+        "sha256": "07e7d3eb52be4a71301df4a19b08ab5f8b81fe87327586da3518e942d4f0cd1d"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.1698581750097219,
+      "exit_code": 0,
+      "label": "owners-02-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1335,
+        "sha256": "10ae4cf918692afe82710aaa91b42b8795f61824bfe3d6736cb17650664338c5"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 21.528680544011877,
+      "exit_code": 0,
+      "label": "sample-03-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1968,
+        "sha256": "4616f574e41219c01ba778fb81c05717bdc48e8f4ccdfe0793cbc6acc8a3ab43"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.1294322839967208,
+      "exit_code": 0,
+      "label": "owners-03-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1335,
+        "sha256": "a5f0ce7d624e96f4f21577d2bf5ef982c82a2475720b416ba42ccc7a6c631093"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 20.994006584995077,
+      "exit_code": 0,
+      "label": "sample-04-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1945,
+        "sha256": "2de0d9da10c1eb1fd1d105f5fde7260a55c3bada77b0664e4799a3d8f168eca4"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.17798916398896836,
+      "exit_code": 0,
+      "label": "owners-04-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1333,
+        "sha256": "0b873792b6f8ba923816b306bb4d0fe7b119185572d08b45f0354fbb8468db29"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 21.263480102992617,
+      "exit_code": 0,
+      "label": "sample-05-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1991,
+        "sha256": "6ab68bade675e41d60c57ea88b7206dc2c7d8961593c9bfb0f590e2be4a1fee7"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.27430241099500563,
+      "exit_code": 0,
+      "label": "owners-05-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1333,
+        "sha256": "42bf5d137c6cd0a1e3f6bbbe3e8beec677b39025024c158b31507128f613b6cb"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 20.774715631996514,
+      "exit_code": 0,
+      "label": "sample-06-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1945,
+        "sha256": "c6152141f70c44f1e0e079d98785cbade7e811c01937f446e79ff324b64f2104"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.20877865300280973,
+      "exit_code": 0,
+      "label": "owners-06-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1336,
+        "sha256": "f7449645240c47de615c26e71e6ddd0fe42788107fdac6ca309697d7d0272ac5"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 21.511394588000257,
+      "exit_code": 0,
+      "label": "sample-07-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1922,
+        "sha256": "8def94e060e591cfb5baaa2300b7375a5ab7f57cc54900290fbd7a158261080e"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.23929424400557764,
+      "exit_code": 0,
+      "label": "owners-07-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1336,
+        "sha256": "1826be82688a4c61e4a938cfd4cfaf297b901e62b845d31e18966d5893250d3e"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 21.740339019990643,
+      "exit_code": 0,
+      "label": "sample-08-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1922,
+        "sha256": "f69e21de9de7e474d4fb2dfc633b311a54baba1e23ed4af97f0b04f921a24874"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.13522082300914917,
+      "exit_code": 0,
+      "label": "owners-08-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1333,
+        "sha256": "8fdf9cd8b8d0c957b0ab244bd2eef64b6964f0aff50c578ac4716badd9e7a2cd"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 21.626203161999,
+      "exit_code": 0,
+      "label": "sample-09-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1942,
+        "sha256": "caa37bd307faf22b760a5dc04e26d210471cdfdc8b79394befefba412d702458"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.13719700199726503,
+      "exit_code": 0,
+      "label": "owners-09-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1333,
+        "sha256": "e7f2161b11a9469c2dd398bd01f131cc34323e128165ff24aae727c54cb0b196"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 20.778242250002222,
+      "exit_code": 0,
+      "label": "sample-10-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1945,
+        "sha256": "bc940a57f1b6dbfbf9aa4b05c97358a687ae7bbfa08dffb12e9e27b585bd38ea"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.1372143679909641,
+      "exit_code": 0,
+      "label": "owners-10-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1335,
+        "sha256": "9ef4eea9aa2c7a41594639630350e28bc8df6afee26808b15f42cc2b6380b772"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 20.97646797899506,
+      "exit_code": 0,
+      "label": "sample-11-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1944,
+        "sha256": "ebd9614467621b5514e6dac9274c08554cd63a6226283b2cf88c8986bdb2bc8b"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.1702911760075949,
+      "exit_code": 0,
+      "label": "owners-11-B",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1335,
+        "sha256": "cf20f4f6d656bec858e8d04488e47951e3774dce54624fc35841bf6434eb45d2"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 23.04830465800478,
+      "exit_code": 0,
+      "label": "sample-12-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1944,
+        "sha256": "278b3f82e30553bbb103747218e97effd8b93579c19e5f37263c7173861e4baa"
+      },
+      "reason": null,
+      "seconds": 180,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.19101885400596075,
+      "exit_code": 0,
+      "label": "owners-12-A",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1333,
+        "sha256": "ea961a38fa94a9b0d47663f9d925ac43e133ddaded8a744cdd09845b3beaef67"
+      },
+      "reason": null,
+      "seconds": 30,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.1718283230002271,
+      "exit_code": 0,
+      "label": "runtime-after-python",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1182,
+        "sha256": "b5cc2e44dbd9e0c7f224c0e402281f94a8e8fd39a5e4ebd20cd6a04bbba421f9"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.1681873950001318,
+      "exit_code": 0,
+      "label": "runtime-after-A-ghc",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1259,
+        "sha256": "314ddfd1209945b89f0a3a9222e6074a532dbb369ff5f84f6ae6119282e53bd5"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.1952284589933697,
+      "exit_code": 0,
+      "label": "runtime-after-A-cc",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1193,
+        "sha256": "4616557435e65cdf8a7685c27df1453a7c9ac61834dfdc39f720198d9d2f81fe"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.17340689500269946,
+      "exit_code": 0,
+      "label": "runtime-after-A-producer",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1283,
+        "sha256": "8ceb70b4add0d84abb4cab81f891d711de332d4a51b3b932d53779375f03ea81"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.19548964699788485,
+      "exit_code": 0,
+      "label": "runtime-after-B-ghc",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1260,
+        "sha256": "98bcfde4b418d027bf85c011a86a88278d68ad21822294c3d82f3a46e5f65a4d"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.18467570799111854,
+      "exit_code": 0,
+      "label": "runtime-after-B-cc",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1194,
+        "sha256": "d8c52c7562d0d584e7e687ebb78843314c7a7a29a891fd34b33b9b0ecca44efd"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.2726247120008338,
+      "exit_code": 0,
+      "label": "runtime-after-B-producer",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1285,
+        "sha256": "7239a07ec772c4dea8ef7fc0f6b793d80068fdd7850cc3967191efafbc14f39e"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.21816879499237984,
+      "exit_code": 0,
+      "label": "runtime-after-A-measured",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1310,
+        "sha256": "850fae4090cad379c427328567d70bb4c252cecb2a00f49b309bd1ee1fa36a24"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    },
+    {
+      "cleanup": true,
+      "complete": true,
+      "elapsed_seconds": 0.17719529700116254,
+      "exit_code": 0,
+      "label": "runtime-after-B-measured",
+      "limits": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "original_receipt": {
+        "bytes": 1310,
+        "sha256": "30183d10b408c8984d43b1f67b6ec7cd2ac5fbee47c0ddfd2ece7e7aabe99016"
+      },
+      "reason": null,
+      "seconds": 10,
+      "test_only": false
+    }
+  ],
+  "guard_call_elapsed_ns_including_cleanup": 331359806755,
+  "outer": {
+    "cleanup": true,
+    "complete": true,
+    "elapsed_seconds": 331.2122912460036,
+    "exit_code": 0,
+    "lease_cleared": true,
+    "limits": {
+      "address_space": 6442450944,
+      "free_disk": 5368709120,
+      "host_available": 3221225472,
+      "output": 4294967296,
+      "tree_rss": 5368709120
+    },
+    "locks_reacquired": true,
+    "reason": null,
+    "seconds": 600,
+    "test_only": false
+  },
+  "sanitization": "Kept every command label, completion, exit, elapsed time and bounds; removed local paths, process identifiers and coordination internals."
+}

@@ -1,0 +1,126 @@
+{
+  "actual_generated_B_builtin": {
+    "bytes": 2220407,
+    "entire_bytes_equal_actual_generator_stdout_and_formal_source": true,
+    "file": "source/B/bootstrap/MLF/BuiltinPreludeData.hs",
+    "git_blob": "9ac163523585f70d0625e7919c002c74c7820fa5",
+    "manually_recreated_by_token_substitution": false,
+    "regeneration_elapsed_ns_including_cleanup": 8840708785,
+    "regeneration_review": {
+      "bytes": 30308,
+      "git_blob": "a3b9aff198c9adea37a3068c878c0d2f34cbca22",
+      "sha256": "620c987d98625dfd8a48319a58966623fa2fae7765da114cc50b03987fec8e57"
+    },
+    "sha256": "b1dc97803cc6c43efc623ed08640ca8c6896f8db121b389997285af13f816ad3",
+    "source_materialization_review": {
+      "bytes": 14253,
+      "git_blob": "e89cd217ce9fc9981b0652b872b6eccc4e09e427",
+      "sha256": "dc0e7e411e340ad46c5522f1246385e87376cc46583c7c66dc859c48a94833da"
+    }
+  },
+  "archive_ancestry_is_not_measured_source_or_producer_qualification": true,
+  "archive_expected_parent": "69cba865e7004d287ed52e4407571a6183fc8b1b",
+  "compiler_generator_test_or_benchmark_executed_for_publication": false,
+  "current_main_qualified": false,
+  "exact_A_to_B_production_changes": [
+    {
+      "path": "bootstrap/MLF/BuiltinPreludeData.hs",
+      "variants": {
+        "A": {
+          "bytes": 2220407,
+          "git_blob": "c59d175b40e207db90e7ce147cc2c22086bf7f0e",
+          "mode": "100644",
+          "sha256": "59e86f76049a60b50602533037b42246ce5f8d403d44b07f9f53c95ec4c9d050"
+        },
+        "B": {
+          "bytes": 2220407,
+          "git_blob": "9ac163523585f70d0625e7919c002c74c7820fa5",
+          "mode": "100644",
+          "sha256": "b1dc97803cc6c43efc623ed08640ca8c6896f8db121b389997285af13f816ad3"
+        }
+      }
+    },
+    {
+      "path": "libraries/mlf-crates/Bootstrap/Bitstream.hs",
+      "variants": {
+        "A": {
+          "bytes": 83566,
+          "git_blob": "2314299e431ab9d97da0e425335d57c3f816ed84",
+          "mode": "100644",
+          "sha256": "9fc2fe7f8d8e38bb7209233980a6d6b05b529acce8152502df31b84637ba7c2b"
+        },
+        "B": {
+          "bytes": 85467,
+          "git_blob": "dd556f2508b47ee2b86bb72ab35db1cd21341bb6",
+          "mode": "100644",
+          "sha256": "066815fb9d74be16a5aed0f0b836d405b9bef8a9dddd5cc15057d9a9f2b83572"
+        }
+      }
+    }
+  ],
+  "local_provenance_commits_not_assumed_remotely_available": true,
+  "native_fixed_point_qualified": false,
+  "new_files": {
+    "source/03-putVar-to-putReferences-Bitstream.patch": {
+      "bytes": 2695,
+      "git_blob": "16533e6ee4282526b264744d9783593416d5190d",
+      "sha256": "b340dc98da961507b90169161b813fb627c99115d15ad2b3192ea0246e88b610"
+    },
+    "source/B/bootstrap/MLF/BuiltinPreludeData.hs": {
+      "bytes": 2220407,
+      "git_blob": "9ac163523585f70d0625e7919c002c74c7820fa5",
+      "sha256": "b1dc97803cc6c43efc623ed08640ca8c6896f8db121b389997285af13f816ad3"
+    }
+  },
+  "other_3870_paths_and_modes_unchanged": true,
+  "public_base": {
+    "commit": "f9bdb40a659bfdff4cbb782d438afbb0417dd2e1",
+    "repository": "https://github.com/mlf-lang/mlf",
+    "tree": "3148203097e7622ced1b272e606bfa892fad746b"
+  },
+  "reused_public_files": [
+    {
+      "bytes": 16423,
+      "git_blob": "ef4fb802733ecc30d153b6a381f9a27dd2de6a84",
+      "prior_archive_file": "source/01-public-to-F25-Graph.patch",
+      "public_commit": "12a27355827acc360b21b18ee717c4513baca2ff",
+      "repository_path": "tools/performance/codec-putvar-byte-screen-20261114/ordinary-qualification/source/01-public-to-F25-Graph.patch",
+      "sha256": "45300140af3cba182dfb0dfbe1faa25bf277cacc7398350d2871d07d645ddd7a"
+    },
+    {
+      "bytes": 1835,
+      "git_blob": "5bd77d20f8a210010a53a8f2654c067eff00e78d",
+      "prior_archive_file": "source/02-F25-to-putVar-Bitstream.patch",
+      "public_commit": "12a27355827acc360b21b18ee717c4513baca2ff",
+      "repository_path": "tools/performance/codec-putvar-byte-screen-20261114/ordinary-qualification/source/02-F25-to-putVar-Bitstream.patch",
+      "sha256": "bf0448ab61b022d8a49af7b3c0d2386210e4c6c74ad9bc73b02ca6e1dc8aff9b"
+    },
+    {
+      "bytes": 2220407,
+      "git_blob": "c59d175b40e207db90e7ce147cc2c22086bf7f0e",
+      "prior_archive_file": "source/B/bootstrap/MLF/BuiltinPreludeData.hs",
+      "public_commit": "12a27355827acc360b21b18ee717c4513baca2ff",
+      "repository_path": "tools/performance/codec-putvar-byte-screen-20261114/ordinary-qualification/source/B/bootstrap/MLF/BuiltinPreludeData.hs",
+      "sha256": "59e86f76049a60b50602533037b42246ce5f8d403d44b07f9f53c95ec4c9d050"
+    }
+  ],
+  "schema": "reference-ordinary-source-reconstruction-v1",
+  "source_identities": {
+    "A": "builtin-source-v1:f5fa252821b0bb4721939319118b9553626e6ee6ac1ffba6f600b3f4c2b83de1",
+    "B": "builtin-source-v1:44e0859f78369c7ddb636617861f269ddcb7729562c09f4107f68c7f1f32abc7"
+  },
+  "status": "complete source reconstruction for independently reviewed ordinary experiment",
+  "tracked_source_file_count_each": 3872,
+  "variants": {
+    "A": {
+      "provenance_commit": "250e495d93de5fad975fb61c6e23a1ad1a964640",
+      "source_tree": "703052cd990d7f8e7d68cef856f6417cafbf0ffc",
+      "tracked_files": 3872
+    },
+    "B": {
+      "provenance_commit": "9f2a1b16b9a997e78ea80912e1e4b55baa8264b5",
+      "source_tree": "f768e86abbaba0a11bdcd66d3a7829943bd67b00",
+      "tracked_files": 3872
+    }
+  }
+}

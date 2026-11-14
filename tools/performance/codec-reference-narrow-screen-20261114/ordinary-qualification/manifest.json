@@ -1,0 +1,162 @@
+{
+  "files": [
+    {
+      "bytes": 10317,
+      "git_blob": "83513b7c3b493c7df270f0ffa98fd91cc2d3ba10",
+      "path": "README.md",
+      "sha256": "143566190caf9a187f5f41b6010b794235a303d2332a62814c8b771f0953ed03"
+    },
+    {
+      "bytes": 25807,
+      "git_blob": "fc8d6f90ef09f230a42e10ccc3c72e14d60f4017",
+      "path": "bench/guards.json",
+      "sha256": "f67579f940c75a1572afb2f280acad9ef67cec4e33ffff7a2e0130a8b7a391a6"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "6ab3d88fa9d8762ca1b90fa11b4c933a469e823c",
+      "path": "bench/raw-rts/01-A.sanitized.rts.txt",
+      "sha256": "165517c6248b5c80e5d9565bfdd1d8f6bc2bc59a71161566183cf09f04abd82c"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "e35c64052f43cc7f7ca219bed9fe9c9a98d3339b",
+      "path": "bench/raw-rts/02-B.sanitized.rts.txt",
+      "sha256": "ec9d26e61556cae86dbd51682858e982abaf71d5c22f2000998f23c165820069"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "c0d5b9b0daa8b29fe51fe0abb6a6a11b3e8aec3b",
+      "path": "bench/raw-rts/03-B.sanitized.rts.txt",
+      "sha256": "c031854a9524faae036396c9f4b8dcd10532064b2d38d6f6723daa2bbdf9d089"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "0e578ce998126a5cca34ba15a7e6c0ef177a475d",
+      "path": "bench/raw-rts/04-A.sanitized.rts.txt",
+      "sha256": "24d61d886d5f65f01fdde45ef8f8caa1d23737e5df8799d2d2ee393f191fbd61"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "c0f70009f4ee366fa3793dc186a1fe99869caca7",
+      "path": "bench/raw-rts/05-A.sanitized.rts.txt",
+      "sha256": "be2263259083c1f9d72931369aa8c8d181461efd721482ed28b267730f9690a7"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "9f6be2f46eee9209f2104336df13222b877b3ab3",
+      "path": "bench/raw-rts/06-B.sanitized.rts.txt",
+      "sha256": "f2b368cdb85be632c1dfa4fa66cf147ae30238820e04cf4b9e641bea4914f21b"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "8741854ffc1024d507f7bb4681ca8eb340482840",
+      "path": "bench/raw-rts/07-B.sanitized.rts.txt",
+      "sha256": "32f4cd5e103f860920816593928c2658ff095c6c73ab757be3c04d575cb84f41"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "92f7c5bbb3455cb12be4904af7bff21da03f001c",
+      "path": "bench/raw-rts/08-A.sanitized.rts.txt",
+      "sha256": "9da7cd7840cac66219c46aa2cc476d5ce883f1b4977bb453e892b3a34d3c8819"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "3d65c875d32bbffa9d394424102121edf4ca3935",
+      "path": "bench/raw-rts/09-A.sanitized.rts.txt",
+      "sha256": "e11e1250c16fc4f9e057166d9db91ce30f0311ea6eb33c327a792e93f8e9c118"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "076e509369f4b6e3d2b8938009b6eebd34d590d3",
+      "path": "bench/raw-rts/10-B.sanitized.rts.txt",
+      "sha256": "4a63b125670ca657d7d08f17771f283179929b0d483ec5017317bb6129b84b1f"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "f462024a90ce26759067107014284c734e5018dc",
+      "path": "bench/raw-rts/11-B.sanitized.rts.txt",
+      "sha256": "97e9a80328090b00215d971e22dffd8e9785314fc75d84faa1ee5c84054043d5"
+    },
+    {
+      "bytes": 981,
+      "git_blob": "b176054ad46dbc280bcb1994c12553eacb29b987",
+      "path": "bench/raw-rts/12-A.sanitized.rts.txt",
+      "sha256": "de367c2e2cc45dc5a9a10edd4474845362b5d0b8aaa01ff4a1772c9c71523871"
+    },
+    {
+      "bytes": 1166,
+      "git_blob": "44ec6fc338b910466a29a55701dc365feabea79d",
+      "path": "bench/samples.csv",
+      "sha256": "753a8ebdac9423076ac0eb7634c2eecc7311342e5b3d8ee0b531a82d39b0417b"
+    },
+    {
+      "bytes": 59129,
+      "git_blob": "ec14604e79795c7411cb74b907000b9ecba43b92",
+      "path": "bench/samples.json",
+      "sha256": "777ad675727cbdd24f6a785d87a7540e5f2f28178bc58167cca12ecd72e80b66"
+    },
+    {
+      "bytes": 23607,
+      "git_blob": "4638246bd05df5a12f8c26a99144b0ec17ef6db4",
+      "path": "bench/statistics.json",
+      "sha256": "918e5673c61c98818f06b3d124949a4d87713e0cad7940b707ddd26c3b0eef13"
+    },
+    {
+      "bytes": 4124,
+      "git_blob": "07a8b177fda738f468c7305068371f83ee0840dd",
+      "path": "bench/workload.json",
+      "sha256": "39b1d568753616989489baeadae145eec7677ddc171287a38f2749e8cc1ca3e1"
+    },
+    {
+      "bytes": 2473,
+      "git_blob": "6b5be00931a29caa23c95244a6130f35040418c9",
+      "path": "evidence/bench-review.json",
+      "sha256": "0d448a6684e12a1d4d68eabd7c0c79067714bfa41f7ec47794dcbc5134263f7a"
+    },
+    {
+      "bytes": 546,
+      "git_blob": "1c66e3274ec1947bc8a4331b1356c38297ecfedd",
+      "path": "evidence/source-reconstruction.json",
+      "sha256": "378e70ff13ad77bf202a65db3963a34681ec79967126166bc22974369c38b538"
+    },
+    {
+      "bytes": 5391,
+      "git_blob": "1baa0fff35426e3a42679026c999562ba8629e1b",
+      "path": "evidence/stages.json",
+      "sha256": "a99cdb11beeb9e7c280651c6929d8afa34a8748c5ef5d3b4215671d7f333d302"
+    },
+    {
+      "bytes": 120474,
+      "git_blob": "d727ccdb4e89775bc40f4ec7efaceaaf8a5d5b22",
+      "path": "producer-recipe.json",
+      "sha256": "c4a160c6e071d2611f6f46601954abed9699a23ac4fd462df7bb213c8014a9bc"
+    },
+    {
+      "bytes": 2695,
+      "git_blob": "16533e6ee4282526b264744d9783593416d5190d",
+      "path": "source/03-putVar-to-putReferences-Bitstream.patch",
+      "sha256": "b340dc98da961507b90169161b813fb627c99115d15ad2b3192ea0246e88b610"
+    },
+    {
+      "bytes": 2220407,
+      "git_blob": "9ac163523585f70d0625e7919c002c74c7820fa5",
+      "path": "source/B/bootstrap/MLF/BuiltinPreludeData.hs",
+      "sha256": "b1dc97803cc6c43efc623ed08640ca8c6896f8db121b389997285af13f816ad3"
+    },
+    {
+      "bytes": 5346,
+      "git_blob": "09048b331187920d4be626cc5c3eecb9b1001be7",
+      "path": "source-manifest.json",
+      "sha256": "ba5ca1a8b9bf63087a0f7ea9ab29068de58bcfde41f17d2a07fcbf1d5c4306a0"
+    },
+    {
+      "bytes": 4086,
+      "git_blob": "25f6939ba6b73b7bf25cecec9e10b4981742b67b",
+      "path": "verify-source-reconstruction.py",
+      "sha256": "2e0f80c73c2000164ada619a0c4bcc822e1cb39ac792640b2b8966904b8673e3"
+    }
+  ],
+  "manifest_self_excluded": true,
+  "schema": "reference-ordinary-public-content-v1"
+}

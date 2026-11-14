@@ -1,0 +1,55 @@
+{
+  "original_report": {
+    "bytes": 16694,
+    "sha256": "f45253d691cb5ee3b59d9363cf010d0fa48eb5ce234933481ad5f48894446ac3"
+  },
+  "original_review_manifest": {
+    "bytes": 2773,
+    "sha256": "21db447904aee5fc01f99bead4f14b3d04f0734d68649987908f895fb68b19ad"
+  },
+  "original_samples": {
+    "bytes": 44486,
+    "sha256": "253e27aacde3da01a0bd76d3a1d21d8f1273b1043ddc22fe90e4c610840102e7"
+  },
+  "sanitized_review_summary": {
+    "GHC_parity_established": false,
+    "actual_BENCH_review_passed": true,
+    "actual_commands_and_guards_verified": 44,
+    "additional_experiments_or_resampling": 0,
+    "adjacent_wall_pairs_B_faster": 4,
+    "adjacent_wall_pairs_B_slower": 2,
+    "all14_owners_order_verified": true,
+    "allocation_bytes_reduced_per_sample": 187935992,
+    "allocation_reduction_percent": 0.31444443125306065,
+    "cleanup_lease_locks_verified": true,
+    "complete": true,
+    "complete_order_verified": true,
+    "complete_ordered_queries_equal": true,
+    "cumulative_guarded_elapsed_ns": 872840906664,
+    "elapsed_ns": 331359806755,
+    "exclusive_reference_writer_attribution_claimed": false,
+    "fixed_batch_count": 1,
+    "foundation_modules": 14,
+    "foundation_source_bytes": 173594,
+    "fresh_groups_each": 475,
+    "interpretation": "One fixed ordinary batch: repeatable within-batch whole-process RTS allocation reduction on frozen Foundation14. No stable wall-time speedup, general workload claim, exclusive writer attribution, native/fixed-point result, GHC parity or production promotion. F25+putVar A is not current main. Historical r14 supplies immutable semantic artifacts only, not current A timing.",
+    "production_promotion": false,
+    "raw_artifacts_compared_exact": 36,
+    "reused_groups_each": 0,
+    "runtime": {
+      "VALIDATE_inheritance_exact": true,
+      "actual_loader_stdout_ELF_interpreter_config_symlink_inode_hash_checked": true,
+      "before_after_roles_each": 9,
+      "binding_occurrences": 310,
+      "observations": 18,
+      "unique_raw_bindings": 52
+    },
+    "sample_count": 12,
+    "sequence": "ABBAABBAABBA",
+    "stable_wall_speedup_established": false,
+    "unique_file_pins_verified": 4123,
+    "worker_input_pins_verified": 3504,
+    "worker_output_pins_verified": 236
+  },
+  "scope": "Completed actual evidence independently reviewed; private paths, coordination records, full toolchain snapshots, large IR and compiled objects are not published. Hashes do not reconstruct omitted files."
+}
