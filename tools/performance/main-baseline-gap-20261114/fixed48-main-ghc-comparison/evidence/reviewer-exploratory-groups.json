@@ -1,0 +1,254 @@
+[
+  {
+    "G_allocated_bytes": [
+      40592064,
+      40595120
+    ],
+    "G_guard_seconds": [
+      0.3038151899818331,
+      0.23642933601513505
+    ],
+    "M_allocated_bytes": [
+      451590392,
+      451590392
+    ],
+    "M_guard_seconds": [
+      0.28892069699941203,
+      0.2943758289911784
+    ],
+    "cell": "baseline-0",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      44843928,
+      44843064
+    ],
+    "G_guard_seconds": [
+      0.1855471890012268,
+      0.2199896660167724
+    ],
+    "M_allocated_bytes": [
+      672842448,
+      672842448
+    ],
+    "M_guard_seconds": [
+      0.3457471170113422,
+      0.35481829900527373
+    ],
+    "cell": "flat_functions-16",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      49191728,
+      49186672
+    ],
+    "G_guard_seconds": [
+      0.255096192995552,
+      0.20881060598185286
+    ],
+    "M_allocated_bytes": [
+      895993760,
+      895993760
+    ],
+    "M_guard_seconds": [
+      0.4237626359972637,
+      0.46057085701613687
+    ],
+    "cell": "flat_functions-32",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      58012592,
+      58014160
+    ],
+    "G_guard_seconds": [
+      0.22800885199103504,
+      0.2380180449981708
+    ],
+    "M_allocated_bytes": [
+      1346205784,
+      1346205784
+    ],
+    "M_guard_seconds": [
+      0.5567593259911519,
+      0.5726609720150009
+    ],
+    "cell": "flat_functions-64",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      76339912,
+      76345568
+    ],
+    "G_guard_seconds": [
+      0.33633820700924844,
+      0.2151544909866061
+    ],
+    "M_allocated_bytes": [
+      2260435800,
+      2260435800
+    ],
+    "M_guard_seconds": [
+      0.93039197800681,
+      0.8670307929860428
+    ],
+    "cell": "flat_functions-128",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      115459688,
+      115457352
+    ],
+    "G_guard_seconds": [
+      0.3688875029911287,
+      0.4063605850096792
+    ],
+    "M_allocated_bytes": [
+      4102392952,
+      4102392952
+    ],
+    "M_guard_seconds": [
+      1.4989229049824644,
+      1.5841021979867946
+    ],
+    "cell": "flat_functions-256",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      42047688,
+      42052520
+    ],
+    "G_guard_seconds": [
+      0.2679744969937019,
+      0.25023687598877586
+    ],
+    "M_allocated_bytes": [
+      552725880,
+      552725880
+    ],
+    "M_guard_seconds": [
+      0.45012014600797556,
+      0.3881974140240345
+    ],
+    "cell": "higher_order_chain-16",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      42596280,
+      42595552
+    ],
+    "G_guard_seconds": [
+      0.26096711299032904,
+      0.12670263802283444
+    ],
+    "M_allocated_bytes": [
+      597463792,
+      597463792
+    ],
+    "M_guard_seconds": [
+      0.5541116149979644,
+      0.4179487520013936
+    ],
+    "cell": "higher_order_chain-32",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      43661360,
+      43657752
+    ],
+    "G_guard_seconds": [
+      0.256173800007673,
+      0.2887096219928935
+    ],
+    "M_allocated_bytes": [
+      689961272,
+      689961272
+    ],
+    "M_guard_seconds": [
+      0.444148779992247,
+      0.3978132119809743
+    ],
+    "cell": "higher_order_chain-64",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      45862256,
+      45871144
+    ],
+    "G_guard_seconds": [
+      0.26579433798906393,
+      0.26318908101529814
+    ],
+    "M_allocated_bytes": [
+      888064328,
+      888064328
+    ],
+    "M_guard_seconds": [
+      0.4399434399965685,
+      0.5435137559834402
+    ],
+    "cell": "higher_order_chain-128",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      50217200,
+      50215368
+    ],
+    "G_guard_seconds": [
+      0.28951038801460527,
+      0.26290361798601225
+    ],
+    "M_allocated_bytes": [
+      1319766272,
+      1319766272
+    ],
+    "M_guard_seconds": [
+      0.5653049889951944,
+      0.7011879720084835
+    ],
+    "cell": "higher_order_chain-256",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  },
+  {
+    "G_allocated_bytes": [
+      511558192,
+      511553264
+    ],
+    "G_guard_seconds": [
+      0.683273189002648,
+      0.6950349940161686
+    ],
+    "M_allocated_bytes": [
+      60608900384,
+      60608900384
+    ],
+    "M_guard_seconds": [
+      20.807319009007188,
+      21.37898243701784
+    ],
+    "cell": "foundation14",
+    "endpoints_have_different_scopes": true,
+    "two_per_lane_exploratory_only": true
+  }
+]

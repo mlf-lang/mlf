@@ -1,0 +1,56 @@
+{
+  "blocks": [
+    {
+      "actual_review": {
+        "bytes": 17450,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-actual-review/report.json",
+        "sha256": "9d0f20dd831a4943bb3672b1889bb1772397c5c9014f8939754adaba1b5cc924"
+      },
+      "block": 1,
+      "worker": {
+        "bytes": 3913506,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/sampling-receipt.json",
+        "sha256": "7260cb7eb59b8446802ee58c526e1986acea3021aa9c145b955e6e60a67cc656"
+      }
+    },
+    {
+      "actual_review": {
+        "bytes": 20604,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/report.json",
+        "sha256": "cf5bf9fe5364b6cdaa850629238aaa36517ace48c93d33ecd92f895e56de591f"
+      },
+      "block": 2,
+      "worker": {
+        "bytes": 4873374,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/sampling-receipt.json",
+        "sha256": "65a73e987be5a2af2c8cd4823bb873c44e7befdd6a682dcf32923bda5c99f14a"
+      }
+    }
+  ],
+  "cells": {
+    "bytes": 47681,
+    "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/CELLS.json",
+    "sha256": "3b5a5d5c486186a50cb45f248e2c9522b2437ae69257025770e02189e94ddaf3"
+  },
+  "legs": {
+    "bytes": 45845,
+    "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/LEGS.json",
+    "sha256": "53dcf311abd779697726d56bfd09a31d77aae0e8c278cd1551cdee280a546be8"
+  },
+  "parser_source": {
+    "bytes": 4888,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/stats.py",
+    "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+  },
+  "qualification_review": {
+    "bytes": 18702,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+    "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+  },
+  "sampling_source_manifest": {
+    "bytes": 4021,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/MANIFEST.json",
+    "sha256": "8d8fb5fdc68f15d404e2e962aab15dd1def5266179a7cd6c207c902d421da099"
+  },
+  "schema": "sampling-summary-input-v1"
+}

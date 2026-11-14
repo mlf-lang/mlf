@@ -1,0 +1,296 @@
+{
+  "files": [
+    {
+      "bytes": 3592,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "d349a3897c66d8dd622d4b9454dbb81acdaeb8de",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/EXPORT-CHECKS.json",
+      "sha256": "da78c5735a2e37f6cac4448a93a44f5ad950781f15b965dbc5b89024b5541e43",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/EXPORT-CHECKS.json"
+    },
+    {
+      "bytes": 4930,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "e7745a2c27990d60fb6130555c7a1c2a24d205fd",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/README.md",
+      "sha256": "3d4b6a54bc6394bce6f43cf3fd9499daf9708cada22b58891f3a925196e96bbb",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/README.md"
+    },
+    {
+      "bytes": 1995,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "0d3b4007224754ada5a1715f7575b659dd2abad7",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/REPRODUCTION.md",
+      "sha256": "2e87f8e5211d3dda9e65e09eeef991b9f3ecc27ee5f7eeb9d3c3a347f01ac174",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/REPRODUCTION.md"
+    },
+    {
+      "bytes": 22578,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "ed7eb24923aa1bb08c03530e16344a460b4fa92a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/REUSED-PUBLIC-FILES.json",
+      "sha256": "7cf5b15daefc7dfd7271ae70d711e9046e9854df9d5bdae47927a207314527ea",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/REUSED-PUBLIC-FILES.json"
+    },
+    {
+      "bytes": 14281,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "539d6086696036ae0a432055efaa76eeb4551a6f",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/SOURCE-MAP.json",
+      "sha256": "5bf39d6d302204b00a61d1f1af75417b971a48ffa1d9457badd08565ec3fcaf8",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/SOURCE-MAP.json"
+    },
+    {
+      "bytes": 4182,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "227925de9007014f6886c01da8e17dfa576d6f26",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/activation-review.json",
+      "sha256": "6ad355cd33598204fe844c4c8b52051b07e214956020cc3b5cf7ce6ad2448ed4",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/activation-review.json"
+    },
+    {
+      "bytes": 1916,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "5e5574066cd244e66fa9a31e11e71ee8072c5309",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/actual-claim-lifecycle.json",
+      "sha256": "e5322d79da93d56d6204fcfcf5be54e793b601e91aebd80f90173788692bc592",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/actual-claim-lifecycle.json"
+    },
+    {
+      "bytes": 41450,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "3b452a8e62f37f6a29280fb3c8b20c0b1909c5c5",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/combined-12-cell-summary.json",
+      "sha256": "00b5b5a3c3b7baa632b80c3cb58808ac93d8e414f18c20ae14cbef4c6716c8b5",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/combined-12-cell-summary.json"
+    },
+    {
+      "bytes": 11067,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "5ab7bc5fd4aeb7a943aa352b6306605281351cdf",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/combined-24-rts-index.json",
+      "sha256": "4c1f0b37d85cb7576217505810d3036471a3c5afed8e6be87a9a6e33f1eed135",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/combined-24-rts-index.json"
+    },
+    {
+      "bytes": 15134,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "9b2e25e892050e776d96ac9dbc83494844a2b5e9",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/completion-commands.json",
+      "sha256": "4138eb9bb8374a58dd80d55ad6dbce321fc9b38c93bc6d08951de253edb85ea4",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/completion-commands.json"
+    },
+    {
+      "bytes": 2233,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "5aead52cba84df25c023c68068d15c11f5bf3421",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/final-cleanup-and-budget.json",
+      "sha256": "ef45085b2c562594951d2114d3e1027140bcb7ac0af4c60e6b9f01d84a03c6dc",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/final-cleanup-and-budget.json"
+    },
+    {
+      "bytes": 890,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "b3d2712a8bcca448d5d682f27707d8807bf44c17",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/foundation-raw-differences.json",
+      "sha256": "4b1b2c07dc2bca3cf3b0593eaf8b55cff25ef814806a036ddfa96136c93fb84d",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/foundation-raw-differences.json"
+    },
+    {
+      "bytes": 17743,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "aa2386c8308511e463dfda02ed61c20e91a1d69a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/independent-actual-review.json",
+      "sha256": "350ace6815b2772ab876643a1dd39f8f6950067d3210dfdd69d4682ecfe965bf",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/independent-actual-review.json"
+    },
+    {
+      "bytes": 10376,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "c131721b1cae3bec8d514727102ae725f8e611f9",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/new-rts-redacted.json",
+      "sha256": "6a073f2812727b32fbe2c1d5ea8bf2dda3c3d5d9d5867efb3d1604305b922ccd",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/new-rts-redacted.json"
+    },
+    {
+      "bytes": 3051,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "95efa9ff89570deb5b6980d9b00a3055a738c870",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/source-checks.json",
+      "sha256": "720e15c028a26a4a93c6360a556f9d41d12985325ae32622ce5132aa4cdea768",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/source-checks.json"
+    },
+    {
+      "bytes": 1516,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "d953807dcfdc1b9f4650229eb22ff2c1b313c7bc",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/source-claim-source-evidence.json",
+      "sha256": "efe2e1ff5467edf7bf3752e9582da349fed9a0c8766f8dec925367341b051399",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/source-claim-source-evidence.json"
+    },
+    {
+      "bytes": 13394,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "52ba2805bb6630feb6c741a94d401697ac6f341a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/source-review.json",
+      "sha256": "f2a0f610d25036f85634d72635b0d9cdd3fa4969cb1931e2bc5fa0a62afdc8e0",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/source-review.json"
+    },
+    {
+      "bytes": 2065,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "f1404adf34e3b0bf52b2cb2a111ef1d5ec871e6b",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/v1-blocked-and-C1-repair.json",
+      "sha256": "09fa444ca22eca319953bdc902600ebb98e12b74e1ed45a2f416b9a59e05b213",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/evidence/v1-blocked-and-C1-repair.json"
+    },
+    {
+      "bytes": 6223,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "72ec52882e138cee9f669af8e898a9372ef4520a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/manifest.json",
+      "sha256": "596554f903e5c373fbcb9133ea345bb5509aa115b1fb7d628cfd5b3f12e465ed",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/manifest.json"
+    },
+    {
+      "bytes": 968,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "12e5047b9620ffc1364966a3f84c5e9c82db3a63",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/ACTIVATION-CONTRACT.json",
+      "sha256": "39ba561a81445570345cc8488804a6f596532edf17e1d6a4e83ea7a65911c06e",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/ACTIVATION-CONTRACT.json"
+    },
+    {
+      "bytes": 2004,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "5fb7d4b2bd80341ddd7881666f9d72d9144602ca",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/ANCESTRY.json",
+      "sha256": "cd22b0194876a00e08ba758a09b6c98f125d84d01b532c2217520ad743312fa8",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/ANCESTRY.json"
+    },
+    {
+      "bytes": 28827,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "5bac702ed1ae99d896ec541acd73513cb1fc4500",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/BINDINGS.json",
+      "sha256": "1cab704437ba4621f67a4ffb741110b42c4f5e437eaebb57a9a73e8edab7beaa",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/BINDINGS.json"
+    },
+    {
+      "bytes": 12877,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "68a8d86ece59e43fd6a7d5d05a340c2f87f23591",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/COMMAND-MAPPING.json",
+      "sha256": "14a7bf59d999426091ddacd3f2d43177af5dcfeeb7f0628b1dfbc2a95d24344b",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/COMMAND-MAPPING.json"
+    },
+    {
+      "bytes": 6530,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "d01ca231a98c6b85753926566f73c5564a5b2a0d",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/DESIGN-AT-SOURCE-FREEZE.md",
+      "sha256": "e8e58feb665568081a24085e19b82f06773be41a3c8c5f2deda690e255a4e967",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/DESIGN-AT-SOURCE-FREEZE.md"
+    },
+    {
+      "bytes": 1509,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "fc64019a281bd361667710e7f19f439d9bea6c12",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/REVISION.json",
+      "sha256": "d31ea591d22099060fb1803bb0a7c454d9e008eafee88eccdfe0c75887af74d7",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/REVISION.json"
+    },
+    {
+      "bytes": 6100,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "a400a7dca18a239f198f1cd62ade8f6f5013128c",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/claim_checks.py",
+      "sha256": "7f1c4e972d8cbc226a24e1e5ffc6ea7d08c6cba50f835f13c459de2f2385cb85",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/claim_checks.py"
+    },
+    {
+      "bytes": 51767,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "9420c2847a06fd40b42b76de4deeed4b2d3e4d08",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/controller.py",
+      "sha256": "fe5627c6666e252366a904e3711d97a15a1677beeb7509e0610f63b692486338",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/controller.py"
+    },
+    {
+      "bytes": 792,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "f1e32165dff3151e8e578d4ccd327f25908a73b0",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/controller.py.diff",
+      "sha256": "1f64aa8703aae89dd6e2ab0eaeb8c36d78bf67f3dc3e72b7c059aafa5b8dd2b2",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/controller.py.diff"
+    },
+    {
+      "bytes": 636,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "493d88973af33fdf3d628986e6369dac7a66bb2f",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/environment.json",
+      "sha256": "5ffa1cbc062f063cad32d670c907fcb19bfab244c8f40008a7ac08470c3da514",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/environment.json"
+    },
+    {
+      "bytes": 3827,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "4b679fe25036a9b8388491f7d1bef2c9e050a63f",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/identity.py",
+      "sha256": "b2caf9e4c4c65782b5cc003d68d60794357cc40a014e0e53364c7cb660dead8a",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/identity.py"
+    },
+    {
+      "bytes": 1436,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "2c8c2a8f270eeb360fb28f895bbc082eec80769d",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/recorded-tests/claim-check-report.json",
+      "sha256": "bb53df44ae717794034685f53b849084c4e0d290804d2fea2e5f71a52fb23947",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/recorded-tests/claim-check-report.json"
+    },
+    {
+      "bytes": 1884,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "c63f1b243a57913fbceca64a8e8453354f8bd3f0",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/recorded-tests/source-check-report.json",
+      "sha256": "a2651fbcc4f374056339f8bf873d79c0fbae56ec9d63ea48ad81fa0834acaf53",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/recorded-tests/source-check-report.json"
+    },
+    {
+      "bytes": 6153,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "d1a846b7ce962d2c35a9cb96e5f3014378dbc0e0",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/report.json",
+      "sha256": "da197ab61a72a42e3f8e6849291a8225f2e721af05c3ca77c79652c377282968",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/report.json"
+    },
+    {
+      "bytes": 7803,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "82a7831a0b62c4e660f26384fb54e802c892d7a5",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/source_checks.py",
+      "sha256": "7e8126badc1692de4b325347cfef3dba9ae6ff88bc2f4d59238f0714c422a362",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/source_checks.py"
+    },
+    {
+      "bytes": 17470,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "10fe717fe34511cd722c94eb20b50c2b11cf05c1",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/worker.py",
+      "sha256": "44f7b4568e8e6677c485e42057fd0f956ab6eba980b6748491f5b1dc2016c891",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/worker.py"
+    },
+    {
+      "bytes": 1515,
+      "commit": "052e58cbbd6e350cef01f8c0cd8de28eea135c5b",
+      "git_blob": "2831bfbb27a60cdb6dd2104461fd14145c81e52a",
+      "repository_path": "tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/worker.py.diff",
+      "sha256": "a281a5f99a4b73365ef9f90d91a2dd56a7eab43b387ab71958bf7dac6d0d32c9",
+      "url": "https://github.com/mlf-lang/mlf/blob/052e58cbbd6e350cef01f8c0cd8de28eea135c5b/tools/performance/main-baseline-gap-20261114/semantic-completion-run01/source/worker.py.diff"
+    }
+  ],
+  "follow_predecessor_REUSED_PUBLIC_FILES_for_fixed25_inputs_and_parser_guard_runtime_source": true,
+  "no_rebuild_or_qualification_transfer_from_public_tree_alone": true,
+  "prior_completion_archive_unchanged": true,
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5"
+}

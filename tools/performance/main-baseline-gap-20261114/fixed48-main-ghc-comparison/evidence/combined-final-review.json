@@ -1,0 +1,277 @@
+{
+  "original": {
+    "artifact": "main-gap-sampling-02-actual-review/combined-final.json",
+    "bytes": 11532,
+    "sha256": "33829f5e71c9a1ed5cc530566450ef06d473dba8de4b5abbc6c554657983c408"
+  },
+  "report": {
+    "MGGM_each_cell": true,
+    "RTS_report_count": 48,
+    "SAMPLE1_actual_pins": {
+      "admission": {
+        "bytes": 2805,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/coordination/SAMPLE1-admission.json",
+        "sha256": "bc2311eb6e2a3db791aeb04890a6affdbafcc8efbf96683a7d794c1335c0428e"
+      },
+      "build_log": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/build.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "claim": {
+        "bytes": 294,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/claims/SAMPLE1.json",
+        "sha256": "17fd624d00877cd249f47b75891effb4622a7072fd4d4fc89fe1f897a4f0aa19"
+      },
+      "config": {
+        "bytes": 1887,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/outer/guard-config.json",
+        "sha256": "1fe677fd396a443569fdb7cfd168c4f84a8a1658de02ede9069d379890330806"
+      },
+      "controller": {
+        "bytes": 7782,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.json",
+        "sha256": "e6415b7c8a52f72b979169b6e3d6e6033e8998c02ee7c6c53ceafecd2f14e185"
+      },
+      "epoch": {
+        "bytes": 1553,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/coordination/SAMPLE1-epoch.json",
+        "sha256": "b9da44c09e5d35fd4223a25ccc3ad40663363f5f20d4a72b79e894f9c943f00a"
+      },
+      "launch_binding": {
+        "bytes": 2429,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/launch-binding.json",
+        "sha256": "aaf850aa203d9e8ef30589229b4ff61f3f3f444026a5cf477b683de0f493b71c"
+      },
+      "outer": {
+        "bytes": 4539,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/outer/guard.json",
+        "sha256": "d3befe0741208317bf68a80e3fff80fd9b6249557079e61704a2c383be10e03b"
+      },
+      "prepare_attempt": {
+        "bytes": 744,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/coordination/SAMPLE1-prepare-attempt.json",
+        "sha256": "78714329410ab57a486d65b8407d46aa4899bf60f55f06eff8d6f45f5f13884e"
+      },
+      "watchdog": {
+        "bytes": 120237,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/bounded-receipt.json",
+        "sha256": "98a7e4eaddff64958767c48f4d599ff15ecd80f0acba4881436432da0a102df2"
+      },
+      "worker": {
+        "bytes": 3913506,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/sampling-receipt.json",
+        "sha256": "7260cb7eb59b8446802ee58c526e1986acea3021aa9c145b955e6e60a67cc656"
+      }
+    },
+    "SAMPLE1_review": {
+      "bytes": 17450,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-actual-review/report.json",
+      "sha256": "9d0f20dd831a4943bb3672b1889bb1772397c5c9014f8939754adaba1b5cc924"
+    },
+    "SAMPLE2_actual_pins": {
+      "admission": {
+        "bytes": 2805,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/coordination/SAMPLE2-admission.json",
+        "sha256": "41ed01ead437f89ba33dc047f32eb940406363302ca2349198232f2e493b34e4"
+      },
+      "build_log": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/build.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "claim": {
+        "bytes": 294,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/claims/SAMPLE2.json",
+        "sha256": "1f9c026f25abcdfab0b4cd0800828f5ed8fea8f087e5c2e72143f9ef9a1ed7ac"
+      },
+      "config": {
+        "bytes": 1887,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/outer/guard-config.json",
+        "sha256": "8e98fbed66fa8d49e63553bf67de3e7a43d2d8aeddc0597b67cf2da9f17c038f"
+      },
+      "controller": {
+        "bytes": 7772,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/controller.json",
+        "sha256": "74785f42f2e7f2d2876fbacc097372da7c07c2981e1a89712c4830951711fa94"
+      },
+      "epoch": {
+        "bytes": 1553,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/coordination/SAMPLE2-epoch.json",
+        "sha256": "59f7c88463f0748c1b4e0e36be71a1a4950d80b42a251c97c899e346a5506f13"
+      },
+      "launch_binding": {
+        "bytes": 2429,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/launch-binding.json",
+        "sha256": "787607c82dc9e9a5fce994cc75208ee9cd9b55b06b373c1a124d37e08e0af64a"
+      },
+      "outer": {
+        "bytes": 4494,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/outer/guard.json",
+        "sha256": "e8990f31453e03e7f4b1dc458c9b6dce3e8bb523251af609f666cd9522009274"
+      },
+      "prepare_attempt": {
+        "bytes": 733,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/coordination/SAMPLE2-prepare-attempt.json",
+        "sha256": "8881ba877a06274add78e8801e3ff5f68250a6b3f6b3afad8e8edf3fad6e78ac"
+      },
+      "watchdog": {
+        "bytes": 189737,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/bounded-receipt.json",
+        "sha256": "3c03db668176e5c0814d6c16e9d9b507686178860abb066610af7031c95f0466"
+      },
+      "worker": {
+        "bytes": 4873374,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/sampling-receipt.json",
+        "sha256": "65a73e987be5a2af2c8cd4823bb873c44e7befdd6a682dcf32923bda5c99f14a"
+      }
+    },
+    "SAMPLE2_review": {
+      "bytes": 20604,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/report.json",
+      "sha256": "cf5bf9fe5364b6cdaa850629238aaa36517ace48c93d33ecd92f895e56de591f"
+    },
+    "all48_rows_csv": {
+      "bytes": 4831,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-samples.csv",
+      "sha256": "d0e275d959ce126d07423a90795af975afd30de840753b1e27b4fbafe3810c53"
+    },
+    "all_same_binary_raw_exact": true,
+    "blockers": [],
+    "budget": {
+      "SAMPLE1_ns": 146870598659,
+      "SAMPLE2_ns": 234962562751,
+      "authoritative_clock": "monotonic_ns",
+      "authoritative_interval": "entire original guard.run_guard call through return including cleanup",
+      "both_caps_passed": true,
+      "completion_ns": 121226195039,
+      "failed_SEMANTIC_ns": 596647140326,
+      "original_guard_elapsed_seconds_excludes_cleanup": 234.74652971400064,
+      "outer_cap_per_block_ns": 600000000000,
+      "post_setup_ceiling_ns": 1800000000000,
+      "post_setup_cumulative_ns": 1099706496775,
+      "post_setup_unused_ns": 700293503225,
+      "qualification_ns": 717873335365,
+      "sampling_ceiling_ns": 1200000000000,
+      "sampling_cumulative_ns": 381833161410,
+      "sampling_unused_ns": 818166838590,
+      "unused_budget_is_not_authorization_for_more_targets": true,
+      "worker_deadline_per_block_ns": 595000000000
+    },
+    "cell_count": 12,
+    "cleanup_lease_locks": true,
+    "combined_48leg_sampling_passed": true,
+    "command_count": 64,
+    "commands": {
+      "bytes": 92701,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-commands.json",
+      "sha256": "ce7f9342cf0ab691662d9369fc2b403b8f6cd0216aee93d7f36c4df297ce3eae"
+    },
+    "complete": true,
+    "exceptions": [],
+    "further_targets_authorized": false,
+    "leg_ordinals": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48
+    ],
+    "measured_leg_count": 48,
+    "native_generation_AB_fixedpoint": false,
+    "observational_limits": [
+      "Both lifecycle durations and their cumulative totals are budget costs, not compiler performance.",
+      "Two observations per endpoint/cell are exploratory only: no stable speedup, significance or asymptotic conclusion.",
+      "GHC typed-only and MLF frontend have different compiler/artifact scopes; no parity claim.",
+      "Child guard elapsed includes supervision; exact target wall_ns and process user/system split remain unknown. RTS process times are rounded.",
+      "Fresh application/query outputs do not mean cold OS page cache.",
+      "No runtime graph/visit/copy/constraint counters; published query counts are not substitutes.",
+      "No discarded first sample, retry, hidden probe or additional leg; whole fixed48 plan is now closed."
+    ],
+    "original_SEMANTIC_passed": false,
+    "preserved_scope_directories": {
+      "bytes": 54562,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/preserved-E-directories.json",
+      "sha256": "4edc2332a39f7cfeaf1c069bf1a0796463b7ca25baf4e2e9572dce5aa9a8a9df"
+    },
+    "preserved_scope_files": {
+      "bytes": 5273816,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/preserved-E-files.json",
+      "sha256": "3bd8945b9c9b1b0ef869d2fc9dce14b39756c9d7cd8445707a82ab3a6ab543da"
+    },
+    "preserved_scope_root": "<EXPERIMENT_ROOT>/main-gap-setup-run04",
+    "production_promotion": false,
+    "qualification_review": {
+      "bytes": 18702,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+      "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+    },
+    "raw_equality": {
+      "bytes": 21766261,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-raw-equality.json",
+      "sha256": "2b936ae6c5eb297f40ea926cbfcc49ccaafe70182816c429df0d6701deef3edd"
+    },
+    "samples": {
+      "bytes": 169268,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-samples.json",
+      "sha256": "755b70380b925c3f5c6c175af0c946e1f6e05761f9be13669734b6d2f1bb2be1"
+    },
+    "schema": "main-gap-sampling-combined-actual-review-v1",
+    "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "source_package_manifest": {
+      "bytes": 4021,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/MANIFEST.json",
+      "sha256": "8d8fb5fdc68f15d404e2e962aab15dd1def5266179a7cd6c207c902d421da099"
+    },
+    "statistics": {
+      "bytes": 126457,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-statistics.json",
+      "sha256": "fbe1734cd69d8d1ec6d9a162a4aa3ee6490756178ecf64c0cb3bbd6a76306947"
+    },
+    "support_command_count": 16
+  },
+  "representation": "literal role-root substitutions; no claimed original byte equality"
+}

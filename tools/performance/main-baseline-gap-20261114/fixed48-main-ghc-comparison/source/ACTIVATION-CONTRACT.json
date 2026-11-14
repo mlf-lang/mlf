@@ -1,0 +1,40 @@
+{
+  "activated": false,
+  "block2_requires_actual_first_block_review_and_full_cap_budget": true,
+  "delta": "unique READY False to True only, same enabled bytes for both exact fixed scope names",
+  "disabled_controller": {
+    "bytes": 67370,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/controller.py",
+    "sha256": "c8a9fa91ec155acaa387ca5143e82353f95eb1a4181f64c3bb5bdc040ddd18e3"
+  },
+  "enabled_bytes": 67369,
+  "enabled_sha256": "19c3fa8dbea246c89ad1ca139dc11542067770a691de8aecb4d2529c8d050a96",
+  "materialize_only_current_scope": true,
+  "required_fields": [
+    "complete=true",
+    "source_gate_passed=true",
+    "blockers=[]",
+    "source_package_manifest exact fullpin"
+  ],
+  "schema": "main-gap-sampling-mechanical-activation-v1",
+  "scopes": [
+    {
+      "admitted": false,
+      "block": 1,
+      "destination": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.py",
+      "disabled_snapshot": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.disabled.py",
+      "phase": "SAMPLE1",
+      "scope_created": false
+    },
+    {
+      "admitted": false,
+      "block": 2,
+      "destination": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/controller.py",
+      "disabled_snapshot": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/controller.disabled.py",
+      "phase": "SAMPLE2",
+      "scope_created": false
+    }
+  ],
+  "source_review": null,
+  "source_review_schema": "main-gap-sampling-source-review-v1"
+}

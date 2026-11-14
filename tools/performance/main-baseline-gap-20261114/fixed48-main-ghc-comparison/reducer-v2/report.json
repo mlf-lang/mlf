@@ -1,0 +1,37 @@
+{
+  "actual_failure": "First complete-data read-only v1 reduction failed at pair_summary n>0 because genuine Foundation size=None. No output report generated; only actual-input and verified-input-pins written in new results directory. No target executed.",
+  "bytecode_cleanup": {
+    "cause": "first read-only import omitted -B",
+    "frozen_member_hashes_unchanged": true,
+    "only_own_new_bytecode_files_removed": [
+      {
+        "bytes": 23032,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-v1-source/__pycache__/reduce.cpython-312.pyc",
+        "sha256": "534dc7cde286303a70fc169efefed219e9361dcc694f03a537012f3f0dcca035"
+      },
+      {
+        "bytes": 7750,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-v1-source/__pycache__/rts_parser.cpython-312.pyc",
+        "sha256": "14b5cc808afc0c759c1767ddf12c379a3990eedde34680c26f0c7f5f27128fd2"
+      }
+    ]
+  },
+  "checks": [
+    "v2 inverse bytes exactly v1",
+    "parser bytes unchanged",
+    "all frozen v1 member hashes unchanged",
+    "Foundation None no divide",
+    "baseline0 no divide",
+    "bool not a size",
+    "positive16 exact division"
+  ],
+  "complete": true,
+  "delta": "Exactly one predicate: integer positive n required for per-size division; Foundation None and baseline0 remain unnormalized.",
+  "schema": "sampling-summary-v2-minimal-fix-v1",
+  "target_executions": 0,
+  "v1_source_manifest": {
+    "bytes": 2286,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-v1-source/MANIFEST.json",
+    "sha256": "9a7e7092ff212693509f5edafc721bdd4ee3c904f0eec489f88d23d0d1f9f6f9"
+  }
+}

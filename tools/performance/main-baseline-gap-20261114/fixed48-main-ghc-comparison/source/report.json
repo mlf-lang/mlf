@@ -1,0 +1,97 @@
+{
+  "READY": false,
+  "actual_combined_review": {
+    "bytes": 18702,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+    "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+  },
+  "actual_preserved_scope_directories": {
+    "bytes": 34234,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/preserved-E-directories.json",
+    "sha256": "a932d9cf5d107de817334b38ea2a909c0ef63a5224f21ea303775117c9c67eaa"
+  },
+  "actual_preserved_scope_files": {
+    "bytes": 2748006,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/preserved-E-files.json",
+    "sha256": "19b8bca89190c77d07e8ba7eff9ae8e9f3b5a5a7672eddf4fbb04268d97c0ef7"
+  },
+  "actual_qualification_cumulative_ns": 717873335365,
+  "actual_sampling_passed": false,
+  "actual_semantic_oracle_inventory": {
+    "bytes": 4327822,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/combined-cells.json",
+    "sha256": "35288fb0241111a89f7cc446edff00e6e5532a0a7b25d7b51d856055e44f2024"
+  },
+  "blocks": 2,
+  "checks": 81,
+  "commands_each": 32,
+  "complete": true,
+  "configuration": {
+    "bytes": 36732,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/BINDINGS.json",
+    "sha256": "390afb62366ad7159d21f976cc3acee0869928ac4c4afd24ede71f5c6a78adfb"
+  },
+  "controller": {
+    "bytes": 67370,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/controller.py",
+    "sha256": "c8a9fa91ec155acaa387ca5143e82353f95eb1a4181f64c3bb5bdc040ddd18e3"
+  },
+  "first_full_cap_entry_ns": 1317873335365,
+  "future_actual_semantic_guardrails": [
+    "all original qualified argv and active source paths unchanged",
+    "fresh0-reuse full query report identical",
+    "full actual B/G names and bytes exactly unchanged",
+    "exact declared GHC home compilation/interfaces",
+    "real prior full600 reservation and actual poststage cumulative check",
+    "cooperative boundary-SHA/metadata policy with original launch-binding claim pin"
+  ],
+  "independent_source_gate_passed": false,
+  "known_functional_implementation_blockers": [],
+  "limitations": [
+    "two observations per endpoint/cell are exploratory only",
+    "fresh query cache is not cold OS cache",
+    "GHC typed-only and MLF frontend differ in output endpoint scope",
+    "RTS CPU is rounded; exact target wall_ns and user/system split unavailable",
+    "no runtime graph visits/copies/constraint counter implementation",
+    "boundary hashes plus metadata cannot rule out hostile privileged transient write/restore",
+    "qualification lifecycle durations are not performance samples"
+  ],
+  "measured_legs_each": 24,
+  "measured_order": "fixed original M,G,G,M per cell",
+  "missing_future_results_are_not_fake_pass": [
+    "block1 actual receipt/review and elapsed",
+    "block2 actual receipt/review and elapsed"
+  ],
+  "no_new_scope_claim_epoch_or_admission_created": true,
+  "no_original_module_entry_guard_runtime_loader_compiler_target_or_lock_executed": true,
+  "original_failed_stage_stays_failed": true,
+  "per_block_cap_ns": 600000000000,
+  "per_block_worker_deadline_ns": 595000000000,
+  "post_setup_total_ns": 1800000000000,
+  "pure_contract": {
+    "bytes": 3848,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/sampling_contract.py",
+    "sha256": "b802d7d03a00b6da52e5395863edff65335c3a8b10855a7dbbb8b84b104efdff"
+  },
+  "same_binary_full_raw_exception_count": 0,
+  "sampling_ceiling_ns": 1200000000000,
+  "schema": "main-gap-sampling-source-preparation-v1",
+  "source_and_producer_reused_without_rebuild": true,
+  "source_checks": {
+    "bytes": 3640,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/source-check-report.json",
+    "sha256": "45bab39fb06f83876f2a67147b7fccb7dba51dc8a1956b15a6efec40a19ee4cc"
+  },
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_only": true,
+  "source_review_contract": "main-gap-sampling-source-review-v1",
+  "support_each": 8,
+  "total_RTS": 48,
+  "total_commands": 64,
+  "total_measured_legs": 48,
+  "worker": {
+    "bytes": 15279,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/sampling_worker.py",
+    "sha256": "508c17765753bd2c5716d2b6569edf234204d395fc36a456954d522e00be567f"
+  }
+}

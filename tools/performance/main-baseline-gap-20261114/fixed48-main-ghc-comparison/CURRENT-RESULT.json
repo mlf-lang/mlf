@@ -1,0 +1,19 @@
+{
+  "actual_fixed48_independent_review": "PASS",
+  "combined_review_sha256": "33829f5e71c9a1ed5cc530566450ef06d473dba8de4b5abbc6c554657983c408",
+  "final_summary_report": {
+    "artifact": "main-gap-sampling-summary-final/report.json",
+    "bytes": 3469,
+    "sha256": "22206fa0769fc821baffad0a64f7cbf0f6cd4edc218f63a0dd0abca5468e2a79"
+  },
+  "new_measurements_during_reduction_or_packaging": 0,
+  "original_SEMANTIC_status": "FAIL unchanged",
+  "publication_freeze_status": "final archive; independent actual and summary reviews PASS",
+  "reducer_status_placeholder": "results/results.json retains original generic pending text; it is not the current actual-review state",
+  "summary_independent_review": {
+    "artifact": "main-gap-sampling-summary-final-independent-review/report.json",
+    "bytes": 4586,
+    "sha256": "8d56244334d0c288b66e66dc95ad1f40618aca166b95bdf05bdb0d10e68d4620"
+  },
+  "summary_verification_checks": 66
+}

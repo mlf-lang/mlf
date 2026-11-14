@@ -1,0 +1,3342 @@
+{
+  "all_exit0_complete_cleanup": true,
+  "count": 64,
+  "guard_elapsed_includes_supervision": true,
+  "measured_legs": 48,
+  "original_stdout_stderr_not_embedded": true,
+  "records": [
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 578,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/001-runtime-python-before/guard-config.json",
+        "sha256": "f2a5ebdc99af817a3fc016cc1038007936fed43dc822a08f01346670035664e1"
+      },
+      "elapsed_seconds": 0.08051877599791624,
+      "exit_code": 0,
+      "global_ordinal": 1,
+      "guard": {
+        "bytes": 1149,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/001-runtime-python-before/guard.json",
+        "sha256": "52bbf5071e94ee4a0d0e1fe177b624fe9b667c51cdc419be294c63acd6a55e51"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-before",
+      "maximum_seconds": 10,
+      "ordinal": 1,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/001-runtime-python-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 414,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/001-runtime-python-before/stdout",
+        "sha256": "44deaa7a9ca0af58cea7888be4cb79214321d95a9d23cc72c3478824ec504437"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 571,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/002-runtime-shell-before/guard-config.json",
+        "sha256": "404a9f4d1bf14fbee953df3d1de601dea46f4d119449a579fb524a0f88f6e849"
+      },
+      "elapsed_seconds": 0.08073042400064878,
+      "exit_code": 0,
+      "global_ordinal": 2,
+      "guard": {
+        "bytes": 1142,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/002-runtime-shell-before/guard.json",
+        "sha256": "19199cd3b5f00844b098ae9606f5c994c44f36db0eae4e2ccfa7fb3afe0ab557"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-before",
+      "maximum_seconds": 10,
+      "ordinal": 2,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/002-runtime-shell-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 280,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/002-runtime-shell-before/stdout",
+        "sha256": "cb784fba6884b7ef31f8c21459cc81d6fcba358fd07bd41ce3b21a5aa95f59e5"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 653,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/003-runtime-ghc-before/guard-config.json",
+        "sha256": "9e0aa4a99c0da522482b3f00349657dfdb889fe80ea61dde70796b39d8365238"
+      },
+      "elapsed_seconds": 0.07636687898775563,
+      "exit_code": 0,
+      "global_ordinal": 3,
+      "guard": {
+        "bytes": 1224,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/003-runtime-ghc-before/guard.json",
+        "sha256": "0214a2bbbf5e8f9693b13fe31430dc7a934faf99a5b30e1bef5978bcf5241acd"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-before",
+      "maximum_seconds": 10,
+      "ordinal": 3,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/003-runtime-ghc-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7830,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/003-runtime-ghc-before/stdout",
+        "sha256": "4d7489e678742709857e5f11fafe481d9b53c3bd72be1839c299751b90b8fd10"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 662,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/004-runtime-stats-emlf-before/guard-config.json",
+        "sha256": "8a4e287665d09e2f5d0d7f86b6c6ad22cfd5e4082f93b75ae51552cecf9eac67"
+      },
+      "elapsed_seconds": 0.09158116701291874,
+      "exit_code": 0,
+      "global_ordinal": 4,
+      "guard": {
+        "bytes": 1233,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/004-runtime-stats-emlf-before/guard.json",
+        "sha256": "4e4f9fe89a151c4311a87a1e49f803407fea2392d2fa69fee056815dae061a0c"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-before",
+      "maximum_seconds": 10,
+      "ordinal": 4,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/004-runtime-stats-emlf-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 345,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/004-runtime-stats-emlf-before/stdout",
+        "sha256": "2a177697cb7983ad729e9cfcf48beebd2ec6d64ffb4ae7a9f068c58247a37a88"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 958,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/005-leg-01-baseline-0-M/guard-config.json",
+        "sha256": "b6c4f05ee1bc2f55e74217c048fca3191e23b591236dfa30c33a608e59eef439"
+      },
+      "elapsed_seconds": 0.28892069699941203,
+      "exit_code": 0,
+      "global_ordinal": 5,
+      "guard": {
+        "bytes": 1823,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/005-leg-01-baseline-0-M/guard.json",
+        "sha256": "09df111a4674688178f205ce675893e582ddac3ec5cb42beeafbac1dbe56428a"
+      },
+      "kind": "measured_leg",
+      "label": "leg-01-baseline-0-M",
+      "maximum_seconds": 15,
+      "ordinal": 5,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/005-leg-01-baseline-0-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/005-leg-01-baseline-0-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1647,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/006-leg-02-baseline-0-G/guard-config.json",
+        "sha256": "d9cc1bfc5a59d035b91b28c4081cecf3c1f84692fe0ad24fd36ff10360a83f55"
+      },
+      "elapsed_seconds": 0.3038151899818331,
+      "exit_code": 0,
+      "global_ordinal": 6,
+      "guard": {
+        "bytes": 2619,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/006-leg-02-baseline-0-G/guard.json",
+        "sha256": "1c2a6a8726110a2ab5c2cf2aac267d56099e11c6efdf51d6bc634d7429518745"
+      },
+      "kind": "measured_leg",
+      "label": "leg-02-baseline-0-G",
+      "maximum_seconds": 15,
+      "ordinal": 6,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3378,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/006-leg-02-baseline-0-G/stderr",
+        "sha256": "60c90db15b8a77e558f0cf3e147a7ef6b4682d3c42befca04abae895198dfb48"
+      },
+      "stdout": {
+        "bytes": 166,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/006-leg-02-baseline-0-G/stdout",
+        "sha256": "bbb9c99f36391ed62cffb978772b07bd8d38bbbbe099363eeb775b8df452044e"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1647,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/007-leg-03-baseline-0-G/guard-config.json",
+        "sha256": "faa61087241b482ed1b15d494788f8d69a48e98add92029664ac1b30324b3562"
+      },
+      "elapsed_seconds": 0.23642933601513505,
+      "exit_code": 0,
+      "global_ordinal": 7,
+      "guard": {
+        "bytes": 2620,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/007-leg-03-baseline-0-G/guard.json",
+        "sha256": "9976d8c5af7cdb74deef53c6109922e6f6318c47eb5db515bad6505bd168873b"
+      },
+      "kind": "measured_leg",
+      "label": "leg-03-baseline-0-G",
+      "maximum_seconds": 15,
+      "ordinal": 7,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3378,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/007-leg-03-baseline-0-G/stderr",
+        "sha256": "283c4ab14459ac854057ef25cc3744b557937523928e1597a114a07c9b44a89a"
+      },
+      "stdout": {
+        "bytes": 166,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/007-leg-03-baseline-0-G/stdout",
+        "sha256": "bbb9c99f36391ed62cffb978772b07bd8d38bbbbe099363eeb775b8df452044e"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/baseline-0/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 958,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/008-leg-04-baseline-0-M/guard-config.json",
+        "sha256": "442326bd219369857e6b88a8869e62cafd56c17591760ea48446002aae9fd5fe"
+      },
+      "elapsed_seconds": 0.2943758289911784,
+      "exit_code": 0,
+      "global_ordinal": 8,
+      "guard": {
+        "bytes": 1822,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/008-leg-04-baseline-0-M/guard.json",
+        "sha256": "0271c1f9222fed9e4e100c9b7c972bfc955f3efede5910a9fd6abd99c6513302"
+      },
+      "kind": "measured_leg",
+      "label": "leg-04-baseline-0-M",
+      "maximum_seconds": 15,
+      "ordinal": 8,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/008-leg-04-baseline-0-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/008-leg-04-baseline-0-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 979,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/009-leg-05-flat_functions-16-M/guard-config.json",
+        "sha256": "049da55562b64aed1856ad83de28f88eb31cf81ddd808ce6618f6a451326fbde"
+      },
+      "elapsed_seconds": 0.3457471170113422,
+      "exit_code": 0,
+      "global_ordinal": 9,
+      "guard": {
+        "bytes": 1850,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/009-leg-05-flat_functions-16-M/guard.json",
+        "sha256": "725acf58512cd35ab5467a961327a15645a9e48c65c4c2d4d8c37b4f4ff4ac3a"
+      },
+      "kind": "measured_leg",
+      "label": "leg-05-flat_functions-16-M",
+      "maximum_seconds": 30,
+      "ordinal": 9,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/009-leg-05-flat_functions-16-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/009-leg-05-flat_functions-16-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1689,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/010-leg-06-flat_functions-16-G/guard-config.json",
+        "sha256": "d3bf208e42bbb2cc3f1ba6004df519318aa02bdd701d653549827bdbe8f91f69"
+      },
+      "elapsed_seconds": 0.1855471890012268,
+      "exit_code": 0,
+      "global_ordinal": 10,
+      "guard": {
+        "bytes": 2668,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/010-leg-06-flat_functions-16-G/guard.json",
+        "sha256": "e239436a09659ef7db505514486c3683042000cafe8369076a90ffea4ed1e0d9"
+      },
+      "kind": "measured_leg",
+      "label": "leg-06-flat_functions-16-G",
+      "maximum_seconds": 15,
+      "ordinal": 10,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3409,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/010-leg-06-flat_functions-16-G/stderr",
+        "sha256": "5dafddb7271a4ae2be67326e441f65a5a350c765e53a5f8aa89c3e9a2a884ad0"
+      },
+      "stdout": {
+        "bytes": 173,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/010-leg-06-flat_functions-16-G/stdout",
+        "sha256": "b62bea71f008dfa2d6dc777acc3cda58aa18cf8c801f4670014d553793e6bacd"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1689,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/011-leg-07-flat_functions-16-G/guard-config.json",
+        "sha256": "a5073e73b5645377bc9d1598a61217498205d0d2120971337df0f8d98059d1c8"
+      },
+      "elapsed_seconds": 0.2199896660167724,
+      "exit_code": 0,
+      "global_ordinal": 11,
+      "guard": {
+        "bytes": 2670,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/011-leg-07-flat_functions-16-G/guard.json",
+        "sha256": "d3655098d7bd9855e1c49a33d554d2d2ccc5d50d5ff5eaaaaef030d0a93803ac"
+      },
+      "kind": "measured_leg",
+      "label": "leg-07-flat_functions-16-G",
+      "maximum_seconds": 15,
+      "ordinal": 11,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3409,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/011-leg-07-flat_functions-16-G/stderr",
+        "sha256": "471efad2cb164d3bd3b4f9ab332c0308cc6f7da651f9a31f0978db74b86b703e"
+      },
+      "stdout": {
+        "bytes": 173,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/011-leg-07-flat_functions-16-G/stdout",
+        "sha256": "b62bea71f008dfa2d6dc777acc3cda58aa18cf8c801f4670014d553793e6bacd"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-16/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 979,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/012-leg-08-flat_functions-16-M/guard-config.json",
+        "sha256": "2623b2502245ca555a8d41b5064b7d56552ba6479046838d02b601aaa68d2133"
+      },
+      "elapsed_seconds": 0.35481829900527373,
+      "exit_code": 0,
+      "global_ordinal": 12,
+      "guard": {
+        "bytes": 1853,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/012-leg-08-flat_functions-16-M/guard.json",
+        "sha256": "4a11735f910881ded3e962595652a97f8b4dc55d974139917e2240e2ceb7b7ae"
+      },
+      "kind": "measured_leg",
+      "label": "leg-08-flat_functions-16-M",
+      "maximum_seconds": 30,
+      "ordinal": 12,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/012-leg-08-flat_functions-16-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/012-leg-08-flat_functions-16-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 979,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/013-leg-09-flat_functions-32-M/guard-config.json",
+        "sha256": "2111b7c4a4d205e414e9c98b05fe5b7583b6737223454812f1a51e57b9b68168"
+      },
+      "elapsed_seconds": 0.4237626359972637,
+      "exit_code": 0,
+      "global_ordinal": 13,
+      "guard": {
+        "bytes": 1852,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/013-leg-09-flat_functions-32-M/guard.json",
+        "sha256": "64c6850e9c454edc939710d861564777ceadf8d27196e285de9babfbdf71a9cc"
+      },
+      "kind": "measured_leg",
+      "label": "leg-09-flat_functions-32-M",
+      "maximum_seconds": 30,
+      "ordinal": 13,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/013-leg-09-flat_functions-32-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/013-leg-09-flat_functions-32-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1689,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/014-leg-10-flat_functions-32-G/guard-config.json",
+        "sha256": "70b42ecc553da4975ab254bcf9ce09fc9ea8ef3132691d07298a138c10be8f88"
+      },
+      "elapsed_seconds": 0.255096192995552,
+      "exit_code": 0,
+      "global_ordinal": 14,
+      "guard": {
+        "bytes": 2669,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/014-leg-10-flat_functions-32-G/guard.json",
+        "sha256": "224d3a13277ee35159d0f1899a821420409c5243870e93fac81caf59d67fa527"
+      },
+      "kind": "measured_leg",
+      "label": "leg-10-flat_functions-32-G",
+      "maximum_seconds": 15,
+      "ordinal": 14,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3410,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/014-leg-10-flat_functions-32-G/stderr",
+        "sha256": "13322a03920be6df90b93babcf45790397d61e768a3e7e35102b2d811fdff03c"
+      },
+      "stdout": {
+        "bytes": 173,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/014-leg-10-flat_functions-32-G/stdout",
+        "sha256": "17afa0d2270a080abd7ce1a80e9413cb3680343ccaa47056559a4d0040b974c5"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1689,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/015-leg-11-flat_functions-32-G/guard-config.json",
+        "sha256": "67ebb59851f273061c13aff548171140dd579d7a8d1cb03bbde4fe2e71c226cc"
+      },
+      "elapsed_seconds": 0.20881060598185286,
+      "exit_code": 0,
+      "global_ordinal": 15,
+      "guard": {
+        "bytes": 2671,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/015-leg-11-flat_functions-32-G/guard.json",
+        "sha256": "f653997727571c8d7bd690decfcbc51538ed65ed8075f17a09b919f99f8dbcc7"
+      },
+      "kind": "measured_leg",
+      "label": "leg-11-flat_functions-32-G",
+      "maximum_seconds": 15,
+      "ordinal": 15,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3410,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/015-leg-11-flat_functions-32-G/stderr",
+        "sha256": "ffe21e62cb5d6e9d3628601faee8d5951ecfbdaf17e2784f57208b40906726ce"
+      },
+      "stdout": {
+        "bytes": 173,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/015-leg-11-flat_functions-32-G/stdout",
+        "sha256": "17afa0d2270a080abd7ce1a80e9413cb3680343ccaa47056559a4d0040b974c5"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-32/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 979,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/016-leg-12-flat_functions-32-M/guard-config.json",
+        "sha256": "292c3b883781a59beaf38687132b11812e0f6ca6e839f87477bec1e9efa47c3c"
+      },
+      "elapsed_seconds": 0.46057085701613687,
+      "exit_code": 0,
+      "global_ordinal": 16,
+      "guard": {
+        "bytes": 1853,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/016-leg-12-flat_functions-32-M/guard.json",
+        "sha256": "8516e4f8e59c687427609e424e92f1f5ff8140d6d2198b322db48c69cd58105c"
+      },
+      "kind": "measured_leg",
+      "label": "leg-12-flat_functions-32-M",
+      "maximum_seconds": 30,
+      "ordinal": 16,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/016-leg-12-flat_functions-32-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/016-leg-12-flat_functions-32-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 979,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/017-leg-13-flat_functions-64-M/guard-config.json",
+        "sha256": "e5ad5c755ea6072d71bf26cc7e206e2f76188db209e19fe47df751dab04d3c30"
+      },
+      "elapsed_seconds": 0.5567593259911519,
+      "exit_code": 0,
+      "global_ordinal": 17,
+      "guard": {
+        "bytes": 1852,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/017-leg-13-flat_functions-64-M/guard.json",
+        "sha256": "0abdc8b7325c361f26202d736441eb71224361cfb0447705aac29c813e94e439"
+      },
+      "kind": "measured_leg",
+      "label": "leg-13-flat_functions-64-M",
+      "maximum_seconds": 30,
+      "ordinal": 17,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/017-leg-13-flat_functions-64-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/017-leg-13-flat_functions-64-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1689,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/018-leg-14-flat_functions-64-G/guard-config.json",
+        "sha256": "68e48f8048c2808cfe0796bc44e481c5c213c6570ff16349dd38cd8293df4243"
+      },
+      "elapsed_seconds": 0.22800885199103504,
+      "exit_code": 0,
+      "global_ordinal": 18,
+      "guard": {
+        "bytes": 2671,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/018-leg-14-flat_functions-64-G/guard.json",
+        "sha256": "2480e0d4b3e49e3999c420b7c8f950b29e5a8fd7ab53233851fc17b92d870475"
+      },
+      "kind": "measured_leg",
+      "label": "leg-14-flat_functions-64-G",
+      "maximum_seconds": 15,
+      "ordinal": 18,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3410,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/018-leg-14-flat_functions-64-G/stderr",
+        "sha256": "d601698d4270196c477fc98626697c5aeb73f6149183398e2d025c8a0d5314f7"
+      },
+      "stdout": {
+        "bytes": 173,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/018-leg-14-flat_functions-64-G/stdout",
+        "sha256": "6f3abfb12e8459392c615e67eb06501f1665141e25230851f11bd4cf0ccaec5d"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1689,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/019-leg-15-flat_functions-64-G/guard-config.json",
+        "sha256": "e72e1fb824c08e08ca9c9da581f0b11b05c5d4d6946993625ef114035adb3ec8"
+      },
+      "elapsed_seconds": 0.2380180449981708,
+      "exit_code": 0,
+      "global_ordinal": 19,
+      "guard": {
+        "bytes": 2670,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/019-leg-15-flat_functions-64-G/guard.json",
+        "sha256": "97282bc67159ea421386d29b2001e1e2a6d0c9705d1b5e2becb139ec7bd24891"
+      },
+      "kind": "measured_leg",
+      "label": "leg-15-flat_functions-64-G",
+      "maximum_seconds": 15,
+      "ordinal": 19,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3410,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/019-leg-15-flat_functions-64-G/stderr",
+        "sha256": "cfa6ab95817f0bea2bdf8f9d6a3743ce813caf6de22686027f207d96961b20a6"
+      },
+      "stdout": {
+        "bytes": 173,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/019-leg-15-flat_functions-64-G/stdout",
+        "sha256": "6f3abfb12e8459392c615e67eb06501f1665141e25230851f11bd4cf0ccaec5d"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-64/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 979,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/020-leg-16-flat_functions-64-M/guard-config.json",
+        "sha256": "902d0db64c37ed009b094cfa44407a25e95103310622759c153aacc8e4add57b"
+      },
+      "elapsed_seconds": 0.5726609720150009,
+      "exit_code": 0,
+      "global_ordinal": 20,
+      "guard": {
+        "bytes": 1875,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/020-leg-16-flat_functions-64-M/guard.json",
+        "sha256": "57aa0b7ae32f08c0b3c6e01ea134b8b4d81911502525fafaceb97a65e36121a5"
+      },
+      "kind": "measured_leg",
+      "label": "leg-16-flat_functions-64-M",
+      "maximum_seconds": 30,
+      "ordinal": 20,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/020-leg-16-flat_functions-64-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/020-leg-16-flat_functions-64-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 982,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/021-leg-17-flat_functions-128-M/guard-config.json",
+        "sha256": "f0b2d931c1768cff45cb72ae567b182cb7fa9f5071762ee4bcd2ef7b837ee555"
+      },
+      "elapsed_seconds": 0.93039197800681,
+      "exit_code": 0,
+      "global_ordinal": 21,
+      "guard": {
+        "bytes": 1854,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/021-leg-17-flat_functions-128-M/guard.json",
+        "sha256": "84ca584bf6280558e412c4db8a4cf62f893a9ec41b933bebd2a5f2c6fd026ae8"
+      },
+      "kind": "measured_leg",
+      "label": "leg-17-flat_functions-128-M",
+      "maximum_seconds": 30,
+      "ordinal": 21,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/021-leg-17-flat_functions-128-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/021-leg-17-flat_functions-128-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1695,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/022-leg-18-flat_functions-128-G/guard-config.json",
+        "sha256": "af852460cf80a0e4cd8dfeea921f5a465fa30d975ba964acfa278b3d21eb6242"
+      },
+      "elapsed_seconds": 0.33633820700924844,
+      "exit_code": 0,
+      "global_ordinal": 22,
+      "guard": {
+        "bytes": 2678,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/022-leg-18-flat_functions-128-G/guard.json",
+        "sha256": "26b06d6e9f890722d4a1828eb25a8377effefa1972a2654c652ec60ae22f76f6"
+      },
+      "kind": "measured_leg",
+      "label": "leg-18-flat_functions-128-G",
+      "maximum_seconds": 15,
+      "ordinal": 22,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3419,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/022-leg-18-flat_functions-128-G/stderr",
+        "sha256": "b02e8902e96186dacf5fdfd73100f185493f1ee0e93d4f01e80d186172ce797b"
+      },
+      "stdout": {
+        "bytes": 174,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/022-leg-18-flat_functions-128-G/stdout",
+        "sha256": "a2956cac60e5ba505f71f8d7557a514a5ead3b00086495c881b57f7006c8b8b6"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1695,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/023-leg-19-flat_functions-128-G/guard-config.json",
+        "sha256": "0de565fc0621f9fe616bd69aa4d6f186a2b50d348dd1bf77155a10628d632929"
+      },
+      "elapsed_seconds": 0.2151544909866061,
+      "exit_code": 0,
+      "global_ordinal": 23,
+      "guard": {
+        "bytes": 2677,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/023-leg-19-flat_functions-128-G/guard.json",
+        "sha256": "be779ebee3cc45e9818a4795f1085d85d20a6a52d28ebc5733977637015939d4"
+      },
+      "kind": "measured_leg",
+      "label": "leg-19-flat_functions-128-G",
+      "maximum_seconds": 15,
+      "ordinal": 23,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3419,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/023-leg-19-flat_functions-128-G/stderr",
+        "sha256": "6439d779954e4924a829b458ae2ad2b0da598d27074da0f2d124db7b91ad20ba"
+      },
+      "stdout": {
+        "bytes": 174,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/023-leg-19-flat_functions-128-G/stdout",
+        "sha256": "a2956cac60e5ba505f71f8d7557a514a5ead3b00086495c881b57f7006c8b8b6"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-128/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 982,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/024-leg-20-flat_functions-128-M/guard-config.json",
+        "sha256": "22e1b73694f57174ed958e37470afb7d28a6f8343bbea1c35a1bfd33700cda55"
+      },
+      "elapsed_seconds": 0.8670307929860428,
+      "exit_code": 0,
+      "global_ordinal": 24,
+      "guard": {
+        "bytes": 1856,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/024-leg-20-flat_functions-128-M/guard.json",
+        "sha256": "28b8e400631374ca89336cc00cf8054ea570526204814ccc8be8c7ebbd923de9"
+      },
+      "kind": "measured_leg",
+      "label": "leg-20-flat_functions-128-M",
+      "maximum_seconds": 30,
+      "ordinal": 24,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/024-leg-20-flat_functions-128-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/024-leg-20-flat_functions-128-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 982,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/025-leg-21-flat_functions-256-M/guard-config.json",
+        "sha256": "860793532ad4ead8968b613fdef956691f0b8240af927d9abdc33e63ecd3a389"
+      },
+      "elapsed_seconds": 1.4989229049824644,
+      "exit_code": 0,
+      "global_ordinal": 25,
+      "guard": {
+        "bytes": 1879,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/025-leg-21-flat_functions-256-M/guard.json",
+        "sha256": "5b5ce606e7dd4ba492401dcc3b363aaf196554d0462a3e48fa293833e394aeb1"
+      },
+      "kind": "measured_leg",
+      "label": "leg-21-flat_functions-256-M",
+      "maximum_seconds": 30,
+      "ordinal": 25,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/025-leg-21-flat_functions-256-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/025-leg-21-flat_functions-256-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1695,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/026-leg-22-flat_functions-256-G/guard-config.json",
+        "sha256": "1bd890aeff6cad955bfebe926057c1a90e4709ae96c8d05b36682938aa61a2fe"
+      },
+      "elapsed_seconds": 0.3688875029911287,
+      "exit_code": 0,
+      "global_ordinal": 26,
+      "guard": {
+        "bytes": 2677,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/026-leg-22-flat_functions-256-G/guard.json",
+        "sha256": "caa61b5c991cad3910017bb8b9fc64aafc982313bd644a5bc429b8e6f5a11ad5"
+      },
+      "kind": "measured_leg",
+      "label": "leg-22-flat_functions-256-G",
+      "maximum_seconds": 15,
+      "ordinal": 26,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3425,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/026-leg-22-flat_functions-256-G/stderr",
+        "sha256": "b701ab80cc530c2aff4213f007396623dc114dc7c370e7335efbb01014a986c4"
+      },
+      "stdout": {
+        "bytes": 174,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/026-leg-22-flat_functions-256-G/stdout",
+        "sha256": "ae14ff98c9b46e5133ae86f34ef99a364bbaf89a1d7c52fa266c26bdedc7a3e5"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1695,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/027-leg-23-flat_functions-256-G/guard-config.json",
+        "sha256": "d178b4faf89f58896d8cde82e36ef52560076da807563ff5d64fad43f2e15b40"
+      },
+      "elapsed_seconds": 0.4063605850096792,
+      "exit_code": 0,
+      "global_ordinal": 27,
+      "guard": {
+        "bytes": 2677,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/027-leg-23-flat_functions-256-G/guard.json",
+        "sha256": "9dd0374cbf09ba1b1b8d921169c67dc6e502fad60196142427e22138f0d34045"
+      },
+      "kind": "measured_leg",
+      "label": "leg-23-flat_functions-256-G",
+      "maximum_seconds": 15,
+      "ordinal": 27,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3426,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/027-leg-23-flat_functions-256-G/stderr",
+        "sha256": "bba8ca3ad7949a2dcb9b732581c174799de1a5c0f7c2d39badaa584f422e0afb"
+      },
+      "stdout": {
+        "bytes": 174,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/027-leg-23-flat_functions-256-G/stdout",
+        "sha256": "ae14ff98c9b46e5133ae86f34ef99a364bbaf89a1d7c52fa266c26bdedc7a3e5"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/flat_functions-256/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 982,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/028-leg-24-flat_functions-256-M/guard-config.json",
+        "sha256": "2d31559e822e4e1e6ab7e03f2a05b2395f22e401f6df7ce1fe3097c1c47a9a31"
+      },
+      "elapsed_seconds": 1.5841021979867946,
+      "exit_code": 0,
+      "global_ordinal": 28,
+      "guard": {
+        "bytes": 1856,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/028-leg-24-flat_functions-256-M/guard.json",
+        "sha256": "d87cb6f29993b737f8df1d722d4d8a17a23cf53ab07b34534db53bd5668623ce"
+      },
+      "kind": "measured_leg",
+      "label": "leg-24-flat_functions-256-M",
+      "maximum_seconds": 30,
+      "ordinal": 28,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/028-leg-24-flat_functions-256-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/028-leg-24-flat_functions-256-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 577,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/029-runtime-python-after/guard-config.json",
+        "sha256": "6367d223cbaa6ed5bc00949c43095e9a1521aa09130b76f8c958a5ed51b46455"
+      },
+      "elapsed_seconds": 0.12180324000655673,
+      "exit_code": 0,
+      "global_ordinal": 29,
+      "guard": {
+        "bytes": 1150,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/029-runtime-python-after/guard.json",
+        "sha256": "44a830d9ac48c6943fb0b94cb3c21210d6bd947ed41fdbfa494eb2723068f711"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-after",
+      "maximum_seconds": 10,
+      "ordinal": 29,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/029-runtime-python-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 414,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/029-runtime-python-after/stdout",
+        "sha256": "a31dd28d9599e5f632a261d26c9fe2ec32f76d30b82abeb3786c3e11eb24b543"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 570,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/030-runtime-shell-after/guard-config.json",
+        "sha256": "e26afe608e4c39d0e8d693b865c68565db1eef656dba5eb84c4d0bab410cbb9a"
+      },
+      "elapsed_seconds": 0.11015203202259727,
+      "exit_code": 0,
+      "global_ordinal": 30,
+      "guard": {
+        "bytes": 1143,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/030-runtime-shell-after/guard.json",
+        "sha256": "f9f0e9638d58f854a0b5762d81f8f3aa800beaa71150df4c15eca39366e6446d"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-after",
+      "maximum_seconds": 10,
+      "ordinal": 30,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/030-runtime-shell-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 280,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/030-runtime-shell-after/stdout",
+        "sha256": "7c6f2027dbdf0df85b673b4b5fa971643f19e189484a791c266ab11e7d2e6961"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 652,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/031-runtime-ghc-after/guard-config.json",
+        "sha256": "2b303cb91f789c23afe15bbec26a09fd9e26d1e32a985afbd2acc52aecaa2209"
+      },
+      "elapsed_seconds": 0.13074171100743115,
+      "exit_code": 0,
+      "global_ordinal": 31,
+      "guard": {
+        "bytes": 1225,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/031-runtime-ghc-after/guard.json",
+        "sha256": "1708ae0627efe589a8a221dab8ab8f619dfec9c04e93715c81da98363f6a41cc"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-after",
+      "maximum_seconds": 10,
+      "ordinal": 31,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/031-runtime-ghc-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7830,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/031-runtime-ghc-after/stdout",
+        "sha256": "774c922c430355bd7d7d0fb5b1ae7e50612227b93a65d1522253c83b45abae6c"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 1,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 661,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/032-runtime-stats-emlf-after/guard-config.json",
+        "sha256": "991d5c34c73bcf54fe0deb077fff7b603be4cab545431898bfda8aa459ffbeba"
+      },
+      "elapsed_seconds": 0.11106109200045466,
+      "exit_code": 0,
+      "global_ordinal": 32,
+      "guard": {
+        "bytes": 1234,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/032-runtime-stats-emlf-after/guard.json",
+        "sha256": "f63b707fdf693562d09f7cf8faf1ddd85d6a1429a2a430765dbfbc7ebfb1021b"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-after",
+      "maximum_seconds": 10,
+      "ordinal": 32,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/032-runtime-stats-emlf-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 345,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/commands/032-runtime-stats-emlf-after/stdout",
+        "sha256": "82f83e09004a1ecef719aae867d5a0798eebf86cc1a39aff9817456eeec0bedd"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 578,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/001-runtime-python-before/guard-config.json",
+        "sha256": "4f1d3c9bd4e3dbd003a6f48697ee3be44314e78d948908e4e013efb652253d05"
+      },
+      "elapsed_seconds": 0.11521445200196467,
+      "exit_code": 0,
+      "global_ordinal": 33,
+      "guard": {
+        "bytes": 1149,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/001-runtime-python-before/guard.json",
+        "sha256": "0a12bedcb1da8e9067771bea0caad2ad044ee3072498b1e470486bba82aae50c"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-before",
+      "maximum_seconds": 10,
+      "ordinal": 1,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/001-runtime-python-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 414,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/001-runtime-python-before/stdout",
+        "sha256": "52f8b37f992f69702ae690aac223d9729bf53d0980122dbeed5e5f96dc5b376e"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 571,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/002-runtime-shell-before/guard-config.json",
+        "sha256": "58c988e1b8cb516171bfb5b8067b985b74bd4225e7399205b1bc9fab629bd348"
+      },
+      "elapsed_seconds": 0.1175149230111856,
+      "exit_code": 0,
+      "global_ordinal": 34,
+      "guard": {
+        "bytes": 1141,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/002-runtime-shell-before/guard.json",
+        "sha256": "5bf5bb66d438ac9c867186a4e81705565dae91ce805a5d303bd3b4fb93e85b07"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-before",
+      "maximum_seconds": 10,
+      "ordinal": 2,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/002-runtime-shell-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 280,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/002-runtime-shell-before/stdout",
+        "sha256": "d555b4ae8ab53f1db86ee5e21a3ab8e348381ccbe61f786fbb882ce429725b4b"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 653,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/003-runtime-ghc-before/guard-config.json",
+        "sha256": "7d5c5eb8b7cdcc33cacbfca492d2d742ab10523a5fa50e043e57d38a96d021bb"
+      },
+      "elapsed_seconds": 0.11031980600091629,
+      "exit_code": 0,
+      "global_ordinal": 35,
+      "guard": {
+        "bytes": 1224,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/003-runtime-ghc-before/guard.json",
+        "sha256": "e7ae31909db944dc31cbef9f0ad73fde00e60f7c94da36f34ae0c401c438d828"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-before",
+      "maximum_seconds": 10,
+      "ordinal": 3,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/003-runtime-ghc-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7830,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/003-runtime-ghc-before/stdout",
+        "sha256": "1881bef48409fad6bb204ede64cddacbd7676ea8a85cded8883ad169337a83fc"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 662,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/004-runtime-stats-emlf-before/guard-config.json",
+        "sha256": "5d1097f4dfce91749e1737b0fefc403fc83080a654bb3352006176183a327dc0"
+      },
+      "elapsed_seconds": 0.11203202698379755,
+      "exit_code": 0,
+      "global_ordinal": 36,
+      "guard": {
+        "bytes": 1233,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/004-runtime-stats-emlf-before/guard.json",
+        "sha256": "ea31ef94e75ebeac78a39086abe9dd094f4b508c034b8253428012b932ad01fd"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-before",
+      "maximum_seconds": 10,
+      "ordinal": 4,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/004-runtime-stats-emlf-before/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 345,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/004-runtime-stats-emlf-before/stdout",
+        "sha256": "42ead27fe0e396bbafc4686161990064527dd06cef02b3a2e070c54e3ee57ced"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 991,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/005-leg-25-higher_order_chain-16-M/guard-config.json",
+        "sha256": "339680f84ef242c8bef7765bdbcda23da4965fd6f179247211f648bfb2114283"
+      },
+      "elapsed_seconds": 0.45012014600797556,
+      "exit_code": 0,
+      "global_ordinal": 37,
+      "guard": {
+        "bytes": 1867,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/005-leg-25-higher_order_chain-16-M/guard.json",
+        "sha256": "d6ce188c12b70728e9deec09e56df7c440300d231aef94df285c0674339b0145"
+      },
+      "kind": "measured_leg",
+      "label": "leg-25-higher_order_chain-16-M",
+      "maximum_seconds": 30,
+      "ordinal": 5,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/005-leg-25-higher_order_chain-16-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/005-leg-25-higher_order_chain-16-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1713,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/006-leg-26-higher_order_chain-16-G/guard-config.json",
+        "sha256": "c53bc0c428f1e2d5b414ebe4f36543ca4e62f641391d5d1122b05ab0486bc037"
+      },
+      "elapsed_seconds": 0.2679744969937019,
+      "exit_code": 0,
+      "global_ordinal": 38,
+      "guard": {
+        "bytes": 2696,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/006-leg-26-higher_order_chain-16-G/guard.json",
+        "sha256": "c2adc487679f621cacb312925dfe1099f1877c80da5a2e3ed85e4c42500743f4"
+      },
+      "kind": "measured_leg",
+      "label": "leg-26-higher_order_chain-16-G",
+      "maximum_seconds": 15,
+      "ordinal": 6,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3422,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/006-leg-26-higher_order_chain-16-G/stderr",
+        "sha256": "e8ff42c42a74bdea0c08c79e1cca418d63397e8a661945e7a5e9f0722103bfcd"
+      },
+      "stdout": {
+        "bytes": 177,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/006-leg-26-higher_order_chain-16-G/stdout",
+        "sha256": "42fbc82a0e17aba000815588cdafe8fe69f5587107d926f29b57d1444a1f1750"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1713,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/007-leg-27-higher_order_chain-16-G/guard-config.json",
+        "sha256": "f4a71076d34cfe2c581f4484c0cd6643532d5d8b6b1b6814a5e642e065480347"
+      },
+      "elapsed_seconds": 0.25023687598877586,
+      "exit_code": 0,
+      "global_ordinal": 39,
+      "guard": {
+        "bytes": 2697,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/007-leg-27-higher_order_chain-16-G/guard.json",
+        "sha256": "02e4de3307591294265567c51faa3eba9d487b4c1db2a420a6c51f8fc3b1b475"
+      },
+      "kind": "measured_leg",
+      "label": "leg-27-higher_order_chain-16-G",
+      "maximum_seconds": 15,
+      "ordinal": 7,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3422,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/007-leg-27-higher_order_chain-16-G/stderr",
+        "sha256": "3dbebf7277e6d766338aea4cce05769a4b851d7c94f62902df0e0e51d8b687dd"
+      },
+      "stdout": {
+        "bytes": 177,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/007-leg-27-higher_order_chain-16-G/stdout",
+        "sha256": "42fbc82a0e17aba000815588cdafe8fe69f5587107d926f29b57d1444a1f1750"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-16/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 991,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/008-leg-28-higher_order_chain-16-M/guard-config.json",
+        "sha256": "c42bdae573c358f9b3c27d8b33ff4cebe4b0e0c3690c76d200c16e11fcdac216"
+      },
+      "elapsed_seconds": 0.3881974140240345,
+      "exit_code": 0,
+      "global_ordinal": 40,
+      "guard": {
+        "bytes": 1888,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/008-leg-28-higher_order_chain-16-M/guard.json",
+        "sha256": "0bb77d118e665b2ddc3008ebf47566bc38c7acc019de3ab1223883c3f7e9034a"
+      },
+      "kind": "measured_leg",
+      "label": "leg-28-higher_order_chain-16-M",
+      "maximum_seconds": 30,
+      "ordinal": 8,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/008-leg-28-higher_order_chain-16-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/008-leg-28-higher_order_chain-16-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 991,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/009-leg-29-higher_order_chain-32-M/guard-config.json",
+        "sha256": "5fdfd450bd84fb710768c2f1a62f640b72630762205c0f597f71253535a9f3dd"
+      },
+      "elapsed_seconds": 0.5541116149979644,
+      "exit_code": 0,
+      "global_ordinal": 41,
+      "guard": {
+        "bytes": 1866,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/009-leg-29-higher_order_chain-32-M/guard.json",
+        "sha256": "5f4ab393d8e41f72066fbb30de0d5e5a1d5e8d1fa5e12ad67acacf934a9d3511"
+      },
+      "kind": "measured_leg",
+      "label": "leg-29-higher_order_chain-32-M",
+      "maximum_seconds": 30,
+      "ordinal": 9,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/009-leg-29-higher_order_chain-32-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/009-leg-29-higher_order_chain-32-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1713,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/010-leg-30-higher_order_chain-32-G/guard-config.json",
+        "sha256": "b4c1ff25a317ea6f8cf2dc1c5da090a4b8072754e797dd7eec272d4fe070c363"
+      },
+      "elapsed_seconds": 0.26096711299032904,
+      "exit_code": 0,
+      "global_ordinal": 42,
+      "guard": {
+        "bytes": 2697,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/010-leg-30-higher_order_chain-32-G/guard.json",
+        "sha256": "a6b826224c79d16a490b1e5c061e8bdfc5847bc47a0caf552dc36139d3ed2e30"
+      },
+      "kind": "measured_leg",
+      "label": "leg-30-higher_order_chain-32-G",
+      "maximum_seconds": 15,
+      "ordinal": 10,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3426,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/010-leg-30-higher_order_chain-32-G/stderr",
+        "sha256": "c880e3fdffe5530825d6275e90b38b88a8a9e64b2a50232255153ed13e3f7331"
+      },
+      "stdout": {
+        "bytes": 177,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/010-leg-30-higher_order_chain-32-G/stdout",
+        "sha256": "e575616087d52e6da20c4bfb162a3709506b40eeb39346be909803d6818dcd2a"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1713,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/011-leg-31-higher_order_chain-32-G/guard-config.json",
+        "sha256": "ebbd01f80efc218195b8b6293b2ff9d769bc98c22e63568dfb7ee1e34a303244"
+      },
+      "elapsed_seconds": 0.12670263802283444,
+      "exit_code": 0,
+      "global_ordinal": 43,
+      "guard": {
+        "bytes": 2699,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/011-leg-31-higher_order_chain-32-G/guard.json",
+        "sha256": "378b4d88c07eac980812fab350509ed6cd9cfc708be9780d9d59f8544bd9b95c"
+      },
+      "kind": "measured_leg",
+      "label": "leg-31-higher_order_chain-32-G",
+      "maximum_seconds": 15,
+      "ordinal": 11,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3426,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/011-leg-31-higher_order_chain-32-G/stderr",
+        "sha256": "9590c0bb66be1cebbea14668915a21f9da9c8d124a78f1b77f5fb5f5d74f4912"
+      },
+      "stdout": {
+        "bytes": 177,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/011-leg-31-higher_order_chain-32-G/stdout",
+        "sha256": "e575616087d52e6da20c4bfb162a3709506b40eeb39346be909803d6818dcd2a"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-32/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 991,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/012-leg-32-higher_order_chain-32-M/guard-config.json",
+        "sha256": "c22f193c5f1b9078095d2b269c5acec73458c67ce8abf9b3b5800b48afb80fad"
+      },
+      "elapsed_seconds": 0.4179487520013936,
+      "exit_code": 0,
+      "global_ordinal": 44,
+      "guard": {
+        "bytes": 1868,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/012-leg-32-higher_order_chain-32-M/guard.json",
+        "sha256": "b6340ca33d5c959bf8fbe4052b2d1156bea8fbecc666ce73e68a56121609207f"
+      },
+      "kind": "measured_leg",
+      "label": "leg-32-higher_order_chain-32-M",
+      "maximum_seconds": 30,
+      "ordinal": 12,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/012-leg-32-higher_order_chain-32-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/012-leg-32-higher_order_chain-32-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 991,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/013-leg-33-higher_order_chain-64-M/guard-config.json",
+        "sha256": "58e2db96925108f35bbdb8d371786ff7bd7d7632d76b077eb841f373ade820ee"
+      },
+      "elapsed_seconds": 0.444148779992247,
+      "exit_code": 0,
+      "global_ordinal": 45,
+      "guard": {
+        "bytes": 1867,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/013-leg-33-higher_order_chain-64-M/guard.json",
+        "sha256": "ad496261a4d722871be1ca858076478f3ac6ab5169fd4d46dc4d4a0ad9d8eb6e"
+      },
+      "kind": "measured_leg",
+      "label": "leg-33-higher_order_chain-64-M",
+      "maximum_seconds": 30,
+      "ordinal": 13,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/013-leg-33-higher_order_chain-64-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/013-leg-33-higher_order_chain-64-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1713,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/014-leg-34-higher_order_chain-64-G/guard-config.json",
+        "sha256": "67bca4e6b3da964ae78962bb5f15b96014a0188ab55000c86a7eac9a978a3011"
+      },
+      "elapsed_seconds": 0.256173800007673,
+      "exit_code": 0,
+      "global_ordinal": 46,
+      "guard": {
+        "bytes": 2697,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/014-leg-34-higher_order_chain-64-G/guard.json",
+        "sha256": "7c298bfdbb64e56a53b68f936901099526cb6e0a0457639d0f852ebefa95d354"
+      },
+      "kind": "measured_leg",
+      "label": "leg-34-higher_order_chain-64-G",
+      "maximum_seconds": 15,
+      "ordinal": 14,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3426,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/014-leg-34-higher_order_chain-64-G/stderr",
+        "sha256": "78ec0b000979c939bc7ae2754776b75523ff6c9863698435b267b88a1df3bf1f"
+      },
+      "stdout": {
+        "bytes": 177,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/014-leg-34-higher_order_chain-64-G/stdout",
+        "sha256": "2a7cd9f82b1c8dc95239d52790197780ece8b566b1e04b169d31f5a2bd1637c9"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1713,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/015-leg-35-higher_order_chain-64-G/guard-config.json",
+        "sha256": "8a34b9d071ce9cf2198b0ded804d86bb1bfebb94fc66135c38db215e36c04859"
+      },
+      "elapsed_seconds": 0.2887096219928935,
+      "exit_code": 0,
+      "global_ordinal": 47,
+      "guard": {
+        "bytes": 2698,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/015-leg-35-higher_order_chain-64-G/guard.json",
+        "sha256": "fa70b0d2fea42035ecfb038f619981340847f1de6021d32ed638f3f48c5e1fc7"
+      },
+      "kind": "measured_leg",
+      "label": "leg-35-higher_order_chain-64-G",
+      "maximum_seconds": 15,
+      "ordinal": 15,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3426,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/015-leg-35-higher_order_chain-64-G/stderr",
+        "sha256": "bd04d2c6508787c86a8f94a9da2e5316c1999c2dc2ce1338e7e85ce97c81a7c7"
+      },
+      "stdout": {
+        "bytes": 177,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/015-leg-35-higher_order_chain-64-G/stdout",
+        "sha256": "2a7cd9f82b1c8dc95239d52790197780ece8b566b1e04b169d31f5a2bd1637c9"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-64/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 991,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/016-leg-36-higher_order_chain-64-M/guard-config.json",
+        "sha256": "0cd23321b0d82540426d1b598c77da957c1f0b358be97f42991ae63cdb7406ad"
+      },
+      "elapsed_seconds": 0.3978132119809743,
+      "exit_code": 0,
+      "global_ordinal": 48,
+      "guard": {
+        "bytes": 1868,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/016-leg-36-higher_order_chain-64-M/guard.json",
+        "sha256": "8b95a806ad1e910d7344ee62b3e90176c2d82da3831ad112626f22baa8d63d45"
+      },
+      "kind": "measured_leg",
+      "label": "leg-36-higher_order_chain-64-M",
+      "maximum_seconds": 30,
+      "ordinal": 16,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/016-leg-36-higher_order_chain-64-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/016-leg-36-higher_order_chain-64-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 994,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/017-leg-37-higher_order_chain-128-M/guard-config.json",
+        "sha256": "6d002a568709ddd1ae1162c195dad70ef5f2f457f40780531405b95f8ac111a0"
+      },
+      "elapsed_seconds": 0.4399434399965685,
+      "exit_code": 0,
+      "global_ordinal": 49,
+      "guard": {
+        "bytes": 1872,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/017-leg-37-higher_order_chain-128-M/guard.json",
+        "sha256": "41178b5dd3a967fbbbe63f853ef47bee4ec2e814076660407a5934258781a923"
+      },
+      "kind": "measured_leg",
+      "label": "leg-37-higher_order_chain-128-M",
+      "maximum_seconds": 30,
+      "ordinal": 17,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/017-leg-37-higher_order_chain-128-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/017-leg-37-higher_order_chain-128-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1719,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/018-leg-38-higher_order_chain-128-G/guard-config.json",
+        "sha256": "8d55ef025884a80387b41f0897634342e474607851fdb89d8fc1a403d0d0b60a"
+      },
+      "elapsed_seconds": 0.26579433798906393,
+      "exit_code": 0,
+      "global_ordinal": 50,
+      "guard": {
+        "bytes": 2706,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/018-leg-38-higher_order_chain-128-G/guard.json",
+        "sha256": "b2e7c27a2e34953b95ae113881c403e231ce17bdb4b423bb9352acedb4c4a50b"
+      },
+      "kind": "measured_leg",
+      "label": "leg-38-higher_order_chain-128-G",
+      "maximum_seconds": 15,
+      "ordinal": 18,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3430,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/018-leg-38-higher_order_chain-128-G/stderr",
+        "sha256": "3c7371eb125739243444e3e89daac026f4f38de7cc561190005ee58361a47fe4"
+      },
+      "stdout": {
+        "bytes": 178,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/018-leg-38-higher_order_chain-128-G/stdout",
+        "sha256": "13074268084aa505332a08281411f43184ff38163ca7092ba7376314977f996f"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1719,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/019-leg-39-higher_order_chain-128-G/guard-config.json",
+        "sha256": "7037b8fb4660c98fca05210c2ee6304cbda6b0010b85a4edea7c714eecef54da"
+      },
+      "elapsed_seconds": 0.26318908101529814,
+      "exit_code": 0,
+      "global_ordinal": 51,
+      "guard": {
+        "bytes": 2706,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/019-leg-39-higher_order_chain-128-G/guard.json",
+        "sha256": "d4085a7844ddd06da46b0b9276994ea086e99651fa3d9f30c6b399026fb460fd"
+      },
+      "kind": "measured_leg",
+      "label": "leg-39-higher_order_chain-128-G",
+      "maximum_seconds": 15,
+      "ordinal": 19,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3430,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/019-leg-39-higher_order_chain-128-G/stderr",
+        "sha256": "98ff97468f2dad9352d1dc65c4d444eff318bd46a7ac1a62b1b47ccb48029fb4"
+      },
+      "stdout": {
+        "bytes": 178,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/019-leg-39-higher_order_chain-128-G/stdout",
+        "sha256": "13074268084aa505332a08281411f43184ff38163ca7092ba7376314977f996f"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-128/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 994,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/020-leg-40-higher_order_chain-128-M/guard-config.json",
+        "sha256": "a254b50ea8080f84a85c7bebf56b90d241b4c15f35aebdf625f93066a75c5be6"
+      },
+      "elapsed_seconds": 0.5435137559834402,
+      "exit_code": 0,
+      "global_ordinal": 52,
+      "guard": {
+        "bytes": 1872,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/020-leg-40-higher_order_chain-128-M/guard.json",
+        "sha256": "824a8a787cd9705a18e3d5dea4a64bf4472c88c9403e515593adfcaa3f7ad06f"
+      },
+      "kind": "measured_leg",
+      "label": "leg-40-higher_order_chain-128-M",
+      "maximum_seconds": 30,
+      "ordinal": 20,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/020-leg-40-higher_order_chain-128-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/020-leg-40-higher_order_chain-128-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 994,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/021-leg-41-higher_order_chain-256-M/guard-config.json",
+        "sha256": "105479883e585ee870ffdcf798af7b145d61f1f61d5db1e0c983392731960cbd"
+      },
+      "elapsed_seconds": 0.5653049889951944,
+      "exit_code": 0,
+      "global_ordinal": 53,
+      "guard": {
+        "bytes": 1872,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/021-leg-41-higher_order_chain-256-M/guard.json",
+        "sha256": "6a42ccbdc5a42e74216a531515b82bdf5cf6ce5c2ac4ad441b44c19eb49446e8"
+      },
+      "kind": "measured_leg",
+      "label": "leg-41-higher_order_chain-256-M",
+      "maximum_seconds": 30,
+      "ordinal": 21,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/021-leg-41-higher_order_chain-256-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/021-leg-41-higher_order_chain-256-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1719,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/022-leg-42-higher_order_chain-256-G/guard-config.json",
+        "sha256": "2385aeaae7ac878c9f793a26fc1d086a97e7a2f01f3c48276fbc5eaac20b4992"
+      },
+      "elapsed_seconds": 0.28951038801460527,
+      "exit_code": 0,
+      "global_ordinal": 54,
+      "guard": {
+        "bytes": 2706,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/022-leg-42-higher_order_chain-256-G/guard.json",
+        "sha256": "5acaaaf0e7680732f39b58c4ce01f4e4e89f93a19c3ac1e869dfd8d510d9d982"
+      },
+      "kind": "measured_leg",
+      "label": "leg-42-higher_order_chain-256-G",
+      "maximum_seconds": 15,
+      "ordinal": 22,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3430,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/022-leg-42-higher_order_chain-256-G/stderr",
+        "sha256": "31a6d199c0d3ae980edd69c4e7323d03dbfa69c4b153e10ef41fbab650bffe85"
+      },
+      "stdout": {
+        "bytes": 178,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/022-leg-42-higher_order_chain-256-G/stdout",
+        "sha256": "ff14d0c33e1dedc71b582df30db47c9ff0cafbe5cd7e353b948efe2ca54c8fd7"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 15,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 1719,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/023-leg-43-higher_order_chain-256-G/guard-config.json",
+        "sha256": "5c7b1b4d7677313cafa73bf035cd18e8894bef55acd8ccb516c4fc0d8af7a5f4"
+      },
+      "elapsed_seconds": 0.26290361798601225,
+      "exit_code": 0,
+      "global_ordinal": 55,
+      "guard": {
+        "bytes": 2706,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/023-leg-43-higher_order_chain-256-G/guard.json",
+        "sha256": "eb388ddcceeeadf452e2207e366183327fa11b1f4bd675176a9e32f1279106a9"
+      },
+      "kind": "measured_leg",
+      "label": "leg-43-higher_order_chain-256-G",
+      "maximum_seconds": 15,
+      "ordinal": 23,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 3430,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/023-leg-43-higher_order_chain-256-G/stderr",
+        "sha256": "a3cbc5e0834c05d847d689ec8bc46454ad9aaeaf3e9e9039e12d69ed9c27c60e"
+      },
+      "stdout": {
+        "bytes": 178,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/023-leg-43-higher_order_chain-256-G/stdout",
+        "sha256": "ff14d0c33e1dedc71b582df30db47c9ff0cafbe5cd7e353b948efe2ca54c8fd7"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/higher_order_chain-256/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 994,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/024-leg-44-higher_order_chain-256-M/guard-config.json",
+        "sha256": "53c5348d768d0a1648d6b3e934c56db071d083df5bff293e331a9337d84b57da"
+      },
+      "elapsed_seconds": 0.7011879720084835,
+      "exit_code": 0,
+      "global_ordinal": 56,
+      "guard": {
+        "bytes": 1872,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/024-leg-44-higher_order_chain-256-M/guard.json",
+        "sha256": "286bb3f8d3011697c7c0707de8e246f9c23ef351ac4546eb42faf372db4873d8"
+      },
+      "kind": "measured_leg",
+      "label": "leg-44-higher_order_chain-256-M",
+      "maximum_seconds": 30,
+      "ordinal": 24,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/024-leg-44-higher_order_chain-256-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/024-leg-44-higher_order_chain-256-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 60,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 964,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/025-leg-45-foundation14-M/guard-config.json",
+        "sha256": "78ede12fc42a57a81453ea9566d0a9694472ad442f1dcffc1c13dadfb55a66a3"
+      },
+      "elapsed_seconds": 20.807319009007188,
+      "exit_code": 0,
+      "global_ordinal": 57,
+      "guard": {
+        "bytes": 1855,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/025-leg-45-foundation14-M/guard.json",
+        "sha256": "b4dc3be708aa85c5aab7ed51a6ba835821cff36e36c7a889c96a07df30bfa2a2"
+      },
+      "kind": "measured_leg",
+      "label": "leg-45-foundation14-M",
+      "maximum_seconds": 60,
+      "ordinal": 25,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/025-leg-45-foundation14-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/025-leg-45-foundation14-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 3518,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/026-leg-46-foundation14-G/guard-config.json",
+        "sha256": "79ae3066619c97384363bc00ed9adb965ae3ecc10cc6acfb17c154834185f674"
+      },
+      "elapsed_seconds": 0.683273189002648,
+      "exit_code": 0,
+      "global_ordinal": 58,
+      "guard": {
+        "bytes": 4549,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/026-leg-46-foundation14-G/guard.json",
+        "sha256": "c390e486de64ab4c16a09749616f81a36169c64e22e8238719b43353f4ce6e5d"
+      },
+      "kind": "measured_leg",
+      "label": "leg-46-foundation14-G",
+      "maximum_seconds": 30,
+      "ordinal": 26,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 35279,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/026-leg-46-foundation14-G/stderr",
+        "sha256": "8356e906ec7d40545bb445012fa8aac0eb98b4d350312a4bb3fc6c6ddf795f57"
+      },
+      "stdout": {
+        "bytes": 2543,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/026-leg-46-foundation14-G/stdout",
+        "sha256": "9c18cf3e1eb7ad3e8e5405a40ac82d36511fd3f6b717386bf7faacbd015f976a"
+      }
+    },
+    {
+      "actual_argv": [
+        "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+        "--make",
+        "-j1",
+        "-O2",
+        "-fforce-recomp",
+        "-fpedantic-bottoms",
+        "-fno-state-hack",
+        "-v",
+        "-package-env",
+        "-",
+        "-clear-package-db",
+        "-global-package-db",
+        "-package-db",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+        "-no-user-package-db",
+        "-hide-all-packages",
+        "-package",
+        "base",
+        "-package",
+        "mlf-shape-primitives",
+        "-i",
+        "-i<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14",
+        "-odir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/objects",
+        "-hidir",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/objects",
+        "-fno-code",
+        "-fwrite-interface",
+        "-no-link",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+        "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+        "+RTS",
+        "-s<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/ghc.stats",
+        "-RTS"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 30,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 3518,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/027-leg-47-foundation14-G/guard-config.json",
+        "sha256": "61a26b053aa05081cafa0fd9de1ed09553d9dc4a56122b28b2910ebb13b4dc73"
+      },
+      "elapsed_seconds": 0.6950349940161686,
+      "exit_code": 0,
+      "global_ordinal": 59,
+      "guard": {
+        "bytes": 4550,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/027-leg-47-foundation14-G/guard.json",
+        "sha256": "5cc4f119e1f54e8c3be222703671261d2377e0cb1c39e3e00d21e382ed98a608"
+      },
+      "kind": "measured_leg",
+      "label": "leg-47-foundation14-G",
+      "maximum_seconds": 30,
+      "ordinal": 27,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 35279,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/027-leg-47-foundation14-G/stderr",
+        "sha256": "54142e8a840aa569f07c82d9c19a5fdb69a3c42f1f7fab6514b694d46f40ea22"
+      },
+      "stdout": {
+        "bytes": 2543,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/027-leg-47-foundation14-G/stdout",
+        "sha256": "9c18cf3e1eb7ad3e8e5405a40ac82d36511fd3f6b717386bf7faacbd015f976a"
+      }
+    },
+    {
+      "actual_argv": [
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+        "--compile-crate",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/crate.spec",
+        "-o",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/active/cells/foundation14/unit"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 60,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 964,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/028-leg-48-foundation14-M/guard-config.json",
+        "sha256": "7aa388476938e22819d7f9f207bc1a12b0796f338ed2a1e54d761a4c43abb1bc"
+      },
+      "elapsed_seconds": 21.37898243701784,
+      "exit_code": 0,
+      "global_ordinal": 60,
+      "guard": {
+        "bytes": 1877,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/028-leg-48-foundation14-M/guard.json",
+        "sha256": "ebc00c47f417b61601d617a8cd561bd6528ce85365c6bf6fed68c029dbce38ef"
+      },
+      "kind": "measured_leg",
+      "label": "leg-48-foundation14-M",
+      "maximum_seconds": 60,
+      "ordinal": 28,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/028-leg-48-foundation14-M/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/028-leg-48-foundation14-M/stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/python3.13"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 577,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/029-runtime-python-after/guard-config.json",
+        "sha256": "bc9eb5d17b9c1de29eb8e3847338b7ae80ade003324620186bb2c51f78c52da0"
+      },
+      "elapsed_seconds": 0.21117108798353001,
+      "exit_code": 0,
+      "global_ordinal": 61,
+      "guard": {
+        "bytes": 1150,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/029-runtime-python-after/guard.json",
+        "sha256": "80c3b4c498203740bcc9afee71217585c65a7716860fcda8066d41b8a947b34f"
+      },
+      "kind": "runtime",
+      "label": "runtime-python-after",
+      "maximum_seconds": 10,
+      "ordinal": 29,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/029-runtime-python-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 414,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/029-runtime-python-after/stdout",
+        "sha256": "68c774de0616ba6cfee0a8a8ca8f116cdde1280ea9d57d7041547c3198b1aecf"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "/usr/bin/bash"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 570,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/030-runtime-shell-after/guard-config.json",
+        "sha256": "bd2a85fd91d208431c50cafddd3f5b41e1c98f52248e387b63e2037dd1f69925"
+      },
+      "elapsed_seconds": 0.1882555559859611,
+      "exit_code": 0,
+      "global_ordinal": 62,
+      "guard": {
+        "bytes": 1142,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/030-runtime-shell-after/guard.json",
+        "sha256": "fab0d3adf0b961aa9bad935b78d9e6b672be44005e08223d1647ee181c829061"
+      },
+      "kind": "runtime",
+      "label": "runtime-shell-after",
+      "maximum_seconds": 10,
+      "ordinal": 30,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/030-runtime-shell-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 280,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/030-runtime-shell-after/stdout",
+        "sha256": "013a2a45102baadab6fc0b86053e890901eada5372568c3aaedc94d93e09d41c"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<GHC_TOOLCHAIN>/ghc/lib/ghc-9.14.1/bin/ghc-9.14.1"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 652,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/031-runtime-ghc-after/guard-config.json",
+        "sha256": "62a35642c03b73e28f7d322b883e5d3129a43405e3e17b30895ffc6ebb697d76"
+      },
+      "elapsed_seconds": 0.18264295501285233,
+      "exit_code": 0,
+      "global_ordinal": 63,
+      "guard": {
+        "bytes": 1225,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/031-runtime-ghc-after/guard.json",
+        "sha256": "1312ff83f49feb05cf07ea93aae17365f611ac33fe6510d867e80d5312d79e66"
+      },
+      "kind": "runtime",
+      "label": "runtime-ghc-after",
+      "maximum_seconds": 10,
+      "ordinal": 31,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/031-runtime-ghc-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 7830,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/031-runtime-ghc-after/stdout",
+        "sha256": "60a84cdc070b3ad6321894d7449a2735d995541a9346b5d1b8c8f3ca4efe0f5e"
+      }
+    },
+    {
+      "actual_argv": [
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+        "--list",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf"
+      ],
+      "actual_guard_cwd": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+      "actual_seconds": 10,
+      "block": 2,
+      "cleanup": true,
+      "complete": true,
+      "config": {
+        "bytes": 661,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/032-runtime-stats-emlf-after/guard-config.json",
+        "sha256": "453fe8f13131db63608b44f6634a7b6f8cb0360bd9e459c9f9a2bd9ce54772e6"
+      },
+      "elapsed_seconds": 0.1646068819973152,
+      "exit_code": 0,
+      "global_ordinal": 64,
+      "guard": {
+        "bytes": 1233,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/032-runtime-stats-emlf-after/guard.json",
+        "sha256": "c533820400c651ccce7315dd6d0d17b3ae4c6461c9b98afc67b4b57b2ee6cfff"
+      },
+      "kind": "runtime",
+      "label": "runtime-stats-emlf-after",
+      "maximum_seconds": 10,
+      "ordinal": 32,
+      "raw_byte_pins_preserved": true,
+      "stderr": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/032-runtime-stats-emlf-after/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 345,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/commands/032-runtime-stats-emlf-after/stdout",
+        "sha256": "dcbd7ad96492e5da21b868f09c627313e955f09190b9ec600935bc70bb954050"
+      }
+    }
+  ],
+  "runtime_support_commands": 16
+}

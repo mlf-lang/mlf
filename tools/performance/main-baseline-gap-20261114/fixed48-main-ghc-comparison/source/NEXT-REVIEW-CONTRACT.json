@@ -1,0 +1,42 @@
+{
+  "actual_pins_exact_roles": [
+    "controller",
+    "worker",
+    "outer",
+    "config",
+    "watchdog",
+    "admission",
+    "claim",
+    "epoch",
+    "launch_binding",
+    "build_log",
+    "prepare_attempt"
+  ],
+  "actual_pins_root": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01",
+  "block1_report_path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-actual-review/report.json",
+  "combined_qualification_review": {
+    "bytes": 18702,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+    "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+  },
+  "cumulative_ns": "717873335365 + actual elapsed_ns",
+  "elapsed_ns": "actual returned-call integer ns <=600000000000",
+  "first24_only": true,
+  "no_actual_values_created": true,
+  "no_future_PASS": true,
+  "not_a_report": true,
+  "required_block": 1,
+  "required_blockers": [],
+  "required_phase": "SAMPLE1",
+  "required_schema": "main-gap-sampling-actual-review-v1",
+  "required_true": [
+    "complete",
+    "actual_sampling_stage_passed",
+    "cleanup_lease_locks"
+  ],
+  "schema": "main-gap-sampling-prospective-actual-review-contract-v1",
+  "scope_directories": "fullpin of sorted unique relative-to-sampling-01 directory string JSON array, excluding dot/root",
+  "scope_inventory": "fullpin of JSON array of all immutable completed sampling-01 files, including final lifecycle files",
+  "second24_not_preaccepted": true,
+  "source_package_manifest": "actual frozen sampling MANIFEST fullpin"
+}

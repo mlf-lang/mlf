@@ -1,0 +1,86 @@
+{
+  "None_nonpositive_noninteger_size_no_normalization": true,
+  "actual_combined_review": {
+    "bytes": 11532,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-final.json",
+    "sha256": "33829f5e71c9a1ed5cc530566450ef06d473dba8de4b5abbc6c554657983c408"
+  },
+  "blockers": [],
+  "cell_count": 12,
+  "checks": [
+    "frozen final/reducer manifests and exact onepredicate None/nonpositive/noninteger fix; reducer not run",
+    "all48 reducer rows and public CSV exactly match already-reviewed observations, evidence pins and every metric",
+    "all12 per-endpoint means,7 mean ratios,per-size/per-source-byte values,and16 adjacent gradient rows independently recomputed",
+    "Foundation shares and ratios plus complete ladder findings and displayed rounding correct; honest endpoint/two-observation/complexity boundaries"
+  ],
+  "complete": true,
+  "exact_all16_gradient_rows": true,
+  "exact_all48_observations": true,
+  "exact_all_means_normalizations_and_ratios": true,
+  "exact_foundation_and_ladder_findings": true,
+  "interpretation": {
+    "GHC_parity_claimed": false,
+    "MUT_algorithm_attribution_claimed": false,
+    "asymptotic_complexity_proved": false,
+    "baseline_subtraction_or_first_sample_discarded": false,
+    "lifecycle_durations_used_as_metrics": false,
+    "stable_speedup_or_significance_claimed": false,
+    "two_observations_per_endpoint_cell": true
+  },
+  "key_observations": {
+    "Foundation_G_Total_CPU_mean": 0.545,
+    "Foundation_M_GC_share": 0.17967044827668913,
+    "Foundation_M_MUT_share": 0.8202575971985705,
+    "Foundation_M_Total_CPU_mean": 20.8465,
+    "Foundation_M_over_G_Total_CPU_mean_ratio": 38.250458715596324,
+    "ratios_are_different_endpoints_not_equivalent_work": true
+  },
+  "new_samples": 0,
+  "observation_count": 48,
+  "presentation_note": {
+    "another_measurement_or_sourcegate_needed": false,
+    "blocking": false,
+    "current_status_source": {
+      "bytes": 3469,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final/report.json",
+      "sha256": "22206fa0769fc821baffad0a64f7cbf0f6cd4edc218f63a0dd0abca5468e2a79"
+    },
+    "generic_results_pending_is_not_current_status": true,
+    "minimal_public_recommendation": "Use SUMMARY.md/report.json as the public landing entry. If linking or displaying results.md/results.json directly, prepend an external caption: \u201cThe fixed48 observations passed independent combined review 33829f5e\u2026; the reducer\u2019s pending placeholder is a retained template, not current review status.\u201d Keep original frozen files unchanged."
+  },
+  "reducer_v2_manifest": {
+    "bytes": 1041,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-v2-source/MANIFEST.json",
+    "sha256": "28ac7cd3a67df5d3bcef01b42d6b277e1386ca21d8ef01342bf26241834d840d"
+  },
+  "review_program": {
+    "bytes": 14104,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final-independent-review/review.py",
+    "sha256": "b13033107e84a12caf0d6febc69ecd08f5b5c2b30367e7ce94558fb3183781f5"
+  },
+  "reviewed_combined_sample_inventory": {
+    "bytes": 169268,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-samples.json",
+    "sha256": "755b70380b925c3f5c6c175af0c946e1f6e05761f9be13669734b6d2f1bb2be1"
+  },
+  "schema": "main-gap-sampling-summary-independent-review-v1",
+  "scope": "Read-only numerical/presentation cross-check, not a new actual-execution or full source gate. No prior targets or48-leg lifecycle repeated.",
+  "source_delta_only_positive_integer_size_predicate": true,
+  "source_or_target_execution": false,
+  "summary_manifest": {
+    "bytes": 2529,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final/MANIFEST.json",
+    "sha256": "66b31ad252834302fba43442c8ff00b81f3a757267940f83c10ef1da3e88af2a"
+  },
+  "summary_markdown": {
+    "bytes": 3989,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final/SUMMARY.md",
+    "sha256": "f870587ac6a4b883f1a8cf9299c8783675d503c1931bbe19f5e52f64c8c5898c"
+  },
+  "summary_report": {
+    "bytes": 3469,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final/report.json",
+    "sha256": "22206fa0769fc821baffad0a64f7cbf0f6cd4edc218f63a0dd0abca5468e2a79"
+  },
+  "summary_review_passed": true
+}

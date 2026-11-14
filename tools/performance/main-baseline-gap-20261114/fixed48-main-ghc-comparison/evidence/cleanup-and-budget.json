@@ -1,0 +1,140 @@
+{
+  "blocks": [
+    {
+      "block": 1,
+      "bounded_original": {
+        "artifact": "main-gap-setup-run04/sampling-01/bounded-receipt.json",
+        "bytes": 120237,
+        "sha256": "98a7e4eaddff64958767c48f4d599ff15ecd80f0acba4881436432da0a102df2"
+      },
+      "budget": {
+        "budget_passed": true,
+        "cumulative_ns": 864743934024,
+        "elapsed_ns": 146870598659,
+        "elapsed_valid": true,
+        "includes_outer_cleanup_time": true,
+        "original_guard_elapsed_seconds_excludes_cleanup": 146.70189464100986,
+        "post_setup_maximum_ns": 1800000000000,
+        "prior_ns": 717873335365,
+        "sampling_cumulative_ns": 146870598659,
+        "sampling_maximum_ns": 1200000000000,
+        "stage_maximum_ns": 600000000000
+      },
+      "controller_original": {
+        "artifact": "main-gap-setup-run04/sampling-01/controller.json",
+        "bytes": 7782,
+        "sha256": "e6415b7c8a52f72b979169b6e3d6e6033e8998c02ee7c6c53ceafecd2f14e185"
+      },
+      "outer": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 146.70189464100986,
+        "exit_code": 0,
+        "lease_cleared": true,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "lock_reacquired": true,
+        "reason": null,
+        "seconds": 600
+      },
+      "outer_original": {
+        "artifact": "main-gap-setup-run04/sampling-01/outer/guard.json",
+        "bytes": 4539,
+        "sha256": "d3befe0741208317bf68a80e3fff80fd9b6249557079e61704a2c383be10e03b"
+      },
+      "raw_equality_exceptions": 0,
+      "review_scope_directories": 167,
+      "review_scope_files": 3243,
+      "worker_original": {
+        "artifact": "main-gap-setup-run04/sampling-01/sampling-receipt.json",
+        "bytes": 3913506,
+        "sha256": "7260cb7eb59b8446802ee58c526e1986acea3021aa9c145b955e6e60a67cc656"
+      }
+    },
+    {
+      "block": 2,
+      "bounded_original": {
+        "artifact": "main-gap-setup-run04/sampling-02/bounded-receipt.json",
+        "bytes": 189737,
+        "sha256": "3c03db668176e5c0814d6c16e9d9b507686178860abb066610af7031c95f0466"
+      },
+      "budget": {
+        "budget_passed": true,
+        "cumulative_ns": 1099706496775,
+        "elapsed_ns": 234962562751,
+        "elapsed_valid": true,
+        "includes_outer_cleanup_time": true,
+        "original_guard_elapsed_seconds_excludes_cleanup": 234.74652971400064,
+        "post_setup_maximum_ns": 1800000000000,
+        "prior_ns": 864743934024,
+        "sampling_cumulative_ns": 381833161410,
+        "sampling_maximum_ns": 1200000000000,
+        "stage_maximum_ns": 600000000000
+      },
+      "controller_original": {
+        "artifact": "main-gap-setup-run04/sampling-02/controller.json",
+        "bytes": 7772,
+        "sha256": "74785f42f2e7f2d2876fbacc097372da7c07c2981e1a89712c4830951711fa94"
+      },
+      "outer": {
+        "cleanup": true,
+        "complete": true,
+        "elapsed_seconds": 234.74652971400064,
+        "exit_code": 0,
+        "lease_cleared": true,
+        "limits": {
+          "address_space": 6442450944,
+          "free_disk": 5368709120,
+          "host_available": 3221225472,
+          "output": 4294967296,
+          "tree_rss": 5368709120
+        },
+        "lock_reacquired": true,
+        "reason": null,
+        "seconds": 600
+      },
+      "outer_original": {
+        "artifact": "main-gap-setup-run04/sampling-02/outer/guard.json",
+        "bytes": 4494,
+        "sha256": "e8990f31453e03e7f4b1dc458c9b6dce3e8bb523251af609f666cd9522009274"
+      },
+      "raw_equality_exceptions": 0,
+      "review_scope_directories": 169,
+      "review_scope_files": 4155,
+      "worker_original": {
+        "artifact": "main-gap-setup-run04/sampling-02/sampling-receipt.json",
+        "bytes": 4873374,
+        "sha256": "65a73e987be5a2af2c8cd4823bb873c44e7befdd6a682dcf32923bda5c99f14a"
+      }
+    }
+  ],
+  "combined_budget": {
+    "SAMPLE1_ns": 146870598659,
+    "SAMPLE2_ns": 234962562751,
+    "authoritative_clock": "monotonic_ns",
+    "authoritative_interval": "entire original guard.run_guard call through return including cleanup",
+    "both_caps_passed": true,
+    "completion_ns": 121226195039,
+    "failed_SEMANTIC_ns": 596647140326,
+    "original_guard_elapsed_seconds_excludes_cleanup": 234.74652971400064,
+    "outer_cap_per_block_ns": 600000000000,
+    "post_setup_ceiling_ns": 1800000000000,
+    "post_setup_cumulative_ns": 1099706496775,
+    "post_setup_unused_ns": 700293503225,
+    "qualification_ns": 717873335365,
+    "sampling_ceiling_ns": 1200000000000,
+    "sampling_cumulative_ns": 381833161410,
+    "sampling_unused_ns": 818166838590,
+    "unused_budget_is_not_authorization_for_more_targets": true,
+    "worker_deadline_per_block_ns": 595000000000
+  },
+  "lifecycle_intervals_not_compiler_performance": true,
+  "no_process_or_lease_identifiers_exported": true,
+  "old_SEMANTIC_remains_failed": true,
+  "unused_budget_not_new_target_authorization": true
+}

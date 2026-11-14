@@ -1,0 +1,11 @@
+--- v1/reduce.py
++++ v2/reduce.py
+@@ -56,7 +56,7 @@
+     need(len(rows)==2,'exact two observations per endpoint/cell')
+     means={k:sum(r['metrics'][k] for r in rows)/2 for k in METRICS}
+     return dict(status=rows[0]['review_status'],observations=rows,mean=means,
+-                per_size={k:[r['metrics'][k]/n for r in rows] for k in METRICS} if n>0 else None,
++                per_size={k:[r['metrics'][k]/n for r in rows] for k in METRICS} if type(n) is int and n>0 else None,
+                 per_source_byte={k:[r['metrics'][k]/source_bytes for r in rows] for k in METRICS})
+ 
+ def read_block(desc, expected, source_manifest, qualification):

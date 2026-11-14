@@ -1,0 +1,345 @@
+{
+  "original": {
+    "artifact": "main-gap-sampling-v1-source-review/report.json",
+    "bytes": 16162,
+    "sha256": "c51c78e6c71e19e18ea53e783b1f5022d55869160808e23f132b000a53467f08"
+  },
+  "original_manifest": {
+    "artifact": "main-gap-sampling-v1-source-review/MANIFEST.json",
+    "bytes": 2333,
+    "sha256": "15e61e4e3fa8ebd247c6e69ed34cdec8d0e7f4796b86bc277956b07f85b8d98f"
+  },
+  "report": {
+    "activation": {
+      "SAMPLE2": "Only after separately accepted actual first-block11pins/report, full-scope inventory and whole next600 budget; same enabled bytes in exact sampling-02 scope, no other basename.",
+      "contract": {
+        "bytes": 1697,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/ACTIVATION-CONTRACT.json",
+        "sha256": "93cc3c0078c91fb24187a58230273fb0880f7159484941006fe79e65c5960328"
+      },
+      "create_only_current_scope": true,
+      "disabled_controller": {
+        "bytes": 67370,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/controller.py",
+        "sha256": "c8a9fa91ec155acaa387ca5143e82353f95eb1a4181f64c3bb5bdc040ddd18e3"
+      },
+      "disabled_snapshot": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.disabled.py",
+      "do_not_precreate_sampling02": true,
+      "enabled_bytes": 67369,
+      "enabled_destination": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.py",
+      "enabled_sha256": "19c3fa8dbea246c89ad1ca139dc11542067770a691de8aecb4d2529c8d050a96",
+      "first_scope": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01",
+      "independent_mechanical_activation_review_required": true,
+      "inner_watchdog_direct_execution_allowed": false,
+      "only_delta": "unique READY = False line becomes READY = True",
+      "sole_prepare_argv": [
+        "/usr/bin/python3.13",
+        "-B",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.py",
+        "prepare",
+        "SAMPLE1",
+        "--source-review",
+        "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/report.json",
+        "--source-review-sha256",
+        "<actual frozen report SHA>",
+        "--prior-review",
+        "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+        "--prior-review-sha256",
+        "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+      ],
+      "sole_run_form": [
+        "/usr/bin/python3.13",
+        "-B",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.py",
+        "run",
+        "SAMPLE1",
+        "--admission",
+        "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/coordination/SAMPLE1-admission.json",
+        "--sha256",
+        "<actual admission SHA>"
+      ]
+    },
+    "actual_sampling_passed": false,
+    "admission_epoch_claim_created": false,
+    "author_check_counts_not_used_as_independent_pass": true,
+    "author_report": {
+      "bytes": 4659,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/report.json",
+      "sha256": "28c61a9ce8e7ba1e97c27dedbb0c34bba3e93417b9d4aa8851b75e59d5d4300b"
+    },
+    "blockers": [],
+    "budget": {
+      "SAMPLE2_requires_real_independent_SAMPLE1_actual_report": true,
+      "block1_actual_elapsed_max_to_reserve_full_block2_ns": 482126664635,
+      "completion_ns": 121226195039,
+      "entire_returned_guard_call_including_cleanup_authoritative": true,
+      "first_entry_reserved_total_ns": 1317873335365,
+      "insufficient_remaining_fullcap_means_stop": true,
+      "next_full_cap_checked_before_prepare_first_effect": true,
+      "no_future_actual_report_or_duration_created": true,
+      "nominal_child_cap_sums_not_execution_guarantee": true,
+      "old_failed_ns": 596647140326,
+      "per_block_outer_ns": 600000000000,
+      "per_block_shared_deadline_ns": 595000000000,
+      "post_setup_ceiling_ns": 1800000000000,
+      "qualification_prior_ns": 717873335365,
+      "sampling_ceiling_ns": 1200000000000
+    },
+    "checks": {
+      "bytes": 1769,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/checks.json",
+      "sha256": "a31d4d68bd8057065d9164a603f7aeca9dd91ed73e3ef1cb055dd742833ad258"
+    },
+    "code_pins": {
+      "controller.py": {
+        "bytes": 67370,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/controller.py",
+        "sha256": "c8a9fa91ec155acaa387ca5143e82353f95eb1a4181f64c3bb5bdc040ddd18e3"
+      },
+      "sampling_contract.py": {
+        "bytes": 3848,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/sampling_contract.py",
+        "sha256": "b802d7d03a00b6da52e5395863edff65335c3a8b10855a7dbbb8b84b104efdff"
+      },
+      "sampling_worker.py": {
+        "bytes": 15279,
+        "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/sampling_worker.py",
+        "sha256": "508c17765753bd2c5716d2b6569edf234204d395fc36a456954d522e00be567f"
+      }
+    },
+    "combined_qualification_review": {
+      "bytes": 18702,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+      "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+    },
+    "combined_qualification_review_manifest": {
+      "bytes": 5088,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/MANIFEST.json",
+      "sha256": "495205f35150d5d00cfe15f373eab1c4619af2551baf0b0c972584d8479426e5"
+    },
+    "complete": true,
+    "configuration": {
+      "bytes": 36732,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/BINDINGS.json",
+      "sha256": "390afb62366ad7159d21f976cc3acee0869928ac4c4afd24ede71f5c6a78adfb"
+    },
+    "current_inputs_checked": {
+      "actual_combined_cells": 12,
+      "actual_qualification_RTS": 24,
+      "all_current_real_raw_oracles_names_and_bytes_checked": true,
+      "completed_historical_epochs_preserved_not_reinvented": true,
+      "hash_method": "Read-only actual serialized consumer with memoized full SHA per path, unchanged metadata verified on repeat. No per-child whole dependency rehash.",
+      "original_failed_semantic_remains_failed": true,
+      "unique_fullpins": 14382,
+      "whole_preserved_E_directories": 490,
+      "whole_preserved_E_files": 7868
+    },
+    "finalization_program": {
+      "bytes": 12396,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/finalize.py",
+      "sha256": "784ffae028232f3a3f1856e6902570aa83670af90eab2cb015dfd5f1931300dd"
+    },
+    "fixed_experiment": {
+      "GHC_exact_qualified_typed_interfaces_noobject_orlink": true,
+      "block1_cells": [
+        "baseline-0",
+        "flat_functions-16",
+        "flat_functions-32",
+        "flat_functions-64",
+        "flat_functions-128",
+        "flat_functions-256"
+      ],
+      "block2_cells": [
+        "higher_order_chain-16",
+        "higher_order_chain-32",
+        "higher_order_chain-64",
+        "higher_order_chain-128",
+        "higher_order_chain-256",
+        "foundation14"
+      ],
+      "blocks": 2,
+      "cells": [
+        "baseline-0",
+        "flat_functions-16",
+        "flat_functions-32",
+        "flat_functions-64",
+        "flat_functions-128",
+        "flat_functions-256",
+        "higher_order_chain-16",
+        "higher_order_chain-32",
+        "higher_order_chain-64",
+        "higher_order_chain-128",
+        "higher_order_chain-256",
+        "foundation14"
+      ],
+      "child_commands_each": 32,
+      "exact_ordered_fresh0reuse_queries": true,
+      "frozen_oracle_cannot_be_rebased_from_samples": true,
+      "mandatory_RTS_each": 24,
+      "measured_legs": 48,
+      "measured_legs_each": 24,
+      "no_compiler_identity_or_path_or_CRC_normalization": true,
+      "order_per_cell": [
+        "M",
+        "G",
+        "G",
+        "M"
+      ],
+      "reference_or_show_or_formula_or_build_rerun": false,
+      "runtime_support_each": 8,
+      "same_actual_qualified_argv_all48": true,
+      "same_binary_full_raw_exception_count": 0,
+      "same_binary_full_raw_gate": true,
+      "total_RTS": 48,
+      "total_child_commands": 64,
+      "unplanned_sample_or_retry": false
+    },
+    "future_actual_review_contract": {
+      "bytes": 1653,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/NEXT-REVIEW-CONTRACT.json",
+      "sha256": "3f4be1f17f2e26e79e0f691dd71bf44bdf22f1a48d919d3fb0227ed1d919456f"
+    },
+    "independent_negative_cases": 30,
+    "independent_positive_groups": 9,
+    "inherited_and_delta": {
+      "bytes": 691,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/inherited-and-delta.json",
+      "sha256": "3435cb8931ddb3dc243fea8bf3142bd79fdf483de14c626eb28979ba8abd0c87"
+    },
+    "inherited_completion_source_manifest": {
+      "bytes": 4409,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/MANIFEST.json",
+      "sha256": "2beaafaf998da6e3e7b5b3b9e284831eebd53062e1b7610aeca6ff05160f1c57"
+    },
+    "inherited_completion_source_review": {
+      "bytes": 13444,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/report.json",
+      "sha256": "483e491550640505ab48f49c8c821a46a374af555c653e485f1f5b6ac3af7d15"
+    },
+    "intermediate_attestation_scope": {
+      "assessment": "Non-blocking under the explicitly cooperative-writer/advisory-lock policy: persistent drift fails final static validation; no claim of continuous attestation or privileged malicious write/restore resistance. Actual same-binary target artifacts still require full raw equality each leg.",
+      "boundary_full_SHA": true,
+      "difference_is_not_hidden_as_byte_identical_middle_policy": true,
+      "global_package_directory_and_ld_so_preload_absence": "Checked in static_inputs at prepare/validate entry and return boundaries, not separately in every sampling-worker middle recheck. Completion worker previously did these two additional middle checks.",
+      "middle_complete_old_E_names_and_types": true,
+      "middle_metadata_all_entry_and_new_archive_files": true,
+      "middle_original_claim_identity": true,
+      "middle_recorded_runtime_link_chain_and_ld_so_conf_d_lists": true
+    },
+    "limitations": [
+      "Two observations per endpoint/cell are exploratory and do not establish stable wall speedup, statistical significance or asymptotic bounds.",
+      "Fresh application/query caches do not imply cold OS caches; no cache dropping is permitted by this source gate.",
+      "GHC typed-only and MLF frontend are distinct endpoint scopes. No native parity or whole-CI/promotion result is inferred.",
+      "Rounded process RTS CPU/GC/elapsed and child guard duration are distinct; exact target wall_ns and user/system splits remain null.",
+      "Runtime graph visit/copy/constraint counters are not implemented; publication query rows are not substitutes.",
+      "Current source PASS is not a performance result or actual admission. Original failed SEMANTIC remains failed."
+    ],
+    "native_generation_AB_fixedpoint": false,
+    "original_binary": {
+      "bytes": 20192216,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+      "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+    },
+    "original_helper_module_entrypoint_runtime_loader_guard_lock_compiler_or_target_executed": false,
+    "preserved_protocol": {
+      "actual_current_boot_dual_lock_held73_free0_protocol": true,
+      "all_source_tool_runtime_and_environment_pins": true,
+      "commands_parent_created_before_first_child": true,
+      "common_deadline_immutable_same_admission_epoch_argv": true,
+      "guard_return_file_and_rowhash_same_envelope": true,
+      "inherited_AST_exact_functions": [
+        "require",
+        "safe",
+        "sha",
+        "pin",
+        "verify_pin",
+        "load",
+        "save",
+        "module",
+        "source_check",
+        "row_sha",
+        "resource_snapshot",
+        "completed_epoch_identity",
+        "interface",
+        "tree_pins",
+        "directory_paths",
+        "runtime_module",
+        "accepted_setup",
+        "verify_setup_file_set",
+        "worker_output_pins"
+      ],
+      "new_scope_and_single_current_original_active_path_only": true,
+      "no_live_outer_watchdog_worker_receipt_selfpin": true,
+      "no_old_scope_file_write_or_move": true,
+      "one_use_claim_original_launch_binding_fullpin_entry_middle_exit": true,
+      "original_guard_runtime_identity_wire_and_RTS_parser_bytes": true,
+      "per_leg_fresh_queries_or_objects_and_complete_archive_restore": true,
+      "positive_worker_output_roots": [
+        "commands",
+        "legs"
+      ],
+      "real_guard_ancestry_lease_and_lock_ownership": true,
+      "runtime_beforeafter_four_roles": [
+        "python",
+        "shell",
+        "ghc",
+        "stats-emlf"
+      ],
+      "single_original_outer_guard_call_per_block": true,
+      "source_gate_and_exact_READY_only_inverse": true
+    },
+    "pure_negative_scope": [
+      "invalid/bool/reset/negative or over-cap duration inputs",
+      "next complete600 cap cannot fit including one-nanosecond boundary",
+      "SAMPLE2 cannot consume combined review as fake SAMPLE1",
+      "wrong cell/lane/order/cap/missing leg or unaccepted qualification",
+      "changed frozen witness path or crate",
+      "extra old scope root/directory, old content drift, unexpected sibling sampling scope and symlink"
+    ],
+    "resolved_ledger": {
+      "bytes": 97094,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/resolved-ledger.json",
+      "sha256": "18750c56ec8f7b4f5c0da0f134bf648580156cab84c2e14618a25a4379d0edee"
+    },
+    "review_program": {
+      "bytes": 19617,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/review.py",
+      "sha256": "79b7674b29a63f8dc88d4d6b203dd698e4f4fea2007474ac47280c5edfec2f36"
+    },
+    "reviewer_corrections": {
+      "bytes": 396,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/reviewer-corrections.json",
+      "sha256": "b5f4a40b0975c48139e23bee4d830935b1e8696febf227a7151667fce07ce0d9"
+    },
+    "runtime_obligations": [
+      "Fresh resources, current epoch, actual same-file locks, one-use claim, outer-only launch and all original lifecycle checks must genuinely pass for each separately admitted block.",
+      "All32 actual child guards,24 raw RTS and24 exact leg order/data must be preserved; missing/failed/uncertain result stops without replacement or partial-success claim.",
+      "Full raw B and G artifact names/bytes must match the already qualified same binaries for every leg, including CURRENT, generation filenames, query content and interface bytes; no cross-binary exception.",
+      "Original logical active path/spec preserved, caches/objects fresh for each leg, reports archived and scratch/TMP empty after commands.",
+      "Actual returned guard-call ns including cleanup charged to both ceilings and independently reviewed before next stage.",
+      "Actual performance claims wait for completed raw results. Qualification durations and support work are not sampling observations."
+    ],
+    "sampling_admission_granted": false,
+    "sampling_scope_created": false,
+    "schema": "main-gap-sampling-source-review-v1",
+    "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "source_gate_passed": true,
+    "source_only": true,
+    "source_package_manifest": {
+      "bytes": 4021,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/MANIFEST.json",
+      "sha256": "8d8fb5fdc68f15d404e2e962aab15dd1def5266179a7cd6c207c902d421da099"
+    },
+    "stats_binary": {
+      "bytes": 20205400,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+      "sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347"
+    },
+    "verified_pins": {
+      "bytes": 4593982,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/verified-pins.json",
+      "sha256": "7d5550861cf6a09a8d1bf6be67f2758b539c61c422b4809b832c8a322a2bf47a"
+    }
+  },
+  "representation": "complete report except role-root replacement and omission of absolute clocks/process identifiers if present; all durations retained"
+}

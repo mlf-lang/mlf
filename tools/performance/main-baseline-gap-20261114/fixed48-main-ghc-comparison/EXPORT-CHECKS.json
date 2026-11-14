@@ -1,0 +1,151 @@
+{
+  "all_passed": true,
+  "awaiting_lightweight_presentation_review": false,
+  "checks": [
+    {
+      "name": "64actual commands and48RTS",
+      "passed": true
+    },
+    {
+      "name": "fixed MGGM actual review closed",
+      "passed": true
+    },
+    {
+      "name": "disabled source",
+      "passed": true
+    },
+    {
+      "name": "privacy README.md",
+      "passed": true
+    },
+    {
+      "name": "privacy REPRODUCTION.md",
+      "passed": true
+    },
+    {
+      "name": "privacy REUSED-PUBLIC-FILES.json",
+      "passed": true
+    },
+    {
+      "name": "privacy SOURCE-MAP.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/all48-recorded-samples.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/all48-rts-redacted.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/all64-commands.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/block1-activation-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/block1-actual-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/block2-activation-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/block2-actual-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/cleanup-and-budget.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/combined-final-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/reviewer-exploratory-groups.json",
+      "passed": true
+    },
+    {
+      "name": "privacy evidence/source-review.json",
+      "passed": true
+    },
+    {
+      "name": "privacy results/reviewer-all48-observations.csv",
+      "passed": true
+    },
+    {
+      "name": "privacy source/ACTIVATION-CONTRACT.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/ANCESTRY.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/BINDINGS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/DESIGN-AT-SOURCE-FREEZE.md",
+      "passed": true
+    },
+    {
+      "name": "privacy source/NEXT-REVIEW-CONTRACT.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/RESOLVED-COMMANDS.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/controller.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/environment-1.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/environment-2.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/report.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/sampling_contract.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/sampling_worker.py",
+      "passed": true
+    },
+    {
+      "name": "privacy source/source-check-report.json",
+      "passed": true
+    },
+    {
+      "name": "privacy source/source_checks.py",
+      "passed": true
+    }
+  ],
+  "count": 33,
+  "final_lightweight_review_passed": true,
+  "final_reducer_still_unbound": false,
+  "only_own_read_hash_AST_serialization": true,
+  "project_code_compiler_helper_guard_or_target_execution": false,
+  "summary_checks": [
+    "exact reducer v2/source and final-result manifests",
+    "all48 CSV non-path strings unchanged and CRLF preserved",
+    "original generic pending field untouched",
+    "current actual PASS explicitly separately bound",
+    "no compiled/target execution",
+    "final independent 48-row/12-group/16-gradient review and all four manifest members verified without running reviewer"
+  ]
+}

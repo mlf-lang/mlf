@@ -1,0 +1,508 @@
+{
+  "original": {
+    "artifact": "main-gap-sampling-02-actual-review/report.json",
+    "bytes": 20604,
+    "sha256": "cf5bf9fe5364b6cdaa850629238aaa36517ace48c93d33ecd92f895e56de591f"
+  },
+  "original_manifest": {
+    "artifact": "main-gap-sampling-02-actual-review/MANIFEST.json",
+    "bytes": 6396,
+    "sha256": "3efb8135ffeb3869fefa065e49e1476bb5f6fefeaebd40c8b9f4d26a00463e53"
+  },
+  "report": {
+    "GHC_typed_interfaces_exact_no_objects_or_links": true,
+    "activation_review": {
+      "bytes": 6805,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-activation-review/report.json",
+      "sha256": "eb2cf9090a39942c5d3d11196d36a22b9aa24d9ad9fc4d875fbd63fcd0ef7797"
+    },
+    "actual_counts": {
+      "RTS_reports": 24,
+      "child_commands": 32,
+      "measured_legs": 24,
+      "runtime_after": 4,
+      "runtime_before": 4
+    },
+    "actual_pins": {
+      "admission": {
+        "bytes": 2805,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/coordination/SAMPLE2-admission.json",
+        "sha256": "41ed01ead437f89ba33dc047f32eb940406363302ca2349198232f2e493b34e4"
+      },
+      "build_log": {
+        "bytes": 0,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/build.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "claim": {
+        "bytes": 294,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/claims/SAMPLE2.json",
+        "sha256": "1f9c026f25abcdfab0b4cd0800828f5ed8fea8f087e5c2e72143f9ef9a1ed7ac"
+      },
+      "config": {
+        "bytes": 1887,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/outer/guard-config.json",
+        "sha256": "8e98fbed66fa8d49e63553bf67de3e7a43d2d8aeddc0597b67cf2da9f17c038f"
+      },
+      "controller": {
+        "bytes": 7772,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/controller.json",
+        "sha256": "74785f42f2e7f2d2876fbacc097372da7c07c2981e1a89712c4830951711fa94"
+      },
+      "epoch": {
+        "bytes": 1553,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/coordination/SAMPLE2-epoch.json",
+        "sha256": "59f7c88463f0748c1b4e0e36be71a1a4950d80b42a251c97c899e346a5506f13"
+      },
+      "launch_binding": {
+        "bytes": 2429,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/launch-binding.json",
+        "sha256": "787607c82dc9e9a5fce994cc75208ee9cd9b55b06b373c1a124d37e08e0af64a"
+      },
+      "outer": {
+        "bytes": 4494,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/outer/guard.json",
+        "sha256": "e8990f31453e03e7f4b1dc458c9b6dce3e8bb523251af609f666cd9522009274"
+      },
+      "prepare_attempt": {
+        "bytes": 733,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/coordination/SAMPLE2-prepare-attempt.json",
+        "sha256": "8881ba877a06274add78e8801e3ff5f68250a6b3f6b3afad8e8edf3fad6e78ac"
+      },
+      "watchdog": {
+        "bytes": 189737,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/bounded-receipt.json",
+        "sha256": "3c03db668176e5c0814d6c16e9d9b507686178860abb066610af7031c95f0466"
+      },
+      "worker": {
+        "bytes": 4873374,
+        "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/sampling-receipt.json",
+        "sha256": "65a73e987be5a2af2c8cd4823bb873c44e7befdd6a682dcf32923bda5c99f14a"
+      }
+    },
+    "actual_sampling_stage_passed": true,
+    "all48_exception_count": 0,
+    "all48_rows_csv": {
+      "bytes": 4831,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-samples.csv",
+      "sha256": "d0e275d959ce126d07423a90795af975afd30de840753b1e27b4fbafe3810c53"
+    },
+    "all48_same_binary_raw_exact": true,
+    "all_24_RTS_independently_reparsed": true,
+    "all_fixed_sampling_complete": true,
+    "authentication_scope": {
+      "claim_historical_attestation_limit": "No separate historic per-file snapshots are emitted. This is authenticated executed source/receipt enforcement plus current equality, not independent continuous observation or protection against privileged transient write-and-restore.",
+      "cooperative_not_ACL_boundary": true,
+      "full_boundary_SHA_and_actual_source_runtime_closure": true,
+      "global_package_directory_and_preload_absence": "Checked at original static entry/return and now independently; not asserted between every child.",
+      "middle_checks": "Reviewed immutable identity metadata, complete old/new scope names/types, runtime binding/config files, critical fullpins and actual guard ancestry/lease/two-lock ownership.",
+      "privileged_write_restore_protection_claimed": false,
+      "unique_fullpin_reads_deduplicated": true,
+      "unique_verified_pins": 21818
+    },
+    "block": 2,
+    "blockers": [],
+    "budget": {
+      "SAMPLE1_ns": 146870598659,
+      "SAMPLE2_ns": 234962562751,
+      "authoritative_clock": "monotonic_ns",
+      "authoritative_interval": "entire original guard.run_guard call through return including cleanup",
+      "both_caps_passed": true,
+      "completion_ns": 121226195039,
+      "failed_SEMANTIC_ns": 596647140326,
+      "original_guard_elapsed_seconds_excludes_cleanup": 234.74652971400064,
+      "outer_cap_per_block_ns": 600000000000,
+      "post_setup_ceiling_ns": 1800000000000,
+      "post_setup_cumulative_ns": 1099706496775,
+      "post_setup_unused_ns": 700293503225,
+      "qualification_ns": 717873335365,
+      "sampling_ceiling_ns": 1200000000000,
+      "sampling_cumulative_ns": 381833161410,
+      "sampling_unused_ns": 818166838590,
+      "unused_budget_is_not_authorization_for_more_targets": true,
+      "worker_deadline_per_block_ns": 595000000000
+    },
+    "checks": {
+      "bytes": 1231,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/checks.json",
+      "sha256": "97212f35d026ae6e55940e70a0dd1a720c040eb14ae9a31a8e05e24ae446c908"
+    },
+    "claim_lifecycle": {
+      "bytes": 1777,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/claim-lifecycle.json",
+      "sha256": "d60bf29887ac12f9eb0fce0506292c2a3d31beea39ba283ac8d8934755aa191b"
+    },
+    "cleanup_lease_locks": true,
+    "combined_12cell_fixed_MGGM": true,
+    "combined_48leg_sampling_passed": true,
+    "combined_command_inventory": {
+      "bytes": 92701,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-commands.json",
+      "sha256": "ce7f9342cf0ab691662d9369fc2b403b8f6cd0216aee93d7f36c4df297ce3eae"
+    },
+    "combined_counts": {
+      "RTS_reports": 48,
+      "blocks": 2,
+      "cells": 12,
+      "child_commands": 64,
+      "measured_legs": 48,
+      "observations_per_cell_per_endpoint": 2,
+      "support_commands": 16
+    },
+    "combined_exploratory_groups": {
+      "bytes": 5163,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-exploratory-groups.json",
+      "sha256": "ba9ec66dfe5ad5e2ce703c07393553bf28f6a5750ffc1fb7f1ca0979432d8cb7"
+    },
+    "combined_qualification_review": {
+      "bytes": 18702,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+      "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+    },
+    "combined_same_binary_raw_inventory": {
+      "bytes": 21766261,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-raw-equality.json",
+      "sha256": "2b936ae6c5eb297f40ea926cbfcc49ccaafe70182816c429df0d6701deef3edd"
+    },
+    "combined_sample_inventory": {
+      "bytes": 169268,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-samples.json",
+      "sha256": "755b70380b925c3f5c6c175af0c946e1f6e05761f9be13669734b6d2f1bb2be1"
+    },
+    "combined_statistics_inventory": {
+      "bytes": 126457,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-statistics.json",
+      "sha256": "fbe1734cd69d8d1ec6d9a162a4aa3ee6490756178ecf64c0cb3bbd6a76306947"
+    },
+    "command_inventory": {
+      "bytes": 45233,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/actual-commands.json",
+      "sha256": "a38de5c3e547c54edb19b9e97887a100a14511a5f513d9586eb50a3f989e72bd"
+    },
+    "complete": true,
+    "configuration": {
+      "bytes": 36732,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/BINDINGS.json",
+      "sha256": "390afb62366ad7159d21f976cc3acee0869928ac4c4afd24ede71f5c6a78adfb"
+    },
+    "cumulative_ns": 1099706496775,
+    "elapsed_ns": 234962562751,
+    "entire_CI_pass_claimed": false,
+    "fixed_sequence": {
+      "block": 2,
+      "cells": [
+        "higher_order_chain-16",
+        "higher_order_chain-32",
+        "higher_order_chain-64",
+        "higher_order_chain-128",
+        "higher_order_chain-256",
+        "foundation14"
+      ],
+      "extras_or_dropped_samples": false,
+      "leg_ordinals": [
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48
+      ],
+      "per_cell": [
+        "M",
+        "G",
+        "G",
+        "M"
+      ]
+    },
+    "full_same_binary_raw_exact": true,
+    "further_sampling_authorized": false,
+    "ghc": {
+      "bytes": 658,
+      "path": "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+      "sha256": "fa9f3666470de75b798d4f15f983096b07184d33e060a740aa9e8772df0d51f7"
+    },
+    "immutable_input_count": 17618,
+    "immutable_inputs": {
+      "bytes": 5702589,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/immutable-inputs.json",
+      "sha256": "dc86d7ab5054f0f1b201bd6efe3d4c964d65b37a433af3ee07d0e786b8498ca1"
+    },
+    "immutable_output_count": 4140,
+    "immutable_outputs": {
+      "bytes": 1411787,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/immutable-outputs.json",
+      "sha256": "681b9c1cf165e0e9c872ecc1d8f5e5d3d5901f57968bfd8a36e14d467d199f22"
+    },
+    "lifecycle": {
+      "actual_outer_cleanup_reacquired_lease_clear": true,
+      "actual_outer_guard_return_row_sha256": "d15eeda81f2b6119edfb0cbd0198d8ad54f134d5394655805ff32eb408e93737",
+      "all_child_cleanups_true": true,
+      "bounded_watchdog_final_group_rss": 0,
+      "new_scope_lease_and_quarantine_absent_after_trusted_cleanup": true,
+      "old_historical_scope_termination_not_inferred": true,
+      "one_use_admission_claim_and_launch_deadline_bound": true,
+      "original_dual_lock_peer_evidence_held73_free0": true,
+      "original_lease_hash_recomputed": true,
+      "original_limits_unchanged": {
+        "address_space": 6442450944,
+        "free_disk": 5368709120,
+        "host_available": 3221225472,
+        "output": 4294967296,
+        "tree_rss": 5368709120
+      },
+      "outer_config_bound": true,
+      "outer_watchdog_and_worker_argv_exact": true,
+      "resource_evidence_recorded_at_prepare": {
+        "boot_id": "27d9728f-8b28-4f55-a672-9e4eabb2e8ff",
+        "disk_free_bytes": 39553196032,
+        "heavy_incumbents": [],
+        "host_available_bytes": 8965488640,
+        "monotonic_ns": 136153230583258
+      }
+    },
+    "native_generation_AB_fixedpoint": false,
+    "observational_limits": [
+      "Both lifecycle durations and their cumulative totals are budget costs, not compiler performance.",
+      "Two observations per endpoint/cell are exploratory only: no stable speedup, significance or asymptotic conclusion.",
+      "GHC typed-only and MLF frontend have different compiler/artifact scopes; no parity claim.",
+      "Child guard elapsed includes supervision; exact target wall_ns and process user/system split remain unknown. RTS process times are rounded.",
+      "Fresh application/query outputs do not mean cold OS page cache.",
+      "No runtime graph/visit/copy/constraint counters; published query counts are not substitutes.",
+      "No discarded first sample, retry, hidden probe or additional leg; whole fixed48 plan is now closed."
+    ],
+    "ordered_fresh_queries_exact": true,
+    "original_SEMANTIC_passed": false,
+    "original_binary": {
+      "bytes": 20192216,
+      "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+      "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+    },
+    "original_guard": {
+      "bytes": 24833,
+      "path": "<EXPERIMENT_ROOT>/recovery/tools/performance/full-compiler/continuation-20261111/sparse-attribution-r13/guard.py",
+      "sha256": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e"
+    },
+    "phase": "SAMPLE2",
+    "precheck_measurements": {
+      "actual_record": {
+        "full_sweeps": [
+          {
+            "elapsed_ns": 3412638052,
+            "phase": "entry",
+            "unique_bytes": 1421682606,
+            "unique_files": 17618
+          },
+          {
+            "elapsed_ns": 5113823562,
+            "phase": "exit",
+            "unique_bytes": 1440779040,
+            "unique_files": 21758
+          }
+        ],
+        "light_check_count": 66,
+        "light_elapsed_ns": 101017738912,
+        "new_archive_hash_checks": 56
+      },
+      "all_child_guard_sum_seconds": 52.20081936501083,
+      "full_plus_light_recorded_ns": 109544200526,
+      "full_sweep_total_ns": 8526461614,
+      "measured_child_guard_sum_seconds": 50.99906167603331,
+      "not_target_CPU_or_optimization_benefit": true,
+      "unaccounted_interval_not_assigned_to_one_function": true
+    },
+    "preservation": {
+      "active_cells_empty": true,
+      "all_previous_names_types_and_bytes_exact": true,
+      "base_E_directories": 490,
+      "base_E_files": 7868,
+      "firstblock_directories": 167,
+      "firstblock_files": 3243,
+      "original_failed_SEMANTIC_not_rewritten": true,
+      "third_block_absent": true,
+      "tmp_empty": true
+    },
+    "preserved_scope_directories": {
+      "bytes": 54562,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/preserved-E-directories.json",
+      "sha256": "4edc2332a39f7cfeaf1c069bf1a0796463b7ca25baf4e2e9572dce5aa9a8a9df"
+    },
+    "preserved_scope_directory_count": 828,
+    "preserved_scope_file_count": 15266,
+    "preserved_scope_files": {
+      "bytes": 5273816,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/preserved-E-files.json",
+      "sha256": "3bd8945b9c9b1b0ef869d2fc9dce14b39756c9d7cd8445707a82ab3a6ab543da"
+    },
+    "preserved_scope_root": "<EXPERIMENT_ROOT>/main-gap-setup-run04",
+    "prior_ns": 864743934024,
+    "prior_sampling_review": {
+      "bytes": 17450,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-actual-review/report.json",
+      "sha256": "9d0f20dd831a4943bb3672b1889bb1772397c5c9014f8939754adaba1b5cc924"
+    },
+    "prior_sampling_review_manifest": {
+      "bytes": 4827,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-actual-review/MANIFEST.json",
+      "sha256": "1ab88cdcd101d326ed1e7f2fe9fa84bda9f9b86a7c28af84f6cb07745e09b803"
+    },
+    "production_promotion": false,
+    "raw_equality_exception_count": 0,
+    "raw_normalization_or_identity_exception_used": false,
+    "review_method": "Inherited exact frozen source and first-block/semantic actual qualifications without rerunning prior targets. Independently recomputed all new actual guard/argv/runtime/claim/budget records, full raw trees, RTS and final names/types/bytes; composed exact fixed64/48 ledger. Own code and AST-allowlisted read-only consumers only; no original module top-level, helper, loader, target, guard or lock executed.",
+    "runtime_helper": {
+      "bytes": 11663,
+      "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/runtime_pins.py",
+      "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+    },
+    "same_binary_raw_inventory": {
+      "bytes": 11944445,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/raw-equality.json",
+      "sha256": "eef0f7cb553160a8f58e49c2bec07f516aea0c68d194b4eaea4c1eb317316bb2"
+    },
+    "sample_inventory": {
+      "bytes": 84920,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/actual-samples.json",
+      "sha256": "bca516aba598e2b5b086ca15da5a2ef707aa787a963228b6ef09a280a1083d33"
+    },
+    "sampling_cumulative_ns": 381833161410,
+    "schema": "main-gap-sampling-actual-review-v1",
+    "scope_directories": {
+      "bytes": 8444,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/scope-directories.json",
+      "sha256": "a44235a7d62fed4c495ef384ef8ba205d13c56fd6282093ac556a0bb6debdaf3"
+    },
+    "scope_directories_format": "sorted-unique-relative-to-sampling-02-directory-strings-excluding-dot-v1",
+    "scope_directory_count": 169,
+    "scope_file_count": 4155,
+    "scope_inventory": {
+      "bytes": 1415393,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/scope-files.json",
+      "sha256": "d9b07bd81d547b941ee48b92b582943420d9a5a265c10db1b8f278b2dc9911b6"
+    },
+    "scope_inventory_format": "json-array-of-full-pins-v1",
+    "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+    "source_package_manifest": {
+      "bytes": 4021,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/MANIFEST.json",
+      "sha256": "8d8fb5fdc68f15d404e2e962aab15dd1def5266179a7cd6c207c902d421da099"
+    },
+    "source_review": {
+      "bytes": 16162,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/report.json",
+      "sha256": "c51c78e6c71e19e18ea53e783b1f5022d55869160808e23f132b000a53467f08"
+    },
+    "source_review_manifest": {
+      "bytes": 2333,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/MANIFEST.json",
+      "sha256": "15e61e4e3fa8ebd247c6e69ed34cdec8d0e7f4796b86bc277956b07f85b8d98f"
+    },
+    "statistics_inventory": {
+      "bytes": 63382,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/actual-statistics.json",
+      "sha256": "fda5496cbdcf9dd0eea31bf4a996d219deb51df850ef9d65ef1903ce7c1c4ace"
+    },
+    "statistics_parser": {
+      "bytes": 4888,
+      "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/stats.py",
+      "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+    },
+    "stats_binary": {
+      "bytes": 20205400,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+      "sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347"
+    },
+    "summary": {
+      "bytes": 4536,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/summary.json",
+      "sha256": "cd5fd605e6f8d6a663af4225d3b942951a80dda79fcc1afcf1411e5a1cd8da02"
+    },
+    "verified_unique_pin_inventory": {
+      "bytes": 7128880,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/verified-pins.json",
+      "sha256": "9785581135fe20a08efc9abd27f31e224849dd97ddb7e8e8ee3dc230122df711"
+    },
+    "whole_plan_cell_order": [
+      "baseline-0",
+      "flat_functions-16",
+      "flat_functions-32",
+      "flat_functions-64",
+      "flat_functions-128",
+      "flat_functions-256",
+      "higher_order_chain-16",
+      "higher_order_chain-32",
+      "higher_order_chain-64",
+      "higher_order_chain-128",
+      "higher_order_chain-256",
+      "foundation14"
+    ],
+    "whole_plan_leg_ordinals": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48
+    ]
+  },
+  "representation": "complete report except role-root replacement and omission of absolute clocks/process identifiers if present; all durations retained"
+}

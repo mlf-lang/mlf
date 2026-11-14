@@ -1,0 +1,122 @@
+{
+  "original": {
+    "artifact": "main-gap-sampling-01-activation-review/report.json",
+    "bytes": 5271,
+    "sha256": "d4e302b8ec44a4df2b546143daa14e1d8c4e38ddc5306aaefe4f3b845f03feeb"
+  },
+  "original_manifest": {
+    "artifact": "main-gap-sampling-01-activation-review/MANIFEST.json",
+    "bytes": 1099,
+    "sha256": "413ca0039aee606891e5ed7aef10d43acd4f748d7c5e53b860374439b48df175"
+  },
+  "report": {
+    "active_scratch_empty": true,
+    "actual_sampling_passed": false,
+    "block": 1,
+    "blockers": [],
+    "combined_qualification_review": {
+      "bytes": 18702,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+      "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+    },
+    "combined_qualification_review_manifest": {
+      "bytes": 5088,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/MANIFEST.json",
+      "sha256": "495205f35150d5d00cfe15f373eab1c4619af2551baf0b0c972584d8479426e5"
+    },
+    "complete": true,
+    "diff": {
+      "bytes": 315,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-activation-review/READY-only.diff",
+      "sha256": "fa023f475ca7538682cc5a74c1ce7dfe1e489ca7fba3803e8d40cfdde3b53658"
+    },
+    "disabled_controller": {
+      "bytes": 67370,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.disabled.py",
+      "sha256": "c8a9fa91ec155acaa387ca5143e82353f95eb1a4181f64c3bb5bdc040ddd18e3"
+    },
+    "enabled_controller": {
+      "bytes": 67369,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.py",
+      "sha256": "19c3fa8dbea246c89ad1ca139dc11542067770a691de8aecb4d2529c8d050a96"
+    },
+    "epoch_claim_created": false,
+    "exact_READY_only_delta": true,
+    "inner_watchdog_direct_execution_allowed": false,
+    "inverse_AST_exact": true,
+    "inverse_bytes_exact": true,
+    "limitations": [
+      "Mechanical activation only; the reviewed coordinator must still establish actual new resources, epoch, locks and one-use admission.",
+      "Only sampling-01 exists. Sampling-02 requires genuine accepted first-block actual review and remaining full600s budget; it is not approved by this receipt.",
+      "No original module was imported/executed. Complete source qualification is inherited from its exact frozen independent review.",
+      "Old SEMANTIC remains FAIL; current source and activation review do not constitute sampling measurements."
+    ],
+    "mechanical_activation_review_passed": true,
+    "observed_state": {
+      "bytes": 1870,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-activation-review/observed-state.json",
+      "sha256": "b27f704372b7db3cda123d87d78a4da8d0bbb9d7836229581ab2131f27f5b6e5"
+    },
+    "old_scope_directories_unchanged": 490,
+    "old_scope_files_unchanged": 7868,
+    "only_two_activation_files_present": true,
+    "phase": "SAMPLE1",
+    "prepare_helper_guard_loader_lock_compiler_or_target_executed": false,
+    "read_only_real_scopes": true,
+    "review_program": {
+      "bytes": 7792,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-activation-review/review.py",
+      "sha256": "99106e8f70b0fe8ef7cf61ef55c4d41f5bed18f9bdb372fe18f344457ec6aacd"
+    },
+    "sampling02_absent": true,
+    "sampling_admission_created": false,
+    "schema": "main-gap-sampling-activation-review-v1",
+    "sole_prepare_argv": [
+      "/usr/bin/python3.13",
+      "-B",
+      "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.py",
+      "prepare",
+      "SAMPLE1",
+      "--source-review",
+      "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/report.json",
+      "--source-review-sha256",
+      "c51c78e6c71e19e18ea53e783b1f5022d55869160808e23f132b000a53467f08",
+      "--prior-review",
+      "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+      "--prior-review-sha256",
+      "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+    ],
+    "sole_run_form": [
+      "/usr/bin/python3.13",
+      "-B",
+      "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/controller.py",
+      "run",
+      "SAMPLE1",
+      "--admission",
+      "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-01/coordination/SAMPLE1-admission.json",
+      "--sha256",
+      "<actual admission SHA>"
+    ],
+    "source_controller": {
+      "bytes": 67370,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/controller.py",
+      "sha256": "c8a9fa91ec155acaa387ca5143e82353f95eb1a4181f64c3bb5bdc040ddd18e3"
+    },
+    "source_package_manifest": {
+      "bytes": 4021,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/MANIFEST.json",
+      "sha256": "8d8fb5fdc68f15d404e2e962aab15dd1def5266179a7cd6c207c902d421da099"
+    },
+    "source_review": {
+      "bytes": 16162,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/report.json",
+      "sha256": "c51c78e6c71e19e18ea53e783b1f5022d55869160808e23f132b000a53467f08"
+    },
+    "source_review_manifest": {
+      "bytes": 2333,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source-review/MANIFEST.json",
+      "sha256": "15e61e4e3fa8ebd247c6e69ed34cdec8d0e7f4796b86bc277956b07f85b8d98f"
+    }
+  },
+  "representation": "complete report except role-root replacement and omission of absolute clocks/process identifiers if present; all durations retained"
+}

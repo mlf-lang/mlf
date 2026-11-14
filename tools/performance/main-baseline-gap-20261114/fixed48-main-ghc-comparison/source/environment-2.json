@@ -1,0 +1,18 @@
+{
+  "CC": "/usr/bin/x86_64-linux-gnu-gcc-14",
+  "GHCRTS": "",
+  "GHC_ENVIRONMENT": "-",
+  "HOME": "<HOME>",
+  "LANG": "C.UTF-8",
+  "LC_ALL": "C.UTF-8",
+  "LD_LIBRARY_PATH": "<GHC_TOOLCHAIN>/debian/usr/lib/x86_64-linux-gnu",
+  "LIBRARY_PATH": "<GHC_TOOLCHAIN>/debian/usr/lib/x86_64-linux-gnu",
+  "MAKEFLAGS": "-j1",
+  "OMP_NUM_THREADS": "1",
+  "OPENBLAS_NUM_THREADS": "1",
+  "PATH": "<GHC_TOOLCHAIN>/ghc/bin:<GHC_TOOLCHAIN>/bin:/usr/bin:/bin",
+  "PKG_CONFIG_PATH": "<GHC_TOOLCHAIN>/pkgconfig",
+  "PYTHONDONTWRITEBYTECODE": "1",
+  "TC": "<GHC_TOOLCHAIN>",
+  "TMPDIR": "<EXPERIMENT_ROOT>/main-gap-setup-run04/sampling-02/tmp"
+}

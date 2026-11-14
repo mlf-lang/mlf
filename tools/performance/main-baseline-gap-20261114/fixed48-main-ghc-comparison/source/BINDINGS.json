@@ -1,0 +1,793 @@
+{
+  "READY": false,
+  "actual_owner_observations": null,
+  "actual_qualification_review": null,
+  "actual_query_counts": null,
+  "blocks": [
+    1,
+    2
+  ],
+  "cc": {
+    "bytes": 1162264,
+    "path": "/usr/bin/x86_64-linux-gnu-gcc-14",
+    "sha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f"
+  },
+  "cell_names": [
+    "baseline-0",
+    "flat_functions-16",
+    "flat_functions-32",
+    "flat_functions-64",
+    "flat_functions-128",
+    "flat_functions-256",
+    "higher_order_chain-16",
+    "higher_order_chain-32",
+    "higher_order_chain-64",
+    "higher_order_chain-128",
+    "higher_order_chain-256",
+    "foundation14"
+  ],
+  "cell_route_contracts": {
+    "baseline-0": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/baseline-0",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "flat_functions-128": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/flat_functions-128",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "flat_functions-16": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/flat_functions-16",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "flat_functions-256": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/flat_functions-256",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "flat_functions-32": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/flat_functions-32",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "flat_functions-64": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/flat_functions-64",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "foundation14": {
+      "checked_schema": 8,
+      "config": [
+        "fresh-split/compiler90/mlf-foundation",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "higher_order_chain-128": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/higher_order_chain-128",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "higher_order_chain-16": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/higher_order_chain-16",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "higher_order_chain-256": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/higher_order_chain-256",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "higher_order_chain-32": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/higher_order_chain-32",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    },
+    "higher_order_chain-64": {
+      "checked_schema": 8,
+      "config": [
+        "compiler-shapes/higher_order_chain-64",
+        null,
+        "MLF-SOURCE-CRATE-QUERY-7",
+        "open-fragment-checker-1/finish-receipt-1",
+        null
+      ],
+      "route_format_source_evidence": {
+        "bytes": 3636,
+        "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+        "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+      }
+    }
+  },
+  "cleanup_headroom_seconds": 5,
+  "cleanup_inclusive_max_ns": 600000000000,
+  "combined_qualification_review": {
+    "bytes": 18702,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+    "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+  },
+  "command_count_per_block": 32,
+  "completion_actual_review": {
+    "bytes": 18702,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+    "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+  },
+  "completion_source": {
+    "bytes": 4409,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/MANIFEST.json",
+    "sha256": "2beaafaf998da6e3e7b5b3b9e284831eebd53062e1b7610aeca6ff05160f1c57"
+  },
+  "completion_source_review": {
+    "bytes": 13444,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/report.json",
+    "sha256": "483e491550640505ab48f49c8c821a46a374af555c653e485f1f5b6ac3af7d15"
+  },
+  "configuration_complete": true,
+  "environments": {
+    "1": {
+      "bytes": 962,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/environment-1.json",
+      "sha256": "2596f7e136fa5656185caeb36a3e2ebf015f7da464ed151030e27f18f763c151"
+    },
+    "2": {
+      "bytes": 962,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/environment-2.json",
+      "sha256": "a6d6a189b3a5306edda0458123975d8761ad6a22ec1a8ac85ffa04e1777368d8"
+    }
+  },
+  "exploration_max_ns": 1200000000000,
+  "failed_semantic_ns": 596647140326,
+  "failure_review": {
+    "bytes": 14887,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-01-failure-review/report.json",
+    "sha256": "331a7e79f7e47927faed87420c57c00935a65495273b74711f93376f4502b7a8"
+  },
+  "ghc": {
+    "bytes": 658,
+    "path": "<GHC_TOOLCHAIN>/ghc/bin/ghc-9.14.1",
+    "sha256": "fa9f3666470de75b798d4f15f983096b07184d33e060a740aa9e8772df0d51f7"
+  },
+  "git": {
+    "bytes": 4082768,
+    "path": "/usr/bin/git",
+    "sha256": "356db14e102d68a1a37d8a1ac577dfd678d45d46e92f468bef8b7154e7bfdc60"
+  },
+  "global_packages": {
+    "bytes": 39417,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/GLOBAL-PACKAGE-INPUTS.json",
+    "sha256": "745046e2fd27a69b968909c189b54d0fcb4ac62d9e367c76231c1ae5f413dfbf"
+  },
+  "guard": {
+    "bytes": 24833,
+    "path": "<EXPERIMENT_ROOT>/recovery/tools/performance/full-compiler/continuation-20261111/sparse-attribution-r13/guard.py",
+    "sha256": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e"
+  },
+  "history": {
+    "bytes": 2252,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-v1-source/HISTORICAL-PINS.json",
+    "sha256": "c02af6d36acc347a430c61c4c689cd9ac6851a8b02bacaaa63e743380d81068c"
+  },
+  "identity_helper": {
+    "bytes": 3827,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/identity.py",
+    "sha256": "b2caf9e4c4c65782b5cc003d68d60794357cc40a014e0e53364c7cb660dead8a"
+  },
+  "migration_manifest": {
+    "bytes": 22026,
+    "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/MANIFEST.json",
+    "sha256": "8df358ec7ec6f5399dbfde2ece6e6510eef971c2955e7dd6bb8c2d1030f677ee"
+  },
+  "original_binary": {
+    "bytes": 20192216,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-run01/build/producer/bin/emlf",
+    "sha256": "0c665045f0ca253e528285a214edd9f67ba5bc51e37841269362e33387a0c64f"
+  },
+  "original_stage_remains_failed": true,
+  "outer_cap_seconds": 600,
+  "performance_sample_count": 48,
+  "plan_commands": {
+    "bytes": 99869,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/COMMANDS.json",
+    "sha256": "33e482c315e80efb9c70fe051fd72ce78e43e989da4f0f7e1d5f4a3609c75f9f"
+  },
+  "plan_manifest": {
+    "bytes": 4872,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/MANIFEST.json",
+    "sha256": "d231f096285925b2e30323f54fd26b4356c180e9c1f0164336e0033b95a2d1d8"
+  },
+  "post_setup_total_ns": 1800000000000,
+  "private_package_db": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/dependencies/package-db",
+  "proposed_ledger": {
+    "bytes": 25529,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-minimal-next-source/LEDGER-PROPOSAL.json",
+    "sha256": "832fdfcbca47ecf7665521e1503ae9e2b7c281c50d9c7aa3d7dd469ff1bd5bf9"
+  },
+  "publication_oracle": {
+    "bytes": 18398,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/publication_oracle.py",
+    "sha256": "df9d3ad4ef1dd23d888a7089efcf365e0939922a5c1f63cc6c04c6c775579be1"
+  },
+  "python": {
+    "bytes": 6832784,
+    "path": "/usr/bin/python3.13",
+    "sha256": "889c603f0d17cb54060951bcf4c4f9b8c9ebd9e52b392c70209bbb9755d797d9"
+  },
+  "qualification_cumulative_ns": 717873335365,
+  "reproduction_lock": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source/.mlf-build/.reproduction.lock",
+  "route_contract": {
+    "bytes": 3791,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/ROUTE-CONTRACT-v3.json",
+    "sha256": "cd0f2e700b9e6a7a0d33f0d29caa6c47f6c10af5ec0420c57d23dd39745e21f8"
+  },
+  "route_design_review": {
+    "bytes": 9821,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-baseline-observation-design-review/report.json",
+    "sha256": "bea14ed40b446a1beda53384355c3cf3f38c4617164b75a3e7651cf634baea83"
+  },
+  "runtime_helper": {
+    "bytes": 11663,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/runtime_pins.py",
+    "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+  },
+  "runtime_paths": {
+    "bytes": 32308,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-v1-source/RUNTIME-PATHS.json",
+    "sha256": "48d01b5a548d8abc3beb5e5def1eba531353eccf705109f2abe037a8b187cc23"
+  },
+  "sampling_contract": {
+    "bytes": 3848,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/sampling_contract.py",
+    "sha256": "b802d7d03a00b6da52e5395863edff65335c3a8b10855a7dbbb8b84b104efdff"
+  },
+  "sampling_runner_included": true,
+  "schema": "main-gap-sampling-disabled-bindings-v1",
+  "semantic_oracle_inventory": {
+    "bytes": 4327822,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/combined-cells.json",
+    "sha256": "35288fb0241111a89f7cc446edff00e6e5532a0a7b25d7b51d856055e44f2024"
+  },
+  "semantic_parsers": {
+    "bytes": 4580,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/semantic_parsers.py",
+    "sha256": "359060abe291cdd0f5e038577985732603aabf6a652381475cdb2c6b44e125cc"
+  },
+  "setup_actual_pins": {
+    "admission": {
+      "bytes": 2704,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/coordination/SETUP-admission.json",
+      "sha256": "d015b2e22b04ca4416254fdba966dd192547321f8f37f8362117739b51b954f9"
+    },
+    "claim": {
+      "bytes": 278,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/claims/SETUP.json",
+      "sha256": "353f6385e40e35c5c5c5dc735d9bcfa1cf3e75951752eb28eabd7f33d4afec95"
+    },
+    "config": {
+      "bytes": 1737,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/outer/guard-config.json",
+      "sha256": "b8c0af8f25d9fd79abc8a3f5ec97223143940cab761b5dd37dae15ebe8e582bd"
+    },
+    "controller": {
+      "bytes": 6291,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/controller.json",
+      "sha256": "0c478590f823262856b7e3ec7f5ec0567a051d5c29127802b733c762512c80b7"
+    },
+    "outer": {
+      "bytes": 4773,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/outer/guard.json",
+      "sha256": "fd9939356e8566abb915f1952dcc258ed12d16e42c42643afa16e0f231297d40"
+    },
+    "worker": {
+      "bytes": 581055,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/setup-receipt.json",
+      "sha256": "ed016dcadc8a20b6c533ac9373a2fd5bc0b22f2eb8fdebb79c534eb682ff5840"
+    }
+  },
+  "setup_configuration": {
+    "bytes": 7563,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-v5-source/CONFIG.json",
+    "sha256": "8be176b18bb7d0d357f358ede76b5172c1b5f7efccb6add80abe5889767b32e8"
+  },
+  "setup_controller": {
+    "bytes": 6291,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/controller.json",
+    "sha256": "0c478590f823262856b7e3ec7f5ec0567a051d5c29127802b733c762512c80b7"
+  },
+  "setup_immutable_inputs": {
+    "bytes": 1816306,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/immutable-inputs.json",
+    "sha256": "32b7f712558c510d06266e2549958e4ffbb89a3999ea80d524bafc093cacfb06"
+  },
+  "setup_immutable_outputs": {
+    "bytes": 106097,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/immutable-outputs.json",
+    "sha256": "61a16cd2ad5bdde7a64445aa9742f4eebe6c0ed4346267b816304b6a273b8775"
+  },
+  "setup_review": {
+    "bytes": 33473,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/report.json",
+    "sha256": "1b5addd5f3ce1821f43ef02f568df5552781f4e41ec1569284bb7554c83bec59"
+  },
+  "setup_scope_inventory": {
+    "bytes": 157955,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/SETUP-SCOPE-BASELINE.json",
+    "sha256": "d0f5b00978dc1075076b9ddcad98fa18c23c7e4536d824dbad8048901e52d6cb"
+  },
+  "setup_work": "<EXPERIMENT_ROOT>/main-gap-setup-run04",
+  "setup_worker": {
+    "bytes": 581055,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/setup-receipt.json",
+    "sha256": "ed016dcadc8a20b6c533ac9373a2fd5bc0b22f2eb8fdebb79c534eb682ff5840"
+  },
+  "shared_lock": {
+    "concrete_historical_identity_omitted": true,
+    "device": null,
+    "inode": null,
+    "path": "<FRESH_SHARED_RESOURCE_LOCK>"
+  },
+  "source": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/source",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "source_inputs": [
+    {
+      "bytes": 4872,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/MANIFEST.json",
+      "sha256": "d231f096285925b2e30323f54fd26b4356c180e9c1f0164336e0033b95a2d1d8"
+    },
+    {
+      "bytes": 5628,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/ARTIFACT-FLOW.json",
+      "sha256": "bc91f75920049a0643614b02813d33486d0d113b1ecb4ea1aace4e0b1206537c"
+    },
+    {
+      "bytes": 1536,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/BUDGETS.json",
+      "sha256": "3cff6e872c4d2359b950b2396fa0053cf54c893ac61541c21d47f100ab7bb8dd"
+    },
+    {
+      "bytes": 15522,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/COMMANDS-v1-to-v2.patch",
+      "sha256": "2f1a144e89539d8627cc3eb24b2c26fd004614ddbc280dce35f88745fb7e4dea"
+    },
+    {
+      "bytes": 99869,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/COMMANDS.json",
+      "sha256": "33e482c315e80efb9c70fe051fd72ce78e43e989da4f0f7e1d5f4a3609c75f9f"
+    },
+    {
+      "bytes": 23965,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/DYNAMIC-ORACLES.json",
+      "sha256": "f58b1461b7bbaed12ff042aa0189361e70d3ae11cc15095e384a7d9d18cb5008"
+    },
+    {
+      "bytes": 45845,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/LEGS.json",
+      "sha256": "53dcf311abd779697726d56bfd09a31d77aae0e8c278cd1551cdee280a546be8"
+    },
+    {
+      "bytes": 5135,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/MODEL-CHECKS.json",
+      "sha256": "9162f39cac3537ef7555b680d1ca8f611db5e2eaa0109c563b5d289b6ebbae15"
+    },
+    {
+      "bytes": 1147,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/PLAN-CHECKS.json",
+      "sha256": "03690b04359aa69af234a79ac860ced9e98765a09c7e210f53537d6f71446a33"
+    },
+    {
+      "bytes": 12729,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/PLAN.md",
+      "sha256": "35f79fd21e33a590f2905cebf2ef3e94a48c6681d17905bb272bc54d10918635"
+    },
+    {
+      "bytes": 4062,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/REQUIRED-NEGATIVE-TESTS.json",
+      "sha256": "892b5b71b5e42a60344550d4292b3570743ff811c5cd776cfeb70c492ba6a538"
+    },
+    {
+      "bytes": 11650,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/SAMPLING-CAPS.json",
+      "sha256": "0fd887c58f83adc2a7bd85edc30c159cd00503d116b2594f62913ef03c7be553"
+    },
+    {
+      "bytes": 5524,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/SOURCES.json",
+      "sha256": "e0361141176dc79fb20f107aafdee4cec0a0b79b7dc702622d5e248c2f1467ce"
+    },
+    {
+      "bytes": 4221,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/WIRE-CONTRACT.json",
+      "sha256": "e019bb914766123a560ca46f97b025a4662dea0cd776c159f304fee3e2ef8a0e"
+    },
+    {
+      "bytes": 5486,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/contract_model.py",
+      "sha256": "11be0f410919dfd5092dcbb4735840b9da38986aad5f6e50b50a5d286f231b09"
+    },
+    {
+      "bytes": 5719,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/freeze.py",
+      "sha256": "78ec3c81783717774e3d339d05e5cd715265a9d70c244be147f2239f55b952b6"
+    },
+    {
+      "bytes": 6324,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/model_tests.py",
+      "sha256": "6433b3ad5f0f5b72baa3bacf54ed4a32f92a89b698f9fbc4260f8419e7fc8647"
+    },
+    {
+      "bytes": 17994,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/prepare_plan.py",
+      "sha256": "36a4ba8f6cd74570efc2512f1d22e55760ff68ad26c2dabab3ac74051ee87158"
+    },
+    {
+      "bytes": 9039,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-plan-v2-source/report.json",
+      "sha256": "bbdd25dd700c53ffa79315c2548a16305bd7ced49d41c677018927c7fb0c4005"
+    },
+    {
+      "bytes": 9597,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/MANIFEST.json",
+      "sha256": "2cc33af7ec0fe71ff2b6464dde15adb369731df4aaa8fd7622087c5f0eb868a0"
+    },
+    {
+      "bytes": 47681,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/CELLS.json",
+      "sha256": "3b5a5d5c486186a50cb45f248e2c9522b2437ae69257025770e02189e94ddaf3"
+    },
+    {
+      "bytes": 72671,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/COMMAND-TEMPLATES.json",
+      "sha256": "85fe9bc1e6d9fd1bb9b21ccaa4f7bf1d5f4b7fe00ee06f0955e544ebc69fea27"
+    },
+    {
+      "bytes": 2876,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/GENERATOR-PROVENANCE.json",
+      "sha256": "6dfa0d7f71b1fd03252c6b91f48bf2411f67140f9b186f720105e1c434e4d624"
+    },
+    {
+      "bytes": 9618,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/INPUTS.json",
+      "sha256": "dc8e3d496aac33bd243b3965eae4f2a99ea336630d6df9225fa421d1cf03ed17"
+    },
+    {
+      "bytes": 45845,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/LEGS.json",
+      "sha256": "53dcf311abd779697726d56bfd09a31d77aae0e8c278cd1551cdee280a546be8"
+    },
+    {
+      "bytes": 5767,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/README.md",
+      "sha256": "074c41bf5cfbb6d3f59eccdb772427f20aa1d185900c32e4d202dfd3823d2205"
+    },
+    {
+      "bytes": 6276,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/check_inputs.py",
+      "sha256": "9a845731a2e4f4684a1e5af34d5924d703e557b588c80099570c80197cea74cf"
+    },
+    {
+      "bytes": 6536,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/checks.json",
+      "sha256": "0b3ab27ed921e9c8042bbb620bfc2080f14d5ff9d47e280231232d17a8fa2188"
+    },
+    {
+      "bytes": 4448,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/generator-functions.py",
+      "sha256": "e52a4bf4276e7c4c2631ed829a000c209a1cf13fd631ea6890ebd7baf17b1e40"
+    },
+    {
+      "bytes": 6525,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/generator-source.py",
+      "sha256": "1648034e7bfe721d025d0d0fae1f404713b4e5ab267ed780ac356baed0848f0a"
+    },
+    {
+      "bytes": 396,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/baseline-0/Main.hs",
+      "sha256": "522b3106f7dab67ca6f7dd1f3b705acd3d8a5e8113740a6a6ce30eeaaa7efd03"
+    },
+    {
+      "bytes": 7751,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-128/Main.hs",
+      "sha256": "af48eb052fca7df869588c13f805ccda52e6ac55451d8b4709237943a5677640"
+    },
+    {
+      "bytes": 1255,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-16/Main.hs",
+      "sha256": "a5254beedeb16e7bf58791f4e7e27a44329bed18369bfb501414cbf230049249"
+    },
+    {
+      "bytes": 15559,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-256/Main.hs",
+      "sha256": "af2371d80197e98f3fb2aa3ea99bac91e95a8905a1d6f3fe2952426a4ec83881"
+    },
+    {
+      "bytes": 2167,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-32/Main.hs",
+      "sha256": "ea9ae079ef50cf57b8c5869466666e774e8524ba735aeca684cdf4be7e493a81"
+    },
+    {
+      "bytes": 3991,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/flat_functions-64/Main.hs",
+      "sha256": "a578c5cd2e6dd90dd1c41a85c65cfabcda69ebf5e2f4e3eada29c4b5dcbfe121"
+    },
+    {
+      "bytes": 2592,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Fresh.hs",
+      "sha256": "7e918fb2293e768853cf0c7cb9c6cf8badc3670b0487dbcf8114856077fc8e7d"
+    },
+    {
+      "bytes": 3246,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Host.hs",
+      "sha256": "eef45272b5a0c96d651be5e7114470d49a2cb3f1073e3d7aa8e26f9fa70b9ba5"
+    },
+    {
+      "bytes": 5573,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IndexVec.hs",
+      "sha256": "cb01570d71d61f6000ea04e23d91cd8ccb6e412c511254736b0a24ff5239b79e"
+    },
+    {
+      "bytes": 21811,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntMap.hs",
+      "sha256": "90eed427c934e0f68b4a320c188f2cebd6e2a06af9f7973c6ed235b6228c200e"
+    },
+    {
+      "bytes": 6684,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntRank.hs",
+      "sha256": "0589c0dbdf264e245b5a880f057ad54b4ce150cec8aa87cb659e3b8a7ea2f725"
+    },
+    {
+      "bytes": 17405,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntSet.hs",
+      "sha256": "c04ea56944feaa4bbeedcd5ded176b3cc10c3cd99aef2aac483df9928b2a35fe"
+    },
+    {
+      "bytes": 3727,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/IntTree.hs",
+      "sha256": "56eb5a37686fa07b5cfa9d5beb978c922bfa490659c0bd4f153510eb5224af49"
+    },
+    {
+      "bytes": 17218,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Map.hs",
+      "sha256": "1ef3465e36c4fddcb2b2e60fafd27b642a79e956fe8357355b798d1c7ab199b0"
+    },
+    {
+      "bytes": 2539,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/ST.hs",
+      "sha256": "64ec30dba979baefb17dd180ebef79179c9ddc60197562263cb0abd5e7f78ca2"
+    },
+    {
+      "bytes": 4093,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Set.hs",
+      "sha256": "c2222cc52e2ee750a92d563f8f513ecf4eb60b1afd534b91a37b7c5d5ba6e60f"
+    },
+    {
+      "bytes": 20088,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Std.hs",
+      "sha256": "f3ce7e610ff4025a51e71c2ceca0ce89b5af1c940ab534ec4532ca2040d48aca"
+    },
+    {
+      "bytes": 12757,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Types.hs",
+      "sha256": "5bd1b057194fd550ffa0a6473c04cf054acdb8237e440747115f729894454596"
+    },
+    {
+      "bytes": 55534,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Unicode.hs",
+      "sha256": "bc54a7eb2a955511d25b3ecefa99bf284ebe1027b9d97d0344d4fab4779a2077"
+    },
+    {
+      "bytes": 327,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/foundation14/Bootstrap/Version.hs",
+      "sha256": "25472aacf1647006d271a72c72f6790252f6e4b6508cd9d7de29d2628fdb0479"
+    },
+    {
+      "bytes": 2496,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-128/Main.hs",
+      "sha256": "ba13ac3b8d15d7b1d4c63fcc9698c86b9cbca1b6244dd1b1ee6a89e2e6ce41da"
+    },
+    {
+      "bytes": 816,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-16/Main.hs",
+      "sha256": "c5bc5b63bfdcd05b263b625788b77846fdac1d5fe69c7c36ae6abed100c1bb2b"
+    },
+    {
+      "bytes": 4416,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-256/Main.hs",
+      "sha256": "0747d08346964a72c21f11990bbc9deec4d31e9dd05629e71df8668dc75c76a7"
+    },
+    {
+      "bytes": 1056,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-32/Main.hs",
+      "sha256": "5943c0526bd00cbe8d76b60643e1495c8a07122c3c5a6fb2a59215bfd5c3db49"
+    },
+    {
+      "bytes": 1536,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/inputs/higher_order_chain-64/Main.hs",
+      "sha256": "d8a72fb0850ef38bf04df17b1490061f6d20ccc7d1dd59a7ca29146a70969a8c"
+    },
+    {
+      "bytes": 9293,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/prepare_inputs.py",
+      "sha256": "6f2cd84560a1433100e780ceb03d6b9a2573e5c7be14d44b7caadf462cc32b45"
+    },
+    {
+      "bytes": 4108,
+      "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/report.json",
+      "sha256": "c3acd62444fb21b41658e3d2f8db16aebc349d4ac0c82a322bf2a026f2845ea8"
+    },
+    {
+      "bytes": 3636,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-route-source-review/report.json",
+      "sha256": "ba1cdd53da71eaa3cf77cabadfe6a32c876a37381949931874ff4bf129ed5680"
+    },
+    {
+      "bytes": 3791,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/ROUTE-CONTRACT-v3.json",
+      "sha256": "cd0f2e700b9e6a7a0d33f0d29caa6c47f6c10af5ec0420c57d23dd39745e21f8"
+    },
+    {
+      "bytes": 2954,
+      "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04-actual-review/MANIFEST.json",
+      "sha256": "829e8995ac36f517ae4e077a972385ffb22b5f5cb4f9548bd14919908d64c77f"
+    },
+    {
+      "bytes": 9821,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-baseline-observation-design-review/report.json",
+      "sha256": "bea14ed40b446a1beda53384355c3cf3f38c4617164b75a3e7651cf634baea83"
+    },
+    {
+      "bytes": 157955,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/SETUP-SCOPE-BASELINE.json",
+      "sha256": "d0f5b00978dc1075076b9ddcad98fa18c23c7e4536d824dbad8048901e52d6cb"
+    },
+    {
+      "bytes": 18702,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+      "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+    },
+    {
+      "bytes": 5088,
+      "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/MANIFEST.json",
+      "sha256": "495205f35150d5d00cfe15f373eab1c4619af2551baf0b0c972584d8479426e5"
+    }
+  ],
+  "source_inventory": {
+    "bytes": 1638110,
+    "path": "<EXPERIMENT_ROOT>/main-migration-source-20261114-1321/SOURCE-FILES.json",
+    "sha256": "e326f4bea2d229b02dc20fe7504793224889749ac474b8d126ba738ab1934e99"
+  },
+  "source_tree": "386f0b41ab5f9b39fca273f3040f51d73df924a1",
+  "statistics_count_per_block": 24,
+  "stats_binary": {
+    "bytes": 20205400,
+    "path": "<EXPERIMENT_ROOT>/main-gap-setup-run04/setup/stats-emlf",
+    "sha256": "b0b46ae804c6e55b64d7792fa7a6835f7805d2207d03b47ea2918e65eef49347"
+  },
+  "stats_parser": {
+    "bytes": 4888,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/stats.py",
+    "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+  },
+  "tool_inventory": {
+    "bytes": 574757,
+    "path": "<EXPERIMENT_ROOT>/main-baseline-ordinary-v1-source/TOOL-FILES.json",
+    "sha256": "25dfb0585e55c29b69a51b999b5dfb4dfa7f7c7092dfffe487c778eb5c154afe"
+  },
+  "worker": {
+    "bytes": 15279,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/sampling_worker.py",
+    "sha256": "508c17765753bd2c5716d2b6569edf234204d395fc36a456954d522e00be567f"
+  },
+  "workload_manifest": {
+    "bytes": 9597,
+    "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/MANIFEST.json",
+    "sha256": "2cc33af7ec0fe71ff2b6464dde15adb369731df4aaa8fd7622087c5f0eb868a0"
+  }
+}

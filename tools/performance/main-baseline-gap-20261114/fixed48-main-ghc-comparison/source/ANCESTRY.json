@@ -1,0 +1,71 @@
+{
+  "actual_combined_review": {
+    "bytes": 18702,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-01-actual-review/report.json",
+    "sha256": "9293db948fe9393f28f6153ee514eb16e1c1ee3c8b1ec0fe15ffa9d762232a41"
+  },
+  "fixed_support_proposal": {
+    "bytes": 25529,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-minimal-next-source/LEDGER-PROPOSAL.json",
+    "sha256": "832fdfcbca47ecf7665521e1503ae9e2b7c281c50d9c7aa3d7dd469ff1bd5bf9"
+  },
+  "immutable_RTS_parser": {
+    "bytes": 4888,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/stats.py",
+    "sha256": "b558556b11af12b117444f6476c5e841fa1b4beddc8f7cfe5e13047f2426a84c"
+  },
+  "immutable_boundary_identity_helper": {
+    "bytes": 3827,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/identity.py",
+    "sha256": "b2caf9e4c4c65782b5cc003d68d60794357cc40a014e0e53364c7cb660dead8a"
+  },
+  "immutable_guard": {
+    "bytes": 24833,
+    "path": "<EXPERIMENT_ROOT>/recovery/tools/performance/full-compiler/continuation-20261111/sparse-attribution-r13/guard.py",
+    "sha256": "53a5b322fe8ed9e1a527dda0596215ffc81322b43b1864442827c9056c313d0e"
+  },
+  "immutable_runtime_helper": {
+    "bytes": 11663,
+    "path": "<EXPERIMENT_ROOT>/dense-direct-capture-r24-source/implementation/runtime_pins.py",
+    "sha256": "cf1346302f2467d74a883e51042d28442d0c0af5f659702e6fcf09ed43c1662b"
+  },
+  "immutable_semantic_parsers": {
+    "bytes": 4580,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/semantic_parsers.py",
+    "sha256": "359060abe291cdd0f5e038577985732603aabf6a652381475cdb2c6b44e125cc"
+  },
+  "immutable_wire_oracle": {
+    "bytes": 18398,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-qualification-v1-source/publication_oracle.py",
+    "sha256": "df9d3ad4ef1dd23d888a7089efcf365e0939922a5c1f63cc6c04c6c775579be1"
+  },
+  "mechanical_diffs": [
+    {
+      "bytes": 55220,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/controller.py.diff",
+      "sha256": "f664d93f94c6600c3150bfe8a117a744958edf5ed759975da29f068f62af5c8a"
+    },
+    {
+      "bytes": 26110,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-v1-source/sampling_worker.py.diff",
+      "sha256": "15ec723d404077ded5ff7520b8833e6302452ef9a561300601040ae1967419a1"
+    }
+  ],
+  "original48_order": {
+    "bytes": 45845,
+    "path": "<EXPERIMENT_ROOT>/main-gap-workloads-v1-source/LEGS.json",
+    "sha256": "53dcf311abd779697726d56bfd09a31d77aae0e8c278cd1551cdee280a546be8"
+  },
+  "reviewed_completion_gate": {
+    "bytes": 13444,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source-review/report.json",
+    "sha256": "483e491550640505ab48f49c8c821a46a374af555c653e485f1f5b6ac3af7d15"
+  },
+  "reviewed_completion_source": {
+    "bytes": 4409,
+    "path": "<EXPERIMENT_ROOT>/main-gap-semantic-completion-v2-source/MANIFEST.json",
+    "sha256": "2beaafaf998da6e3e7b5b3b9e284831eebd53062e1b7610aeca6ff05160f1c57"
+  },
+  "schema": "main-gap-sampling-source-ancestry-v1",
+  "source_only": true
+}

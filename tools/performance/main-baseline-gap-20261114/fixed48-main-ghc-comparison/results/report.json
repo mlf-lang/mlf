@@ -1,0 +1,75 @@
+{
+  "RTS_count": 48,
+  "actual_combined_review": {
+    "bytes": 11532,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/combined-final.json",
+    "sha256": "33829f5e71c9a1ed5cc530566450ef06d473dba8de4b5abbc6c554657983c408"
+  },
+  "actual_combined_sampling_passed": true,
+  "actual_stage_reviews": [
+    {
+      "bytes": 17450,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-01-actual-review/report.json",
+      "sha256": "9d0f20dd831a4943bb3672b1889bb1772397c5c9014f8939754adaba1b5cc924"
+    },
+    {
+      "bytes": 20604,
+      "path": "<EXPERIMENT_ROOT>/main-gap-sampling-02-actual-review/report.json",
+      "sha256": "cf5bf9fe5364b6cdaa850629238aaa36517ace48c93d33ecd92f895e56de591f"
+    }
+  ],
+  "basis": "All48 reduced raw metric and guard/RTS pins exactly match independent combined-samples; three original manifests and both report hashes verified; v2 minimal null-size repair recorded.",
+  "blockers": [],
+  "cell_count": 12,
+  "claims": {
+    "CPU_algorithm_attribution": false,
+    "asymptotic_complexity_proved": false,
+    "equivalent_GHC_endpoint": false,
+    "production_promotion": false,
+    "stable_speedup": false,
+    "statistical_significance": false
+  },
+  "complete": true,
+  "finding_file": {
+    "bytes": 6537,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final/findings.json",
+    "sha256": "6fe83ac1157ae7fb172c028e451fdd2c21dec3d1f8c9f33809d93ae7a16c7854"
+  },
+  "input": {
+    "bytes": 2466,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final/actual-input.json",
+    "sha256": "79066ebbe349554a153a73d471febd331b817c7d9b9731d3561a8c6b4385468b"
+  },
+  "new_samples": 0,
+  "new_target_executions": 0,
+  "normalization_exclusions": {
+    "baseline-0": "n=0, division undefined",
+    "foundation14": "size=None: no single generated-size unit; not on either ladder"
+  },
+  "observation_count": 48,
+  "old_sources_or_evidence_modified": false,
+  "original_reducer_source_manifest": {
+    "bytes": 2286,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-v1-source/MANIFEST.json",
+    "sha256": "9a7e7092ff212693509f5edafc721bdd4ee3c904f0eec489f88d23d0d1f9f6f9"
+  },
+  "reducer_generic_pending_placeholder": "Retained unchanged in generated results; genuine actual combined PASS above is authoritative. Reducer itself issues no gate.",
+  "reducer_source_manifest": {
+    "bytes": 1041,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-v2-source/MANIFEST.json",
+    "sha256": "28ac7cd3a67df5d3bcef01b42d6b277e1386ca21d8ef01342bf26241834d840d"
+  },
+  "schema": "main-gap-fixed48-final-summary-v1",
+  "source_commit": "fc300bc9fdc389b585cbef0630fc8915d53e89c5",
+  "summary": {
+    "bytes": 3989,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final/SUMMARY.md",
+    "sha256": "f870587ac6a4b883f1a8cf9299c8783675d503c1931bbe19f5e52f64c8c5898c"
+  },
+  "verification": {
+    "bytes": 5100,
+    "path": "<EXPERIMENT_ROOT>/main-gap-sampling-summary-final/verification.json",
+    "sha256": "a573ac3a33630defab650c474eb6d1efecbe966859a1ad786b322806e4172887"
+  },
+  "verification_count": 66
+}
