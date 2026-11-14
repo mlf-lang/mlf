@@ -1,0 +1,47 @@
+{
+  "schema": "mlf-source-only-regression-public-manifest-v1",
+  "original_DIAG_passed": false,
+  "runtime_admitted": false,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3562,
+      "sha256": "aee39c729033a2ad89499b3798ecd087991b63ee99dabdf9138b428f89b65b7e"
+    },
+    {
+      "path": "checks-optimized.json",
+      "bytes": 1631,
+      "sha256": "2e57d7009713b36b9980c4b6792f70e821928349beccfeadfdc142ad4b326a24"
+    },
+    {
+      "path": "checks.json",
+      "bytes": 1631,
+      "sha256": "2e57d7009713b36b9980c4b6792f70e821928349beccfeadfdc142ad4b326a24"
+    },
+    {
+      "path": "inventory-order.patch",
+      "bytes": 727,
+      "sha256": "ebd87d8b4200faaf32942024a83c80d46337e2cfa947a5883f51c8aabb64e8a3"
+    },
+    {
+      "path": "original_shape.py",
+      "bytes": 899,
+      "sha256": "fa1f3613d2e585fb2a4f4921829b56c2e5295819486e7d724d41093907b5749b"
+    },
+    {
+      "path": "public-review.json",
+      "bytes": 4910,
+      "sha256": "74b6383355b0aa3db5b17f022d54553bed2182cbefbd76d36b524f7d45c64d09"
+    },
+    {
+      "path": "repaired_shape.py",
+      "bytes": 908,
+      "sha256": "991e6569e24abb395e0b41c9f5fd753ce74d83e5fb2e369a90156d02ca20d336"
+    },
+    {
+      "path": "test_inventory_order.py",
+      "bytes": 4441,
+      "sha256": "1b14cc8fa3f06f6cb49d0649e89acd2e2e5a9ed41b7148af425dc9137223d4ad"
+    }
+  ]
+}

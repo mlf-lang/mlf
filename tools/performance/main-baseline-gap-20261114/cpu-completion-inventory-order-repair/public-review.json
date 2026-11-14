@@ -1,0 +1,100 @@
+{
+  "schema": "mlf-inventory-order-public-independent-review-v1",
+  "review_completed_at_utc": "2026-11-14T23:22:01.524001+00:00",
+  "complete": true,
+  "verdict": "PASS_NARROW_SOURCE_DELTA_ONLY",
+  "reviewed_input_file_count": 7,
+  "reviewed_inputs": [
+    {
+      "file": "README.md",
+      "sha256": "aee39c729033a2ad89499b3798ecd087991b63ee99dabdf9138b428f89b65b7e",
+      "bytes": 3562
+    },
+    {
+      "file": "checks-optimized.json",
+      "sha256": "2e57d7009713b36b9980c4b6792f70e821928349beccfeadfdc142ad4b326a24",
+      "bytes": 1631
+    },
+    {
+      "file": "checks.json",
+      "sha256": "2e57d7009713b36b9980c4b6792f70e821928349beccfeadfdc142ad4b326a24",
+      "bytes": 1631
+    },
+    {
+      "file": "inventory-order.patch",
+      "sha256": "ebd87d8b4200faaf32942024a83c80d46337e2cfa947a5883f51c8aabb64e8a3",
+      "bytes": 727
+    },
+    {
+      "file": "original_shape.py",
+      "sha256": "fa1f3613d2e585fb2a4f4921829b56c2e5295819486e7d724d41093907b5749b",
+      "bytes": 899
+    },
+    {
+      "file": "repaired_shape.py",
+      "sha256": "991e6569e24abb395e0b41c9f5fd753ce74d83e5fb2e369a90156d02ca20d336",
+      "bytes": 908
+    },
+    {
+      "file": "test_inventory_order.py",
+      "sha256": "1b14cc8fa3f06f6cb49d0649e89acd2e2e5a9ed41b7148af425dc9137223d4ad",
+      "bytes": 4441
+    }
+  ],
+  "delta": "Only sorted(names) changes to sorted(names,key=Path) in preserved_shape. Expected evidence is not re-sorted or rewritten. Directory string sorting and other source gates are unchanged.",
+  "full_controller_identities": {
+    "baseline_sha256": "c39129fae7dc1fb5c1ee0c294d386a26e9c3d6e2b33b2bc6eba0634d33cc233d",
+    "candidate_sha256": "ea8edc77d875351882c786d490b5922063174469eaa9ae9b09542f3298721ae2"
+  },
+  "public_fixture_tests": [
+    {
+      "command": "python3 -I -B test_inventory_order.py",
+      "exit_code": 0,
+      "passed_checks": 13,
+      "output_matches": "checks.json"
+    },
+    {
+      "command": "python3 -O -I -B test_inventory_order.py",
+      "exit_code": 0,
+      "passed_checks": 13,
+      "output_matches": "checks-optimized.json"
+    }
+  ],
+  "reported_checks": "13 checks in each public run. These are synthetic, AST-extracted preserved_shape checks; historical dependencies are stubbed. They are not complete-controller tests.",
+  "extraction_identity": "Both public function fixtures are AST-identical to the corresponding reviewed full controller functions. The public patch body is identical to the reviewed one-expression delta.",
+  "label_correction_verified": {
+    "resolved": true,
+    "changes": [
+      "The public test and output hash keys now say old_fixture_sha256 and candidate_fixture_sha256, distinguishing extracted fixtures from full controllers.",
+      "The first public check now says all other fixture bytes unchanged, accurately limiting its claim."
+    ],
+    "both_saved_outputs_regenerated_and_independently_reproduced": true
+  },
+  "separate_private_review_summary": {
+    "independent_checks_passed": 53,
+    "scope": "Source and archive pin identity checks, exact byte/AST delta, archived Path ordering, and extracted-function behavior in temporary trees at optimization levels 0 and 1. A temporary 3294-file, 82-directory shape replica used zero-byte placeholders, not original payloads. Additional rejection controls covered reordered and duplicate records, missing and extra files, directory changes, file/directory/dangling symlinks, hardlinks outside the scope, FIFO special files, and dependency-failure propagation.",
+    "all_reviewed_source_and_archive_bytes_preserved": true,
+    "private_24_check_suite": "Separately rerun successfully in normal and -O modes. Not included in or conflated with the public 13-check suite.",
+    "private_inventory_not_included": true
+  },
+  "full_source_gate_passed": false,
+  "execution_admitted": false,
+  "activation_performed": false,
+  "compiler_runs": 0,
+  "loader_runs": 0,
+  "benchmark_runs": 0,
+  "guard_runs": 0,
+  "lease_actions": 0,
+  "historical_entry_points_run": 0,
+  "original_DIAG_passed": false,
+  "original_DIAG_status": "FAIL, unchanged",
+  "remaining_blockers": [
+    "Historical runtime and complete original run-scope continuity are unavailable in the recovery workspace.",
+    "The two supplemental loader commands and complete source/runtime qualification remain unexecuted.",
+    "A fully frozen, independently qualified source package and fresh admission are still required before any authorized execution."
+  ],
+  "no_performance_claim": true,
+  "qualified_CPU_attribution_claimed": false,
+  "public_export_suitability": "Suitable for publication as a narrow source-regression archive only. No private absolute workspace paths or original frozen inventory payload are present in the reviewed public inputs. This report is not an execution admission, performance result, or full source qualification.",
+  "publication_performed_by_reviewer": false
+}

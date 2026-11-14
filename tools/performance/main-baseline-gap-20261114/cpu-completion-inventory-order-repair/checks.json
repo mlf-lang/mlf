@@ -1,0 +1,66 @@
+{
+  "schema": "mlf-completion-inventory-order-public-fixture-v1",
+  "complete": true,
+  "narrow_source_checks_passed": true,
+  "full_source_gate_passed": false,
+  "execution_admitted": false,
+  "compiler_loader_benchmark_runs": 0,
+  "original_DIAG_passed": false,
+  "checks": [
+    {
+      "name": "exact one-expression delta, all other fixture bytes unchanged",
+      "pass": true
+    },
+    {
+      "name": "one preserved_shape definition",
+      "pass": true
+    },
+    {
+      "name": "one preserved_shape definition",
+      "pass": true
+    },
+    {
+      "name": "full v1 preserved_shape reproduces ordering failure",
+      "pass": true
+    },
+    {
+      "name": "full repaired function retains original rows and metadata",
+      "pass": true
+    },
+    {
+      "name": "old-scope check still called, no bypass",
+      "pass": true
+    },
+    {
+      "name": "unexpected filesystem file rejected",
+      "pass": true
+    },
+    {
+      "name": "missing filesystem file rejected",
+      "pass": true
+    },
+    {
+      "name": "duplicate frozen record rejected",
+      "pass": true
+    },
+    {
+      "name": "extra directory rejected",
+      "pass": true
+    },
+    {
+      "name": "symlink alias rejected",
+      "pass": true
+    },
+    {
+      "name": "hardlink alias rejected",
+      "pass": true
+    },
+    {
+      "name": "restored synthetic tree accepted without old-row mutation",
+      "pass": true
+    }
+  ],
+  "count": 13,
+  "old_fixture_sha256": "fa1f3613d2e585fb2a4f4921829b56c2e5295819486e7d724d41093907b5749b",
+  "candidate_fixture_sha256": "991e6569e24abb395e0b41c9f5fd753ce74d83e5fb2e369a90156d02ca20d336"
+}
