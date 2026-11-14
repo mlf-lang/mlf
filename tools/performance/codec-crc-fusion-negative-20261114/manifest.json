@@ -1,0 +1,45 @@
+{
+  "review_pending": false,
+  "files": [
+    {
+      "file": "A-controls.stdout",
+      "bytes": 39,
+      "sha256": "4dc176e999effee4deb7a28040bcc46acc64e8d997e85fa62b50bf5bf15f68cb"
+    },
+    {
+      "file": "A-phases.stdout",
+      "bytes": 735,
+      "sha256": "a3263882644e3f7812a73526b768404ed8acb01a663ccac1c36475f81848a381"
+    },
+    {
+      "file": "B-controls.stdout",
+      "bytes": 39,
+      "sha256": "4dc176e999effee4deb7a28040bcc46acc64e8d997e85fa62b50bf5bf15f68cb"
+    },
+    {
+      "file": "B-phases.stdout",
+      "bytes": 734,
+      "sha256": "4365c599743f9245cda64906f12df63e676a004c3f77b8c034ae8d8908f5028f"
+    },
+    {
+      "file": "Main.hs",
+      "bytes": 13552,
+      "sha256": "a2274477486451d9c4a2c10024f36e022fa43379f08ccb92baa1cb7a4e525a4d"
+    },
+    {
+      "file": "README.md",
+      "bytes": 3562,
+      "sha256": "7bb45edbfa6aa2b48163a015c670f1b93ebffc2ed9e47a2b45ebfc2b9cfdb47d"
+    },
+    {
+      "file": "candidate.patch",
+      "bytes": 625,
+      "sha256": "9d384059bdebdb1d640534efb5dab08c47718edc698c21621f18b8f1d640eef9"
+    },
+    {
+      "file": "results.json",
+      "bytes": 10735,
+      "sha256": "46f4433bd03e795cd195a2a8ec921e9dcc676d305c170fdb7c07384937b8674f"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+--- a/libraries/mlf-crates/Bootstrap/Bitstream.hs
++++ b/libraries/mlf-crates/Bootstrap/Bitstream.hs
+@@ -514,7 +514,8 @@
+   crcRange table bytes end position crc =
+     if position == end then ioReturn crc else do {
+       byte <- if position >= 76 && position < 80 then ioReturn 0 else readByteArray bytes position;
+-      next <- advanceCRC table crc byte;
++      remainder <- readIntArray table (andInt (xorInt crc byte) 255);
++      let { next = xorInt (unsignedShiftRInt crc 8) remainder };
+       seq next (crcRange table bytes end (position + 1) next)
+     };
+   checksumAt :: ByteArray -> Int -> Int -> Int -> IO Int;

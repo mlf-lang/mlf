@@ -1,0 +1,409 @@
+{
+  "status": "actual controls and limited emitted phase/action boundaries reviewed; negative result",
+  "promoted": false,
+  "additional_repetitions": 0,
+  "observations": {
+    "A": [
+      {
+        "index": 0,
+        "stage": "empty-before",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 311
+      },
+      {
+        "index": 0,
+        "stage": "plan",
+        "current_thread_counter_bytes": 3104,
+        "nanoseconds": 7751
+      },
+      {
+        "index": 0,
+        "stage": "force-tables-control",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 2163
+      },
+      {
+        "index": 0,
+        "stage": "layout",
+        "current_thread_counter_bytes": 1000,
+        "nanoseconds": 3095
+      },
+      {
+        "index": 0,
+        "stage": "writer-plus-crc",
+        "current_thread_counter_bytes": 87920,
+        "nanoseconds": 44426
+      },
+      {
+        "index": 0,
+        "stage": "standalone-crc",
+        "current_thread_counter_bytes": 22992,
+        "nanoseconds": 10275
+      },
+      {
+        "index": 0,
+        "stage": "empty-after",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 40
+      },
+      {
+        "index": 1,
+        "stage": "empty-before",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 70
+      },
+      {
+        "index": 1,
+        "stage": "plan",
+        "current_thread_counter_bytes": 78352,
+        "nanoseconds": 38818
+      },
+      {
+        "index": 1,
+        "stage": "force-tables-control",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 511
+      },
+      {
+        "index": 1,
+        "stage": "layout",
+        "current_thread_counter_bytes": 1288,
+        "nanoseconds": 2564
+      },
+      {
+        "index": 1,
+        "stage": "writer-plus-crc",
+        "current_thread_counter_bytes": 912760,
+        "nanoseconds": 661065
+      },
+      {
+        "index": 1,
+        "stage": "standalone-crc",
+        "current_thread_counter_bytes": 437696,
+        "nanoseconds": 196736
+      },
+      {
+        "index": 1,
+        "stage": "empty-after",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 61
+      },
+      {
+        "index": 2,
+        "stage": "empty-before",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 90
+      },
+      {
+        "index": 2,
+        "stage": "plan",
+        "current_thread_counter_bytes": 18557480,
+        "nanoseconds": 6370217
+      },
+      {
+        "index": 2,
+        "stage": "force-tables-control",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 39299
+      },
+      {
+        "index": 2,
+        "stage": "layout",
+        "current_thread_counter_bytes": 458104,
+        "nanoseconds": 107552
+      },
+      {
+        "index": 2,
+        "stage": "writer-plus-crc",
+        "current_thread_counter_bytes": 46704696,
+        "nanoseconds": 7915503
+      },
+      {
+        "index": 2,
+        "stage": "standalone-crc",
+        "current_thread_counter_bytes": 14435008,
+        "nanoseconds": 2405650
+      },
+      {
+        "index": 2,
+        "stage": "empty-after",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 290
+      },
+      {
+        "index": 3,
+        "stage": "empty-before",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 461
+      },
+      {
+        "index": 3,
+        "stage": "plan",
+        "current_thread_counter_bytes": 100312088,
+        "nanoseconds": 38091259
+      },
+      {
+        "index": 3,
+        "stage": "force-tables-control",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 220402
+      },
+      {
+        "index": 3,
+        "stage": "layout",
+        "current_thread_counter_bytes": 1679144,
+        "nanoseconds": 612612
+      },
+      {
+        "index": 3,
+        "stage": "writer-plus-crc",
+        "current_thread_counter_bytes": 307142432,
+        "nanoseconds": 46403981
+      },
+      {
+        "index": 3,
+        "stage": "standalone-crc",
+        "current_thread_counter_bytes": 104236736,
+        "nanoseconds": 15809535
+      },
+      {
+        "index": 3,
+        "stage": "empty-after",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 261
+      }
+    ],
+    "B": [
+      {
+        "index": 0,
+        "stage": "empty-before",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 200
+      },
+      {
+        "index": 0,
+        "stage": "plan",
+        "current_thread_counter_bytes": 3104,
+        "nanoseconds": 8783
+      },
+      {
+        "index": 0,
+        "stage": "force-tables-control",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 2223
+      },
+      {
+        "index": 0,
+        "stage": "layout",
+        "current_thread_counter_bytes": 1000,
+        "nanoseconds": 4086
+      },
+      {
+        "index": 0,
+        "stage": "writer-plus-crc",
+        "current_thread_counter_bytes": 87920,
+        "nanoseconds": 63546
+      },
+      {
+        "index": 0,
+        "stage": "standalone-crc",
+        "current_thread_counter_bytes": 22992,
+        "nanoseconds": 14281
+      },
+      {
+        "index": 0,
+        "stage": "empty-after",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 70
+      },
+      {
+        "index": 1,
+        "stage": "empty-before",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 80
+      },
+      {
+        "index": 1,
+        "stage": "plan",
+        "current_thread_counter_bytes": 78352,
+        "nanoseconds": 68403
+      },
+      {
+        "index": 1,
+        "stage": "force-tables-control",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 461
+      },
+      {
+        "index": 1,
+        "stage": "layout",
+        "current_thread_counter_bytes": 1288,
+        "nanoseconds": 1823
+      },
+      {
+        "index": 1,
+        "stage": "writer-plus-crc",
+        "current_thread_counter_bytes": 960928,
+        "nanoseconds": 555726
+      },
+      {
+        "index": 1,
+        "stage": "standalone-crc",
+        "current_thread_counter_bytes": 485864,
+        "nanoseconds": 248174
+      },
+      {
+        "index": 1,
+        "stage": "empty-after",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 60
+      },
+      {
+        "index": 2,
+        "stage": "empty-before",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 210
+      },
+      {
+        "index": 2,
+        "stage": "plan",
+        "current_thread_counter_bytes": 18557480,
+        "nanoseconds": 6025769
+      },
+      {
+        "index": 2,
+        "stage": "force-tables-control",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 42033
+      },
+      {
+        "index": 2,
+        "stage": "layout",
+        "current_thread_counter_bytes": 458104,
+        "nanoseconds": 107242
+      },
+      {
+        "index": 2,
+        "stage": "writer-plus-crc",
+        "current_thread_counter_bytes": 48502528,
+        "nanoseconds": 7898378
+      },
+      {
+        "index": 2,
+        "stage": "standalone-crc",
+        "current_thread_counter_bytes": 16232840,
+        "nanoseconds": 2346712
+      },
+      {
+        "index": 2,
+        "stage": "empty-after",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 50
+      },
+      {
+        "index": 3,
+        "stage": "empty-before",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 190
+      },
+      {
+        "index": 3,
+        "stage": "plan",
+        "current_thread_counter_bytes": 100312088,
+        "nanoseconds": 38374446
+      },
+      {
+        "index": 3,
+        "stage": "force-tables-control",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 242715
+      },
+      {
+        "index": 3,
+        "stage": "layout",
+        "current_thread_counter_bytes": 1679144,
+        "nanoseconds": 863019
+      },
+      {
+        "index": 3,
+        "stage": "writer-plus-crc",
+        "current_thread_counter_bytes": 320165480,
+        "nanoseconds": 47346690
+      },
+      {
+        "index": 3,
+        "stage": "standalone-crc",
+        "current_thread_counter_bytes": 117259784,
+        "nanoseconds": 17438666
+      },
+      {
+        "index": 3,
+        "stage": "empty-after",
+        "current_thread_counter_bytes": 0,
+        "nanoseconds": 50
+      }
+    ]
+  },
+  "largest_payload_bytes": 406975,
+  "largest_crc_bytes": {
+    "A": 104236736,
+    "B": 117259784
+  },
+  "largest_writer_plus_crc_bytes": {
+    "A": 307142432,
+    "B": 320165480
+  },
+  "interpretation": "Negative allocation result, not a speedup; single invocation per phase per side, four unweighted payloads.",
+  "review_hashes": {
+    "actual": "210c4035813d6c74d883d27545549f5f61bf558d2d3f5efeff129c5ea9b9ec7f",
+    "emitted": "f7167666c896b77b03f2d88c9041af677d75978151fa39cf277bf11c8f76779f"
+  },
+  "emitted_explanation": {
+    "A_large_checksum_entry": "checksum12: specialized state-threaded loop with unboxed position; direct byte reads and advanceCRC call; returned CRC forced before recursion",
+    "B_large_checksum_entry": "$wcrcRange then local $s$wcrcRange: table read and CRC arithmetic fused, unboxed CRC, but boxed position, next-position thunk and byte-read/IO action closures remain",
+    "exact_heap_accounting_or_Cmm_review_performed": false,
+    "single_closure_exact_32_byte_attribution_proven": false
+  },
+  "main_core_stg_identical_except_dump_timestamps": true,
+  "main_object_identical": true,
+  "source_and_object_pins": {
+    "A": {
+      "Bitstream_object": {
+        "bytes": 694016,
+        "sha256": "b4e6ad9d8b72e27cc4ce39b5c20164f8f33c84b47fdac98adab071b35839d909"
+      },
+      "Bitstream_source": {
+        "bytes": 82558,
+        "sha256": "f25fe195b5a287fd0c365286acb31839118edac2227f463ea5cc85eb26daedb8"
+      },
+      "Main_object": {
+        "bytes": 229496,
+        "sha256": "fb5133a1ccf53eebdb30c3a2ebf4350c1aa261d5b4c25c34912c86f952818d4f"
+      },
+      "Main_source": {
+        "bytes": 13552,
+        "sha256": "a2274477486451d9c4a2c10024f36e022fa43379f08ccb92baa1cb7a4e525a4d"
+      }
+    },
+    "B": {
+      "Bitstream_object": {
+        "bytes": 695624,
+        "sha256": "8b8384e09e0f11f7685eddc25b5d99bbfd9ddc57501fe76cc8730127170aca4f"
+      },
+      "Bitstream_source": {
+        "bytes": 82652,
+        "sha256": "a6f4e1d264536eaf0ec283974a565a309045e4ee19051d6f112383b9200d28bf"
+      },
+      "Main_object": {
+        "bytes": 229496,
+        "sha256": "fb5133a1ccf53eebdb30c3a2ebf4350c1aa261d5b4c25c34912c86f952818d4f"
+      },
+      "Main_source": {
+        "bytes": 13552,
+        "sha256": "a2274477486451d9c4a2c10024f36e022fa43379f08ccb92baa1cb7a4e525a4d"
+      }
+    }
+  },
+  "ordinary_speedup_qualified": false,
+  "complete_codec_qualification": false
+}
