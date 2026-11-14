@@ -16,7 +16,7 @@ main :: IO ();
 main = ioBind (getArg 0) (\text -> printInt (entry (readInt text)))
 }
 '''
-FAMILIES = ('flat_functions', 'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring',
+FAMILIES = ('flat_functions', 'inferred_functions', 'local_functions', 'dependency_chain', 'inferred_chain', 'recursive_ring',
             'mono_calls', 'poly_calls', 'tree_chain', 'balanced_tree',
             'literal_table', 'higher_order_chain')
 
@@ -32,15 +32,15 @@ def program(family, n):
     """No generated declaration is intentionally unreachable from the IO entry."""
     if family == 'baseline':
         declarations, expression = '', 'x'
-    elif family in ('flat_functions', 'local_functions', 'dependency_chain', 'inferred_chain'):
+    elif family in ('flat_functions', 'inferred_functions', 'local_functions', 'dependency_chain', 'inferred_chain'):
         declarations = ''
         for i in range(n):
-            if family != 'inferred_chain':
+            if family not in ('inferred_chain', 'inferred_functions'):
                 declarations += f'f{i} :: Int -> Int;\n'
-            rhs = f'addInt x {i}' if family in ('flat_functions','local_functions') else ('addInt x 1' if i == 0 else f'f{i-1} (addInt x 1)')
+            rhs = f'addInt x {i}' if family in ('flat_functions','inferred_functions','local_functions') else ('addInt x 1' if i == 0 else f'f{i-1} (addInt x 1)')
             declarations += f'f{i} x = {rhs};\n'
         expression = (balanced([f'f{i} x' for i in range(n)], lambda a,b:f'addInt ({a}) ({b})')
-                      if family in ('flat_functions','local_functions') else f'f{n-1} x')
+                      if family in ('flat_functions','inferred_functions','local_functions') else f'f{n-1} x')
         if family == 'local_functions':
             expression = 'let {\n'+declarations+'} in '+expression
             declarations = ''
@@ -85,7 +85,7 @@ def expected(family, n, x):
     """Closed-form specifications; no compiled results or generated helpers used."""
     if family == 'baseline':
         return x
-    if family in ('flat_functions', 'local_functions', 'mono_calls', 'poly_calls', 'tree_chain', 'balanced_tree'):
+    if family in ('flat_functions', 'inferred_functions', 'local_functions', 'mono_calls', 'poly_calls', 'tree_chain', 'balanced_tree'):
         return n*x + n*(n-1)//2
     if family in ('dependency_chain', 'inferred_chain', 'higher_order_chain'):
         return x+n
@@ -101,7 +101,7 @@ def generate(out, sizes=(8,32,128), families=None):
     cases = []
     if families is None:
         # The default matrix keeps the ten shape families and one minimal baseline.
-        selected = [f for f in FAMILIES if f != 'local_functions']
+        selected = [f for f in FAMILIES if f not in ('local_functions', 'inferred_functions')]
         pairs = [('baseline', 0)]
         for family in selected:
             pairs.extend((family, n) for n in sizes)

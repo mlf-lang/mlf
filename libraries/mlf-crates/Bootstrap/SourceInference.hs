@@ -1205,7 +1205,7 @@ module Bootstrap.SourceInference where {
       Just (RootAuthority owner labels protected candidates _) -> do {
         resolved <- case (,) scope owners of {
           (,) (DeclScope _ _ _ _ (ResolvedOrigin inventory)) [ownerId] -> do {
-            let { entries = Classes.inventoryCandidateIds inventory ownerId };
+            let { entries = if null labels then [] else Classes.inventoryCandidateIds inventory ownerId };
             ensure (length entries == length candidates) "definition candidate inventory changed";
             traverseEither (\((,) ((,) role i) ((,,) expected name _)) -> do {
               ensure (Evidence.sameRole role expected &&
@@ -1473,20 +1473,26 @@ module Bootstrap.SourceInference where {
               Just _ -> Classes.lowerUnsignedRootAt Classes.sourceOwnedEnvironmentNames owner
             }) inventory overloads protected name rhs;
             case lowered of { Classes.SourceRootLowering body labels candidates protected -> do {
+              -- Lowering still sees the complete definition scope. Once it
+              -- produces no evidence slots, prepareOpenFinish cannot ask that
+              -- scope for an answer. Actual references in the lowered body
+              -- remain ordinary binding/layout dependencies. Roots with any
+              -- slots retain the complete conservative candidate inventory.
+              let { demanded = if null labels then [] else candidates };
               values <- freshLift (case (,) checked owner of {
                 (,) (Just current) (Just i) -> do {
-                  let { ids = Classes.inventoryCandidateIds inventory i };
-                  ensure (length candidates == length ids) "definition candidate inventory changed";
+                  let { ids = if null labels then [] else Classes.inventoryCandidateIds inventory i };
+                  ensure (length demanded == length ids) "definition candidate inventory changed";
                   traverseEither (\((,) ((,) role id) ((,) expected _)) -> do {
                     ensure (Evidence.sameRole role expected) "definition candidate role changed";
                     c <- checkedBinding current id;
                     Right ((,,) role (declName (checkedScope current) id) c)
-                  }) (zip ids candidates)
+                  }) (zip ids demanded)
                 };
                 _ -> traverseEither (\((,) role n) -> case M.lookup compareString n contracts of {
                   Nothing -> Left ("definition evidence support has not been checked: " ++ n);
                   Just c -> Right ((,,) role n c)
-                }) candidates
+                }) demanded
               });
               let { typed = map (\((,,) r n c) -> (,,) r n (contractType c)) values;
                 marked = mapMaybe (\((,,) _ n c) -> if contractProtected c then Just n else Nothing) values };

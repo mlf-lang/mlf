@@ -5,6 +5,7 @@
   "purpose": "Compile identical generated shared-Haskell programs with GHC and with GHC-hosted MLF, from fresh targets to native executables. This classifies compiler behaviour by program shape; it is not the C/MLF Benchmarks Game comparison in tools/bench.",
   "families": {
     "flat_functions": {"label": "Independent annotated functions", "default": true, "work": "n annotated top-level functions summed in a balanced tree"},
+    "inferred_functions": {"label": "Independent inferred functions (optional)", "default": false, "work": "the flat_functions family with no signatures on the n generated functions; opt in explicitly"},
     "dependency_chain": {"label": "Annotated dependency chain", "default": true, "work": "n annotated functions in a strict chain"},
     "inferred_chain": {"label": "Inferred dependency chain", "default": true, "work": "the same chain with no signature on the generated functions"},
     "recursive_ring": {"label": "Mutually recursive ring", "default": true, "work": "n functions in a mutually recursive cycle"},

@@ -15,6 +15,8 @@ module MLF.Tests.SharedFrontend where {
   import qualified Bootstrap.Bitstream as Wire;
   import qualified Bootstrap.ArtifactStructure as Structure;
   import qualified Bootstrap.InferenceUnit as Inference;
+  import qualified Bootstrap.SourceInference as Source;
+  import qualified Bootstrap.IntSet as IntSet;
   import qualified Bootstrap.OpenFragment as Open;
   import qualified Bootstrap.IndexVec as Index;
   import qualified Bootstrap.Lexer as L;
@@ -1563,6 +1565,7 @@ module MLF.Tests.SharedFrontend where {
   monomorphicGroupChecks = do {
     let { int = SCon "Int" []; bool = SCon "Bool" []; arrow = SArrow int int;
       row = \ty body -> [(,) (Index.fromInt 10) ((,,) "function" (Just (SAnnotation [] ty)) body)];
+      unsigned = \body -> [(,) (Index.fromInt 10) ((,,) "function" Nothing body)];
       add = \a b -> SApp (SApp (SPrimitive PAddInt) a) b;
       identity = SLam "x" Nothing (SVar "x") };
     monomorphicGroupCase "signed primitive lambda" True []
@@ -1587,11 +1590,39 @@ module MLF.Tests.SharedFrontend where {
       (row (SForall Flexible "a" SBottom (SArrow (STVar "a") (STVar "a"))) identity);
     monomorphicGroupCase "unsigned declaration uses solver" False []
       [(,) (Index.fromInt 10) ((,,) "function" Nothing identity)];
+    monomorphicGroupCase "inferred primitive lambda" True []
+      (unsigned (SLam "x" Nothing (add (SVar "x") (SIntLit 7))));
+    monomorphicGroupCase "inferred two arguments" True []
+      (unsigned (SLam "x" Nothing (SLam "y" Nothing (add (SVar "x") (SVar "y")))));
+    monomorphicGroupCase "inferred resolved parameter" True []
+      (unsigned (SDeclScope [Index.fromInt 12]
+        (SLam "x" Nothing (add (SGlobal (Index.fromInt 12) "wrong") (SIntLit 1)))));
+    monomorphicGroupCase "inferred closed global" True
+      [(,,) (Index.fromInt 3) "outside" (XArrow (XCon "Int" []) (XCon "Int" []))]
+      (unsigned (SLam "x" Nothing (SApp (SGlobal (Index.fromInt 3) "wrong") (SVar "x"))));
+    monomorphicGroupCase "inferred literal" True [] (unsigned (SIntLit 7));
+    monomorphicGroupCase "inferred boolean" True [] (unsigned (SBoolLit True));
+    monomorphicGroupCase "inferred Unicode" True [] (unsigned (SStringLit "λ"));
+    monomorphicGroupCase "inferred negative zero" True []
+      (unsigned (SDoubleLit (doubleFromBits (-9223372036854775808))));
+    monomorphicGroupCase "inferred inline lambda application uses solver" False []
+      (unsigned (SLam "x" Nothing (SApp (SLam "y" Nothing (add (SVar "y") (SIntLit 1))) (SVar "x"))));
+    monomorphicGroupCase "inferred unused parameter remains polymorphic" False []
+      (unsigned (SLam "x" Nothing (SIntLit 1)));
+    monomorphicGroupCase "inferred unknown function uses solver" False []
+      (unsigned (SLam "f" Nothing (SApp (SVar "f") (SIntLit 1))));
+    monomorphicGroupCase "inferred let generalization uses solver" False []
+      (unsigned (SLet "id" identity (SApp (SVar "id") (SIntLit 1))));
+    monomorphicGroupCase "inferred shadowing leaves outer parameter polymorphic" False []
+      (unsigned (SLam "x" Nothing (SLam "x" Nothing (add (SVar "x") (SIntLit 1)))));
     monomorphicGroupCase "recursive declaration uses solver" False []
       (row arrow (SLam "x" Nothing (SApp (SGlobal (Index.fromInt 10) "function") (SVar "x"))));
     let { bad = [row int (SBoolLit True), row arrow (SLam "x" (Just (SAnnotation [] bool)) (SIntLit 1)),
           row int (SGlobal (Index.fromInt 99) "outside"), row int (SVar "missing"),
-          row arrow (SChecked (SArrow bool bool) identity)] };
+          row arrow (SChecked (SArrow bool bool) identity),
+          unsigned (SLam "x" Nothing (add (SVar "x") (SBoolLit True))),
+          unsigned (SLam "x" Nothing (add (SVar "x")
+            (SApp (SAnn (SLam "b" Nothing (SIntLit 1)) (SAnnotation [] (SArrow bool int))) (SVar "x"))))] };
     mapM_ (\members -> do {
       check "bad monomorphic declaration rejects"
         (isLeft (Inference.compileOpenGroupIndexed "control" [] [] members));
@@ -1617,7 +1648,51 @@ module MLF.Tests.SharedFrontend where {
     check "direct entry rejects import type mismatch"
       (isLeft (Artifact.linkEntry 3 [ordinary] ordinary (M.fromList compareString [(,) entry ((,) (XName 0 "main") (XCon "Bool" []))]) entry))
   };
+  sourceCandidateChecks = do {
+    let { int = SCon "Int" [];
+      klass = SClassDecl "Probe" [(,) "a" Star] [] [(,) "probe" (SArrow (STVar "a") int)];
+      instanceValue = SInstanceDecl [] [] "Probe" [int] [(,) "probe" (SLam "x" Nothing (SVar "x"))];
+      members = [(,,) "plain" Nothing (SLam "x" Nothing (SApp (SApp (SPrimitive PAddInt) (SVar "x")) (SIntLit 1))),
+        (,,) "overloaded" Nothing (SLam "x" Nothing (SApp (SVar "probe") (SVar "x")))];
+      scope = IntSet.fromList [0] };
+    planned <- recursiveRight "candidate-demand source plan"
+      (Source.prepareSourcePlan M.empty [] [klass] [(,) "probeInt" instanceValue]
+        (M.fromList compareString [(,) "plain" scope,(,) "overloaded" scope]) [scope] members);
+    plan <- case planned of { Just value -> ioReturn value; Nothing -> panic "candidate-demand source plan fallback" };
+    dictionary <- case M.lookup compareString "Probe" (Classes.inventoryOrdinaryRegistry (Source.planInventory plan)) of {
+      Just value -> ioReturn value; Nothing -> panic "candidate-demand dictionary missing"
+    };
+    let { contracts = M.singleton "probeInt" (Source.SourceContract (XCon dictionary [XCon "Int" []]) [] False) };
+    plain <- recursiveRight "plain prepared source" (Source.prepareGroup plan contracts ["plain"]);
+    overloaded <- recursiveRight "overloaded prepared source" (Source.prepareGroup plan contracts ["overloaded"]);
+    check "unsigned root without evidence slots has no candidate dependencies" (null (Source.groupCandidateBindings plain));
+    check "unsigned overloaded root retains its exact candidate dependency"
+      (eqList eqString (map fst (Source.groupCandidateBindings overloaded)) ["probeInt"]);
+    check "unsigned overloaded root retains evidence slots" (case Source.groupAuthority overloaded of {
+      Just (Source.RootAuthority _ labels _ _ _) -> not (null labels); _ -> False
+    })
+  };
   rebuiltHashChecks = do {
+    check "open group owner uses exact framing"
+      (eqString (Separate.openGroupName "c" ["a","b"])
+        "16:MLF-OPEN-GROUP-11:c6:1:a1:b");
+    let { owners = map (\((,) crate members) -> Separate.openGroupName crate members)
+          [(,) "c" ["a","b"],(,) "c" ["a","c"],(,) "c" ["a1:b"],
+           (,) "c" ["ab"],(,) "c1:a" ["b"],(,) "d" ["a","b"],(,) "λ" ["a",""]] };
+    check "open group owner retains crate, full membership, boundaries and Unicode"
+      (length (nubBy eqString owners) == length owners);
+    check "open group owner canonicalizes member order"
+      (eqString (Separate.openGroupName "c" ["a","b"]) (Separate.openGroupName "c" ["b","a"]));
+    check "open owner reader retains legacy admission"
+      (Artifact.openGroupOwnerMatches "c" ["a","b"] (Separate.queryGroupName "c" ["a","b"]));
+    check "open owner reader admits exact new ownership"
+      (Artifact.openGroupOwnerMatches "c" ["a","b"] (Separate.openGroupName "c" ["a","b"]));
+    check "open owner reader rejects empty ownership"
+      (not (Artifact.openGroupOwnerMatches "c" [] (Separate.openGroupName "c" [])));
+    check "open owner reader rejects changed ownership"
+      (all (\owner -> not (Artifact.openGroupOwnerMatches "c" ["a","b"] owner))
+        [Separate.openGroupName "d" ["a","b"],Separate.openGroupName "c" ["a"],
+         Separate.openGroupName "c" ["a","c"],Separate.openGroupName "c" ["a","b","c"]]);
     let { prepared names original lowered metadata = Wire.VNode 421
             [Wire.VText "v",Structure.toList Structure.toText names,Wire.VText original,
              Wire.VText lowered,Structure.toList Structure.toText metadata];
@@ -1625,6 +1700,9 @@ module MLF.Tests.SharedFrontend where {
         Structure.toList (Structure.toPair Structure.toText Structure.toText) bindings];
       preparedBase = prepared ["a"] "body" "lowered" ["metadata"];
       finishBase = finished "g" "h" [(,) "a" "d"];
+      inventory fields = Wire.VNode 422 (map Wire.VText fields);
+      scope fields edges = Wire.VNode 423 [inventory fields,
+        Structure.toList (Structure.toPair Structure.toText Structure.toText) edges];
       literal label value text = do {
         bytes <- byteArrayFromString text;
         expected <- byteArrayDigest bytes;
@@ -1636,6 +1714,10 @@ module MLF.Tests.SharedFrontend where {
       "25:MLF-PREPARED-INPUT-TEXT-11:v1:11:a4:body7:lowered1:18:metadata";
     literal "finish receipt fixed framing" finishBase
       "25:MLF-FINISH-RECEIPT-TEXT-11:g1:h1:11:a1:d";
+    literal "scope inventory fixed framing" (inventory ["a","bc"])
+      "26:MLF-SCOPE-INVENTORY-TEXT-11:21:a2:bc";
+    literal "scope dependencies fixed framing" (scope ["a"] [(,) "k" "h"])
+      "22:MLF-SCOPE-READS-TEXT-11:11:a1:11:k1:h";
     let { variants = [preparedBase,prepared [] "body" "lowered" ["metadata"],
           prepared [""] "body" "lowered" ["metadata"],
           prepared ["a","b"] "body" "lowered" ["metadata"],
@@ -1644,7 +1726,12 @@ module MLF.Tests.SharedFrontend where {
           prepared ["a"] "body" "lowered" ["meta","data"],
           prepared ["a"] "body" "lowered" ["meta4:data"],
           prepared ["a"] ("λ" ++ stringFromCode 0 ++ stringFromCode 128512) "lowered" ["metadata"],
-          finishBase,finished "h" "g" [(,) "a" "d"],finished "g" "h" [(,) "d" "a"]] };
+          finishBase,finished "h" "g" [(,) "a" "d"],finished "g" "h" [(,) "d" "a"],
+          inventory [],inventory [""],inventory ["a","bc"],inventory ["ab","c"],
+          inventory ["bc","a"],inventory ["λ" ++ stringFromCode 0 ++ stringFromCode 128512],
+          scope [] [],scope ["a"] [],scope ["a"] [(,) "k" "h"],
+          scope ["a"] [(,) "k" "changed"],scope ["b"] [(,) "k" "h"],
+          scope ["a"] [(,) "k" "h",(,) "j" "i"],scope ["a"] [(,) "j" "i",(,) "k" "h"]] };
     hashes <- mapM (\value -> CrateGraph.hashRebuiltValue value >>= recursiveRight "rebuilt hash") variants;
     check "rebuilt hashes retain domains, list boundaries, order and Unicode"
       (length (nubBy eqString hashes) == length variants);
@@ -1656,6 +1743,25 @@ module MLF.Tests.SharedFrontend where {
     expected <- QueryGraph.hashValue ordinary >>= recursiveRight "ordinary hash";
     actual <- CrateGraph.hashRebuiltValue ordinary >>= recursiveRight "fallback hash";
     check "unknown rebuilt shape retains ordinary encoding" (eqString expected actual);
+    let { unknownScope = Wire.VNode 422 [Wire.VBits 1] };
+    scopeExpected <- QueryGraph.hashValue unknownScope >>= recursiveRight "ordinary scope shape";
+    scopeActual <- CrateGraph.hashRebuiltValue unknownScope >>= recursiveRight "fallback scope shape";
+    check "non-text scope shape retains ordinary encoding" (eqString scopeExpected scopeActual);
+    first <- CrateGraph.hashRebuiltCached Nothing (scope ["a"] [(,) "k" "h"])
+      >>= recursiveRight "initial scope hash";
+    repeated <- CrateGraph.hashRebuiltCached (snd first) (scope ["a"] [(,) "k" "h"])
+      >>= recursiveRight "repeated scope hash";
+    check "exact scope reuses validated digest" (eqString (fst first) (fst repeated));
+    mapM_ (\value -> do {
+      fresh <- CrateGraph.hashRebuiltValue value >>= recursiveRight "changed scope fresh hash";
+      changed <- CrateGraph.hashRebuiltCached (snd repeated) value >>= recursiveRight "changed scope cached hash";
+      check "scope memo preserves changed metadata and dependency hashes"
+        (eqString fresh (fst changed) && not (eqString (fst repeated) (fst changed)))
+    }) [scope ["b"] [(,) "k" "h"],scope ["a"] [(,) "k" "new"],
+        scope ["a"] [],inventory ["a"],unknownScope];
+    invalidCached <- CrateGraph.hashRebuiltCached (snd repeated)
+      (Wire.VNode 423 [inventory ["a"],Wire.VNode 1 [Wire.VNode (-1) []]]);
+    check "scope memo still rejects invalid new wire value" (isLeft invalidCached);
     invalid <- CrateGraph.hashRebuiltValue (Wire.VNode (-1) []);
     check "rebuilt hash preserves wire admission rejection" (isLeft invalid)
   };
@@ -1664,6 +1770,7 @@ module MLF.Tests.SharedFrontend where {
     do {
       formatterChecks;
       monomorphicGroupChecks;
+      sourceCandidateChecks;
       rebuiltHashChecks;
       check "legacy malformed pragma comment"
         (isRight

@@ -31,8 +31,11 @@ nominal context needed by expressions, annotations, constructors and imported
 types. Candidate dictionary schemes are conservative dependencies because
 instance selection can depend on types still being inferred.
 
-Signed nonrecursive declarations with closed monomorphic types can use a partial
-type-directed checker. It checks exact argument and result types, preserves
+Nonrecursive declarations with closed monomorphic types can use a partial
+type-directed checker. Unsigned declarations may first synthesize a monotype
+when known calls determine every lambda parameter. Unconstrained parameters,
+unknown callees and local generalization use the ordinary solver; no default
+type is invented. It checks exact argument and result types, preserves
 resolved declaration identities, and obtains its fragment from the independent
 xMLF checker. Polymorphic imports, unsupported syntax and failed attempts use the
 ordinary lowering and graph solver. The general path retains inferred-type and
@@ -45,15 +48,30 @@ Imported binding and datatype input nodes are recorded when a query actually
 observes them. The initial imported contracts remain separate from local results:
 a missing local producer cannot be manufactured as an input. Observed versions,
 candidate dictionary dependencies and publication validation remain mandatory.
+After unsigned-root lowering, a root with no evidence slots needs no candidate
+inventory: finalization returns directly. Lowering still sees the complete
+definition scope, and actual references in its result remain binding/layout
+dependencies. A root with any evidence slot keeps all its candidates.
 Only inference and evidence results need persistent payload files. Scope,
 finish and binding values are reconstructed from current checked inputs; their
 content hashes and dependency edges still enter the authenticated generation.
-Prepared source inputs and finish receipts hash their complete, domain-separated
-length-framed text after the ordinary wire planner validates all resource bounds.
+Prepared source inputs, evidence scopes and finish receipts hash their complete,
+domain-separated length-framed text after the ordinary wire planner validates
+all resource bounds.
 They do not encode an unused binary payload. A conservative framing-size bound
 keeps the temporary UTF-8 allocation within the existing byte limit; other shapes
 or larger frames use the ordinary binary hash. Persisted payloads keep their
-canonical binary encoding and checksum checks.
+canonical binary encoding and checksum checks. The two scope-hash lanes each
+retain only their preceding validated wire value; exact structural equality
+reuses its digest and bounds check, while
+each query records its own key and dependency edges. Changed values receive the
+full checks before hashing.
+
+Open-fragment ownership uses a versioned length-framed crate identity and the
+complete sorted member names. These are wire strings rather than source-language
+identifiers, so they need no further decimal escaping. The reader verifies the
+full ownership set and still accepts the legacy owner encoding with its original
+checks. Ordinary separate-unit identifiers retain their existing encoding.
 
 A module import SCC does not require signatures. An actual recursive value
 SCC retains the compiler's existing requirement for closed signatures; this

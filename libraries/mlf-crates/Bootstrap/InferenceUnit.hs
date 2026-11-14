@@ -325,8 +325,8 @@ module Bootstrap.InferenceUnit where {
       Left _ -> finishOpenGroup externalTypes (map snd members) lowered
     }
   };
-  -- Signed nonrecursive monotypes need checking, not generalization. This
-  -- deliberately partial elaborator accepts only exact monomorphic uses and
+  -- Closed nonrecursive monotypes need no generalization. This deliberately
+  -- partial elaborator accepts only exact monomorphic uses and
   -- still obtains the opaque fragment proof from the independent xMLF checker.
   -- Unsupported syntax/types and all failed checks take the ordinary path.
   monomorphicType :: SType -> Either String XType;
@@ -347,8 +347,7 @@ module Bootstrap.InferenceUnit where {
     _ -> False
   };
   monomorphicIndexed parameters members lowered = case (,) members lowered of {
-    (,) [(,) identity ((,,) name (Just annotation) _)] ((,) (SProgram declarations expression) _) -> do {
-      expected <- monomorphicAnnotation annotation;
+    (,) [(,) identity ((,,) name annotation _)] ((,) (SProgram declarations expression) _) -> do {
       ensure (all (\((,,) _ _ ty) -> monomorphicTarget ty) parameters)
         "polymorphic import requires ordinary adaptation";
       let { entries = zip parameters (range 0 (length parameters - 1));
@@ -369,6 +368,12 @@ module Bootstrap.InferenceUnit where {
         };
         _ -> Left "not a single nonrecursive binding"
       };
+      expected <- case annotation of {
+        Just written -> monomorphicAnnotation written;
+        Nothing -> mapEither fst (monoSynthesize
+          (M.map (\binding -> MonoType (snd binding)) globals)
+          (M.map (\binding -> MonoType (snd binding)) names) (MonoState 0 M.empty) rhs)
+      };
       result <- monomorphicCheck globals names (length parameters + 1) expected rhs;
       env <- Open.environment declarations;
       fragment <- Open.check env ps
@@ -379,7 +384,91 @@ module Bootstrap.InferenceUnit where {
       }) "monomorphic fragment export mismatch";
       Right fragment
     };
-    _ -> Left "not a signed nonrecursive monotype"
+    _ -> Left "not a single nonrecursive monotype"
+  };
+  -- A small synthesis pass discovers only fully determined monotypes. Holes
+  -- are lambda parameters, filled solely by a known closed argument type.
+  -- There is no defaulting, polymorphic instantiation or local generalization;
+  -- an unconstrained parameter or unknown callee falls back to the solver.
+  -- The resulting type is only a proposal for the ordinary monotype checker
+  -- above; no temporary hole can enter an xMLF term or checked fragment.
+  data MonoBinding = MonoType XType | MonoParameter Int;
+  data MonoState = MonoState Int (Map Int XType);
+  monoResolve :: MonoState -> Maybe MonoBinding -> Either String XType;
+  monoResolve state binding = case binding of {
+    Nothing -> Left "unknown monomorphic variable";
+    Just (MonoType ty) -> Right ty;
+    Just (MonoParameter i) -> case state of { MonoState _ known ->
+      case M.lookup compareInt i known of {
+        Nothing -> Left "monomorphic parameter is not determined";
+        Just ty -> Right ty
+      }
+    }
+  };
+  monoDemand :: MonoState -> XType -> Maybe MonoBinding -> Either String MonoState;
+  monoDemand state expected binding = case (,) state binding of {
+    (,) (MonoState next known) (Just (MonoParameter i)) -> case M.lookup compareInt i known of {
+      Nothing -> do {
+        ensure (monomorphicTarget expected) "monomorphic demand is not closed";
+        Right (MonoState next (M.insert compareInt i expected known))
+      };
+      Just ty -> do { ensure (T.alphaEq ty expected) "conflicting monomorphic parameter uses"; Right state }
+    };
+    _ -> do { ty <- monoResolve state binding; ensure (T.alphaEq ty expected) "monomorphic use mismatch"; Right state }
+  };
+  monoSynthesize :: Map Int MonoBinding -> Map String MonoBinding -> MonoState -> SExpr ->
+    Either String ((,) XType MonoState);
+  monoSynthesize globals names state expression = case expression of {
+    SDeclScope [identity] (SLam name annotation body) -> monoLambda globals names state (Just identity) name annotation body;
+    SLam name annotation body -> monoLambda globals names state Nothing name annotation body;
+    SVar name -> mapEither (\ty -> (,) ty state) (monoResolve state (M.lookup compareString name names));
+    SGlobal identity _ -> mapEither (\ty -> (,) ty state) (monoResolve state (M.lookup compareInt (V.toInt identity) globals));
+    SApp function argument -> do {
+      (,) functionType next <- monoSynthesize globals names state function;
+      case functionType of {
+        XArrow domain result -> mapEither ((,) result) (monoCheck globals names next domain argument);
+        _ -> Left "monomorphic application requires known arrow"
+      }
+    };
+    SSignature body annotation -> monoAnnotated globals names state body annotation;
+    SAnn body annotation -> monoAnnotated globals names state body annotation;
+    SChecked ty body -> monoAnnotated globals names state body (SAnnotation [] ty);
+    -- The existing exact inference cases cover literals and monomorphic
+    -- primitives. Empty environments cannot synthesize any additional binding.
+    _ -> mapEither (\((,,) _ ty _) -> (,) ty state) (monomorphicInfer M.empty M.empty 0 expression)
+  };
+  monoCheck globals names state expected expression = case expression of {
+    SVar name -> monoDemand state expected (M.lookup compareString name names);
+    SGlobal identity _ -> monoDemand state expected (M.lookup compareInt (V.toInt identity) globals);
+    _ -> do {
+      (,) actual next <- monoSynthesize globals names state expression;
+      ensure (T.alphaEq actual expected) "monomorphic argument mismatch";
+      Right next
+    }
+  };
+  monoAnnotated globals names state body annotation = do {
+    expected <- monomorphicAnnotation annotation;
+    next <- monoCheck globals names state expected body;
+    Right ((,) expected next)
+  };
+  monoLambda globals names state identity name annotation body = case state of {
+    MonoState serial known -> do {
+      binding <- case annotation of {
+        Just written -> mapEither MonoType (monomorphicAnnotation written);
+        Nothing -> Right (MonoParameter serial)
+      };
+      scope <- case identity of {
+        Nothing -> Right globals;
+        Just i -> do {
+          ensure (not (M.member compareInt (V.toInt i) globals)) "monomorphic parameter identity already bound";
+          Right (M.insert compareInt (V.toInt i) binding globals)
+        }
+      };
+      (,) result next <- monoSynthesize scope (M.insert compareString name binding names)
+        (MonoState (advanceIdentity serial 1) known) body;
+      argument <- monoResolve next (Just binding);
+      Right ((,) (XArrow argument result) next)
+    }
   };
   monomorphicCheck globals names serial expected expression = case expression of {
     SDeclScope [identity] (SLam name annotation body) ->

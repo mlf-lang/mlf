@@ -3938,7 +3938,7 @@ module Bootstrap.CrateArtifact where {
             (\((,) n ty) -> (,) (X.nameHint n) ty) (Open.bindings fragment)) (Open.packageFragments package) };
           mapM_ (\((,) owner fragment) -> let {
             keys = sortStrings (map (compose X.nameHint fst) (Open.bindings fragment))
-          } in ensure (not (null keys) && eqString owner (Separate.queryGroupName (crateId iface) keys))
+          } in ensure (openGroupOwnerMatches (crateId iface) keys owner)
             "open crate fragment owner mismatch") (Open.packageFragments package);
           uniqueNames "open crate binding" (map fst actual);
           ensure (eqList Separate.sameSignature actual (crateBindings iface)) "open crate ownership/type inventory mismatch";
@@ -3947,6 +3947,9 @@ module Bootstrap.CrateArtifact where {
       }
     }
   };
+  openGroupOwnerMatches crate keys owner = not (null keys) &&
+    (eqString owner (Separate.openGroupName crate keys) ||
+     eqString owner (Separate.queryGroupName crate (sortStrings keys)));
   -- Object files name declarations by stable, crate-qualified identities. Only
   -- this link owns the slots below. Never reuse a producer's resolver slot.
   data OpenUnit = OpenUnit;

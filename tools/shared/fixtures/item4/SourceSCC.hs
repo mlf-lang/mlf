@@ -66,12 +66,19 @@ evaluate term=do
  (env,_)<-expect"runtime prepare"(R.prepare False term)
  v<-expect"runtime"(R.evaluate env(R.REnv M.empty)(X.erase term))
  case v of R.RInteger n->pure n;_->error"not integer"
-closed ds values parameters rhs=
+closed ds values parameters rhs=do
+ -- Inlining a predecessor body also imports its private datatype context.
+ -- A consumer's own interface only describes its direct syntax/types.
+ let dependencyData n=case vb(lookupValue values(X.nameHint n)) of
+      T.XWithData declarations _->declarations
+      _->[]
+ allData<-foldM (\acc declaration->expect "linked dependency datatype context"
+   (U.mergeDeclaration acc declaration)) ds (concatMap (dependencyData . fst) parameters)
  let ids=foldl(\acc(n,t)->U.typeIdentities t(IS.insert(X.nameId n)acc))(U.termIdentities rhs IS.empty)parameters
      start=1+maximum(0:IS.toList ids)
      step(serial,bindings)(n,_)=let(next,term)=U.freshObject serial(strip(vb(lookupValue values(X.nameHint n))))in(next,bindings++[(n,term)])
      (_,bindings)=foldl step(start,[])parameters
- in T.XWithData ds(foldr(\(n,term)b->T.XLet n term b)rhs bindings)
+ pure(T.XWithData allData(foldr(\(n,term)b->T.XLet n term b)rhs bindings))
 -- Read the actual default binary raw record. The compact key has no user
 -- context field. Verify its carrier, then use normal checked-record admission.
 decodeRawSourceCache keys cache digest final=do
@@ -113,7 +120,7 @@ main=do
  let members=[(n,T.Nothing,e)|(n,e,_,_)<-roots,n/= "signedUse"]
  planMaybe<-expect "source dispatcher plan" (SI.prepareSourcePlan M.empty [] [cls] [("tagInt",instInt),("tagBool",instBool)] scopes [IS.fromList[0,1],IS.fromList[0,1]] members)
  rawPlan<-case planMaybe of T.Just p->pure p;_->error "unexpected whole fallback"
- let plan=case rawPlan of SI.SourcePlan a b c d e f g _ i j -> SI.SourcePlan a b c d e f g (error "POISON old global lowering forced") i j
+ let plan=case rawPlan of SI.SourcePlan a b c d e _ g h -> SI.SourcePlan a b c d e (error "POISON old global lowering forced") g h
  (objects,cold,contracts)<-Q.compileSourceGroups "dispatch" (B.literal cache) [] M.empty plan >>= expect "cold source SCC compilation"
  assert "cold inferred all groups" (Q.inferredCount cold==fromIntegral(length(SI.planGroups plan))&&Q.reusedCount cold==0)
  keys<-sourceKeys "dispatch" plan [] M.empty contracts
@@ -156,7 +163,8 @@ collect values object=do
  let (ds,term)=case U.objectTerm object of { T.XWithData ds b->(ds,b);b->([],b) }
      (parameters,core)=U.splitParameters term
  new<-mapM (\(name,ty)->do
-   let(n,_)=findBinding name core;rhs=replaceTail core(T.XVarTerm n);linked=closed ds values parameters rhs
+   let(n,_)=findBinding name core;rhs=replaceTail core(T.XVarTerm n)
+   linked<-closed ds values parameters rhs
    checked<-expect "final fragment parameterized linking check"(Checked.check linked)
    pure(Value name(SI.SourceContract ty [] False)(Checked.term checked))) (U.unitBindings(U.objectInterface object))
  pure(values++new)

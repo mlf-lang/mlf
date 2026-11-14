@@ -117,6 +117,17 @@ module Bootstrap.CrateGraph where {
       Right (append ["MLF-FINISH-RECEIPT-TEXT-1",group,fragment,showInt (length contracts)]
         (concatMap (\((,) name digest) -> [name,digest]) contracts))
     };
+    W.VNode 422 inventory -> do {
+      fields <- traverseEither A.fromText inventory;
+      Right (append ["MLF-SCOPE-INVENTORY-TEXT-1",showInt (length fields)] fields)
+    };
+    W.VNode 423 [W.VNode 422 inventory, dependencies] -> do {
+      fields <- traverseEither A.fromText inventory;
+      reads <- A.fromList (A.fromPair A.fromText A.fromText) dependencies;
+      Right (append ["MLF-SCOPE-READS-TEXT-1",showInt (length fields)]
+        (append fields ((:) (showInt (length reads))
+          (concatMap (\((,) name digest) -> [name,digest]) reads))))
+    };
     _ -> Left "not a rebuilt text value"
   };
   framedSize limit total fields = case fields of {
@@ -145,6 +156,30 @@ module Bootstrap.CrateGraph where {
   recordRebuilt identity reads value session = do {
     hashed <- hashRebuiltValue value;
     ioReturn (mapEither (\digest -> G.recordDigest identity reads Nothing digest Nothing session) hashed)
+  };
+  -- Retain only the preceding validated value in each of the two scope lanes.
+  -- Structural equality is bounded by that admitted tree and allocates no
+  -- encoding of the new value before its bounds check. Query keys and read
+  -- edges are still recorded afresh; no inference or scope answer is reused.
+  data RebuiltHash = RebuiltHash W.Value String;
+  sameRebuiltText old value = case (,) old value of {
+    (,) (W.VText a) (W.VText b) -> eqString a b;
+    (,) (W.VNode a xs) (W.VNode b ys) -> a == b && eqList sameRebuiltText xs ys;
+    _ -> False
+  };
+  hashRebuiltCached previous value = case previous of {
+    Just (RebuiltHash old digest) -> if sameRebuiltText old value
+      then ioReturn (Right ((,) digest previous)) else hashRebuiltFresh value;
+    Nothing -> hashRebuiltFresh value
+  };
+  hashRebuiltFresh value = do {
+    hashed <- hashRebuiltValue value;
+    ioReturn (mapEither (\digest -> (,) digest (Just (RebuiltHash value digest))) hashed)
+  };
+  recordRebuiltCached previous identity reads value session = do {
+    hashed <- hashRebuiltCached previous value;
+    ioReturn (mapEither (\((,) digest cached) ->
+      (,) (G.recordDigest identity reads Nothing digest Nothing session) cached) hashed)
   };
   preparedInput slots prepared = recordRebuilt (G.inputKey (groupKey PreparedQuery slots)) []
     (preparedValue slots prepared);
@@ -228,11 +263,11 @@ module Bootstrap.CrateGraph where {
         case started of { Left e -> ioReturn (Left e); Right session -> do {
           let { initial = case contracts of { Source.CheckedContracts _ indexed _ -> indexed } };
           G.elapsed statistics 0 graphStarted;
-          runGroups verify (eqString auditSetting "1") crateId inventory initial groups
+          runGroups verify (eqString auditSetting "1") crateId inventory initial ((,) Nothing Nothing) groups
             (State session contracts M.empty [] 0 0 [] statistics)
         } }
     };
-  runGroups verify audit crateId inventory initial groups state = case groups of {
+  runGroups verify audit crateId inventory initial scopeHashes groups state = case groups of {
     [] -> ioReturn (Right state);
     (:) ((,) owners prepare) rest -> case state of {
       State session contracts contexts objects inferred reused reports statistics ->
@@ -242,7 +277,7 @@ module Bootstrap.CrateGraph where {
           Right ((,) slots prepared) -> do {
             let { declarations = Q.requiredDataIn inventory (Source.groupMembers prepared)
                     (append (Source.groupBindings prepared) (Source.groupCandidateBindings prepared));
-              group = Q.groupName crateId names;
+              group = Separate.openGroupName crateId names;
               rawKey = groupKey InferQuery slots };
             graphStarted <- G.clock statistics;
             source <- do {
@@ -251,8 +286,8 @@ module Bootstrap.CrateGraph where {
                 preparedInput slots prepared current }
             };
             case source of { Left e -> ioReturn (Left e); Right ((,) sourceNode first) -> do {
-              scopeInput <- input (groupKey ScopeInventoryQuery slots) (scopeInventory prepared) first;
-              case scopeInput of { Left e -> ioReturn (Left e); Right ((,) scopeLeaf second) ->
+              scopeInput <- recordRebuiltCached (fst scopeHashes) (G.inputKey (groupKey ScopeInventoryQuery slots)) [] (scopeInventory prepared) first;
+              case scopeInput of { Left e -> ioReturn (Left e); Right ((,) ((,) scopeLeaf second) inventoryHash) ->
                 case do {
                   candidateNodes <- requireBindings scope (Source.candidateIds slots) second;
                   bindingNodes <- requireBindings scope (Source.parameterIds slots) second;
@@ -261,10 +296,10 @@ module Bootstrap.CrateGraph where {
                 } of {
                   Left e -> ioReturn (Left e);
                   Right ((,,) candidateNodes bindingNodes dataNodes) -> do {
-                    scoped <- G.record (groupKey ScopeQuery slots)
-                      ((:) (G.edge scopeLeaf) (map G.edge candidateNodes)) False
+                    scoped <- recordRebuiltCached (snd scopeHashes) (groupKey ScopeQuery slots)
+                      ((:) (G.edge scopeLeaf) (map G.edge candidateNodes))
                       (scopeValue prepared candidateNodes) second;
-                    case scoped of { Left e -> ioReturn (Left e); Right ((,) scopeNode third) -> do {
+                    case scoped of { Left e -> ioReturn (Left e); Right ((,) ((,) scopeNode third) scopeHash) -> do {
                       let { dataIdentity = Separate.pack (map G.nodeHash dataNodes);
                         environment = case M.lookup compareString dataIdentity contexts of {
                           Just env -> Right env; Nothing -> Open.environment declarations } };
@@ -356,7 +391,7 @@ module Bootstrap.CrateGraph where {
                                   recordFinish slots group hash delta reads afterInputs };
                                 case supplied of { Left e -> ioReturn (Left e); Right next -> do {
                                     G.elapsed statistics 3 finishStarted;
-                                    runGroups verify audit crateId inventory initial rest
+                                    runGroups verify audit crateId inventory initial ((,) inventoryHash scopeHash) rest
                                       (State next (Source.publishContracts contracts delta) currentContexts
                                         ((:) ((,,) group final (map fst delta)) objects)
                                         (inferred + if hit then 0 else 1) (reused + if hit then 1 else 0)

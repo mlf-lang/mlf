@@ -29,6 +29,8 @@ def main():
     parser.add_argument('--build-receipt', required=True, type=Path)
     parser.add_argument('--builtin', required=True, type=Path, help='existing builtin prefix')
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--inferred', action='store_true',
+                        help='omit signatures on the independent consumer functions')
     args = parser.parse_args()
     receipt = args.build_receipt.resolve(strict=True)
     producer = receipt.parent
@@ -37,7 +39,7 @@ def main():
         parser.error('output must be separate from the producer')
     authenticate_build(receipt, producer / 'bin')
     output.mkdir(parents=True, exist_ok=False)
-    evidence = {'complete': False, 'producer_receipt': str(receipt),
+    evidence = {'complete': False, 'inferred_functions': args.inferred, 'producer_receipt': str(receipt),
                 'producer_sha256': sha(receipt), 'driver_sha256': sha(__file__),
                 'commands': [], 'checks': []}
 
@@ -68,8 +70,10 @@ def main():
                            'inc :: Int -> ' + result + '; inc x = ' + rhs + '; ' + spare + ' }\n')
 
     def write_main(offset=2):
+        f0 = '' if args.inferred else 'f0 :: Int -> Int; '
+        f1 = '' if args.inferred else 'f1 :: Int -> Int; '
         consumer.write_text(HEADER + 'module Main (main) where { import MLF.Primitive; import Lib; '
-            'f0 :: Int -> Int; f0 x = inc x; f1 :: Int -> Int; f1 x = addInt x ' + str(offset) + '; '
+            + f0 + 'f0 x = inc x; ' + f1 + 'f1 x = addInt x ' + str(offset) + '; '
             'main = printInt (addInt (f0 3) (f1 4)); }\n')
 
     def spec(module, source, dependencies, entry):
@@ -163,7 +167,7 @@ def main():
     Path(str(builtin) + '.mlfco').write_bytes(good_builtin)
     run('physical-builtin-restored', main_prefix, '12\n')
     consumer.write_text(HEADER + 'module Main (main) where { import MLF.Primitive; '
-        'equal :: Int -> Bool; equal x = x == 7; '
+        + ('' if args.inferred else 'equal :: Int -> Bool; ') + 'equal x = x == 7; '
         'main = ifThenElse (equal 7) (printInt 42) (printInt 0); }\n')
     compile('consumer-dictionary-dependency', main_spec, main_prefix)
     run('dictionary-dependency-value', main_prefix, '42\n')
